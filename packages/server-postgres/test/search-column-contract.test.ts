@@ -13,7 +13,12 @@
  * in one place "just for this case".
  */
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
-import { generatePostgresDdl, getSqlColumnType } from "../src/schema/generate-postgres-ddl-logic";
+import {
+    generatePostgresDdl,
+    generatePostgresSearchDdl,
+    searchExcludePatterns,
+    getSqlColumnType
+} from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
@@ -167,5 +172,136 @@ describe("a collection that has not opted in is untouched", () => {
         expect(kinds).not.toContain("create-function");
         expect(kinds).not.toContain("create-extension");
         expect(kinds).not.toContain("create-index");
+    });
+});
+
+describe("what Atlas is allowed to read", () => {
+    /**
+     * `schema.sql` is a desired-state file handed to Atlas, and Atlas's free
+     * tier refuses to parse one containing a function at all:
+     *
+     *   drizzle/schema.sql:6: functions and procedures are available to
+     *   logged-in users only. Use 'atlas login' to access this feature
+     *
+     * Emitting the search helpers there took `rebase db push` down for every
+     * project declaring a `search` block — the whole feature, not the helpers.
+     * They live in `search.sql` now and the CLI applies them first, to the
+     * target database and to the dev database Atlas diffs against.
+     *
+     * The table definition still has to reference them, so this is not "keep
+     * search out of the schema" — it is a split, and both halves are pinned.
+     */
+    it("keeps functions and extensions out of the Atlas desired state", async () => {
+        const ddl = await generatePostgresDdl([collection], {
+            includePolicies: false,
+            includeSearch: false
+        });
+        expect(ddl).not.toMatch(/CREATE\s+(OR\s+REPLACE\s+)?FUNCTION/i);
+        expect(ddl).not.toMatch(/CREATE\s+EXTENSION/i);
+    });
+
+    it("shows Atlas no trace of search at all — not the column, not the index", async () => {
+        const ddl = await generatePostgresDdl([collection], {
+            includePolicies: false,
+            includeSearch: false
+        });
+        // The column cannot come across on its own: its expression calls a
+        // helper, and Atlas materialises the schema it inspects in a dev
+        // database it has just emptied, so the helper is never there when the
+        // plan is analysed. Column, index and helpers move together.
+        expect(ddl).not.toContain("search_vector");
+        expect(ddl).not.toContain("rebase_search_text");
+        expect(ddl).not.toContain(spec.indexName);
+    });
+
+    it("puts the whole apparatus in the file the CLI applies", () => {
+        const sql = generatePostgresSearchDdl([collection]);
+        expect(sql).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION/i);
+        expect(sql).toContain("rebase_search_text");
+        expect(sql).toMatch(/CREATE\s+EXTENSION[^\n]*unaccent/i);
+        // Replayed against a live database on every push, so every statement
+        // must tolerate already being there.
+        for (const line of sql.split("\n").filter(l => /^CREATE /.test(l))) {
+            expect(line).toMatch(/IF NOT EXISTS|OR REPLACE/i);
+        }
+    });
+
+    it("writes nothing when no collection opted in", () => {
+        const noSearch: CollectionConfig[] = [{
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" } }
+        }];
+        expect(generatePostgresSearchDdl(noSearch)).toBe("");
+    });
+
+    it("declares every helper it calls, since nothing else will", () => {
+        const sql = generatePostgresSearchDdl([collection]);
+        // `search.sql` is applied on its own, against databases that have only
+        // ever been touched by Atlas. A helper referenced but not declared here
+        // has nowhere else to come from.
+        const called = new Set([...sql.matchAll(/(rebase_search_\w+)\s*\(/g)].map(m => m[1]));
+        expect(called.size).toBeGreaterThan(0);
+        for (const fn of called) {
+            expect(sql).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}`));
+        }
+    });
+
+    it("adds the column rather than defining it inline — the table already exists", () => {
+        const sql = generatePostgresSearchDdl([collection]);
+        expect(sql).toContain(`ALTER TABLE "public"."talents" ADD COLUMN IF NOT EXISTS "${spec.column}"`);
+        expect(sql).not.toContain("CREATE TABLE");
+    });
+});
+
+describe("searchExcludePatterns — what Atlas is told to keep its hands off", () => {
+    /**
+     * Atlas takes the schema from the pattern's first segment. A two-part
+     * `posts.search_vector` is read as a *table* `search_vector` in a *schema*
+     * `posts`, matches nothing, and — this is the part that costs the time —
+     * is not an error. The push then plans a `DROP COLUMN` for the search
+     * column it was supposed to protect, and the exclude that was meant to
+     * stop it reported nothing at all.
+     */
+    it("qualifies every pattern with the schema", () => {
+        for (const pattern of searchExcludePatterns([collection])) {
+            expect(pattern.split(".")).toHaveLength(3);
+            expect(pattern.startsWith("public.")).toBe(true);
+        }
+    });
+
+    it("covers the column and the index — both are absent from the desired state", () => {
+        const patterns = searchExcludePatterns([collection]);
+        expect(patterns).toContain(`public.talents.${spec.column}`);
+        expect(patterns).toContain(`public.talents.${spec.indexName}`);
+    });
+
+    it("names the fuzzy column and its index too, when one is configured", () => {
+        const fuzzy: PostgresCollectionConfig = {
+            ...collection,
+            search: { ...collection.search!, fuzzy: true }
+        };
+        const fuzzySpec = buildSearchColumnSpec(fuzzy)!;
+        const patterns = searchExcludePatterns([fuzzy]);
+        expect(fuzzySpec.fuzzy).toBeDefined();
+        expect(patterns).toContain(`public.talents.${fuzzySpec.fuzzy!.column}`);
+        expect(patterns).toContain(`public.talents.${fuzzySpec.fuzzy!.indexName}`);
+    });
+
+    it("is empty for a project that never opted in, so nothing changes for it", () => {
+        expect(searchExcludePatterns([{
+            slug: "posts", table: "posts", name: "Posts",
+            properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" } }
+        }])).toEqual([]);
+    });
+
+    it("excludes exactly the objects search.sql creates, and nothing else", () => {
+        // The two lists are built independently. If one grows an object the
+        // other does not know about, Atlas drops it on the next push.
+        const sql = generatePostgresSearchDdl([collection]);
+        for (const pattern of searchExcludePatterns([collection])) {
+            expect(sql).toContain(pattern.split(".")[2]);
+        }
     });
 });

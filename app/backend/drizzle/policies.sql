@@ -5,265 +5,265 @@ ALTER TABLE "public"."authors" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "authors_select_841c287" ON "public"."authors";
 CREATE POLICY "authors_select_841c287" ON "public"."authors" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "authors_insert_3561e70_0" ON "public"."authors";
-CREATE POLICY "authors_insert_3561e70_0" ON "public"."authors" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "authors_insert_3561e70_0" ON "public"."authors" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "authors_update_3561e70_1" ON "public"."authors";
-CREATE POLICY "authors_update_3561e70_1" ON "public"."authors" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "authors_update_3561e70_1" ON "public"."authors" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "authors_delete_3561e70_2" ON "public"."authors";
-CREATE POLICY "authors_delete_3561e70_2" ON "public"."authors" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "authors_delete_3561e70_2" ON "public"."authors" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "authors" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "authors_default_admin_read" ON "public"."authors";
-CREATE POLICY "authors_default_admin_read" ON "public"."authors" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "authors_default_admin_read" ON "public"."authors" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "authors" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "authors_default_admin_write_insert" ON "public"."authors";
-CREATE POLICY "authors_default_admin_write_insert" ON "public"."authors" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "authors_default_admin_write_insert" ON "public"."authors" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "authors_default_admin_write_update" ON "public"."authors";
-CREATE POLICY "authors_default_admin_write_update" ON "public"."authors" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "authors_default_admin_write_update" ON "public"."authors" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "authors_default_admin_write_delete" ON "public"."authors";
-CREATE POLICY "authors_default_admin_write_delete" ON "public"."authors" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "authors_default_admin_write_delete" ON "public"."authors" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."customers" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "customers_select_841c287" ON "public"."customers";
 CREATE POLICY "customers_select_841c287" ON "public"."customers" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "customers_insert_3561e70_0" ON "public"."customers";
-CREATE POLICY "customers_insert_3561e70_0" ON "public"."customers" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "customers_insert_3561e70_0" ON "public"."customers" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "customers_update_3561e70_1" ON "public"."customers";
-CREATE POLICY "customers_update_3561e70_1" ON "public"."customers" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "customers_update_3561e70_1" ON "public"."customers" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "customers_delete_3561e70_2" ON "public"."customers";
-CREATE POLICY "customers_delete_3561e70_2" ON "public"."customers" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "customers_delete_3561e70_2" ON "public"."customers" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "customers" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "customers_default_admin_read" ON "public"."customers";
-CREATE POLICY "customers_default_admin_read" ON "public"."customers" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "customers_default_admin_read" ON "public"."customers" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "customers" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "customers_default_admin_write_insert" ON "public"."customers";
-CREATE POLICY "customers_default_admin_write_insert" ON "public"."customers" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "customers_default_admin_write_insert" ON "public"."customers" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "customers_default_admin_write_update" ON "public"."customers";
-CREATE POLICY "customers_default_admin_write_update" ON "public"."customers" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "customers_default_admin_write_update" ON "public"."customers" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "customers_default_admin_write_delete" ON "public"."customers";
-CREATE POLICY "customers_default_admin_write_delete" ON "public"."customers" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "customers_default_admin_write_delete" ON "public"."customers" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."exercises" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "exercises_select_841c287" ON "public"."exercises";
 CREATE POLICY "exercises_select_841c287" ON "public"."exercises" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "exercises_insert_3561e70_0" ON "public"."exercises";
-CREATE POLICY "exercises_insert_3561e70_0" ON "public"."exercises" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "exercises_insert_3561e70_0" ON "public"."exercises" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "exercises_update_3561e70_1" ON "public"."exercises";
-CREATE POLICY "exercises_update_3561e70_1" ON "public"."exercises" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "exercises_update_3561e70_1" ON "public"."exercises" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "exercises_delete_3561e70_2" ON "public"."exercises";
-CREATE POLICY "exercises_delete_3561e70_2" ON "public"."exercises" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "exercises_delete_3561e70_2" ON "public"."exercises" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "exercises" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "exercises_default_admin_read" ON "public"."exercises";
-CREATE POLICY "exercises_default_admin_read" ON "public"."exercises" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "exercises_default_admin_read" ON "public"."exercises" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "exercises" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "exercises_default_admin_write_insert" ON "public"."exercises";
-CREATE POLICY "exercises_default_admin_write_insert" ON "public"."exercises" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "exercises_default_admin_write_insert" ON "public"."exercises" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "exercises_default_admin_write_update" ON "public"."exercises";
-CREATE POLICY "exercises_default_admin_write_update" ON "public"."exercises" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "exercises_default_admin_write_update" ON "public"."exercises" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "exercises_default_admin_write_delete" ON "public"."exercises";
-CREATE POLICY "exercises_default_admin_write_delete" ON "public"."exercises" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "exercises_default_admin_write_delete" ON "public"."exercises" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."order_items" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "order_items_select_841c287" ON "public"."order_items";
 CREATE POLICY "order_items_select_841c287" ON "public"."order_items" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "order_items_insert_3561e70_0" ON "public"."order_items";
-CREATE POLICY "order_items_insert_3561e70_0" ON "public"."order_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "order_items_insert_3561e70_0" ON "public"."order_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "order_items_update_3561e70_1" ON "public"."order_items";
-CREATE POLICY "order_items_update_3561e70_1" ON "public"."order_items" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "order_items_update_3561e70_1" ON "public"."order_items" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "order_items_delete_3561e70_2" ON "public"."order_items";
-CREATE POLICY "order_items_delete_3561e70_2" ON "public"."order_items" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "order_items_delete_3561e70_2" ON "public"."order_items" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "order_items" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "order_items_default_admin_read" ON "public"."order_items";
-CREATE POLICY "order_items_default_admin_read" ON "public"."order_items" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "order_items_default_admin_read" ON "public"."order_items" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "order_items" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "order_items_default_admin_write_insert" ON "public"."order_items";
-CREATE POLICY "order_items_default_admin_write_insert" ON "public"."order_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "order_items_default_admin_write_insert" ON "public"."order_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "order_items_default_admin_write_update" ON "public"."order_items";
-CREATE POLICY "order_items_default_admin_write_update" ON "public"."order_items" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "order_items_default_admin_write_update" ON "public"."order_items" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "order_items_default_admin_write_delete" ON "public"."order_items";
-CREATE POLICY "order_items_default_admin_write_delete" ON "public"."order_items" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "order_items_default_admin_write_delete" ON "public"."order_items" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."orders" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "orders_select_841c287" ON "public"."orders";
 CREATE POLICY "orders_select_841c287" ON "public"."orders" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "orders_insert_3561e70_0" ON "public"."orders";
-CREATE POLICY "orders_insert_3561e70_0" ON "public"."orders" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "orders_insert_3561e70_0" ON "public"."orders" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "orders_update_3561e70_1" ON "public"."orders";
-CREATE POLICY "orders_update_3561e70_1" ON "public"."orders" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "orders_update_3561e70_1" ON "public"."orders" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "orders_delete_3561e70_2" ON "public"."orders";
-CREATE POLICY "orders_delete_3561e70_2" ON "public"."orders" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "orders_delete_3561e70_2" ON "public"."orders" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "orders" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "orders_default_admin_read" ON "public"."orders";
-CREATE POLICY "orders_default_admin_read" ON "public"."orders" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "orders_default_admin_read" ON "public"."orders" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "orders" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "orders_default_admin_write_insert" ON "public"."orders";
-CREATE POLICY "orders_default_admin_write_insert" ON "public"."orders" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "orders_default_admin_write_insert" ON "public"."orders" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "orders_default_admin_write_update" ON "public"."orders";
-CREATE POLICY "orders_default_admin_write_update" ON "public"."orders" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "orders_default_admin_write_update" ON "public"."orders" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "orders_default_admin_write_delete" ON "public"."orders";
-CREATE POLICY "orders_default_admin_write_delete" ON "public"."orders" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "orders_default_admin_write_delete" ON "public"."orders" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."posts" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "posts_select_841c287" ON "public"."posts";
 CREATE POLICY "posts_select_841c287" ON "public"."posts" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "posts_insert_3561e70_0" ON "public"."posts";
-CREATE POLICY "posts_insert_3561e70_0" ON "public"."posts" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "posts_insert_3561e70_0" ON "public"."posts" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "posts_update_3561e70_1" ON "public"."posts";
-CREATE POLICY "posts_update_3561e70_1" ON "public"."posts" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "posts_update_3561e70_1" ON "public"."posts" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "posts_delete_3561e70_2" ON "public"."posts";
-CREATE POLICY "posts_delete_3561e70_2" ON "public"."posts" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "posts_delete_3561e70_2" ON "public"."posts" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "posts" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "posts_default_admin_read" ON "public"."posts";
-CREATE POLICY "posts_default_admin_read" ON "public"."posts" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_default_admin_read" ON "public"."posts" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "posts" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "posts_default_admin_write_insert" ON "public"."posts";
-CREATE POLICY "posts_default_admin_write_insert" ON "public"."posts" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_default_admin_write_insert" ON "public"."posts" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_default_admin_write_update" ON "public"."posts";
-CREATE POLICY "posts_default_admin_write_update" ON "public"."posts" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_default_admin_write_update" ON "public"."posts" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_default_admin_write_delete" ON "public"."posts";
-CREATE POLICY "posts_default_admin_write_delete" ON "public"."posts" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_default_admin_write_delete" ON "public"."posts" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."product_locales" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "product_locales_select_841c287" ON "public"."product_locales";
 CREATE POLICY "product_locales_select_841c287" ON "public"."product_locales" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "product_locales_insert_3561e70_0" ON "public"."product_locales";
-CREATE POLICY "product_locales_insert_3561e70_0" ON "public"."product_locales" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "product_locales_insert_3561e70_0" ON "public"."product_locales" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "product_locales_update_3561e70_1" ON "public"."product_locales";
-CREATE POLICY "product_locales_update_3561e70_1" ON "public"."product_locales" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "product_locales_update_3561e70_1" ON "public"."product_locales" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "product_locales_delete_3561e70_2" ON "public"."product_locales";
-CREATE POLICY "product_locales_delete_3561e70_2" ON "public"."product_locales" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "product_locales_delete_3561e70_2" ON "public"."product_locales" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "product_locales" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "product_locales_default_admin_read" ON "public"."product_locales";
-CREATE POLICY "product_locales_default_admin_read" ON "public"."product_locales" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "product_locales_default_admin_read" ON "public"."product_locales" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "product_locales" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "product_locales_default_admin_write_insert" ON "public"."product_locales";
-CREATE POLICY "product_locales_default_admin_write_insert" ON "public"."product_locales" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "product_locales_default_admin_write_insert" ON "public"."product_locales" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "product_locales_default_admin_write_update" ON "public"."product_locales";
-CREATE POLICY "product_locales_default_admin_write_update" ON "public"."product_locales" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "product_locales_default_admin_write_update" ON "public"."product_locales" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "product_locales_default_admin_write_delete" ON "public"."product_locales";
-CREATE POLICY "product_locales_default_admin_write_delete" ON "public"."product_locales" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "product_locales_default_admin_write_delete" ON "public"."product_locales" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."products" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "products_select_841c287" ON "public"."products";
 CREATE POLICY "products_select_841c287" ON "public"."products" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "products_insert_3561e70_0" ON "public"."products";
-CREATE POLICY "products_insert_3561e70_0" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "products_insert_3561e70_0" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "products_update_3561e70_1" ON "public"."products";
-CREATE POLICY "products_update_3561e70_1" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "products_update_3561e70_1" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "products_delete_3561e70_2" ON "public"."products";
-CREATE POLICY "products_delete_3561e70_2" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "products_delete_3561e70_2" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "products" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "products_default_admin_read" ON "public"."products";
-CREATE POLICY "products_default_admin_read" ON "public"."products" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "products_default_admin_read" ON "public"."products" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "products" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "products_default_admin_write_insert" ON "public"."products";
-CREATE POLICY "products_default_admin_write_insert" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "products_default_admin_write_insert" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "products_default_admin_write_update" ON "public"."products";
-CREATE POLICY "products_default_admin_write_update" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "products_default_admin_write_update" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "products_default_admin_write_delete" ON "public"."products";
-CREATE POLICY "products_default_admin_write_delete" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "products_default_admin_write_delete" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."tags" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "tags_select_841c287" ON "public"."tags";
 CREATE POLICY "tags_select_841c287" ON "public"."tags" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "tags_insert_3561e70_0" ON "public"."tags";
-CREATE POLICY "tags_insert_3561e70_0" ON "public"."tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tags_insert_3561e70_0" ON "public"."tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "tags_update_3561e70_1" ON "public"."tags";
-CREATE POLICY "tags_update_3561e70_1" ON "public"."tags" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tags_update_3561e70_1" ON "public"."tags" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "tags_delete_3561e70_2" ON "public"."tags";
-CREATE POLICY "tags_delete_3561e70_2" ON "public"."tags" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tags_delete_3561e70_2" ON "public"."tags" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "tags" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "tags_default_admin_read" ON "public"."tags";
-CREATE POLICY "tags_default_admin_read" ON "public"."tags" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tags_default_admin_read" ON "public"."tags" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "tags" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "tags_default_admin_write_insert" ON "public"."tags";
-CREATE POLICY "tags_default_admin_write_insert" ON "public"."tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tags_default_admin_write_insert" ON "public"."tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "tags_default_admin_write_update" ON "public"."tags";
-CREATE POLICY "tags_default_admin_write_update" ON "public"."tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tags_default_admin_write_update" ON "public"."tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "tags_default_admin_write_delete" ON "public"."tags";
-CREATE POLICY "tags_default_admin_write_delete" ON "public"."tags" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tags_default_admin_write_delete" ON "public"."tags" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."tickets" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "tickets_select_841c287" ON "public"."tickets";
 CREATE POLICY "tickets_select_841c287" ON "public"."tickets" AS PERMISSIVE FOR SELECT TO "public" USING (true);
 DROP POLICY IF EXISTS "tickets_insert_3561e70_0" ON "public"."tickets";
-CREATE POLICY "tickets_insert_3561e70_0" ON "public"."tickets" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tickets_insert_3561e70_0" ON "public"."tickets" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "tickets_update_3561e70_1" ON "public"."tickets";
-CREATE POLICY "tickets_update_3561e70_1" ON "public"."tickets" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tickets_update_3561e70_1" ON "public"."tickets" AS PERMISSIVE FOR UPDATE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']) WITH CHECK (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 DROP POLICY IF EXISTS "tickets_delete_3561e70_2" ON "public"."tickets";
-CREATE POLICY "tickets_delete_3561e70_2" ON "public"."tickets" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(auth.roles(), ',') && ARRAY['admin']);
+CREATE POLICY "tickets_delete_3561e70_2" ON "public"."tickets" AS PERMISSIVE FOR DELETE TO "public" USING (string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "tickets" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "tickets_default_admin_read" ON "public"."tickets";
-CREATE POLICY "tickets_default_admin_read" ON "public"."tickets" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tickets_default_admin_read" ON "public"."tickets" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "tickets" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "tickets_default_admin_write_insert" ON "public"."tickets";
-CREATE POLICY "tickets_default_admin_write_insert" ON "public"."tickets" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tickets_default_admin_write_insert" ON "public"."tickets" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "tickets_default_admin_write_update" ON "public"."tickets";
-CREATE POLICY "tickets_default_admin_write_update" ON "public"."tickets" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tickets_default_admin_write_update" ON "public"."tickets" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "tickets_default_admin_write_delete" ON "public"."tickets";
-CREATE POLICY "tickets_default_admin_write_delete" ON "public"."tickets" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "tickets_default_admin_write_delete" ON "public"."tickets" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "rebase"."users" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "users_read_policy" ON "rebase"."users";
-CREATE POLICY "users_read_policy" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR ((id)::text = auth.uid()) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_read_policy" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR ((id)::text = rebase.uid()) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_write_policy_insert" ON "rebase"."users";
-CREATE POLICY "users_write_policy_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_write_policy_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_write_policy_update" ON "rebase"."users";
-CREATE POLICY "users_write_policy_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_write_policy_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_write_policy_delete" ON "rebase"."users";
-CREATE POLICY "users_write_policy_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_write_policy_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "users_default_admin_read" ON "rebase"."users";
-CREATE POLICY "users_default_admin_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_default_admin_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "users_default_admin_write_insert" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_default_admin_write_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_default_admin_write_update" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_default_admin_write_update" ON "rebase"."users" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_default_admin_write_delete" ON "rebase"."users";
-CREATE POLICY "users_default_admin_write_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_default_admin_write_delete" ON "rebase"."users" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "users_default_self_read" ON "rebase"."users";
-CREATE POLICY "users_default_self_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((id)::text = auth.uid());
+CREATE POLICY "users_default_self_read" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((id)::text = rebase.uid());
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "users" to drop these and own its RLS outright.
 DROP POLICY IF EXISTS "users_require_admin_write_insert" ON "rebase"."users";
-CREATE POLICY "users_require_admin_write_insert" ON "rebase"."users" AS RESTRICTIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_require_admin_write_insert" ON "rebase"."users" AS RESTRICTIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_require_admin_write_update" ON "rebase"."users";
-CREATE POLICY "users_require_admin_write_update" ON "rebase"."users" AS RESTRICTIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_require_admin_write_update" ON "rebase"."users" AS RESTRICTIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_require_admin_write_delete" ON "rebase"."users";
-CREATE POLICY "users_require_admin_write_delete" ON "rebase"."users" AS RESTRICTIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_require_admin_write_delete" ON "rebase"."users" AS RESTRICTIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 
 ALTER TABLE "public"."posts_tags" ENABLE ROW LEVEL SECURITY;
 
@@ -272,19 +272,19 @@ ALTER TABLE "public"."posts_tags" ENABLE ROW LEVEL SECURITY;
 -- rules of "posts", "tags". Set `disableDefaultPolicies: true` on the
 -- declaring collection(s) to drop these and police the junction yourself.
 DROP POLICY IF EXISTS "posts_tags_default_admin_read" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_admin_read" ON "public"."posts_tags" AS PERMISSIVE FOR SELECT TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_tags_default_admin_read" ON "public"."posts_tags" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_tags_default_admin_write_insert" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_admin_write_insert" ON "public"."posts_tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_tags_default_admin_write_insert" ON "public"."posts_tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_tags_default_admin_write_update" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_admin_write_update" ON "public"."posts_tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])) WITH CHECK ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_tags_default_admin_write_update" ON "public"."posts_tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_tags_default_admin_write_delete" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_admin_write_delete" ON "public"."posts_tags" AS PERMISSIVE FOR DELETE TO "public" USING ((auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "posts_tags_default_admin_write_delete" ON "public"."posts_tags" AS PERMISSIVE FOR DELETE TO "public" USING ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "posts_tags_default_edge_read" ON "public"."posts_tags";
 CREATE POLICY "posts_tags_default_edge_read" ON "public"."posts_tags" AS PERMISSIVE FOR SELECT TO "public" USING ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE "_ex0".id = "public"."posts_tags".post_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."posts_tags".tag_id)));
 DROP POLICY IF EXISTS "posts_tags_default_edge_write_insert" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_edge_write_insert" ON "public"."posts_tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))));
+CREATE POLICY "posts_tags_default_edge_write_insert" ON "public"."posts_tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))));
 DROP POLICY IF EXISTS "posts_tags_default_edge_write_update" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_edge_write_update" ON "public"."posts_tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin']))))) WITH CHECK ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))));
+CREATE POLICY "posts_tags_default_edge_write_update" ON "public"."posts_tags" AS PERMISSIVE FOR UPDATE TO "public" USING ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin']))))) WITH CHECK ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))));
 DROP POLICY IF EXISTS "posts_tags_default_edge_write_delete" ON "public"."posts_tags";
-CREATE POLICY "posts_tags_default_edge_write_delete" ON "public"."posts_tags" AS PERMISSIVE FOR DELETE TO "public" USING ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))));
+CREATE POLICY "posts_tags_default_edge_write_delete" ON "public"."posts_tags" AS PERMISSIVE FOR DELETE TO "public" USING ((EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(rebase.roles(), ',') && ARRAY['admin'])))));
 

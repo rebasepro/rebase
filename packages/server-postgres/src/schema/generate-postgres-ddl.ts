@@ -3,7 +3,11 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chokidar from "chokidar";
-import { generatePostgresDdl, generatePostgresPoliciesDdl } from "./generate-postgres-ddl-logic";
+import {
+    generatePostgresDdl,
+    generatePostgresPoliciesDdl,
+    generatePostgresSearchDdl
+} from "./generate-postgres-ddl-logic";
 import { CollectionConfig } from "@rebasepro/types";
 import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
 
@@ -29,8 +33,16 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         // Sort collections by slug alphabetically to ensure deterministic DDL generation
         collections.sort((a, b) => a.slug.localeCompare(b.slug));
 
-        const ddlContent = await generatePostgresDdl(collections, { includePolicies: false });
+        // `schema.sql` is Atlas's desired state, and it carries neither the RLS
+        // policies nor the search apparatus: Atlas manages neither, and in the
+        // search case cannot. Both are written beside it and applied by the CLI
+        // in their own right.
+        const ddlContent = await generatePostgresDdl(collections, {
+            includePolicies: false,
+            includeSearch: false
+        });
         const policiesContent = generatePostgresPoliciesDdl(collections);
+        const searchContent = generatePostgresSearchDdl(collections);
 
         if (outputPath) {
             const outputDir = path.dirname(outputPath);
@@ -41,6 +53,17 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             const policiesPath = path.join(outputDir, "policies.sql");
             await fsPromises.writeFile(policiesPath, policiesContent);
             logger.info(`✅ PostgreSQL Policies DDL generated successfully at ${policiesPath}`);
+
+            // Removed when the last `search` block goes: the CLI applies this
+            // file whenever it exists, and a stale one would keep re-creating
+            // functions for collections that no longer want them.
+            const searchPath = path.join(outputDir, "search.sql");
+            if (searchContent) {
+                await fsPromises.writeFile(searchPath, searchContent);
+                logger.info(`✅ PostgreSQL search DDL generated successfully at ${searchPath}`);
+            } else if (fs.existsSync(searchPath)) {
+                await fsPromises.rm(searchPath);
+            }
         } else {
             logger.info("✅ PostgreSQL DDL generated successfully.");
             logger.info(String(ddlContent));

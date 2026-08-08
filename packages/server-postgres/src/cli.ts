@@ -12,6 +12,10 @@ import {
     getTableIncludes,
     getDevDatabaseUrl,
     ensureDevDatabaseExists,
+    applySearchDdl,
+    getSearchExcludes,
+    readSearchDdl,
+    seedDevDatabaseSearchHelpers,
     getTableExcludes,
     ExcludeIntrospectionError,
     promptConfirm
@@ -70,6 +74,13 @@ export async function runPluginCommand(args: string[]) {
     }
 }
 
+/** The migration files on disk, sorted, or none if the directory is absent. */
+function listMigrationFiles(): string[] {
+    const dir = path.resolve(process.cwd(), "drizzle", "migrations");
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
+}
+
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
@@ -116,7 +127,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         logger.info(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
         logger.info("");
         const migrationName = argsList._[0] || "migration";
+        const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"], collectionsPath);
+        const wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
         
         // Post-process the newest migration file
         try {
@@ -137,6 +150,33 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
                         "CREATE SCHEMA IF NOT EXISTS $1;"
                     );
+                    // Atlas never writes the search objects into a migration —
+                    // it is not shown them — so a migration replayed against a
+                    // fresh database would build every table except the part
+                    // that makes search work. Appending, because these are
+                    // `ALTER TABLE ... ADD COLUMN` over the tables the
+                    // migration just created.
+                    //
+                    // Only into a migration Atlas just wrote. The file picked
+                    // here is simply the newest one, which when there was no
+                    // diff is a migration that has already run in production:
+                    // editing it changes a hash Atlas has recorded, and the
+                    // appended SQL would never be applied anywhere.
+                    const searchContent = readSearchDdl();
+                    if (searchContent && wroteNewMigration) {
+                        migrationContent = `${migrationContent}\n\n${searchContent}`;
+                        logger.info(chalk.gray("  ✓ Appended search DDL to the migration"));
+                    } else if (searchContent) {
+                        // Reachable whenever a `search` block is the *only*
+                        // thing that changed: Atlas cannot see one, so it finds
+                        // nothing to diff and writes no file.
+                        logger.info(chalk.gray(
+                            "  ℹ Search DDL not written to a migration — this change produced none.\n" +
+                            "    It is applied by `rebase db push`, and at boot by the schema ensure.\n" +
+                            "    For a migration-only deployment, add drizzle/search.sql to a migration by hand."
+                        ));
+                    }
+
                     fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
 
                     // Append RLS policies, preceded by the RLS bootstrap so the
@@ -234,6 +274,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             
             if (databaseUrl) {
                 await ensureAuthTables(databaseUrl, collectionsPath);
+                // After the tables exist and before the policies: the search
+                // column is `ALTER TABLE ... ADD COLUMN`, and a policy may
+                // reference the table it is added to.
+                await applySearchDdl(databaseUrl);
                 await applyPolicies(databaseUrl);
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
@@ -759,6 +803,9 @@ async function runAtlas(
 
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
     await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);
+    if (collectionsPath) {
+        await seedDevDatabaseSearchHelpers(devDatabaseUrl, collectionsPath);
+    }
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
     // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
@@ -782,6 +829,16 @@ async function runAtlas(
             if (args.includes("apply")) {
                 atlasArgs.push("--allow-dirty");
             }
+        }
+    }
+
+    // Search objects are Rebase's, not Atlas's — on both paths. `schema apply`
+    // would drop them as absent from the desired state; `migrate diff` would
+    // write that same drop into the next migration file, where it would sit
+    // waiting to be applied later.
+    if (collectionsPath && (args.includes("apply") || args.includes("diff"))) {
+        for (const exc of await getSearchExcludes(collectionsPath)) {
+            atlasArgs.push("--exclude", exc);
         }
     }
 

@@ -119,6 +119,19 @@ export async function getTableIncludesFromCollections(allCollections: Collection
 }
 
 export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
+    return getTableIncludesFromCollections(await loadCollectionsForCli(collectionsPath));
+}
+
+/**
+ * Load a project's collections the way the Atlas-facing commands need them.
+ *
+ * Deliberately forgiving — a file that fails to import is skipped rather than
+ * fatal — because the callers use this to *narrow* what Atlas may touch, and a
+ * hard failure here would block a push over an unrelated broken file. Callers
+ * that cannot tolerate a partial answer (the table excludes, which fail closed)
+ * check the result themselves.
+ */
+export async function loadCollectionsForCli(collectionsPath: string): Promise<CollectionConfig[]> {
     // Note: a relative --collections path resolves against the *current working
     // directory*, not the backend package. When invoked via the generated npm
     // script (cwd = backend/), the script uses "../config/collections" to
@@ -158,7 +171,7 @@ export async function getTableIncludes(collectionsPath: string): Promise<string[
         }
     }
 
-    return getTableIncludesFromCollections(collections);
+    return collections;
 }
 
 export function getDevDatabaseUrl(databaseUrl: string): string {
@@ -192,6 +205,99 @@ export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUr
         }
     } catch {
         // Ignore, let Atlas handle connection failures
+    }
+}
+
+/**
+ * The generated SQL for the project's `search` blocks, if it has any.
+ *
+ * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
+ *        under the working directory.
+ */
+export function readSearchDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
+    const searchFile = path.join(drizzleDir, "search.sql");
+    if (!fs.existsSync(searchFile)) return "";
+    return fs.readFileSync(searchFile, "utf-8").trim();
+}
+
+/**
+ * Bring the search column, its index and their helpers up to date.
+ *
+ * Runs *after* Atlas, not before: the statements are `ALTER TABLE ... ADD
+ * COLUMN`, so the table has to exist. Atlas is told to ignore these objects
+ * entirely (`getSearchExcludes`) — it cannot manage them, and left to itself it
+ * would plan a `DROP COLUMN` for every one, since they are absent from the
+ * desired state it was given.
+ *
+ * A no-op when no collection declared `search`. A failure is *not* swallowed:
+ * silently pushing a schema whose search column never appeared is how a
+ * collection ends up with search configured, no error anywhere, and no results.
+ */
+export async function applySearchDdl(
+    databaseUrl: string,
+    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+): Promise<void> {
+    const sql = readSearchDdl(drizzleDir);
+    if (!sql) return;
+
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        await client.query(sql);
+    } finally {
+        await client.end();
+    }
+    logger.info(chalk.gray("  ✓ Applied full-text search columns and indexes"));
+}
+
+/**
+ * Glob patterns keeping Atlas away from the search objects.
+ *
+ * Returns an empty list — and so changes nothing — for a project with no
+ * `search` block, which is every project that has not opted in.
+ */
+export async function getSearchExcludes(collectionsPath: string): Promise<string[]> {
+    const { searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    return searchExcludePatterns(await loadCollectionsForCli(collectionsPath));
+}
+
+/**
+ * Give the dev database the search helper functions before Atlas plans.
+ *
+ * Excluding the search column keeps Atlas from *diffing* it, but not from
+ * materialising the inspected schema — column and all — in the dev database to
+ * analyse the plan against. That replay is where a push against an
+ * already-searchable database died with `function public.rebase_search_text
+ * (jsonb) does not exist`: the column came across, the function it calls did
+ * not, because Atlas will not carry a function at all.
+ *
+ * Only the extensions and functions, never the tables: the dev database holds
+ * whatever Atlas puts there and nothing of ours.
+ *
+ * Best-effort by design. Failing here would block a push for a project whose
+ * collections merely failed to import, and if the functions really are needed
+ * and really are missing, Atlas says so a moment later in its own words.
+ */
+export async function seedDevDatabaseSearchHelpers(
+    devDatabaseUrl: string,
+    collectionsPath: string
+): Promise<void> {
+    try {
+        const { searchPrerequisiteStatements } = await import("./schema/generate-postgres-ddl-logic");
+        const statements = searchPrerequisiteStatements(await loadCollectionsForCli(collectionsPath));
+        if (statements.length === 0) return;
+
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: devDatabaseUrl });
+        await client.connect();
+        try {
+            await client.query(statements.join("\n"));
+        } finally {
+            await client.end();
+        }
+    } catch {
+        // See above: not worth failing a push over.
     }
 }
 

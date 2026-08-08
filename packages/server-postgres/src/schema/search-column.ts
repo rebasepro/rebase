@@ -439,11 +439,11 @@ export const fuzzyColumnDefinition = (spec: SearchColumnSpec): string | undefine
 /**
  * Index statements for the spec.
  *
- * `CONCURRENTLY` is deliberately *not* used here: this form runs inside the
- * same transaction as the `CREATE TABLE` that precedes it, where a concurrent
- * build is not allowed and not needed (the table is empty and unreachable).
- * The boot-time ensure path, which meets populated tables, uses the
- * concurrent form instead — see `ensureSearchColumns`.
+ * `CONCURRENTLY` is deliberately *not* used here. This form is emitted into a
+ * SQL file replayed as one unit — a migration, or `search.sql` — where a
+ * concurrent build is not allowed. The boot-time ensure path runs statement by
+ * statement against tables that are live and populated, and uses the
+ * concurrent form instead; see `ensureSearchColumns`.
  */
 export const searchIndexStatements = (spec: SearchColumnSpec): string[] => {
     const statements = [
@@ -459,6 +459,15 @@ export const searchIndexStatements = (spec: SearchColumnSpec): string[] => {
     }
     return statements;
 };
+
+/**
+ * The index names the spec creates.
+ *
+ * Needed by name, not just by statement, so Atlas can be told to exclude them
+ * from its diff — see `searchExcludePatterns`.
+ */
+export const searchIndexNames = (spec: SearchColumnSpec): string[] =>
+    spec.fuzzy ? [spec.indexName, spec.fuzzy.indexName] : [spec.indexName];
 
 // ── Keeping the generated columns out of responses ──────────────────────────
 
