@@ -1,11 +1,12 @@
 /**
  * `rebase cloud projects` — list / create / info / delete.
  */
-import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
+    parseCloudArgs,
+    requireProjectRef,
     resolveProjectRef,
     getContextOrg,
     readLink,
@@ -159,23 +160,32 @@ async function resolveRequestedTarget(
     return chosen;
 }
 
+/** The flags `rebase cloud projects create` takes. */
+export const CREATE_PROJECT_FLAGS = {
+    "--name": String,
+    "--subdomain": String,
+    "--repo": String,
+    "--branch": String,
+    "--provider": String,
+    "--region": String,
+    "--vm-size": String,
+    "--org": String,
+    "--link": Boolean,
+    "-n": "--name"
+} as const;
+
 export async function createProject(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--name": String,
-            "--subdomain": String,
-            "--repo": String,
-            "--branch": String,
-            "--provider": String,
-            "--region": String,
-            "--vm-size": String,
-            "--org": String,
-            "--link": Boolean,
-            "-n": "--name"
-        },
-        { argv: rawArgs.slice(4),
-permissive: true }
-    );
+    // Strict: every value here ends up in the project record, and the permissive
+    // parse dropped a mistyped one silently — `--subdomian shop` created a
+    // project on a generated subdomain, and a subdomain is not editable in
+    // passing afterwards.
+    const { flags: args } = parseCloudArgs({
+        spec: CREATE_PROJECT_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud projects create
+        command: "cloud projects create",
+        maxPositionals: 0
+    });
 
     const { client, url } = await requireClient(rawArgs);
     const org = args["--org"] || getContextOrg(url);
@@ -281,6 +291,32 @@ orgId: String(org) });
 
 /* ─── info ─────────────────────────────────────────────────────── */
 
+/**
+ * Which project `projects info` / `projects delete` acts on.
+ *
+ * The id is optional — omitted, it falls back to `--project` or the link file —
+ * and the dispatcher used to read it off `positionals()`, which skips only
+ * LEADING `-` tokens and declares only the global cloud flags. So an undeclared
+ * flag written after the action became the id: `rebase cloud projects delete
+ * --force` looked up a project named "--force" and reported it missing, rather
+ * than saying there is no such flag. Benign next to the deletes and writes the
+ * rest of this family aimed at the wrong resource, but the same mistake, and
+ * `positionals()` has no spec with which to do better — the handler's own
+ * module does.
+ *
+ * Exported so its tests drive the real parser rather than a copy of it.
+ */
+export function resolveProjectArg(rawArgs: string[], action: "info" | "delete"): string {
+    const { positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud projects <action>
+        command: `cloud projects ${action}`,
+        maxPositionals: 1
+    });
+    return positionals[0] || requireProjectRef(rawArgs);
+}
+
 export async function projectInfo(rawArgs: string[], projectRef: string): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     try {
@@ -317,9 +353,13 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
 /* ─── delete ───────────────────────────────────────────────────── */
 
 export async function deleteProject(rawArgs: string[], projectRef: string): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes" }, { argv: rawArgs.slice(2),
-permissive: true });
+    const { flags: args } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud projects delete
+        command: "cloud projects delete",
+        maxPositionals: 1 // [id]
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 

@@ -17,6 +17,7 @@ import {
     fetchTenantBaseDomain,
     projectHost,
     openUrl,
+    parseCloudArgs,
     success,
     fail,
     reportError
@@ -232,20 +233,54 @@ path: projectId });
 
 /* ─── webhooks ─────────────────────────────────────────────────── */
 
+/**
+ * The webhook `webhooks delete` names.
+ *
+ * The worst instance of the operand-filter bug in this family, because the
+ * argument is consumed by a DELETE and the wrong value looks entirely
+ * plausible: `rebase cloud webhooks delete --project acme 42` filtered out
+ * `--project` and kept "acme", so the id it deleted was the project slug rather
+ * than the 42 the caller wrote. Strict parsing consumes the flag with its
+ * value, leaving `["42"]`.
+ *
+ * Exported so its tests drive the real parser.
+ */
+export function resolveWebhookIdArg(rawArgs: string[]): string | undefined {
+    return parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud webhooks delete
+        command: "cloud webhooks delete",
+        maxPositionals: 1
+    }).positionals[0];
+}
+
 export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    // Both lines are parsed BEFORE the client is built. A line the parser will
+    // refuse is refused without first spending a login round-trip on it — and
+    // for `delete`, without the ambiguity of a refusal that arrives after the
+    // command has already started talking to the control plane.
+    const create = subcommand === "create"
+        ? parseCloudArgs({
+            spec: { "--name": String,
+"--table": String,
+"--url": String,
+"--events": String },
+            rawArgs,
+            commandWords: 3, // cloud webhooks create
+            command: "cloud webhooks create",
+            maxPositionals: 0
+        }).flags
+        : undefined;
+    const deleteId = subcommand === "delete" ? resolveWebhookIdArg(rawArgs) : undefined;
+    if (subcommand === "delete" && !deleteId) fail("Usage: rebase cloud webhooks delete <id>");
+
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
     try {
         if (subcommand === "create") {
-            const args = arg(
-                { "--name": String,
-"--table": String,
-"--url": String,
-"--events": String },
-                { argv: rawArgs.slice(4),
-permissive: true }
-            );
+            const args = create!;
             const name = args["--name"] || fail("--name is required.");
             const table = args["--table"] || fail("--table is required.");
             const url = args["--url"] || fail("--url (endpoint) is required.");
@@ -264,10 +299,8 @@ permissive: true }
         }
 
         if (subcommand === "delete") {
-            const id = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[2];
-            if (!id) fail("Usage: rebase cloud webhooks delete <id>");
-            await client.data.collection("webhooks").delete(id);
-            success(`Deleted webhook ${id}`);
+            await client.data.collection("webhooks").delete(deleteId!);
+            success(`Deleted webhook ${deleteId}`);
             return;
         }
 
@@ -364,6 +397,16 @@ export function printStorageHelp(): void {
 /* ─── storage create: platform-managed ─────────────────────────── */
 
 async function storageCreateCommand(rawArgs: string[]): Promise<void> {
+    // Takes no options of its own, and provisions billable infrastructure: an
+    // unrecognised flag here (`storage create --region eu`, borrowed from
+    // `attach`) provisioned in the default region and said nothing.
+    parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud storage create
+        command: "cloud storage create",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
@@ -398,8 +441,12 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
 /* ─── storage attach: bring your own ───────────────────────────── */
 
 async function storageAttachCommand(rawArgs: string[]): Promise<void> {
-    const parsed = arg(
-        {
+    // Strict: every value here is credentials or the bucket they open, and the
+    // permissive parse turned a mistyped `--acces-key-id` into the "missing
+    // --access-key-id" refusal below — the right refusal for the wrong reason,
+    // and one that says nothing about the flag that was actually wrong.
+    const { flags: parsed } = parseCloudArgs({
+        spec: {
             "--bucket": String,
             "--access-key-id": String,
             "--secret-access-key": String,
@@ -407,9 +454,11 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
             "--region": String,
             "--force-path-style": Boolean
         },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
+        rawArgs,
+        commandWords: 3, // cloud storage attach
+        command: "cloud storage attach",
+        maxPositionals: 0
+    });
 
     const bucket = parsed["--bucket"];
     const accessKeyId = parsed["--access-key-id"];
@@ -511,10 +560,18 @@ export async function clustersCommand(rawArgs: string[]): Promise<void> {
 /* ─── billing ──────────────────────────────────────────────────── */
 
 export async function billingCommand(rawArgs: string[]): Promise<void> {
+    // Parsed before the client is built: an unusable line should be refused
+    // without first spending a login round-trip on it.
+    const action = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud billing
+        command: "cloud billing",
+        maxPositionals: 1
+    }).positionals[0];
+
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
-
-    const action = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[1];
 
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).

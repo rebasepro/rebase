@@ -7,13 +7,12 @@
  * offers — and refuses to invoke — a rollback the server would reject, exactly
  * mirroring the console's `isRollbackable`.
  */
-import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
     requireProject,
     displayProjectRef,
-    cloudPositionals,
+    parseCloudArgs,
     emit,
     confirmDestructive,
     colorStatus,
@@ -170,14 +169,16 @@ export function parseDeploymentsLimit(raw: number | undefined): number {
 }
 
 export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--limit": Number,
-"--all": Boolean,
-"--project": String,
-"-p": "--project" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+    // `--limit` is validated below and a typo of it must not silently fall back
+    // to the default page — the refusal is the whole point of the bound.
+    const { flags: args } = parseCloudArgs({
+        spec: { "--limit": Number,
+"--all": Boolean },
+        rawArgs,
+        commandWords: 2, // cloud deployments
+        command: "cloud deployments list",
+        maxPositionals: 1 // the `list` action word, when written out
+    });
     const limit = args["--all"] ? MAX_DEPLOYMENTS_LIMIT : parseDeploymentsLimit(args["--limit"]);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -229,19 +230,34 @@ deployments: views }
     }
 }
 
+/**
+ * The deployment id `rollback`/`cancel` was given, if any.
+ *
+ * Both take an optional id, which is what made the old operand filter so easy
+ * to trip: `rebase cloud rollback -p acme` — the documented way to act on an
+ * unlinked project — read `--project`'s value as the id and refused with
+ * "Deployment acme not found", and `cancel -p acme` sent "acme" to the server
+ * as the deployment to cancel. Strict parsing consumes the flag with its value,
+ * so an id given as a flag value is never mistaken for an argument.
+ */
+export function resolveDeploymentIdArg(rawArgs: string[], command: string) {
+    const { flags, positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud <rollback|cancel>
+        command,
+        maxPositionals: 1
+    });
+    return { flags,
+id: positionals[0] };
+}
+
 export async function rollbackCommand(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // `rollback [deploymentId]` — the id, when given, is the only argument.
+    const { flags: args, id: explicitId } = resolveDeploymentIdArg(rawArgs, "cloud rollback");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-
-    // `rollback [deploymentId]` — the id, when given, is the first operand after
-    // the `rollback` group token.
-    const explicitId = cloudPositionals(rawArgs).slice(1)[0];
 
     // Fetch history — the only step here that can fail with a server error.
     let rows: DeploymentRow[];
@@ -321,16 +337,10 @@ client: "cli" }, { path: "rollback" });
 }
 
 export async function cancelCommand(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    const { flags: args, id: explicitId } = resolveDeploymentIdArg(rawArgs, "cloud cancel");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-
-    const explicitId = cloudPositionals(rawArgs).slice(1)[0];
 
     await confirmDestructive({
         yes: Boolean(args["--yes"]),

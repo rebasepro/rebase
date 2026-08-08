@@ -12,13 +12,12 @@
  * `pgvector` alias resolves to `vector`, and a 202 (`pending`) means the database
  * is restarting and the extension is not installed yet — re-drive later.
  */
-import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
     requireProject,
     displayProjectRef,
-    cloudPositionals,
+    parseCloudArgs,
     emit,
     confirmDestructive,
     keyValues,
@@ -137,17 +136,31 @@ extensions: res.extensions }
     }
 }
 
+/**
+ * The extension `enable`/`disable` names, plus the flags that gate it.
+ *
+ * Under the old operand filter `rebase cloud extensions enable -p acme` read
+ * `--project`'s value as the extension name and asked the server to install one
+ * called "acme"; `extensions disable -p acme vector` dropped "acme" rather than
+ * vector. Strict parsing consumes the flag with its value.
+ */
+export function resolveExtensionArgs(rawArgs: string[], action: "enable" | "disable") {
+    const { flags, positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud extensions <action>
+        command: `cloud extensions ${action}`,
+        maxPositionals: 1
+    });
+    return { flags,
+name: positionals[0] };
+}
+
 async function enableExtension(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    const { flags: args, name: raw } = resolveExtensionArgs(rawArgs, "enable");
+    if (!raw) fail("Usage: rebase cloud extensions enable <name>", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs);
-    const raw = cloudPositionals(rawArgs).slice(2)[0];
-    if (!raw) fail("Usage: rebase cloud extensions enable <name>", undefined, "usage");
     const name = resolveExtensionAlias(raw!);
 
     try {
@@ -199,16 +212,10 @@ extensionName: name }, { path: "enable" });
 }
 
 async function disableExtension(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    const { flags: args, name: raw } = resolveExtensionArgs(rawArgs, "disable");
+    if (!raw) fail("Usage: rebase cloud extensions disable <name>", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs);
-    const raw = cloudPositionals(rawArgs).slice(2)[0];
-    if (!raw) fail("Usage: rebase cloud extensions disable <name>", undefined, "usage");
     const name = resolveExtensionAlias(raw!);
 
     try {
