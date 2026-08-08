@@ -147,6 +147,7 @@ parentEntityIds,
             key={"sort_button"}
             tableController={tableController}
             properties={resolvedProperties}
+            compact={compact}
         />
     );
 
@@ -170,6 +171,7 @@ parentEntityIds,
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}
+            compact={compact}
             enabled={!collection.fixedFilter}/>,
         filterPresetsButton
     ];

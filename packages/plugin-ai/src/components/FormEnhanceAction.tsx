@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef } from "react";
 
 import {
-    Button,
     CircularProgress,
     cls,
     fieldBackgroundMixin,
@@ -117,14 +116,18 @@ export function FormEnhanceAction({
                 // Never full width: this used to stretch to fill the form's
                 // `w-80 2xl:w-96` side rail in full screen. That rail is gone, and
                 // in the footer a stretched button reads as the primary action.
-                trigger={<Button variant={"filled"}
-                    color={"neutral"}
+                // Icon only. The label is carried by `aria-label`/`title` — a
+                // `Tooltip` here would swallow the menu: both it and
+                // `DropdownMenu.Trigger` render `asChild`, and `Tooltip` drops
+                // the props Radix clones onto it, so the menu never opens.
+                trigger={<IconButton variant={"filled"}
                     size={"small"}
+                    aria-label={"Autofill"}
+                    title={"Autofill"}
                     disabled={loading}>
                     {!loading && <AIIcon size={"small"}/>}
                     {loading && <CircularProgress size={"small"}/>}
-                    Autofill
-                </Button>}>
+                </IconButton>}>
 
                 <MenuItem className={"py-4"}
                     onClick={() => {

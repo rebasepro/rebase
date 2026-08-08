@@ -1,13 +1,19 @@
-import { Button, FilterXIcon, iconSize, Tooltip } from "@rebasepro/ui";
+import { FilterXIcon, iconSize, IconButton, Tooltip } from "@rebasepro/ui";
 import { EntityTableController } from "@rebasepro/admin-types";
 import { useTranslation } from "@rebasepro/app";
 
 export function ClearFilterSortButton({
     tableController,
-    enabled
+    enabled,
+    compact
 }: {
     enabled: boolean;
-    tableController: EntityTableController
+    tableController: EntityTableController;
+    /**
+     * Narrow toolbar (split view). Only decides the icon size, which follows
+     * the neighbouring controls — see `CollectionViewStartActions`.
+     */
+    compact?: boolean;
 }) {
     const { t } = useTranslation();
 
@@ -29,17 +35,19 @@ export function ClearFilterSortButton({
         }
         return (
             <Tooltip title={label}>
-                <Button
+                {/* An `IconButton`, like every other icon-only control in this
+                    toolbar. As a `Button` it was a rounded-md box with text
+                    padding sitting between two circular icon buttons. */}
+                <IconButton
                     size={"small"}
-                    variant={"text"}
                     aria-label={label}
                     onClick={() => {
                         tableController.clearFilter?.();
                         tableController.setSortBy?.(undefined);
                     }}
                 >
-                    <FilterXIcon size={iconSize.small}/>
-                </Button>
+                    <FilterXIcon size={compact ? iconSize.smallest : iconSize.small}/>
+                </IconButton>
             </Tooltip>
         );
     }

@@ -24,6 +24,11 @@ export type SortButtonProps<M extends Record<string, unknown>> = {
      * the options offered.
      */
     properties: Properties;
+    /**
+     * Narrow toolbar (split view). Only decides the icon size, which follows
+     * the neighbouring controls — see `CollectionViewStartActions`.
+     */
+    compact?: boolean;
 };
 
 /**
@@ -40,7 +45,8 @@ export type SortButtonProps<M extends Record<string, unknown>> = {
  */
 export function SortButton<M extends Record<string, unknown>>({
     tableController,
-    properties
+    properties,
+    compact
 }: SortButtonProps<M>) {
 
     const { t } = useTranslation();
@@ -97,6 +103,8 @@ export function SortButton<M extends Record<string, unknown>>({
     // `asChild` — is what toggles it. A handler of our own would toggle it a
     // second time in the same click and the popover would never open; a
     // `Tooltip` in between would swallow the trigger's ref.
+    const arrowSize = compact ? iconSize.smallest : iconSize.small;
+
     const trigger = (
         <IconButton
             size={"small"}
@@ -104,11 +112,14 @@ export function SortButton<M extends Record<string, unknown>>({
             title={label}
             className={cls(activeOption && "text-primary")}
         >
+            {/* Same icon size as the filter controls it sits between: 16 in the
+                split view's narrow toolbar, 20 everywhere else. It was a flat
+                16, which read as a smaller button next to them. */}
             {activeDirection === "desc"
-                ? <ArrowDownIcon size={iconSize.smallest}/>
+                ? <ArrowDownIcon size={arrowSize}/>
                 : activeDirection === "asc"
-                    ? <ArrowUpIcon size={iconSize.smallest}/>
-                    : <ArrowUpDownIcon size={iconSize.smallest}/>}
+                    ? <ArrowUpIcon size={arrowSize}/>
+                    : <ArrowUpDownIcon size={arrowSize}/>}
         </IconButton>
     );
 

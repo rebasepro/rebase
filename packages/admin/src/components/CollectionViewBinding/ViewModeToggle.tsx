@@ -79,12 +79,17 @@ export function ViewModeToggle({
     const { t } = useTranslation();
 
 
-    // Get icon for current view mode
+    // Get icon for current view mode.
+    //
+    // `small` on the trigger, matching the filters button beside it — the two
+    // labelled buttons open the toolbar together, and at 16 against its 20 this
+    // one read as the smaller of the pair. The options inside the popover stay
+    // at `smallest`, which is the size every other menu icon uses.
     const getViewModeIcon = () => {
-        if (viewMode === "kanban") return <KanbanIcon size={iconSize.smallest}/>;
-        if (viewMode === "cards") return <LayoutGridIcon size={iconSize.smallest}/>;
-        if (viewMode === "table") return <TableIcon size={iconSize.smallest}/>;
-        return <ListIcon size={iconSize.smallest}/>;
+        if (viewMode === "kanban") return <KanbanIcon size={iconSize.small}/>;
+        if (viewMode === "cards") return <LayoutGridIcon size={iconSize.small}/>;
+        if (viewMode === "table") return <TableIcon size={iconSize.small}/>;
+        return <ListIcon size={iconSize.small}/>;
     };
 
     const getViewModeName = () => {
