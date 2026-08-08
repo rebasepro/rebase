@@ -210,6 +210,36 @@ describe("pg-error-utils", () => {
             expect(result.message).not.toContain("params:");
         });
 
+        // The logger is mocked in this file, so it cannot redact for us here —
+        // which is the point: the metadata this call site *hands* the logger
+        // must not contain the statement or its bound values in the first
+        // place. `drizzleMessage` used to carry both "for full context".
+        it("logs the SQLSTATE diagnostics without the statement or its params", () => {
+            const pgError = Object.assign(new Error("duplicate key value violates unique constraint \"users_email_key\""), {
+                code: "23505",
+                constraint: "users_email_key",
+                table: "users"
+            });
+            const drizzleError = new Error(
+                'Failed query: insert into "users" ("email", "password_hash") values ($1, $2)\n'
+                + "params: alice@acme.com,$2b$12$abcdefghijklmnop"
+            );
+            (drizzleError as any).cause = pgError;
+
+            sanitizeErrorForClient(drizzleError, "users");
+
+            expect(mockLogger.error).toHaveBeenCalledTimes(1);
+            const metadata = JSON.stringify(mockLogger.error.mock.calls[0][1]);
+            expect(metadata).not.toContain("alice@acme.com");
+            expect(metadata).not.toContain("$2b$12$");
+            expect(metadata).not.toContain("Failed query");
+            expect(metadata).not.toContain("password_hash");
+            // The diagnosis survives — redaction that removes the signal too
+            // would just move the outage.
+            expect(metadata).toContain("23505");
+            expect(metadata).toContain("users_email_key");
+        });
+
         it("returns generic message when no PG error is found", () => {
             const error = new Error("something went wrong");
             const result = sanitizeErrorForClient(error, "clients");

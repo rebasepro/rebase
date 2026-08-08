@@ -314,9 +314,14 @@ export function sanitizeErrorForClient(error: unknown, context: string): { messa
             column: pgError.column,
             table: pgError.table,
             constraint: pgError.constraint,
-            dataType: pgError.dataType,
-            // Also log the outer Drizzle wrapper message for full context
-            drizzleMessage: error instanceof Error ? error.message : String(error)
+            dataType: pgError.dataType
+            // The outer Drizzle wrapper message used to be logged here "for
+            // full context": it is `Failed query: <sql>\nparams: <values>`, so
+            // it published the statement and every bound value (an email, a
+            // password hash) on every realtime data failure. The SQLSTATE,
+            // detail, table, column and constraint above are the diagnostic
+            // value; the wrapper added only the leak. `logger` strips the
+            // wrapper as well, but the field itself carried nothing else.
         });
         return pgErrorToFriendlyMessage(pgError, context);
     }

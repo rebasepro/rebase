@@ -37,6 +37,7 @@ jest.mock("@rebasepro/server", () => {
     };
 });
 
+import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
@@ -541,5 +542,101 @@ describe("WebSocket Server requireAuth resolution", () => {
             expect({ authConfig, refused: await anonymousIsRefused() })
                 .toEqual({ authConfig, refused: resolveRequireAuth(authConfig) });
         }
+    });
+});
+
+/**
+ * The `[SQL Audit]` line the Studio SQL editor produces.
+ *
+ * It used to be a bare `console.log`, unconditional in production, carrying
+ * the whole `options` object — which is where `executeSql`'s bound parameters
+ * live. So an operator fixing one customer record wrote that record's values
+ * into the platform's shared, unstructured log stream, outside `logger`'s JSON
+ * envelope, severity and LOG_LEVEL gate.
+ */
+describe("WebSocket Server SQL audit line", () => {
+    const mockLogger = logger as unknown as { info: jest.Mock; error: jest.Mock };
+
+    let mockServer: Server;
+    let mockRealtimeService: RealtimeService;
+    let mockDriver: PostgresBackendDriver;
+    let consoleLog: ReturnType<typeof jest.spyOn>;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        mockExtractUserFromToken.mockReturnValue({ uid: "admin-user", roles: ["admin"] });
+        consoleLog = jest.spyOn(console, "log").mockImplementation(() => {});
+
+        mockServer = {} as Server;
+        mockRealtimeService = {
+            addClient: jest.fn(),
+            registerDataDriverSubscription: jest.fn()
+        } as unknown as RealtimeService;
+        mockDriver = {
+            key: "postgres",
+            initialised: true,
+            admin: { executeSql: jest.fn(async () => [{ id: 1 }]) }
+        } as unknown as PostgresBackendDriver;
+
+        createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, {
+            requireAuth: true,
+            jwtSecret: "test-jwt-secret"
+        });
+    });
+
+    afterEach(() => {
+        consoleLog.mockRestore();
+    });
+
+    const runSql = async () => {
+        const connectionCallback = mockWssInstance.on.mock.calls.find(
+            (call: any[]) => call[0] === "connection"
+        )[1];
+        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        connectionCallback(mockWs);
+        const messageCallback = mockWs.on.mock.calls.find(
+            (call: any[]) => call[0] === "message"
+        )[1];
+
+        await messageCallback(Buffer.from(JSON.stringify({
+            type: "AUTHENTICATE",
+            requestId: "auth-audit",
+            payload: { token: "valid-admin-token" }
+        })));
+        await messageCallback(Buffer.from(JSON.stringify({
+            type: "EXECUTE_SQL",
+            requestId: "req-audit",
+            payload: {
+                sql: "UPDATE users SET email = $1 WHERE id = $2",
+                options: { role: "postgres", params: ["alice@acme.com", "user-7"] }
+            }
+        })));
+    };
+
+    it("goes through the logger, never through console.log", async () => {
+        await runSql();
+
+        expect(consoleLog).not.toHaveBeenCalled();
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            "[SQL Audit] WebSocket SQL execution",
+            expect.objectContaining({ sql: "UPDATE users SET email = $1 WHERE id = $2" })
+        );
+    });
+
+    it("counts the bound parameters instead of writing them", async () => {
+        await runSql();
+
+        const entry = mockLogger.info.mock.calls.find(
+            (call: any[]) => call[0] === "[SQL Audit] WebSocket SQL execution"
+        )![1] as Record<string, unknown>;
+
+        expect(JSON.stringify(entry)).not.toContain("alice@acme.com");
+        expect(JSON.stringify(entry)).not.toContain("user-7");
+        expect(entry.paramCount).toBe(2);
+        // The context an operator actually needs to reconstruct the action.
+        expect(entry.role).toBe("postgres");
+        expect(entry.uid).toBe("admin-user");
+        expect(entry.requestId).toBe("req-audit");
     });
 });

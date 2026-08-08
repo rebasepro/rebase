@@ -8,7 +8,7 @@ import type {
 import type { RebaseServerClient } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
-import { logger } from "../utils/logger.js";
+import { logger, redactSensitiveText } from "../utils/logger.js";
 import { buildScaleToZeroWarning } from "./scale-to-zero.js";
 
 // ─── Cron expression parser (minimal, no external dependency) ────────
@@ -743,7 +743,12 @@ reason: "already_executing" },
             }
         } catch (err: unknown) {
             success = false;
-            error = err instanceof Error ? err.message : String(err);
+            // Redacted at the point of capture, not just on the way to the log:
+            // this string is persisted into `cron_logs` and rendered in the
+            // Studio cron panel, and a job that fails on a query would
+            // otherwise store `Failed query: <sql>\nparams: <values>` — the
+            // statement and every bound value — in a table, indefinitely.
+            error = redactSensitiveText(err instanceof Error ? err.message : String(err));
             job.totalFailures++;
         } finally {
             // Always clear executing flag — even on catastrophic errors
