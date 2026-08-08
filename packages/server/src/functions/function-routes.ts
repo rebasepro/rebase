@@ -7,9 +7,16 @@ import { LoadedFunction } from "./function-loader";
  *
  * Each function is mounted at `/<function-name>`, preserving
  * whatever HTTP methods and middleware the Hono sub-app defines.
+ *
+ * @param functions What loaded. May be empty — the router still mounts, so
+ *   "no functions are served" answers 200 with an empty list instead of 404.
+ * @param skipped How many files the loader saw and could not serve. Reported
+ *   as a count and a pointer to the log, not as filenames: the listing is
+ *   reachable anonymously, and the per-file reasons carry import errors.
  */
 export function createFunctionRoutes(
-    functions: LoadedFunction[]
+    functions: LoadedFunction[],
+    skipped = 0
 ): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
@@ -19,7 +26,11 @@ export function createFunctionRoutes(
             functions: functions.map((fn) => ({
                 name: fn.name,
                 endpoint: `/functions/${fn.name}`
-            }))
+            })),
+            ...(skipped > 0 && {
+                skipped,
+                note: `${skipped} function file(s) failed to load and are NOT served — see the server log for the reason.`
+            })
         });
     });
 

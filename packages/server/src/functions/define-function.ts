@@ -17,11 +17,27 @@ export interface RebaseFunctionContext {
      * The server-side Rebase singleton (`dataAsAdmin`, `auth`, `storage`,
      * `email`, `sql`).
      *
-     * `rebase.dataAsAdmin` runs with **admin privileges and bypasses RLS** — use
-     * it only for trusted admin work. For user-scoped queries inside a handler,
-     * use the request `driver` (`c.var.driver`), which carries the caller's
-     * identity so RLS applies. (`rebase.data` no longer exists on this type —
-     * `dataAsAdmin` is the only name for the admin-scoped accessor.)
+     * `rebase.dataAsAdmin` runs as the service identity
+     * `{ uid: "service", roles: ["admin"] }` — **admin-scoped, not an RLS
+     * bypass**. Policies are still evaluated; it passes the default ones
+     * through their `rolesOverlap(['admin'])` arm, the same arm an application
+     * user holding the `admin` role passes. Two things follow:
+     *
+     * - `policy.serverContext()` (`auth.uid() IS NULL`) is **false** here. A
+     *   collection with `disableDefaultPolicies: true` whose write rule is
+     *   `serverContext()` will refuse these writes with `42501`, and reads
+     *   against a hand-written admin policy that does not name the `admin` role
+     *   return zero rows with a 200.
+     * - Do not read it as "nobody else can reach these rows". Whatever an
+     *   `admin`-roled user can reach, this can, and vice versa.
+     *
+     * `rebase.sql()` is the true bypass: it runs on the owner connection and
+     * never goes through `withAuth`.
+     *
+     * For user-scoped queries inside a handler, use the request `driver`
+     * (`c.var.driver`), which carries the caller's identity. (`rebase.data` no
+     * longer exists on this type — `dataAsAdmin` is the only name for the
+     * admin-scoped accessor.)
      */
     rebase: RebaseServerClient;
 }
@@ -44,6 +60,9 @@ export interface RebaseFunctionContext {
  * export default defineFunction((app, { rebase }) => {
  *     app.use("/*", requireAuth);
  *     app.get("/home", async (c) => {
+ *         // `rebase.sql` runs on the owner connection: no RLS, no policies,
+ *         // every row. It is the most privileged thing in this context —
+ *         // more so than `dataAsAdmin`, which is merely admin-scoped.
  *         const [stats] = await rebase.sql(`SELECT count(*) AS n FROM orders`);
  *         return c.json({ orders: Number(stats.n) });
  *     });

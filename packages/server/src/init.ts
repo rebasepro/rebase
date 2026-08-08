@@ -27,7 +27,7 @@ import { Server } from "http";
 import { RestApiGenerator } from "./api/rest/api-generator";
 import { createAuthMiddleware } from "./auth/middleware";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
-import { scopeDataDriver } from "./auth/rls-scope";
+import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
 import { Hono } from "hono";
@@ -40,6 +40,7 @@ import { initializeStorage, assertStorageAccessControlConfigured } from "./init/
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
+import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, requireAdmin } from "./auth";
 import {
     BackendStorageConfig,
@@ -52,7 +53,7 @@ import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
 import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
 import { createRequireAuth } from "./auth/middleware";
-import { createDataRateLimiter, type DataRateLimitConfig } from "./auth/rate-limiter";
+import { createDataRateLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
 import { createRebaseClient } from "@rebasepro/client";
@@ -400,6 +401,17 @@ export interface RebaseBackendConfig {
     history?: HistoryConfig;
     enableSwagger?: boolean;
     functionsDir?: string;
+    /**
+     * Per-request ceiling for `/api/functions/*`, in milliseconds.
+     *
+     * Custom functions run code the framework did not write, and nothing else
+     * in the stack bounds it. Defaults to 30000 (or
+     * `REBASE_FUNCTIONS_TIMEOUT_MS`). `0` disables the ceiling — for a function
+     * that legitimately runs long, or a deployment whose proxy already imposes
+     * one. Timed-out requests answer 504; the handler itself cannot be
+     * cancelled, so give outbound calls an `AbortSignal`.
+     */
+    functionsTimeoutMs?: number;
     cronsDir?: string;
     /**
      * Enable/disable database persistence for cron job execution logs.
@@ -610,6 +622,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     logger.info("Initializing Rebase Backend");
+
+    // One floating promise in application code — a fire-and-forget call in a
+    // custom function is the usual one — otherwise ends the process, and on the
+    // managed runtime that process is shared with other tenants. Log it and
+    // keep serving. Idempotent, and opt-out via REBASE_EXIT_ON_UNHANDLED_REJECTION.
+    installUnhandledRejectionHandler();
 
     const basePath = config.basePath || "/api";
     const isProduction = process.env.NODE_ENV === "production";
@@ -1497,9 +1515,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Replace the HTTP-transport data layer with a driver-backed RebaseData.
     // This eliminates JSON serialize → Hono dispatch → auth → deserialize for
     // every rebase.data call. RLS semantics are preserved: the driver is scoped
-    // once as { uid: "service", roles: ["admin"] }, matching the identity the
-    // service-key HTTP path produced.
-    const serviceIdentity = { uid: "service", roles: ["admin"] as string[] };
+    // once as SERVICE_IDENTITY, matching the identity the service-key HTTP path
+    // produced.
+    //
+    // "Preserved" is the operative word, and it is what the docblocks on this
+    // accessor used to deny: `dataAsAdmin` is admin-scoped, NOT RLS-bypassing.
+    // See SERVICE_IDENTITY for what that costs you (`policy.serverContext()` is
+    // false for it) and `rebase.sql()` for the accessor that really does bypass.
+    const serviceIdentity = SERVICE_IDENTITY;
 
     const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
     const defaultData = buildSdkData(scopedDefaultDriver);
@@ -1539,7 +1562,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // leave `rebase.data` working in plain JS while quietly routing through the
     // loop this native plane exists to skip — a silent performance and identity
     // change instead of the compile error TypeScript now gives. Both names point
-    // at the same admin-scoped, RLS-bypassing object.
+    // at the same admin-scoped object — admin-scoped, not RLS-bypassing.
     Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
     logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 
@@ -1620,63 +1643,96 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // 5. Mount Custom Functions
     if (config.functionsDir) {
-        const { loadFunctionsFromDirectory } = await import("./functions/function-loader");
+        const { loadFunctionsWithDiagnostics } = await import("./functions/function-loader");
         const { createFunctionRoutes } = await import("./functions/function-routes");
+        const { createFunctionsRequestTimeout, resolveFunctionsTimeoutMs } = await import("./functions/request-timeout");
 
-        const loadedFunctions = await loadFunctionsFromDirectory(config.functionsDir);
+        const { functions: loadedFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+
+        // Mounted for the directory, not for the functions in it — the same
+        // correction the cron router carries ninety lines down, which was never
+        // swept back here. Three function files that all `import` a module
+        // throwing on a missing env var is one deploy, not three bugs: every
+        // import failed, the list came back empty, `/api/functions` 404ed, and
+        // `rebase cloud debug` read that 404 as "this build shipped no
+        // functions". An empty list is the honest answer and a debuggable one.
+        const functionsRouter = new Hono<HonoEnv>();
+        functionsRouter.onError(errorHandler);
+
+        // A ceiling on how long one function request may hold a socket and a
+        // request object. First in the chain on purpose: it covers the auth
+        // middleware too, so a wedged driver answers 504 rather than hanging.
+        const functionsTimeoutMs = resolveFunctionsTimeoutMs(config.functionsTimeoutMs);
+        if (functionsTimeoutMs > 0) {
+            functionsRouter.use("/*", createFunctionsRequestTimeout(functionsTimeoutMs));
+        }
+
+        // Custom functions do NOT require authentication at the global level by default.
+        // This allows custom functions to define public endpoints (like webhooks).
+        // Per-route auth can be further refined inside individual functions using `requireAuth`.
+        const functionsRequireAuth = false;
+
+        // Use adapter middleware when available, fallback to built-in
+        if (authAdapter) {
+            functionsRouter.use("/*", createAdapterAuthMiddleware({
+                adapter: authAdapter,
+                driver: defaultDriver,
+                requireAuth: functionsRequireAuth,
+                apiKeyStore
+            }));
+        } else {
+            functionsRouter.use("/*", createAuthMiddleware({
+                driver: defaultDriver,
+                requireAuth: functionsRequireAuth,
+                serviceKey: internalServiceKey,
+                apiKeyStore
+            }));
+        }
+
+        // API-key requests must hold a "functions"/"functions/<name>"
+        // permission (or the "*" wildcard). Without this, any valid key —
+        // however narrowly scoped — could invoke every custom function.
+        functionsRouter.use("/*", createFunctionApiKeyGuard(`${basePath}/functions`));
+
+        // Same per-caller rate limiting as the data API, sharing its
+        // store so one caller has one budget. Previously only /api/data
+        // was limited, so a key's rate_limit did not bound its function
+        // traffic at all.
+        //
+        // The anonymous bucket gets its own, much looser allowance rather than
+        // being switched off: functions default to public access precisely for
+        // webhook receivers (Stripe, GitHub), whose bursts come from a handful
+        // of provider IPs and would trip the data API's 300/window cap. That
+        // argument bounds the value, not the existence of a limit — and this is
+        // the one router that invites anonymous callers, so it is the last one
+        // that should have no ceiling. `rateLimit.anonymousFunctions` overrides
+        // it; `null` disables it, deliberately.
+        if (rateLimitConfig) {
+            functionsRouter.use("/*", createDataRateLimiter({
+                ...rateLimitConfig,
+                anonymous: rateLimitConfig.anonymousFunctions !== undefined
+                    ? rateLimitConfig.anonymousFunctions
+                    : DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT
+            }));
+        }
+
+        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length);
+        functionsRouter.route("/", fnRoutes);
+        config.app.route(`${basePath}/functions`, functionsRouter);
 
         if (loadedFunctions.length > 0) {
-            const functionsRouter = new Hono<HonoEnv>();
-            functionsRouter.onError(errorHandler);
-
-            // Custom functions do NOT require authentication at the global level by default.
-            // This allows custom functions to define public endpoints (like webhooks).
-            // Per-route auth can be further refined inside individual functions using `requireAuth`.
-            const functionsRequireAuth = false;
-
-            // Use adapter middleware when available, fallback to built-in
-            if (authAdapter) {
-                functionsRouter.use("/*", createAdapterAuthMiddleware({
-                    adapter: authAdapter,
-                    driver: defaultDriver,
-                    requireAuth: functionsRequireAuth,
-                    apiKeyStore
-                }));
-            } else {
-                functionsRouter.use("/*", createAuthMiddleware({
-                    driver: defaultDriver,
-                    requireAuth: functionsRequireAuth,
-                    serviceKey: internalServiceKey,
-                    apiKeyStore
-                }));
-            }
-
-            // API-key requests must hold a "functions"/"functions/<name>"
-            // permission (or the "*" wildcard). Without this, any valid key —
-            // however narrowly scoped — could invoke every custom function.
-            functionsRouter.use("/*", createFunctionApiKeyGuard(`${basePath}/functions`));
-
-            // Same per-caller rate limiting as the data API, sharing its
-            // store so one caller has one budget. Previously only /api/data
-            // was limited, so a key's rate_limit did not bound its function
-            // traffic at all.
-            //
-            // The anonymous bucket is disabled here: functions default to
-            // public access precisely for webhook receivers (Stripe, GitHub),
-            // whose bursts come from a handful of provider IPs — an IP-keyed
-            // 300/window cap would 429 them. Anonymous function traffic was
-            // never limited before; keys and signed-in users now are.
-            if (rateLimitConfig) {
-                functionsRouter.use("/*", createDataRateLimiter({ ...rateLimitConfig, anonymous: null }));
-            }
-
-            const fnRoutes = createFunctionRoutes(loadedFunctions);
-            functionsRouter.route("/", fnRoutes);
-            config.app.route(`${basePath}/functions`, functionsRouter);
             logger.info("Mounted custom functions", {
                 count: loadedFunctions.length,
-                path: `${basePath}/functions`
+                path: `${basePath}/functions`,
+                timeoutMs: functionsTimeoutMs
             });
+        } else {
+            logger.warn(
+                `Function routes mounted at ${basePath}/functions, but no functions loaded from ${config.functionsDir}. ` +
+                (problems.length > 0
+                    ? `${problems.length} file(s) were skipped — see the messages above.`
+                    : "The directory holds no .ts/.js function files.")
+            );
         }
     }
 
@@ -1694,7 +1750,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         // The cron scheduler gets the singleton itself, so `ctx.rebase` inside a
         // cron handler IS the `rebase` you would import — same object, same type,
-        // same `dataAsAdmin` spelling for the RLS-bypassing plane.
+        // same `dataAsAdmin` spelling for the admin-scoped plane.
         cronScheduler.setClient(serverSingleton);
 
         if (loadedCronJobs.length > 0) {

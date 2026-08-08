@@ -364,8 +364,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // bypasses RLS. Detect the posture and, when privileged, provision
             // the restricted `rebase_user` role and route authenticated
             // requests (reads AND writes) through it. The server context (base
-            // driver / dataAsAdmin / auth flows) stays on the owner connection
-            // and bypasses. Default-on: a privileged connection that cannot be
+            // driver / auth flows / `rebase.sql`) stays on the owner connection
+            // and bypasses; `rebase.dataAsAdmin` does NOT — it is scoped with
+            // `withAuth({ uid: "service", roles: ["admin"] })` at boot, so it
+            // runs as `rebase_user` and its policies are evaluated.
+            // Default-on: a privileged connection that cannot be
             // isolated fails the boot rather than serving unenforced requests.
             {
                 const runSql: RawSqlRunner = async (text) => {

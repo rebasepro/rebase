@@ -1,5 +1,5 @@
 import * as path from "path";
-import { loadFunctionsFromDirectory } from "../src/functions/function-loader";
+import { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics } from "../src/functions/function-loader";
 import { createFunctionRoutes } from "../src/functions/function-routes";
 import { requireImporter } from "./helpers/require-importer";
 
@@ -37,6 +37,49 @@ describe("Function Loader & Routes", () => {
             const validFactory = loaded.find(f => f.name === "valid-factory")!;
             expect(typeof validFactory.app.fetch).toBe("function");
             expect(Array.isArray(validFactory.app.routes)).toBe(true);
+        });
+    });
+
+    describe("what the loader refuses to serve, it reports", () => {
+        /**
+         * `rebase build` globs `functions/**\/*.ts` — recursive — while the
+         * loader reads one directory level. A project that reorganises into
+         * `functions/admin/users.ts` gets both files compiled, typechecked and
+         * written into the bundle, and neither mounted: the entry did not match
+         * the `.ts`/`.js` filter, so it was not even a problem, and the boot log
+         * said nothing at all. The build's answer must not be wider than the
+         * runtime's in silence.
+         */
+        it("names ignored subdirectories instead of dropping them", async () => {
+            // `test/fixtures` holds only subdirectories (`functions`, `crons`).
+            const { functions, problems } = await loadFunctionsWithDiagnostics(
+                path.resolve(__dirname, "fixtures"), requireImporter
+            );
+
+            expect(functions).toEqual([]);
+            expect(problems).toEqual(expect.arrayContaining([
+                expect.stringContaining("functions/ (subdirectory"),
+                expect.stringContaining("crons/ (subdirectory")
+            ]));
+        });
+
+        it("names files whose extension it cannot import", async () => {
+            const { problems } = await loadFunctionsWithDiagnostics(functionsDir, requireImporter);
+
+            expect(problems).toEqual(expect.arrayContaining([
+                expect.stringContaining("needs-transpile.mts (unsupported extension .mts)")
+            ]));
+        });
+
+        it("still reports the files it tried and could not use", async () => {
+            const { problems } = await loadFunctionsWithDiagnostics(functionsDir, requireImporter);
+
+            expect(problems).toEqual(expect.arrayContaining([
+                expect.stringContaining("no-default.js"),
+                expect.stringContaining("invalid-export.js")
+            ]));
+            // A `.txt` next to your functions is not a mistake worth a warning.
+            expect(problems.join(" ")).not.toContain("ignored.txt");
         });
     });
 

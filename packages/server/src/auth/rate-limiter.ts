@@ -244,13 +244,29 @@ export interface DataRateLimitConfig {
     user?: number;
     /**
      * Per IP, for requests with no principal at all. Default 300.
-     * `null` disables the anonymous bucket entirely — used for routers whose
-     * anonymous traffic must not be throttled (public webhook functions).
+     * `null` disables the anonymous bucket entirely.
      */
     anonymous?: number | null;
+    /**
+     * Per IP, for anonymous requests to `/api/functions/*`. Default 3000 —
+     * deliberately far looser than {@link anonymous}, because the functions
+     * router is public by default for webhook receivers (Stripe, GitHub) whose
+     * bursts arrive from a handful of provider IPs and would trip the data
+     * API's ceiling.
+     *
+     * The looseness bounds the *value*, not the existence of the limit: this
+     * router is the one that invites anonymous callers, so it is the last one
+     * that should have no ceiling at all. `null` disables it — an explicit
+     * choice, which is what the hardcoded `anonymous: null` here used to be
+     * without any way to say otherwise.
+     */
+    anonymousFunctions?: number | null;
     /** Share counts across replicas. Defaults to this process's memory. */
     store?: RateLimitStore;
 }
+
+/** @see DataRateLimitConfig.anonymousFunctions */
+export const DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT = 3000;
 
 /**
  * Rate limiting for the data API.
