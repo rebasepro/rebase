@@ -27,8 +27,46 @@ const MARK = /(<mark>.*?<\/mark>)/g;
  * is allowed to carry is the highlight Postgres put there. Anything else stays
  * inert text.
  */
+/**
+ * Context kept before and after a hit, in characters.
+ *
+ * Asymmetric on purpose. The snippet renders on one truncated line, so anything
+ * before the hit competes with the hit itself for the width available — with a
+ * generous lead-in the mark is pushed off the right edge and the reader sees a
+ * fragment with nothing highlighted in it, which is worse than no snippet at
+ * all. Lead with just enough to not start abruptly, then run on.
+ */
+const SNIPPET_LEAD = 16;
+const SNIPPET_TRAIL = 90;
+
+/**
+ * Pull the first mark near the front of the snippet.
+ *
+ * The snippet renders on one truncated line whose width is not knowable here —
+ * a list column is wide, the same list beside an open record is not. Whatever
+ * precedes the mark competes with it for that width, and when the mark loses
+ * the reader gets a fragment of their record with nothing highlighted in it,
+ * which reads as the feature being broken rather than as a narrow column.
+ *
+ * `ts_headline` centres its fragment on the match, so roughly half the window
+ * is lead-in; that is the right shape for a paragraph and the wrong one for a
+ * line. Trimming here rather than asking Postgres for a smaller window keeps
+ * the trailing context, which is what actually explains the hit — and applies
+ * the same shape to the snippets built in the browser, so a row looks the same
+ * whichever path produced it.
+ */
+export function trimSnippetLead(text: string, lead: number = SNIPPET_LEAD): string {
+    const at = text.indexOf("<mark>");
+    if (at < 0 || at <= lead) return text;
+    // Trim the lead-in only. Running the word-boundary strip over the whole
+    // remainder eats the mark itself when the lead is short enough that the
+    // slice opens on `<mark>`, which has no space in it to stop at.
+    const head = text.slice(at - lead, at).replace(/^\S*\s/, "");
+    return "…" + head + text.slice(at);
+}
+
 export function Snippet({ text, className }: { text: string; className?: string }) {
-    const parts = useMemo(() => text.split(MARK), [text]);
+    const parts = useMemo(() => trimSnippetLead(text).split(MARK), [text]);
     return (
         <span className={className}>
             {parts.map((part, i) =>
@@ -211,18 +249,6 @@ export function localRowMatch(
     }
     return undefined;
 }
-
-/**
- * Context kept before and after a hit, in characters.
- *
- * Asymmetric on purpose. The snippet renders on one truncated line, so anything
- * before the hit competes with the hit itself for the width available — with a
- * generous lead-in the mark is pushed off the right edge and the reader sees a
- * fragment with nothing highlighted in it, which is worse than no snippet at
- * all. Lead with just enough to not start abruptly, then run on.
- */
-const SNIPPET_LEAD = 16;
-const SNIPPET_TRAIL = 90;
 
 function findInValue(
     value: unknown,

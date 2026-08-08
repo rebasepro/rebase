@@ -1,4 +1,4 @@
-import { splitOnTerms, searchTerms, offSlotMatch, localRowMatch, snippetAround } from "../../src/components/CollectionViewBinding/SearchHighlight";
+import { splitOnTerms, searchTerms, offSlotMatch, localRowMatch, snippetAround, trimSnippetLead } from "../../src/components/CollectionViewBinding/SearchHighlight";
 import { withListState } from "../../src/util/view_mode";
 import { fieldLabel } from "../../src/components/CollectionViewBinding/SearchExplanation";
 
@@ -278,5 +278,50 @@ describe("offSlotMatch with the joined shown-keys round trip", () => {
             .toBeUndefined();
         expect(offSlotMatch(matches, "full_name|".split("|").map(k => k || undefined))?.field)
             .toBe("questionnaire.certifications");
+    });
+});
+
+describe("trimSnippetLead — the mark has to survive a narrow column", () => {
+    /**
+     * `ts_headline` centres its fragment on the match, so about half the
+     * window is lead-in. In a list beside an open record that column is narrow
+     * enough that the truncation lands before the mark, and the row shows a
+     * fragment of the record with nothing highlighted in it — which reads as
+     * the feature being broken.
+     */
+    const centred = "different statements. The second lets a <mark>planner</mark> de-risk by checking the API";
+
+    it("pulls a centred fragment's mark to the front", () => {
+        const out = trimSnippetLead(centred);
+        expect(out.indexOf("<mark>")).toBeLessThanOrEqual(17);
+        expect(out.startsWith("…")).toBe(true);
+    });
+
+    it("keeps the trailing context, which is what explains the hit", () => {
+        expect(trimSnippetLead(centred)).toContain("de-risk by checking the API");
+    });
+
+    it("leaves a snippet that already opens near the mark alone", () => {
+        const short = "the <mark>planner</mark> ignores your index";
+        expect(trimSnippetLead(short)).toBe(short);
+    });
+
+    it("opens at a word boundary rather than mid-word", () => {
+        const out = trimSnippetLead(centred).replace(/^…/, "");
+        const firstWord = out.split(/\s/)[0];
+        expect(new RegExp(`(^|\\s)${firstWord}(\\s|$)`).test(centred)).toBe(true);
+    });
+
+    it("leaves text with no mark untouched", () => {
+        expect(trimSnippetLead("nothing marked here at all, quite a long line of it"))
+            .toBe("nothing marked here at all, quite a long line of it");
+    });
+
+    it("never splits the mark tag itself", () => {
+        // Cutting inside `<mark>` would render the tag as literal text.
+        for (let lead = 0; lead < 40; lead++) {
+            const out = trimSnippetLead(centred, lead);
+            expect(out).toContain("<mark>planner</mark>");
+        }
     });
 });
