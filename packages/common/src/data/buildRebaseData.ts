@@ -666,6 +666,16 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug, getPks());
         },
+        // Declared on `CollectionAccessor` and, until now, never implemented on
+        // this side of the boundary — so the admin's own import wrote one HTTP
+        // request per row and could neither be atomic nor upsert. It forwards to
+        // the same `/bulk` route the SDK client uses.
+        createMany: sdk.createMany
+            ? async (data: Partial<EntityValues<M>>[], options?: { upsert?: boolean }): Promise<Entity<M>[]> => {
+                const rows = await sdk.createMany!(data as Partial<M>[], options);
+                return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
+            }
+            : undefined,
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await sdk.update(id, data as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);

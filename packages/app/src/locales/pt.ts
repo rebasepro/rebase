@@ -418,6 +418,7 @@ export const pt: RebaseTranslations = {
     flatten_arrays: "Achatar listas",
     download: "Descarregar",
     large_number_of_documents: "Esta coleção tem um grande número de documentos ({{count}}).",
+    too_many_documents_to_export: "Esta coleção tem mais documentos ({{count}}) do que o navegador consegue exportar num único ficheiro (limite {{limit}}). Filtre-a antes de exportar.",
     include_undefined_values: "Incluir valores indefinidos",
     submit: "Submeter",
 

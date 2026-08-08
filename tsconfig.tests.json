@@ -90,7 +90,18 @@
     // `scripts/check-test-scripts.mjs`, and the reason its tests have never
     // executed. Until one lands, tsc reading them is the only thing standing
     // between the assertions and the code they assert on.
-    "packages/firebase/test"
+    "packages/firebase/test",
+    // Four files, not the directory. The import/export regression tests build
+    // wire-shaped fixtures — a paginated `find` that clamps the way the REST
+    // ingress does, an `ImportSaveError` read for the row it names — and a
+    // fixture that drifts from those shapes is the whole failure mode they
+    // exist to stop. The rest of `packages/admin/test` carries pre-existing
+    // errors (fixtures declaring properties with no `name`), and clearing those
+    // is what would earn the directory its own line here.
+    "packages/admin/test/data_export/fetch_export_data.test.ts",
+    "packages/admin/test/data_import/csv.test.ts",
+    "packages/admin/test/data_import/prototype_pollution.test.ts",
+    "packages/admin/test/data_import/save_entities.test.ts"
   ],
   "exclude": [
     "**/node_modules",

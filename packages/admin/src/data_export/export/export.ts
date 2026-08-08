@@ -154,6 +154,24 @@ function getHeaders(property: Property, propertyKey: string, prefix = ""): Heade
     }
 }
 
+/**
+ * Read whatever a `date` column actually arrived as into a `Date`.
+ *
+ * The driver/WebSocket path revives `{ __type: "date" }` into a `Date`; the REST
+ * path — which is the one the admin is on — leaves an ISO string, and an epoch
+ * number is what a re-imported export carries. Returns `undefined` for anything
+ * that is not a date, so the caller can pass the raw value through.
+ */
+function toExportableDate(inputValue: unknown): Date | undefined {
+    if (inputValue instanceof Date) return Number.isNaN(inputValue.getTime()) ? undefined : inputValue;
+    if (typeof inputValue === "number" && Number.isFinite(inputValue)) return new Date(inputValue);
+    if (typeof inputValue === "string" && inputValue.trim() !== "") {
+        const parsed = new Date(inputValue);
+        return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    }
+    return undefined;
+}
+
 function processValueForExport(inputValue: unknown,
     property: Property,
     exportType: "csv" | "json",
@@ -181,8 +199,17 @@ function processValueForExport(inputValue: unknown,
     } else if (property.type === "reference" && inputValue && typeof inputValue === "object" && "isEntityReference" in inputValue && typeof (inputValue as EntityReference).isEntityReference === "function" && (inputValue as EntityReference).isEntityReference()) {
         const ref = inputValue ? inputValue as EntityReference : undefined;
         value = ref ? ref.fullPath : null;
-    } else if (property.type === "date" && inputValue instanceof Date) {
-        value = inputValue ? (dateExportType === "timestamp" ? inputValue.getTime() : inputValue.toISOString()) : null;
+    } else if (property.type === "date") {
+        // Not `instanceof Date`: the admin reads over REST, and the REST row
+        // pipeline hands dates back as the database wrote them — a string. That
+        // made this branch dead on every live export, so both radio options
+        // produced identical files. Normalise here, where the declared type says
+        // the column is a date, and leave anything unparseable untouched rather
+        // than exporting an invalid date as `null`.
+        const date = toExportableDate(inputValue);
+        value = date
+            ? (dateExportType === "timestamp" ? date.getTime() : date.toISOString())
+            : inputValue;
     } else {
         value = inputValue;
     }
@@ -209,15 +236,40 @@ function processValuesForExport<M extends Record<string, unknown>>
 ...updatedValues };
 }
 
-function entryToCSVRow(entry: unknown[]) {
+/**
+ * Characters that make a spreadsheet read a cell as a formula rather than text.
+ *
+ * Quoting is CSV *escaping* and is not enough: Excel, LibreOffice Calc and
+ * Sheets strip the CSV quoting at parse time and then evaluate a cell whose
+ * first character is one of these — `=HYPERLINK(…)` exfiltrates neighbouring
+ * cells on click, `=cmd|'…'!A0` is worse.
+ */
+const FORMULA_TRIGGERS = ["=", "+", "-", "@", "\t", "\r"];
+
+/**
+ * Neutralise a cell that a spreadsheet would otherwise evaluate, by prefixing a
+ * single quote — the standard OWASP mitigation. The apostrophe is consumed by
+ * the spreadsheet as "treat the rest as text", so the value reads back intact.
+ */
+export function escapeCsvFormula(value: string): string {
+    const first = value.charAt(0);
+    if (!FORMULA_TRIGGERS.includes(first)) return value;
+    // A signed number is not a formula, and prefixing it would turn every
+    // negative amount in the file into text. `-1+1` is still neutralised,
+    // because it is not a number.
+    if ((first === "-" || first === "+") && value.trim() !== "" && Number.isFinite(Number(value))) return value;
+    return "'" + value;
+}
+
+function toCSVCell(v: unknown): string {
+    if (v === null || v === undefined) return "";
+    const s = Array.isArray(v) ? JSON.stringify(v) : String(v);
+    return "\"" + escapeCsvFormula(s).replaceAll("\"", "\"\"") + "\"";
+}
+
+export function entryToCSVRow(entry: unknown[]) {
     return entry
-        .map((v: unknown) => {
-            if (v === null || v === undefined) return "";
-            if (Array.isArray(v))
-                return "\"" + JSON.stringify(v).replaceAll("\"", "\"\"") + "\"";
-            const s = String(v);
-            return "\"" + s.replaceAll("\"", "\"\"") + "\"";
-        })
+        .map(toCSVCell)
         .join(",") + "\r\n";
 }
 
@@ -236,12 +288,7 @@ export function downloadDataAsCsv(data: object[], name: string) {
     const headers = Object.keys(data[0]);
     const csvContent = [
         headers.join(","),
-        ...data.map(row => headers.map(header => {
-            const value = (row as Record<string, unknown>)[header];
-            if (value === null || value === undefined) return "";
-            if (Array.isArray(value)) return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
-            return `"${String(value).replace(/"/g, '""')}"`;
-        }).join(","))
+        ...data.map(row => headers.map(header => toCSVCell((row as Record<string, unknown>)[header])).join(","))
     ].join("\r\n");
 
     downloadBlob([csvContent], `${name}.csv`, "text/csv");

@@ -29,8 +29,25 @@ import {
     Tooltip
 } from "@rebasepro/ui";
 import { downloadEntitiesExport } from "./export";
+import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "./fetch_export_data";
 
 const DOCS_LIMIT = 500;
+
+/**
+ * Additional-field builders run per row and may do I/O, so a `Promise.all` over
+ * the whole export is one request per row all at once. That was bounded only by
+ * the 50-row cap the export used to have; now that the read is paginated, it is
+ * bounded here instead.
+ */
+const ADDITIONAL_FIELDS_CONCURRENCY = 50;
+
+async function mapInChunks<T, R>(items: T[], fn: (item: T) => Promise<R>, chunkSize = ADDITIONAL_FIELDS_CONCURRENCY): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+        results.push(...await Promise.all(items.slice(i, i + chunkSize).map(fn)));
+    }
+    return results;
+}
 
 export function ExportCollectionAction<M extends Record<string, unknown>, USER extends User>({
     collection,
@@ -59,6 +76,11 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const context = useAdminContext<USER>();
     const dataClient = useData();
 
+    // Said before the download starts, not discovered halfway through it: the
+    // walk refuses rather than writing a short file, so the dialog has to name
+    // the ceiling it is about to hit.
+    const tooManyToExport = collectionEntitiesCount !== undefined && collectionEntitiesCount > MAX_EXPORT_ROWS;
+
     const canExport = !exportAllowed || exportAllowed({
         collectionEntitiesCount: collectionEntitiesCount ?? 0,
         path,
@@ -67,6 +89,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
     const [dataLoading, setDataLoading] = React.useState<boolean>(false);
     const [dataLoadingError, setDataLoadingError] = React.useState<Error | undefined>();
+    const [progress, setProgress] = React.useState<{ loaded: number, total?: number }>({ loaded: 0 });
 
     const [open, setOpen] = React.useState(false);
 
@@ -84,7 +107,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         const additionalFields = collection.additionalFields;
 
         const resolvedExportColumnsValues: Record<string, any>[] = additionalExportFields
-            ? await Promise.all(entities.map(async (entity) => {
+            ? await mapInChunks(entities, async (entity) => {
                 return (await Promise.all(additionalExportFields.map(async (column) => {
                     return {
                         [column.key]: await column.builder({
@@ -94,11 +117,11 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                     };
                 }))).reduce((a, b) => ({ ...a,
 ...b }), {});
-            }))
+            })
             : [];
 
         const resolvedColumnsValues: Record<string, any>[] = additionalFields
-            ? await Promise.all(entities.map(async (entity) => {
+            ? await mapInChunks(entities, async (entity) => {
                 return (await Promise.all(additionalFields
                     .map(async (field) => {
                         if (!field.value)
@@ -111,64 +134,74 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                         };
                     }))).reduce((a, b) => ({ ...a,
 ...b }), {});
-            }))
+            })
             : [];
         return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
     }, [exportConfig?.additionalFields]);
 
     const doDownload = useCallback(async (collection: AdminCollection<M>,
-        exportConfig: ExportConfig<any> | undefined) => {
+        exportConfig: ExportConfig<any> | undefined): Promise<boolean> => {
 
         onAnalyticsEvent?.("export_collection", {
             collection: collection.slug
         });
         setDataLoading(true);
-        dataClient.collection(path).find({})
-            .then(async (res) => {
-                const data = res.data as Entity<M>[];
-                setDataLoadingError(undefined);
-                const additionalData = await fetchAdditionalFields(data);
-                const additionalHeaders = [
-                    ...exportConfig?.additionalFields?.map(column => column.key) ?? [],
-                    ...collection.additionalFields?.map(field => field.key) ?? []
-                ];
+        setDataLoadingError(undefined);
+        setProgress({ loaded: 0 });
+        try {
+            // Paginated, not `find({})`: an absent limit resolves to 50 rows
+            // server-side, so the export used to be the first page of the
+            // collection under a filename that read like all of it.
+            const data = await fetchAllEntitiesForExport<M>({
+                accessor: dataClient.collection(path) as { find: (params?: any) => Promise<any> },
+                onProgress: (loaded, total) => setProgress({ loaded,
+                    total })
+            });
+            const additionalData = await fetchAdditionalFields(data);
+            const additionalHeaders = [
+                ...exportConfig?.additionalFields?.map(column => column.key) ?? [],
+                ...collection.additionalFields?.map(field => field.key) ?? []
+            ];
 
-                const dataWithDefaults = includeUndefinedValues
-                    ? data.map(entity => {
-                        const defaultValues = getDefaultValuesFor(collection.properties);
-                        return {
-                            ...entity,
-                            values: { ...defaultValues,
+            const defaultValues = includeUndefinedValues ? getDefaultValuesFor(collection.properties) : undefined;
+            const dataWithDefaults = defaultValues
+                ? data.map(entity => ({
+                    ...entity,
+                    values: { ...defaultValues,
 ...entity.values }
-                        };
-                    })
-                    : data;
-                downloadEntitiesExport({
-                    data: dataWithDefaults,
-                    additionalData,
-                    properties: collection.properties,
-                    propertiesOrder: collection.propertiesOrder,
-                    name: collection.name,
-                    flattenArrays,
-                    additionalHeaders,
-                    exportType,
-                    dateExportType
-                });
-                onAnalyticsEvent?.("export_collection_success", {
-                    collection: collection.slug
-                });
-            })
-            .catch((e) => {
-                console.error("Error loading export data", e);
-                setDataLoadingError(e);
-            })
-            .finally(() => setDataLoading(false));
+                }))
+                : data;
+            downloadEntitiesExport({
+                data: dataWithDefaults,
+                additionalData,
+                properties: collection.properties,
+                propertiesOrder: collection.propertiesOrder,
+                name: collection.name,
+                flattenArrays,
+                additionalHeaders,
+                exportType,
+                dateExportType
+            });
+            onAnalyticsEvent?.("export_collection_success", {
+                collection: collection.slug
+            });
+            return true;
+        } catch (e) {
+            console.error("Error loading export data", e);
+            setDataLoadingError(e as Error);
+            return false;
+        } finally {
+            setDataLoading(false);
+        }
 
     }, [onAnalyticsEvent, dataClient, path, fetchAdditionalFields, includeUndefinedValues, flattenArrays, exportType, dateExportType]);
 
     const onOkClicked = useCallback(() => {
-        doDownload(collection, exportConfig);
-        handleClose();
+        // The dialog stays open until the walk finishes: it is the only place a
+        // multi-page export reports progress, or reports that it failed.
+        doDownload(collection, exportConfig).then((downloaded) => {
+            if (downloaded) handleClose();
+        });
     }, [doDownload, collection, exportConfig, handleClose]);
 
     return <>
@@ -194,10 +227,20 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 <div>{t("download_table_csv")}</div>
 
-                {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT &&
+                {collectionEntitiesCount !== undefined && collectionEntitiesCount > DOCS_LIMIT && !tooManyToExport &&
                     <Alert color={"warning"}>
                         <div>
                             {t("large_number_of_documents", { count: collectionEntitiesCount.toString() })}
+                        </div>
+                    </Alert>}
+
+                {tooManyToExport &&
+                    <Alert color={"error"}>
+                        <div>
+                            {t("too_many_documents_to_export", {
+                                count: (collectionEntitiesCount ?? 0).toString(),
+                                limit: MAX_EXPORT_ROWS.toString()
+                            })}
                         </div>
                     </Alert>}
 
@@ -242,6 +285,10 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
                     onValueChange={setIncludeUndefinedValues}
                     label={t("include_undefined_values")}/>
 
+                {dataLoadingError && <Alert color={"error"}>
+                    <div>{dataLoadingError.message}</div>
+                </Alert>}
+
                 {!canExport && notAllowedView}
 
             </DialogContent>
@@ -250,13 +297,19 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
 
                 {dataLoading && <CircularProgress size={"smallest"}/>}
 
+                {dataLoading && <Label>
+                    {progress.total !== undefined
+                        ? `${progress.loaded} / ${progress.total}`
+                        : `${progress.loaded}`}
+                </Label>}
+
                 <Button onClick={handleClose}
                     variant={"text"}>
                     {t("cancel")}
                 </Button>
 
                 <Button onClick={onOkClicked}
-                    disabled={dataLoading || !canExport}>
+                    disabled={dataLoading || !canExport || tooManyToExport}>
                     {t("download")}
                 </Button>
 

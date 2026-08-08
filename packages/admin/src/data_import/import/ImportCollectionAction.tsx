@@ -35,7 +35,7 @@ import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping
 import { ImportFileUpload } from "../components/ImportFileUpload";
 import { ImportSaveInProgress } from "../components/ImportSaveInProgress";
 import { ImportConfig } from "../types";
-import { slugify } from "@rebasepro/utils";
+import { isPrototypePollutingKey, slugify } from "@rebasepro/utils";
 
 type ImportState = "initial" | "mapping" | "preview" | "import_data_saving";
 
@@ -400,7 +400,15 @@ export function ImportDataPreview<M extends Record<string, unknown>>({
     return <CollectionTableBinding
         title={<div>
             <Typography variant={"subtitle2"}>Imported data preview</Typography>
-            <Typography variant={"caption"}>Entities with the same id will be overwritten</Typography>
+            {/* Conditional because it is only true when a column was chosen as
+                the id: without one, every row is created and nothing can be
+                overwritten. With one, the import asks for an upsert — which it
+                did not, back when this sentence was unconditional and false. */}
+            <Typography variant={"caption"}>
+                {importConfig.idColumn
+                    ? "Entities with the same id will be overwritten"
+                    : "All rows will be imported as new entities"}
+            </Typography>
         </div>}
         tableController={{
             data: importConfig.entities,
@@ -421,6 +429,9 @@ function buildHeadersMappingFromData(objArr: object[], properties?: Properties) 
     const headersMapping: Record<string, string> = {};
     objArr.filter(Boolean).forEach((obj) => {
         Object.keys(obj).forEach((key) => {
+            // The keys are the uploaded file's header row; `headersMapping[key] = …`
+            // is the same setter the import pipeline refuses elsewhere.
+            if (isPrototypePollutingKey(key)) return;
             const child = (obj as Record<string, unknown>)[key];
             if (child != null && typeof child === "object" && !Array.isArray(child)) {
                 const childProperty = properties?.[key];

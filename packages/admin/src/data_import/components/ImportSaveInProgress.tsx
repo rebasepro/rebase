@@ -1,10 +1,9 @@
 import { useData } from "@rebasepro/app";
-import { Entity } from "@rebasepro/types";
-import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
 import type { AdminCollection } from "@rebasepro/admin-types";
+import { IMPORT_BATCH_SIZE, ImportSaveError, saveImportedEntities } from "../utils/save_entities";
 
 export function ImportSaveInProgress<C extends AdminCollection<any>>
     ({
@@ -20,10 +19,15 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
             onImportSuccess: (collection: C) => void
         }) {
 
-    const [errorSaving, setErrorSaving] = useState<Error | undefined>(undefined);
+    const [errorSaving, setErrorSaving] = useState<ImportSaveError | undefined>(undefined);
     const dataClient = useData();
 
     const savingRef = useRef<boolean>(false);
+
+    // Rows confirmed as written. A retry resumes here rather than re-sending
+    // rows that now exist and conflicting on its first batch, forever.
+    const committedRef = useRef<number>(0);
+    const bulkUnsupportedRef = useRef<{ current: boolean }>({ current: false });
 
     const [processedEntities, setProcessedEntities] = useState<number>(0);
 
@@ -33,20 +37,29 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
             return;
 
         savingRef.current = true;
+        setErrorSaving(undefined);
 
-        saveDataBatch(
+        saveImportedEntities(
             dataClient,
-            collection,
             path,
             importConfig.entities,
-            0,
-            25,
-            setProcessedEntities
+            {
+                offset: committedRef.current,
+                batchSize: IMPORT_BATCH_SIZE,
+                onBatchCommitted: (written) => {
+                    committedRef.current = written;
+                    setProcessedEntities(written);
+                },
+                bulkUnsupported: bulkUnsupportedRef.current
+            }
         ).then(() => {
             onImportSuccess(collection);
             savingRef.current = false;
         }).catch((e) => {
-            setErrorSaving(e);
+            const error = e as ImportSaveError;
+            committedRef.current = error.committed ?? committedRef.current;
+            setProcessedEntities(committedRef.current);
+            setErrorSaving(error);
             savingRef.current = false;
         });
     }
@@ -56,6 +69,10 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
     }, []);
 
     if (errorSaving) {
+        const total = importConfig.entities.length;
+        const failedRows = errorSaving.failedTo - errorSaving.failedFrom > 1
+            ? `rows ${errorSaving.failedFrom + 1}–${errorSaving.failedTo}`
+            : `row ${errorSaving.failedFrom + 1}`;
         return (
             <CenteredView className={"flex flex-col gap-4 items-center"}>
                 <Typography variant={"h6"}>
@@ -65,10 +82,18 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
                 <Typography variant={"body2"} color={"error"}>
                     {errorSaving.message}
                 </Typography>
+
+                <Typography variant={"body2"}>
+                    {errorSaving.committed} of {total} rows were imported.
+                    The import stopped on {failedRows}, which {errorSaving.failedTo - errorSaving.failedFrom > 1 ? "were" : "was"} not written.
+                </Typography>
+
                 <Button
                     onClick={save}
                 >
-                    Retry
+                    {errorSaving.committed > 0
+                        ? `Retry from row ${errorSaving.committed + 1}`
+                        : "Retry"}
                 </Button>
             </CenteredView>
         );
@@ -93,30 +118,4 @@ export function ImportSaveInProgress<C extends AdminCollection<any>>
         </div>
     );
 
-}
-
-function saveDataBatch(dataClient: RebaseData,
-    collection: AdminCollection,
-    path: string,
-    data: Partial<Entity<any>>[],
-    offset = 0,
-    batchSize = 25,
-    onProgressUpdate: (progress: number) => void): Promise<void> {
-
-    console.debug("Saving imported data", offset, batchSize);
-
-    const batch = data.slice(offset, offset + batchSize);
-    return Promise.all(batch.map(d =>
-        dataClient.collection(path).create(
-            d.values,
-            d.id
-        )))
-        .then(() => {
-            if (offset + batchSize < data.length) {
-                onProgressUpdate(offset + batchSize);
-                return saveDataBatch(dataClient, collection, path, data, offset + batchSize, batchSize, onProgressUpdate);
-            }
-            onProgressUpdate(data.length);
-            return Promise.resolve();
-        });
 }

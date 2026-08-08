@@ -413,6 +413,7 @@ export const hi: RebaseTranslations = {
     flatten_arrays: "ऐरे को फ़्लैट करें",
     download: "डाउनलोड",
     large_number_of_documents: "इस संग्रह में बड़ी संख्या में दस्तावेज़ हैं ({{count}})।",
+    too_many_documents_to_export: "इस संग्रह में इतने दस्तावेज़ ({{count}}) हैं कि ब्राउज़र उन्हें एक ही फ़ाइल में निर्यात नहीं कर सकता (सीमा {{limit}})। निर्यात से पहले इसे फ़िल्टर करें।",
     include_undefined_values: "अपरिभाषित (undefined) मान शामिल करें",
     submit: "सबमिट करें",
 
