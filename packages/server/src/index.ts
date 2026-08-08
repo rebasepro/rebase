@@ -215,6 +215,10 @@ export * from "./services/driver-registry";
 // (`@rebasepro/server/services/webhook-service`) resolves in-repo and fails for
 // every installed consumer. Exported from the root, where it is reachable.
 export * from "./services/webhook-service";
+// The destination guard the dispatcher runs before every attempt. Exported on
+// its own because a webhook is not the only outbound call whose URL comes from
+// data — anything that fetches a stored address wants the same check.
+export * from "./services/outbound-url-guard";
 
 // =============================================================================
 // @internal — dev-server / SPA-serving plumbing for the official app template.

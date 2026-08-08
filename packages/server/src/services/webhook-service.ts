@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from "crypto";
+import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard";
 
 export interface WebhookConfig {
     id: string;
@@ -20,17 +21,84 @@ export interface WebhookDeliveryResult {
     attemptNumber: number;
 }
 
+export interface WebhookDispatcherOptions {
+    /**
+     * Deliver to destinations that resolve to loopback, link-local or private
+     * addresses. Off by default. Turning it on re-opens SSRF: anyone who can
+     * choose a webhook URL can then reach the pod's metadata endpoint, the
+     * cluster API server and the database — and read the first 1000 bytes of
+     * the answer back out of `responseBody`. Only for a receiver you run
+     * yourself on the same host or network.
+     */
+    allowPrivateNetworks?: boolean;
+    /**
+     * Deadline for one attempt, covering the response body as well as the
+     * headers. Defaults to 10s.
+     */
+    timeoutMs?: number;
+    /**
+     * Called with the final result of every delivery, including the ones
+     * started by {@link WebhookDispatcher.enqueueEntityChange} — which return
+     * nothing to their caller, so this is the only place their failures
+     * surface.
+     */
+    onDelivery?: (result: WebhookDeliveryResult) => void;
+    /**
+     * Hostname resolver used by the destination guard. Defaults to
+     * `dns.lookup`; injected by tests so a unit suite never asks a resolver.
+     */
+    lookup?: (hostname: string) => Promise<string[]>;
+}
+
+/**
+ * A delivery attempt, plus whether another one could ever go differently.
+ * A refused destination or a redirect fails the same way every time; sleeping
+ * 6 seconds to prove it is 6 seconds of somebody's transaction.
+ */
+interface DeliveryAttempt {
+    result: WebhookDeliveryResult;
+    terminal: boolean;
+}
+
+interface QueuedDelivery {
+    webhook: WebhookConfig;
+    event: string;
+    payload: Record<string, unknown>;
+}
+
+/** Read at most this much of a response before cancelling the rest. */
+const MAX_RESPONSE_BYTES = 64 * 1024;
+
 export class WebhookDispatcher {
     private webhooks: WebhookConfig[] = [];
     private maxRetries = 3;
     private retryDelays = [1000, 5000, 15000]; // Exponential backoff
+    private readonly options: WebhookDispatcherOptions;
+    private readonly timeoutMs: number;
+    private queue: QueuedDelivery[] = [];
+    private draining: Promise<void> | null = null;
+
+    constructor(options: WebhookDispatcherOptions = {}) {
+        this.options = options;
+        this.timeoutMs = options.timeoutMs ?? 10000;
+    }
 
     /** Register webhooks to watch */
     setWebhooks(webhooks: WebhookConfig[]): void {
         this.webhooks = webhooks.filter(w => w.enabled);
     }
 
-    /** Called when a entity changes — checks if any webhook matches */
+    /**
+     * Called when a entity changes — checks if any webhook matches, and awaits
+     * every delivery, retries included.
+     *
+     * **Do not await this inside a collection callback.** `afterSave` and
+     * `afterDelete` run inside the write's Postgres transaction, so awaiting a
+     * delivery here holds a pooled connection and the row's locks for as long
+     * as the receiver takes to answer — up to ~36s across three attempts, per
+     * matching webhook. Use {@link enqueueEntityChange} there; this method is
+     * for a custom function or a job that wants the results.
+     */
     async onEntityChange(
         table: string,
         event: "INSERT" | "UPDATE" | "DELETE",
@@ -38,29 +106,101 @@ export class WebhookDispatcher {
         entity: Record<string, unknown> | null,
         previousEntity?: Record<string, unknown> | null
     ): Promise<WebhookDeliveryResult[]> {
+        const jobs = this.buildDeliveries(table, event, entity, previousEntity);
+
+        const results: WebhookDeliveryResult[] = [];
+        for (const job of jobs) {
+            const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+            this.options.onDelivery?.(result);
+            results.push(result);
+        }
+
+        return results;
+    }
+
+    /**
+     * Queue the same deliveries and return immediately.
+     *
+     * This is the form a collection callback wants. `afterSave` is awaited
+     * *inside* the transaction that wrote the row, so anything it awaits is
+     * transaction time; queueing hands the HTTP to a drain loop that runs
+     * after the callback returns, and the transaction commits without waiting
+     * for a third party. It also means a receiver that is down can no longer
+     * fail the customer's write.
+     *
+     * The cost, stated plainly: the queue is in-process and in-memory. A crash
+     * or a deploy between the enqueue and the delivery drops the event, and a
+     * receiver may see the notification a few milliseconds before the row it
+     * describes is committed. Use {@link flush} on shutdown, and
+     * `onDelivery` to record failures.
+     */
+    enqueueEntityChange(
+        table: string,
+        event: "INSERT" | "UPDATE" | "DELETE",
+        id: string,
+        entity: Record<string, unknown> | null,
+        previousEntity?: Record<string, unknown> | null
+    ): void {
+        const jobs = this.buildDeliveries(table, event, entity, previousEntity);
+        if (jobs.length === 0) return;
+        this.queue.push(...jobs);
+        this.startDraining();
+    }
+
+    /**
+     * Wait for every queued delivery to finish. For graceful shutdown, and for
+     * tests that need to observe what {@link enqueueEntityChange} sent.
+     */
+    async flush(): Promise<void> {
+        while (this.draining) {
+            await this.draining;
+        }
+    }
+
+    private startDraining(): void {
+        if (this.draining) return;
+        const run = this.drainQueue().finally(() => {
+            if (this.draining === run) this.draining = null;
+        });
+        this.draining = run;
+    }
+
+    private async drainQueue(): Promise<void> {
+        while (this.queue.length > 0) {
+            const job = this.queue.shift() as QueuedDelivery;
+            try {
+                const result = await this.deliverWithRetry(job.webhook, job.event, job.payload);
+                this.options.onDelivery?.(result);
+            } catch {
+                // `deliverWithRetry` converts everything to a result, but a
+                // throw from `onDelivery` must not take the queue down with it.
+            }
+        }
+    }
+
+    /** The payload each matching webhook gets for this change. */
+    private buildDeliveries(
+        table: string,
+        event: "INSERT" | "UPDATE" | "DELETE",
+        entity: Record<string, unknown> | null,
+        previousEntity?: Record<string, unknown> | null
+    ): QueuedDelivery[] {
         const matchingWebhooks = this.webhooks.filter(
             w => w.table === table && w.events.includes(event)
         );
 
-        if (matchingWebhooks.length === 0) return [];
-
-        const results: WebhookDeliveryResult[] = [];
-
-        for (const webhook of matchingWebhooks) {
-            const payload: Record<string, unknown> = {
+        return matchingWebhooks.map(webhook => ({
+            webhook,
+            event,
+            payload: {
                 type: event,
                 table,
                 record: entity,
                 old_record: event === "UPDATE" ? previousEntity : undefined,
                 schema: "public",
                 timestamp: new Date().toISOString()
-            };
-
-            const result = await this.deliverWithRetry(webhook, event, payload);
-            results.push(result);
-        }
-
-        return results;
+            }
+        }));
     }
 
     private async deliverWithRetry(
@@ -69,8 +209,8 @@ export class WebhookDispatcher {
         payload: Record<string, unknown>
     ): Promise<WebhookDeliveryResult> {
         for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
-            const result = await this.deliver(webhook, event, payload, attempt);
-            if (result.success) return result;
+            const { result, terminal } = await this.deliver(webhook, event, payload, attempt);
+            if (result.success || terminal) return result;
 
             if (attempt < this.maxRetries) {
                 // `maxRetries` and `retryDelays.length` have to agree, and
@@ -102,7 +242,7 @@ export class WebhookDispatcher {
         event: string,
         payload: Record<string, unknown>,
         attemptNumber: number
-    ): Promise<WebhookDeliveryResult> {
+    ): Promise<DeliveryAttempt> {
         const body = JSON.stringify(payload);
 
         const headers: Record<string, string> = {
@@ -120,42 +260,135 @@ export class WebhookDispatcher {
             headers["X-Webhook-Signature"] = `sha256=${signature}`;
         }
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            // The destination is a string from a config, and configs are loaded
+            // from environment *and* from databases. Validate it here rather
+            // than trusting every caller to: unchecked, `fetch` will happily
+            // POST to 169.254.169.254 and hand the response back through
+            // `responseBody`.
+            const url = await assertAllowedOutboundUrl(webhook.url, {
+                allowPrivateNetworks: this.options.allowPrivateNetworks,
+                lookup: this.options.lookup
+            });
 
-            const response = await fetch(webhook.url, {
+            const response = await fetch(url.href, {
                 method: "POST",
                 headers,
                 body,
-                signal: controller.signal
+                signal: controller.signal,
+                // Following a redirect would send this POST — signature, custom
+                // headers and all — to an address the guard above never saw.
+                // A webhook receiver has no reason to redirect.
+                redirect: "manual"
             });
 
-            clearTimeout(timeout);
+            if (response.status >= 300 && response.status < 400) {
+                const location = typeof response.headers?.get === "function" ? response.headers.get("location") : null;
+                return {
+                    terminal: true,
+                    result: {
+                        webhookId: webhook.id,
+                        event,
+                        payload,
+                        statusCode: response.status,
+                        responseBody:
+                            `Webhook receivers must not redirect: HTTP ${response.status}` +
+                            (location ? ` to ${location}` : "") +
+                            ". The redirect target is not re-validated, so it is not followed.",
+                        success: false,
+                        attemptNumber
+                    }
+                };
+            }
 
-            const responseBody = await response.text().catch(() => "");
+            // Read the body under the *same* deadline as the request. Clearing
+            // the timer before this read is what let a receiver that trickles
+            // one byte a minute hang a delivery forever.
+            const responseBody = await this.readCappedBody(response);
             const success = response.status >= 200 && response.status < 300;
 
             return {
-                webhookId: webhook.id,
-                event,
-                payload,
-                statusCode: response.status,
-                responseBody: responseBody.slice(0, 1000), // Truncate
-                success,
-                attemptNumber
+                terminal: false,
+                result: {
+                    webhookId: webhook.id,
+                    event,
+                    payload,
+                    statusCode: response.status,
+                    responseBody: responseBody.slice(0, 1000), // Truncate
+                    success,
+                    attemptNumber
+                }
             };
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             return {
-                webhookId: webhook.id,
-                event,
-                payload,
-                statusCode: 0,
-                responseBody: message.slice(0, 1000),
-                success: false,
-                attemptNumber
+                // A refused destination is a decision, not an outage: the next
+                // two attempts would refuse it identically.
+                terminal: error instanceof BlockedUrlError,
+                result: {
+                    webhookId: webhook.id,
+                    event,
+                    payload,
+                    statusCode: 0,
+                    responseBody: message.slice(0, 1000),
+                    success: false,
+                    attemptNumber
+                }
             };
+        } finally {
+            // `finally`, so an attempt that rejects fast (ECONNREFUSED, DNS)
+            // does not leave a 10s timer armed on the event loop.
+            clearTimeout(timeout);
         }
     }
+
+    /**
+     * Read at most {@link MAX_RESPONSE_BYTES} of the response and cancel the
+     * rest, so a receiver cannot buffer a 10 GB body into the pod before the
+     * caller truncates it to 1000 characters.
+     */
+    private async readCappedBody(response: Response): Promise<string> {
+        const stream = response.body;
+        if (!stream || typeof stream.getReader !== "function") {
+            // A non-streaming Response — a test double, or a polyfilled fetch.
+            // The abort signal is still armed, so a stalled body still fails;
+            // only the size cap is unavailable here.
+            return await response.text().catch(() => "");
+        }
+
+        const reader = stream.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value) continue;
+                chunks.push(value);
+                total += value.byteLength;
+                if (total >= MAX_RESPONSE_BYTES) break;
+            }
+        } catch {
+            // A body that fails or aborts part-way still describes the status.
+            return new TextDecoder().decode(concat(chunks, total));
+        } finally {
+            await reader.cancel().catch(() => undefined);
+        }
+
+        return new TextDecoder().decode(concat(chunks, total));
+    }
+}
+
+function concat(chunks: Uint8Array[], total: number): Uint8Array {
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        const room = out.length - offset;
+        if (room <= 0) break;
+        out.set(chunk.length > room ? chunk.subarray(0, room) : chunk, offset);
+        offset += chunk.length;
+    }
+    return out;
 }

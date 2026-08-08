@@ -15,9 +15,11 @@ Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notificatio
 
 - **Table + event matching** — Only dispatches to webhooks whose `table` and `events` match
 - **HMAC-SHA256 signing** — Optional payload signing for receiver verification
-- **Automatic retries** — Up to 3 attempts with exponential backoff (1s → 5s → 15s)
+- **Automatic retries** — Up to 3 attempts with exponential backoff (1s → 5s)
 - **Custom headers** — Attach authorization tokens or other headers to outbound requests
-- **10-second timeout** — Requests are aborted if the receiver doesn't respond in time
+- **10-second deadline** — Covers the response body as well as the headers; the body is capped at 64 KB
+- **Destination validation** — Loopback, link-local, private and non-`http(s)` destinations are refused, and redirects are not followed
+- **Queued delivery** — `enqueueEntityChange()` returns immediately, so a collection callback never holds its transaction open on HTTP
 - **Multiple webhooks** — Multiple webhooks can match the same entity change
 
 ## Setup
@@ -28,8 +30,22 @@ Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notificatio
 import { WebhookDispatcher } from "@rebasepro/server";
 import type { WebhookConfig } from "@rebasepro/server";
 
-const dispatcher = new WebhookDispatcher();
+const dispatcher = new WebhookDispatcher({
+    // Every option is optional. `onDelivery` is the only place a queued
+    // delivery's failure surfaces — without it, a receiver that has been down
+    // for a week looks exactly like one that is working.
+    onDelivery: (result) => {
+        if (!result.success) console.error(`Webhook ${result.webhookId}: ${result.statusCode} ${result.responseBody}`);
+    }
+});
 ```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `onDelivery` | `(result: WebhookDeliveryResult) => void` | — | Called with the final result of every delivery, queued ones included. |
+| `timeoutMs` | `number` | `10000` | Deadline for one attempt, covering the response body. |
+| `allowPrivateNetworks` | `boolean` | `false` | Permit destinations that resolve to loopback/private/link-local addresses. Re-opens SSRF — only for a receiver you run yourself. |
+| `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard. For tests. |
 
 ### Register Webhooks
 
@@ -339,32 +355,53 @@ The `WebhookDispatcher` automatically retries failed deliveries with **exponenti
 | HTTP 5xx response (e.g. 500, 502) | ✅ Yes — retries up to max |
 | Network error (DNS failure, connection refused) | ✅ Yes — `statusCode: 0` |
 | Request timeout (>10 seconds) | ✅ Yes — `statusCode: 0`, `AbortError` |
+| HTTP 3xx redirect | ❌ No — terminal, the redirect is not followed |
+| Destination refused by the guard | ❌ No — terminal, `statusCode: 0` |
 
-> **WARNING FOR AGENTS**: The dispatcher retries on **all** non-2xx status codes, including 4xx client errors. There is no distinction between retryable and non-retryable HTTP errors. If the receiver returns 400 Bad Request, the dispatcher will still retry twice more.
+> **WARNING FOR AGENTS**: The dispatcher retries on **all** non-2xx status codes, including 4xx client errors. There is no distinction between retryable and non-retryable HTTP errors. If the receiver returns 400 Bad Request, the dispatcher will still retry twice more. The two exceptions are the terminal cases above: a refused destination and a redirect fail identically on every attempt, so retrying them only burns backoff.
 
 ### Timeout
 
-Each individual delivery attempt has a **10-second timeout** enforced via `AbortController`:
+Each individual delivery attempt has a **10-second deadline** enforced via `AbortController`, and it covers the response body — not just the headers:
 
 ```typescript
 const controller = new AbortController();
 const timeout = setTimeout(() => controller.abort(), 10000); // 10s
 ```
 
-If the receiver does not respond within 10 seconds, the request is aborted and treated as a failure (triggering a retry if attempts remain).
+A receiver that answers `200 OK` and then trickles one byte a minute is aborted at 10 seconds like any other slow response. The body is read up to 64 KB and the rest is cancelled, so a receiver cannot stream gigabytes into the process before the 1000-character truncation applies. Configure the deadline with `new WebhookDispatcher({ timeoutMs })`.
+
+### Destination Validation
+
+The URL is a string from a config, and configs get loaded from databases — so the dispatcher validates it before every attempt rather than trusting the caller:
+
+- the scheme must be `http:` or `https:`;
+- the host must not be `localhost` or end in `.local` / `.internal` / `.localhost` / `.home.arpa`;
+- **every** address the host resolves to must be public — loopback, link-local (`169.254.0.0/16`, the cloud metadata range), RFC1918, CGNAT, multicast and their IPv6 equivalents are refused, including IPv4-mapped forms like `::ffff:127.0.0.1`;
+- redirects are not followed (`redirect: "manual"`), because a `307` would replay the POST — signature, custom headers and all — at an address the guard never saw.
+
+A refused destination comes back as `success: false` with the reason in `responseBody`. `allowPrivateNetworks: true` turns the address check off for a receiver you run yourself; it re-opens SSRF for any caller who can choose a URL, so do not set it on a dispatcher whose configs come from user data.
+
+> **WARNING FOR AGENTS**: this is validate-then-fetch. The runtime resolves the name a second time when it connects, so a TTL-0 name that flips answers between the two can still land on a blocked address. Do not treat the guard as a licence to accept arbitrary URLs from untrusted users.
 
 ## Integration Patterns
 
 ### With Collection Callbacks
 
-The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations:
+The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
+
+> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts, per matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and delivers after the callback returns, which is why it is the pattern for callbacks.
 
 ```typescript
 // config/collections/orders.ts
 import type { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 import { WebhookDispatcher } from "@rebasepro/server";
 
-const dispatcher = new WebhookDispatcher();
+const dispatcher = new WebhookDispatcher({
+    onDelivery: (result) => {
+        if (!result.success) console.error(`Webhook ${result.webhookId} failed`, result.responseBody);
+    }
+});
 dispatcher.setWebhooks([
     {
         id: "wh_orders",
@@ -379,7 +416,7 @@ dispatcher.setWebhooks([
 const callbacks: CollectionCallbacks = {
     afterSave: async ({ id, values, previousValues, status, collection }) => {
         const event = status === "new" ? "INSERT" : "UPDATE";
-        await dispatcher.onEntityChange(
+        dispatcher.enqueueEntityChange(
             collection.slug,
             event,
             String(id),
@@ -388,7 +425,7 @@ const callbacks: CollectionCallbacks = {
         );
     },
     afterDelete: async ({ id, collection }) => {
-        await dispatcher.onEntityChange(
+        dispatcher.enqueueEntityChange(
             collection.slug,
             "DELETE",
             String(id),
@@ -473,7 +510,12 @@ import type { WebhookConfig } from "@rebasepro/server";
 
 const dispatcher = new WebhookDispatcher();
 
-// Load webhook configs from environment or database
+// Load webhook configs from environment or database.
+//
+// A URL that comes out of a table is attacker-controlled input wherever the
+// table is writable — the dispatcher's destination guard is what stops it from
+// reaching the metadata endpoint or the database, so do not disable it with
+// `allowPrivateNetworks` on a dispatcher configured this way.
 const webhooks: WebhookConfig[] = [
     {
         id: "wh_orders",
@@ -514,7 +556,7 @@ import { dispatcher } from "../lib/webhooks";
 // In a collection callback:
 afterSave: async ({ id, values, status, collection }) => {
     if (status === "new") {
-        await dispatcher.onEntityChange(collection.slug, "INSERT", String(id), values);
+        dispatcher.enqueueEntityChange(collection.slug, "INSERT", String(id), values);
     }
 },
 ```
@@ -542,6 +584,18 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 | `previousEntity` | `Record<string, unknown> \| null` | *(Optional)* The previous entity state. Only relevant for `UPDATE` events — included as `old_record` in the payload. |
 
 **Returns:** `Promise<WebhookDeliveryResult[]>` — One result per matching webhook. Empty array if no webhooks match.
+
+**Do not await this in a collection callback** — see the warning under *Integration Patterns*. It is for a custom function, a job, or anywhere else the caller genuinely wants to know the outcome before continuing.
+
+### `enqueueEntityChange(table, event, id, entity, previousEntity?): void`
+
+Same matching and same payload, queued instead of awaited. Returns `void` immediately; the deliveries run on an in-process drain loop after the caller returns, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
+
+The queue is in memory: a crash or a deploy between the enqueue and the delivery drops the event, and the receiver may see the notification a few milliseconds before the row is committed. For deliveries that must survive a restart, write an outbox row in the same transaction and drain it from a job.
+
+### `flush(): Promise<void>`
+
+Resolves when every queued delivery has finished. Call it on graceful shutdown so a deploy does not drop what is in flight, and in tests that need to observe what `enqueueEntityChange` sent.
 
 ## Event Types
 
@@ -578,20 +632,23 @@ for (const result of results) {
 | Receiver returns 500 | `500` | `"Internal Server Error"` | `false` |
 | DNS resolution failure | `0` | `"getaddrinfo ENOTFOUND ..."` | `false` |
 | Connection refused | `0` | `"connect ECONNREFUSED ..."` | `false` |
-| 10s timeout exceeded | `0` | `"The operation was aborted"` | `false` |
+| 10s deadline exceeded (headers *or* body) | `0` | `"The operation was aborted"` | `false` |
 | Network error | `0` | Error message (truncated to 1000 chars) | `false` |
+| Destination refused by the guard | `0` | `"... which is loopback (127.0.0.0/8) ..."` | `false` |
+| Receiver answers 3xx | the 3xx | `"Webhook receivers must not redirect: ..."` | `false` |
 
 ### Non-Blocking Pattern
 
-If you don't want webhook delivery to block your API response, use fire-and-forget:
+If you don't want webhook delivery to block your API response — and inside a collection callback you never do — use `enqueueEntityChange` and read the outcome from `onDelivery`:
 
 ```typescript
 afterSave: async ({ id, values, collection }) => {
-    // Fire-and-forget — don't await
-    dispatcher.onEntityChange(collection.slug, "INSERT", String(id), values)
-        .catch(err => console.error("Webhook dispatch error:", err));
+    // Returns void. Delivery happens after this callback returns.
+    dispatcher.enqueueEntityChange(collection.slug, "INSERT", String(id), values);
 },
 ```
+
+> **WARNING FOR AGENTS**: the old form of this pattern — calling `onEntityChange` without awaiting and attaching `.catch()` — reports nothing. `onEntityChange` converts every failure into a result and never rejects, so that `.catch` can only fire on a bug in the dispatcher itself. Use `enqueueEntityChange` plus `onDelivery`.
 
 ## Edge Cases and Gotchas
 
@@ -600,7 +657,10 @@ afterSave: async ({ id, values, collection }) => {
 | **No webhooks match the table/event** | Returns empty array `[]` immediately. No HTTP requests made. |
 | **Webhook URL is unreachable** | Retries 3 times with backoff (1s, 5s delays). Final result has `statusCode: 0`. |
 | **Receiver returns 4xx (e.g. 400, 404)** | Treated as failure and retried (no distinction between 4xx and 5xx). |
-| **Receiver takes >10 seconds** | Request aborted via `AbortController`. Treated as failure, retried. |
+| **Receiver takes >10 seconds** | Request aborted via `AbortController`. Treated as failure, retried. The deadline covers the response body, so a slow *body* aborts too. |
+| **Receiver streams a huge body** | Read stops at 64 KB and the rest is cancelled. |
+| **URL points at a private or link-local address** | Refused before connecting. Terminal — not retried. |
+| **Receiver answers a redirect** | Not followed. Terminal — not retried. |
 | **Multiple webhooks match same event** | All matching webhooks are dispatched **sequentially** (not in parallel). |
 | **Disabled webhook in `setWebhooks()`** | Silently filtered out. Never dispatched. |
 | **`setWebhooks()` called multiple times** | Replaces the entire list each time. Previous webhooks are discarded. |
@@ -609,7 +669,9 @@ afterSave: async ({ id, values, collection }) => {
 | **Response body very large** | Truncated to **1000 characters** in the `WebhookDeliveryResult`. |
 | **`entity` is `null` for DELETE** | Sent as `"record": null` in the payload. |
 | **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |
-| **`onEntityChange` is async** | The entire retry sequence is awaited. For INSERT with 3 failed attempts: ~6s of waiting. |
+| **`onEntityChange` is async** | The entire retry sequence is awaited: up to 10s per attempt plus 1s and 5s of backoff, so **~36s** worst case per matching webhook — not the ~6s the backoffs alone suggest. Inside a collection callback that is transaction time; use `enqueueEntityChange`. |
+| **`enqueueEntityChange` returns `void`** | Deliveries run after the caller returns. Nothing awaits them but `flush()`, and results arrive only through `onDelivery`. |
+| **Process exits with deliveries queued** | They are lost. `await dispatcher.flush()` on shutdown. |
 
 ## References
 
