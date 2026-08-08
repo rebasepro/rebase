@@ -83,6 +83,44 @@ count: 42 },
         expect(result.inverseRelationUpdates).toEqual([]);
         expect(result.joinPathRelationUpdates).toEqual([]);
     });
+
+    // ── `undefined` means "not this field", not "NULL this column" ──
+    //
+    // `update(id, { title, subtitle: payload.subtitle })` with no subtitle in
+    // the payload used to null the column: the key survived with `undefined`,
+    // `sanitizeAndConvertDates` turned it into `null`, and Drizzle's
+    // `set[col] !== undefined` test then saw a value to write. Unreachable over
+    // HTTP (JSON has no `undefined`); the in-process data API hands the
+    // caller's object straight to the driver.
+    it("drops a key whose value is undefined instead of writing NULL", () => {
+        const result = serializeDataToServer(
+            { title: "Hello",
+subtitle: undefined } as any,
+            { ...properties,
+subtitle: { type: "string",
+name: "Subtitle" } as Property }
+        );
+        expect(result.scalarData).toEqual({ title: "Hello" });
+        expect("subtitle" in result.scalarData).toBe(false);
+    });
+
+    it("still writes NULL for an explicit null", () => {
+        // The caller who means "clear this column" says so, and is obeyed.
+        const result = serializeDataToServer(
+            { title: null } as any,
+            properties
+        );
+        expect(result.scalarData).toEqual({ title: null });
+    });
+
+    it("drops an undefined value on a key the collection does not declare", () => {
+        const result = serializeDataToServer(
+            { title: "Hello",
+trigger_populated: undefined } as any,
+            properties
+        );
+        expect("trigger_populated" in result.scalarData).toBe(false);
+    });
 });
 
 // ─────────────────────────────────────────────────────────────

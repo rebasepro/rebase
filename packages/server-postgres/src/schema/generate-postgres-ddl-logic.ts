@@ -193,6 +193,11 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             const mapProp = prop as MapProperty;
             return mapProp.columnType === "json" ? "JSON" : "JSONB";
         }
+        // `{ latitude, longitude }` — a document, like `map`. It used to fall to
+        // the `TEXT` default below while the Drizzle generator emitted no column
+        // at all, which is the divergence that made the type unpersistable.
+        case "geopoint":
+            return "JSONB";
         case "array": {
             const arrayProp = prop as ArrayProperty;
             let colType = arrayProp.columnType;
@@ -244,7 +249,17 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "TEXT");
         }
         default:
-            return "TEXT";
+            // A silent `TEXT` here is how the two generators drifted apart: the
+            // database got a column for `geopoint` and the Drizzle table did
+            // not, so the type looked supported and persisted nothing. Every
+            // member of `DataType` is handled above; anything else is a
+            // generator that has not been taught the type yet, and it should
+            // say so rather than invent a column.
+            throw new Error(
+                `No Postgres column type for property '${propName}' of type ` +
+                `'${(prop as Property).type}' in collection '${collection.slug}'. ` +
+                "Add a case to `getSqlColumnType` (and to `getDrizzleColumn`, which must agree)."
+            );
     }
 };
 

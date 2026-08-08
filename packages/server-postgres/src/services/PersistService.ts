@@ -1,10 +1,11 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
+import { CollectionConfig, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
+    assertWritableColumns,
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
@@ -307,6 +308,11 @@ export class PersistService {
 
             const entityData = sanitizeAndConvertDates(serializedResult.scalarData);
 
+            // Everything below builds SQL from the table's own column list, so
+            // a key that is not a column is silently left out rather than
+            // refused. Say so here, while the key is still in hand.
+            assertWritableColumns(entityData as Record<string, unknown>, table, effectiveCollectionPath);
+
             savedId = await this.db.transaction(async (tx) => {
                 let currentId: string | number;
 
@@ -379,6 +385,23 @@ export class PersistService {
                         // Never reassign the key columns to themselves in the UPDATE
                         // branch; Postgres rejects that against the conflict target.
                         for (const info of idInfoArray) delete set[info.fieldName];
+
+                        // A conflict means the row was already there, so its
+                        // `on_create` stamp is a fact about the past and not
+                        // this write's to redecide. Bulk rows are saved with
+                        // `status: "new"` on purpose (an import's rows carry a
+                        // natural key for rows that may not exist), which
+                        // computes the creation timestamp for every row — and
+                        // the conflict-update then wrote it over the original.
+                        // A nightly re-import reset `createdAt` on everything
+                        // it touched, and every "new this week" query with it.
+                        // The INSERT branch keeps the value: it is right there.
+                        for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
+                            if ((prop as Property).type === "date"
+                                && (prop as { autoValue?: string }).autoValue === "on_create") {
+                                delete set[propName];
+                            }
+                        }
 
                         result = Object.keys(set).length > 0
                             ? await insertQuery.onConflictDoUpdate({ target, set }).returning(returningKeys)

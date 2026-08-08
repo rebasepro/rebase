@@ -1,8 +1,9 @@
 import { PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
+import { getTableColumns } from "drizzle-orm";
 import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { getTableName } from "@rebasepro/common";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 
 // Row identity is derived on both sides of the wire — the driver parses an
 // incoming address into key columns, the admin derives one from a served row —
@@ -74,6 +75,58 @@ export function getCollectionByPath(collectionPath: string, registry: PostgresCo
         throw new Error(`Collection not found: ${collectionPath}. Registered collections: [${registered}]`);
     }
     return collection;
+}
+
+/**
+ * Reject a write naming something that is not a column of the table.
+ *
+ * Drizzle builds INSERT from `Object.entries(table[Symbol.Columns])` and UPDATE
+ * from `Object.keys(tableColumns)`, so a key the table does not carry is not
+ * rejected by anything — it is *left out of the statement*. The insert answers
+ * 201 having stored nothing under that name; the update, if the key was the
+ * only one, builds `update "posts" set  where …` and Postgres raises a syntax
+ * error (SQLSTATE 42601), which is neither class 22 nor 23 and so surfaces as a
+ * 500 for what is a caller's typo.
+ *
+ * That makes this the last honest place to check, and the only one every write
+ * passes through. `assertKnownWriteFields` in the REST layer checks the same
+ * thing against the *config* and is skipped on four paths — `strictWrites:
+ * false`, a collection declaring no properties, an auth adapter that owns the
+ * body's shape, and a nested route whose target cannot be walked — and it never
+ * sees an in-process `rebase.data` write at all.
+ *
+ * It also gives `strictWrites: false` a truthful implementation. The flag is
+ * documented for "a column that really does exist which the config never
+ * declared", and skipping the config check alone could not deliver that: the
+ * value was dropped a layer later regardless. Skipping the config check and
+ * keeping this one does exactly what the flag says — the column must exist,
+ * the property need not.
+ */
+export function assertWritableColumns(
+    values: Record<string, unknown>,
+    table: PgTable,
+    collectionPath: string
+): void {
+    // Only a real Drizzle table carries a column list. A stand-in that does not
+    // (a test double, a registry entry built by hand) has nothing to check
+    // against, and inventing an answer from its own keys would reject writes
+    // over the shape of the double rather than the shape of the table.
+    const columns = getTableColumns(table) as Record<string, unknown> | undefined;
+    if (!columns || Object.keys(columns).length === 0) return;
+
+    const unknown = Object.keys(values).filter(key => !(key in columns));
+    if (unknown.length === 0) return;
+
+    // The offending keys, and deliberately not the list of real ones: this
+    // error is reachable on paths where the REST field check was skipped, and
+    // an `excludeFromApi` column is documented as never being served to a
+    // caller. Naming what was sent is the actionable half anyway.
+    throw ApiError.badRequest(
+        `'${collectionPath}' has no column${unknown.length > 1 ? "s" : ""} ` +
+        `${unknown.map(key => `'${key}'`).join(", ")}, so the value${unknown.length > 1 ? "s" : ""} ` +
+        "would have been dropped before the statement was built.",
+        "VALIDATION_UNKNOWN_FIELDS"
+    );
 }
 
 export function getTableForCollection(collection: CollectionConfig, registry: PostgresCollectionRegistry): PgTable<any> {

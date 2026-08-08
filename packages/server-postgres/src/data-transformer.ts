@@ -7,7 +7,7 @@ import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/collection-helpers";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 
 /**
  * Data transformation utilities for converting between frontend and database formats.
@@ -136,6 +136,17 @@ joinPathRelationUpdates: [] };
         // Same reasoning as `sanitizeAndConvertDates`: these keys come from the
         // request body, and no column answers to them.
         if (isPrototypePollutingKey(key)) continue;
+
+        // `{ subtitle: undefined }` means "I have no value for this", not "set
+        // this column to NULL" — it is what spreading an optional field
+        // produces, and what Drizzle itself skips. The key used to survive with
+        // `undefined` and `sanitizeAndConvertDates` then turned it into `null`,
+        // so `update(id, { title, subtitle: payload.subtitle })` wiped
+        // `subtitle` whenever the payload happened not to carry one. Unreachable
+        // over HTTP (JSON has no `undefined`); the in-process data API passes
+        // the caller's object straight through, so it is reachable there.
+        if (value === undefined) continue;
+
         const property = properties[key as keyof M] as Property;
 
         // Coerce empty strings to null for any field that acts as a foreign key
@@ -153,7 +164,7 @@ joinPathRelationUpdates: [] };
             if (relation) {
                 if (relation.kind === "belongsTo") {
                     // Owning relation: Map relation object to FK column on current table
-                    const serializedValue = serializePropertyToServer(effectiveValue, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
                     if (serializedValue !== undefined) {
                         result[relation.localKey] = serializedValue;
                     }
@@ -161,7 +172,7 @@ joinPathRelationUpdates: [] };
                     continue;
                 } else if (hasForeignKeyOnTarget(relation)) {
                     // Inverse relation: Need to update the target table's FK
-                    const serializedValue = serializePropertyToServer(effectiveValue, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
                     inverseRelationUpdates.push({
                         relationKey: key,
                         relation,
@@ -175,7 +186,7 @@ joinPathRelationUpdates: [] };
                     // There used to be two arms here — "owning" and "inverse"
                     // joinPath — but a join chain has no owning side, so they
                     // only ever differed by which list they pushed to.
-                    const serializedValue = serializePropertyToServer(effectiveValue, property);
+                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
                     if (relation.cardinality === "one") {
                         // Ordering matters: PersistService applies these BEFORE
                         // the main UPDATE, so the mapping reads the pre-update
@@ -197,7 +208,7 @@ joinPathRelationUpdates: [] };
             }
         }
 
-        result[key] = serializePropertyToServer(effectiveValue, property);
+        result[key] = serializePropertyToServer(effectiveValue, property, key);
     }
 
     return {
@@ -208,19 +219,41 @@ joinPathRelationUpdates: [] };
 }
 
 /**
- * Serialize a single property value for database storage
+ * How to name a rejected value in an error, without quoting it back.
+ *
+ * The value may be anything the caller sent, including a secret in the wrong
+ * field, so the message describes its shape rather than echoing it — an echoed
+ * value ends up in logs and in error-reporting services.
  */
-export function serializePropertyToServer(value: unknown, property: Property): unknown {
+function describeValue(value: unknown): string {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return "an array";
+    if (value instanceof Date) return "a date";
+    const type = typeof value;
+    return type === "object" ? "an object" : `a ${type}`;
+}
+
+/**
+ * Serialize a single property value for database storage.
+ *
+ * `propertyKey` is only ever used to phrase errors and warnings. Without it the
+ * one trace a bad value left was `Expected array value for array property, got
+ * string` — no collection, no property, no value, which in the log of a
+ * thousand-row import names nothing at all.
+ */
+export function serializePropertyToServer(value: unknown, property: Property, propertyKey?: string): unknown {
     if (value === null || value === undefined) {
         return value;
     }
+
+    const fieldLabel = propertyKey ? `'${propertyKey}'` : `a '${property.type}' field`;
 
     const propertyType = property.type;
 
     switch (propertyType) {
         case "relation":
             if (Array.isArray(value)) {
-                return value.map(v => serializePropertyToServer(v, property));
+                return value.map(v => serializePropertyToServer(v, property, propertyKey));
             } else if (typeof value === "object" && value !== null && "id" in value) {
                 return (value as Record<string, unknown>).id;
             }
@@ -230,7 +263,7 @@ export function serializePropertyToServer(value: unknown, property: Property): u
         case "array":
             if (Array.isArray(value)) {
                 if (property.of) {
-                    return value.map(item => serializePropertyToServer(item, property.of as Property));
+                    return value.map(item => serializePropertyToServer(item, property.of as Property, propertyKey));
                 } else if (property.oneOf) {
                     const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
                     const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
@@ -243,15 +276,50 @@ export function serializePropertyToServer(value: unknown, property: Property): u
                         if (!type || !childProperty) return e;
                         return {
                             [typeField]: type,
-                            [valueField]: serializePropertyToServer(rec[valueField], childProperty)
+                            [valueField]: serializePropertyToServer(rec[valueField], childProperty, propertyKey)
                         };
                     });
                 }
                 return value;
             }
-            // Non-array value for an array property — coerce to avoid .map() crashes downstream
-            logger.warn(`Expected array value for array property, got ${typeof value}. Coercing to empty array.`);
-            return [];
+            // A non-array value used to become `[]` here — the caller's value
+            // destroyed, answered 200/201, and the row reading back as an empty
+            // list on every later fetch. `POST /posts {"tags":"news"}` from a
+            // client that sent a single tag as a scalar, or a CSV import that
+            // did not split a column, was unrecoverable data loss on a `text[]`
+            // column. The stated reason for coercing — "avoid .map() crashes
+            // downstream" — is better served by refusing the value at the
+            // boundary, which is what a 400 does.
+            //
+            // The read-side twin (`parsePropertyFromServer`) still coerces, and
+            // should: a row already in the database is not this caller's fault.
+            throw ApiError.badRequest(
+                `${fieldLabel} expects an array, but received ${describeValue(value)}.`,
+                "VALIDATION_INVALID_VALUE"
+            );
+
+        case "geopoint": {
+            // Stored as `jsonb`, in the `{ latitude, longitude }` shape the
+            // OpenAPI schema and the generated TS type both promise. Nothing
+            // used to handle `geopoint` on either side, which is why the type
+            // was documented, code-generated, admin-editable — and dropped.
+            if (typeof value !== "object" || Array.isArray(value)) {
+                throw ApiError.badRequest(
+                    `${fieldLabel} expects a geopoint object with \`latitude\` and \`longitude\`, ` +
+                    `but received ${describeValue(value)}.`,
+                    "VALIDATION_INVALID_VALUE"
+                );
+            }
+            const point = value as Record<string, unknown>;
+            if (typeof point.latitude !== "number" || typeof point.longitude !== "number") {
+                throw ApiError.badRequest(
+                    `${fieldLabel} expects a geopoint object with numeric \`latitude\` and \`longitude\`.`,
+                    "VALIDATION_INVALID_VALUE"
+                );
+            }
+            return { latitude: point.latitude,
+longitude: point.longitude };
+        }
 
 
         case "map":
@@ -260,7 +328,7 @@ export function serializePropertyToServer(value: unknown, property: Property): u
                 for (const [subKey, subValue] of Object.entries(value)) {
                     const subProperty = (property.properties as Properties)[subKey];
                     if (subProperty) {
-                        result[subKey] = serializePropertyToServer(subValue, subProperty);
+                        result[subKey] = serializePropertyToServer(subValue, subProperty, propertyKey ? `${propertyKey}.${subKey}` : subKey);
                     } else {
                         result[subKey] = subValue;
                     }
@@ -624,6 +692,13 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
                 const parsed = parseFloat(value);
                 return isNaN(parsed) ? null : parsed;
             }
+            return value;
+
+        case "geopoint":
+            // A `jsonb` column, so node-postgres hands back the object already.
+            // Named explicitly rather than left to `default:`, which would run
+            // it past the Buffer probe — and because a type with a write
+            // serializer and no read counterpart is how this one went missing.
             return value;
 
         case "vector": {

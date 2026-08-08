@@ -164,9 +164,12 @@ path: "authors" }
                 .toEqual(["a", "b", "c"]);
         });
 
-        it("should coerce non-array values to empty array", () => {
-            expect(serializePropertyToServer("not-an-array", arrayOfStringsProp))
-                .toEqual([]);
+        // Was "should coerce non-array values to empty array". The coercion it
+        // asserted threw the caller's value away and answered 201 — a test that
+        // pinned a bug in place rather than a behaviour.
+        it("should reject a non-array value for an array property", () => {
+            expect(() => serializePropertyToServer("not-an-array", arrayOfStringsProp, "tags"))
+                .toThrow(/'tags' expects an array/);
         });
 
         // --- Null safety ---
@@ -197,17 +200,16 @@ path: "authors" }
             expect(result).toEqual(["1", null, "2"]);
         });
 
-        it("should coerce number value to empty array for array property", () => {
-            expect(serializePropertyToServer(42, arrayOfStringsProp)).toEqual([]);
+        it("should reject a number value for an array property", () => {
+            expect(() => serializePropertyToServer(42, arrayOfStringsProp)).toThrow(/expects an array/);
         });
 
-        it("should coerce boolean value to empty array for array property", () => {
-            expect(serializePropertyToServer(true, arrayOfStringsProp)).toEqual([]);
+        it("should reject a boolean value for an array property", () => {
+            expect(() => serializePropertyToServer(true, arrayOfStringsProp)).toThrow(/expects an array/);
         });
 
-        it("should coerce object value to empty array for array property", () => {
-            const obj = { a: 1 };
-            expect(serializePropertyToServer(obj, arrayOfStringsProp)).toEqual([]);
+        it("should reject an object value for an array property", () => {
+            expect(() => serializePropertyToServer({ a: 1 }, arrayOfStringsProp)).toThrow(/expects an array/);
         });
     });
 

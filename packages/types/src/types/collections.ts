@@ -211,11 +211,16 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      * Whether a write naming a field this collection does not declare is
      * rejected with a 400. Defaults to `true`.
      *
-     * Set to `false` to let unknown keys through to the database, which is what
-     * happened before this existed: a typo reached the INSERT and came back as
-     * a Postgres error about a column, or — where a column really does exist
-     * that the config never declared, populated by a trigger or a default —
-     * quietly worked. The second case is the reason for the escape hatch.
+     * Set to `false` where a column really does exist that the config never
+     * declared — populated by a trigger, or introspected rather than declared —
+     * and callers need to write it. The column still has to exist: the driver
+     * checks the key against the table's own columns whatever this is set to,
+     * because a key with no column behind it is not passed to the database and
+     * refused, it is dropped from the statement and answered 201.
+     *
+     * It does not let a typo through to Postgres for Postgres to judge. That is
+     * what this flag was documented as doing, and no such judgment ever
+     * happened.
      */
     strictWrites?: boolean;
 
