@@ -45,23 +45,24 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 
 `rebase_project_add` accepts any `baseUrl`, and the CLI tools connect with whatever `DATABASE_URL` the project's `.env` declares. That means the same tool list that edits a scratch database on your laptop can drop production rows — with nothing in between but the assistant's judgement about which project is currently active.
 
-These tools are therefore refused unless their target is on the loopback interface:
+**Every tool that changes the target environment is refused unless that target is on the loopback interface.** The gate is a list of what is *not* gated, so a newly added tool is protected by default:
 
-| Tool | Target checked |
-|---|---|
-| `rebase_db_push` | `DATABASE_URL` |
-| `rebase_db_migrate` | `DATABASE_URL` |
-| `rebase_db_branch_delete` | `DATABASE_URL` |
-| `delete_document` | project `baseUrl` |
-| `delete_user` | project `baseUrl` |
-| `storage_delete_object` | project `baseUrl` |
-| `rebase_auth_reset_password` | project `baseUrl` |
+- **Not gated — reads:** `rebase_schema_introspect`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`.
+- **Not gated — local only:** `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
+- **Gated against `DATABASE_URL`:** every other CLI tool — `rebase_db_push`, `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
+- **Gated against the project `baseUrl`:** every other SDK tool — `create_document`, `update_document`, `delete_document`, `create_user`, `update_user`, `delete_user`, `rebase_auth_reset_password`, `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`, `invoke_function`.
 
-The two targets are not interchangeable: CLI tools never see `baseUrl`, so a localhost backend sitting next to a production `DATABASE_URL` is checked against the database, not the backend.
+The two targets are not interchangeable: CLI tools never see `baseUrl`, so a localhost backend sitting next to a production `DATABASE_URL` is checked against the database, not the backend. `create_user` and `update_user` set `roles`, so they can mint an admin; `invoke_function` calls any function with any HTTP method; `cron_toggle_job` disables a scheduled backup silently. None of those is recoverable in the sense "additive" suggests, which is why the list is now the other way round.
 
-Only loopback (`localhost`, `127.0.0.0/8`, `::1`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop. Read-only tools, and writes that only add data (`create_document`, `create_user`), are not gated.
+The `DATABASE_URL` the gate checks is resolved the way the spawned CLI resolves it — ambient environment first, then `<root>/.env`, `<root>/backend/.env`, `DOTENV_CONFIG_PATH` and the parent directory, including the `ADMIN_CONNECTION_STRING` fallback the branch commands accept. **If no connection string can be resolved at all, the DB tools are refused**: an unverifiable target is not a safe one, and the child does its own resolution from files this process may not see.
+
+Only loopback (`localhost`, `127.0.0.0/8`, `::1`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop.
 
 Set `REBASE_MCP_ALLOW_REMOTE_WRITES=true` to opt out.
+
+## Untrusted Data Marking
+
+Rows, user records, storage listings, cron jobs, function responses and CLI output are returned inside an explicit `<<<UNTRUSTED_DATA …>>>` envelope. Anything stored in your database was written by somebody, and it arrives on the same channel as the tool contract the assistant is following; the envelope tells the model to treat it as inert content rather than instructions. It is a marker, not a sandbox — an assistant with these tools is only as safe as the content you let it read.
 
 ---
 
