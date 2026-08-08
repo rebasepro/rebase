@@ -375,7 +375,7 @@ timestamps, and reverse-iterate instead of copying.
   returns a path *shape*, never a full path; `createMetricsMiddleware:306` drops the `collection`
   label unless the slug is in the schema-derived set installed by `boot.ts:270`; no user id, row id
   or path segment containing an id is ever a label. The `MAX_SERIES` cap and the
-  ``/`` separator choice are both correct and well argued in comments.
+  `\x1f`/`\x1e` separator choice are both correct and well argued in comments.
 * **The status label is right even when the handler throws.** Hono's `compose`
   (`hono@4.13.0/dist/compose.js:20-33`) catches at the frame that threw and runs `onError` there,
   assigning `context.res` before the exception would reach an outer middleware — so the metrics
