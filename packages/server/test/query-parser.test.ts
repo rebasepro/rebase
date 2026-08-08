@@ -88,10 +88,15 @@ limit: "10" });
         expect(result.offset).toBeUndefined();
     });
 
-    it("clamps an over-large limit to the hard maximum", () => {
-        // The core DoS fix: `?limit=100000000` must never be honoured verbatim.
-        const result = parseQueryOptions({ limit: "100000000" });
-        expect(result.limit).toBe(MAX_LIST_LIMIT);
+    it("refuses an over-large limit with a 400 naming the ceiling", () => {
+        // The core DoS fix was to stop honouring `?limit=100000000` verbatim.
+        // Answering it with 1 000 rows was the second half of the bug: a page
+        // the caller cannot distinguish from the end of the collection. It is a
+        // 400 now, and the message has to carry the number to page by.
+        expectBadRequest({ limit: "100000000" }, "INVALID_LIMIT");
+        expectBadRequest({ limit: String(MAX_LIST_LIMIT + 1) }, "INVALID_LIMIT");
+        expect(() => parseQueryOptions({ limit: "100000000" }))
+            .toThrow(new RegExp(`maximum of ${MAX_LIST_LIMIT}`));
     });
 
     it("honours a limit at or below the maximum unchanged", () => {
@@ -99,19 +104,29 @@ limit: "10" });
         expect(parseQueryOptions({ limit: String(MAX_LIST_LIMIT) }).limit).toBe(MAX_LIST_LIMIT);
     });
 
-    it("clamps zero and negative limits up to 1 (never an unlimited bypass)", () => {
-        expect(parseQueryOptions({ limit: "0" }).limit).toBe(1);
-        expect(parseQueryOptions({ limit: "-5" }).limit).toBe(1);
+    it("refuses zero and negative limits (never an unlimited bypass, never a silent 1 row)", () => {
+        expectBadRequest({ limit: "0" }, "INVALID_LIMIT");
+        expectBadRequest({ limit: "-5" }, "INVALID_LIMIT");
     });
 
-    it("falls back to the default when the limit is non-numeric", () => {
-        expect(parseQueryOptions({ limit: "abc" }).limit).toBe(DEFAULT_LIST_LIMIT);
+    it("refuses a non-numeric limit rather than serving the default", () => {
+        // `?limit=1O0` (letter O) used to serve 50 rows and say nothing.
+        expectBadRequest({ limit: "abc" }, "INVALID_LIMIT");
+        expectBadRequest({ limit: "50rows" }, "INVALID_LIMIT");
+        // An *empty* parameter is still the caller naming no window at all.
         expect(parseQueryOptions({ limit: "" }).limit).toBe(DEFAULT_LIST_LIMIT);
     });
 
     it("respects caller-supplied default and max bounds", () => {
         expect(parseQueryOptions({}, { defaultLimit: 25 }).limit).toBe(25);
-        expect(parseQueryOptions({ limit: "9999" }, { maxLimit: 200 }).limit).toBe(200);
+        expect(parseQueryOptions({ limit: "200" }, { maxLimit: 200 }).limit).toBe(200);
+        expect(() => parseQueryOptions({ limit: "9999" }, { maxLimit: 200 })).toThrow(/maximum of 200/);
+    });
+
+    it("refuses the limit before it can be used as a page stride", () => {
+        // `?page=` resolves the limit early, to stride by it. That resolution
+        // has to refuse too, or a rejected read still computes an offset.
+        expectBadRequest({ page: "3", limit: "100000000" }, "INVALID_LIMIT");
     });
 
     it("defaults a vector search to the vector page size, not the list default", () => {
@@ -126,13 +141,12 @@ limit: "10" });
         expect(result.vectorSearch).toBeDefined();
     });
 
-    it("still clamps an explicit over-large limit on a vector search", () => {
-        const result = parseQueryOptions({
+    it("still refuses an explicit over-large limit on a vector search", () => {
+        expectBadRequest({
             vector_search: "embedding",
             vector: "[0.1,0.2,0.3]",
             limit: "100000000"
-        });
-        expect(result.limit).toBe(MAX_LIST_LIMIT);
+        }, "INVALID_LIMIT");
     });
 });
 

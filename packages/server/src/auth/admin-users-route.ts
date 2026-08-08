@@ -21,7 +21,7 @@ import { prepareAdminUserValues, finalizeAdminUserCreation } from "./admin-user-
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AdminUser, AuthCollectionConfig } from "@rebasepro/types";
-import { resolveClientListLimit } from "@rebasepro/types";
+import { resolveListLimitParam } from "../api/rest/query-parser";
 import { logger } from "../utils/logger";
 
 export interface AdminUsersRouteConfig {
@@ -181,9 +181,11 @@ offset: 0 });
         const orderBy = c.req.query("orderBy");
         const orderDir = c.req.query("orderDir") as "asc" | "desc" | undefined;
 
-        // Same bounded guarantee as every other list ingress: clamp to the
-        // hard max and coerce bad input, keeping this endpoint's own 25 default.
-        const limit = resolveClientListLimit(limitParam, { defaultLimit: 25 });
+        // Same bounded guarantee as every other list ingress: an absent limit
+        // gets this endpoint's own 25 default, and one above the ceiling is a
+        // 400 naming it rather than a shorter page that reads like the end of
+        // the user list.
+        const limit = resolveListLimitParam(limitParam, { defaultLimit: 25 });
         const offset = offsetParam ? Math.max(0, parseInt(offsetParam, 10) || 0) : 0;
 
         const result = await authRepo.listUsersPaginated({

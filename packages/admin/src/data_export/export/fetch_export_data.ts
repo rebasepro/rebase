@@ -3,9 +3,10 @@ import { Entity, FindParams, FindResponse } from "@rebasepro/types";
 /**
  * Rows asked for per request.
  *
- * Kept at or below the server's `MAX_LIST_LIMIT`, which clamps a larger limit
- * *silently* — asking for 100 000 and receiving 1 000 looks exactly like a
- * collection with 1 000 rows. The walk never trusts the page size it asked for:
+ * Kept at or below the server's `MAX_LIST_LIMIT`, which is now the largest page
+ * a read will serve *and refuses* anything larger — it used to clamp silently,
+ * and asking for 100 000 while receiving 1 000 looked exactly like a collection
+ * with 1 000 rows in it. The walk still never trusts the page size it asked for:
  * it advances by the rows it was actually handed.
  */
 export const EXPORT_PAGE_SIZE = 500;

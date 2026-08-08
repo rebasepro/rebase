@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
@@ -487,12 +487,25 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
             // Bound the client-supplied limit with the SAME guarantee the REST
-            // ingress applies (`resolveClientListLimit`): clamp to the hard max
-            // and default an absent limit by mode. A subscription is re-fetched
-            // on every matching write, so an unbounded one is a DoS amplified
-            // per write — resolve it once and reuse for the stored request and
-            // the initial fetch.
-            const boundedLimit = resolveClientListLimit(request.limit);
+            // ingress applies (`resolveClientListLimit`): default an absent
+            // limit by mode, refuse one above the ceiling. A subscription is
+            // re-fetched on every matching write, so an unbounded one is a DoS
+            // amplified per write — resolve it once and reuse for the stored
+            // request and the initial fetch.
+            //
+            // Refusing matters more here than on the REST route: a
+            // `collection_update` frame carries rows and nothing else — no
+            // `total`, no `hasMore` — so a subscriber handed a quietly smaller
+            // page has no way at all to learn it is not seeing the collection.
+            let boundedLimit: number;
+            try {
+                boundedLimit = resolveClientListLimit(request.limit);
+            } catch (e) {
+                if (!(e instanceof ListLimitError)) throw e;
+                logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
+                this.sendError(clientId, e.message, subscriptionId, "INVALID_LIMIT");
+                return;
+            }
 
             // Store subscription with full request parameters and auth context for RLS
             this._subscriptions.set(subscriptionId, {

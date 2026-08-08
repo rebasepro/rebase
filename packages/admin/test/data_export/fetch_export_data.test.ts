@@ -5,10 +5,16 @@ import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "../../src/data_expor
 /**
  * A collection accessor that answers the way the REST ingress does.
  *
- * The point of the fixture is the clamp: an absent `limit` resolves to
- * `DEFAULT_LIST_LIMIT` (50) and a supplied one is clamped to `MAX_LIST_LIMIT`
- * without an error or a header — so a walk that trusts the page size it asked
- * for, or that never asks for one, silently reads the first page and stops.
+ * The point of the fixture is what an absent `limit` costs: it resolves to
+ * `DEFAULT_LIST_LIMIT` (50), so a walk that never asks for a page size reads
+ * the first page and calls it the collection.
+ *
+ * `maxLimit` models the *other* half — a backend that hands back fewer rows
+ * than it was asked for. Rebase itself no longer does that (an over-large
+ * `limit` is refused outright rather than shrunk), which is why the clamp here
+ * is written out rather than borrowed from `resolveClientListLimit`: the walk
+ * still must not assume the page it asked for is the page it got, because an
+ * older or third-party backend with a lower ceiling will do exactly this.
  */
 function makeAccessor(rowCount: number, options: { reportMeta?: boolean, maxLimit?: number } = {}) {
     const calls: FindParams<any>[] = [];
@@ -23,7 +29,8 @@ function makeAccessor(rowCount: number, options: { reportMeta?: boolean, maxLimi
         accessor: {
             async find(params?: FindParams<any>): Promise<FindResponse<any>> {
                 calls.push(params ?? {});
-                const limit = resolveClientListLimit(params?.limit, { maxLimit: options.maxLimit });
+                const asked = resolveClientListLimit(params?.limit);
+                const limit = options.maxLimit ? Math.min(asked, options.maxLimit) : asked;
                 const offset = params?.offset ?? 0;
                 const data = rows.slice(offset, offset + limit);
                 return {

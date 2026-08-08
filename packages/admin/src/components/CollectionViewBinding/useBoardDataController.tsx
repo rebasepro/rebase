@@ -1,5 +1,5 @@
 
-import { Entity, FilterValues } from "@rebasepro/types";
+import { Entity, FilterValues, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
@@ -220,6 +220,14 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
         // Skip if we're in the middle of cleanup
         if (isCleaningUpRef.current) return;
 
+        // `itemCount` grows by one page per "load more" click with nothing
+        // stopping it, and a read above `MAX_LIST_LIMIT` is refused rather than
+        // trimmed — a column would stop loading with an error instead of
+        // stopping at the ceiling. Ask for what the platform serves; `hasMore`
+        // below still compares against the count the board asked for, so the
+        // column reports itself exhausted exactly where it did before.
+        const requestedCount = Math.min(itemCount, MAX_LIST_LIMIT);
+
         const currentDataClient = dataClientRef.current;
         const currentCollection = collectionRef.current;
         const currentContext = contextRef.current;
@@ -406,7 +414,7 @@ values: { ...e.values,
 
         const fetchOnce = () => accessor.find({
             where: whereFilter,
-            limit: itemCount,
+            limit: requestedCount,
             orderBy: orderByParam,
             include: includeParams,
             searchString: currentSearchString
@@ -445,7 +453,7 @@ values: { ...e.values,
             let liveDataReceived = false;
             const unsubscribe = accessor.listen({
                 where: whereFilter,
-                limit: itemCount,
+                limit: requestedCount,
                 orderBy: orderByParam,
                 include: includeParams,
                 // Read into a local at the top of this function and then used

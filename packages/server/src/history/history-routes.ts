@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { HonoEnv } from "../api/types";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { ApiError, errorHandler } from "../api/errors";
+import { resolveListLimitParam } from "../api/rest/query-parser";
 import { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 import { httpMethodToOperation, isOperationAllowed } from "../auth/api-keys/api-key-permission-guard";
@@ -13,6 +14,11 @@ export interface HistoryService {
     fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
     fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
 }
+
+/** Entries returned when the caller names no `?limit`. */
+const HISTORY_DEFAULT_LIMIT = 20;
+/** Most entries one history read will serve. Above it the request is refused. */
+const HISTORY_MAX_LIMIT = 100;
 
 export function createHistoryRoutes(params: {
     historyService: HistoryService;
@@ -84,15 +90,22 @@ export function createHistoryRoutes(params: {
      * GET /:slug/:id/history - List history entries for a entity
      *
      * Query params:
-     *   limit  (default 20)
+     *   limit  (default 20, maximum 100 — above that the request is refused)
      *   offset (default 0)
      */
     router.get("/:slug/:id/history", async (c) => {
         const slug = c.req.param("slug");
         const id = c.req.param("id");
-        const parsedLimit = parseInt(c.req.query("limit") ?? "20", 10);
+        // This route has its own, tighter window (20/100), but the *rule* is
+        // the shared one: an absent limit defaults, and a limit this route will
+        // not serve is a 400 naming the ceiling. It used to clamp silently, so
+        // `?limit=1000` answered with 100 rows and a `meta` that agreed with
+        // itself — a caller could only tell by comparing what it asked for.
+        const limit = resolveListLimitParam(c.req.query("limit"), {
+            defaultLimit: HISTORY_DEFAULT_LIMIT,
+            maxLimit: HISTORY_MAX_LIMIT
+        });
         const parsedOffset = parseInt(c.req.query("offset") ?? "0", 10);
-        const limit = Number.isNaN(parsedLimit) ? 20 : parsedLimit;
         const offset = Number.isNaN(parsedOffset) ? 0 : parsedOffset;
 
         // Resolve the collection to get the actual table name
@@ -112,11 +125,12 @@ export function createHistoryRoutes(params: {
 
         const tableName = collection.slug;
 
-        // Echo back the limit and offset that were actually applied, not the
-        // ones asked for. A client paginating on `meta` — which is what `meta`
-        // is for — would otherwise advance by the number it requested while
-        // receiving the clamped number, and skip every row in between.
-        const appliedLimit = Math.min(limit, 100);
+        // Echo back the offset that was actually applied, not the one asked
+        // for. A client paginating on `meta` — which is what `meta` is for —
+        // would otherwise advance by the number it requested while receiving
+        // the clamped number, and skip every row in between. (The limit can no
+        // longer differ from the request: an unservable one was refused above.)
+        const appliedLimit = limit;
         const appliedOffset = Math.max(offset, 0);
 
         const result = await historyService.fetchHistory(tableName, id, {

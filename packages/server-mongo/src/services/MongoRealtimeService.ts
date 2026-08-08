@@ -14,7 +14,9 @@ import {
     CollectionSubscriptionConfig,
     SingleSubscriptionConfig,
     WebSocketMessage,
-    User
+    User,
+    ListLimitError,
+    resolveClientListLimit
 } from "@rebasepro/types";
 import { WebSocket } from "ws";
 
@@ -399,6 +401,28 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                 const subscriptionId = message.payload?.subscriptionId ?? message.subscriptionId;
                 if (!subscriptionId) return;
 
+                // The same list bound the Postgres socket and every REST route
+                // apply. This ingress applied none: an absent limit reached the
+                // driver as `undefined` and emitted no `.limit()` at all, so one
+                // subscribe frame streamed the whole collection — and re-streamed
+                // it on every matching write. An over-large limit is refused
+                // rather than shrunk, because a `collection_update` frame carries
+                // no `total` or `hasMore` for the client to notice with.
+                let boundedLimit: number;
+                try {
+                    boundedLimit = resolveClientListLimit(message.payload?.limit);
+                } catch (e) {
+                    if (!(e instanceof ListLimitError)) throw e;
+                    logger.warn(`⚠️ [MongoRealtime] Refused subscription to '${message.payload?.path}': ${e.message}`);
+                    ws.send(JSON.stringify({
+                        type: "ERROR",
+                        subscriptionId,
+                        payload: { error: { message: e.message, code: "INVALID_LIMIT" } },
+                        error: e.message
+                    }));
+                    return;
+                }
+
                 this.subscribeToCollection(
                     subscriptionId,
                     {
@@ -407,7 +431,7 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                         filter: message.payload?.filter,
                         orderBy: message.payload?.orderBy,
                         order: message.payload?.order,
-                        limit: message.payload?.limit,
+                        limit: boundedLimit,
                         startAfter: message.payload?.startAfter,
                         searchString: message.payload?.searchString,
                         authContext

@@ -1,5 +1,5 @@
-import type { FilterValues, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
-import { toCanonicalOp, resolveClientListLimit, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import type { FilterValues, ListLimitBounds, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
+import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
@@ -183,7 +183,7 @@ function parseOrderByParam(raw: unknown): OrderByEntry[] | undefined {
 }
 
 // Re-exported for callers/tests that reference the REST list bounds. The
-// numbers and clamp live in `@rebasepro/types` so the REST parser and the
+// numbers and the rule live in `@rebasepro/types` so the REST parser and the
 // WebSocket ingress enforce ONE shared guarantee. See `resolveClientListLimit`.
 export { DEFAULT_LIST_LIMIT, DEFAULT_VECTOR_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 
@@ -199,8 +199,32 @@ export interface ListLimitOptions {
      * text-search reads — a vector search falls back to its own default (10).
      */
     defaultLimit?: number;
-    /** Upper bound clamped onto any client-supplied `?limit`. */
+    /** Largest `?limit` a client may ask for. A larger one is a 400, not a clamp. */
     maxLimit?: number;
+}
+
+/**
+ * {@link resolveClientListLimit} for an HTTP route: the same bounds, answered
+ * with a 400 rather than a 500.
+ *
+ * The shared resolver throws a `ListLimitError`, which carries `status` — but
+ * the Hono error handler discriminates on `statusCode`, so an unconverted one
+ * reaches the client as `INTERNAL_ERROR` with its message stripped, telling the
+ * caller nothing about the parameter it got wrong. Every REST list ingress
+ * routes its `limit` through here so all of them name the ceiling the same way.
+ */
+export function resolveListLimitParam(
+    rawLimit: number | string | null | undefined,
+    opts: ListLimitBounds & { vectorSearch?: boolean } = {}
+): number {
+    try {
+        return resolveClientListLimit(rawLimit, opts);
+    } catch (e) {
+        if (e instanceof ListLimitError) {
+            throw ApiError.badRequest(e.message, "INVALID_LIMIT");
+        }
+        throw e;
+    }
 }
 
 /**
@@ -222,7 +246,7 @@ export function parseQueryOptions(
         // Page stride uses the same bounded page size the read will use, so
         // pages neither overlap nor gap. (Vector search never paginates by
         // page, so the plain/text default is correct here.)
-        const limit = resolveClientListLimit(rawLimit, {
+        const limit = resolveListLimitParam(rawLimit, {
             defaultLimit: limits.defaultLimit,
             maxLimit: limits.maxLimit
         });
@@ -352,11 +376,12 @@ export function parseQueryOptions(
     }
 
     // Resolve the limit LAST — once we know whether this is a vector search —
-    // so a client-supplied limit is clamped to the hard max and an absent one
-    // falls back to the correct mode default (plain/text = defaultLimit, vector
-    // = 10). Without this a bare `GET /<collection>` would return the whole
-    // table. Shared with the WebSocket ingress via `resolveClientListLimit`.
-    options.limit = resolveClientListLimit(rawLimit, {
+    // so a client-supplied limit above the ceiling is refused with a 400 and an
+    // absent one falls back to the correct mode default (plain/text =
+    // defaultLimit, vector = 10). Without this a bare `GET /<collection>` would
+    // return the whole table. Shared with the WebSocket ingress via
+    // `resolveClientListLimit`.
+    options.limit = resolveListLimitParam(rawLimit, {
         vectorSearch: !!options.vectorSearch,
         defaultLimit: limits.defaultLimit,
         maxLimit: limits.maxLimit

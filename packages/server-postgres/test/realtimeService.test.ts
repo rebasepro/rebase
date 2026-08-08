@@ -112,7 +112,7 @@ subscriptionId: "sub-1" }
     });
 
     describe("Subscription limit bounds", () => {
-        it("clamps an over-large client limit to the hard maximum on subscribe", async () => {
+        it("refuses an over-large client limit on subscribe instead of clamping it", async () => {
             const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-1", ws);
 
@@ -121,14 +121,20 @@ subscriptionId: "sub-1" }
                 payload: { path: "posts", subscriptionId: "sub-1", limit: 100000000 }
             });
 
-            // Initial fetch must go out with the clamped limit, never 100000000.
-            expect(mockFetchCollection).toHaveBeenCalledWith(
-                "posts",
-                expect.objectContaining({ limit: MAX_LIST_LIMIT })
-            );
-            // The stored subscription (reused for every refetch) is bounded too.
-            const stored = realtimeService.subscriptions.get("sub-1");
-            expect(stored.collectionRequest.limit).toBe(MAX_LIST_LIMIT);
+            // A `collection_update` frame carries rows and nothing else — no
+            // `total`, no `hasMore` — so a subscriber quietly handed 1 000 rows
+            // has no way at all to learn it is not seeing the collection. The
+            // frame that goes back has to be the error.
+            expect(mockFetchCollection).not.toHaveBeenCalled();
+            expect(realtimeService.subscriptions.has("sub-1")).toBe(false);
+
+            const sent = ws.send.mock.calls.map((c: unknown[]) => JSON.parse(c[0] as string));
+            const error = sent.find((m: { type: string }) => m.type === "error");
+            expect(error).toBeDefined();
+            expect(error.subscriptionId).toBe("sub-1");
+            expect(error.payload.error.code).toBe("INVALID_LIMIT");
+            expect(error.payload.error.message).toContain(String(MAX_LIST_LIMIT));
+            expect(sent.some((m: { type: string }) => m.type === "collection_update")).toBe(false);
         });
 
         it("defaults an absent client limit instead of fetching the whole table", async () => {
