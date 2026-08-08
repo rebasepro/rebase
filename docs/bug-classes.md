@@ -1729,3 +1729,73 @@ coverage until you ask which files contain none. Every surface that shows code
 to a human — marketing pages, agent skills, READMEs, slides — is documentation
 whether or not it lives in the docs directory, and the ones stored as markup are
 exactly the ones no tool will volunteer to check.
+
+---
+
+## 35. A generator that writes a name instead of quoting it
+
+Class 13 says nothing typechecks a generator's output. This is the other half:
+nothing *escapes* it either. A generator assembling source text does two things
+with every value it is handed — writes it as a **name**, or writes it inside a
+**literal** — and both are wrong by default.
+
+Written as a name, any value that is not a JavaScript identifier stops the file
+parsing. The SDK generator emitted every column as a bare key, `generateCollectionFile`
+emitted every column and every table name that way, and `generateSchema` did it
+for columns and foreign keys. `order`, `full name`, `2fa_enabled` and `créé_à`
+are all ordinary quoted Postgres identifiers, and in a `baas` project the
+property keys **are** the column names, so this is not a hypothetical schema.
+
+Written inside a literal, any value containing the quote character closes it
+early and continues as code. Enum values went into the Drizzle schema between
+*single* quotes, so `O'Brien` broke the file — not an attack, a surname. And in
+the SDK generator the values are not even local: `rebase generate-sdk --from <url>`
+takes every slug, column and enum value from a remote contract, so a slug of
+`posts", OWNED: (globalThis as any).process?.env, x: "` produced a file that
+compiled **cleanly** and carried an attacker-authored module-level initializer
+into the developer's bundle. `rebase init` has the same shape against a database
+somebody else made.
+
+The tell in all three was the same, and it is a good one to look for: a `quote()`
+helper already existed in the file and was applied to two sites out of thirty.
+Someone hit the bug once, fixed it locally, and did not generalise. A generator
+either routes *every* value through an escape or it has none.
+
+Comments count. A table comment, a column comment and a classification reason
+are free text from the database, and all three were written after `//`, where a
+newline ends the comment and the rest is code.
+
+**Sweep:** in every file that emits source text, grep for `${` inside a template
+literal and classify each hit: name position, literal position, comment. A name
+needs an identifier test with a quoted fallback (and a member access needs
+bracket notation — `t["full name"]`, which Drizzle treats identically). A literal
+needs `JSON.stringify`. A comment needs its newlines collapsed. Then assert the
+invariant structurally rather than by substring: parse the output and compare its
+list of top-level declarations against the expected one — an escaped payload and
+an injected payload contain the same words and only the AST can tell them apart.
+`generated-output-compiles.test.ts` and `introspect-hostile-identifiers.test.ts`
+do this; `openapi-generator.ts` is the sibling that needed nothing, because it
+builds an object and lets `JSON.stringify` do the escaping. That is the shape to
+prefer when the output format allows it.
+
+### Last sweep — 2026-08-08, the three code generators
+
+| checked | result |
+|---|---|
+| every interpolation in `packages/codegen` | **BUG** — slug, enum value and property name all raw. Injection PoC compiles clean. Plus the naming defect below. |
+| the generated `Row` against the wire | **BUG** — every column camel-cased, so `author_id` was typed `authorId` and neither `row.author_id` nor a `where` on it compiled. `FindParams` is keyed off this type, so the correct name was a type error and the wrong one a 400. Three tests pinned the wrong names as the spec. |
+| `Row` / `Insert` / `Update` against what reads and writes actually accept | **BUG** ×6 — primary key optional on reads, nullable columns typed as merely absent, `excludeFromApi` columns typed as readable (the scaffolded `users` collection says its own password hash comes back), `Update` accepting the primary key, neither write type accepting the documented `{ author: 5 }` form, nested map fields ignoring their own validation. |
+| `generateCollectionFile` (`introspect-db-logic.ts`) | **BUG** — 25 raw interpolations: column and table names as bare keys and as a `const` name, table name inside an import specifier, comments unescaped, PG enum values raw in one branch and quoted in the next. |
+| `generateSchema` (`generate-drizzle-schema-logic.ts`) | **BUG** — 29 column-name literals, 3 property keys, 6 member accesses, and enum values in single quotes. |
+| `openapi-generator.ts` | clean — builds an object, serialises as JSON. No text assembly, no injection surface. |
+| the regenerated SaaS console SDK against the console's own code | **BUG** — `o.billingAccountId`, a key no organization row has ever had, so the billing account never loaded after a page reload. Found by regenerating, not by reading. |
+
+The lesson is that **a generated file is the one place where a naming decision is
+also a parsing decision.** The SDK generator's camel-casing looked like a style
+choice and was actually the difference between a type that describes the payload
+and one that describes nothing; the same function applied to a bare key is the
+difference between a file and a syntax error. And the only in-repo consumer of
+the generated SDK — the SaaS console — had quietly stopped using the typed
+accessors and gone back to `data.collection(slug)`, which is how three of these
+survived a year. When the only user of a generated artifact routes around it,
+that is the finding.
