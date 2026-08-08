@@ -638,9 +638,16 @@ describe("generateSDK configurations", () => {
  * and the documented relation-write shape missing.
  */
 describe("Row, Insert and Update describe different things", () => {
-    /** The body of one of the three blocks, so an assertion cannot match the wrong one. */
-    function block(ts: string, name: "Row" | "Insert" | "Update"): string {
-        const start = ts.indexOf(`    ${name}: {`);
+    /**
+     * The body of one of the three blocks, so an assertion cannot match the
+     * wrong one. Scoped to a collection as well as a block: the generator emits
+     * collections in slug order, so `posts` is not the first one in the file
+     * however the fixtures are passed in.
+     */
+    function block(ts: string, name: "Row" | "Insert" | "Update", slug = "posts"): string {
+        const collection = ts.indexOf(`  ${slug}: {`);
+        expect(collection).toBeGreaterThan(-1);
+        const start = ts.indexOf(`    ${name}: {`, collection);
         expect(start).toBeGreaterThan(-1);
         return ts.slice(start, ts.indexOf("    };", start));
     }
@@ -878,5 +885,32 @@ describe("excludeFromApi keeps a property off every generated type", () => {
         // column nothing marked. The server serves it, so the type says so:
         // excluding a relation is not a claim about a different column.
         expect(block(generated, "Row")).toContain("auditor_id");
+    });
+});
+
+describe("generateTypedefs is independent of collection order", () => {
+    // `rebase generate-sdk` sorts by slug before generating, and both
+    // `generate-sdk && git diff --exit-code` and `rebase doctor` compare the
+    // generator's output against the file it wrote. While the sort lived only
+    // in the command, a project whose filename order differed from its slug
+    // order had its SDK reported permanently out of date, and re-running the
+    // printed fix rewrote the file in the order it was already in.
+    const articles = {
+        slug: "articles",
+        properties: { title: { type: "string" } }
+    } as unknown as CollectionConfig;
+    const authors = {
+        slug: "authors",
+        properties: { name: { type: "string" } }
+    } as unknown as CollectionConfig;
+
+    it("emits byte-identical output for a shuffled input", () => {
+        expect(generateTypedefs([authors, articles])).toEqual(generateTypedefs([articles, authors]));
+    });
+
+    it("does not reorder the array it was given", () => {
+        const input = [authors, articles];
+        generateTypedefs(input);
+        expect(input.map(c => c.slug)).toEqual(["authors", "articles"]);
     });
 });

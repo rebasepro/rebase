@@ -1,7 +1,8 @@
 import { CollectionConfig, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { checkCollectionsVsSchema, getExpectedColumnType, runDoctor } from "../src/schema/doctor";
-import { loadCollectionsFromDirectory, logger } from "@rebasepro/server";
+import { checkCollectionsVsSchema, checkCollectionsVsSdk, getExpectedColumnType, renderReport, runDoctor } from "../src/schema/doctor";
+import { generateTypedefs } from "@rebasepro/codegen";
+import { loadCollectionsFromDirectory } from "@rebasepro/server";
 import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
@@ -207,16 +208,24 @@ inactive: "Inactive" }
         }];
 
         let logSpy: jest.SpyInstance;
+        let errSpy: jest.SpyInstance;
+        /** Every line the report wrote, joined — the report is console output. */
+        const printed = () => logSpy.mock.calls.map(c => String(c[0] ?? "")).join("\n");
 
         beforeEach(() => {
             (loadCollectionsFromDirectory as jest.Mock).mockResolvedValue(collections);
-            // The renderer writes the whole drift report to the logger; the
-            // counts are what is under test, not the noise.
-            logSpy = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+            // The renderer writes the whole drift report to stdout; the counts
+            // and the verdict are what is under test, not the noise. It writes
+            // through `console.log` rather than `logger.info` deliberately —
+            // LOG_LEVEL=warn used to silence the entire report while doctor
+            // still exited 1.
+            logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+            errSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
         });
 
         afterEach(() => {
             logSpy.mockRestore();
+            errSpy.mockRestore();
             jest.clearAllMocks();
         });
 
@@ -233,16 +242,18 @@ inactive: "Inactive" }
                     // Missing schema file → one error from phase 1.
                     schemaPath: path.join(dir, "schema.generated.ts"),
                     sdkPath
-                    // No databaseUrl → phase 2 is skipped and counts as passing.
+                    // No databaseUrl → phase 2 never runs, and is counted as
+                    // neither passing nor failing.
                 });
 
                 expect(report.collectionsToSchema.passed).toBe(false);
                 expect(report.collectionsToSdk.passed).toBe(false);
-                expect(report.schemaToDatabase.passed).toBe(true);
+                expect(report.schemaToDatabase.skipped).toBeTruthy();
 
                 // Errors and warnings are summed across ALL phases, not per phase;
                 // `passed` counts phases, not issues.
-                expect(report.summary).toEqual({ passed: 1,
+                expect(report.summary).toEqual({ passed: 0,
+skipped: 1,
 warnings: 1,
 errors: 1 });
             } finally {
@@ -250,7 +261,14 @@ errors: 1 });
             }
         });
 
-        it("reports a clean summary when every phase is in sync", async () => {
+        // This test used to assert `{ passed: 3, warnings: 0, errors: 0 }` for a
+        // run that never opened a connection, enshrining the bug as the clean
+        // case: the database phase initialised to `{ passed: true, issues: [] }`,
+        // rendered as "✅ Collections → Database: In sync" and closed with
+        // "✓ All schemas are in sync!". A user whose .env spells the connection
+        // string `POSTGRES_URL` got two green ticks against a database with no
+        // tables in it.
+        it("does not count a database phase that never ran as passing", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-summary-clean-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
             fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
@@ -262,12 +280,111 @@ errors: 1 });
                     // An absent SDK is informational, so it must not count as a
                     // warning or the phase would never come back clean.
                     sdkPath: path.join(dir, "rebase.d.ts")
+                    // No databaseUrl.
                 });
 
                 expect(report.collectionsToSdk.issues.map(i => i.severity)).toEqual(["info"]);
-                expect(report.summary).toEqual({ passed: 3,
+                expect(report.schemaToDatabase.passed).toBe(false);
+                expect(report.schemaToDatabase.skipped).toBe("DATABASE_URL not set");
+                expect(report.summary).toEqual({ passed: 2,
+skipped: 1,
 warnings: 0,
 errors: 0 });
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        });
+
+        it("renders the skipped phase as skipped, and never claims everything is in sync", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-render-skipped-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+
+            try {
+                await runDoctor({
+                    collectionsPath: dir,
+                    schemaPath,
+                    sdkPath: path.join(dir, "rebase.d.ts")
+                });
+
+                const output = printed();
+                expect(output).toContain("Collections → Database: skipped (DATABASE_URL not set)");
+                expect(output).not.toContain("Collections → Database: In sync");
+                expect(output).not.toContain("All schemas are in sync");
+                expect(output).toContain("1 skipped");
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        });
+
+        // The control for the test above: the clean verdict is still reachable
+        // when all three phases actually ran.
+        it("says everything is in sync when no phase was skipped", () => {
+            const clean = { passed: true,
+issues: [] };
+            renderReport({
+                collectionsToSchema: clean,
+                collectionsToSdk: clean,
+                schemaToDatabase: clean,
+                summary: { passed: 3,
+skipped: 0,
+warnings: 0,
+errors: 0 }
+            });
+
+            const output = printed();
+            expect(output).toContain("Collections → Database: In sync");
+            expect(output).toContain("All schemas are in sync!");
+        });
+    });
+
+    // `rebase schema generate` and `rebase generate-sdk` write their files from
+    // collections sorted by slug. The doctor regenerates in memory from whatever
+    // order `readdirSync` returned, so on any project whose filename order
+    // differs from its slug order both staleness checks fired on a file that was
+    // freshly generated — and the fix they printed rewrote it in the order it
+    // was already in. The generators sort themselves now.
+    describe("staleness checks are independent of collection order", () => {
+        const articles: CollectionConfig = {
+            slug: "articles",
+            table: "articles",
+            name: "Articles",
+            properties: { title: { type: "string" } }
+        };
+        const authors: CollectionConfig = {
+            // `authors.ts` sorts before `blogPosts.ts` as a filename, while
+            // `articles` sorts before `authors` as a slug.
+            slug: "authors",
+            table: "authors",
+            name: "Authors",
+            properties: { name: { type: "string" } }
+        };
+
+        it("does not report the generated schema as stale on a filename/slug inversion", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-order-schema-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            // Written the way `rebase schema generate` writes it: sorted by slug.
+            fs.writeFileSync(schemaPath, await generateSchema([articles, authors]), "utf-8");
+
+            try {
+                // Checked the way the loader hands them over: readdirSync order.
+                const result = await checkCollectionsVsSchema([authors, articles], schemaPath);
+                expect(result.issues).toHaveLength(0);
+                expect(result.passed).toBe(true);
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        });
+
+        it("does not report the SDK types as stale on a filename/slug inversion", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-order-sdk-"));
+            const sdkPath = path.join(dir, "database.types.ts");
+            fs.writeFileSync(sdkPath, generateTypedefs([articles, authors]), "utf-8");
+
+            try {
+                const result = await checkCollectionsVsSdk([authors, articles], sdkPath);
+                expect(result.issues).toHaveLength(0);
+                expect(result.passed).toBe(true);
             } finally {
                 fs.rmSync(dir, { recursive: true });
             }

@@ -17,7 +17,7 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
-import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
+import { loadCollectionsFromDirectory } from "@rebasepro/server";
 
 /**
  * Resolve the SQL column name for a property.
@@ -33,6 +33,22 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
 
 // ── Types ────────────────────────────────────────────────────────────────
 
+/**
+ * The report is CLI output, not application logging.
+ *
+ * `logger.info` is gated by `LOG_LEVEL`, which is a documented setting and
+ * ships in the scaffold's own `.env.example`: a developer who quietened their
+ * dev server with `LOG_LEVEL=warn` got a `rebase doctor` that printed nothing
+ * at all and still exited 1, with no way to tell a failing run from a crashed
+ * one. At the default level every line of the ASCII box arrived with
+ * `ℹ️ [INFO] ` glued to the front of it, and under `NODE_ENV=production` the
+ * whole report became JSON log records with the chalk escapes inside.
+ * `packages/cli` writes all of its output this way for the same reason.
+ */
+const out = (line = ""): void => {
+    console.log(line);
+};
+
 export type IssueSeverity = "error" | "warning" | "info";
 
 export interface DoctorIssue {
@@ -46,11 +62,27 @@ export interface DoctorIssue {
     fix: string;
 }
 
+export interface DoctorPhase {
+    passed: boolean;
+    issues: DoctorIssue[];
+    /**
+     * Why this phase never ran, when it did not.
+     *
+     * A check that did not happen is a third state, not a passing one. While a
+     * skipped phase initialised to `{ passed: true, issues: [] }` it rendered as
+     * `✅ Collections → Database: In sync` and counted towards
+     * `✓ All schemas are in sync!` — so a project whose connection string was
+     * spelled `POSTGRES_URL`, or a CI job that never exported one, got two green
+     * ticks and exit 0 against a database with no tables in it.
+     */
+    skipped?: string;
+}
+
 export interface DoctorReport {
-    collectionsToSchema: { passed: boolean; issues: DoctorIssue[] };
-    collectionsToSdk: { passed: boolean; issues: DoctorIssue[] };
-    schemaToDatabase: { passed: boolean; issues: DoctorIssue[] };
-    summary: { passed: number; warnings: number; errors: number };
+    collectionsToSchema: DoctorPhase;
+    collectionsToSdk: DoctorPhase;
+    schemaToDatabase: DoctorPhase;
+    summary: { passed: number; skipped: number; warnings: number; errors: number };
 }
 
 // ── Column type mapping (mirrors generate-drizzle-schema-logic.ts) ───────
@@ -149,7 +181,7 @@ export async function loadCollections(collectionsPath: string): Promise<Collecti
 export async function checkCollectionsVsSchema(
     collections: CollectionConfig[],
     schemaFilePath: string
-): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
+): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
 
     // Check if schema file exists
@@ -210,7 +242,7 @@ issues };
 export async function checkCollectionsVsSdk(
     collections: CollectionConfig[],
     sdkFilePath: string
-): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
+): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
 
     // The typed SDK is opt-in — nothing in a scaffolded project imports it until
@@ -297,7 +329,7 @@ interface DbEnumValue {
 export async function checkCollectionsVsDatabase(
     collections: CollectionConfig[],
     databaseUrl: string
-): Promise<{ passed: boolean; issues: DoctorIssue[] }> {
+): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
 
     // Dynamic import to avoid loading pg when not needed
@@ -612,96 +644,99 @@ issues };
 // ── Report Rendering ─────────────────────────────────────────────────────
 
 export function renderReport(report: DoctorReport): void {
-    logger.info("");
-    logger.info(chalk.bold("  🩺 Rebase Schema Doctor"));
-    logger.info(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    logger.info("");
+    out();
+    out(chalk.bold("  🩺 Rebase Schema Doctor"));
+    out(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+    out();
 
     // Phase 1
-    renderPhase(
-        "Collections → Generated Schema",
-        report.collectionsToSchema.passed,
-        report.collectionsToSchema.issues
-    );
+    renderPhase("Collections → Generated Schema", report.collectionsToSchema);
 
     // Phase 2
-    renderPhase(
-        "Collections → Database",
-        report.schemaToDatabase.passed,
-        report.schemaToDatabase.issues
-    );
+    renderPhase("Collections → Database", report.schemaToDatabase);
 
     // Phase 3
-    renderPhase(
-        "Collections → SDK Types",
-        report.collectionsToSdk.passed,
-        report.collectionsToSdk.issues
-    );
+    renderPhase("Collections → SDK Types", report.collectionsToSdk);
 
     // Summary
-    logger.info(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    const { passed, warnings, errors } = report.summary;
+    out(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+    const { passed, skipped, warnings, errors } = report.summary;
 
     const parts: string[] = [];
     parts.push(chalk.green(`${passed} passed`));
+    if (skipped > 0) parts.push(chalk.yellow(`${skipped} skipped`));
     if (warnings > 0) parts.push(chalk.yellow(`${warnings} warnings`));
     if (errors > 0) parts.push(chalk.red(`${errors} errors`));
 
-    logger.info(`  Summary: ${parts.join(", ")}`);
-    logger.info("");
+    out(`  Summary: ${parts.join(", ")}`);
+    out();
 
     if (errors > 0) {
-        logger.info(chalk.red.bold("  ✗ Schema drift detected. Run the suggested fixes above."));
+        out(chalk.red.bold("  ✗ Schema drift detected. Run the suggested fixes above."));
     } else if (warnings > 0) {
-        logger.info(chalk.yellow.bold("  ⚠ Minor issues detected. Consider running the suggested fixes."));
+        out(chalk.yellow.bold("  ⚠ Minor issues detected. Consider running the suggested fixes."));
+    } else if (skipped > 0) {
+        // Never "all schemas are in sync" off the back of a check that did not
+        // run: a clean bill of health has to come from measurement.
+        out(chalk.yellow.bold(`  ⚠ Nothing wrong in the checks that ran, but ${skipped} did not run — this is not a clean bill of health.`));
     } else {
-        logger.info(chalk.green.bold("  ✓ All schemas are in sync!"));
+        out(chalk.green.bold("  ✓ All schemas are in sync!"));
     }
-    logger.info("");
+    out();
 }
 
-function renderPhase(label: string, passed: boolean, issues: DoctorIssue[]): void {
+function renderPhase(label: string, phase: DoctorPhase): void {
+    // A phase that never ran gets its own marker and its reason. It is neither
+    // "In sync" nor a drift report; conflating it with the former is what let
+    // doctor certify a database it had not opened.
+    if (phase.skipped) {
+        out(`  ${chalk.yellow("⏭")}  ${label}: ${chalk.yellow(`skipped (${phase.skipped})`)}`);
+        out();
+        return;
+    }
+
+    const issues = phase.issues;
     const errorCount = issues.filter((i) => i.severity === "error").length;
     const warnCount = issues.filter((i) => i.severity === "warning").length;
     const infoIssues = issues.filter((i) => i.severity === "info");
 
     // Informational notes don't make a phase unhealthy, so key the header off
-    // real problems rather than `passed` alone.
+    // real problems rather than `phase.passed` alone.
     if (errorCount === 0 && warnCount === 0) {
-        logger.info(`  ${chalk.green("✅")} ${label}: ${chalk.green("In sync")}`);
+        out(`  ${chalk.green("✅")} ${label}: ${chalk.green("In sync")}`);
     } else {
         const parts: string[] = [];
         if (errorCount > 0) parts.push(`${errorCount} error${errorCount > 1 ? "s" : ""}`);
         if (warnCount > 0) parts.push(`${warnCount} warning${warnCount > 1 ? "s" : ""}`);
-        logger.info(`  ${chalk.yellow("⚠️")}  ${label}: ${chalk.yellow(parts.join(", "))}`);
+        out(`  ${chalk.yellow("⚠️")}  ${label}: ${chalk.yellow(parts.join(", "))}`);
     }
-    logger.info("");
+    out();
 
     // Notes render as a quiet one-liner, not a full drift box.
     for (const issue of infoIssues) {
         const fixPart = issue.fix ? chalk.gray(` — ${issue.fix}`) : "";
-        logger.info(`  ${chalk.gray("ℹ")} ${chalk.gray(issue.message)}${fixPart}`);
-        logger.info("");
+        out(`  ${chalk.gray("ℹ")} ${chalk.gray(issue.message)}${fixPart}`);
+        out();
     }
 
     for (const issue of issues.filter((i) => i.severity !== "info")) {
         const severityIcon = issue.severity === "error" ? chalk.red("✗") : chalk.yellow("⚠");
         const categoryLabel = formatCategory(issue.category);
-        logger.info(`  ${chalk.gray("┌─")} ${severityIcon} ${chalk.bold(categoryLabel)} ${chalk.gray("─".repeat(Math.max(0, 42 - categoryLabel.length)))}`);
+        out(`  ${chalk.gray("┌─")} ${severityIcon} ${chalk.bold(categoryLabel)} ${chalk.gray("─".repeat(Math.max(0, 42 - categoryLabel.length)))}`);
 
         if (issue.table) {
             const colPart = issue.column ? ` │ Column: ${chalk.cyan(issue.column)}` : "";
-            logger.info(`  ${chalk.gray("│")} Table: ${chalk.cyan(issue.table)}${colPart}`);
+            out(`  ${chalk.gray("│")} Table: ${chalk.cyan(issue.table)}${colPart}`);
         }
 
         if (issue.expected && issue.actual) {
-            logger.info(`  ${chalk.gray("│")} Expected: ${chalk.green(issue.expected)} │ Actual: ${chalk.red(issue.actual)}`);
+            out(`  ${chalk.gray("│")} Expected: ${chalk.green(issue.expected)} │ Actual: ${chalk.red(issue.actual)}`);
         }
 
-        logger.info(`  ${chalk.gray("│")} ${issue.message}`);
-        logger.info(`  ${chalk.gray("│")} Fix: ${chalk.blue(issue.fix)}`);
-        logger.info(`  ${chalk.gray("└" + "─".repeat(48))}`);
-        logger.info("");
+        out(`  ${chalk.gray("│")} ${issue.message}`);
+        out(`  ${chalk.gray("│")} Fix: ${chalk.blue(issue.fix)}`);
+        out(`  ${chalk.gray("└" + "─".repeat(48))}`);
+        out();
     }
 }
 
@@ -730,38 +765,44 @@ export async function runDoctor(options: {
     sdkPath: string;
     databaseUrl?: string;
 }): Promise<DoctorReport> {
-    logger.info("");
-    logger.info(chalk.bold("  🩺 Loading collections..."));
+    out();
+    out(chalk.bold("  🩺 Loading collections..."));
     const collections = await loadCollections(options.collectionsPath);
     if (collections.length === 0) {
-        logger.error(chalk.red("  ✗ No collections found."));
+        console.error(chalk.red("  ✗ No collections found."));
         process.exit(1);
     }
-    logger.info(chalk.gray(`  Found ${collections.length} collection(s)`));
-    logger.info("");
+    out(chalk.gray(`  Found ${collections.length} collection(s)`));
+    out();
 
     // Phase 1: Collections ↔ Generated Schema
-    logger.info(chalk.gray("  Checking Collections → Generated Schema..."));
+    out(chalk.gray("  Checking Collections → Generated Schema..."));
     const collectionsToSchema = await checkCollectionsVsSchema(collections, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
-    let schemaToDatabase: { passed: boolean; issues: DoctorIssue[] } = { passed: true,
-issues: [] };
+    let schemaToDatabase: DoctorPhase;
     if (options.databaseUrl) {
-        logger.info(chalk.gray("  Checking Collections → Database..."));
+        out(chalk.gray("  Checking Collections → Database..."));
         schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
     } else {
-        logger.info(chalk.yellow("  ⚠ DATABASE_URL not set — skipping database comparison."));
-        logger.info(chalk.gray("    Set DATABASE_URL in your .env to enable full drift detection."));
+        // Not `{ passed: true }`: see DoctorPhase.skipped.
+        schemaToDatabase = { passed: false,
+issues: [],
+skipped: "DATABASE_URL not set" };
+        out(chalk.yellow("  ⚠ DATABASE_URL not set — skipping database comparison."));
+        out(chalk.gray("    Set DATABASE_URL in your .env to enable full drift detection."));
     }
 
     // Phase 3: Collections ↔ SDK Types
-    logger.info(chalk.gray("  Checking Collections → SDK Types..."));
+    out(chalk.gray("  Checking Collections → SDK Types..."));
     const collectionsToSdk = await checkCollectionsVsSdk(collections, options.sdkPath);
 
-    const allIssues = [...collectionsToSchema.issues, ...schemaToDatabase.issues, ...collectionsToSdk.issues];
+    const phases = [collectionsToSchema, schemaToDatabase, collectionsToSdk];
+    const allIssues = phases.flatMap((p) => p.issues);
     const summary = {
-        passed: [collectionsToSchema, schemaToDatabase, collectionsToSdk].filter((p) => p.passed).length,
+        // A skipped phase is not a passing one, however few issues it collected.
+        passed: phases.filter((p) => p.passed && !p.skipped).length,
+        skipped: phases.filter((p) => p.skipped).length,
         warnings: allIssues.filter((i) => i.severity === "warning").length,
         errors: allIssues.filter((i) => i.severity === "error").length
     };

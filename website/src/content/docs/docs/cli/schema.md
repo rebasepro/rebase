@@ -98,7 +98,7 @@ That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, s
 
 `db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
 
-To audit a database that was pushed before this landed, run `rebase doctor --policies`. It exits non-zero on drift, so it works as a CI gate.
+To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--collections` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
 :::
 
 :::caution
@@ -165,6 +165,8 @@ rebase doctor
 - Collections ↔ Database — is there any unexpected drift?
 
 Run `doctor` whenever something feels out of sync. It pinpoints exactly where the mismatch is.
+
+The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
 ### `rebase generate-sdk`
 

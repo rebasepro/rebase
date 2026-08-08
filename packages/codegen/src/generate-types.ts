@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { findRelation, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSafeIdentifier } from "./utils";
 
 /**
@@ -266,7 +266,12 @@ function excludedApiKeys(properties: Properties): Set<string> {
     return excluded;
 }
 
-export function generateTypedefs(collections: CollectionConfig[]): string {
+export function generateTypedefs(input: CollectionConfig[]): string {
+    // Sorted here rather than only in `generate-sdk`: the output is
+    // order-dependent and `rebase doctor` regenerates it in memory to diff
+    // against the file on disk. While only the writer sorted, a project whose
+    // file order differed from its slug order was reported permanently stale.
+    const collections = sortCollectionsBySlug(input);
     const accessors = buildAccessors(collections);
     const lines: string[] = [
         "/**",
