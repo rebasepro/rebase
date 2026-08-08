@@ -834,24 +834,46 @@ describe("WebSocket Server list limits", () => {
         expect(limitReachingDriver().limit).toBe(resolveClientListLimit(undefined));
     });
 
-    it("clamps an absurd limit to the shared ceiling", async () => {
-        await sendUnauthed({
+    /**
+     * Refused, not clamped.
+     *
+     * These two used to assert a clamp, which is what the shared resolver did
+     * when this suite was written. A `collection_update` frame carries rows and
+     * nothing else — no `total`, no `hasMore` — so a caller handed a quietly
+     * smaller page has no way to learn it is not seeing the collection. The
+     * resolver now throws, and the socket answers INVALID_LIMIT with the
+     * message intact: it names the ceiling, which is the one thing that tells
+     * the caller what to send instead.
+     */
+    const errorFrame = (mockWs: any) =>
+        mockWs.send.mock.calls
+            .map((c: any[]) => JSON.parse(c[0] as string))
+            .find((f: any) => f?.type === "ERROR");
+
+    it("refuses an absurd limit, naming the ceiling", async () => {
+        const mockWs = await sendUnauthed({
             type: "FETCH_COLLECTION",
             requestId: "req-huge",
             payload: { path: "posts", limit: 100_000_000 }
         });
 
-        expect(limitReachingDriver().limit).toBe(MAX_LIST_LIMIT);
+        const frame = errorFrame(mockWs);
+        expect(frame?.payload?.error?.code).toBe("INVALID_LIMIT");
+        expect(frame?.payload?.error?.message).toContain(String(MAX_LIST_LIMIT));
+        expect(frame?.requestId).toBe("req-huge");
+        // Refused before it reached the driver, not bounded on the way in.
+        expect(mockDriver.fetchCollection).not.toHaveBeenCalled();
     });
 
-    it("clamps `limit: 0` — historically the unlimited bypass", async () => {
-        await sendUnauthed({
+    it("refuses `limit: 0` — historically the unlimited bypass", async () => {
+        const mockWs = await sendUnauthed({
             type: "FETCH_COLLECTION",
             requestId: "req-zero",
             payload: { path: "posts", limit: 0 }
         });
 
-        expect(limitReachingDriver().limit).toBe(1);
+        expect(errorFrame(mockWs)?.payload?.error?.code).toBe("INVALID_LIMIT");
+        expect(mockDriver.fetchCollection).not.toHaveBeenCalled();
     });
 
     it("defaults a vector search by its own, smaller mode default", async () => {

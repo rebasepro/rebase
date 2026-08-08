@@ -1,7 +1,7 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
-import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -724,6 +724,23 @@ roles: ["anon"] };
                         logger.error("❌ [WebSocket Server] Unknown message type", { detail: type });
                 }
             } catch (error: unknown) {
+                // A refused `limit` is the caller's mistake, not a server fault.
+                // Left to the generic branch below it answers INTERNAL_ERROR
+                // with the message suppressed in production — so the one thing
+                // that would tell the caller what to send instead is exactly
+                // what gets dropped. Answered here the way
+                // `subscribe_collection` already answers it: INVALID_LIMIT,
+                // message intact. The text names the ceiling and nothing else.
+                if (error instanceof ListLimitError) {
+                    logger.warn(`[WebSocket Server] Refused a list read: ${error.message}`);
+                    ws.send(JSON.stringify({
+                        type: "ERROR",
+                        requestId,
+                        payload: { error: { message: error.message,
+code: "INVALID_LIMIT" } }
+                    }));
+                    return;
+                }
                 logger.error("💥 [WebSocket Server] Error handling message", { error: error });
                 if (error instanceof Error) {
                     logger.error("Stack trace", { detail: error.stack });
