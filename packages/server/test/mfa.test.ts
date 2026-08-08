@@ -3,6 +3,7 @@ import {
     base32Decode,
     generateTotp,
     verifyTotp,
+    verifyTotpCounter,
     generateTotpSecret,
     generateRecoveryCodes,
     hashRecoveryCode
@@ -138,6 +139,34 @@ describe("verifyTotp", () => {
             jest.setSystemTime(now);
             expect(verifyTotp(secret, twoStepsOut, 1)).toBe(false);
             expect(verifyTotp(secret, twoStepsOut, 2)).toBe(true);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+});
+
+describe("verifyTotpCounter", () => {
+    it("reports which step matched, not merely that one did", () => {
+        // Replay protection is built on this number: the caller records it
+        // against the factor and refuses anything at or below it. An
+        // implementation that always answered with the *current* step would
+        // still verify every code correctly, and would silently mark a code
+        // from the previous step as having spent the current one — so the
+        // identity of the step is asserted, not just its presence.
+        const secret = Buffer.from("12345678901234567890");
+        const now = 1_700_000_000_000;
+        jest.useFakeTimers().setSystemTime(now);
+        try {
+            const step = Math.floor(now / 1000 / 30);
+            const current = generateTotp(secret);
+
+            jest.setSystemTime(now - 30_000);
+            const previous = generateTotp(secret);
+            jest.setSystemTime(now);
+
+            expect(verifyTotpCounter(secret, current)).toBe(step);
+            expect(verifyTotpCounter(secret, previous)).toBe(step - 1);
+            expect(verifyTotpCounter(secret, "000000")).toBeNull();
         } finally {
             jest.useRealTimers();
         }

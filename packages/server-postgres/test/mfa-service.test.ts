@@ -219,6 +219,7 @@ describe("MfaService", () => {
                         secret_encrypted: "enc-secret",
                         friendly_name: "My TOTP",
                         verified: true,
+                        last_used_counter: null,
                         created_at: now,
                         updated_at: now
                     }
@@ -235,9 +236,36 @@ describe("MfaService", () => {
                 secretEncrypted: "enc-secret",
                 friendlyName: "My TOTP",
                 verified: true,
+                lastUsedCounter: null,
                 createdAt: expect.any(Date),
                 updatedAt: expect.any(Date)
             });
+        });
+
+        it("reads last_used_counter back as a number", async () => {
+            // BIGINT arrives from node-postgres as a string, and a string
+            // compared against a number in the route would make every accepted
+            // code look unspent — the replay check would pass on both halves.
+            const now = new Date().toISOString();
+            mockExecute.mockResolvedValueOnce({
+                rows: [
+                    {
+                        id: "factor-1",
+                        uid: "user-123",
+                        factor_type: "totp",
+                        secret_encrypted: "enc-secret",
+                        friendly_name: null,
+                        verified: true,
+                        last_used_counter: "58000000",
+                        created_at: now,
+                        updated_at: now
+                    }
+                ]
+            });
+
+            const result = await mfaService.getMfaFactorById("factor-1");
+
+            expect(result?.lastUsedCounter).toBe(58000000);
         });
 
         it("should return null when factor not found", async () => {
@@ -408,7 +436,8 @@ describe("MfaService", () => {
                 factorId: "factor-1",
                 createdAt: expect.any(Date),
                 verifiedAt: undefined,
-                ipAddress: "10.0.0.1"
+                ipAddress: "10.0.0.1",
+                attempts: 0
             });
         });
 
@@ -541,6 +570,63 @@ describe("MfaService", () => {
             const result = await mfaService.useRecoveryCode("user-123", "wrong-hash");
 
             expect(result).toBe(false);
+        });
+    });
+
+    // =========================================================================
+    // claimMfaFactorCounter
+    // =========================================================================
+    describe("claimMfaFactorCounter", () => {
+        it("claims a TOTP step in one statement, guarded on the stored counter", async () => {
+            mockExecute.mockResolvedValueOnce({ rows: [{ id: "factor-1" }] });
+
+            const result = await mfaService.claimMfaFactorCounter("factor-1", 58000000);
+
+            expect(result).toBe(true);
+            const { text, params } = statementAt(0);
+            // The guard IS the replay protection, and it has to live in the
+            // WHERE: reading the counter and then writing it lets two requests
+            // carrying the same six digits both pass before either writes,
+            // which is exactly the replay this exists to stop. The boolean
+            // return looks identical either way.
+            expect(text).toBe(
+                'UPDATE "rebase"."mfa_factors" SET last_used_counter = $1, updated_at = NOW() '
+                + "WHERE id = $2 AND (last_used_counter IS NULL OR last_used_counter < $3) RETURNING id"
+            );
+            expect(params).toEqual([58000000, "factor-1", 58000000]);
+        });
+
+        it("reports a step that was already spent", async () => {
+            mockExecute.mockResolvedValueOnce({ rows: [] });
+
+            expect(await mfaService.claimMfaFactorCounter("factor-1", 58000000)).toBe(false);
+        });
+    });
+
+    // =========================================================================
+    // recordMfaChallengeAttempt
+    // =========================================================================
+    describe("recordMfaChallengeAttempt", () => {
+        it("increments in the database and returns the new total", async () => {
+            mockExecute.mockResolvedValueOnce({ rows: [{ attempts: 3 }] });
+
+            const result = await mfaService.recordMfaChallengeAttempt("challenge-1");
+
+            expect(result).toBe(3);
+            const { text, params } = statementAt(0);
+            // `attempts + 1` in SQL, not a value the caller computed: guesses
+            // arriving in parallel — the shape any real brute force takes —
+            // would otherwise share one increment and the cap would never bite.
+            expect(text).toBe(
+                'UPDATE "rebase"."mfa_challenges" SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts'
+            );
+            expect(params).toEqual(["challenge-1"]);
+        });
+
+        it("returns 0 when the challenge is gone", async () => {
+            mockExecute.mockResolvedValueOnce({ rows: [] });
+
+            expect(await mfaService.recordMfaChallengeAttempt("challenge-1")).toBe(0);
         });
     });
 

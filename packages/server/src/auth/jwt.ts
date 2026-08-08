@@ -116,11 +116,17 @@ export function generateAccessToken(
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
+    // `aal` is written AFTER the custom claims, not before. The hook is handed a
+    // `defaultClaims` object that already contains `aal`, and the obvious hook
+    // — spread the input, add a field — echoes it straight back; one that
+    // merged a user-controlled profile object could echo back `aal: "aal2"`.
+    // Spreading last made the assurance level of a session something its own
+    // holder could assert, which is the one claim that must be decided here.
     const payload: Record<string, unknown> = {
         uid,
         roles,
-        aal,
-        ...customClaims
+        ...customClaims,
+        aal
     };
 
     return jwt.sign(payload, jwtConfig.secret, {
@@ -261,6 +267,57 @@ export function getRefreshTokenTtlMs(): number {
  */
 export function getRefreshTokenExpiry(): Date {
     return new Date(Date.now() + getRefreshTokenTtlMs());
+}
+
+/**
+ * The `purpose` claim carried by a credential that stands between "first factor
+ * accepted" and "session issued".
+ *
+ * A pre-auth token is NOT a session and must never be usable as one:
+ * {@link verifyAccessToken} refuses any token carrying a `purpose`, so this
+ * value cannot authenticate a request no matter which route it is presented to.
+ * The only thing that reads it is the MFA challenge pair, which exchanges it —
+ * plus a second factor — for a real session.
+ */
+export const MFA_PENDING_PURPOSE = "mfa-pending";
+
+/**
+ * Mint the short-lived credential handed back with an `MFA_REQUIRED` response.
+ *
+ * Short-lived on purpose: it is the window in which a caller who has proven the
+ * first factor may present the second, not a session to be carried around. Five
+ * minutes matches the challenge TTL.
+ */
+export function generateMfaPendingToken(uid: string, expiresInSeconds = 300): string {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    return jwt.sign({ purpose: MFA_PENDING_PURPOSE,
+uid }, jwtConfig.secret, {
+        expiresIn: expiresInSeconds,
+        algorithm: "HS256"
+    });
+}
+
+/**
+ * Verify a pre-auth token and return the user it was minted for.
+ *
+ * Returns `null` for anything else — including a perfectly valid *access*
+ * token, which must not be interchangeable with this one in either direction.
+ */
+export function verifyMfaPendingToken(token: string): { uid: string } | null {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    try {
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string };
+        if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.uid) return null;
+        return { uid: decoded.uid };
+    } catch {
+        return null;
+    }
 }
 
 export interface DownloadTokenPayload {

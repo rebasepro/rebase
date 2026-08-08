@@ -1,4 +1,4 @@
-import { pgSchema, pgTable, uuid, timestamp, boolean, jsonb, text, unique, index } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, uuid, timestamp, boolean, jsonb, text, unique, index, integer, bigint } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
@@ -87,6 +87,13 @@ export function createAuthSchema(usersSchemaName = "rebase") {
          * that rotates immediately after it.
          */
         sessionStartedAt: timestamp("session_started_at").defaultNow().notNull(),
+        /**
+         * The assurance level the sign-in was established at — `aal2` only
+         * where a second factor was actually presented. Carried across
+         * rotations, because refresh is not a new authentication and has
+         * nothing else to read the level from.
+         */
+        aal: text("aal"),
         userAgent: text("user_agent"),
         ipAddress: text("ip_address"),
         createdAt: timestamp("created_at").defaultNow().notNull()
@@ -140,6 +147,13 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         secretEncrypted: text("secret_encrypted").notNull(),
         friendlyName: text("friendly_name"),
         verified: boolean("verified").default(false).notNull(),
+        /**
+         * The highest TOTP time step ever accepted for this factor. RFC 6238
+         * §5.2 forbids accepting an OTP twice, and the ±1 step window that
+         * exists for clock drift is also a 90-second replay window: without
+         * this, one observed code buys a fresh session for a minute and a half.
+         */
+        lastUsedCounter: bigint("last_used_counter", { mode: "number" }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
@@ -153,6 +167,8 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         createdAt: timestamp("created_at").defaultNow().notNull(),
         verifiedAt: timestamp("verified_at"),
         ipAddress: text("ip_address"),
+        /** Failed guesses recorded against this challenge; bounded by the route. */
+        attempts: integer("attempts").default(0).notNull(),
         expiresAt: timestamp("expires_at").notNull()
     });
 

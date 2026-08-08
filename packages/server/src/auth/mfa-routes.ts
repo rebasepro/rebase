@@ -1,54 +1,192 @@
-import { Hono } from "hono";
-import { randomUUID } from "crypto";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { requireAuth } from "./middleware";
+import { requireAuth, extractBearerToken } from "./middleware";
 import { logger } from "../utils/logger";
+import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
 import {
     generateTotpSecret,
-    verifyTotp,
+    verifyTotpCounter,
     base32Decode,
     generateRecoveryCodes,
     hashRecoveryCode
 } from "./mfa";
 import { encryptTotpSecret, decryptTotpSecret } from "./mfa-crypto";
 import {
-    generateAccessToken,
-    generateRefreshToken,
-    hashRefreshToken,
-    getRefreshTokenExpiry,
     getAccessTokenExpiry,
+    verifyAccessToken,
+    verifyMfaPendingToken,
     type AccessTokenPayload
 } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
+import { redactRefreshToken } from "./cookie-utils";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 
-export function mountMfaRoutes(
-    router: Hono<HonoEnv>,
-    config: AuthModuleConfig,
-    ops: ReturnType<typeof resolveAuthHooks>,
-    parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T,
+/**
+ * How many failed verifications one challenge tolerates before it is spent.
+ *
+ * A 6-digit code with a ±1 step window accepts 3 of 1,000,000 values, so the
+ * only thing standing between an attacker and the second factor is how many
+ * guesses a challenge will take. Five, and then they must open another one —
+ * which the per-user limiter below is counting.
+ */
+const MAX_CHALLENGE_ATTEMPTS = 5;
+
+/** Verification attempts one *account* may make per window, across all IPs. */
+const MFA_VERIFICATION_ATTEMPTS_PER_WINDOW = 10;
+
+interface MfaRoutesConfig {
+    router: Hono<HonoEnv>;
+    config: AuthModuleConfig;
+    ops: ReturnType<typeof resolveAuthHooks>;
+    parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
+    buildAuthResponse: (
+        user: { id: string; email: string; displayName?: string | null; photoUrl?: string | null; emailVerified?: boolean; isAnonymous?: boolean; metadata?: Record<string, unknown> | null },
+        roleIds: string[],
+        accessToken: string,
+        refreshToken: string,
+        providerId: string
+    ) => unknown;
+    createSessionAndTokens: (
+        uid: string,
+        userAgent: string,
+        ipAddress: string,
+        options?: { skipMfaGate?: boolean; aal?: "aal1" | "aal2" }
+    ) => Promise<{ roleIds: string[]; accessToken: string; refreshToken: string }>;
     applyTransformHook?: (
         response: AuthResponsePayload,
         method: TransformAuthResponseContext["method"],
         request: Request,
         uid: string
-    ) => Promise<AuthResponsePayload>
-): void {
+    ) => Promise<AuthResponsePayload>;
+}
+
+/**
+ * Who is asking, on the two routes that may be reached *before* a session
+ * exists.
+ *
+ * `pending` marks the caller as one factor short of a session: they hold the
+ * short-lived, purpose-scoped token issued alongside `MFA_REQUIRED`, which is
+ * refused as a credential everywhere else in the server.
+ */
+interface StepUpPrincipal {
+    uid: string;
+    aal: "aal1" | "aal2";
+    pending: boolean;
+}
+
+/**
+ * Resolve the caller of a challenge route from either a full session or a
+ * pre-auth token.
+ *
+ * Both are parsed here rather than by `requireAuth` because the whole point of
+ * the challenge pair is that it runs before the session exists — a login by an
+ * MFA-enrolled user never receives an access token until it is finished.
+ */
+function resolveStepUpPrincipal(c: Context<HonoEnv>): StepUpPrincipal | null {
+    // Respect a principal an upstream middleware already resolved, exactly as
+    // `requireAuth` does.
+    const existing = c.get("user") as AccessTokenPayload | undefined;
+    if (existing?.uid) {
+        return { uid: existing.uid,
+aal: existing.aal === "aal2" ? "aal2" : "aal1",
+pending: false };
+    }
+
+    const token = extractBearerToken(c.req.header("authorization"));
+    if (token === undefined) return null;
+
+    const session = verifyAccessToken(token);
+    if (session) {
+        return { uid: session.uid,
+aal: session.aal === "aal2" ? "aal2" : "aal1",
+pending: false };
+    }
+
+    const pending = verifyMfaPendingToken(token);
+    if (pending) {
+        return { uid: pending.uid,
+aal: "aal1",
+pending: true };
+    }
+
+    return null;
+}
+
+/**
+ * Per-account throttle on code verification.
+ *
+ * Keyed on the uid rather than the IP because an IP is the attacker's to
+ * rotate and the account under attack is not: a distributed run against one
+ * account passes an IP-keyed limiter untouched. The IP limiter still runs in
+ * front of this one — they bound different things.
+ */
+const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: MFA_VERIFICATION_ATTEMPTS_PER_WINDOW,
+    keyGenerator: (c) => `mfa-verify:${resolveStepUpPrincipal(c as Context<HonoEnv>)?.uid ?? "unidentified"}`,
+    message: "Too many verification attempts for this account, please try again later."
+});
+
+export function mountMfaRoutes(opts: MfaRoutesConfig): void {
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = opts;
     const authRepo = config.authRepo;
     const emailConfig = config.emailConfig;
+
+    /**
+     * Changing which factors an account trusts is itself a privileged act.
+     *
+     * An account that already has a verified factor may only gain or confirm
+     * another one from a session that presented the existing one. Without this
+     * the `aal2` gate on unenroll was self-service: an `aal1` session enrolled
+     * a factor of its own, verified it with a code it computed from the secret
+     * the enrol response had just handed it, stepped up on that, and deleted
+     * the victim's real factor — arriving at `aal2` without ever holding the
+     * second factor the account was protected by.
+     *
+     * The first enrolment on an account with no verified factor is deliberately
+     * allowed at `aal1`: there is no second factor to demand yet.
+     */
+    async function requireStepUpForFactorChange(userCtx: AccessTokenPayload): Promise<void> {
+        if (userCtx.aal === "aal2") return;
+        if (!(await authRepo.hasVerifiedMfaFactors(userCtx.uid))) return;
+        throw ApiError.forbidden(
+            "This account already has a verified second factor. Re-authenticate with it before changing enrolled factors.",
+            "AAL2_REQUIRED"
+        );
+    }
+
+    /**
+     * Spend a TOTP time step, or refuse it as already spent.
+     *
+     * RFC 6238 §5.2: an accepted OTP must not be accepted again. The window
+     * that exists for clock drift is also a 90-second replay window, and a
+     * replay here is not momentary — `challenge/verify` mints a refresh token,
+     * so one observed code buys a durable session.
+     */
+    async function claimTotpStep(factorId: string, counter: number): Promise<boolean> {
+        if (typeof authRepo.claimMfaFactorCounter !== "function") {
+            logger.warn("[MFA] Auth repository cannot record spent TOTP steps; an accepted code stays replayable for its window", {
+                factorId
+            });
+            return true;
+        }
+        return authRepo.claimMfaFactorCounter(factorId, counter);
+    }
 
     /**
      * POST /auth/mfa/enroll
      * Start MFA enrollment: generate TOTP secret and recovery codes
      */
-    router.post("/mfa/enroll", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+    router.post("/mfa/enroll", strictAuthLimiter, requireAuth, async (c) => {
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
+
+        await requireStepUpForFactorChange(userCtx);
 
         const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
         const friendlyName = typeof body.friendlyName === "string" ? body.friendlyName : undefined;
@@ -99,11 +237,13 @@ export function mountMfaRoutes(
      * POST /auth/mfa/verify
      * Verify TOTP code to complete MFA enrollment
      */
-    router.post("/mfa/verify", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
+    router.post("/mfa/verify", strictAuthLimiter, requireAuth, mfaVerificationLimiter, async (c) => {
+        const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
+
+        await requireStepUpForFactorChange(userCtx);
 
         const verifySchema = z.object({
             factorId: z.string().min(1, "Factor ID is required"),
@@ -124,9 +264,9 @@ export function mountMfaRoutes(
         // Decrypt and verify the TOTP code
         const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
-        const isValid = verifyTotp(secretBuffer, code);
+        const matchedCounter = verifyTotpCounter(secretBuffer, code);
 
-        if (!isValid) {
+        if (matchedCounter === null || !(await claimTotpStep(factor.id, matchedCounter))) {
             throw ApiError.unauthorized("Invalid TOTP code", "INVALID_CODE");
         }
 
@@ -141,11 +281,12 @@ export function mountMfaRoutes(
 
     /**
      * POST /auth/mfa/challenge
-     * Create an MFA challenge during login (user has MFA enrolled)
+     * Open a challenge — either to finish a sign-in that answered
+     * `MFA_REQUIRED`, or to step an existing session up to `aal2`.
      */
-    router.post("/mfa/challenge", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
-        if (!userCtx) {
+    router.post("/mfa/challenge", strictAuthLimiter, async (c) => {
+        const principal = resolveStepUpPrincipal(c);
+        if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
@@ -156,7 +297,7 @@ export function mountMfaRoutes(
 
         // Verify the factor belongs to this user and is verified
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.uid !== userCtx.uid) {
+        if (!factor || factor.uid !== principal.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -176,11 +317,12 @@ export function mountMfaRoutes(
 
     /**
      * POST /auth/mfa/challenge/verify
-     * Verify a TOTP code for an active challenge, upgrade aal1 → aal2
+     * Answer a challenge: this is where an MFA-enrolled account's session is
+     * minted, at `aal2`.
      */
-    router.post("/mfa/challenge/verify", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
-        if (!userCtx) {
+    router.post("/mfa/challenge/verify", strictAuthLimiter, mfaVerificationLimiter, async (c) => {
+        const principal = resolveStepUpPrincipal(c);
+        if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
@@ -198,73 +340,102 @@ export function mountMfaRoutes(
 
         // Get the factor and verify ownership
         const factor = await authRepo.getMfaFactorById(challenge.factorId);
-        if (!factor || factor.uid !== userCtx.uid) {
+        if (!factor || factor.uid !== principal.uid) {
             throw ApiError.notFound("MFA factor not found");
+        }
+
+        // A challenge that has already been guessed at its limit is spent, and
+        // stays spent for its remaining lifetime — otherwise one open challenge
+        // is an unlimited number of guesses at six digits.
+        if ((challenge.attempts ?? 0) >= MAX_CHALLENGE_ATTEMPTS) {
+            logger.warn("[Security Audit] MFA challenge attempt limit reached", {
+                eventType: "auth.mfa.challenge.exhausted",
+                uid: principal.uid,
+                challengeId
+            });
+            throw ApiError.unauthorized("Too many failed attempts for this challenge", "CHALLENGE_EXHAUSTED");
         }
 
         // Try TOTP verification first (standard 6-digit codes)
         const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
-        let isValid = verifyTotp(secretBuffer, code);
+        const matchedCounter = verifyTotpCounter(secretBuffer, code);
+        let isValid = matchedCounter !== null && await claimTotpStep(factor.id, matchedCounter);
 
         // Fall back to recovery code verification if TOTP didn't match
-        if (!isValid) {
+        if (!isValid && matchedCounter === null) {
             const codeHash = hashRecoveryCode(code);
-            isValid = await authRepo.useRecoveryCode(userCtx.uid, codeHash);
+            isValid = await authRepo.useRecoveryCode(principal.uid, codeHash);
         }
 
         if (!isValid) {
+            const attempts = typeof authRepo.recordMfaChallengeAttempt === "function"
+                ? await authRepo.recordMfaChallengeAttempt(challengeId)
+                : undefined;
+            logger.warn("[Security Audit] MFA verification failed", {
+                eventType: "auth.mfa.verify.failure",
+                uid: principal.uid,
+                challengeId,
+                attempts
+            });
             throw ApiError.unauthorized("Invalid verification code", "INVALID_CODE");
         }
 
         // Mark challenge as verified
         await authRepo.verifyMfaChallenge(challengeId);
 
-        // Generate new access token with aal2
-        const roles = await authRepo.getUserRoles(userCtx.uid);
-        const roleIds = roles.map((r) => r.id);
-        const accessToken = generateAccessToken(userCtx.uid, roleIds, "aal2");
-        const refreshToken = generateRefreshToken();
-
-        // Create new refresh token. Stepping up to aal2 opens a new session:
-        // it is a fresh authentication, and dating it now is what lets a later
-        // revocation void it.
-        await authRepo.createRefreshToken(
-            userCtx.uid,
-            hashRefreshToken(refreshToken),
-            getRefreshTokenExpiry(),
+        // A fresh authentication opens a fresh session, dated now — which is
+        // what lets a later revocation void it. The gate is skipped because
+        // this route IS the gate: the second factor was just presented.
+        const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
+            principal.uid,
             c.req.header("user-agent") || "unknown",
             c.req.header("x-forwarded-for") || "unknown",
-            { id: randomUUID(), startedAt: new Date() }
+            { skipMfaGate: true,
+aal: "aal2" }
         );
 
         // Fire onMfaVerified hook
         if (ops.onMfaVerified) {
-            ops.onMfaVerified(userCtx.uid, factor.id).catch((err) => {
+            ops.onMfaVerified(principal.uid, factor.id).catch((err) => {
                 logger.error("[AuthHooks] onMfaVerified error", {
                     error: err instanceof Error ? err.message : err
                 });
             });
         }
 
-        let mfaResponse: AuthResponsePayload = {
-            tokens: {
-                accessToken,
-                refreshToken,
-                accessTokenExpiresAt: getAccessTokenExpiry()
-            }
-        };
+        logger.info("[Security Audit] MFA verification success", {
+            eventType: "auth.mfa.verify.success",
+            uid: principal.uid,
+            factorId: factor.id,
+            completedSignIn: principal.pending
+        });
+
+        // The caller who arrived with a pre-auth token is completing a sign-in
+        // and has no user object yet, so return the same payload a login would
+        // have returned. Best-effort: a session was minted either way, and
+        // failing the response over the enrichment would strand the caller.
+        const user = await authRepo.getUserById(principal.uid).catch(() => null);
+        let mfaResponse: AuthResponsePayload = user
+            ? buildAuthResponse(user, roleIds, accessToken, refreshToken, "mfa") as AuthResponsePayload
+            : {
+                tokens: {
+                    accessToken,
+                    refreshToken,
+                    accessTokenExpiresAt: getAccessTokenExpiry()
+                }
+            };
         if (applyTransformHook) {
-            mfaResponse = await applyTransformHook(mfaResponse, "mfa", c.req.raw, userCtx.uid);
+            mfaResponse = await applyTransformHook(mfaResponse, "mfa", c.req.raw, principal.uid);
         }
-        return c.json(mfaResponse);
+        return c.json(redactRefreshToken(mfaResponse, c, refreshToken, config.cookieAuth));
     });
 
     /**
      * GET /auth/mfa/factors
      * List enrolled MFA factors for the current user
      */
-    router.get("/mfa/factors", requireAuth, async (c) => {
+    router.get("/mfa/factors", strictAuthLimiter, requireAuth, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -286,7 +457,7 @@ export function mountMfaRoutes(
      * DELETE /auth/mfa/unenroll
      * Remove an MFA factor
      */
-    router.delete("/mfa/unenroll", requireAuth, async (c) => {
+    router.delete("/mfa/unenroll", strictAuthLimiter, requireAuth, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");

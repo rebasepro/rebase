@@ -641,6 +641,12 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT FALSE NOT NULL`);
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMP WITH TIME ZONE`);
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_started_at TIMESTAMP WITH TIME ZONE`);
+                    // Nullable with no default and no back-fill: a row written
+                    // before this column existed says nothing about whether a
+                    // second factor was presented, and the reader treats "says
+                    // nothing" as `aal1` — the restrictive answer. Stamping
+                    // every existing row would be inventing evidence.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS aal TEXT`);
 
                     // One session per pre-existing row: under the old model a row
                     // WAS a device session, and there is no record of which rows
@@ -730,6 +736,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 secret_encrypted TEXT NOT NULL,
                 friendly_name TEXT,
                 verified BOOLEAN DEFAULT FALSE,
+                last_used_counter BIGINT,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
@@ -749,6 +756,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                 verified_at TIMESTAMP WITH TIME ZONE,
                 ip_address TEXT,
+                attempts INTEGER NOT NULL DEFAULT 0,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL
             )
         `);
@@ -758,6 +766,20 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             CREATE INDEX IF NOT EXISTS idx_mfa_challenges_factor
             ON ${sql.raw(mfaChallengesTableName)}(factor_id)
         `);
+
+        // ── Migration: replay and brute-force state on the MFA tables ───────
+        // Both are additive and nullable-or-defaulted, so a runtime that
+        // predates them reads the tables unchanged. `last_used_counter` records
+        // the TOTP step a factor has already spent (RFC 6238 §5.2); `attempts`
+        // bounds how many guesses one challenge will take before it is dead.
+        // Without them the code paths degrade to "no replay protection, rate
+        // limiters only" rather than failing, which is why this is a warn.
+        try {
+            await db.execute(sql`ALTER TABLE ${sql.raw(mfaFactorsTableName)} ADD COLUMN IF NOT EXISTS last_used_counter BIGINT`);
+            await db.execute(sql`ALTER TABLE ${sql.raw(mfaChallengesTableName)} ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0`);
+        } catch (mfaMigrationError: unknown) {
+            logger.warn(`⚠️  MFA hardening columns skipped: ${mfaMigrationError instanceof Error ? mfaMigrationError.message : String(mfaMigrationError)}`);
+        }
 
         // Create recovery_codes table
         await db.execute(sql`
