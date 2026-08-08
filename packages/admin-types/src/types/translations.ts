@@ -466,6 +466,7 @@ export interface RebaseTranslations {
     flatten_arrays: string;
     download: string;
     large_number_of_documents: string;
+    too_many_documents_to_export: string;
     include_undefined_values: string;
     submit: string;
 

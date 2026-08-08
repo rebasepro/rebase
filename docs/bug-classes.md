@@ -734,6 +734,20 @@ function already performs when the value has not changed.
 **Close the read too.** `getIn(x, "constructor.prototype")` returning
 `Object.prototype` is how a polluted value is read back out and rendered, and it
 is the half that survived in the copy whose write was safe.
+
+**The sibling the first sweep missed** is the one the paragraph above names out
+loud: *a column mapped out of an imported CSV*. `unflattenObject`
+(`packages/admin/src/data_import/utils/transforms.ts`) turns the header row of an
+uploaded workbook into nested objects one dot-segment at a time, with no guard —
+so a column headed `__proto__.polluted` wrote onto `Object.prototype` for the
+life of the admin tab, and `constructor.prototype.x` threw `Cannot assign to
+read only property 'prototype'`, which the user saw as an unreadable file. It
+was the only copy whose keys are attacker-supplied **by design**, and it was
+missed because the sweep grepped for the function names (`setIn`, `getIn`,
+`mergeDeep`) rather than for the shape. Its three neighbours in the same
+pipeline — `mapJsonParse`, `flattenEntry`, and the header loops in
+`file_to_json.ts` / `csv.ts` — all write `obj[header] = …` and all needed the
+same refusal.
 ---
 
 ## 23. A platform limit that clamps instead of rejecting

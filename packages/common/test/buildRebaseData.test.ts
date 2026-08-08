@@ -1,5 +1,5 @@
-import { buildRebaseData } from "../src/data/buildRebaseData";
-import { CollectionAccessor, DataDriver, Entity, RebaseData } from "@rebasepro/types";
+import { buildRebaseData, wrapAsEntityData } from "../src/data/buildRebaseData";
+import { CollectionAccessor, DataDriver, Entity, RebaseData, RebaseSdkData } from "@rebasepro/types";
 
 /**
  * `RebaseData`'s dynamic index signature is a union of a collection accessor
@@ -344,5 +344,52 @@ path: "products" })
                 })
             );
         });
+    });
+});
+
+/**
+ * The admin's `useData()` is `wrapAsEntityData(client.data)`, so this is the
+ * accessor the CMS actually holds. `createMany` is declared on
+ * `CollectionAccessor` and was implemented on the driver-backed accessor only —
+ * which is why the admin's own import wrote one HTTP request per row, could not
+ * be atomic, and never asked for the upsert its preview screen promised.
+ */
+describe("wrapAsEntityData", () => {
+
+    function sdkDataWithBulk() {
+        const calls: Array<{ rows: Record<string, unknown>[]; options?: { upsert?: boolean } }> = [];
+        const collection = () => ({
+            find: jest.fn(),
+            create: jest.fn(),
+            createMany: async (rows: Record<string, unknown>[], options?: { upsert?: boolean }) => {
+                calls.push({ rows,
+                    options });
+                return rows;
+            }
+        });
+        return { calls,
+            sdkData: { collection } as unknown as Pick<RebaseSdkData, "collection"> };
+    }
+
+    it("exposes createMany and forwards the rows and the upsert flag", async () => {
+        const { calls, sdkData } = sdkDataWithBulk();
+        const accessor = wrapAsEntityData(sdkData).collection("products");
+
+        expect(accessor.createMany).toBeDefined();
+        const written = await accessor.createMany!(
+            [{ id: "p1",
+                name: "Widget" }],
+            { upsert: true }
+        );
+
+        expect(calls).toEqual([{
+            rows: [{ id: "p1",
+                name: "Widget" }],
+            options: { upsert: true }
+        }]);
+        // Entity-shaped on the way back out, like every other accessor method.
+        expect(written[0].id).toEqual("p1");
+        expect(written[0].values).toEqual({ id: "p1",
+            name: "Widget" });
     });
 });

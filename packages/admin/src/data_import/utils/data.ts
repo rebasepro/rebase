@@ -5,7 +5,7 @@ import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./file_to_json";
 import { getIn } from "@rebasepro/forms";
 import { inferTypeFromValue } from "@rebasepro/inference";
-import { mergeDeep } from "@rebasepro/utils";
+import { isPrototypePollutingKey, mergeDeep } from "@rebasepro/utils";
 
 export function convertDataToEntity(authController: AuthController,
     navigation: CollectionRegistryController,
@@ -57,6 +57,12 @@ export function convertDataToEntity(authController: AuthController,
 
 export function flattenEntry(obj: Record<string, unknown>, parent = ""): Record<string, unknown> {
     return Object.keys(obj).reduce<Record<string, unknown>>((acc, key) => {
+        // Keys come from the uploaded file, so `acc[key] = …` is the class-22
+        // primitive when the key is `__proto__`; refuse the column instead.
+        if (isPrototypePollutingKey(key)) {
+            console.warn(`Skipping column "${key}": a header may not reach the prototype chain`);
+            return acc;
+        }
         const prefixedKey = parent ? `${parent}.${key}` : key;
 
         if (typeof obj[key] === "object" && !(obj[key] instanceof Date) && obj[key] !== null && !Array.isArray(obj[key])) {
