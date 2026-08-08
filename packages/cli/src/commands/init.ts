@@ -1,4 +1,3 @@
-import arg from "arg";
 import inquirer from "inquirer";
 import chalk from "chalk";
 import path from "path";
@@ -10,6 +9,7 @@ import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
 import { promptForConsent } from "../telemetry/consent";
@@ -268,7 +268,7 @@ ${chalk.bold("Examples")}
 }
 
 export async function createRebaseApp(rawArgs: string[]) {
-    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    if (wantsHelp(rawArgs)) {
         printInitHelp();
         return;
     }
@@ -282,31 +282,37 @@ ${chalk.bold("Rebase")} — Create a new project 🚀
     await createProject(options);
 }
 
-async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<InitOptions> {
-    const args = arg(
-        {
-            "--git": Boolean,
-            "--install": Boolean,
-            "--database-url": String,
-            "--introspect": Boolean,
-            "--template": String,
-            "--headless": Boolean,
-            "--project": String,
-            "--setup-key": String,
-            "--yes": Boolean,
-            "-g": "--git",
-            "-i": "--install",
-            "-t": "--template",
-            "-y": "--yes"
-        },
-        {
-            argv: rawArgs.slice(3), // skip "node", "rebase", "init"
-            permissive: true
-        }
-    );
+/** The flags `rebase init` takes. */
+export const INIT_FLAGS = {
+    "--git": Boolean,
+    "--install": Boolean,
+    "--database-url": String,
+    "--introspect": Boolean,
+    "--template": String,
+    "--headless": Boolean,
+    "--project": String,
+    "--setup-key": String,
+    "--yes": Boolean,
+    "-g": "--git",
+    "-i": "--install",
+    "-t": "--template",
+    "-y": "--yes"
+} as const;
 
-    // The first positional arg after "init" is the project name
-    const nameArg = args._[0];
+async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<InitOptions> {
+    const { flags: args, positionals } = parseCommandArgs({
+        spec: INIT_FLAGS,
+        rawArgs,
+        commandWords: 1,
+        command: "init",
+        maxPositionals: 1
+    });
+
+    // The first positional arg after "init" is the project name. Under the old
+    // permissive parse a mistyped flag took that slot — `rebase init --headles
+    // shop` scaffolded a directory called `--headles` — and the misspelling that
+    // caused it was accepted in silence.
+    const nameArg = positionals[0];
     const isNonInteractive = args["--yes"] || false;
 
     // The interactive prompt validates typed names; a name passed as an

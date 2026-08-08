@@ -87,4 +87,23 @@ describe("what `rebase build` does with each runtime", () => {
         expect(buildBundle).toHaveBeenCalledTimes(1);
         expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ appName: "backend" });
     });
+
+    // The parser used to run permissively and then filter `_` for tokens that
+    // do not start with `-`, so a mistyped flag was dropped in silence and the
+    // build ran as though it had not been asked for anything: `rebase build
+    // --skip-typecheck` (the real flag is `--skip-type-check`) typechecked.
+    it("refuses a flag nobody declared instead of building anyway", async () => {
+        manifest("managed");
+        await expect(buildCommand(["node", "rebase", "build", "--skip-typecheck"]))
+            .rejects.toThrow(/unknown or unexpected option/);
+        expect(buildBundle).not.toHaveBeenCalled();
+    });
+
+    // `rawArgs` is the whole `process.argv`, so `slice(3)` only found the app
+    // names when the command word sat at exactly index 2.
+    it("still names its target when a flag precedes the command", async () => {
+        manifest("managed");
+        await buildCommand(["node", "rebase", "--debug", "build", "backend"]);
+        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ appName: "backend" });
+    });
 });

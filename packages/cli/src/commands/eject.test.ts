@@ -216,6 +216,27 @@ describe("rebase eject", () => {
         expect(loadManifest(scratch).source).toBe("file");
     });
 
+    it("refuses a flag nobody declared rather than ejecting anyway", async () => {
+        // The old parse ran permissively and then skipped every token starting
+        // with `-` when looking for the app, so a mistyped flag was dropped in
+        // silence and the command went ahead and rewrote the project.
+        manifestWith("managed");
+
+        await expect(run("--dry")).rejects.toThrow(/unknown or unexpected option/);
+        expect(fs.existsSync(path.join(scratch, "backend/src/index.ts"))).toBe(false);
+        expect(loadManifest(scratch).manifest.apps.backend).toMatchObject({ runtime: "managed" });
+    });
+
+    it("names the app it was given even when a flag precedes the command", async () => {
+        // `slice(2)` then `_.slice(1)` assumed `eject` was at index 2: with a
+        // flag in front, the app read as the word "eject".
+        manifestWith("managed");
+
+        await ejectCommand(["node", "rebase", "--debug", "eject", "backend"]);
+
+        expect(loadManifest(scratch).manifest.apps.backend).toMatchObject({ runtime: "custom" });
+    });
+
     it("refuses to run twice", async () => {
         manifestWith("custom");
 

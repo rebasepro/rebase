@@ -6,13 +6,12 @@
  *   create  — Create a new API key
  *   revoke  — Revoke an existing API key
  */
-import arg from "arg";
 import chalk from "chalk";
 import {
     requireProjectRoot,
     readEnvFile
 } from "../utils/project";
-import { wantsHelp } from "../utils/args";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import fs from "fs";
 import path from "path";
 
@@ -153,24 +152,45 @@ async function listKeys(_rawArgs: string[]): Promise<void> {
    create
    ═══════════════════════════════════════════════════════════════ */
 
-async function createKey(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--name": String,
-            "--permissions": String,
-            "--full-access": Boolean,
-            "--admin": Boolean,
-            "--rate-limit": Number,
-            "--expires": String,
-            "-n": "--name"
-        },
-        {
-            argv: rawArgs.slice(4), // skip "node rebase api-keys create"
-            permissive: true
-        }
-    );
+/** The flags `rebase api-keys create` takes. */
+export const CREATE_KEY_FLAGS = {
+    "--name": String,
+    "--permissions": String,
+    "--full-access": Boolean,
+    "--admin": Boolean,
+    "--rate-limit": Number,
+    "--expires": String,
+    "-n": "--name"
+} as const;
 
-    const name = args["--name"] || args._[0];
+/**
+ * What this invocation asks to be created.
+ *
+ * The name may be given either way — `--name "My Key"` or as the single
+ * positional — and under the old permissive parse an undeclared flag became
+ * that positional: `rebase api-keys create --debug --full-access` created a
+ * key called `--debug` with read/write/delete on every collection, and
+ * `--debug` is what the CLI prints after every failure as the thing to re-run
+ * with. Strict parsing makes the flag an error instead of a name.
+ *
+ * Exported so its tests can drive the real parser rather than a copy of it.
+ */
+export function resolveCreateKeyArgs(rawArgs: string[]) {
+    const { flags, positionals } = parseCommandArgs({
+        spec: CREATE_KEY_FLAGS,
+        rawArgs,
+        commandWords: 2,
+        command: "api-keys create",
+        maxPositionals: 1
+    });
+
+    return { flags,
+name: flags["--name"] || positionals[0] };
+}
+
+async function createKey(rawArgs: string[]): Promise<void> {
+    const { flags: args, name } = resolveCreateKeyArgs(rawArgs);
+
     const permissionsRaw = args["--permissions"];
 
     if (!name) {
@@ -284,18 +304,35 @@ operations: ["read", "write", "delete"] }];
    revoke
    ═══════════════════════════════════════════════════════════════ */
 
-async function revokeKey(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--id": String
-        },
-        {
-            argv: rawArgs.slice(4), // skip "node rebase api-keys revoke"
-            permissive: true
-        }
-    );
+/** The flags `rebase api-keys revoke` takes. */
+export const REVOKE_KEY_FLAGS = {
+    "--id": String
+} as const;
 
-    const id = args["--id"] || args._[0];
+/**
+ * Which key this invocation names.
+ *
+ * The id is a positional, so the permissive parse handed one straight to the
+ * DELETE: `rebase api-keys revoke --foo` sent
+ * `DELETE /api/admin/api-keys/--foo`, and `rebase --debug api-keys revoke <id>`
+ * shifted the words along and revoked the key named `revoke`.
+ *
+ * Exported so its tests can drive the real parser rather than a copy of it.
+ */
+export function resolveRevokeKeyArgs(rawArgs: string[]): { id?: string } {
+    const { flags, positionals } = parseCommandArgs({
+        spec: REVOKE_KEY_FLAGS,
+        rawArgs,
+        commandWords: 2,
+        command: "api-keys revoke",
+        maxPositionals: 1
+    });
+
+    return { id: flags["--id"] || positionals[0] };
+}
+
+async function revokeKey(rawArgs: string[]): Promise<void> {
+    const { id } = resolveRevokeKeyArgs(rawArgs);
 
     if (!id) {
         console.error(chalk.red("✗ Key ID is required."));
