@@ -570,5 +570,88 @@ status: "draft" });
             // ^ Note: This now returns false because rolesContain is accurately evaluated even without a entity.
         });
     });
-});
+    // ── Engine independence ──────────────────────────────────
+    describe("engines without database-enforced RLS", () => {
+        /**
+         * `supportsRLS` says *who* enforces a rule, not *whether* it holds. The
+         * capability gate that used to sit at the top of `checkOperation`
+         * discarded the rules for any collection carrying an engine whose
+         * capabilities report `supportsRLS: false` — which is every call site in
+         * the MongoDB driver, all of which pass `onUnknown: "deny"` and were
+         * never reached.
+         */
+        function mongoCollection(securityRules: SecurityRule[]): CollectionConfig {
+            return { ...makeCollection(securityRules),
+engine: "mongodb" };
+        }
 
+        const ownerRule: SecurityRule[] = [
+            { operations: ["all"],
+ownerField: "owner_id" } as SecurityRule
+        ];
+
+        it("evaluates the rules of a `engine: \"mongodb\"` collection", () => {
+            const col = mongoCollection(ownerRule);
+            const auth = makeAuthController({ uid: "u1" });
+            expect(canEditEntity(col, auth, "products", makeEntity({ owner_id: "someone-else" }))).toBe(false);
+            expect(canDeleteEntity(col, auth, "products", makeEntity({ owner_id: "someone-else" }))).toBe(false);
+        });
+
+        it("still grants the owner — the rule has to discriminate", () => {
+            const col = mongoCollection(ownerRule);
+            const auth = makeAuthController({ uid: "u1" });
+            expect(canEditEntity(col, auth, "products", makeEntity({ owner_id: "u1" }))).toBe(true);
+        });
+
+        /**
+         * The behaviour used to flip on spelling: `driver: "mongodb"` leaves
+         * `engine` undefined, which resolved to the Postgres capabilities and
+         * *did* evaluate the rules. Configuring the collection the documented
+         * way was what removed the enforcement.
+         */
+        it("answers the same for `engine: \"mongodb\"` and the legacy `driver` spelling", () => {
+            const auth = makeAuthController({ uid: "u1" });
+            const entity = makeEntity({ owner_id: "someone-else" });
+            const byEngine = mongoCollection(ownerRule);
+            const byDriver = { ...makeCollection(ownerRule),
+driver: "mongodb" } as CollectionConfig;
+            expect(canEditEntity(byEngine, auth, "products", entity))
+                .toBe(canEditEntity(byDriver, auth, "products", entity));
+        });
+    });
+
+    // ── USING / WITH CHECK, asked separately ─────────────────
+    describe("clause selection", () => {
+        /**
+         * Postgres checks `USING` against the stored row and `WITH CHECK`
+         * against the row that will replace it. A driver enforcing an update
+         * in-process holds two different rows and must be able to ask the two
+         * questions separately.
+         */
+        const rule: SecurityRule[] = [
+            {
+                operation: "update",
+                using: "owner_id = auth.uid()",
+                withCheck: "status = 'draft'"
+            } as SecurityRule
+        ];
+
+        it("`using` ignores the WITH CHECK clause", () => {
+            const col = makeCollection(rule);
+            const auth = makeAuthController({ uid: "u1" });
+            const stored = makeEntity({ owner_id: "u1",
+status: "published" });
+            expect(checkOperation(col, auth, stored, "update", { clauses: "using" })).toBe(true);
+            expect(checkOperation(col, auth, stored, "update")).toBe(false);
+        });
+
+        it("`withCheck` ignores the USING clause", () => {
+            const col = makeCollection(rule);
+            const auth = makeAuthController({ uid: "u1" });
+            const incoming = makeEntity({ owner_id: "someone-else",
+status: "draft" });
+            expect(checkOperation(col, auth, incoming, "update", { clauses: "withCheck" })).toBe(true);
+            expect(checkOperation(col, auth, incoming, "update", { clauses: "using" })).toBe(false);
+        });
+    });
+});

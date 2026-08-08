@@ -40,6 +40,7 @@ jest.mock("@rebasepro/server", () => ({
     resolveRequireAuth: require("../../server/src/auth/require-auth").resolveRequireAuth
 }));
 
+import { extractUserFromToken } from "@rebasepro/server";
 import { createMongoWebSocket } from "../src/websocket";
 import type { MongoRealtimeService } from "../src/services/MongoRealtimeService";
 import type { MongoDriver } from "../src/services/MongoDriver";
@@ -145,5 +146,64 @@ describe("Mongo WebSocket requireAuth resolution", () => {
 
         expect(mockWssInstance).not.toBe(firstWss);
         expect(await anonymousIsRefused()).toBe(true);
+    });
+
+    /**
+     * `BackendBootstrapper.initializeWebsockets` declares five parameters and
+     * `init.ts` passes five; `MongoBootstrapper` accepted four, so the adapter
+     * was dropped between two individually consistent signatures. The socket
+     * then verified with the built-in JWT path only, and on a backend using an
+     * AuthAdapter — Clerk, Auth0, the documented way to unify identity — every
+     * realtime AUTHENTICATE answered "Invalid or expired token".
+     */
+    describe("with an AuthAdapter", () => {
+        const authenticateWith = async (token: string) => {
+            const connectionCallback = mockWssInstance.on.mock.calls.find(
+                (call: any[]) => call[0] === "connection"
+            )[1];
+            const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+            connectionCallback(mockWs);
+            const messageCallback = mockWs.on.mock.calls.find(
+                (call: any[]) => call[0] === "message"
+            )[1];
+
+            await messageCallback(Buffer.from(JSON.stringify({
+                type: "AUTHENTICATE",
+                requestId: "req-auth",
+                payload: { token }
+            })));
+
+            return mockWs.send.mock.calls.map((c: any[]) => JSON.parse(c[0]));
+        };
+
+        const adapter = {
+            verifyRequest: jest.fn(),
+            verifyToken: jest.fn(async (token: string) =>
+                token === "adapter-token" ? { uid: "u-clerk",
+roles: ["editor"],
+isAdmin: false } : null)
+        } as any;
+
+        it("verifies the token with the adapter", async () => {
+            createMongoWebSocket(mockServer, realtimeService, driver, undefined, undefined, adapter);
+
+            const frames = await authenticateWith("adapter-token");
+            expect(frames.some((f: any) => f.type === "AUTH_SUCCESS" && f.payload.uid === "u-clerk")).toBe(true);
+            // The built-in JWT path must not be consulted when an adapter is present.
+            expect(extractUserFromToken).not.toHaveBeenCalled();
+        });
+
+        it("still refuses a token the adapter rejects", async () => {
+            createMongoWebSocket(mockServer, realtimeService, driver, undefined, undefined, adapter);
+
+            const frames = await authenticateWith("not-a-token");
+            expect(frames.some((f: any) => f.payload?.error?.code === "INVALID_TOKEN")).toBe(true);
+        });
+
+        it("requires auth because an adapter is configured, with no jwtSecret anywhere", async () => {
+            createMongoWebSocket(mockServer, realtimeService, driver, undefined, undefined, adapter);
+
+            expect(await anonymousIsRefused()).toBe(true);
+        });
     });
 });

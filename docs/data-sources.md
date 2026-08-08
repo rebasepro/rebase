@@ -122,11 +122,27 @@ Authentication has important interactions with multi-data-source setups:
   driver. The auth collection must therefore be on the default data source —
   the backend warns at boot if it isn't (a non-default auth collection would
   produce a split-brain user store).
-- **Row-level security is Postgres-only.** Server collections on engines
-  without RLS (e.g. MongoDB) still require authentication (the `requireAuth`
-  gate), but get **no row-level authorization** — `scopeDataDriver` no-ops for
-  engines without `withAuth()`. Enforce access with app-level checks or
-  engine-native rules. The backend warns at boot for non-RLS server engines.
+- **Database-enforced row security is Postgres-only; the rules are not.**
+  `securityRules` are a declaration about the data, and the engine decides *who*
+  enforces them, not *whether* they hold. Postgres compiles them to RLS DDL;
+  MongoDB has no RLS, so its driver applies the same rules in-process — on the
+  listing, the count, `fetchOne`, `save`, `delete` and realtime subscriptions
+  alike. An engine with no `withAuth()` at all still gets no row-level
+  authorization (`scopeDataDriver` no-ops for it); enforce access there with
+  app-level checks or engine-native rules. The backend warns at boot for
+  non-RLS server engines.
+- **In-process enforcement refuses what it cannot express.** The MongoDB driver
+  translates each rule through the same compiler the Postgres DDL generator
+  uses. A rule it cannot turn into a query — raw SQL beyond simple comparisons,
+  a membership subquery (`existsIn`), a negated column predicate — makes the
+  request fail with `SECURITY_RULE_UNSUPPORTED` rather than be served without
+  authorization. Prefer `access`, `ownerField`, `roles` and structured
+  `condition`/`check` on a non-Postgres collection; raw `using`/`withCheck`
+  stays Postgres-only.
+- **`withCheck` runs before the write on MongoDB.** There is no transaction to
+  roll back, so the driver evaluates `USING` against the stored row and
+  `WITH CHECK` against the row that would replace it, and refuses before
+  touching the document.
 - **Direct data sources bypass Rebase auth entirely.** A Firestore (`direct`)
   collection is reached straight from the client, so the Rebase JWT, RLS, and
   API keys never apply — security is governed by the external backend's own

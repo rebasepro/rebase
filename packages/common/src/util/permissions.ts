@@ -1,4 +1,4 @@
-import { AuthState, Entity, CollectionConfig, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { AuthState, Entity, CollectionConfig, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
@@ -26,8 +26,28 @@ export type AuthContext<USER extends User = User> = AuthState<USER>;
  */
 export type UnknownResolution = "allow" | "deny";
 
+/**
+ * Which half of a rule to evaluate.
+ *
+ * Postgres evaluates `USING` against the row as it is *now* and `WITH CHECK`
+ * against the row as it *will be*, both inside the transaction. A driver
+ * enforcing an update in-process has two different rows in hand and therefore
+ * needs to ask the two questions separately — asking one question about one row
+ * either checks the new values against the old row's ownership or the reverse.
+ *
+ * - `"both"` (default): what a single-row decision means (`USING ∧ WITH CHECK`).
+ * - `"using"`: the read/target clause only — ask it about the stored row.
+ * - `"withCheck"`: the write clause only — ask it about the row being written.
+ *
+ * Rule *selection* is unaffected: the target operation still decides which rules
+ * apply, so `"using"` on an `update` evaluates the update rules' USING clause,
+ * not the delete rules'.
+ */
+export type PolicyClauses = "both" | "using" | "withCheck";
+
 export interface CheckOperationOptions {
     onUnknown?: UnknownResolution;
+    clauses?: PolicyClauses;
 }
 
 /** Combine clause results with AND under three-valued (Kleene) logic. */
@@ -57,12 +77,17 @@ function ruleApplies(rule: SecurityRule, targetOperation: SecurityOperation): bo
  * in that case. USING applies to SELECT/UPDATE/DELETE; WITH CHECK to
  * INSERT/UPDATE; both must pass for UPDATE.
  */
-function evaluateRuleForOperation(rule: SecurityRule, ctx: PolicyEvalContext, targetOperation: SecurityOperation): TriState {
+function evaluateRuleForOperation(
+    rule: SecurityRule,
+    ctx: PolicyEvalContext,
+    targetOperation: SecurityOperation,
+    clauses: PolicyClauses = "both"
+): TriState {
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
     const clause = (expr: typeof usingExpr): TriState => expr === null ? false : evaluatePolicy(expr, ctx);
 
-    const needsUsing = targetOperation !== "insert";
-    const needsWithCheck = targetOperation === "insert" || targetOperation === "update";
+    const needsUsing = targetOperation !== "insert" && clauses !== "withCheck";
+    const needsWithCheck = (targetOperation === "insert" || targetOperation === "update") && clauses !== "using";
 
     const results: TriState[] = [];
     if (needsUsing) results.push(clause(usingExpr));
@@ -81,9 +106,20 @@ function resolveTriState(value: TriState, onUnknown: UnknownResolution): boolean
  * the same model compiled to Postgres RLS DDL, so the decision matches database
  * enforcement for every non-raw rule.
  *
+ * Engine-independent by design. `securityRules` are a declaration about the
+ * data, not about Postgres: the engine decides *who* enforces them (Postgres
+ * compiles them to RLS DDL, a document driver applies them in-process), never
+ * *whether* they hold. Gating this function on the engine's `supportsRLS`
+ * capability is what made every `{ onUnknown: "deny" }` call site in the Mongo
+ * driver return `true` before it evaluated anything — and it did so only for
+ * collections that spelled their engine out, so declaring `engine: "mongodb"`
+ * was what switched authorization off.
+ *
  * @param options.onUnknown how to treat rules that cannot be decided
  *   client-side (raw SQL, or row predicates with no row). Defaults to `"allow"`
  *   for optimistic UI gating; enforcement callers should pass `"deny"`.
+ * @param options.clauses which half of each rule to evaluate. See
+ *   {@link PolicyClauses}; defaults to `"both"`.
  */
 export function checkOperation<M extends Record<string, unknown>, USER extends User>(
     collection: CollectionConfig<M>,
@@ -93,7 +129,8 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
     options?: CheckOperationOptions
 ): boolean {
     const onUnknown = options?.onUnknown ?? "allow";
-    const securityRules = getDataSourceCapabilities(collection.engine).supportsRLS ? collection.securityRules : undefined;
+    const clauses = options?.clauses ?? "both";
+    const securityRules = collection.securityRules;
     if (!securityRules || securityRules.length === 0) {
         return true;
     }
@@ -113,7 +150,7 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
 
     for (const rule of applicableRules) {
         const mode = rule.mode || "permissive";
-        const passed = resolveTriState(evaluateRuleForOperation(rule, ctx, targetOperation), onUnknown);
+        const passed = resolveTriState(evaluateRuleForOperation(rule, ctx, targetOperation, clauses), onUnknown);
 
         if (mode === "restrictive") {
             if (!passed) {

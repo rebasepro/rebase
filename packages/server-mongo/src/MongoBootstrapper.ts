@@ -1,5 +1,6 @@
 import { Db, MongoClient } from "mongodb";
 import type {
+    AuthAdapter,
     BackendBootstrapper,
     InitializedDriver,
     BootstrappedAuth,
@@ -182,14 +183,21 @@ policies: [] };
 
         mountRoutes() {},
 
-        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown): Promise<void> {
+        // Five parameters, not four. `BackendBootstrapper` declares an
+        // `authAdapter` here and `init.ts` passes one; dropping it left the
+        // socket with only its built-in JWT verifier, so on a backend using an
+        // AuthAdapter every realtime AUTHENTICATE failed with "Invalid or
+        // expired token" — and nothing on either side could have type-checked
+        // the mismatch.
+        async initializeWebsockets(server: unknown, realtimeService: RealtimeProvider, driver: DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> {
             const { createMongoWebSocket } = await import("./websocket");
             createMongoWebSocket(
                 server as import("http").Server,
                 realtimeService as MongoRealtimeService,
                 driver as MongoDriver,
                 config as Record<string, unknown> | undefined,
-                cachedAdmin
+                cachedAdmin,
+                authAdapter
             );
         }
     };

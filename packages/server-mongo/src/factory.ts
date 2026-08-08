@@ -6,7 +6,7 @@
  */
 
 import { Db, MongoClient } from "mongodb";
-import { DataDriver, CollectionConfig } from "@rebasepro/types";
+import { DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 
 import { MongoDataService } from "./db/MongoDataService";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
@@ -56,14 +56,27 @@ export interface MongoBackendInstance extends BackendInstance {
  * Simple in-memory collection registry for MongoDB.
  */
 export class MongoCollectionRegistry implements CollectionRegistryInterface {
+    /** Every addressable key → collection. See {@link register}. */
     private collections = new Map<string, CollectionConfig>();
+    /** Registration order, so `getCollections()` returns each collection once. */
+    private registered: CollectionConfig[] = [];
     private _globalCallbacks?: any;
 
     /**
-     * Register a collection
+     * Register a collection under every name it can be addressed by.
+     *
+     * A Mongo collection has up to three: `slug` (the routing key), `path` (the
+     * MongoDB collection-name override, which is what `getCollectionDataPath`
+     * hands the driver) and `name` (the human label). Registering only `name`
+     * meant every `getCollectionByPath` lookup missed — and the realtime path,
+     * whose only source of the collection is this registry, ran with no
+     * `securityRules`, no `properties` and no callbacks.
      */
     register(collection: CollectionConfig): void {
-        this.collections.set(collection.name, collection);
+        this.registered.push(collection);
+        for (const key of [getCollectionDataPath(collection), collection.slug, collection.name]) {
+            if (key) this.collections.set(key, collection);
+        }
     }
 
     /**
@@ -77,7 +90,7 @@ export class MongoCollectionRegistry implements CollectionRegistryInterface {
      * Get all registered collections
      */
     getCollections(): CollectionConfig[] {
-        return Array.from(this.collections.values());
+        return [...this.registered];
     }
 
     /**

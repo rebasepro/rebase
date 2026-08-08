@@ -146,6 +146,30 @@ createdAt: now };
 
             expect(entity.createdAt).toEqual(now);
         });
+
+        /**
+         * A partial update sends only the fields that changed. Returning those
+         * back was a partial row everywhere it went: the REST response, the
+         * `afterSave` callback, the history entry a revert restores from, and
+         * the row pushed to single-document subscribers. Postgres returns the
+         * whole row here.
+         */
+        it("returns the stored row after a partial update, not the values sent", async () => {
+            const created = await dataService.save("users", {
+                name: "Original Name",
+                email: "test@example.com",
+                age: 30
+            });
+
+            const updated = await dataService.save("users", { name: "Updated Name" }, rowId(created));
+
+            expect(updated).toEqual({
+                id: created.id,
+                name: "Updated Name",
+                email: "test@example.com",
+                age: 30
+            });
+        });
     });
 
     describe("EntityReference round-trip", () => {

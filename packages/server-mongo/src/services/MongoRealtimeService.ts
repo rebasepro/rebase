@@ -7,6 +7,8 @@
 
 import { Db, ChangeStream, ChangeStreamDocument, Document, ObjectId } from "mongodb";
 import {
+    ANONYMOUS_USER_ID,
+    DataDriver,
     FilterValues,
     RealtimeProvider,
     CollectionSubscriptionConfig,
@@ -15,17 +17,27 @@ import {
     User
 } from "@rebasepro/types";
 import { WebSocket } from "ws";
-import { MongoDataService } from "../db/MongoDataService";
 
 import type { MongoDriver } from "./MongoDriver";
 import { logger } from "@rebasepro/server";
 
+/** The acting user for a subscription, as the driver and the socket carry it. */
+export interface SubscriptionAuthContext {
+    uid: string;
+    roles: string[];
+}
+
 interface Subscription {
     type: "collection" | "single";
-    config: CollectionSubscriptionConfig | SingleSubscriptionConfig;
+    /**
+     * Carries `authContext`. There is deliberately no second copy on this
+     * object: every fetch reads `config.authContext`, and the one that used to
+     * live here was written from three places and read from none — so a
+     * subscription that looked authorized was re-fetched as nobody.
+     */
+    config: (CollectionSubscriptionConfig | SingleSubscriptionConfig) & { authContext?: SubscriptionAuthContext };
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
-    authContext?: { uid: string; roles: string[] };
 }
 
 /**
@@ -37,12 +49,9 @@ interface Subscription {
 export class MongoRealtimeService implements RealtimeProvider {
     private subscriptions = new Map<string, Subscription>();
     private clients = new Map<string, WebSocket>();
-    private dataService: MongoDataService;
     private driver?: MongoDriver;
 
-    constructor(private db: Db) {
-        this.dataService = new MongoDataService(db);
-    }
+    constructor(private db: Db) {}
 
     setDataDriver(driver: MongoDriver) {
         this.driver = driver;
@@ -60,7 +69,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     subscribeToCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
+        config: CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext },
         callback?: (rows: Record<string, unknown>[]) => void
     ): void {
         // Clean up existing subscription if any
@@ -89,8 +98,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 type: "collection",
                 config,
                 changeStream,
-                callback,
-                authContext: config.authContext
+                callback
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -117,8 +125,7 @@ export class MongoRealtimeService implements RealtimeProvider {
             const subscription: Subscription = {
                 type: "collection",
                 config,
-                callback,
-                authContext: config.authContext
+                callback
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -133,38 +140,29 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private async fetchAndNotifyCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
+        config: CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext },
         callback?: (rows: Record<string, unknown>[]) => void
     ): Promise<void> {
         try {
-            let rows;
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
-
-            if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.uid,
-roles: config.authContext.roles } as User;
-                const authenticatedDriver = await this.driver.withAuth(mockUser);
-                rows = await authenticatedDriver.fetchCollection({
-                    path: config.path,
-                    collection: registryCollection,
-                    filter: config.filter as FilterValues<string> | undefined,
-                    orderBy: config.orderBy,
-                    order: config.order,
-                    limit: config.limit,
-                    startAfter: config.startAfter,
-                    searchString: config.searchString
-                });
-            } else {
-                rows = await this.dataService.fetchCollection(config.path, {
-                    filter: config.filter as FilterValues<string> | undefined,
-                    orderBy: config.orderBy,
-                    order: config.order,
-                    limit: config.limit,
-                    startAfter: config.startAfter,
-                    searchString: config.searchString,
-                    collection: registryCollection
-                });
-            }
+            // One path, authenticated or not. The `else` branch used to reach
+            // past the driver into the repository, which applies no security
+            // rules at all — the fallback stubbing out the contract the primary
+            // branch honours, and granting more while doing it. An anonymous
+            // subscriber is now a user like any other: rules are evaluated
+            // against the anonymous uid, and a rule that needs a real one
+            // matches nothing.
+            const driver = await this.scopedDriver(config.authContext);
+            const rows = await driver.fetchCollection({
+                path: config.path,
+                collection: registryCollection,
+                filter: config.filter as FilterValues<string> | undefined,
+                orderBy: config.orderBy,
+                order: config.order,
+                limit: config.limit,
+                startAfter: config.startAfter,
+                searchString: config.searchString
+            });
 
             if (callback) {
                 callback(rows);
@@ -175,11 +173,26 @@ roles: config.authContext.roles } as User;
     }
 
     /**
+     * The driver scoped to a subscriber.
+     *
+     * Never the bare repository: everything a subscription delivers has to pass
+     * the same row authorization an HTTP read does.
+     */
+    private async scopedDriver(authContext?: SubscriptionAuthContext): Promise<DataDriver> {
+        if (!this.driver) {
+            throw new Error("MongoRealtimeService has no data driver — subscriptions cannot be authorized");
+        }
+        const user = { uid: authContext?.uid ?? ANONYMOUS_USER_ID,
+roles: authContext?.roles ?? [] } as User;
+        return this.driver.withAuth(user);
+    }
+
+    /**
      * Subscribe to single row changes
      */
     subscribeToOne(
         subscriptionId: string,
-        config: SingleSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
+        config: SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext },
         callback?: (row: Record<string, unknown> | null) => void
     ): void {
         // Clean up existing subscription if any
@@ -211,8 +224,7 @@ roles: config.authContext.roles } as User;
                 type: "single",
                 config,
                 changeStream,
-                callback,
-                authContext: config.authContext
+                callback
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -241,8 +253,7 @@ roles: config.authContext.roles } as User;
             const subscription: Subscription = {
                 type: "single",
                 config,
-                callback,
-                authContext: config.authContext
+                callback
             };
 
             this.subscriptions.set(subscriptionId, subscription);
@@ -257,25 +268,17 @@ roles: config.authContext.roles } as User;
      */
     private async fetchAndNotifyOne(
         subscriptionId: string,
-        config: SingleSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
+        config: SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext },
         callback?: (row: Record<string, unknown> | null) => void
     ): Promise<void> {
         try {
-            let row;
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
-
-            if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.uid,
-roles: config.authContext.roles } as User;
-                const authenticatedDriver = await this.driver.withAuth(mockUser);
-                row = await authenticatedDriver.fetchOne({
-                    path: config.path,
-                    id: config.id,
-                    collection: registryCollection
-                });
-            } else {
-                row = await this.dataService.fetchOne(config.path, config.id);
-            }
+            const driver = await this.scopedDriver(config.authContext);
+            const row = await driver.fetchOne({
+                path: config.path,
+                id: config.id,
+                collection: registryCollection
+            });
 
             if (callback) {
                 callback(row || null);
@@ -311,14 +314,21 @@ roles: config.authContext.roles } as User;
         // Find all subscriptions that might be affected by this update
         for (const [subscriptionId, subscription] of this.subscriptions) {
             if (subscription.type === "single") {
-                const config = subscription.config as SingleSubscriptionConfig;
+                const config = subscription.config as SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext };
                 if (config.path === path && config.id.toString() === id) {
-                    if (subscription.callback) {
-                        subscription.callback(row);
+                    if (row === null) {
+                        // A deletion carries no row to authorize.
+                        subscription.callback?.(null);
+                    } else {
+                        // Re-fetched through the subscriber's own driver rather
+                        // than pushed verbatim: `notifyUpdate` runs after every
+                        // save, and handing it the row as written broadcast any
+                        // document to whoever happened to be watching its id.
+                        await this.fetchAndNotifyOne(subscriptionId, config, subscription.callback);
                     }
                 }
             } else if (subscription.type === "collection") {
-                const config = subscription.config as CollectionSubscriptionConfig;
+                const config = subscription.config as CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext };
                 if (config.path === path) {
                     // Re-fetch the collection to get updated data
                     await this.fetchAndNotifyCollection(subscriptionId, config, subscription.callback);

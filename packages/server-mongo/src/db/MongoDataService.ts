@@ -299,6 +299,12 @@ export class MongoDataService implements DataRepository {
 
     /**
      * Save an row (create or update)
+     *
+     * Returns the **stored** document, not the values that were sent. A partial
+     * update sends only the fields that changed, and returning those was a
+     * partial row everywhere it went: the REST response, `afterSave`, the
+     * history entry a revert restores from, and the row pushed to realtime
+     * subscribers. Postgres returns the whole row here (`RETURNING *`).
      */
     async save<M extends Record<string, any>>(
         collectionPath: string,
@@ -310,7 +316,10 @@ export class MongoDataService implements DataRepository {
         const mongoValues = this.convertToMongoValues(values as Record<string, any>);
 
         if (id) {
-            // Update existing row
+            // Still an upsert: this is also the call that creates a row with a
+            // client-chosen id. Addressing an id that does not exist is caught
+            // above — the REST `PUT` 404s and the authenticated driver refuses
+            // — so the upsert only ever lands as the create it is meant to be.
             const objectId = this.toObjectId(id);
             await collection.updateOne(
                 { _id: objectId } as Filter<Document>,
@@ -318,10 +327,8 @@ export class MongoDataService implements DataRepository {
                 { upsert: true }
             );
 
-            return {
-                ...values,
-                id: id.toString()
-            };
+            return await this.readBack(collectionPath, objectId, { ...values,
+id: id.toString() });
         } else {
             // Create new row
             const newId = new ObjectId();
@@ -330,11 +337,22 @@ export class MongoDataService implements DataRepository {
                 ...mongoValues
             });
 
-            return {
-                ...values,
-                id: newId.toString()
-            };
+            return await this.readBack(collectionPath, newId, { ...values,
+id: newId.toString() });
         }
+    }
+
+    /**
+     * Read the document back after a write, falling back to the caller's own
+     * values if it has already been removed by a concurrent delete.
+     */
+    private async readBack(
+        collectionPath: string,
+        objectId: ObjectId | string | number,
+        fallback: Record<string, unknown>
+    ): Promise<Record<string, unknown>> {
+        const doc = await this.getCollection(collectionPath).findOne({ _id: objectId } as Filter<Document>);
+        return doc ? this.documentToRow(doc) : fallback;
     }
 
     /**
