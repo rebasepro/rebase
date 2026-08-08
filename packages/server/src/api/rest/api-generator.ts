@@ -7,7 +7,12 @@ import { assertKnownWriteFields, projectResponseFields } from "./write-validatio
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
-import { createIdempotencyStore, IDEMPOTENCY_HEADER, type IdempotencyStore } from "./idempotency";
+import {
+    createIdempotencyStore,
+    IDEMPOTENCY_HEADER,
+    requestFingerprint,
+    type IdempotencyStore
+} from "./idempotency";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -23,6 +28,25 @@ async function parseJsonBody(c: Context<HonoEnv>): Promise<Record<string, unknow
     } catch {
         throw ApiError.badRequest("Invalid JSON body");
     }
+}
+
+/**
+ * A live key presented on a different request than the one it was claimed for.
+ *
+ * Refused rather than replayed, because the replay is the dangerous answer: a
+ * delete sent under the key of an earlier create used to be handed the create's
+ * `200` and its rows, so the caller saw a success for rows that are still
+ * there. A `422` names the mistake instead — the key is well-formed, the
+ * request is not repeatable under it.
+ */
+function idempotencyKeyReused(key: string): ApiError {
+    return new ApiError(
+        422,
+        "IDEMPOTENCY_KEY_REUSED",
+        `Idempotency-Key '${key}' was already used for a different request. ` +
+        "A key names one write: use a new key for each distinct request, and re-send " +
+        "the identical request to replay its answer."
+    );
 }
 
 
@@ -284,9 +308,14 @@ export class RestApiGenerator {
          * failure, complete on success — and getting one of those steps wrong
          * is exactly the bug the key exists to prevent. Written once so the
          * three cannot drift into three different notions of "already done".
+         *
+         * `body` is what the key is claimed *for*: the same key on a different
+         * request is a caller mistake, and replaying a create's answer to a
+         * delete would report a deletion that never happened.
          */
         const withIdempotency = async (
             c: Context<HonoEnv>,
+            body: unknown,
             run: () => Promise<unknown>,
             respond: (body: unknown) => Response
         ): Promise<Response> => {
@@ -296,10 +325,13 @@ export class RestApiGenerator {
             // Claimed before the write, not after: the two-step
             // recall-then-write let concurrent replays of one key both through.
             const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid)
+                ? await store.claim(idempotencyKey, uid, requestFingerprint(c.req.method, c.req.path, body))
                 : undefined;
             if (claimed?.status === "replay") {
                 return respond(claimed.response);
+            }
+            if (claimed?.status === "mismatch") {
+                throw idempotencyKeyReused(idempotencyKey!);
             }
             if (claimed?.status === "in-flight") {
                 throw ApiError.conflict(
@@ -398,7 +430,7 @@ export class RestApiGenerator {
             // batch committed, so it retries — and without a key the server
             // cannot tell that retry from a second genuine import. On a single
             // create that duplicates one row; here it duplicates the batch.
-            return withIdempotency(c, async () => {
+            return withIdempotency(c, body, async () => {
                 const written = await driver.saveMany!({
                     path,
                     rows,
@@ -454,7 +486,7 @@ export class RestApiGenerator {
                 assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
             });
 
-            return withIdempotency(c, async () => {
+            return withIdempotency(c, body, async () => {
                 const written = await driver.updateMany!({
                     path,
                     updates: updates.map((entry) => ({
@@ -505,7 +537,7 @@ export class RestApiGenerator {
                 );
             }
 
-            return withIdempotency(c, async () => {
+            return withIdempotency(c, body, async () => {
                 await driver.deleteMany!({
                     path,
                     ids: ids as (string | number)[],
@@ -603,10 +635,13 @@ values: entity as Record<string, unknown> },
             // recall-then-write let concurrent replays of one key both
             // through, which is the duplicate this exists to stop.
             const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid)
+                ? await store.claim(idempotencyKey, uid, requestFingerprint(c.req.method, c.req.path, body))
                 : undefined;
             if (claimed?.status === "replay") {
                 return c.json(claimed.response as never, 201);
+            }
+            if (claimed?.status === "mismatch") {
+                throw idempotencyKeyReused(idempotencyKey!);
             }
             if (claimed?.status === "in-flight") {
                 throw ApiError.conflict(

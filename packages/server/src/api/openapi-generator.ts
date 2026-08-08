@@ -308,7 +308,9 @@ description: "Whether more records exist beyond this page" }
             description:
                 "Names this write so a retry is recognised instead of repeated. Without it a " +
                 "client that lost the response cannot distinguish a replay from a second " +
-                "genuine batch, and the whole batch is written twice."
+                "genuine batch, and the whole batch is written twice. A key names one request: " +
+                "re-send the identical request to replay its answer, and use a new key for a " +
+                "different one."
         };
 
         const bulkErrors = {
@@ -317,7 +319,13 @@ description: "Whether more records exist beyond this page" }
                 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
             },
             409: {
-                description: "A request with the same Idempotency-Key is still in flight",
+                description:
+                    "A request with the same Idempotency-Key is still in flight. Retry it: the " +
+                    "first attempt's result is replayed once it lands",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            422: {
+                description: "The Idempotency-Key was already used for a different request",
                 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
             },
             ...errorResponses(requireAuth)
