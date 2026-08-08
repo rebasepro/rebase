@@ -12,13 +12,12 @@
  * a domain only registers it — it is unverified until the records are published
  * and `verify` passes.
  */
-import arg from "arg";
 import chalk from "chalk";
 import {
     requireClient,
     requireProject,
     displayProjectRef,
-    cloudPositionals,
+    parseCloudArgs,
     emit,
     confirmDestructive,
     keyValues,
@@ -134,12 +133,29 @@ async function listDomains(rawArgs: string[]): Promise<void> {
     }
 }
 
+/**
+ * The domain `domains add` was asked to register.
+ *
+ * Exported so its tests drive the real parser. Under the old operand filter
+ * `rebase cloud domains add -p acme` registered a domain called "acme" — the
+ * project slug, read out of `--project`'s own value — and a registered domain
+ * is a project-record write, not a no-op.
+ */
+export function resolveDomainArg(rawArgs: string[]): string | undefined {
+    return parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud domains add
+        command: "cloud domains add",
+        maxPositionals: 1
+    }).positionals[0];
+}
+
 async function addDomain(rawArgs: string[]): Promise<void> {
+    const domain = resolveDomainArg(rawArgs);
+    if (!domain) fail("Usage: rebase cloud domains add <domain>", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs);
-    const domain = cloudPositionals(rawArgs).slice(2)[0];
-    if (!domain) fail("Usage: rebase cloud domains add <domain>", undefined, "usage");
 
     try {
         // Registering the domain is a project update; the DNS records to publish
@@ -204,11 +220,16 @@ instructions: res.instructions }
 }
 
 async function removeDomain(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // Strict, and it takes no arguments: detaching a domain is destructive, and
+    // the permissive parse accepted `domains remove --dry-run` by ignoring the
+    // flag and detaching anyway.
+    const { flags: args } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud domains remove
+        command: "cloud domains remove",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

@@ -10,7 +10,7 @@ import arg from "arg";
 import chalk from "chalk";
 import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
-import { listProjects, createProject, projectInfo, deleteProject } from "./projects";
+import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand, printOrgsHelp } from "./orgs";
 import { dbCommand, printDbHelp } from "./databases";
@@ -260,16 +260,17 @@ async function projectsGroup(action: string | undefined, rawArgs: string[]): Pro
         case "create":
             await createProject(rawArgs);
             break;
-        case "info": {
-            const id = positionals(rawArgs)[2] || requireProjectRef(rawArgs);
-            await projectInfo(rawArgs, id);
+        // The id is resolved by the handlers' own module, against their own flag
+        // spec. `positionals()` cannot do it: it declares only the global cloud
+        // flags and skips only LEADING `-` tokens, so any other flag written
+        // after the action became the id — `projects delete --force` looked up
+        // a project named "--force".
+        case "info":
+            await projectInfo(rawArgs, resolveProjectArg(rawArgs, "info"));
             break;
-        }
-        case "delete": {
-            const id = positionals(rawArgs)[2] || requireProjectRef(rawArgs);
-            await deleteProject(rawArgs, id);
+        case "delete":
+            await deleteProject(rawArgs, resolveProjectArg(rawArgs, "delete"));
             break;
-        }
         case "--help":
             printCloudHelp();
             break;

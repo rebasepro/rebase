@@ -1,0 +1,328 @@
+/**
+ * What a `rebase cloud` command reads as its ARGUMENT.
+ *
+ * Every command here used to resolve its operands with `cloudPositionals` —
+ * `rawArgs.slice(3).filter(a => !a.startsWith("-"))` — or a copy of it. That
+ * filter fails in two directions, and both are asserted below:
+ *
+ *  - **It keeps a flag's VALUE.** `arg` is not involved, so `--project acme`
+ *    contributes "acme" to the operand list: a plain word, in the argument
+ *    position, that no `startsWith("-")` test can distinguish from a real one.
+ *    `--project` is documented on every one of these commands, so this was
+ *    reachable straight off the help page — `env unset -p acme` removed a
+ *    variable called "acme", `webhooks delete --project acme 42` deleted "acme"
+ *    rather than 42.
+ *  - **It drops an undeclared flag without refusing it.** The flag leaves the
+ *    operand list but not the run, so the command proceeds with its argument
+ *    missing or defaulted: `db backup --dry-run` listed, `domains remove
+ *    --dry-run` detached the domain, `env set KEY=v --secrett` stored the value
+ *    as an ordinary readable variable. `projects info|delete` resolved its id
+ *    through `positionals()` rather than the filter, and there the undeclared
+ *    flag became the id outright.
+ *
+ * The fix is to parse the whole line strictly (`parseCloudArgs`), so `arg`
+ * consumes each declared flag together with its value and refuses the rest.
+ * These tests drive the real resolvers, not copies of them: a re-implementation
+ * of the thing under test can only ever confirm itself, which is exactly how
+ * the previous version of the dispatch test stayed green while the dispatcher
+ * was broken.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { setJsonModeForTest } from "./context";
+
+// `requireProjectRef` is the fallback `projects info|delete` uses when no id is
+// given; the rest keep the handler tests below off the network.
+vi.mock("./context", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./context")>();
+    return {
+        ...actual,
+        requireClient: vi.fn(),
+        requireProject: vi.fn(async () => "proj_1"),
+        requireProjectRef: vi.fn(() => "linked-project"),
+        displayProjectRef: vi.fn(() => "linked-project")
+    };
+});
+
+import * as context from "./context";
+import { resolveEnvSetArgs, resolveEnvKeyArg, envCommand } from "./env";
+import { resolveDomainArg } from "./domains";
+import { resolveExtensionArgs } from "./extensions";
+import { resolveDeploymentIdArg } from "./deployments";
+import { resolveBackupArgs } from "./databases";
+import { resolveWebhookIdArg, webhooksCommand } from "./resources";
+import { resolveProjectArg } from "./projects";
+
+/** `rebase <words…>` as `process.argv` — what every command is handed. */
+function argv(...words: string[]): string[] {
+    return ["/usr/bin/node", "/x/y/rebase.js", "cloud", ...words];
+}
+
+/**
+ * Run something that must refuse, and return the parsed `{error}` payload.
+ *
+ * A refusal in this family is `fail`: exactly one JSON value on stdout and a
+ * non-zero exit, never a thrown error — see `expectsJsonNotAThrow` below.
+ */
+async function refusalOf(run: () => unknown): Promise<{ message: string; code: string | null }> {
+    const chunks: string[] = [];
+    const origWrite = process.stdout.write.bind(process.stdout);
+    // @ts-expect-error test shim
+    process.stdout.write = (s: string) => {
+        chunks.push(typeof s === "string" ? s : String(s));
+        return true;
+    };
+    const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+        throw new Error("__exit__");
+    }) as never);
+
+    let exited = false;
+    try {
+        await run();
+    } catch (e) {
+        exited = e instanceof Error && e.message === "__exit__";
+        if (!exited) {
+            process.stdout.write = origWrite;
+            exit.mockRestore();
+            throw e;
+        }
+    } finally {
+        process.stdout.write = origWrite;
+        exit.mockRestore();
+    }
+
+    expect(exited).toBe(true);
+    return JSON.parse(chunks.join("").trim()).error;
+}
+
+beforeEach(() => setJsonModeForTest(true));
+afterEach(() => {
+    setJsonModeForTest(false);
+    vi.clearAllMocks();
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   A declared flag's value is never the argument
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("--project's value is not an argument", () => {
+    /**
+     * `-p <slug>` is how the help page says to act on an unlinked project, so
+     * every line here is one a user is invited to type. The number in the
+     * comment is what the old filter returned.
+     */
+    it.each([
+        ["env unset", () => resolveEnvKeyArg(argv("env", "unset", "-p", "acme"), "unset")], // "acme"
+        ["env reveal", () => resolveEnvKeyArg(argv("env", "reveal", "--project", "acme"), "reveal")], // "acme"
+        ["domains add", () => resolveDomainArg(argv("domains", "add", "-p", "acme"))], // "acme"
+        ["rollback", () => resolveDeploymentIdArg(argv("rollback", "-p", "acme"), "cloud rollback").id], // "acme"
+        ["cancel", () => resolveDeploymentIdArg(argv("cancel", "--project", "acme"), "cloud cancel").id], // "acme"
+        ["extensions enable", () => resolveExtensionArgs(argv("extensions", "enable", "-p", "acme"), "enable").name], // "acme"
+        ["extensions disable", () => resolveExtensionArgs(argv("extensions", "disable", "-p", "acme"), "disable").name], // "acme"
+        ["webhooks delete", () => resolveWebhookIdArg(argv("webhooks", "delete", "-p", "acme"))], // "acme"
+        ["db backup restore", () => resolveBackupArgs(argv("db", "backup", "restore", "-p", "acme")).filename] // "acme"
+    ])("%s reads no argument from `-p acme`", (_label, resolve) => {
+        expect(resolve()).toBeUndefined();
+    });
+
+    it("db backup reads no ACTION from `-p acme` either", () => {
+        // The action decides between listing, creating, restoring over the live
+        // database and printing a signed download URL. The old filter made it
+        // the project slug, which fell through to a list — the flag silently
+        // changed which command ran.
+        expect(resolveBackupArgs(argv("db", "backup", "-p", "acme")).action).toBe("list");
+    });
+
+    /**
+     * Order is the other half. With the flag written first the value took the
+     * argument's place and the real argument was pushed one along, so the
+     * command acted on the project slug and ignored what the caller named.
+     */
+    it("keeps the real argument when the flag comes first", () => {
+        expect(resolveEnvKeyArg(argv("env", "unset", "--project", "acme", "API_KEY"), "unset")).toBe("API_KEY");
+        expect(resolveWebhookIdArg(argv("webhooks", "delete", "--project", "acme", "42"))).toBe("42");
+        expect(resolveBackupArgs(argv("db", "backup", "restore", "-p", "acme", "db.sql")).filename).toBe("db.sql");
+    });
+
+    it("still reads the argument written the ordinary way", () => {
+        expect(resolveEnvKeyArg(argv("env", "unset", "API_KEY", "--project", "acme"), "unset")).toBe("API_KEY");
+        expect(resolveDomainArg(argv("domains", "add", "app.example.com"))).toBe("app.example.com");
+        expect(resolveDeploymentIdArg(argv("rollback", "d2", "--yes", "--json"), "cloud rollback").id).toBe("d2");
+        expect(resolveExtensionArgs(argv("extensions", "enable", "vector", "-y"), "enable").name).toBe("vector");
+        expect(resolveWebhookIdArg(argv("webhooks", "delete", "42"))).toBe("42");
+    });
+
+    /**
+     * A flag before the group shifts nothing: `commandWords` is applied to the
+     * PARSED positionals, not to a fixed argv index.
+     */
+    it("is unmoved by flags written before the group", () => {
+        expect(resolveEnvKeyArg(argv("--json", "env", "unset", "API_KEY"), "unset")).toBe("API_KEY");
+        expect(resolveEnvSetArgs(argv("-p", "acme", "env", "set", "K=v")).assignment).toEqual({ key: "K",
+value: "v" });
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   env set: the value, which is the field that gets written
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("env set", () => {
+    it("does not store --project's value as the variable's value", () => {
+        // `env set KEY -p acme` parsed as the documented `KEY VALUE` form with
+        // VALUE = "acme": a write that succeeds and reports success, and is
+        // wrong. The KEY-only form means an empty value.
+        expect(resolveEnvSetArgs(argv("env", "set", "KEY", "-p", "acme")).assignment).toEqual({ key: "KEY",
+value: "" });
+    });
+
+    it("still takes both operand forms", () => {
+        expect(resolveEnvSetArgs(argv("env", "set", "DB_URL=postgres://a=b")).assignment)
+            .toEqual({ key: "DB_URL",
+value: "postgres://a=b" });
+        expect(resolveEnvSetArgs(argv("env", "set", "KEY", "val")).assignment)
+            .toEqual({ key: "KEY",
+value: "val" });
+    });
+
+    it("still reads its own flags wherever they sit", () => {
+        expect(resolveEnvSetArgs(argv("env", "set", "--secret", "K=v")).flags["--secret"]).toBe(true);
+        expect(resolveEnvSetArgs(argv("env", "set", "K=v", "--force")).flags["--force"]).toBe(true);
+    });
+
+    it("refuses a third operand rather than dropping it", async () => {
+        const err = await refusalOf(() => resolveEnvSetArgs(argv("env", "set", "KEY", "one", "two")));
+        expect(err.code).toBe("usage");
+        expect(err.message).toContain("2 arguments");
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   An undeclared flag is an error, not an argument
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("an undeclared flag", () => {
+    it.each([
+        ["db backup restore", () => resolveBackupArgs(argv("db", "backup", "restore", "--dry-run"))],
+        ["domains add", () => resolveDomainArg(argv("domains", "add", "--dry-run"))],
+        ["env unset", () => resolveEnvKeyArg(argv("env", "unset", "--dry-run"), "unset")],
+        ["extensions enable", () => resolveExtensionArgs(argv("extensions", "enable", "--dry-run"), "enable")],
+        ["webhooks delete", () => resolveWebhookIdArg(argv("webhooks", "delete", "--dry-run"))],
+        ["rollback", () => resolveDeploymentIdArg(argv("rollback", "--dry-run"), "cloud rollback")],
+        ["projects delete", () => resolveProjectArg(argv("projects", "delete", "--dry-run"), "delete")]
+    ])("is refused by %s, never taken as the argument", async (_label, resolve) => {
+        const err = await refusalOf(resolve);
+        expect(err.code).toBe("usage");
+        expect(err.message).toContain("--dry-run");
+    });
+
+    /**
+     * The refusal has to name the command's help, because the flag being wrong
+     * is usually a memory of a real flag on a neighbouring command.
+     */
+    it("points at the help page for the command that refused", async () => {
+        const err = await refusalOf(() => resolveDomainArg(argv("domains", "add", "--dry-run")));
+        expect(err.message).toContain("rebase cloud domains add --help");
+    });
+
+    /**
+     * `--debug` is what `bin/rebase.js` prints after EVERY failure as the thing
+     * to re-run with, so it must be consumed rather than become the argument —
+     * the same reasoning that put it in `GLOBAL_COMMAND_FLAGS`.
+     */
+    it("does not include --debug, the flag the CLI tells you to add", () => {
+        expect(resolveDomainArg(argv("domains", "add", "app.example.com", "--debug"))).toBe("app.example.com");
+        expect(resolveWebhookIdArg(argv("webhooks", "delete", "--debug"))).toBeUndefined();
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   The refusal keeps the JSON contract
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("a parse refusal in JSON mode", () => {
+    /**
+     * This is why the cloud family cannot call `parseCommandArgs` directly, the
+     * way the non-cloud commands do. That helper THROWS, and a throw reaches
+     * `bin/rebase.js`, which prints `✗ …` to stderr and exits 1 — right for
+     * every other command, wrong here. `rebase cloud` enters JSON mode whenever
+     * stdout is not a TTY, i.e. always for the agents this family exists for,
+     * and it promises them exactly one JSON value on stdout. A throw would give
+     * them an empty stdout and a human sentence on stderr.
+     */
+    it("is one JSON value on stdout, not a thrown error", async () => {
+        const err = await refusalOf(() => resolveDomainArg(argv("domains", "add", "--dry-run")));
+        expect(err).toMatchObject({ code: "usage" });
+        expect(typeof err.message).toBe("string");
+    });
+
+    it("carries no ANSI escapes", async () => {
+        const err = await refusalOf(() => resolveEnvKeyArg(argv("env", "unset", "--dry-run"), "unset"));
+        // eslint-disable-next-line no-control-regex
+        expect(err.message).not.toMatch(/\[/);
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   projects info|delete: the optional id
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("projects info|delete", () => {
+    it("falls back to the linked project when no id is given", () => {
+        expect(resolveProjectArg(argv("projects", "delete", "--yes"), "delete")).toBe("linked-project");
+        expect(resolveProjectArg(argv("projects", "info"), "info")).toBe("linked-project");
+    });
+
+    it("takes an explicit id", () => {
+        expect(resolveProjectArg(argv("projects", "delete", "shop", "--yes"), "delete")).toBe("shop");
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   End to end: the wrong resource is never reached
+   ══════════════════════════════════════════════════════════════════ */
+
+describe("the destructive commands, driven end to end", () => {
+    function fakeClient(hooks: { invoke?: ReturnType<typeof vi.fn>; del?: ReturnType<typeof vi.fn> }) {
+        return {
+            functions: { invoke: hooks.invoke ?? vi.fn(async () => ({})) },
+            data: {
+                collection: () => ({
+                    find: async () => ({ data: [] }),
+                    findById: async () => undefined,
+                    update: async () => ({}),
+                    create: async () => ({}),
+                    delete: hooks.del ?? vi.fn(async () => ({}))
+                })
+            }
+        };
+    }
+
+    it("`env unset -p acme` removes nothing — it asks for a KEY", async () => {
+        const invoke = vi.fn(async () => ({ success: true,
+pendingRedeploy: true }));
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: fakeClient({ invoke }),
+            url: "https://cp.example"
+        });
+
+        const err = await refusalOf(() => envCommand("unset", argv("env", "unset", "-p", "acme")));
+        // Previously: DELETE env-vars/proj_1/acme, and a variable was gone.
+        expect(invoke).not.toHaveBeenCalled();
+        expect(err.code).toBe("usage");
+    });
+
+    it("`webhooks delete --project acme 42` never deletes the project slug", async () => {
+        const del = vi.fn(async () => ({}));
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: fakeClient({ del }),
+            url: "https://cp.example"
+        });
+
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await webhooksCommand("delete", argv("webhooks", "delete", "--project", "acme", "42"));
+        log.mockRestore();
+
+        expect(del).toHaveBeenCalledTimes(1);
+        expect(del.mock.calls[0][0]).toBe("42");
+    });
+});

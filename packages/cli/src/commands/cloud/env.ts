@@ -13,7 +13,6 @@
  * replaced but never read back. This mirrors `env-vars` exactly and refuses to
  * offer reveal for a secret variable rather than letting the server 403.
  */
-import arg from "arg";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
@@ -21,7 +20,7 @@ import {
     requireClient,
     requireProject,
     displayProjectRef,
-    cloudPositionals,
+    parseCloudArgs,
     emit,
     isJsonMode,
     confirmDestructive,
@@ -73,7 +72,7 @@ export async function envCommand(action: string | undefined, rawArgs: string[]):
         case "unset":
         case "delete":
         case "rm":
-            await unsetEnv(rawArgs);
+            await unsetEnv(rawArgs, action);
             break;
         case "reveal":
             await revealEnv(rawArgs);
@@ -185,21 +184,44 @@ export function buildTimeEnvPrefix(key: string): string | undefined {
     return BUILD_TIME_ENV_PREFIXES.find((prefix) => key.toUpperCase().startsWith(prefix));
 }
 
+/** The flags `rebase cloud env set` takes, on top of the global cloud ones. */
+export const ENV_SET_FLAGS = {
+    "--secret": Boolean,
+    "--force": Boolean
+} as const;
+
+/**
+ * What `env set` was asked to store.
+ *
+ * The sharp one in this family: the old operand filter left `--project`'s value
+ * in the operand list, so `rebase cloud env set KEY -p acme` parsed as the
+ * `KEY VALUE` form and stored the project slug as KEY's value — a write that
+ * succeeds, reports success, and is wrong. Strict parsing consumes `-p` with
+ * its value, leaving `["KEY"]` and the documented empty value.
+ *
+ * A value beginning with `-` must use the `KEY=-v` form; the bare `KEY -v` form
+ * is refused rather than guessed at, as everywhere else strict parsing is used.
+ *
+ * Exported so its tests drive the real parser rather than a copy of it.
+ */
+export function resolveEnvSetArgs(rawArgs: string[]) {
+    const { flags, positionals } = parseCloudArgs({
+        spec: ENV_SET_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud env set
+        command: "cloud env set",
+        maxPositionals: 2 // KEY=VALUE, or KEY VALUE
+    });
+    return { flags,
+assignment: parseEnvAssignment(positionals) };
+}
+
 async function setEnv(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--secret": Boolean,
-"--force": Boolean,
-"--project": String,
-"-p": "--project" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+    const { flags: args, assignment: parsed } = resolveEnvSetArgs(rawArgs);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
 
-    const operands = cloudPositionals(rawArgs).slice(2); // after `env set`
-    const parsed = parseEnvAssignment(operands);
     if (!parsed || !parsed.key) {
         fail("Usage: rebase cloud env set KEY=VALUE [--secret]", undefined, "usage");
     }
@@ -249,12 +271,35 @@ value: parsed!.value };
     }
 }
 
-async function unsetEnv(rawArgs: string[]): Promise<void> {
+/**
+ * The variable `env unset` / `env reveal` names.
+ *
+ * `unset` is a delete, and the operand filter aimed it at the wrong variable:
+ * `rebase cloud env unset -p acme` removed a variable called "acme" from the
+ * linked project instead of reporting a missing KEY, and `env unset -p acme
+ * KEY` removed "acme" instead of KEY. Both read `--project`'s value as the
+ * operand — a plain word in the right position that no flag filter can catch.
+ *
+ * `action` is the word the caller used (`unset`, `rm`, `delete`, `reveal`); the
+ * count of command words is the same for all of them.
+ */
+export function resolveEnvKeyArg(rawArgs: string[], action: string): string | undefined {
+    return parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 3, // cloud env <action>
+        command: `cloud env ${action}`,
+        maxPositionals: 1
+    }).positionals[0];
+}
+
+async function unsetEnv(rawArgs: string[], action: string): Promise<void> {
+    const key = resolveEnvKeyArg(rawArgs, action);
+    // Refused before the login round-trip: an unusable line is unusable whether
+    // or not there is a session behind it.
+    if (!key) fail("Usage: rebase cloud env unset KEY", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs);
-    const key = cloudPositionals(rawArgs).slice(2)[0];
-    if (!key) fail("Usage: rebase cloud env unset KEY", undefined, "usage");
 
     try {
         const res = await client.functions.invoke<{ success: boolean; pendingRedeploy: true }>("env-vars", undefined, {
@@ -277,11 +322,11 @@ pendingRedeploy: res.pendingRedeploy }
 }
 
 async function revealEnv(rawArgs: string[]): Promise<void> {
+    const key = resolveEnvKeyArg(rawArgs, "reveal");
+    if (!key) fail("Usage: rebase cloud env reveal KEY", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-    const key = cloudPositionals(rawArgs).slice(2)[0];
-    if (!key) fail("Usage: rebase cloud env reveal KEY", undefined, "usage");
 
     // Pre-check: a secret variable is write-only. Don't even ask the server — it
     // would 403 — say so plainly and never offer reveal for it. Done OUTSIDE the
@@ -324,13 +369,16 @@ value: res.value }
 }
 
 async function pullEnv(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--output": String,
-"--out": "--output",
-"--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // Strict: this writes a file, and the permissive parse accepted
+    // `env pull --ouput creds.env` by ignoring the typo and overwriting `.env`.
+    const { flags: args } = parseCloudArgs({
+        spec: { "--output": String,
+"--out": "--output" },
+        rawArgs,
+        commandWords: 3, // cloud env pull
+        command: "cloud env pull",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

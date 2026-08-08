@@ -22,6 +22,7 @@ import arg from "arg";
 import inquirer from "inquirer";
 import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
+import { parseCommandArgs } from "../../utils/args";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants & paths
@@ -667,16 +668,70 @@ message: opts.prompt }
 }
 
 /**
- * Positional tokens after `rebase cloud` — `[group, action, arg1, …]`.
+ * Resolve one cloud command's flags and ARGUMENTS from the full `process.argv`.
  *
- * Deliberately NOT `arg({}, { permissive: true })._`: in permissive mode `arg`
- * pushes UNKNOWN FLAGS onto `_` too, so `rollback --yes --json` would report
- * `--yes` as the deployment id. Operand extraction must see operands only, so
- * anything starting with `-` is dropped — the same filter the db backup handler
- * has always used.
+ * This replaces `cloudPositionals`, which was `rawArgs.slice(3).filter(a =>
+ * !a.startsWith("-"))`. Dropping `-`-prefixed tokens looks like it solves the
+ * permissive-parse problem and does not: a flag that takes a VALUE leaves the
+ * value behind, an ordinary word in the argument position that no filter can
+ * tell from a real one. `--project` is the flag every one of these commands
+ * documents, so the failure was reachable from the help page:
+ *
+ *   rebase cloud env unset -p acme            → removed the variable "acme"
+ *   rebase cloud env set KEY -p acme          → stored the value "acme"
+ *   rebase cloud domains add -p acme          → registered the domain "acme"
+ *   rebase cloud webhooks delete -p acme 42   → deleted webhook "acme", not 42
+ *   rebase cloud cancel -p acme               → cancelled deployment id "acme"
+ *
+ * The filter's other half is quieter. A flag nobody declared *is* dropped by
+ * it — but only from the operands, never from the run: nothing rejects it, so
+ * the command proceeds with the argument missing or defaulted. `db backup
+ * --dry-run` listed backups, `domains remove --dry-run` detached the domain,
+ * and `env set KEY=v --secrett` stored the value as an ordinary variable that
+ * `env reveal` will hand back. The one place an undeclared flag became the
+ * argument outright is `projects info|delete`, which resolved its id through
+ * `positionals()` instead — that skips only LEADING `-` tokens, so `projects
+ * delete --force` looked up a project named "--force".
+ *
+ * So: parse the whole line strictly, through the same `parseCommandArgs` the
+ * non-cloud commands use — `arg` then consumes each declared flag *with its
+ * value* wherever it appears, and rejects the undeclared, leaving `_` holding
+ * the command words followed by the real arguments. `commandWords` counts from
+ * `cloud` itself (`cloud env set` ⇒ 3), and is applied to the parsed
+ * positionals, so a flag written before the group shifts nothing.
+ *
+ * Two things this adds over calling `parseCommandArgs` directly, and the reason
+ * it is worth a wrapper:
+ *
+ *  - `GLOBAL_CLOUD_FLAGS` is merged in. `--json`, `--yes` and `--project` may
+ *    appear anywhere on a cloud line including before the group, so a strict
+ *    parse that did not declare them would reject the CLI's own documented
+ *    usage. (`parseCommandArgs` adds `--debug`/`--help` on top of that.)
+ *  - A parse error is reported through `fail`, not thrown. A throw reaches
+ *    `bin/rebase.js`, which prints `✗ …` to stderr — which is right for every
+ *    other command and wrong here: `rebase cloud` is in JSON mode whenever
+ *    stdout is not a TTY, i.e. always for the agents this family is built for,
+ *    and it promises them exactly one JSON value. `fail` keeps that promise,
+ *    with the same `usage` code the other refusals in this family use.
  */
-export function cloudPositionals(rawArgs: string[]): string[] {
-    return rawArgs.slice(3).filter((a) => !a.startsWith("-"));
+export function parseCloudArgs<S extends arg.Spec>(opts: {
+    spec: S;
+    rawArgs: string[];
+    commandWords: number;
+    /** Names the command in errors, e.g. `cloud env set` (no leading `rebase`). */
+    command: string;
+    maxPositionals?: number;
+}): { flags: arg.Result<S & typeof GLOBAL_CLOUD_FLAGS>; positionals: string[] } {
+    const spec = { ...GLOBAL_CLOUD_FLAGS,
+...opts.spec };
+    try {
+        const parsed = parseCommandArgs({ ...opts,
+spec });
+        return { flags: parsed.flags,
+positionals: parsed.positionals };
+    } catch (err) {
+        fail(err instanceof Error ? err.message : String(err), undefined, "usage");
+    }
 }
 
 export function success(message: string): void {

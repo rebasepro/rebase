@@ -13,7 +13,7 @@ import {
     requireClient,
     requireProject,
     displayProjectRef,
-    cloudPositionals,
+    parseCloudArgs,
     emit,
     confirmDestructive,
     colorStatus,
@@ -269,16 +269,38 @@ connectionString } : {})
 
 /* ─── backups ──────────────────────────────────────────────────── */
 
+/**
+ * `db backup [action] [filename]`, resolved in one strict parse.
+ *
+ * Both halves were reachable by the old operand filter, and both are
+ * destructive: `rebase cloud db backup -p acme` read `--project`'s value as the
+ * ACTION (falling through to a list, so the flag silently changed what ran),
+ * and `db backup restore -p acme` read it as the FILENAME — a restore staged
+ * over the live database, named after the project slug. An undeclared flag was
+ * dropped instead of refused, which is the same failure one step quieter: `db
+ * backup --dry-run` ran a list, having silently discarded the flag that was
+ * supposed to change what it did.
+ *
+ * Exported so its tests drive the real parser.
+ */
+export function resolveBackupArgs(rawArgs: string[]) {
+    const { flags, positionals } = parseCloudArgs({
+        spec: { "--yes": Boolean },
+        rawArgs,
+        commandWords: 3, // cloud db backup
+        command: "cloud db backup",
+        maxPositionals: 2 // <action> [filename]
+    });
+    return { flags,
+action: positionals[0] || "list",
+filename: positionals[1] };
+}
+
 async function backupCommand(rawArgs: string[]): Promise<void> {
-    // `rebase cloud db backup <action>` — action is the 4th positional token.
-    const action = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[2] || "list";
+    const { flags: args, action, filename: backupFile } = resolveBackupArgs(rawArgs);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes" }, { argv: rawArgs.slice(2),
-permissive: true });
 
     try {
         if (action === "create") {
@@ -298,7 +320,7 @@ backup: res.backup ?? null }
         }
 
         if (action === "restore") {
-            const filename = cloudPositionals(rawArgs).slice(3)[0];
+            const filename = backupFile;
             if (!filename) fail("Usage: rebase cloud db backup restore <filename>", undefined, "usage");
             await confirmDestructive({
                 yes: Boolean(args["--yes"]),
@@ -346,7 +368,7 @@ message: res.message ?? null });
         }
 
         if (action === "download") {
-            const filename = cloudPositionals(rawArgs).slice(3)[0];
+            const filename = backupFile;
             if (!filename) fail("Usage: rebase cloud db backup download <filename>", undefined, "usage");
             const res = await client.functions.invoke<{ url: string; name: string; size: number }>("backup", undefined, {
                 method: "GET",
@@ -416,16 +438,18 @@ backups: res.backups ?? [] }
  * non-interactive use, and the CLI surfaces these staged semantics honestly.
  */
 async function pitrCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--target": String,
-"--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
-    const action = cloudPositionals(rawArgs).slice(2)[0] || "status";
+    // Same shape as `db backup`: `db pitr -p acme` used to read the project slug
+    // as the action, and a PITR action decides between reporting, staging a
+    // recovered copy, and repointing the live app at one.
+    const { flags: args, positionals } = parseCloudArgs({
+        spec: { "--target": String,
+"--yes": Boolean },
+        rawArgs,
+        commandWords: 3, // cloud db pitr
+        command: "cloud db pitr",
+        maxPositionals: 1
+    });
+    const action = positionals[0] || "status";
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
