@@ -1644,3 +1644,88 @@ pairing again, now seen often enough to state plainly: **the highest-yield
 question in this codebase is not "is this right?" but "does this agree with the
 thing next to it?"** Both fixes were three lines. Finding them was the work.
 
+
+---
+
+## 34. Documentation the verifier cannot see, because it is not documentation
+
+`verify-docs.mjs` is thorough about what it covers: every locale grepped for
+unknown identifiers, every English fence compiled against workspace source, 930
+snippets, 2405 fences. That number is reassuring, and it is the problem — it
+describes coverage of `website/src/content/docs/**` and `rebase-agent-skills/**`
+and says nothing at all about the pages a reader actually lands on first.
+
+Marketing snippets are not fenced code. They are syntax-highlighted HTML, kept
+as template literals full of `<span class="text-amber-400">`, so a tool looking
+for ` ```ts ` finds nothing and reports clean. Nothing was broken; the check
+simply never looked. The gap is invisible from the passing output, which is why
+it survived across the whole life of the verifier.
+
+What accumulates in that blind spot is not random error. It is *the previous
+API*, carried forward by copy-paste from one redesign to the next, long after
+the real one was renamed. The landing page is where a snippet is least likely to
+be re-derived and most likely to be duplicated.
+
+**The tell** is a snippet in a file the compiler has no reason to visit.
+Anything under `website/src/components`, `website/src/pages`, a README, a
+screenshot caption, a slide, an OG image template. If a code sample is stored as
+markup, no type-checker in the repo has an opinion about it.
+
+**Recipe.** Strip the markup and re-apply the checks the docs already get:
+
+```
+node scripts/verify-docs.mjs --names   # stage 3 covers website/src/{components,pages}
+```
+
+Two tests, not one. Named imports must be exported by the package — that catches
+renames. And a short denylist of *known-wrong spellings* catches the rest,
+because marketing snippets are elided on purpose and compiling them would be all
+false positives. Derive the CLI command tree from `cli.ts` and the driver rather
+than hardcoding it: a hardcoded list is this same bug one level up.
+
+**Found:** eight wrong APIs across the landing, SDK, backend and CLI pages, none
+of which had ever existed in a shipped version — `createClient()` (the factory
+is `createRebaseClient`), `rebase.init({ projectId })` (Firebase-shaped, never
+ours), `client.orders.retrieve(...)` / `.list(...)` (the methods are `findById`
+and `find`, under `client.data`), `.where("status", "eq", ...)` (the operator is
+`"=="`), `channel.on("message", ...)` — *the exact call the identifier check was
+written to catch*, sitting on the page most likely to be copied from —
+`FindResponse` where the SDK returns `FindResult`, `@rebasepro/sdk_generator`
+(no such package), and `client.admin.getSession()` / `.getConfig()` offered as
+clickable buttons in a live playground demo. Plus three dead commands: `rebase
+ext add`, `rebase auth bootstrap`, and `rebase db push --database-url` (the
+driver reads `DATABASE_URL`; the flag exists only on `init`).
+
+The same pass over the skills found the sibling shape — agent-facing docs, also
+outside the compiler's reach for anything that is not a fenced snippet. Three
+skills taught `auth.uid()` / `auth.roles()` / `auth.jwt()`, the pre-1.0 RLS
+helpers the compiler silently rewrites and the boot warns about. `rls-enforcement.ts`
+names the hazard exactly: *"A silent rewrite that works forever is not a
+migration, it is a second supported spelling nobody wrote down, and the next
+person to read those rules will copy the old one."* An agent skill is the
+strongest possible version of "the next person" — it copies the old one forever,
+into every project. Four skill files also taught `rebase login` / `rebase deploy`,
+which exit 1: every cloud command lives under `rebase cloud`.
+
+### Last sweep — 2026-08-08, docs, skills and the marketing site
+
+| checked | result |
+|---|---|
+| `pnpm verify:docs` baseline | clean before and after — 930 snippets, 2405 fences, all four stages. The findings below are all from surfaces it did not scan. |
+| every `@rebasepro/*` import on the marketing site, against the real export surface | **BUG** ×8 (class 34) — see above. Now stage 3 of the verifier, mutation-tested against all six shapes. |
+| every `rebase <cmd>` shown on the marketing site and in the skills, against the CLI's dispatch table | **BUG** ×3 + ×4 — `ext add`, `auth bootstrap`, `db push --database-url`; and `login`/`deploy` in four skill files. The check derives the tree from `cli.ts` + the driver, so a renamed subcommand fails on the commit that renames it. |
+| the MCP tool list on `/ai`, against the exported names in `@rebasepro/mcp` | clean — 40/40, exactly in sync. The page carries a comment asking to keep them together, and someone did. |
+| generated SQL shown on `/backend`, against what the policy compiler emits | **BUG** — `auth.uid()` / `auth.roles()` presented as the output of `schema generate → db push`, which emits `rebase.*`. |
+| the RLS helpers taught by all 21 skills | **BUG** ×3 (class 34) — `rebase-auth`, `rebase-security`, `rebase-collections`. |
+| removed types (`RebaseUser`, `RebaseTokens`, `AuthApiError`, …) across docs and skills | **BUG** ×1 — `RebaseUser` in `rebase-auth`, *declared locally* rather than imported, which is why the identifier check could not see it. Blind spot worth naming on its own: a doc that redeclares a type instead of importing it is unverifiable by construction. |
+| every internal `/docs/` link in docs, skills and marketing | **BUG** ×32 — 27 on the UI showcase (`/docs/components/*`, missing the `ui/` segment and snake_cased), plus `/docs/auth`, `/docs/storage` ×2, `/docs/backend/webhooks`, `/docs/icons`. |
+| every EN docs page against the sidebar | **BUG** ×4 — `self-hosting`, `runtime-and-bundles`, `apps-and-repositories`, `multiple-sources` built fine and were reachable by nothing. They were also absent from `llms.txt`, so the four newest architecture and deployment pages were invisible to agents too. 60 → 64 pages. |
+| docs frontmatter (title + description) | one gap, in the *generator* — `copy_changelog.js` emitted no description. Fixed there, not in its output. |
+| the six locales against English | **9 pages untranslated in all five non-EN locales**, including `backend/search`. Not fixed — `translate_docs.mjs` over 45 files is a batch job with a cost, and that is a call to make awake. |
+
+The lesson is narrower than "check the marketing site". It is that **a verifier's
+passing output describes its glob, not your repo.** 2405 fences sounds like
+coverage until you ask which files contain none. Every surface that shows code
+to a human — marketing pages, agent skills, READMEs, slides — is documentation
+whether or not it lives in the docs directory, and the ones stored as markup are
+exactly the ones no tool will volunteer to check.

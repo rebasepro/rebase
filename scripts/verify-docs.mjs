@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { typecheckSnippets } from "./docs-verify/typecheck-snippets.mjs";
 import { checkApiNames } from "./docs-verify/check-api-names.mjs";
 import { checkDeployBuildContext } from "./docs-verify/check-deploy-build-context.mjs";
+import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -50,6 +51,7 @@ if (asJson) {
     if (only !== "snippets") {
         out.names = (await checkApiNames(ROOT)).unknown;
         out.deployBuildContext = checkDeployBuildContext(ROOT).findings;
+        out.marketing = checkMarketingSnippets(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -106,6 +108,22 @@ if (only === "both" || only === "names") {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);
             console.log(`      ${DIM}→ ${b.hint}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Marketing-page snippets ━━━${NC}`);
+    const { findings: bad, scanned } = checkMarketingSnippets(ROOT);
+    console.log(`${DIM}Scanned ${scanned} marketing components and pages.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No unknown SDK identifiers or dead CLI commands on the marketing site.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} stale marketing snippet reference(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
         }
     }
 }
