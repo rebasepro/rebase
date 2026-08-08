@@ -139,8 +139,30 @@ function evaluateCompare(
     const b = r.value;
 
     if (a === null || b === null) {
-        if (op === "eq") return false;
-        if (op === "neq") return true;
+        // SQL answers NULL for *every* comparison against NULL, and a policy
+        // that answers NULL does not grant the row. So the only question here
+        // is which JavaScript answer reproduces that outcome.
+        //
+        // This used to answer `false` for `eq` and `true` for `neq`, which is
+        // JavaScript's two-valued reading of a three-valued question.
+        //
+        // `neq` was a grant the database does not give:
+        // `owner_id != rebase.uid()` on a row whose `owner_id` is NULL read as
+        // *permitted* in the admin panel and was refused by Postgres — on every
+        // row where the column is null, which for a nullable column is usually
+        // most of them.
+        //
+        // `false` for `eq` looked safe, because false denies and NULL denies.
+        // It is not, because it does not survive negation: `not(a = NULL)`
+        // became `true` while `NOT NULL` stays NULL, so the same grant reappears
+        // one operator up. A local answer that is only right in a positive
+        // position is not right — it just moves.
+        //
+        // "unknown" is what SQL actually says, it composes correctly through
+        // Kleene negation, and enforcement callers already resolve it
+        // fail-closed. Both were found by the exhaustive Postgres differential
+        // in `policy-agreement-exhaustive.test.ts`, the second only after the
+        // first was fixed.
         return "unknown";
     }
 

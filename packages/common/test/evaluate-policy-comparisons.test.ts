@@ -96,10 +96,30 @@ describe("comparisons that cannot be ordered", () => {
         expect(compare("2", "gt", 1)).toBe("unknown");
     });
 
-    it("is `unknown` when either side is null, except for eq/neq", () => {
-        expect(compare(null, "gt", 1)).toBe("unknown");
-        expect(compare(null, "eq", 1)).toBe(false);
-        expect(compare(null, "neq", 1)).toBe(true);
+    /**
+     * Every operator, `eq` and `neq` included. SQL answers NULL for any
+     * comparison against NULL, and this is the twin of that SQL.
+     *
+     * These two used to answer `false` and `true`, which is JavaScript's
+     * two-valued reading of a three-valued question. `neq` was the dangerous
+     * one — a hard `true` is a grant even a fail-closed caller honours, and
+     * `owner_id != rebase.uid()` on a row with a NULL owner read as permitted
+     * in the panel while Postgres refused it.
+     *
+     * `false` for `eq` looked harmless, since false denies and NULL denies too.
+     * It was not, because it did not survive negation: `not(a = NULL)` came out
+     * `true` while `NOT NULL` is still NULL. An answer that is only right in a
+     * positive position is not right, it just moves.
+     *
+     * Both were found by the exhaustive Postgres differential
+     * (`server-postgres/test/e2e/policy-agreement-exhaustive.test.ts`), the
+     * second only after the first was fixed.
+     */
+    it("is `unknown` when either side is null, for every operator", () => {
+        for (const op of ["gt", "gte", "lt", "lte", "eq", "neq"] as const) {
+            expect({ op, result: compare(null, op, 1) }).toEqual({ op, result: "unknown" });
+            expect({ op, result: compare(1, op, null) }).toEqual({ op, result: "unknown" });
+        }
     });
 
     it("is `unknown` when the row is absent, whatever the operator", () => {

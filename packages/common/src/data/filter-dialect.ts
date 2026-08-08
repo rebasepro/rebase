@@ -9,8 +9,10 @@
  * metadata, so type coercion is the responsibility of the server-side data
  * driver which has access to the collection schema.
  *
- * Commas inside list values are backslash-escaped (`\,`), and literal
- * backslashes are escaped as `\\`.
+ * Structural characters inside a value are backslash-escaped: `,` → `\,`,
+ * `(` → `\(`, `)` → `\)`, and a literal backslash as `\\`. Decoding is
+ * deliberately conservative — only those four sequences are decoded, so a
+ * backslash that arrives unescaped from an older client survives intact.
  *
  * @module
  */
@@ -51,26 +53,49 @@ function stringifyValue(value: unknown): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Escape a single list item for the wire format.
- * `\` → `\\`, `,` → `\,`
+ * Characters that carry structure in the wire format and must therefore be
+ * escaped inside a value: the separator, the group delimiters, and the escape
+ * character itself.
+ *
+ * Parentheses are here because `and(...)`/`or(...)` groups are parsed by
+ * tracking paren depth. A value containing one is not merely ambiguous, it
+ * moves where the parser thinks the group ends.
  */
-function escapeListItem(value: string): string {
-    return value.replace(/\\/g, "\\\\").replace(/,/g, "\\,");
+const WIRE_SPECIALS = /[\\,()]/g;
+
+/**
+ * Escape a value for the wire format: `\` → `\\`, `,` → `\,`, `(` → `\(`,
+ * `)` → `\)`.
+ */
+function escapeWireValue(value: string): string {
+    return value.replace(WIRE_SPECIALS, ch => `\\${ch}`);
 }
 
 /**
- * Unescape a single list item from the wire format.
- * `\\` → `\`, `\,` → `,`
+ * Unescape a wire-format value.
+ *
+ * **Conservative**, and deliberately so: only the four sequences
+ * {@link escapeWireValue} actually produces are decoded. A backslash followed
+ * by anything else is left exactly as it is.
+ *
+ * This used to consume the backslash before *any* character, which is
+ * indistinguishable for anything this codec emitted — it only ever emits those
+ * four — but not for input arriving from elsewhere. A client on an older
+ * release sends a Windows path or a LIKE pattern with a literal `C:\x`
+ * unescaped, and greedy unescaping silently turned it into `C:x`, changing
+ * which rows matched. Decoding only what the encoder can produce makes the two
+ * directions agree across versions.
  */
-function unescapeListItem(value: string): string {
+function unescapeWireValue(value: string): string {
     let result = "";
     for (let i = 0; i < value.length; i++) {
-        if (value[i] === "\\" && i + 1 < value.length) {
-            result += value[i + 1];
-            i++; // skip next char
-        } else {
-            result += value[i];
+        const next = value[i + 1];
+        if (value[i] === "\\" && (next === "\\" || next === "," || next === "(" || next === ")")) {
+            result += next;
+            i++;
+            continue;
         }
+        result += value[i];
     }
     return result;
 }
@@ -88,18 +113,47 @@ function splitListItems(inner: string): string[] {
     let current = "";
     for (let i = 0; i < inner.length; i++) {
         if (inner[i] === "\\" && i + 1 < inner.length) {
-            // Escaped character — consume both chars
+            // Escaped pair — consume both chars so the comma in `\,` is not
+            // read as a separator. Kept verbatim; decoding happens once, below.
             current += inner[i] + inner[i + 1];
             i++;
         } else if (inner[i] === ",") {
-            items.push(unescapeListItem(current));
+            items.push(unescapeWireValue(current));
             current = "";
         } else {
             current += inner[i];
         }
     }
-    items.push(unescapeListItem(current));
+    items.push(unescapeWireValue(current));
     return items;
+}
+
+/**
+ * Split a group body on commas at paren depth 0, honouring escapes.
+ *
+ * The escape-awareness is the point. The splitter used to track only paren
+ * depth, so a comma inside a scalar value ended a condition:
+ * `or(name.eq.Doe, John,age.gte.18)` parsed as *three* conditions, the middle
+ * one a fabricated `" John" == true`. On an `or` that widens the result set,
+ * and nothing anywhere reports an error — the query simply stops meaning what
+ * the caller wrote.
+ */
+function splitGroupItems(inner: string): string[] {
+    const parts: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < inner.length; i++) {
+        const ch = inner[i];
+        if (ch === "\\" && i + 1 < inner.length) { i++; continue; }
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        else if (ch === "," && depth === 0) {
+            parts.push(inner.slice(start, i));
+            start = i + 1;
+        }
+    }
+    parts.push(inner.slice(start));
+    return parts;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +200,7 @@ function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
     }
 
     if (Array.isArray(value)) {
-        const items = value.map(v => escapeListItem(stringifyValue(v))).join(",");
+        const items = value.map(v => escapeWireValue(stringifyValue(v))).join(",");
         return `${restOp}.(${items})`;
     }
 
@@ -337,10 +391,13 @@ export function serializeLogicalCondition(
     // FilterCondition
     const restOp = CANONICAL_OP_LOOKUP[cond.operator] ?? "eq";
     if (Array.isArray(cond.value)) {
-        const items = cond.value.map(v => escapeListItem(stringifyValue(v))).join(",");
+        const items = cond.value.map(v => escapeWireValue(stringifyValue(v))).join(",");
         return `${cond.column}.${restOp}.(${items})`;
     }
-    return `${cond.column}.${restOp}.${stringifyValue(cond.value)}`;
+    // Escaped, like a list item. A scalar inside a group sits between the same
+    // delimiters a list item does, so leaving it raw let a comma in the value
+    // end the condition early — see `splitGroupItems`.
+    return `${cond.column}.${restOp}.${escapeWireValue(stringifyValue(cond.value))}`;
 }
 
 /**
@@ -388,19 +445,8 @@ export function deserializeLogicalCondition(
         const type = logicalMatch[1] as "and" | "or";
         const innerStr = logicalMatch[2];
 
-        // Split on commas that are not inside parentheses
-        const conditions: (LogicalCondition | FilterCondition)[] = [];
-        let depth = 0;
-        let start = 0;
-        for (let i = 0; i < innerStr.length; i++) {
-            if (innerStr[i] === "(") depth++;
-            else if (innerStr[i] === ")") depth--;
-            else if (innerStr[i] === "," && depth === 0) {
-                conditions.push(deserializeLogicalCondition(innerStr.slice(start, i), nesting + 1));
-                start = i + 1;
-            }
-        }
-        conditions.push(deserializeLogicalCondition(innerStr.slice(start), nesting + 1));
+        const conditions = splitGroupItems(innerStr)
+            .map(part => deserializeLogicalCondition(part, nesting + 1));
 
         return { type, conditions };
     }
@@ -417,18 +463,20 @@ export function deserializeLogicalCondition(
     const secondDot = rest.indexOf(".");
     if (secondDot === -1) {
         // "column.value" — treat as equality (value kept as string)
-        return { column, operator: "==", value: rest };
+        return { column, operator: "==", value: unescapeWireValue(rest) };
     }
 
     const opStr = rest.substring(0, secondDot);
     const valueStr = rest.substring(secondDot + 1);
     const operator = toCanonicalOp(opStr) ?? "==";
 
-    // Parse list values with escape-aware splitting
+    // Parse list values with escape-aware splitting. The wrapping parens are
+    // written by the serializer *after* the items are escaped, so an escaped
+    // paren inside an item can never be mistaken for them.
     if (valueStr.startsWith("(") && valueStr.endsWith(")")) {
         const items = splitListItems(valueStr.slice(1, -1));
         return { column, operator, value: items };
     }
 
-    return { column, operator, value: valueStr };
+    return { column, operator, value: unescapeWireValue(valueStr) };
 }

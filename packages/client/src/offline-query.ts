@@ -347,6 +347,28 @@ export function resolvePagination(params?: FindParams): { limit: number; offset:
     return { limit, offset };
 }
 
+/** `<`, `<=`, `>`, `>=` — the operators whose answer depends on a collation. */
+const ORDERING_OPS = new Set<WhereFilterOp>(["<", "<=", ">", ">="]);
+
+/** Does any condition in this `where` clause order its operands? */
+function whereOrders(where: FilterValues<string> | undefined): boolean {
+    if (!where) return false;
+    for (const condition of Object.values(where)) {
+        const tuples = isTuple(condition) ? [condition] : (condition as unknown[]).filter(isTuple);
+        if (tuples.some(([op]) => ORDERING_OPS.has(op))) return true;
+    }
+    return false;
+}
+
+/** The same question, through an `and(...)`/`or(...)` tree. */
+function logicalOrders(condition: LogicalCondition | FilterCondition | undefined, depth = 0): boolean {
+    if (!condition || depth > 32) return false;
+    if ("type" in condition) {
+        return (condition.conditions ?? []).some((c) => logicalOrders(c, depth + 1));
+    }
+    return ORDERING_OPS.has(condition.operator);
+}
+
 /**
  * Can a locally evaluated answer to `params` be trusted to match the server's,
  * assuming the cache holds every row of the collection?
@@ -354,6 +376,28 @@ export function resolvePagination(params?: FindParams): { limit: number; offset:
  * `include` pulls in rows from other collections that this evaluator never
  * sees, and `searchString` is only approximated — both make the local answer a
  * best effort rather than an equivalent one.
+ *
+ * **Ordering comparisons are refused, and that is the interesting one.**
+ * `compareValues` falls back to an `Intl.Collator` for operands it cannot read
+ * as numbers or instants. PostgreSQL orders text by the *database's* collation,
+ * which is a property of the server this process has never been told: under the
+ * C collation `'apple' < 'Banana'` is false, under `en_US.UTF-8` it is true,
+ * and the collator says true. So `["<", "Banana"]` selects a different set here
+ * than it does there — silently, and in whichever direction the deployment
+ * happens to have been created.
+ *
+ * The refusal covers *every* ordering comparison rather than only the ones with
+ * a string operand, because the operand type does not settle it: a numeric
+ * bound against a text column (`["<", 10]` on a `varchar`) also reaches the
+ * collator, and nothing in `params` says what the column holds. Conservative on
+ * purpose — the cost is that a query combining an ordering filter with
+ * *unsynced local writes* stops placing those writes optimistically, which is a
+ * degraded answer rather than a wrong one. Claiming exactness we do not have is
+ * the other way round.
+ *
+ * This says nothing about ordering *results*; that is a separate claim with a
+ * separate answer, because a sort changes which rows come first and not which
+ * rows match. See {@link isLocallySortable}.
  */
 export function isExactlyEvaluable(params?: FindParams): boolean {
     if (!params) return true;
@@ -364,6 +408,45 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     // nearest of what happens to be cached while looking like the nearest there
     // are — a wrong answer that is indistinguishable from a right one.
     if (params.vectorSearch) return false;
+    if (whereOrders(params.where)) return false;
+    if (logicalOrders(params.logical)) return false;
+    return true;
+}
+
+/**
+ * Would sorting `rows` locally reproduce the order the server would have sent?
+ *
+ * Asked of the rows rather than of the query, because unlike a filter this one
+ * *is* decidable from the data in hand: {@link compareValues} reaches the
+ * collator only when it cannot read both operands as numbers, and `toComparable`
+ * has already turned dates and relations into numbers and ids by then. If every
+ * value on the sort column normalises to a number, the collator is unreachable
+ * and the local order is the server's order.
+ *
+ * A text column is therefore refused — see {@link isExactlyEvaluable} for why
+ * the two cannot be made to agree — and so is a column this page happens to see
+ * only as strings, which is the same thing from here.
+ *
+ * Nulls are fine either way: they are ordered by an explicit rule (last
+ * ascending, first descending) that matches Postgres and never reaches the
+ * comparator.
+ */
+export function isLocallySortable(
+    rows: readonly Record<string, unknown>[],
+    orderBy?: OrderByTuple
+): boolean {
+    if (!orderBy) return true;
+    const [field] = orderBy;
+    for (const row of rows) {
+        const value = toComparable(row[field]);
+        if (isNullish(value)) continue;
+        if (typeof value === "number" || typeof value === "boolean") continue;
+        if (typeof value === "bigint") continue;
+        // A numeric string is compared as a number, so it is safe too — this is
+        // the wire's type erasure, which `compareValues` already undoes.
+        if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) continue;
+        return false;
+    }
     return true;
 }
 

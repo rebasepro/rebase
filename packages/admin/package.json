@@ -116,6 +116,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-measure": "^2.0.12",
     "@vitejs/plugin-react": "^6.0.4",
+    "fast-check": "^4.9.0",
     "jest": "^30.4.2",
     "react-router": "^8.3.0",
     "ts-jest": "^29.4.12",

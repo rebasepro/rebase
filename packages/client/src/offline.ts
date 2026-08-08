@@ -20,6 +20,7 @@ import {
 } from "./offline-store";
 import {
     isExactlyEvaluable,
+    isLocallySortable,
     matchesParams,
     resolvePagination,
     runLocalQuery,
@@ -1103,7 +1104,17 @@ data: u.data as AnyRow })),
         // `sort` being silently ignored on every list backed by this overlay:
         // the query carries it, the server honours it, and the answer served
         // from here did not.
-        if (params?.orderBy) sortRows(rows, params.orderBy);
+        //
+        // …but only when the local sort would land where the server's did.
+        // `snapshot.ids` already arrived in the server's order, so re-sorting a
+        // text column with `Intl.Collator` *replaces* a correct order with a
+        // possibly different one — under the C collation Postgres puts
+        // `Banana` before `apple` and the collator does not. When the column
+        // cannot be ordered locally the snapshot's order is the better answer,
+        // and the result says so rather than presenting it as the sorted page
+        // that was asked for.
+        const orderIsLocal = isLocallySortable(rows, params?.orderBy);
+        if (params?.orderBy && orderIsLocal) sortRows(rows, params.orderBy);
 
         const total = Math.max(rows.length, snapshot.total - removed + added);
         return {
@@ -1116,7 +1127,9 @@ data: u.data as AnyRow })),
             },
             fromCache,
             hasPendingWrites: rows.some((row) => this.hasPending(slug, row.id as string | number)),
-            partial: !exact
+            // Not the page that was asked for if either the membership
+            // decision or the order could not be reproduced here.
+            partial: !exact || !orderIsLocal
         };
     }
 

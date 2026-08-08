@@ -62,6 +62,7 @@
     "@types/react-measure": "^2.0.12",
     "babel-plugin-react-compiler": "beta",
     "cross-env": "^10.1.0",
+    "fast-check": "^4.9.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.12",
     "tsd": "^0.33.0",
