@@ -14,6 +14,7 @@ class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list,
 class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, listObjects, putObject }
 class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, startedAt }
+class RawHtml { toString, value }
 class S3StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
 class SMTPEmailService { isConfigured, send, verifyConnection }
 class TransformCache { buildKey, get, set }
@@ -41,6 +42,7 @@ function applyCollectionDefaults
 function assertAllowedOutboundUrl
 function assertCollectionConfigs
 function assertDistinctSuffixes
+function assertEmailLinkBases
 function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }
@@ -74,6 +76,7 @@ function createTwitterProvider
 function defineCron
 function defineFunction
 function envSuffixForKey
+function escapeHtml
 function extractUserFromToken
 function findCollectionConfigProblems
 function generateSecurePassword
@@ -83,6 +86,7 @@ function getPasswordResetTemplate { html, subject, text }
 function getUserInvitationTemplate { html, subject, text }
 function getWelcomeEmailTemplate { html, subject, text }
 function hashPassword
+function html
 function httpMethodToOperation
 function initializeDataSource
 function initializeDataSources
@@ -112,12 +116,14 @@ function parseBackupTimestamp
 function parseTransformOptions
 function pkceTokenParams
 function providerVerifiedEmail
+function raw
 function readBackupBytes
 function readBundleManifest
 function resolveAuthHooks
 function resolveAuthOptions
 function resolveCorsOrigin
 function resolveDataSources
+function resolveEmailLinkBase
 function resolveEmailOptions
 function resolveRequireAuth
 function resolveStorageBackend
@@ -142,7 +148,7 @@ interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key,
 interface ApiResponse { data, error, meta }
 interface AuthHooks { afterLogout, afterUserCreate, afterUserDelete, beforeLogin, beforeUserCreate, beforeUserDelete, customizeAccessToken, hashPassword, onAdminCreateUser, onAdminResetPassword, onAuthenticated, onMfaVerified, onPasswordReset, transformAuthResponse, validatePasswordStrength, verifyCredentials, verifyPassword }
 interface AuthMiddlewareOptions { apiKeyStore, driver, requireAuth, resolveDriver, serviceKey, validator }
-interface AuthRepository { assignDefaultRole, createMagicLinkToken, createMfaChallenge, createMfaFactor, createPasswordResetToken, createRecoveryCodes, createRefreshToken, createRole, createUser, deleteAllPasswordResetTokensForUser, deleteAllRecoveryCodes, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteMfaFactor, deleteRefreshToken, deleteRefreshTokenById, deleteRole, deleteUser, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getMfaChallengeById, getMfaFactorById, getMfaFactors, getRoleById, getTokensValidAfter, getUnusedRecoveryCodeCount, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserRoles, getUserWithRoles, hasVerifiedMfaFactors, linkUserIdentity, listRefreshTokensForUser, listRoles, listUsers, listUsersPaginated, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setEmailVerified, setTokensValidAfter, setUserRoles, setVerificationToken, updatePassword, updateRole, updateUser, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
+interface AuthRepository { assignDefaultRole, claimMfaFactorCounter, createMagicLinkToken, createMfaChallenge, createMfaFactor, createPasswordResetToken, createRecoveryCodes, createRefreshToken, createRole, createUser, deleteAllPasswordResetTokensForUser, deleteAllRecoveryCodes, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteMfaFactor, deleteRefreshToken, deleteRefreshTokenById, deleteRole, deleteUser, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getMfaChallengeById, getMfaFactorById, getMfaFactors, getRoleById, getTokensValidAfter, getUnusedRecoveryCodeCount, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserRoles, getUserWithRoles, hasVerifiedMfaFactors, linkUserIdentity, listRefreshTokensForUser, listRoles, listUsers, listUsersPaginated, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, recordMfaChallengeAttempt, revokeRefreshTokenSession, setEmailVerified, setTokensValidAfter, setUserRoles, setVerificationToken, updatePassword, updateRole, updateUser, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
 interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
@@ -187,9 +193,9 @@ interface LocalStorageConfig { allowedMimeTypes, basePath, baseUrl, maxFileSize,
 interface Logger { child, debug, error, info, warn }
 interface MagicLinkTokenInfo { expiresAt, uid }
 interface MetricsHandle { middleware, registry, setKnownCollections }
-interface MfaChallengeInfo { createdAt, factorId, id, ipAddress, verifiedAt }
-interface MfaFactor { createdAt, factorType, friendlyName, id, uid, updatedAt, verified }
-interface MfaRepository { createMfaChallenge, createMfaFactor, createRecoveryCodes, deleteAllRecoveryCodes, deleteMfaFactor, getMfaChallengeById, getMfaFactorById, getMfaFactors, getUnusedRecoveryCodeCount, hasVerifiedMfaFactors, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
+interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
+interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
+interface MfaRepository { claimMfaFactorCounter, createMfaChallenge, createMfaFactor, createRecoveryCodes, deleteAllRecoveryCodes, deleteMfaFactor, getMfaChallengeById, getMfaFactorById, getMfaFactors, getUnusedRecoveryCodeCount, hasVerifiedMfaFactors, recordMfaChallengeAttempt, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
 interface OAuthProvider { id, schema, verify }
 interface OAuthProviderProfile { displayName, email, emailVerified, photoUrl, providerId }
 interface OutboundUrlGuardOptions { allowPrivateNetworks, lookup }
@@ -201,12 +207,12 @@ interface QueryOptions { fields, include, limit, logical, offset, orderBy, vecto
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, slack, spotify, twitter }
-interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, history, logging, maxBodySize, rateLimit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePublicRead, storageSources }
+interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, functionsTimeoutMs, history, logging, maxBodySize, rateLimit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePublicRead, storageSources }
 interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, driver, driverRegistry, healthCheck, history, realtimeService, realtimeServices, setCollectionCallbacks, shutdown, storageController, storageRegistry }
 interface RebaseFunctionContext { rebase }
 interface RecoveryCode { id, uid, usedAt }
-interface RefreshTokenInfo { createdAt, expiresAt, id, ipAddress, revoked, rotatedAt, sessionId, sessionStartedAt, tokenHash, uid, userAgent }
-interface RefreshTokenSession { id, startedAt }
+interface RefreshTokenInfo { aal, createdAt, expiresAt, id, ipAddress, revoked, rotatedAt, sessionId, sessionStartedAt, tokenHash, uid, userAgent }
+interface RefreshTokenSession { aal, id, startedAt }
 interface ResolvedDataSourceConfig { adminConnectionString, connectionString, driverPackage, engine, isDefault, key, poolConfig, readConnectionString }
 interface RoleData { collectionPermissions, defaultPermissions, id, isAdmin, name }
 interface RoleRepository { createRole, deleteRole, getRoleById, listRoles, updateRole }
@@ -239,6 +245,7 @@ type BackupDestination
 type ConditionBuilderStatic { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 type CorsOriginResolver
 type DrizzleClient
+type EmailLinkKind
 type EmailVerificationTemplateFunction
 type EnvBag
 type HonoEnv { Variables }
