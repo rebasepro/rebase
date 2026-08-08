@@ -1,6 +1,6 @@
 
 import { useStudioCollectionRegistry, useStudioCapabilities } from "@rebasepro/app";
-import { useApiBase } from "@rebasepro/app";
+import { useApiBase, useApiConfig } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Alert,
@@ -32,6 +32,7 @@ import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL 
 import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
+import { saveSecurityRulesToCodebase } from "./saveSecurityRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -156,9 +157,19 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
     const { codebase: hasCodebase } = useStudioCapabilities();
+    const apiConfig = useApiConfig();
     /* `apiUrl` is a bare origin; the routes live under the backend's
        `basePath`, which is `/api` only by default. */
     const apiBase = useApiBase() ?? `${apiUrl.replace(/\/+$/, "")}/api`;
+
+    const saveSecurityRules = useCallback(
+        (collectionId: string, securityRules: unknown[]) => saveSecurityRulesToCodebase({
+            apiBase,
+            collectionId,
+            securityRules,
+            getAuthToken: apiConfig?.getAuthToken
+        }),
+        [apiBase, apiConfig]);
     const { t } = useTranslation();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -788,15 +799,10 @@ message: e instanceof Error ? e.message : String(e) });
                                         }
 
                                         try {
-                                            const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({
-                                                    collectionId: (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData.tableName,
-                                                    collectionData: { securityRules: newRules }
-                                                })
-                                            });
-                                            if (!response.ok) throw new Error("Failed to save policy");
+                                            await saveSecurityRules(
+                                                (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData.tableName,
+                                                newRules
+                                            );
 
                                             snackbarController.open({ type: "success",
 message: "Policy saved successfully" });
@@ -987,15 +993,10 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     const newRules = [...existingRules, rule];
 
                                                                     try {
-                                                                        const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
-                                                                            method: "POST",
-                                                                            headers: { "Content-Type": "application/json" },
-                                                                            body: JSON.stringify({
-                                                                                collectionId: (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData!.tableName,
-                                                                                collectionData: { securityRules: newRules }
-                                                                            })
-                                                                        });
-                                                                        if (!response.ok) throw new Error("Failed to save policy");
+                                                                        await saveSecurityRules(
+                                                                            (activeCollection as { id?: string, path?: string, alias?: string }).id || (activeCollection as { id?: string, path?: string, alias?: string }).path || (activeCollection as { id?: string, path?: string, alias?: string }).alias || activeTableData!.tableName,
+                                                                            newRules
+                                                                        );
 
                                                                         snackbarController.open({ type: "success",
 message: "Policy imported successfully" });
