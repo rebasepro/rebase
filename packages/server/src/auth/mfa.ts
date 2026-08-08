@@ -101,14 +101,34 @@ export function generateTotp(secret: Buffer, timeStep = 30): string {
  * @returns true if the token is valid within the window
  */
 export function verifyTotp(secret: Buffer, token: string, window = 1): boolean {
+    return verifyTotpCounter(secret, token, window) !== null;
+}
+
+/**
+ * Verify a TOTP token and report *which* time step matched.
+ *
+ * RFC 6238 §5.2 requires that an accepted OTP not be accepted a second time,
+ * and a boolean cannot express what was accepted: with `window = 1` the same
+ * six digits stay valid for up to 90 seconds, so a code observed once — by a
+ * phishing relay, over a shoulder, in a pasted support message — can be
+ * presented again for the rest of that window. The caller records the returned
+ * counter against the factor and refuses anything at or below it.
+ *
+ * @param secret - The shared secret as a Buffer
+ * @param token - The 6-digit TOTP code to verify
+ * @param window - Number of time steps to check on each side (default: 1)
+ * @returns The matched time step, or `null` when no step in the window matches
+ */
+export function verifyTotpCounter(secret: Buffer, token: string, window = 1): number | null {
     const timeStep = 30;
     const counter = BigInt(Math.floor(Date.now() / 1000 / timeStep));
     for (let i = -window; i <= window; i++) {
-        if (generateHotp(secret, counter + BigInt(i)) === token) {
-            return true;
+        const step = counter + BigInt(i);
+        if (generateHotp(secret, step) === token) {
+            return Number(step);
         }
     }
-    return false;
+    return null;
 }
 
 // ─── Secret Generation ───────────────────────────────────────────────────────

@@ -169,8 +169,59 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
 | `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in) |
+| `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
+| `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
+| `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
+| `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
+| `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
+| `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
+
+### Multi-factor authentication (TOTP)
+
+**A second factor gates sign-in, not just individual operations.** Once an
+account has one *verified* TOTP factor, no route issues it a session until a
+code is presented — password login, every OAuth provider, magic link and
+anonymous-link all refuse with `401 MFA_REQUIRED`:
+
+```json
+{
+  "error": {
+    "code": "MFA_REQUIRED",
+    "message": "Multi-factor authentication is required to complete sign-in.",
+    "details": {
+      "mfaToken": "<short-lived pre-auth token>",
+      "factors": [{ "id": "…", "factorType": "totp", "friendlyName": "Phone" }]
+    }
+  }
+}
+```
+
+`mfaToken` is **not a session**: it is purpose-scoped, expires in five minutes,
+and is rejected by every authenticated route. Send it as the bearer token to
+`POST /api/auth/mfa/challenge` (with a `factorId`) and then to
+`POST /api/auth/mfa/challenge/verify` (with the `challengeId` and the six-digit
+code, or a recovery code). That last call is what mints the access and refresh
+tokens, at `aal2`; the level is stored on the session and carried across
+`POST /api/auth/refresh`.
+
+Enrolment is gated too. The first factor on an account may be enrolled from an
+ordinary session, but once one is verified, `enroll`, `verify` and `unenroll`
+all require an `aal2` session — otherwise a stolen password could enrol a
+factor of its own, step up on it, and delete the real one.
+
+Verification is bounded on both axes: a challenge dies after five failed
+guesses, each account is limited to ten verification attempts per 15 minutes
+(counted per user, so rotating IPs does not help), and an accepted code is
+recorded against the factor so it cannot be replayed for the rest of its
+±1-step window.
+
+Set `MFA_ENCRYPTION_KEY` (32+ random characters) to encrypt stored TOTP
+secrets. Without it the server falls back to `JWT_SECRET` and warns. Set it
+**before** anyone enrols: stored secrets carry no key id, so changing the key
+afterwards leaves existing factors undecryptable and their owners unable to
+complete a challenge.
 
 ### Inviting teammates by email
 

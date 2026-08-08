@@ -591,7 +591,7 @@ export class RefreshTokenService {
             userAgent: this.refreshTokensTable.userAgent,
             ipAddress: this.refreshTokensTable.ipAddress
         } as unknown as Record<string, never>;
-        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt"]) {
+        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt", "aal"]) {
             if (this.has(optional)) selection[optional] = this.col(optional);
         }
         return selection;
@@ -624,6 +624,11 @@ export class RefreshTokenService {
         };
         if (session && this.has("sessionId")) values.sessionId = session.id;
         if (session && this.has("sessionStartedAt")) values.sessionStartedAt = session.startedAt;
+        // Written on every token of the session, including the ones rotation
+        // mints, because refresh reads the level off whichever row was
+        // presented. A table without the column degrades to `aal1` on read,
+        // which is the restrictive answer rather than a bypass.
+        if (session?.aal && this.has("aal")) values.aal = session.aal;
 
         await this.db.insert(this.refreshTokensTable).values(values);
     }
@@ -1297,6 +1302,14 @@ collectionPermissions: null }
     async hasVerifiedMfaFactors(uid: string): Promise<boolean> {
         return this.getMfaService().hasVerifiedMfaFactors(uid);
     }
+
+    async claimMfaFactorCounter(factorId: string, counter: number): Promise<boolean> {
+        return this.getMfaService().claimMfaFactorCounter(factorId, counter);
+    }
+
+    async recordMfaChallengeAttempt(challengeId: string): Promise<number> {
+        return this.getMfaService().recordMfaChallengeAttempt(challengeId);
+    }
 }
 
 // =============================================================================
@@ -1362,7 +1375,7 @@ export class MfaService implements MfaRepository {
     async getMfaFactorById(factorId: string): Promise<(MfaFactor & { secretEncrypted: string }) | null> {
         const tableName = this.qualify("mfa_factors");
         const result = await this.db.execute(sql`
-            SELECT id, uid, factor_type, secret_encrypted, friendly_name, verified, created_at, updated_at
+            SELECT id, uid, factor_type, secret_encrypted, friendly_name, verified, last_used_counter, created_at, updated_at
             FROM ${sql.raw(tableName)}
             WHERE id = ${factorId}
         `);
@@ -1377,9 +1390,34 @@ export class MfaService implements MfaRepository {
             secretEncrypted: row.secret_encrypted as string,
             friendlyName: (row.friendly_name as string | null) ?? undefined,
             verified: row.verified as boolean,
+            // BIGINT comes back as a string from node-postgres.
+            lastUsedCounter: row.last_used_counter === null || row.last_used_counter === undefined
+                ? null
+                : Number(row.last_used_counter),
             createdAt: new Date(row.created_at as string),
             updatedAt: new Date(row.updated_at as string)
         };
+    }
+
+    /**
+     * Spend a TOTP time step, once and only once.
+     *
+     * One statement: the `WHERE` is the check, the `UPDATE` is the act, and
+     * `RETURNING` reports which of two concurrent requests carrying the same
+     * six digits won. Reading the counter and then writing it would let both
+     * pass — the exact replay this closes.
+     */
+    async claimMfaFactorCounter(factorId: string, counter: number): Promise<boolean> {
+        const tableName = this.qualify("mfa_factors");
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET last_used_counter = ${counter}, updated_at = NOW()
+            WHERE id = ${factorId}
+              AND (last_used_counter IS NULL OR last_used_counter < ${counter})
+            RETURNING id
+        `);
+
+        return result.rows.length > 0;
     }
 
     async verifyMfaFactor(factorId: string): Promise<void> {
@@ -1422,7 +1460,7 @@ export class MfaService implements MfaRepository {
     async getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null> {
         const tableName = this.qualify("mfa_challenges");
         const result = await this.db.execute(sql`
-            SELECT id, factor_id, created_at, verified_at, ip_address, expires_at
+            SELECT id, factor_id, created_at, verified_at, ip_address, attempts, expires_at
             FROM ${sql.raw(tableName)}
             WHERE id = ${challengeId} AND expires_at > NOW() AND verified_at IS NULL
         `);
@@ -1435,8 +1473,29 @@ export class MfaService implements MfaRepository {
             factorId: row.factor_id as string,
             createdAt: new Date(row.created_at as string),
             verifiedAt: row.verified_at ? new Date(row.verified_at as string) : undefined,
-            ipAddress: (row.ip_address as string | null) ?? undefined
+            ipAddress: (row.ip_address as string | null) ?? undefined,
+            attempts: Number(row.attempts ?? 0)
         };
+    }
+
+    /**
+     * Count one failed guess against a challenge and report the new total.
+     *
+     * Incremented in the database rather than in the route so that guesses
+     * arriving in parallel — the shape any real brute-force takes — cannot
+     * share a single increment.
+     */
+    async recordMfaChallengeAttempt(challengeId: string): Promise<number> {
+        const tableName = this.qualify("mfa_challenges");
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET attempts = attempts + 1
+            WHERE id = ${challengeId}
+            RETURNING attempts
+        `);
+
+        if (result.rows.length === 0) return 0;
+        return Number((result.rows[0] as { attempts: number | string }).attempts);
     }
 
     async verifyMfaChallenge(challengeId: string): Promise<void> {

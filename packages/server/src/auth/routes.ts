@@ -15,6 +15,7 @@ import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from 
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
+import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { isSteadyStateRegistrationOpen } from "./registration-policy";
@@ -282,9 +283,28 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
-     * Helper to generate and store session tokens
+     * Helper to generate and store session tokens.
+     *
+     * Every route that signs somebody in comes through here — password login,
+     * register, each OAuth provider, magic link, anonymous and anonymous-link —
+     * which is why the second-factor gate is *inside* it rather than repeated at
+     * each call site. An account with a verified factor gets no session from
+     * this function at all: it throws `MFA_REQUIRED`, and the only thing that
+     * mints a session for that user is `POST /auth/mfa/challenge/verify`.
+     *
+     * `skipMfaGate` exists for exactly one caller: the challenge-verify route
+     * itself, which has just seen the second factor and mints at `aal2`.
      */
-    async function createSessionAndTokens(uid: string, userAgent: string, ipAddress: string) {
+    async function createSessionAndTokens(
+        uid: string,
+        userAgent: string,
+        ipAddress: string,
+        options?: { skipMfaGate?: boolean; aal?: "aal1" | "aal2" }
+    ) {
+        if (!options?.skipMfaGate) {
+            await assertMfaSatisfied(authRepo, uid);
+        }
+        const aal = options?.aal ?? "aal1";
         const roles = await authRepo.getUserRoles(uid);
         const roleIds = roles.map(r => r.id);
 
@@ -295,12 +315,12 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             if (user) {
                 const defaultClaims: Record<string, unknown> = { uid,
 roles: roleIds,
-aal: "aal1" };
+aal };
                 customClaims = await ops.customizeAccessToken(defaultClaims, user);
             }
         }
 
-        const accessToken = generateAccessToken(uid, roleIds, "aal1", customClaims);
+        const accessToken = generateAccessToken(uid, roleIds, aal, customClaims);
         const refreshToken = generateRefreshToken();
 
         // A sign-in opens a session; every token later rotated out of it
@@ -314,7 +334,7 @@ aal: "aal1" };
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
-            { id: randomUUID(), startedAt: new Date() }
+            { id: randomUUID(), startedAt: new Date(), aal }
         );
 
         return { roleIds,
@@ -1055,16 +1075,26 @@ message: "Email verified successfully" });
             return null;
         });
 
+        // The assurance level is a property of the sign-in, and rotation is not
+        // a new sign-in — so it is read off the presented token's row and
+        // carried forward. Hardcoding `aal1` here meant an MFA-verified session
+        // silently dropped back to password-grade within one access-token
+        // lifetime, which both defeats the step-up and locks the user out of
+        // the operations that require it. A row with no stored value (written
+        // before the column existed, or by a repository that does not keep it)
+        // reads as `aal1`, the restrictive value.
+        const sessionAal: "aal1" | "aal2" = storedToken.aal === "aal2" ? "aal2" : "aal1";
+
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
         if (ops.customizeAccessToken && user) {
             const defaultClaims: Record<string, unknown> = { uid: storedToken.uid,
 roles: roleIds,
-aal: "aal1" };
+aal: sessionAal };
             customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
-        const newAccessToken = generateAccessToken(storedToken.uid, roleIds, "aal1", customClaims);
+        const newAccessToken = generateAccessToken(storedToken.uid, roleIds, sessionAal, customClaims);
         const newRefreshToken = generateRefreshToken();
 
         // Rotate: mark the presented token superseded and mint its successor
@@ -1080,7 +1110,8 @@ aal: "aal1" };
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
         const session = {
             id: storedToken.sessionId ?? storedToken.id,
-            startedAt: sessionStartedAt
+            startedAt: sessionStartedAt,
+            aal: sessionAal
         };
 
         if (!supersededAt) {
@@ -1151,7 +1182,15 @@ aal: "aal1" };
     // ═══════════════════════════════════════════════════════════════════════
     // MFA / TOTP
     // ═══════════════════════════════════════════════════════════════════════
-    mountMfaRoutes(router, config, ops, parseBody, applyTransformHook);
+    mountMfaRoutes({
+        router,
+        config,
+        ops,
+        parseBody,
+        buildAuthResponse,
+        createSessionAndTokens,
+        applyTransformHook
+    });
 
     // ═══════════════════════════════════════════════════════════════════════
     // Magic Link (passwordless email login)

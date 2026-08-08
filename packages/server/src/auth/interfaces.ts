@@ -163,6 +163,15 @@ export interface RefreshTokenInfo {
     revoked?: boolean;
     /** When the sign-in happened; carried across rotations, unlike createdAt. */
     sessionStartedAt?: Date;
+    /**
+     * The assurance level this session was established at. See
+     * {@link RefreshTokenSession.aal} — refresh reads it from here and mints
+     * the replacement access token at the same level.
+     *
+     * Absent on rows written before this column existed, and on repositories
+     * that do not store it; both read as `aal1`, the restrictive value.
+     */
+    aal?: "aal1" | "aal2";
 }
 
 /**
@@ -172,6 +181,16 @@ export interface RefreshTokenInfo {
 export interface RefreshTokenSession {
     id: string;
     startedAt: Date;
+    /**
+     * How this session was established: `aal2` only where a second factor was
+     * actually presented.
+     *
+     * Persisted because refresh has nothing else to go on. Deriving it at
+     * refresh time from "does this user have a factor?" would promote every
+     * pre-existing password-only session of a user who later enrolled — the
+     * assurance level is a property of the *sign-in*, not of the account.
+     */
+    aal?: "aal1" | "aal2";
 }
 
 /**
@@ -493,6 +512,12 @@ export interface MfaFactor {
     verified: boolean;
     createdAt: Date;
     updatedAt: Date;
+    /**
+     * The highest TOTP time step ever accepted for this factor. A code whose
+     * step is at or below it has already been spent — see
+     * {@link MfaRepository.claimMfaFactorCounter}.
+     */
+    lastUsedCounter?: number | null;
 }
 
 /**
@@ -504,6 +529,8 @@ export interface MfaChallengeInfo {
     createdAt: Date;
     verifiedAt?: Date;
     ipAddress?: string;
+    /** Failed verifications recorded against this challenge so far. */
+    attempts?: number;
 }
 
 /**
@@ -584,6 +611,34 @@ export interface MfaRepository {
      * Check if a user has any verified MFA factors
      */
     hasVerifiedMfaFactors(uid: string): Promise<boolean>;
+
+    /**
+     * Claim a TOTP time step for a factor: succeed once, then never again for
+     * that step or any earlier one.
+     *
+     * One statement, claim-and-act — `UPDATE … WHERE last_used_counter IS NULL
+     * OR last_used_counter < $counter RETURNING id`. A read-then-write would
+     * let two requests carrying the same code both pass the check before either
+     * wrote, which is precisely the replay this exists to stop.
+     *
+     * Optional so a repository written against an older release still compiles;
+     * where it is absent, an accepted code stays replayable for the rest of its
+     * window and the route says so in the log.
+     *
+     * @returns true when the step was claimed by this call, false when it had
+     *          already been spent.
+     */
+    claimMfaFactorCounter?(factorId: string, counter: number): Promise<boolean>;
+
+    /**
+     * Record a failed verification against a challenge and return the new
+     * total. Atomic (`UPDATE … SET attempts = attempts + 1 RETURNING attempts`)
+     * so concurrent guesses cannot share one increment.
+     *
+     * Optional; where it is absent the route falls back to the rate limiters
+     * alone.
+     */
+    recordMfaChallengeAttempt?(challengeId: string): Promise<number>;
 }
 
 /**

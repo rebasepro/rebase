@@ -841,7 +841,11 @@ withEmail: false }); // Hack to pass empty list of providers
             await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
 
             const session = mockAuthRepo.createRefreshToken.mock.calls[0][5];
-            expect(session).toEqual({ id: "session-42", startedAt });
+            // `aal1` because the presented row carries no assurance level: a
+            // token written before the column existed says nothing about a
+            // second factor, and "says nothing" must not read as "was
+            // verified". See mfa-enforcement.test.ts for the aal2 direction.
+            expect(session).toEqual({ id: "session-42", startedAt, aal: "aal1" });
         });
 
         it("falls back to deleting when the repository predates rotation tracking", async () => {
