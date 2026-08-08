@@ -200,9 +200,15 @@ export class ChannelHistoryStore {
         `);
 
         // Retained broadcasts for every channel in one table, with no RLS: who
-        // may replay a channel is decided by the channel rules the server
-        // evaluates before it reads. The driver's schema-wide grant reaches
-        // these (created here, after it ran), so take the privilege back.
+        // may replay a channel is decided before the read, by the channel gate
+        // in `realtimeService.authorizeChannelAction` — a replay is answered
+        // only for a client that has joined the channel, plus whatever an
+        // installed `ChannelAuthorizer` adds. That gate is the entire reason
+        // this table can sit outside the RLS model, so it fails closed; the
+        // rule language it does not yet have is written up in
+        // `docs/channel-authorization.md`. The driver's schema-wide
+        // grant reaches these (created here, after it ran), so take the
+        // privilege back.
         await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_messages")));
         await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_cursors")));
 

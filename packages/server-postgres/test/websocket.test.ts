@@ -543,3 +543,118 @@ describe("WebSocket Server requireAuth resolution", () => {
         }
     });
 });
+
+/**
+ * The per-client message budget.
+ *
+ * One counter used to cover everything, at 2000 per 60 s — 33 messages a
+ * second. That is generous for queries and subscriptions and an order of
+ * magnitude below the channel workload the capacity docs use as their worked
+ * example (60 fps cursors, plus the presence update the documented idiom sends
+ * with each one). The result was that a cursor stream worked for the first ~33
+ * seconds of every minute and was refused for the rest of it — and the refusal
+ * was a frame the client registered no waiter for, so nothing surfaced anywhere.
+ */
+describe("WebSocket Server rate limiting", () => {
+    let mockServer: Server;
+    let mockRealtimeService: RealtimeService;
+    let mockDriver: PostgresBackendDriver;
+
+    const connect = () => {
+        const connectionCallback = mockWssInstance.on.mock.calls.find(
+            (call: any[]) => call[0] === "connection"
+        )[1];
+        const mockWs = { on: jest.fn(),
+send: jest.fn() } as unknown as any;
+        connectionCallback(mockWs);
+        const messageCallback = mockWs.on.mock.calls.find(
+            (call: any[]) => call[0] === "message"
+        )[1];
+        return { mockWs, messageCallback };
+    };
+
+    const send = (messageCallback: any, message: unknown) =>
+        messageCallback(Buffer.from(JSON.stringify(message)));
+
+    const rateLimited = (mockWs: any) =>
+        mockWs.send.mock.calls
+            .map((call: any[]) => JSON.parse(call[0] as string))
+            .filter((frame: any) => frame?.payload?.error?.code === "RATE_LIMITED");
+
+    const broadcast = (n: number) => ({
+        type: "broadcast",
+        payload: { channel: "doc:42",
+event: "cursor",
+payload: { n } }
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        mockExtractUserFromToken.mockReturnValue({ uid: "u1", roles: ["admin"] });
+
+        mockServer = {} as Server;
+        mockRealtimeService = {
+            addClient: jest.fn(),
+            registerDataDriverSubscription: jest.fn(),
+            handleClientMessage: jest.fn(async () => {})
+        } as unknown as RealtimeService;
+
+        mockDriver = {
+            key: "postgres",
+            initialised: true,
+            fetchCollection: jest.fn(async () => [])
+        } as unknown as PostgresBackendDriver;
+
+        createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, { requireAuth: false });
+    });
+
+    it("does not refuse channel frames at the general 2000/minute ceiling", async () => {
+        const { mockWs, messageCallback } = connect();
+
+        for (let i = 0; i < 2400; i++) await send(messageCallback, broadcast(i));
+
+        expect(rateLimited(mockWs)).toHaveLength(0);
+        expect(mockRealtimeService.handleClientMessage).toHaveBeenCalledTimes(2400);
+    });
+
+    it("still refuses channel frames past the channel ceiling", async () => {
+        const { mockWs, messageCallback } = connect();
+
+        for (let i = 0; i < 7201; i++) await send(messageCallback, broadcast(i));
+
+        const refusals = rateLimited(mockWs);
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0].payload.error.message).toContain("channel");
+        expect(mockRealtimeService.handleClientMessage).toHaveBeenCalledTimes(7200);
+    });
+
+    it("does not let a cursor stream spend the budget queries need", async () => {
+        const { mockWs, messageCallback } = connect();
+
+        for (let i = 0; i < 2400; i++) await send(messageCallback, broadcast(i));
+        await send(messageCallback, {
+            type: "FETCH_COLLECTION",
+            requestId: "req-after-cursors",
+            payload: { path: "posts" }
+        });
+
+        expect(rateLimited(mockWs)).toHaveLength(0);
+        expect(mockDriver.fetchCollection).toHaveBeenCalledTimes(1);
+    });
+
+    it("still caps non-channel frames at the general ceiling", async () => {
+        const { mockWs, messageCallback } = connect();
+
+        for (let i = 0; i < 2001; i++) {
+            await send(messageCallback, {
+                type: "FETCH_COLLECTION",
+                requestId: `req-${i}`,
+                payload: { path: "posts" }
+            });
+        }
+
+        expect(rateLimited(mockWs)).toHaveLength(1);
+        expect(mockDriver.fetchCollection).toHaveBeenCalledTimes(2000);
+    });
+});

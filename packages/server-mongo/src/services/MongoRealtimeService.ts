@@ -451,6 +451,30 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                 }
                 break;
             }
+            default: {
+                // A silent `switch` over a wire protocol is how channel,
+                // presence and broadcast frames came to be accepted here and
+                // dropped: the client's `broadcast()` resolved, `onPresence`
+                // never fired, and a `channel_history` request buffered live
+                // messages until the catch-up timeout on every join. Say so,
+                // and tell the sender rather than leaving it waiting.
+                logger.warn(
+                    `⚠️ [MongoRealtime] Unhandled realtime message type "${message.type}" — ` +
+                    "channels, presence and broadcast are not implemented by the Mongo driver."
+                );
+                ws.send(JSON.stringify({
+                    type: "ERROR",
+                    subscriptionId: message.subscriptionId,
+                    payload: {
+                        error: {
+                            message: `Realtime message type "${message.type}" is not supported by the Mongo driver`,
+                            code: "REALTIME_UNSUPPORTED"
+                        }
+                    },
+                    error: `Realtime message type "${message.type}" is not supported by the Mongo driver`
+                }));
+                break;
+            }
         }
     }
 }

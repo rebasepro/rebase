@@ -895,6 +895,22 @@ export class RebaseWebSocketClient {
             } else {
                 callback.onUpdate(message);
             }
+            return;
+        }
+
+        // An error that matched no waiter used to fall off the end of this
+        // method and disappear. Channel frames are the ones that always do:
+        // they are fire-and-forget by design, so no `pendingRequests` entry
+        // exists to reject and the server's errors about them — RATE_LIMITED,
+        // CHANNEL_FORBIDDEN, CHANNEL_HISTORY_WRITE_FAILED — were dropped while
+        // `await channel.broadcast(...)` resolved as if it had been sent. A
+        // console warning is the floor, not the answer: an `onError` on
+        // `RebaseRealtimeChannel` is the shape this should eventually take.
+        if (type === "ERROR" || type === "error" || message.error) {
+            const { errorMessage, errorCode } = extractMessageError(message);
+            console.warn(
+                `[Rebase] Realtime error from the server${errorCode ? ` (${errorCode})` : ""}: ${errorMessage}`
+            );
         }
     }
 

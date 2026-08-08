@@ -190,7 +190,13 @@ await channel.leave();
 
 Los canales son ligeros y efímeros — existen mientras al menos un cliente esté suscrito. Las llamadas repetidas a `channel()` con el mismo nombre devuelven el **mismo** objeto, por lo que dos componentes pueden adjuntar manejadores de forma independiente sin que uno corte al otro al salir.
 
-Las tramas de canal y presencia no requieren una cuenta: los visitantes anónimos pueden unirse a canales públicos, y el servidor sigue autorizando cada trama.
+Las tramas de canal y presencia no requieren una cuenta: los visitantes anónimos pueden unirse a canales públicos.
+
+:::caution[Los canales aún no tienen reglas de acceso]
+La única comprobación que aplica el servidor es la **pertenencia**: para difundir en un canal, leer su lista de presencia o reproducir su historial, el cliente debe haberse unido antes a ese canal. Unirse, en cambio, está abierto — cualquier cliente que pueda nombrar un canal puede unirse a él, tenga o no sesión iniciada.
+
+Así que el nombre de un canal no es un secreto ni un permiso. No ponga en un canal (incluidos el historial retenido y el estado de presencia) nada que no puedan ver todos los usuarios de su aplicación, y no derive el nombre de un canal de datos que no repartiría. Las reglas de autorización por canal no están implementadas; si las necesita hoy, mantenga la mitad sensible del intercambio en `client.data`, donde sí se aplica la seguridad a nivel de fila.
+:::
 
 > **Por defecto, las difusiones no se reproducen.** Solo llegan a los miembros conectados en ese momento. Eso es lo que se quiere para notificaciones que se autocorrigen — un aviso de «alguien ha guardado» queda sustituido por el siguiente guardado — y no cuesta nada. Para un flujo de operaciones, donde un hueco silencioso causa divergencia, active el [historial de mensajes](#historial-de-mensajes-y-recuperación) en el canal.
 

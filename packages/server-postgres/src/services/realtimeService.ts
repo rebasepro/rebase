@@ -33,6 +33,37 @@ export interface SubscriptionAuthContext {
     roles: string[];
 }
 
+/** What a channel frame is asking to do. */
+export type ChannelAction = "join" | "broadcast" | "presence" | "history";
+
+/** Everything an authorizer is told about the frame it is asked to allow. */
+export interface ChannelAuthorizationRequest {
+    /** The channel the frame names, exactly as the client wrote it. */
+    channel: string;
+    action: ChannelAction;
+    /** The socket, not the principal — one user may hold several. */
+    clientId: string;
+    /** The socket's authenticated principal, or the anonymous one. */
+    user?: SubscriptionAuthContext;
+}
+
+/**
+ * The extension point for channel access rules.
+ *
+ * **This is deliberately not a product API yet.** The rule *language* — a
+ * config key, a per-pattern DSL, how it composes with `securityRules` — is an
+ * open design question (see `docs/channel-authorization.md`), and
+ * inventing one here would be inventing the answer. What exists is the single
+ * place every channel frame passes through, so that whatever shape the rules
+ * eventually take has exactly one seam to plug into and no arm of the switch
+ * can be forgotten.
+ *
+ * Returning `false` — or throwing — refuses the frame. It is consulted *after*
+ * the membership floor below, so an authorizer can only ever narrow access,
+ * never widen it.
+ */
+export type ChannelAuthorizer = (request: ChannelAuthorizationRequest) => boolean | Promise<boolean>;
+
 interface DataDriverWithData extends DataDriver {
     data: unknown;
 }
@@ -74,6 +105,13 @@ type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
  * Implements the RealtimeProvider interface for database abstraction.
  */
 export class RealtimeService extends EventEmitter implements RealtimeProvider {
+    /**
+     * Declares to the multi-engine router that channel frames can be handled
+     * here. Read by `createRoutedRealtimeService`, which otherwise would have to
+     * guess — and guessed "the default provider", whichever engine that is.
+     */
+    public readonly supportsChannels = true;
+
     private clients = new Map<string, WebSocket>();
 
     // Broadcast channels: channel name → set of client IDs
@@ -130,6 +168,26 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * so a hot channel logs the problem once rather than once per message.
      */
     private oversizedBroadcastWarned = new Set<string>();
+
+    /**
+     * Optional narrowing on top of the membership floor — see
+     * {@link ChannelAuthorizer}. Unset by default, which leaves membership as
+     * the whole of the rule.
+     */
+    private channelAuthorizer?: ChannelAuthorizer;
+
+    /**
+     * Whether a notification from another instance has ever arrived.
+     *
+     * The entity LISTEN handler sees a foreign `sid` on every cross-instance
+     * change, which is proof that this deployment runs more than one pod — the
+     * one fact needed to tell "the memory bus is fine here" from "broadcast and
+     * presence silently reach a fraction of your users".
+     */
+    private foreignInstanceSeen = false;
+
+    /** So the multi-pod memory-bus warning is emitted once, not once per join. */
+    private memoryBusWarned = false;
 
     private presenceInterval?: ReturnType<typeof setInterval>;
     private static readonly PRESENCE_TIMEOUT_MS = 30000; // 30s
@@ -378,45 +436,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 await this.handleUnsubscribe(clientId, message.subscriptionId!);
                 break;
 
-            // ── Broadcast Channels ──
+            // ── Broadcast Channels & Presence ──
+            //
+            // One arm for all of them, because every one has to pass the same
+            // gate and a switch with seven arms is a place to forget it once.
+            // See `handleChannelMessage`.
             case "join_channel":
-                this.joinChannel(clientId, payload?.channel as string);
-                break;
             case "leave_channel":
-                this.leaveChannel(clientId, payload?.channel as string);
-                break;
             case "broadcast":
-                this.broadcastToChannel(
-                    clientId,
-                    payload?.channel as string,
-                    payload?.event as string,
-                    payload?.payload
-                );
-                break;
             case "channel_history":
-                await this.handleChannelHistoryRequest(
-                    clientId,
-                    payload?.channel as string,
-                    payload?.sinceSeq as number | undefined,
-                    payload?.limit as number | undefined
-                );
-                break;
-
-            // ── Presence ──
             case "presence_track":
-                // Auto-join the channel so presence works without a separate join
-                this.joinChannel(clientId, payload?.channel as string);
-                this.trackPresence(
-                    clientId,
-                    payload?.channel as string,
-                    payload?.state as Record<string, unknown> ?? {}
-                );
-                break;
             case "presence_untrack":
-                this.removePresence(clientId, payload?.channel as string);
-                break;
             case "presence_state":
-                this.sendPresenceState(clientId, payload?.channel as string);
+                await this.handleChannelMessage(clientId, message.type, payload, authContext);
                 break;
 
             default:
@@ -1134,13 +1166,195 @@ roles: activeAuth.roles },
     // Broadcast Channels
     // =============================================================================
 
+    /**
+     * Install a channel authorizer — see {@link ChannelAuthorizer}.
+     *
+     * Nothing in the framework calls this yet: it is the seam a rules API will
+     * be built on, kept deliberately separate from the membership floor so the
+     * floor holds whether or not anyone uses it.
+     */
+    setChannelAuthorizer(authorizer: ChannelAuthorizer | undefined): void {
+        this.channelAuthorizer = authorizer;
+    }
+
+    /** Which action each channel frame is asking to perform. */
+    private static readonly CHANNEL_ACTIONS: Record<string, ChannelAction> = {
+        join_channel: "join",
+        broadcast: "broadcast",
+        channel_history: "history",
+        presence_track: "join",
+        presence_state: "presence"
+    };
+
+    /**
+     * The one door every channel frame comes through.
+     *
+     * Returns synchronously — and so dispatches synchronously — unless an
+     * authorizer is installed. That matters: a client sends `join_channel`,
+     * `presence_state` and `channel_history` back to back on connect, and the
+     * socket's message handler processes each frame up to its first `await`,
+     * so a gate that always yielded would let the reads overtake the join that
+     * is about to authorize them.
+     */
+    private handleChannelMessage(
+        clientId: string,
+        type: string,
+        payload: Record<string, unknown> | undefined,
+        authContext?: SubscriptionAuthContext
+    ): void | Promise<void> {
+        const channel = payload?.channel as string;
+
+        // Leaving and untracking only ever remove the caller's own state, so
+        // they need no permission — refusing them could only strand a client.
+        if (type === "leave_channel") {
+            this.leaveChannel(clientId, channel);
+            return;
+        }
+        if (type === "presence_untrack") {
+            this.removePresence(clientId, channel);
+            return;
+        }
+
+        const action = RealtimeService.CHANNEL_ACTIONS[type];
+        const allowed = this.authorizeChannelAction(clientId, channel, action, authContext);
+        if (allowed === false) return;
+        if (allowed === true) return this.dispatchChannelMessage(clientId, type, channel, payload);
+        return allowed.then((ok) => {
+            if (ok) return this.dispatchChannelMessage(clientId, type, channel, payload);
+        });
+    }
+
+    /** Perform an already-authorized channel frame. */
+    private dispatchChannelMessage(
+        clientId: string,
+        type: string,
+        channel: string,
+        payload: Record<string, unknown> | undefined
+    ): void | Promise<void> {
+        switch (type) {
+            case "join_channel":
+                this.joinChannel(clientId, channel);
+                return;
+            case "broadcast":
+                this.broadcastToChannel(clientId, channel, payload?.event as string, payload?.payload);
+                return;
+            case "channel_history":
+                return this.handleChannelHistoryRequest(
+                    clientId,
+                    channel,
+                    payload?.sinceSeq as number | undefined,
+                    payload?.limit as number | undefined
+                );
+            case "presence_track":
+                // Auto-join the channel so presence works without a separate join
+                this.joinChannel(clientId, channel);
+                this.trackPresence(clientId, channel, payload?.state as Record<string, unknown> ?? {});
+                return;
+            case "presence_state":
+                this.sendPresenceState(clientId, channel);
+                return;
+        }
+    }
+
+    /**
+     * Decide whether a client may perform an action on a channel.
+     *
+     * **Membership is the floor.** Reading a channel's presence roster, replaying
+     * its retained history and broadcasting into it all require that this client
+     * has joined it. That is a low bar — joining is open to anyone who can name
+     * the channel — but it is not the bar that was there before, which was none
+     * at all: `channel_history` and `presence_state` answered any socket about
+     * any channel, and a broadcast fanned out to members the sender had never
+     * joined. Two internal tables (`rebase.channel_presence`,
+     * `rebase.channel_messages`) are held outside RLS on the strength of this
+     * check, so it fails closed: an authorizer that throws refuses the frame.
+     *
+     * Anything richer than membership belongs in a {@link ChannelAuthorizer};
+     * this method is where it is consulted, and the only place.
+     */
+    private authorizeChannelAction(
+        clientId: string,
+        channel: string,
+        action: ChannelAction,
+        authContext?: SubscriptionAuthContext
+    ): boolean | Promise<boolean> {
+        // Joining is what establishes membership, so it cannot require it.
+        if (action !== "join" && !this.channels.get(channel)?.has(clientId)) {
+            this.denyChannelAction(clientId, channel, action, "not a member of the channel");
+            return false;
+        }
+
+        const authorizer = this.channelAuthorizer;
+        if (!authorizer) return true;
+
+        let verdict: boolean | Promise<boolean>;
+        try {
+            verdict = authorizer({ channel, action, clientId, user: authContext });
+        } catch (error) {
+            logger.error(`❌ [Channels] Authorizer threw for ${action} on "${channel}" — refusing`, { error });
+            this.denyChannelAction(clientId, channel, action, "channel authorization failed");
+            return false;
+        }
+
+        if (typeof verdict === "boolean") {
+            if (!verdict) this.denyChannelAction(clientId, channel, action, "refused by the channel authorizer");
+            return verdict;
+        }
+
+        return verdict.then(
+            (ok) => {
+                if (!ok) this.denyChannelAction(clientId, channel, action, "refused by the channel authorizer");
+                return ok;
+            },
+            (error) => {
+                logger.error(`❌ [Channels] Authorizer rejected for ${action} on "${channel}" — refusing`, { error });
+                this.denyChannelAction(clientId, channel, action, "channel authorization failed");
+                return false;
+            }
+        );
+    }
+
+    /** Tell the client why its channel frame went nowhere, and say so in the log. */
+    private denyChannelAction(clientId: string, channel: string, action: ChannelAction, reason: string): void {
+        this.debugLog(`🚫 [Channels] Refused ${action} on "${channel}" for ${clientId}: ${reason}`);
+        this.sendError(
+            clientId,
+            `Refused ${action} on channel "${channel}": ${reason}`,
+            undefined,
+            "CHANNEL_FORBIDDEN"
+        );
+    }
+
     /** Join a broadcast channel */
     joinChannel(clientId: string, channel: string): void {
         if (!this.channels.has(channel)) {
             this.channels.set(channel, new Set());
         }
         this.channels.get(channel)!.add(clientId);
+        this.warnIfMemoryBusOnMultiplePods();
         this.debugLog(`📡 [Broadcast] Client ${clientId} joined channel: ${channel}`);
+    }
+
+    /**
+     * Say something the first time channels are used on a deployment that is
+     * demonstrably multi-pod while the bus is still the in-memory default.
+     *
+     * Every other warning in this subsystem covers a *configured* bus failing —
+     * the case where the operator already knew a bus mattered. The common
+     * misconfiguration is the opposite one: scaled to two replicas, never
+     * touched `realtime.bus`, and broadcast and presence quietly serve a
+     * fraction of the room. The evidence is already in the process, so use it.
+     */
+    private warnIfMemoryBusOnMultiplePods(): void {
+        if (this.memoryBusWarned) return;
+        if (this.bus.kind !== "memory" || !this.foreignInstanceSeen) return;
+        this.memoryBusWarned = true;
+        logger.warn(
+            "⚠️ [ChannelBus] Channels are in use with the in-memory bus, but notifications from another " +
+            "instance have been seen — this deployment runs more than one process. Broadcast and presence " +
+            "reach only the clients connected to this one. Set `realtime.bus` (or REBASE_REALTIME_BUS=postgres) " +
+            "to make channels cross-instance."
+        );
     }
 
     /** Leave a broadcast channel */
@@ -2097,6 +2311,11 @@ lastSeen: Date.now() });
 
                     // Skip our own notifications — already processed locally
                     if (sid === this.instanceId) return;
+
+                    // A foreign sid is proof of a second process. Nothing here
+                    // needs that fact, but the channel path does — see
+                    // `warnIfMemoryBusOnMultiplePods`.
+                    this.foreignInstanceSeen = true;
 
                     this.debugLog(`📡 [RealtimeService] Received cross-instance notification: path=${p}, id=${eid}, from=${sid}`);
 

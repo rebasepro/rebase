@@ -210,7 +210,13 @@ await channel.leave();
 
 Channels are lightweight and ephemeral — they exist as long as at least one client is subscribed. Repeated `channel()` calls with the same name return the **same** object, so two components can attach handlers independently without either cutting the other off by leaving.
 
-Channel and presence frames do not require an account: anonymous visitors can join public channels, and the server still authorizes every frame.
+Channel and presence frames do not require an account: anonymous visitors can join public channels.
+
+:::caution[Channels have no access rules yet]
+The only check the server applies is **membership**: to broadcast into a channel, read its presence roster or replay its history, a client must have joined that channel first. Joining itself is open — any client that can name a channel can join it, whether or not it is signed in.
+
+So a channel name is not a secret and is not a permission. Do not put anything in a channel (including retained history and presence state) that every user of your app may not see, and do not derive a channel name from data you would not hand out. Per-channel authorization rules are not implemented; if you need them today, keep the sensitive half of the exchange on `client.data`, where row-level security applies.
+:::
 
 > **By default, broadcasts are not replayed.** They reach currently-connected members only. That is what you want for notifications that self-correct — a "someone saved" nudge is superseded by the next save — and it costs nothing. For an operation stream, where a silent gap causes divergence, enable [message history](#message-history-and-catch-up) on the channel.
 

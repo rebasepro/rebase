@@ -249,7 +249,7 @@ Pruning happens as messages arrive, throttled per channel so cost tracks elapsed
 - **At-least-once on catch-up.** A replay range may overlap messages a client already received; the SDK discards ones it has already delivered.
 
 :::caution[History has the same access model as the channel]
-Anyone who may join a channel may replay its retained messages, including those broadcast before they arrived. Retention is opt-in per channel pattern, so treat enabling it on a publicly-joinable channel as making that channel's past readable to any visitor.
+A client that has joined a channel may replay its retained messages, including those broadcast before it arrived — membership is the only check, and joining is open to any client that can name the channel. Retention is opt-in per channel pattern, so enabling it makes that channel's past readable to any visitor who guesses the name. Retained channels are the case where this becomes durable rather than momentary, so treat a retained channel's contents as public to your users.
 :::
 
 ## Presence Tracking
@@ -388,6 +388,8 @@ Rebase deploys as Postgres + backend + frontend. A bus that needed a message bro
 It can. Measured across two backend instances against a single Postgres container, the Postgres bus delivered **~10,000 cross-instance messages per second with no losses**, and stayed flat out to **eight instances** (14,000 deliveries, no losses). Twenty people dragging cursors at 60 fps generate around 1,200 messages per second — roughly an eighth of that.
 
 The limit worth watching is not capacity, it is that every notification is a query against your primary database, competing with your application's real queries. The Postgres bus therefore **coalesces** outgoing frames (see below), which is what keeps that cost proportional to elapsed time rather than message count.
+
+Per client, the socket accepts up to **7,200 channel frames a minute** (120/s — 60 fps of cursor broadcasts plus the presence update each one carries), counted separately from the budget queries and subscriptions share. Frames past that are refused with a `RATE_LIMITED` error rather than queued.
 
 If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
 
