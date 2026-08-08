@@ -24,7 +24,7 @@ client.data.collection<Record<string, unknown>>("blog_posts")
 ### Find (List)
 
 ```typescript
-// All products (default limit: 20)
+// All products (default limit: 50)
 const { data, meta } = await client.data.products.find();
 
 // With pagination, filtering, and sorting
@@ -259,6 +259,11 @@ if (page1.meta.hasMore) {
 // Page-number pagination (1-indexed)
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
+
+`limit` must be a whole number between 1 and 1000. A larger one — or a zero,
+negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
+clamped, because a silently smaller page cannot be told apart from the last one.
+To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 
 ## Sorting
 
