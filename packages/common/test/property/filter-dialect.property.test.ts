@@ -127,6 +127,9 @@ describe("filter wire codec", () => {
         fc.assert(fc.property(fieldName, filterTuple, (field, tuple) => {
             const back = deserializeFilter(serializeFilter({ [field]: tuple } as never));
             const result = back[field];
+            // Presence is part of the property, not a precondition: a round trip
+            // that drops the field entirely preserves the operator vacuously.
+            if (!result) throw new Error(`round trip dropped the field "${field}"`);
             const op = Array.isArray(result[0]) ? undefined : result[0];
             expect(op).toBe(tuple[0]);
         }), { numRuns: RUNS });

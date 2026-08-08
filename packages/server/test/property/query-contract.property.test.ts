@@ -225,10 +225,13 @@ describe("reserved parameter names", () => {
 
     /**
      * The full classification, because the names do not all fail the same way
-     * and the difference is the whole point: thirteen of the fourteen lose the
-     * filter with no diagnostic, while `where` happens to 400 because
-     * `eq.x` is not JSON. Loud is strictly better than silent here, and the
-     * table below is what the fix would have to make uniform.
+     * and the difference is the whole point: twelve of the fourteen lose the
+     * filter with no diagnostic, while two happen to 400 — `where` because
+     * `eq.x` is not JSON, and `limit` because the list-limit resolver refuses a
+     * value that is not a whole number instead of falling back to the default.
+     * Both are accidents of another check rather than collision handling, but
+     * loud is strictly better than silent here, and the table below is what the
+     * fix would have to make uniform.
      */
     it("pins how each reserved name fails", () => {
         const classify = (name: string): "applied" | "silently-dropped" | "rejected" => {
@@ -241,7 +244,9 @@ describe("reserved parameter names", () => {
         };
         const actual = Object.fromEntries(RESERVED.map(n => [n, classify(n)]));
         expect(actual).toEqual({
-            limit: "silently-dropped",
+            // Refused, not dropped: `?limit=eq.x` is not a whole number, and the
+            // resolver answers that with a 400 rather than a default page.
+            limit: "rejected",
             offset: "silently-dropped",
             page: "silently-dropped",
             orderBy: "silently-dropped",
