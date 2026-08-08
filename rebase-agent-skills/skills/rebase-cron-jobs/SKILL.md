@@ -241,7 +241,7 @@ interface CronJobContext {
 > **IMPORTANT FOR AGENTS:** `ctx.client` authenticates as the **service identity** (`userId: "service"`, `roles: ["admin"]`). All data operations through `ctx.client` go through the full REST middleware pipeline (including DataHooks and Collection Callbacks). This means:
 > - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
 > - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
-> - The service identity bypasses RLS policies
+> - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`auth.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.
 
 ### Using `ctx.client`
 

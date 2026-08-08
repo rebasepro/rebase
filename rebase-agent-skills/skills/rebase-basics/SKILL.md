@@ -674,12 +674,12 @@ The `rebase` singleton implements the `RebaseClient` interface:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access (bypasses RLS). Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
+| `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access — scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is **evaluated against that identity, not bypassed**. Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
 | `rebase.auth` | `AuthClient` | Authentication operations |
 | `rebase.storage` | `StorageSource \| undefined` | File storage operations |
 | `rebase.email` | `EmailService \| undefined` | Send emails via SMTP (only when email is configured) |
 | `rebase.admin` | `AdminAPI \| undefined` | User management API |
-| `rebase.sql` | `(query: string) => Promise<Record[]> \| undefined` | Raw SQL execution (only for SQL databases) |
+| `rebase.sql` | `(query: string) => Promise<Record[]> \| undefined` | Raw SQL execution (only for SQL databases). Runs on the owner connection — this, not `dataAsAdmin`, is the unconditional RLS bypass |
 | `rebase.baseUrl` | `string \| undefined` | The base HTTP URL of the backend |
 
 ### Usage Examples
@@ -689,7 +689,7 @@ import { rebase } from "@rebasepro/server";
 
 // In a cron job, custom function, or hook:
 
-// Data operations (admin-level, no RLS)
+// Data operations (admin-level: RLS applies, evaluated as the `admin` role)
 const { data: posts } = await rebase.dataAsAdmin.collection<Record<string, unknown>>("posts").find({ limit: 10 });
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
 

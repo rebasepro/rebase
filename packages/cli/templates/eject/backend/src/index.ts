@@ -203,9 +203,13 @@ pass: env.SMTP_PASS! }
     //
     // `requireAuth` answers 401 without a valid token; `requireAdmin` answers
     // 403 without the `admin` role and must follow `requireAuth`. Note that
-    // `c.get("driver")` — the RLS-scoped driver — is only set inside the Rebase
-    // routers, so out here reach for `rebase.dataAsAdmin`, which **bypasses
-    // RLS** and therefore belongs behind one of those guards.
+    // `c.get("driver")` — the driver carrying the caller's identity — is only
+    // set inside the Rebase routers, so out here reach for
+    // `rebase.dataAsAdmin`. That one is **admin-scoped, not an RLS bypass**: it
+    // runs as `{ uid: "service", roles: ["admin"] }` and your policies still
+    // apply, evaluated against that identity — which is exactly an admin's
+    // reach, and therefore belongs behind one of those guards. (`rebase.sql()`
+    // is the real bypass: owner connection, no policies.)
 
     // ─── Health check ─────────────────────────────────────────────
     // Deliberately public: an orchestrator's probe has no token to send.

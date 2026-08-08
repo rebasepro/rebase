@@ -8,8 +8,14 @@ import { getPolicyNamesForRules } from "@rebasepro/utils";
  * Rebase's enforcement model is unified: authenticated (user-context) requests
  * run under the restricted `rebase_user` role, so Postgres RLS binds *every*
  * statement — reads and writes. A collection's `securityRules` are the whole
- * authorization model. The server context (auth flows, migrations,
- * `dataAsAdmin`) runs as the owner and bypasses RLS.
+ * authorization model. The server context (auth flows, migrations, raw
+ * `rebase.sql`) runs as the owner and bypasses RLS.
+ *
+ * `rebase.dataAsAdmin` is **not** in that set, despite the name: it is scoped as
+ * `{ uid: "service", roles: ["admin"] }`, so it runs as `rebase_user` like any
+ * other caller and clears the baseline below through the *admin* arm, not the
+ * server arm. Which is why `disableDefaultPolicies` plus a lone
+ * `policy.serverContext()` rule locks it out too.
  *
  * Because RLS default-denies, every collection is **locked by default**: with
  * no rules, only the server context and admins can touch it. The generator

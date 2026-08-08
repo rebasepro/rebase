@@ -303,7 +303,8 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 **`context.data` hereda los privilegios de aquello que activó el callback.** No es un nivel de confianza fijo.
 
 - Activado por una **petición de usuario** (REST, tiempo real, una edición en el panel de administración) → **con ámbito de usuario**. El callback se ejecuta dentro de la transacción sujeta a RLS abierta para esa petición, por lo que las políticas se aplican tanto a lecturas *como* a escrituras. Un callback no puede ver una fila que su llamante no pudiera ver.
-- Activado por **trabajo en contexto de servidor** (`rebase.dataAsAdmin`, una tarea cron) → **sin ámbito**. Se ejecuta sobre la conexión propietaria y omite RLS.
+- Activado por **`rebase.dataAsAdmin` o una tarea cron** (el mismo singleton) → **con ámbito de administrador**, no sin ámbito. Ese driver está limitado a `{ uid: "service", roles: ["admin"] }`, así que el callback sigue ejecutándose en una transacción sujeta a RLS: tus políticas se evalúan, contra esa identidad.
+- Activado por **el driver base** (los flujos de autenticación integrados, las migraciones) → **sin ámbito**. Se ejecuta sobre la conexión propietaria y omite RLS.
 :::
 
 Esto importa sobre todo en la dirección que falla en silencio. RLS *filtra*, no lanza errores — así que un callback que lee una fila hermana la encontrará cuando guarde una tarea de administración y puede no encontrar nada cuando guarde un usuario final, sin error en ninguno de los dos casos. Escribe callbacks que toleren un resultado vacío, o recurre al plano de administración de forma deliberada:
@@ -313,8 +314,12 @@ afterSave: async ({ context }) => {
     // Con ámbito de usuario cuando un usuario activó este guardado: se aplica RLS.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Omitir RLS deliberadamente — para trabajo que el llamante realmente no
-    // debe ver, como un registro de auditoría que no puede leer ni editar.
+    // Ámbito de administrador deliberado — para trabajo que el llamante
+    // realmente no debe ver, como un registro de auditoría que no puede leer ni
+    // editar. Ojo: es el alcance de un administrador, no una omisión de RLS: una
+    // colección cuya única regla sea `policy.serverContext()` le sigue estando
+    // cerrada, porque eso compila a `auth.uid() IS NULL` y el uid de este
+    // accesor es `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```

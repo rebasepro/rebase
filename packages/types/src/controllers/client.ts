@@ -267,18 +267,31 @@ export interface RebaseClient<DB = unknown> {
     data: RebaseSdkData<DB>;
 
     /**
-     * Admin-scoped, **RLS-bypassing** data accessor.
+     * Admin-scoped data accessor — **not** an RLS bypass.
      *
      * Present on the **server** singleton only (see {@link RebaseServerClient}).
-     * It runs with `{ uid: "service", roles: ["admin"] }` — every read and write
-     * bypasses row-level-security policies. This is the correct tool for trusted
-     * background work (cron jobs, migrations, service-to-service tasks).
+     * It runs as the service identity `{ uid: "service", roles: ["admin"] }`,
+     * and the driver is scoped with `withAuth()` at boot, so every read and
+     * write runs in a transaction that has switched to the restricted
+     * `rebase_user` role with `app.uid = 'service'`: policies are evaluated,
+     * against that identity. This is the correct tool for trusted background
+     * work (cron jobs, migrations, service-to-service tasks).
+     *
+     * Two consequences the name does not suggest:
+     *
+     * - `policy.serverContext()` compiles to `auth.uid() IS NULL` and is
+     *   therefore **false** here. A collection with `disableDefaultPolicies:
+     *   true` whose only rule is `serverContext()` refuses these writes
+     *   (`42501`) and returns zero rows — HTTP 200, empty — for these reads.
+     * - Its reach equals an `admin`-roled application user's reach. It is not a
+     *   private channel. The true bypass is {@link sql}, which runs on the
+     *   owner connection and never goes through `withAuth`.
      *
      * ⚠️ **Do NOT use it to serve user-facing data.** Inside a request handler,
      * user-scoped queries must go through the request-scoped driver
-     * (`c.var.driver`), which carries the caller's identity so RLS applies.
-     * Reaching for `dataAsAdmin` (or its alias {@link data}) in a request handler
-     * silently exposes every row to every caller.
+     * (`c.var.driver`), which carries the caller's identity. Reaching for
+     * `dataAsAdmin` (or its alias {@link data}) in a request handler serves
+     * every caller whatever an admin may see.
      *
      * Undefined in the browser SDK.
      */
@@ -397,17 +410,20 @@ export interface RebaseClient<DB = unknown> {
  * the admin-scoped {@link dataAsAdmin} accessor, raw {@link sql}, and the
  * {@link email} service are all present (non-optional).
  *
- * **Trust levels.** {@link dataAsAdmin} is the admin-scoped, **RLS-bypassing**
- * driver, and it is the only name for it here — the `data` alias that used to
- * sit beside it is deliberately `Omit`ted from {@link RebaseClient} so the
- * privilege has to be spelled out at every call site. For user-scoped queries
- * inside a request handler use the request-scoped driver (`c.var.driver`)
- * instead — never `dataAsAdmin`.
+ * **Trust levels.** {@link dataAsAdmin} is the admin-scoped driver — scoped as
+ * `{ uid: "service", roles: ["admin"] }`, so policies are still evaluated
+ * against that identity rather than skipped — and it is the only name for it
+ * here: the `data` alias that used to sit beside it is deliberately `Omit`ted
+ * from {@link RebaseClient} so the privilege has to be spelled out at every
+ * call site. {@link sql} is the unconditional bypass: raw SQL on the owner
+ * connection, no policies. For user-scoped queries inside a request handler use
+ * the request-scoped driver (`c.var.driver`) instead — never `dataAsAdmin`.
  */
 export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>, "data"> {
     /**
-     * Admin-scoped, **RLS-bypassing** data accessor. Always present server-side.
-     * See {@link RebaseClient.dataAsAdmin} for the full safety contract.
+     * Admin-scoped data accessor (RLS is evaluated as the service identity, not
+     * skipped). Always present server-side. See {@link RebaseClient.dataAsAdmin}
+     * for the full safety contract.
      */
     dataAsAdmin: RebaseSdkData<DB>;
 

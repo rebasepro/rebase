@@ -7,6 +7,17 @@ import type { CronJobDefinition } from "@rebasepro/types";
  *
  * @see {@link defineFunction} for the equivalent custom-functions helper.
  *
+ * `ctx.rebase` is the `rebase` singleton itself — the same object a custom
+ * function is handed — so `rebase.dataAsAdmin` here is **admin-scoped, not an
+ * RLS bypass**: it is scoped once at boot as `SERVICE_IDENTITY`
+ * (`{ uid: "service", roles: ["admin"] }`), and your policies are evaluated
+ * against that identity, not skipped. See that constant's docblock. It clears
+ * the default policies through their `rolesOverlap(['admin'])` arm, which is why
+ * the distinction rarely shows; it shows against hand-written rules, where
+ * `policy.serverContext()` (`auth.uid() IS NULL`) is **false** for it. Use
+ * `rebase.sql()` when you need the genuine bypass — owner connection, no
+ * policies.
+ *
  * @example
  * ```ts
  * import { defineCron } from "@rebasepro/server";
@@ -15,8 +26,9 @@ import type { CronJobDefinition } from "@rebasepro/types";
  *     name: "Nightly cleanup",
  *     schedule: "0 3 * * *",
  *     async handler({ rebase, log }) {
- *         // `dataAsAdmin` bypasses RLS. A cron has no per-request user, so
- *         // there is no policy to fall back on — scope the filters yourself.
+ *         // `dataAsAdmin` runs as the service identity, with the `admin` role.
+ *         // A cron has no per-request user to narrow that, so scope the
+ *         // filters yourself — RLS will not do it for you here.
  *         const { data: expired } = await rebase.dataAsAdmin.sessions.find({
  *             where: { expired: ["==", true] },
  *         });

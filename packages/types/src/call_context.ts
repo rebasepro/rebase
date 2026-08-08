@@ -25,11 +25,13 @@ export type RebaseCallContext<USER extends User = User> = {
      * Use it to call backend functions, access storage, send email, etc.
      *
      * ⚠️ **Not the same trust level as {@link data}.** Server-side this is the
-     * app singleton, so `client.dataAsAdmin` is **always** the RLS-bypassing
-     * plane — while {@link data}, one property over, follows whoever triggered
-     * the callback. On a user request, reaching for `context.client.dataAsAdmin`
-     * silently escalates a user-scoped operation to admin. For queries in a
-     * callback use {@link data}; come here for functions, storage and email.
+     * app singleton, so `client.dataAsAdmin` is **always** the admin-scoped
+     * plane — scoped as `{ uid: "service", roles: ["admin"] }`, so policies are
+     * evaluated against that identity rather than skipped — while {@link data},
+     * one property over, follows whoever triggered the callback. On a user
+     * request, reaching for `context.client.dataAsAdmin` silently escalates a
+     * user-scoped operation to admin. For queries in a callback use
+     * {@link data}; come here for functions, storage and email.
      *
      * @example
      * // In a beforeSave callback:
@@ -53,14 +55,21 @@ export type RebaseCallContext<USER extends User = User> = {
      *   user-scoped. The callback runs on the RLS-bound transaction opened for
      *   that request, so policies apply to reads *and* writes — a callback
      *   cannot see a row its caller could not.
-     * - Triggered by **server-context work** (`rebase.dataAsAdmin`, a cron):
-     *   unscoped, on the owner connection, bypassing RLS.
+     * - Triggered by **`rebase.dataAsAdmin` or a cron** (the same singleton):
+     *   admin-scoped, not unscoped. That driver is scoped as
+     *   `{ uid: "service", roles: ["admin"] }`, so the callback still runs on an
+     *   RLS-bound transaction — policies are evaluated against that identity.
+     * - Triggered by **the base driver** (auth flows, migrations): unscoped, on
+     *   the owner connection, bypassing RLS.
      *
      * So a callback that reads a sibling row will find it when an admin task
      * saves and may find nothing when an end user saves — without an error,
      * because RLS filters rather than raises. Write callbacks that tolerate
      * that, or reach for {@link client}`.dataAsAdmin` deliberately when the
-     * callback genuinely has to see past its caller.
+     * callback genuinely has to see what an admin may see. Note what that does
+     * *not* buy you: `policy.serverContext()` (`auth.uid() IS NULL`) is false
+     * for the service identity, so a collection whose only rule is
+     * `serverContext()` stays closed to it.
      *
      * Verified end-to-end against Postgres rather than asserted — see
      * `"scopes context.data to the caller when a callback runs on a user
