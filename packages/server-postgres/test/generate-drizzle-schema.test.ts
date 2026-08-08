@@ -1181,6 +1181,28 @@ roles: ["admin", "user"] }
         expect(resultUnsorted).toContain("string_to_array(rebase.roles(), ',') && ARRAY['admin','manager','user']");
         expect(resultUnsorted).toContain('to: ["app_role", "service_role"]');
     });
+
+    // The writer sorts by slug before generating; `rebase doctor` regenerates
+    // from whatever order the loader's `readdirSync` returned and diffs the
+    // result against the file. While the sort lived only in the writer, a
+    // project whose filename order differed from its slug order was reported
+    // stale forever, and the fix it printed rewrote the file unchanged.
+    it("should generate the exact same schema regardless of the order of the collections", async () => {
+        const articles: CollectionConfig = {
+            slug: "articles",
+            table: "articles",
+            name: "Articles",
+            properties: { title: { type: "string" } }
+        };
+        const authors: CollectionConfig = {
+            slug: "authors",
+            table: "authors",
+            name: "Authors",
+            properties: { name: { type: "string" } }
+        };
+
+        expect(await generateSchema([authors, articles])).toEqual(await generateSchema([articles, authors]));
+    });
 });
 
 describe("generateDrizzleSchema ID Generation", () => {

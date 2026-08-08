@@ -5,62 +5,8 @@
  */
 import path from "path";
 import chalk from "chalk";
-import fs from "fs";
-import { runDoctor, loadCollections } from "./doctor";
-import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
-import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-enforcement";
-import { logger } from "@rebasepro/server";
-
-/**
- * The RLS half of the doctor: policies actually deployed vs the ones the
- * collections describe, plus policy roles this server could never satisfy.
- *
- * Returns true when something is wrong, so callers can set the exit code.
- */
-async function runPolicyChecks(collectionsPath: string, databaseUrl?: string): Promise<boolean> {
-    if (!databaseUrl) {
-        logger.warn(chalk.yellow("  ⚠ No DATABASE_URL — skipping RLS policy checks"));
-        return false;
-    }
-
-    let problems = false;
-    const { Pool } = await import("pg");
-    const pool = new Pool({ connectionString: databaseUrl });
-    try {
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        const runSql = async (text: string) => (await pool.query(text)).rows as Record<string, unknown>[];
-
-        // A policy naming a role the server never runs as filters every row, so
-        // the collection reads as empty. Report it without booting a server.
-        try {
-            await validatePolicyPgRoles(runSql, collections as never);
-            logger.info(chalk.green("  ✓ Policy roles are usable by this server"));
-        } catch (err) {
-            problems = true;
-            logger.info("");
-            logger.error(chalk.red(err instanceof Error ? err.message : String(err)));
-        }
-
-        // A rule that reads as a lockdown but is true for every caller compiles
-        // to a grant. Report it without booting a server.
-        warnOnAnonymousGrants(collections as never);
-
-        const drift = await checkPolicyDrift(pool as never, collections);
-        logger.info("");
-        if (hasDrift(drift)) {
-            problems = true;
-            logger.info(chalk.yellow("  RLS policies: database does not match your collections"));
-            logger.info(formatPolicyDrift(drift));
-        } else {
-            logger.info(chalk.green("  ✓ RLS policies match your collections"));
-        }
-    } catch (err) {
-        logger.warn(chalk.yellow("  ⚠ Could not check RLS policies"), { error: err });
-    } finally {
-        await pool.end();
-    }
-    return problems;
-}
+import { runDoctor } from "./doctor";
+import { exitCodeForPolicyGate, runPolicyChecks } from "./doctor-policy-checks";
 
 async function main() {
     const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
@@ -91,9 +37,9 @@ async function main() {
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
 
     if (policiesOnly) {
-        // Non-zero so this can gate CI — the whole point of the flag.
-        if (await runPolicyChecks(collectionsPath, databaseUrl)) process.exit(1);
-        return;
+        // Non-zero so this can gate CI — the whole point of the flag, and a
+        // check that could not run has not passed. See exitCodeForPolicyGate.
+        process.exit(exitCodeForPolicyGate(await runPolicyChecks(collectionsPath, databaseUrl)));
     }
 
     const report = await runDoctor({
@@ -103,15 +49,18 @@ async function main() {
         databaseUrl: databaseUrl ?? undefined
     });
 
-    const policiesDrifted = await runPolicyChecks(collectionsPath, databaseUrl);
+    const policyStatus = await runPolicyChecks(collectionsPath, databaseUrl);
 
-    // Exit with non-zero code if there are errors
-    if (report.summary.errors > 0 || policiesDrifted) {
+    // Exit non-zero if there are errors. A policy run that could not happen is
+    // reported loudly above but does not fail the interactive command — the
+    // same treatment the skipped database phase gets. `--policies` is the gate,
+    // and that one fails closed.
+    if (report.summary.errors > 0 || policyStatus === "problems") {
         process.exit(1);
     }
 }
 
 main().catch((err) => {
-    logger.error(chalk.red("  ✗ Doctor failed"), { error: err });
+    console.error(chalk.red("  ✗ Doctor failed"), err instanceof Error ? (err.stack ?? err.message) : String(err));
     process.exit(1);
 });
