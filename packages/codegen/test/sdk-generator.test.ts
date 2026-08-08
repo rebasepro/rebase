@@ -674,13 +674,12 @@ describe("Row, Insert and Update describe different things", () => {
             .toContain("subtitle?: string | null;");
     });
 
-    it("leaves excludeFromApi columns out of Row but keeps them writable", () => {
-        // `excludeFromApi` is a server-side guarantee that the column is
-        // stripped from every row the API serves — the scaffolded `users`
-        // collection uses it for the password hash.
+    it("leaves excludeFromApi columns out of every type", () => {
+        // One rule, both directions — see the dedicated suite below.
         const ts = generateTypedefs([postsCol, authorsCol]);
-        expect(block(ts, "Row")).not.toContain("secret");
-        expect(block(ts, "Insert")).toContain("secret?: string;");
+        for (const name of ["Row", "Insert", "Update"] as const) {
+            expect(block(ts, name)).not.toContain("secret");
+        }
     });
 
     it("does not let Update reassign the primary key", () => {
@@ -734,5 +733,150 @@ describe("Row, Insert and Update describe different things", () => {
         // numeric-keyed target while Row knew better.
         expect(block(generateTypedefs([postsCol, authorsCol]), "Insert"))
             .not.toContain("string | number");
+    });
+});
+
+/**
+ * `excludeFromApi` means one thing: the API surface does not mention the
+ * property, in either direction. `Insert` used to keep such columns writable —
+ * "stripped from responses, not from writes" — which left the generated types
+ * as the one place a secret was still named, and offered it to a client as
+ * something to send.
+ *
+ * The assertions below are over the *rule*, derived from the fixture, not over
+ * a list of names. Pinning `passwordHash` and `emailVerificationToken` is how
+ * this kept coming back: every sibling generator was fixed for those two names
+ * and stayed wrong for the rule.
+ */
+describe("excludeFromApi keeps a property off every generated type", () => {
+    const owners = {
+        slug: "owners",
+        properties: {
+            id: {
+                name: "ID",
+                type: "string",
+                isId: "uuid"
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    /** Excluded properties, one per shape the generator emits differently. */
+    const excludedProperties = {
+        credential: {
+            name: "Credential",
+            type: "string",
+            excludeFromApi: true
+        },
+        attempts: {
+            name: "Attempts",
+            type: "number",
+            validation: { required: true },
+            excludeFromApi: true
+        },
+        lockedOut: {
+            name: "Locked out",
+            type: "boolean",
+            excludeFromApi: true
+        },
+        rotatedAt: {
+            name: "Rotated at",
+            type: "date",
+            excludeFromApi: true
+        },
+        recoveryCodes: {
+            name: "Recovery codes",
+            type: "array",
+            of: { name: "Code", type: "string" },
+            excludeFromApi: true
+        },
+        internalNotes: {
+            name: "Internal notes",
+            type: "map",
+            properties: { note: { name: "Note", type: "string" } },
+            excludeFromApi: true
+        },
+        // Declared under one name, stored under another. The server strips a
+        // row by both, so a generated type may name neither — and the relation
+        // below claims exactly this column as its foreign key.
+        legacyOwner: {
+            name: "Legacy owner",
+            type: "string",
+            columnName: "owner_id",
+            excludeFromApi: true
+        },
+        // A relation can be excluded too; the included target is stripped by
+        // the property key, like any other column.
+        auditor: {
+            name: "Auditor",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => owners, localKey: "auditor_id" },
+            excludeFromApi: true
+        }
+    } as const;
+
+    const vault = {
+        slug: "vault",
+        properties: {
+            id: {
+                name: "ID",
+                type: "string",
+                isId: "uuid"
+            },
+            label: {
+                name: "Label",
+                type: "string",
+                validation: { required: true }
+            },
+            owner: {
+                name: "Owner",
+                type: "relation",
+                relation: { kind: "belongsTo", target: () => owners, localKey: "owner_id" }
+            },
+            ...excludedProperties
+        }
+    } as unknown as CollectionConfig;
+
+    /** Every name a property was declared or stored under. */
+    const forbidden = Object.entries(excludedProperties).flatMap(([key, prop]) => {
+        const columnName = (prop as { columnName?: string }).columnName;
+        return columnName ? [key, columnName] : [key];
+    });
+
+    /** The keys one emitted block declares, ignoring the types they carry. */
+    function emittedKeys(body: string): string[] {
+        return [...body.matchAll(/^ {6}"?([^"?:]+)"?\??:/gm)].map(m => m[1]);
+    }
+
+    function block(ts: string, name: "Row" | "Insert" | "Update"): string[] {
+        const start = ts.indexOf(`    ${name}: {`);
+        expect(start).toBeGreaterThan(-1);
+        return emittedKeys(ts.slice(start, ts.indexOf("    };", start)));
+    }
+
+    const generated = generateTypedefs([vault, owners]);
+
+    it.each(["Row", "Insert", "Update"] as const)("%s names none of them", name => {
+        const keys = block(generated, name);
+        // Guards against passing because nothing was generated at all.
+        expect(keys).toContain("label");
+        for (const forbiddenKey of forbidden) {
+            expect(keys).not.toContain(forbiddenKey);
+        }
+    });
+
+    it("keeps the unmarked siblings, including the relation and its foreign key", () => {
+        // `owner_id` is the excluded `legacyOwner`'s column, so the relation
+        // that stores its key there loses the scalar — but the relation itself
+        // is not excluded and is still readable and writable by name.
+        expect(block(generated, "Row")).toContain("owner");
+        expect(block(generated, "Insert")).toContain("owner");
+        expect(block(generated, "Update")).toContain("owner");
+    });
+
+    it("keeps a foreign key whose own column is not excluded", () => {
+        // The excluded `auditor` relation stores its key in `auditor_id`, a
+        // column nothing marked. The server serves it, so the type says so:
+        // excluding a relation is not a claim about a different column.
+        expect(block(generated, "Row")).toContain("auditor_id");
     });
 });

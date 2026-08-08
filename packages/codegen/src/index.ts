@@ -81,9 +81,14 @@ back.
 
 | Type | What it describes |
 |---|---|
-| \`Row\` | What a read serves. Nullable columns are \`T \\| null\`; relations appear only when \`include\` names them; \`excludeFromApi\` columns are absent. |
+| \`Row\` | What a read serves. Nullable columns are \`T \\| null\`; relations appear only when \`include\` names them. |
 | \`Insert\` | What \`create()\` accepts. Server-assigned ids are optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ author_id: 5 }\`). |
 | \`Update\` | What \`update()\` accepts. Everything optional, and the primary key is not settable. |
+
+A property marked \`excludeFromApi\` is absent from all three: the API surface
+does not mention it, in either direction. The server still accepts one on a
+write — these types describe the surface, they do not enforce it — but nothing
+generated names a password hash.
 
 If you need an untyped escape hatch, \`rebase.data.collection(slug)\` still works —
 but it is generic over \`Record<string, unknown>\` and gives up everything above.

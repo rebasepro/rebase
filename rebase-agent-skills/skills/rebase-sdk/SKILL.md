@@ -43,9 +43,13 @@ A single `database.types.ts` file containing:
 
 | Sub-type | Purpose | Primary key | Other fields |
 |----------|---------|-------------|--------------|
-| `Row` | Read type — what a query returns | Always present | Required ones present; the rest are `T \| null`. `excludeFromApi` columns are absent. |
+| `Row` | Read type — what a query returns | Always present | Required ones present; the rest are `T \| null` |
 | `Insert` | Create type — for new records | Optional when the server assigns it | Required fields stay required |
 | `Update` | Partial update type | Not settable | All optional |
+
+A property marked `excludeFromApi` is absent from all three — the API surface
+does not mention it, in either direction. The server still accepts one on a
+write; the generated types simply never name it.
 
 **Field names are the API's, unchanged.** A `created_at` column is
 `row.created_at`; a relation's foreign key is `author_id`. Only the collection

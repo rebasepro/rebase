@@ -218,12 +218,19 @@ export interface BaseProperty<CustomProps = unknown> {
     validation?: PropertyValidationSchema;
 
     /**
-     * Never include this column in an API response.
+     * Never mention this column on the API surface, in either direction.
      *
      * For secrets the server must store and read but no client should ever
      * receive — password hashes, verification tokens. The value is still
      * written and queryable server-side; it is stripped from every row the API
-     * serves, for every caller, including admins and service keys.
+     * serves, for every caller, including admins and service keys, and it is
+     * absent from every generated description of the surface: the SDK's `Row`,
+     * `Insert` and `Update` types, and the OpenAPI schemas, filters and
+     * parameters.
+     *
+     * The generated types are a *description*, not a second enforcement point:
+     * the server still accepts such a field on a write, because that is how the
+     * value gets written in the first place. Nothing generated offers it.
      *
      * This is a server-side guarantee, unlike `admin.hideFromCollection`, which
      * only stops the admin panel from *rendering* a field and leaves it in the

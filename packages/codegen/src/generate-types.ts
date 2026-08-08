@@ -240,6 +240,32 @@ function line(key: string, type: string, optional: boolean): string {
     return `      ${emitKey(key)}${optional ? "?" : ""}: ${type};`;
 }
 
+/**
+ * The keys `excludeFromApi` takes off the API surface — in *both* directions.
+ *
+ * `excludeFromApi` means one thing: the API surface does not mention this
+ * property. `Row` already honoured that; `Insert` and `Update` deliberately did
+ * not, on the reading that the column is stripped from responses rather than
+ * from writes. That left the generated types as the one place a password hash
+ * was still named, and it invited a client to send one. The server still
+ * *accepts* such a field on a write — this describes the surface, it does not
+ * add an enforcement point — but nothing generated advertises it.
+ *
+ * Keyed by the property name *and* by its column name, the same pair the
+ * server's `stripExcluded` deletes, so a foreign key or a relation addressed
+ * under the column name cannot put the property back.
+ */
+function excludedApiKeys(properties: Properties): Set<string> {
+    const excluded = new Set<string>();
+    for (const [key, rawProp] of Object.entries(properties)) {
+        const prop = rawProp as Property;
+        if (!prop?.excludeFromApi) continue;
+        excluded.add(key);
+        if (prop.columnName) excluded.add(prop.columnName);
+    }
+    return excluded;
+}
+
 export function generateTypedefs(collections: CollectionConfig[]): string {
     const accessors = buildAccessors(collections);
     const lines: string[] = [
@@ -303,16 +329,18 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
         lines.push("    Row: {");
         const emittedKeys = new Set<string>();
 
+        // Off the surface entirely — see `excludedApiKeys`. Seeding the emitted
+        // set means every later pass (foreign keys, relations, unresolved
+        // relations) skips them too, since each of those already refuses to
+        // emit a key twice.
+        const excluded = excludedApiKeys(properties);
+        for (const key of excluded) emittedKeys.add(key);
+
         // 1. Direct properties
         for (const [key, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (prop.type === "relation") continue;
-
-            // `excludeFromApi` is a server-side guarantee that the column is
-            // stripped from every row the API serves, for every caller. Typing
-            // it as readable is a lie the scaffolded `users` collection makes
-            // about its own password hash.
-            if (prop.excludeFromApi) continue;
+            if (excluded.has(key)) continue;
 
             const tsType = propertyToTypeScriptType(prop);
             // A primary key is on every row a read can return, whether or not
@@ -378,14 +406,17 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
 
         // ── Insert Type ──
         //
-        // What `create()` accepts. `excludeFromApi` columns are included: they
-        // are stripped from *responses*, not from writes.
+        // What `create()` accepts, minus the `excludeFromApi` columns: the
+        // property is off the API surface in both directions, so a generated
+        // client never names it.
         lines.push("    Insert: {");
         emittedKeys.clear();
+        for (const key of excluded) emittedKeys.add(key);
 
         for (const [key, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (prop.type === "relation") continue;
+            if (excluded.has(key)) continue;
             const tsType = propertyToTypeScriptType(prop);
             const isOptional = !prop.validation?.required || isAutoAssignedId(prop);
             lines.push(line(key, tsType, isOptional));
@@ -402,10 +433,12 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
         // typechecked `update(id, { id: someoneElses })`.
         lines.push("    Update: {");
         emittedKeys.clear();
+        for (const key of excluded) emittedKeys.add(key);
         for (const [key, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (prop.type === "relation") continue;
             if (isPrimaryKey(prop)) continue;
+            if (excluded.has(key)) continue;
             lines.push(line(key, propertyToTypeScriptType(prop), true));
             emittedKeys.add(key);
         }
