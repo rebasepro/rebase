@@ -94,8 +94,6 @@
   "packages/cli/src/commands/cloud/env.ts::projectRef": 3,
   "packages/cli/src/commands/cloud/extensions.ts::projectRef": 2,
   "packages/cli/templates/template/scripts/example.ts::rebase": 1,
-  "packages/client-postgres/src/usePostgresClientDriver.ts::onError": 1,
-  "packages/client-postgres/src/usePostgresClientDriver.ts::onUpdate": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::appCheckVerified": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::defaultUserManagement": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::error": 1,
