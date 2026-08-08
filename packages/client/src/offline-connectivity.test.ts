@@ -1,4 +1,9 @@
-import { ConnectivityMonitor, isNetworkError, isRetryableError } from "./offline-connectivity";
+import {
+    ConnectivityMonitor,
+    isDuplicateKeyError,
+    isNetworkError,
+    isRetryableError
+} from "./offline-connectivity";
 import { RebaseApiError } from "./transport";
 
 /**
@@ -34,6 +39,35 @@ describe("network error classification", () => {
         // A 500 is far more often a bug the same payload will hit again than a
         // blip, and retrying it forever jams every write queued behind it.
         expect(isRetryableError(new RebaseApiError("boom", { status: 500 }))).toBe(false);
+    });
+
+    it("retries a write the server is still answering, and only that 409", () => {
+        // The server's own message says to retry — "its result will be
+        // replayed" — and a key whose claim outlived the process that took it
+        // is refused until the lease expires. Giving up instead rolls back a
+        // write that retrying would have completed.
+        expect(isRetryableError(new RebaseApiError("in progress", {
+            status: 409, code: "IDEMPOTENCY_KEY_IN_PROGRESS"
+        }))).toBe(true);
+        // Every other 409 is a real conflict and stays fatal.
+        expect(isRetryableError(new RebaseApiError("row exists", { status: 409, code: "23505" }))).toBe(false);
+        expect(isRetryableError(new RebaseApiError("conflict", { status: 409 }))).toBe(false);
+        expect(isRetryableError(new RebaseApiError("reused", {
+            status: 422, code: "IDEMPOTENCY_KEY_REUSED"
+        }))).toBe(false);
+    });
+
+    it("does not read an unanswered write as a row that is already there", () => {
+        // The status alone cannot decide it. Read as a duplicate, the queue
+        // went looking for a row that was never written, found nothing,
+        // concluded there was nothing left to do and deleted the write.
+        expect(isDuplicateKeyError(new RebaseApiError("in progress", {
+            status: 409, code: "IDEMPOTENCY_KEY_IN_PROGRESS"
+        }))).toBe(false);
+
+        expect(isDuplicateKeyError(new RebaseApiError("dup", { status: 400, code: "23505" }))).toBe(true);
+        expect(isDuplicateKeyError(new RebaseApiError("conflict", { status: 409 }))).toBe(true);
+        expect(isDuplicateKeyError(new RebaseApiError("gone", { status: 404 }))).toBe(false);
     });
 });
 

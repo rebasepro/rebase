@@ -38,11 +38,37 @@ export function isNetworkError(error: unknown): boolean {
  */
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 502, 503, 504]);
 
+/**
+ * The server holds this key for a request it has not answered yet.
+ *
+ * It is a 409 like a duplicate row is a 409, and nothing but the code separates
+ * them — one means "your write is already there", the other means "your write
+ * may not have happened at all, ask again".
+ */
+const IDEMPOTENCY_IN_PROGRESS = "IDEMPOTENCY_KEY_IN_PROGRESS";
+
+/**
+ * Is the server still answering an earlier attempt of this same write?
+ *
+ * The only correct response is to ask again — which is exactly what the
+ * server's own message says, and exactly what this SDK used not to do.
+ */
+export function isIdempotencyInProgressError(error: unknown): boolean {
+    return error instanceof RebaseApiError
+        && error.status === 409
+        && error.code === IDEMPOTENCY_IN_PROGRESS;
+}
+
 /** Is this failure worth another attempt later? */
 export function isRetryableError(error: unknown): boolean {
     if (isNetworkError(error)) return true;
-    if (error instanceof RebaseApiError) return error.status !== undefined && RETRYABLE_STATUSES.has(error.status);
-    return false;
+    if (!(error instanceof RebaseApiError)) return false;
+    // The one 409 that resolves on its own. A key whose claim outlived the
+    // request that took it — the process was killed between the write and the
+    // answer — is refused until the claim's lease expires, and giving up on it
+    // means dropping a write that retrying would have completed.
+    if (isIdempotencyInProgressError(error)) return true;
+    return error.status !== undefined && RETRYABLE_STATUSES.has(error.status);
 }
 
 /**
@@ -55,10 +81,16 @@ export function isRetryableError(error: unknown): boolean {
  * The queue uses this to recognise its own earlier attempt. A create whose
  * response was lost is replayed, and for a row carrying an id the SDK generated
  * the server can only be rejecting it because the first attempt actually landed.
+ *
+ * Which is why the status alone cannot decide it: `IDEMPOTENCY_KEY_IN_PROGRESS`
+ * is a 409 that means the opposite — the row may not exist at all. Read as a
+ * duplicate, the queue looked for a row that was never written, found nothing,
+ * concluded there was nothing left to do and deleted the write from the queue.
  */
 export function isDuplicateKeyError(error: unknown): boolean {
     if (!(error instanceof RebaseApiError)) return false;
-    return error.code === "23505" || error.status === 409;
+    if (error.code === "23505") return true;
+    return error.status === 409 && !isIdempotencyInProgressError(error);
 }
 
 export interface ConnectivityOptions {

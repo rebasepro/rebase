@@ -541,9 +541,20 @@ export interface WriteOptions {
      * it performs it again. On a table with a server-assigned id that is a
      * duplicate row, because the id the client chose was never used.
      *
+     * A key names **one** request, not a job. It records the method, the path
+     * and the body it was claimed for, so re-sending that exact request replays
+     * its answer, while the same key on a different one is refused with
+     * `IDEMPOTENCY_KEY_REUSED` (422) rather than silently answered with the
+     * first request's result. Pass a fresh key — a uuid — per call; a reusable
+     * business id shared by the create and the delete of one import means the
+     * second of them never runs.
+     *
      * Set by the offline queue on every replay. Honoured for 24 hours and scoped
-     * to the authenticated user; a server that cannot store keys ignores it
-     * rather than refusing the write.
+     * to the authenticated user — an unauthenticated caller has no principal to
+     * scope it to, so the key is ignored there. A retry sent while the first
+     * attempt is still being answered gets `IDEMPOTENCY_KEY_IN_PROGRESS` (409)
+     * and should be sent again. A server that cannot store keys ignores the
+     * header rather than refusing the write.
      */
     idempotencyKey?: string;
 }

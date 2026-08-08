@@ -14,7 +14,7 @@ type Row = Record<string, unknown>;
  * online/offline decision logic rather than a mock of it.
  */
 function createFakeServer() {
-    const state = { online: true };
+    const state: { online: boolean; rejectNextCreate?: Error; rejectEveryCreate?: Error } = { online: true };
     const tables = new Map<string, Map<string, Row>>();
     const log: { collection: string; op: string; id?: unknown; ids?: unknown[]; upsert?: boolean }[] = [];
 
@@ -41,6 +41,13 @@ function createFakeServer() {
             },
             async create(data: Partial<Row>, id?: string | number) {
                 assertOnline();
+                // Lets a test answer the first replay the way a server does
+                // when it is still holding this write's idempotency key.
+                const injected = state.rejectNextCreate ?? state.rejectEveryCreate;
+                if (injected) {
+                    state.rejectNextCreate = undefined;
+                    throw injected;
+                }
                 const rowId = id ?? data.id ?? `srv-${table(slug).size + 1}`;
                 log.push({ collection: slug, op: "create", id: rowId });
                 const row = { ...data, id: rowId };
@@ -309,6 +316,64 @@ describe("OfflineManager", () => {
             expect(onSyncError).toHaveBeenCalledTimes(1);
             expect(onSyncError.mock.calls[0][1]).toMatchObject({ type: "update", id: "does-not-exist" });
             expect(server.table("posts").get("p9")).toMatchObject({ title: "kept" });
+        });
+
+        it("keeps a write the server is still answering, and lands it on the next flush", async () => {
+            // `IDEMPOTENCY_KEY_IN_PROGRESS` means the server holds this write's
+            // key and has not answered yet — the row may not exist at all. Read
+            // as any other 409 it looked like "your row is already there": the
+            // queue looked the row up, found nothing, decided there was nothing
+            // left to do and deleted the write. The record survived only in the
+            // local store and disappeared at the next reconciliation, silently.
+            const server = createFakeServer();
+            const onSyncError = jest.fn<(error: Error, mutation: PendingMutation) => void>();
+            const { manager, wrap } = createManager(server, { onSyncError });
+
+            server.state.online = false;
+            await wrap("posts").create({ title: "queued" });
+
+            server.state.online = true;
+            server.state.rejectNextCreate = new RebaseApiError("still in progress", {
+                status: 409,
+                code: "IDEMPOTENCY_KEY_IN_PROGRESS"
+            });
+
+            const refused = await manager.sync();
+            expect(refused).toEqual({ flushed: 0, remaining: 1 });
+            expect(onSyncError).not.toHaveBeenCalled();
+            expect(server.table("posts").size).toBe(0);
+
+            // The claim expired (or its request finally answered): the same
+            // queued write goes through untouched.
+            const settled = await manager.sync();
+            expect(settled).toEqual({ flushed: 1, remaining: 0 });
+            expect([...server.table("posts").values()]).toMatchObject([{ title: "queued" }]);
+        });
+
+        it("outlasts the claim's lease rather than giving up on the default retry budget", async () => {
+            // Retries double from a second, so the five a busy server gets are
+            // spent inside half a minute — less than the lease the server gives
+            // a claim whose process died. Spending them here would roll back
+            // the write a few seconds before the key became free again.
+            const server = createFakeServer();
+            const onSyncError = jest.fn<(error: Error, mutation: PendingMutation) => void>();
+            const { manager, wrap } = createManager(server, { onSyncError });
+
+            server.state.online = false;
+            await wrap("posts").create({ title: "queued" });
+
+            server.state.online = true;
+            server.state.rejectEveryCreate = new RebaseApiError("still in progress", {
+                status: 409,
+                code: "IDEMPOTENCY_KEY_IN_PROGRESS"
+            });
+            for (let attempt = 0; attempt < 8; attempt++) await manager.sync();
+
+            expect(onSyncError).not.toHaveBeenCalled();
+            expect(await manager.api.pending()).toHaveLength(1);
+
+            server.state.rejectEveryCreate = undefined;
+            expect(await manager.sync()).toEqual({ flushed: 1, remaining: 0 });
         });
 
         it("notifies queue-size listeners as writes queue and drain", async () => {

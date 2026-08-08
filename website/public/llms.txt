@@ -10094,10 +10094,23 @@ so it retries — and without a key the server cannot tell that retry from a
 second genuine batch. Pass an idempotency key on anything that may be resent:
 
 ```typescript
-await client.data.products.createMany(rows, { idempotencyKey: importId });
+const attemptKey = crypto.randomUUID();
+await client.data.products.createMany(rows, { idempotencyKey: attemptKey });
 ```
 
-The offline queue sets one automatically on every replay.
+A key names one request, not a job: it is recorded against the method, the path
+and the body it was sent with. Re-sending that exact request replays its answer;
+the same key on a different request is refused with `IDEMPOTENCY_KEY_REUSED`
+(422). So mint one per call rather than reusing a business id — an `importId`
+shared by the `createMany` and the `deleteMany` of one import would leave the
+delete silently unperformed.
+
+A retry that arrives while the first attempt is still being answered gets
+`IDEMPOTENCY_KEY_IN_PROGRESS` (409): send it again, and it will be answered with
+the first attempt's result once that lands. Keys are honoured for 24 hours, and
+only for a signed-in caller — there is no principal to scope one to otherwise.
+
+The offline queue sets a key automatically on every replay.
 
 #### Limits
 

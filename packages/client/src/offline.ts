@@ -4,7 +4,13 @@ import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
-import { ConnectivityMonitor, isDuplicateKeyError, isNetworkError, isRetryableError } from "./offline-connectivity";
+import {
+    ConnectivityMonitor,
+    isDuplicateKeyError,
+    isIdempotencyInProgressError,
+    isNetworkError,
+    isRetryableError
+} from "./offline-connectivity";
 import {
     IndexedDBOfflineStore,
     MemoryOfflineStore,
@@ -217,6 +223,18 @@ interface Observer {
 // made this whole file test as binary, so every `grep` over the repo skipped
 // all 1,700 lines of it in silence.
 const MISSING = "\u0000missing";
+
+/**
+ * Replays to spend on a mutation whose idempotency key the server is still
+ * holding, when the app has not asked for more.
+ *
+ * Retries double from a second and cap at the sync interval, so the default
+ * budget of five covers about half a minute — less than the lease a server
+ * gives a claim nobody came back for. This many outlast it with room for a slow
+ * batch, and the count is what stops a server that never releases the key from
+ * blocking the queue behind it indefinitely.
+ */
+const IN_PROGRESS_MIN_RETRIES = 12;
 
 export class OfflineManager {
     private readonly store: OfflineStore;
@@ -1479,7 +1497,18 @@ data: u.data as AnyRow })),
                         }
                         op.attempts = (op.attempts ?? 0) + 1;
                         op.lastError = (error as Error)?.message ?? String(error);
-                        if (isRetryableError(error) && op.attempts < this.maxRetries) {
+                        // A key the server is still holding gets a longer
+                        // budget than a busy server does. The claim outlives
+                        // the request that took it — the process was killed
+                        // between the write and its answer — so it is refused
+                        // until the claim's lease runs out, which is longer
+                        // than the default five retries reach. Giving up on
+                        // that schedule rolls back precisely the write the key
+                        // exists to save.
+                        const limit = isIdempotencyInProgressError(error)
+                            ? Math.max(this.maxRetries, IN_PROGRESS_MIN_RETRIES)
+                            : this.maxRetries;
+                        if (isRetryableError(error) && op.attempts < limit) {
                             // The server is busy, not unhappy. Keep the op — and
                             // its place in line, since later writes may depend on
                             // it — and come back after a backoff.
