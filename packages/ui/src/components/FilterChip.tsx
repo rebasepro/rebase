@@ -61,11 +61,21 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
                 "transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                 sizeClasses[size],
+                !disabled && "cursor-pointer",
+                // Hover is one step along the same ramp the chip already sits
+                // on, the way every other hoverable surface here moves. It used
+                // to be `hover:bg-primary/5` for the inactive chip, which
+                // *replaces* the resting fill with a tint fainter than it — so
+                // pointing at a chip made its background vanish. The active chip
+                // had no hover state at all.
                 active
-                    ? "bg-primary/12 text-primary dark:bg-primary/20 dark:text-primary shadow-[inset_0_0_0_1.5px_var(--color-primary)]"
+                    ? cls(
+                        "bg-primary/12 text-primary dark:bg-primary/20 dark:text-primary shadow-[inset_0_0_0_1.5px_var(--color-primary)]",
+                        !disabled && "hover:bg-primary/20 dark:hover:bg-primary/30"
+                    )
                     : cls(
                         "bg-surface-accent-100 text-text-secondary dark:bg-surface-accent-800 dark:text-text-secondary-dark",
-                        !disabled && "cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/5"
+                        !disabled && "hover:bg-surface-accent-200 dark:hover:bg-surface-accent-700"
                     ),
                 disabled && "opacity-50 cursor-not-allowed",
                 className
