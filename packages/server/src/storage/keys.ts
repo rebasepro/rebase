@@ -1,5 +1,5 @@
 /**
- * Canonical storage keys.
+ * Canonical storage keys and bucket names.
  *
  * Storage is not under RLS, so a `storageAuthorize` hook is the whole access
  * control model — and a hook can only be correct if the key it is shown is the
@@ -110,4 +110,65 @@ export function tryCanonicalStorageKey(rawKey: string): string | null {
     } catch {
         return null;
     }
+}
+
+/**
+ * Longest bucket name accepted. 63 is the S3/GCS limit, and a local bucket is
+ * one directory name, so the tighter of the two bounds everything.
+ */
+export const MAX_STORAGE_BUCKET_LENGTH = 63;
+
+/** A bucket name that does not name a bucket. See {@link canonicalStorageBucket}. */
+export class InvalidStorageBucketError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "InvalidStorageBucketError";
+    }
+}
+
+/**
+ * One path segment: letters, digits, `.`, `_`, `-`, first character
+ * alphanumeric. Deliberately narrow — it is the intersection of what S3, GCS
+ * and a filesystem directory all accept, and it makes `..`, `.tus-uploads`,
+ * absolute paths and anything containing a separator unrepresentable.
+ */
+const STORAGE_BUCKET_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Canonicalize a caller-supplied bucket name, or throw
+ * {@link InvalidStorageBucketError}.
+ *
+ * The bucket is the *other* caller-controlled routing value in an upload
+ * request, and it was the one nobody validated. `LocalStorageController`
+ * builds `join(basePath, bucket)` and then checks containment against that
+ * result, so a bucket of `../../etc` moved the boundary rather than crossing
+ * it — the guard passed because the guard's reference point was the attacker's.
+ * The containment check now resolves against the storage root, and this is the
+ * check at the route boundary that stops the value before it gets there.
+ *
+ * A bucket is configuration, not user data: there is no legitimate caller that
+ * needs a separator, a leading dot, or a `..` in one. So this refuses rather
+ * than repairs, exactly as {@link canonicalStorageKey} does — a rewritten
+ * bucket would silently store the object somewhere the caller did not ask for.
+ *
+ * Returns `undefined` when the caller named no bucket (absent, or an empty
+ * form field), which is how every controller spells "use my default". An empty
+ * string used to reach `getFullPath` and resolve to the storage *root* rather
+ * than the `default` bucket, which is a third place a bare key did not
+ * round-trip.
+ */
+export function canonicalStorageBucket(rawBucket: string | undefined | null): string | undefined {
+    if (rawBucket === undefined || rawBucket === null || rawBucket === "") return undefined;
+    if (rawBucket.length > MAX_STORAGE_BUCKET_LENGTH) {
+        throw new InvalidStorageBucketError(
+            `Storage bucket exceeds the maximum length of ${MAX_STORAGE_BUCKET_LENGTH} characters.`
+        );
+    }
+    if (!STORAGE_BUCKET_PATTERN.test(rawBucket)) {
+        throw new InvalidStorageBucketError(
+            "Storage bucket must be a single name of letters, digits, '.', '_' or '-', " +
+            "starting with a letter or digit."
+        );
+    }
+    return rawBucket;
 }

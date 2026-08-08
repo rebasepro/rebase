@@ -18,12 +18,103 @@ import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTo
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
+import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
-import { canonicalStorageKey, InvalidStorageKeyError } from "./keys";
+import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
 
 /** Shared image transform cache (LRU, 500 entries, 1 hour TTL). */
 const transformCache = new TransformCache();
+
+/**
+ * Transforms currently being computed, keyed the same way the cache is.
+ *
+ * Without it, N concurrent requests for one uncached variant run N full
+ * decode+encode pipelines — the cache only helps the requests that arrive
+ * after the first one has finished. Joining the in-flight promise makes a
+ * thundering herd cost one decode.
+ */
+const transformsInFlight = new Map<string, Promise<{ data: Buffer; contentType: string }>>();
+
+/**
+ * Compute a transform, or join the one already running for this key.
+ *
+ * `loadSource` is only called on a real miss, so the concurrent requests that
+ * join an in-flight transform do not each read the source object either.
+ */
+async function transformOnce(
+    cacheKey: string,
+    options: ImageTransformOptions,
+    loadSource: () => Promise<Buffer>
+): Promise<{ data: Buffer; contentType: string }> {
+    const cached = transformCache.get(cacheKey);
+    if (cached) return cached;
+
+    const running = transformsInFlight.get(cacheKey);
+    if (running) return running;
+
+    const pending = (async () => {
+        try {
+            const result = await transformImage(await loadSource(), options);
+            transformCache.set(cacheKey, result.data, result.contentType);
+            return result;
+        } catch (err) {
+            // A refusal from the transform queue is a load signal, not a bad
+            // request: the caller should retry, and an operator should see the
+            // status that says so. Mapped inside the shared promise so the
+            // requests that joined it get the same answer.
+            if (err instanceof TransformOverloadedError) {
+                throw ApiError.serviceUnavailable(err.message, "TRANSFORM_OVERLOADED");
+            }
+            throw err;
+        }
+    })();
+    transformsInFlight.set(cacheKey, pending);
+    try {
+        return await pending;
+    } finally {
+        transformsInFlight.delete(cacheKey);
+    }
+}
+
+/**
+ * Content types served inline. Everything else is handed back as
+ * `application/octet-stream` with `Content-Disposition: attachment`.
+ *
+ * The stored content type is the *uploader's claim* — `putObject` writes
+ * `file.type` from the multipart part, and TUS takes it from a request header;
+ * nothing sniffs the bytes. Echoing that claim back as the response type turns
+ * `/api/storage/file/*` into an HTML hosting endpoint on the API origin, and
+ * where `cookieAuth` is enabled the refresh cookie is `Path=/` on exactly that
+ * origin — so an uploaded page can fetch `/api/auth/refresh` same-origin and
+ * read out a fresh access token, `HttpOnly` notwithstanding.
+ *
+ * `image/svg+xml` is deliberately absent: an SVG is a document that can carry
+ * script. `text/html` and `application/xhtml+xml` are absent for the same
+ * reason, and are what the attack actually uses.
+ */
+const INLINE_CONTENT_TYPE_PREFIXES = ["image/", "video/", "audio/"];
+const INLINE_CONTENT_TYPES = new Set(["application/pdf", "text/plain"]);
+
+/**
+ * Decide what to actually serve for a stored content type.
+ *
+ * Returns the type to send and whether to force a download. The check is an
+ * allowlist rather than a blocklist of dangerous types: the set of types a
+ * browser will execute grows, and the set we want to render inline does not.
+ */
+export function resolveServedContentType(storedContentType: string): { contentType: string; attachment: boolean } {
+    // Parameters (`; charset=utf-8`) are not part of the decision, and a
+    // trailing parameter must not be a way to slip past the prefix match.
+    const base = storedContentType.split(";")[0].trim().toLowerCase();
+
+    const inline = base.includes("svg")
+        ? false
+        : INLINE_CONTENT_TYPES.has(base) || INLINE_CONTENT_TYPE_PREFIXES.some((p) => base.startsWith(p));
+
+    return inline
+        ? { contentType: storedContentType, attachment: false }
+        : { contentType: "application/octet-stream", attachment: true };
+}
 
 export interface StorageRoutesConfig {
     /**
@@ -116,6 +207,43 @@ function canonicalKeyOrBadRequest(key: string): string {
             400,
             "INVALID_STORAGE_KEY",
             err instanceof InvalidStorageKeyError ? err.message : "Invalid storage key"
+        );
+    }
+}
+
+/**
+ * Canonicalize a caller-supplied bucket name, answering 400 when it is not one.
+ *
+ * The bucket's counterpart to {@link canonicalKeyOrBadRequest}, and it exists
+ * for the same reason: the value routes a write, so it has to be checked where
+ * it enters rather than where it is used. Applied at every entry point a bucket
+ * has — this route's multipart body, the `?bucket=` query, and the TUS
+ * `Upload-Metadata` header.
+ */
+function canonicalBucketOrBadRequest(bucket: string | undefined | null): string | undefined {
+    try {
+        return canonicalStorageBucket(bucket);
+    } catch (err) {
+        throw new ApiError(
+            400,
+            "INVALID_STORAGE_BUCKET",
+            err instanceof InvalidStorageBucketError ? err.message : "Invalid storage bucket"
+        );
+    }
+}
+
+/**
+ * Parse image transform query parameters, answering 400 when they are out of
+ * bounds rather than clamping them to something the caller did not ask for.
+ */
+function transformOptionsOrBadRequest(query: Record<string, string>): ImageTransformOptions | null {
+    try {
+        return parseTransformOptions(query);
+    } catch (err) {
+        throw new ApiError(
+            400,
+            "INVALID_TRANSFORM_OPTIONS",
+            err instanceof InvalidTransformOptionsError ? err.message : "Invalid image transform options"
         );
     }
 }
@@ -275,8 +403,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      *
      * A key that cannot be canonicalized (a real `..` segment, a null byte) is
      * a 400, not a repaired key. The `LocalStorageController` traversal guard
-     * (`getFullPath`) is still the load-bearing defence for the *bucket*
-     * boundary; this is what defends the boundary the hook drew inside it.
+     * (`getFullPath`) is the load-bearing defence for the *storage root*, and
+     * `canonicalStorageBucket` for the bucket the caller names; this is what
+     * defends the boundary the hook drew inside them.
      */
     const parseBucketAndPath = (filePath: string): { bucket: string; resolvedPath: string } => {
         const parts = filePath.split("/");
@@ -310,7 +439,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         const key = typeof body["key"] === "string" ? body["key"] : "";
-        const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
+        const bucket = canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined);
         const storageId = typeof body["storageId"] === "string" ? body["storageId"] : c.req.query("storageId");
 
         const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
@@ -357,18 +486,26 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
 
-        {
-            const { bucket, resolvedPath } = parseBucketAndPath(filePath);
-            await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
-        }
+        const { bucket, resolvedPath } = parseBucketAndPath(filePath);
+        await checkAuthorized(c, "read", resolvedPath, bucket, storageId);
+
+        // The stored content type is the uploader's claim; never sniff past
+        // what we decide to send. Set unconditionally, including on the
+        // transform responses below.
+        c.header("X-Content-Type-Options", "nosniff");
+
+        // The cache key names the object, not the URL that reached it: the raw
+        // wildcard admits several spellings of one object (`x.png`,
+        // `default/x.png`), and it omitted the storage source entirely — two
+        // sources holding the same key shared one entry.
+        const transformKeyPrefix = `${storageId || "(default)"}/${bucket}/${resolvedPath}`;
 
         // Parse image transform query params (e.g. ?width=300&format=webp)
-        const transformOpts = parseTransformOptions(c.req.query() as Record<string, string>);
+        const transformOpts = transformOptionsOrBadRequest(c.req.query() as Record<string, string>);
 
         // For local storage, serve the file directly from disk
         if (resolved.getType() === "local") {
             const localController = resolved as LocalStorageController;
-            const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
             const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
 
@@ -390,22 +527,23 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // Ignore metadata errors (file may not exist)
             }
 
-            const fileContent = await fsp.readFile(absolutePath);
-
             // Apply image transforms if requested and the file is a transformable image
             if (transformOpts && isTransformableImage(contentType)) {
-                const cacheKey = transformCache.buildKey(filePath, transformOpts);
-                let cached = transformCache.get(cacheKey);
-                if (!cached) {
-                    cached = await transformImage(Buffer.from(fileContent), transformOpts);
-                    transformCache.set(cacheKey, cached.data, cached.contentType);
-                }
-                c.header("Content-Type", cached.contentType);
+                const cacheKey = transformCache.buildKey(transformKeyPrefix, transformOpts);
+                const transformed = await transformOnce(
+                    cacheKey,
+                    transformOpts,
+                    async () => Buffer.from(await fsp.readFile(absolutePath))
+                );
+                c.header("Content-Type", transformed.contentType);
                 c.header("Cache-Control", "public, max-age=31536000, immutable");
-                return c.body(new Uint8Array(cached.data));
+                return c.body(new Uint8Array(transformed.data));
             }
 
-            c.header("Content-Type", contentType);
+            const fileContent = await fsp.readFile(absolutePath);
+            const served = resolveServedContentType(contentType);
+            c.header("Content-Type", served.contentType);
+            if (served.attachment) c.header("Content-Disposition", "attachment");
             return c.body(new Uint8Array(fileContent));
         }
 
@@ -413,8 +551,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // We avoid redirecting to signed URLs because:
         //  1. Mixed-content (HTTPS page → HTTP MinIO) is blocked by browsers
         //  2. Internal IPs / VPC endpoints are unreachable from the browser
-        const { bucket: parsedBucket, resolvedPath: parsedPath } = parseBucketAndPath(filePath);
-        const fileObject = await resolved.getObject(parsedPath, parsedBucket);
+        const fileObject = await resolved.getObject(resolvedPath, bucket);
         if (!fileObject) {
             throw ApiError.notFound("File not found");
         }
@@ -423,19 +560,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         // Apply image transforms for remote storage too
         if (transformOpts && isTransformableImage(remoteContentType)) {
-            const cacheKey = transformCache.buildKey(filePath, transformOpts);
-            let cached = transformCache.get(cacheKey);
-            if (!cached) {
-                const buf = Buffer.from(await fileObject.arrayBuffer());
-                cached = await transformImage(buf, transformOpts);
-                transformCache.set(cacheKey, cached.data, cached.contentType);
-            }
-            c.header("Content-Type", cached.contentType);
+            const cacheKey = transformCache.buildKey(transformKeyPrefix, transformOpts);
+            const transformed = await transformOnce(
+                cacheKey,
+                transformOpts,
+                async () => Buffer.from(await fileObject.arrayBuffer())
+            );
+            c.header("Content-Type", transformed.contentType);
             c.header("Cache-Control", "public, max-age=31536000, immutable");
-            return c.body(new Uint8Array(cached.data));
+            return c.body(new Uint8Array(transformed.data));
         }
 
-        c.header("Content-Type", remoteContentType);
+        const servedRemote = resolveServedContentType(remoteContentType);
+        c.header("Content-Type", servedRemote.contentType);
+        if (servedRemote.attachment) c.header("Content-Disposition", "attachment");
         c.header("Cache-Control", "public, max-age=3600, immutable");
         const buf = await fileObject.arrayBuffer();
         return c.body(new Uint8Array(buf));
@@ -523,7 +661,10 @@ message: "No file to delete" });
         // where a prefix that means something other than what it says hands
         // back exactly the keys the hook meant to withhold.
         const storagePrefix = canonicalKeyOrBadRequest(c.req.query("prefix") || c.req.query("path") || "");
-        const bucket = c.req.query("bucket");
+        // A listing is the read half of the same unvalidated parameter:
+        // `?bucket=../../..` enumerated arbitrary directories on the pod,
+        // including the TUS temp directory next to the buckets.
+        const bucket = canonicalBucketOrBadRequest(c.req.query("bucket"));
         const maxResults = c.req.query("maxResults");
         const pageToken = c.req.query("pageToken");
         const storageId = c.req.query("storageId");
@@ -604,14 +745,17 @@ message: "No file to delete" });
         tusBaseDir,
         defaultCtrl,
         registry,
-        // The key arrives already canonical: `TusHandler` canonicalizes once at
-        // creation and stores the result, so the key shown here is the exact
-        // key `finalize` writes. Canonicalizing again *here* would recreate the
-        // bug this closes — two call sites deriving the key separately is how
-        // the check and the write came apart in the first place.
+        // Key, bucket and storage source all arrive already resolved:
+        // `TusHandler` computes each once at creation and stores it, so what is
+        // shown here is exactly what `finalize` writes. Re-deriving any of them
+        // *here* would recreate the bug this closes — two call sites deriving
+        // one value separately is how the check and the write came apart in the
+        // first place. `storageId` used to be read from `c.req.query()` while
+        // `finalize` used the `Upload-Metadata` header, so a request could name
+        // the permissive source in the URL and the private one in the header.
         authorize
-            ? async (c, key, bucket) => {
-                await checkAuthorized(c as never, "write", key, bucket, c.req.query("storageId"));
+            ? async (c, key, bucket, storageId) => {
+                await checkAuthorized(c as never, "write", key, bucket, storageId);
             }
             : undefined
     );

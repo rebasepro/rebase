@@ -110,15 +110,38 @@ GET /api/storage/files/products/laptop.jpg?width=300&format=webp
 
 ### Supported Parameters
 
-- `width`: Resizes the image to the specified width (maintaining aspect ratio).
+- `width`, `height`: Resize bounds, `1`–`4096` (the image is never enlarged).
+- `quality`: `1`–`100`.
 - `format`: Converts the image format. Supported formats: `webp`, `jpeg`, `png`, `avif`.
+- `fit`: `cover`, `contain`, `fill`, `inside` or `outside`.
+
+A parameter outside these bounds is a **400**, not a silently clamped value —
+`?width=99999` used to return a 4096px image and `?format=tiff` a webp one, and
+neither said so.
 
 ### Performance & LRU Caching
 
-To prevent high CPU utilization and scaling latency under heavy traffic, processed images are stored in a memory-backed **LRU Cache**:
-- **Capacity**: Capped at **500 entries** globally.
+Transforming is CPU- and memory-heavy, and on a public object the endpoint is
+reachable anonymously, so the work is bounded rather than merely cached:
+- **Capacity**: an LRU capped at **500 entries** globally, keyed by storage
+  source, bucket and canonical key.
 - **TTL (Time to Live)**: Cached variants expire after **1 hour**.
-- Subsequent requests for the same size/format combination hit the LRU cache instantly, preventing redundant file manipulation.
+- Concurrent requests for the same uncached variant produce **one** transform,
+  not one each.
+- A small number of transforms run at once; beyond a bounded backlog the server
+  answers **503 `TRANSFORM_OVERLOADED`** rather than accepting work it will not
+  get to.
+
+### What gets served
+
+The stored content type is whatever the uploader declared — nothing sniffs the
+bytes — so `/api/storage/file/*` will only render a **narrow allowlist** inline:
+images (except SVG), video, audio, `application/pdf` and `text/plain`. Anything
+else, `text/html` and `image/svg+xml` included, is served as
+`application/octet-stream` with `Content-Disposition: attachment`, and every
+response carries `X-Content-Type-Options: nosniff`. Storage is not a web host:
+an uploaded page rendered on the API origin can read that origin's cookies and
+call its endpoints.
 
 ## TUS Resumable Upload Protocol
 

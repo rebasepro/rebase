@@ -6,6 +6,8 @@
  * in-memory cache to avoid redundant processing.
  */
 
+import os from "node:os";
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sharpFactory: ((input: Buffer | Uint8Array) => any) | undefined;
 
@@ -45,43 +47,82 @@ const VALID_FORMATS = new Set(["webp", "avif", "jpeg", "png"]);
 const VALID_FITS = new Set(["cover", "contain", "fill", "inside", "outside"]);
 
 /**
+ * A transform request naming parameters outside the declared bounds.
+ *
+ * Surfaced as a 400 by the route. Out-of-range values used to be *clamped*:
+ * `width=99999` silently became 4096 and `format=tiff` silently became webp,
+ * so the caller debugged a wrongly-sized `<img>` in the browser instead of
+ * reading an error. A bound that rewrites its input is invisible, and this
+ * endpoint's bounds are load-bearing — see {@link runTransform}.
+ */
+export class InvalidTransformOptionsError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "InvalidTransformOptionsError";
+    }
+}
+
+/**
+ * Parse a bounded integer parameter, or throw.
+ *
+ * Strict digits only: `parseInt` accepted `300px` and `12abc`, which is a
+ * second way for a caller to get a transform they did not describe.
+ */
+function boundedInt(name: string, raw: string, min: number, max: number): number {
+    if (!/^\d+$/.test(raw)) {
+        throw new InvalidTransformOptionsError(`Invalid '${name}': expected an integer between ${min} and ${max}.`);
+    }
+    const value = parseInt(raw, 10);
+    if (value < min || value > max) {
+        throw new InvalidTransformOptionsError(`Invalid '${name}': must be between ${min} and ${max}, got ${value}.`);
+    }
+    return value;
+}
+
+/**
  * Parse transform options from URL query parameters.
  * Returns `null` when no transformation is requested.
+ *
+ * Throws {@link InvalidTransformOptionsError} for anything outside the bounds
+ * declared here — these are the whole parameter surface of an endpoint that is
+ * reachable anonymously for public objects, so what it accepts has to be a
+ * closed, stated set rather than "whatever we could coerce into range".
  */
 export function parseTransformOptions(query: Record<string, string>): ImageTransformOptions | null {
     const opts: ImageTransformOptions = {};
     let hasTransform = false;
 
     if (query.width) {
-        const w = parseInt(query.width, 10);
-        if (!Number.isNaN(w) && w > 0) {
-            opts.width = Math.min(w, MAX_DIMENSION);
-            hasTransform = true;
-        }
+        opts.width = boundedInt("width", query.width, 1, MAX_DIMENSION);
+        hasTransform = true;
     }
 
     if (query.height) {
-        const h = parseInt(query.height, 10);
-        if (!Number.isNaN(h) && h > 0) {
-            opts.height = Math.min(h, MAX_DIMENSION);
-            hasTransform = true;
-        }
+        opts.height = boundedInt("height", query.height, 1, MAX_DIMENSION);
+        hasTransform = true;
     }
 
     if (query.quality) {
-        const q = parseInt(query.quality, 10);
-        if (!Number.isNaN(q)) {
-            opts.quality = Math.min(Math.max(q, MIN_QUALITY), MAX_QUALITY);
-            hasTransform = true;
-        }
+        opts.quality = boundedInt("quality", query.quality, MIN_QUALITY, MAX_QUALITY);
+        hasTransform = true;
     }
 
-    if (query.format && VALID_FORMATS.has(query.format)) {
+    if (query.format) {
+        if (!VALID_FORMATS.has(query.format)) {
+            throw new InvalidTransformOptionsError(
+                `Invalid 'format': expected one of ${[...VALID_FORMATS].join(", ")}.`
+            );
+        }
         opts.format = query.format as ImageTransformOptions["format"];
         hasTransform = true;
     }
 
-    if (query.fit && VALID_FITS.has(query.fit)) {
+    if (query.fit) {
+        if (!VALID_FITS.has(query.fit)) {
+            throw new InvalidTransformOptionsError(
+                `Invalid 'fit': expected one of ${[...VALID_FITS].join(", ")}.`
+            );
+        }
         opts.fit = query.fit as ImageTransformOptions["fit"];
         hasTransform = true;
     }
@@ -107,9 +148,87 @@ export function isTransformableImage(contentType: string): boolean {
 }
 
 /**
+ * A transform refused because the server is already doing as many as it will.
+ *
+ * Surfaced as a 503 by the route.
+ */
+export class TransformOverloadedError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "TransformOverloadedError";
+    }
+}
+
+/**
+ * A bounded work queue.
+ *
+ * A transform is seconds of libvips CPU and a full-resolution bitmap in RSS,
+ * and `GET /file/*?width=…` is reachable anonymously for public objects — so
+ * without a bound, a few hundred bytes per request buys unlimited pod CPU, and
+ * enough of them at once buys the heap too. `maxConcurrent` caps the CPU and
+ * memory in flight; `maxQueued` is what keeps an unbounded backlog from
+ * becoming the same problem one level up, refusing fast (503) instead of
+ * accepting work the process will not get to.
+ */
+export class TransformQueue {
+    private active = 0;
+    private readonly waiting: Array<() => void> = [];
+
+    constructor(
+        private readonly maxConcurrent: number,
+        private readonly maxQueued: number
+    ) {}
+
+    /** Number of tasks running plus waiting. Exposed for tests and metrics. */
+    get depth(): number {
+        return this.active + this.waiting.length;
+    }
+
+    async run<T>(work: () => Promise<T>): Promise<T> {
+        if (this.active >= this.maxConcurrent) {
+            if (this.waiting.length >= this.maxQueued) {
+                throw new TransformOverloadedError(
+                    "Image transformation is at capacity. Retry shortly."
+                );
+            }
+            await new Promise<void>((resolve) => this.waiting.push(resolve));
+        }
+        this.active++;
+        try {
+            return await work();
+        } finally {
+            this.active--;
+            this.waiting.shift()?.();
+        }
+    }
+}
+
+/**
+ * The queue every transform goes through.
+ *
+ * Small on purpose: transforms are CPU-bound, so more concurrency than cores
+ * buys nothing but resident bitmaps.
+ */
+export const transformQueue = new TransformQueue(
+    Math.max(1, Math.min(4, os.availableParallelism?.() ?? os.cpus().length)),
+    64
+);
+
+/**
  * Apply image transformations and return the result buffer + content type.
+ *
+ * Runs on {@link transformQueue}: the work is bounded, and callers past the
+ * bound get {@link TransformOverloadedError} rather than a share of a
+ * saturated CPU.
  */
 export async function transformImage(
+    buffer: Buffer | Uint8Array,
+    options: ImageTransformOptions
+): Promise<{ data: Buffer; contentType: string }> {
+    return transformQueue.run(() => runTransform(buffer, options));
+}
+
+async function runTransform(
     buffer: Buffer | Uint8Array,
     options: ImageTransformOptions
 ): Promise<{ data: Buffer; contentType: string }> {

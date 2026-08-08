@@ -82,7 +82,7 @@ export class LocalStorageController implements StorageController {
 
     /**
      * Get the full filesystem path for a storage path, with a traversal guard
-     * that keeps the result inside the bucket directory.
+     * that keeps the result inside the storage root.
      *
      * Defaults the bucket the way `putObject` does.
      *
@@ -93,10 +93,24 @@ export class LocalStorageController implements StorageController {
      * design), and `listObjects` returned an empty page. So the obvious
      * `putObject({ key })` → `getObject(key)` did not round-trip and nothing
      * said why. One default, applied everywhere, removes the whole class.
+     *
+     * Two boundaries, checked separately, because there are two of them. The
+     * key must stay inside its bucket — that check always worked. The bucket
+     * must stay inside the storage root, and that one did not exist: the guard
+     * derived `bucketPath` from the caller's `bucket` and then asked whether
+     * the result was inside `bucketPath`, so `bucket = "../../etc"` made the
+     * reference point `/etc` and `/etc/passwd` is comfortably inside it. A
+     * guard whose reference point moves with its input is not a guard. The
+     * route boundary rejects such a bucket outright
+     * (`canonicalStorageBucket`); this is the layer underneath that does not
+     * depend on it having run.
      */
     private getFullPath(storagePath: string, bucket?: string): string {
-        const bucketPath = path.join(this.basePath, bucket ?? DEFAULT_BUCKET);
-        const resolved = path.resolve(path.join(bucketPath, storagePath));
+        const bucketPath = path.resolve(this.basePath, bucket || DEFAULT_BUCKET);
+        if (!bucketPath.startsWith(this.basePath + path.sep)) {
+            throw new Error("Path traversal detected: bucket resolves outside the storage root.");
+        }
+        const resolved = path.resolve(bucketPath, storagePath);
         if (!resolved.startsWith(bucketPath + path.sep) && resolved !== bucketPath) {
             throw new Error("Path traversal detected: resolved storage path is outside the bucket directory.");
         }
@@ -127,8 +141,10 @@ export class LocalStorageController implements StorageController {
     }: UploadFileProps): Promise<UploadFileResult> {
         this.validateFile(file);
 
-        // Always use a bucket (default to 'default')
-        const usedBucket = bucket ?? DEFAULT_BUCKET;
+        // Always use a bucket (default to 'default'). `||`, not `??`: an empty
+        // bucket is "the caller named none", and it used to resolve to the
+        // storage root instead of the default bucket.
+        const usedBucket = bucket || DEFAULT_BUCKET;
         const fullStoragePath = key;
         const fullPath = this.getFullPath(fullStoragePath, usedBucket);
 
