@@ -18,7 +18,6 @@
  * and editing one line, and a command that silently discarded a user's server
  * code would be worse than its absence.
  */
-import arg from "arg";
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
@@ -26,6 +25,7 @@ import { fileURLToPath } from "url";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths, writeManifest } from "../manifest";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -177,27 +177,28 @@ ${chalk.bold("Options")}
 }
 
 export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
-    const args = arg(
-        {
-            "--dry-run": Boolean,
-            "--force": Boolean,
-            "--help": Boolean,
-            "-h": "--help"
-        },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
-
-    if (args["--help"]) {
+    if (wantsHelp(rawArgs)) {
         printHelp();
         return;
     }
 
+    const { flags: args, positionals } = parseCommandArgs({
+        spec: {
+            "--dry-run": Boolean,
+            "--force": Boolean
+        },
+        rawArgs,
+        commandWords: 1,
+        command: "eject",
+        maxPositionals: 1
+    });
+
     const projectRoot = requireProjectRoot();
     const dryRun = Boolean(args["--dry-run"]);
     const force = Boolean(args["--force"]);
-    // `_[0]` is the command itself.
-    const requested = args._.slice(1).find(value => !value.startsWith("-"));
+    // Strict parsing rejects an undeclared flag rather than filing it under the
+    // positionals, so the first one is the app — there is nothing to filter out.
+    const requested = positionals[0];
 
     let loaded;
     try {

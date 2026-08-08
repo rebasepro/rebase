@@ -10,10 +10,10 @@
  */
 import fs from "fs";
 import path from "path";
-import arg from "arg";
 import chalk from "chalk";
 import { execa } from "execa";
 import { requireProjectRoot, findEnvFile } from "../utils/project";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { DEFAULT_BUNDLE_DIR } from "../bundle";
 
@@ -34,21 +34,21 @@ Build first with ${chalk.cyan("rebase build")}.
 }
 
 export async function startCommand(rawArgs: string[] = []): Promise<void> {
-    const args = arg(
-        {
-            "--bundle": String,
-            "--legacy": Boolean,
-            "--help": Boolean,
-            "-h": "--help"
-        },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
-
-    if (args["--help"]) {
+    if (wantsHelp(rawArgs)) {
         printHelp();
         return;
     }
+
+    const { flags: args } = parseCommandArgs({
+        spec: {
+            "--bundle": String,
+            "--legacy": Boolean
+        },
+        rawArgs,
+        commandWords: 1,
+        command: "start",
+        maxPositionals: 0
+    });
 
     const projectRoot = requireProjectRoot();
 

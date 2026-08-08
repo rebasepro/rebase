@@ -11,12 +11,12 @@
  * docblock claimed to cover, was never called at all. Both are exported now and
  * imported here.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { DEV_PORT_FILENAME, getProjectPort, resolveStartPort } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, getProjectPort, resolveStartPort } from "./dev";
 
 describe("getProjectPort", () => {
     it("returns a port in the range 3001–3999", () => {
@@ -154,5 +154,37 @@ force: true });
     it("falls back to the hash when the project directory does not exist", () => {
         const missing = path.join(projectRoot, "gone");
         expect(resolveStartPort(missing)).toBe(getProjectPort(missing));
+    });
+});
+
+/**
+ * The help is an instruction, so a flag it names has to exist.
+ *
+ * This page advertised `--port, -p` while the spec has only ever declared `-P`
+ * — the same shape as the `auth` bug, where a `-p` that was documented and
+ * undeclared was pushed into the positionals. Here it was silent rather than
+ * destructive: `rebase dev -p 4000`, typed straight off this page, started on
+ * the project's default port and said nothing about the flag it ignored.
+ */
+describe("the dev help and the dev flag spec", () => {
+    it("advertises only short aliases the spec declares", async () => {
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        const advertised = [...help.matchAll(/--[a-z-]+, (-[a-zA-Z])/g)].map(match => match[1]);
+
+        expect(advertised.length).toBeGreaterThan(0);
+        for (const alias of advertised) {
+            expect(Object.keys(DEV_FLAGS)).toContain(alias);
+        }
     });
 });

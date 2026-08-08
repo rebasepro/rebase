@@ -14,11 +14,11 @@
  */
 import fs from "fs";
 import path from "path";
-import arg from "arg";
 import chalk from "chalk";
 import { execa } from "execa";
 import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
 import {
@@ -52,8 +52,13 @@ ${chalk.bold("Examples")}
 }
 
 export async function buildCommand(rawArgs: string[] = []): Promise<void> {
-    const args = arg(
-        {
+    if (wantsHelp(rawArgs)) {
+        printHelp();
+        return;
+    }
+
+    const { flags: args, positionals: requested } = parseCommandArgs({
+        spec: {
             "--output": String,
             // `--out` kept as an accepted alias. `generate-sdk` has always
             // spelled this `--output`, and two names for one concept across one
@@ -70,18 +75,12 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                build command — for a CI job that built the frontend in an earlier
                step. */
             "--skip-static-build": Boolean,
-            "--legacy": Boolean,
-            "--help": Boolean,
-            "-h": "--help"
+            "--legacy": Boolean
         },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
-
-    if (args["--help"]) {
-        printHelp();
-        return;
-    }
+        rawArgs,
+        commandWords: 1,
+        command: "build"
+    });
 
     const projectRoot = requireProjectRoot();
 
@@ -105,7 +104,6 @@ permissive: true }
     }
 
     const { manifest, source } = loaded;
-    const requested = args._.filter(a => !a.startsWith("-"));
 
     let targets = buildableApps(manifest);
     if (requested.length > 0) {

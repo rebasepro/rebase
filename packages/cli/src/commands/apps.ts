@@ -13,10 +13,10 @@
  */
 import fs from "fs";
 import path from "path";
-import arg from "arg";
 import chalk from "chalk";
 import type { RebaseAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
     loadManifest,
@@ -44,21 +44,26 @@ ${chalk.bold("Options")}
 }
 
 export async function appsCommand(subcommand: string | undefined, rawArgs: string[] = []): Promise<void> {
-    const args = arg(
-        {
-            "--json": Boolean,
-            "--force": Boolean,
-            "--help": Boolean,
-            "-h": "--help"
-        },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
-
-    if (args["--help"] || !subcommand || subcommand === "--help") {
+    // Help is answered before parsing, so `rebase apps config --help` prints the
+    // page rather than being rejected for naming no app.
+    if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
         printHelp();
         return;
     }
+
+    // Only `apps` is a command word here: this one parser serves every
+    // subcommand, so the subcommand stays in the positionals and the app name
+    // `apps config` takes follows it.
+    const { flags: args, positionals } = parseCommandArgs({
+        spec: {
+            "--json": Boolean,
+            "--force": Boolean
+        },
+        rawArgs,
+        commandWords: 1,
+        command: "apps",
+        maxPositionals: 2
+    });
 
     switch (subcommand) {
         case "list":
@@ -68,7 +73,7 @@ permissive: true }
             await initManifest(Boolean(args["--force"]));
             break;
         case "config":
-            await printAppConfig(args._[1], Boolean(args["--json"]));
+            await printAppConfig(positionals[1], Boolean(args["--json"]));
             break;
         default:
             console.error(chalk.red(`Unknown subcommand: ${subcommand}`));
