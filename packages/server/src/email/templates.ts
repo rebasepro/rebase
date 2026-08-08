@@ -1,6 +1,16 @@
 /**
- * Default email templates for authentication emails
+ * Default email templates for authentication emails.
+ *
+ * Every HTML body is built with the `html` tag from `./html`, which escapes each
+ * interpolated value unless it is explicitly marked `raw`. `displayName` reaches
+ * these templates straight from the registration body, and the resulting mail is
+ * sent — signed by the sending domain — to an address the same anonymous request
+ * chose, so an unescaped interpolation here is a phishing primitive, not a
+ * rendering glitch. Escaping lives in the tag rather than at the call sites so a
+ * sixth template inherits it instead of having to remember it.
  */
+
+import { html, raw } from "./html";
 
 interface TemplateUser {
     email: string;
@@ -8,42 +18,52 @@ interface TemplateUser {
 }
 
 /**
- * Get a greeting name for the user
+ * Get a greeting name for the user.
+ *
+ * Returns the raw value — `displayName` is whatever the account was registered
+ * with, including markup. Escaping is the `html` tag's job, so that a template
+ * that interpolates the greeting into text (the plain-text bodies below) and one
+ * that interpolates it into markup can share this.
  */
 function getGreeting(user: TemplateUser): string {
     return user.displayName || user.email.split("@")[0];
 }
 
 /**
- * Common email styles
+ * Common email styles.
+ *
+ * `raw` because these are static, author-written CSS — the one category of
+ * interpolation the `html` tag lets through unescaped. (Escaping them would
+ * survive an HTML parser but not every mail client's CSS parser: the
+ * `'Segoe UI'` quotes would arrive as entities.)
  */
 const styles = {
-    container: `
+    container: raw(`
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         max-width: 600px;
         margin: 0 auto;
         padding: 40px 20px;
         background-color: #f8fafc;
-    `,
-    card: `
+    `),
+    card: raw(`
         background-color: #ffffff;
         border-radius: 12px;
         padding: 40px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    `,
-    heading: `
+    `),
+    heading: raw(`
         color: #1e293b;
         font-size: 24px;
         font-weight: 600;
         margin: 0 0 20px 0;
-    `,
-    paragraph: `
+    `),
+    paragraph: raw(`
         color: #475569;
         font-size: 16px;
         line-height: 1.6;
         margin: 0 0 20px 0;
-    `,
-    button: `
+    `),
+    button: raw(`
         display: inline-block;
         background-color: #3b82f6;
         color: #ffffff;
@@ -53,22 +73,22 @@ const styles = {
         padding: 14px 28px;
         border-radius: 8px;
         margin: 20px 0;
-    `,
-    footer: `
+    `),
+    footer: raw(`
         color: #94a3b8;
         font-size: 14px;
         margin-top: 30px;
         padding-top: 20px;
         border-top: 1px solid #e2e8f0;
-    `,
-    warning: `
+    `),
+    warning: raw(`
         color: #64748b;
         font-size: 14px;
         background-color: #fef3c7;
         padding: 12px 16px;
         border-radius: 6px;
         margin-top: 20px;
-    `
+    `)
 };
 
 /**
@@ -83,7 +103,7 @@ export function getPasswordResetTemplate(
 
     const subject = `Reset your ${appName} password`;
 
-    const html = `
+    const body = html`
 <!DOCTYPE html>
 <html>
 <head>
@@ -130,7 +150,7 @@ export function getPasswordResetTemplate(
     </div>
 </body>
 </html>
-    `.trim();
+    `;
 
     const text = `
 Reset Your Password
@@ -149,7 +169,7 @@ Your password will remain unchanged.
     `.trim();
 
     return { subject,
-html,
+html: body.toString().trim(),
 text };
 }
 
@@ -165,7 +185,7 @@ export function getEmailVerificationTemplate(
 
     const subject = `Verify your ${appName} email address`;
 
-    const html = `
+    const body = html`
 <!DOCTYPE html>
 <html>
 <head>
@@ -207,7 +227,7 @@ export function getEmailVerificationTemplate(
     </div>
 </body>
 </html>
-    `.trim();
+    `;
 
     const text = `
 Verify Your Email
@@ -221,7 +241,7 @@ If you didn't create an account with ${appName}, you can safely ignore this emai
     `.trim();
 
     return { subject,
-html,
+html: body.toString().trim(),
 text };
 }
 
@@ -238,7 +258,7 @@ export function getUserInvitationTemplate(
 
     const subject = `You've been invited to ${appName}`;
 
-    const html = `
+    const body = html`
 <!DOCTYPE html>
 <html>
 <head>
@@ -284,7 +304,7 @@ export function getUserInvitationTemplate(
     </div>
 </body>
 </html>
-    `.trim();
+    `;
 
     const text = `
 Welcome to ${appName}!
@@ -302,7 +322,7 @@ If you weren't expecting this invitation, you can safely ignore this email.
     `.trim();
 
     return { subject,
-html,
+html: body.toString().trim(),
 text };
 }
 
@@ -320,7 +340,7 @@ export function getWelcomeEmailTemplate(
 
     const subject = `¡Bienvenido/a a ${appName}!`;
 
-    const html = `
+    const body = html`
 <!DOCTYPE html>
 <html>
 <head>
@@ -347,11 +367,11 @@ export function getWelcomeEmailTemplate(
                 que tenemos para ti.
             </p>
 
-            ${url ? `
+            ${url ? html`
             <div style="text-align: center;">
                 <a href="${url}" style="${styles.button}">Ir a mi Panel</a>
             </div>
-            ` : ""}
+            ` : raw("")}
             
             <p style="${styles.paragraph}">
                 Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
@@ -366,7 +386,7 @@ export function getWelcomeEmailTemplate(
     </div>
 </body>
 </html>
-    `.trim();
+    `;
 
     const text = `
 ¡Bienvenido/a a ${appName}!
@@ -383,7 +403,7 @@ Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
     `.trim();
 
     return { subject,
-html,
+html: body.toString().trim(),
 text };
 }
 
@@ -399,7 +419,7 @@ export function getMagicLinkTemplate(
 
     const subject = `Sign in to ${appName}`;
 
-    const html = `
+    const body = html`
 <!DOCTYPE html>
 <html>
 <head>
@@ -446,7 +466,7 @@ export function getMagicLinkTemplate(
     </div>
 </body>
 </html>
-    `.trim();
+    `;
 
     const text = `
 Sign In to ${appName}
@@ -465,6 +485,6 @@ No action is needed.
     `.trim();
 
     return { subject,
-html,
+html: body.toString().trim(),
 text };
 }

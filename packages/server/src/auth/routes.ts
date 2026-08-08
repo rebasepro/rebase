@@ -8,10 +8,10 @@ import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefresh
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { requireAuth } from "./middleware";
-import { EmailService, EmailConfig } from "../email";
+import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate } from "../email/templates";
 import { HonoEnv } from "../api/types";
-import { defaultAuthLimiter, strictAuthLimiter } from "./rate-limiter";
+import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
@@ -256,7 +256,7 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     function sendWelcomeEmail(user: { email: string; displayName?: string | null }) {
         if (!isEmailConfigured()) return;
         const appName = emailConfig?.appName || "Rebase";
-        const loginUrl = emailConfig?.resetPasswordUrl || ""; // reuse base URL → the login / app page
+        const loginUrl = resolveEmailLinkBase(emailConfig, "resetPassword"); // reuse base URL → the login / app page
         const templateFn = emailConfig?.templates?.welcomeEmail;
         const emailContent = templateFn
             ? templateFn(user, appName)
@@ -673,7 +673,7 @@ displayName: user.displayName });
             await authRepo.createPasswordResetToken(user.id, tokenHash, expiresAt);
 
             // Build reset URL
-            const baseUrl = emailConfig?.resetPasswordUrl || "";
+            const baseUrl = resolveEmailLinkBase(emailConfig, "resetPassword");
             const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
             // Get email template
@@ -798,8 +798,15 @@ message: "Password has been changed successfully" });
     /**
      * POST /auth/send-verification
      * Send email verification link (authenticated)
+     *
+     * Two limiters, because they bound different things: `strictAuthLimiter`
+     * bounds the caller by IP as it does on every other email-sending route, and
+     * `verificationEmailLimiter` bounds how much mail one account — i.e. one
+     * recipient address — can be made to receive. Authentication is not a bound
+     * here: the address is unverified by construction, so an attacker can hold a
+     * session for a mailbox that is not theirs.
      */
-    router.post("/send-verification", requireAuth, async (c) => {
+    router.post("/send-verification", strictAuthLimiter, requireAuth, verificationEmailLimiter, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -825,8 +832,11 @@ message: "Password has been changed successfully" });
         // Store hashed token in user record (raw token goes in the email URL)
         await authRepo.setVerificationToken(user.id, hashToken(token));
 
-        // Build verification URL
-        const baseUrl = emailConfig?.verifyEmailUrl || "";
+        // Build verification URL. `verifyEmailUrl` is set by no boot path, so
+        // this used to be `""` — a relative href, dead in every mail client,
+        // reported as `{ success: true }`. The resolver falls back to the reset
+        // base, and `createEmailService` refuses to boot when neither is absolute.
+        const baseUrl = resolveEmailLinkBase(emailConfig, "verifyEmail");
         const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
 
         // Get email template

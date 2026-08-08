@@ -1,5 +1,6 @@
 import type { Transporter } from "nodemailer";
 import { EmailConfig, EmailSendOptions, EmailService } from "./types";
+import { assertEmailLinkBases } from "./link-base";
 import { logger } from "../utils/logger";
 
 let _nodemailer: typeof import("nodemailer") | undefined;
@@ -147,8 +148,15 @@ export class SMTPEmailService implements EmailService {
 }
 
 /**
- * Create an email service from configuration
+ * Create an email service from configuration.
+ *
+ * This is the choke point every boot path goes through — the managed runtime,
+ * both driver bootstrappers, and any app that passes `auth.email` — so it is
+ * where the link bases are checked. A config that can send mail but cannot build
+ * an absolute link fails the start rather than delivering dead `href="/…"` links
+ * and reporting success; see `assertEmailLinkBases`.
  */
 export function createEmailService(config: EmailConfig): EmailService {
+    assertEmailLinkBases(config);
     return new SMTPEmailService(config);
 }

@@ -13,6 +13,7 @@ class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list,
 class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, listObjects, putObject }
 class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, startedAt }
+class RawHtml { toString, value }
 class S3StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
 class SMTPEmailService { isConfigured, send, verifyConnection }
 class TransformCache { buildKey, get, set }
@@ -39,6 +40,7 @@ function _setRebaseMock
 function applyCollectionDefaults
 function assertCollectionConfigs
 function assertDistinctSuffixes
+function assertEmailLinkBases
 function bootFromBundle
 function classifySurface { collection, surface }
 function cleanupDevPortFile
@@ -71,6 +73,7 @@ function createTwitterProvider
 function defineCron
 function defineFunction
 function envSuffixForKey
+function escapeHtml
 function extractUserFromToken
 function findCollectionConfigProblems
 function generateSecurePassword
@@ -80,6 +83,7 @@ function getPasswordResetTemplate { html, subject, text }
 function getUserInvitationTemplate { html, subject, text }
 function getWelcomeEmailTemplate { html, subject, text }
 function hashPassword
+function html
 function httpMethodToOperation
 function initializeDataSource
 function initializeDataSources
@@ -106,12 +110,14 @@ function loadUsersCollection
 function parseBackupDestination
 function parseBackupTimestamp
 function parseTransformOptions
+function raw
 function readBackupBytes
 function readBundleManifest
 function resolveAuthHooks
 function resolveAuthOptions
 function resolveCorsOrigin
 function resolveDataSources
+function resolveEmailLinkBase
 function resolveEmailOptions
 function resolveRequireAuth
 function resolveStorageBackend
@@ -146,7 +152,7 @@ interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storag
 interface BundleSchema { enums, relations, tables }
 interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
-interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchString, startAfter }
+interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConfigProblem { message, path, severity }
 interface ContractRoutesConfig { collectionRegistry, runtimeVersion, schemaVersion }
@@ -229,6 +235,7 @@ type BackupDestination
 type ConditionBuilderStatic { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 type CorsOriginResolver
 type DrizzleClient
+type EmailLinkKind
 type EmailVerificationTemplateFunction
 type EnvBag
 type HonoEnv { Variables }
