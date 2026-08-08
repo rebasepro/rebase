@@ -134,7 +134,7 @@ import { rebase } from "@rebasepro/server";
 
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
 await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
-await rebase.email.send({ to, subject, html });
+await rebase.email.send({ to, subject, html: "<p>Thanks for your order.</p>" });
 ```
 
 | Need | ✅ Use | ❌ Never import directly |
