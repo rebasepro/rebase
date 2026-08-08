@@ -21,5 +21,10 @@
   //
   // No `rootDir`: it would have to be `.` for both, and letting tsc infer the
   // common root gets there without a second place to keep in sync.
-  "include": ["src/**/*", "functions/**/*"]
+  //
+  // `crons/` too: `rebase build` compiles it through a generated tsconfig, but
+  // an ejected project builds with *this* file, so leaving it out meant an
+  // ejected server had no compiled jobs to load and silently stopped running
+  // every schedule.
+  "include": ["src/**/*", "functions/**/*", "crons/**/*"]
 }

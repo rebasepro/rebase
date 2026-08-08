@@ -7,7 +7,12 @@
 # not reach this project.
 #
 # Assumes pnpm, which is what `rebase init` scaffolds a workspace for. On npm,
-# swap the three pnpm lines below for `npm ci` and `npm run build --workspace`.
+# every line below that mentions pnpm has to change — the `pnpm install` and
+# `pnpm --filter … run build` lines become `npm ci` and
+# `npm run build --workspace <package>`, `CMD ["pnpm", "start"]` becomes
+# `CMD ["npm", "start"]`, and the two `COPY` lines that name `pnpm-lock.yaml`
+# and `pnpm-workspace.yaml` have to name `package-lock.json` instead. Those
+# COPYs fail first, before any of the build lines runs.
 #
 # Build context: the project root (where pnpm-workspace.yaml lives)
 # Usage:
@@ -33,15 +38,31 @@ WORKDIR /app
 # Copy workspace root files first (cache-friendly layer)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
-# Copy workspace packages
+# Copy workspace packages. Every workspace the lockfile has an importer for,
+# so `--frozen-lockfile` below sees the same set of packages it was written from.
 COPY backend ./backend
 COPY config ./config
+# {{#frontend}}
+COPY frontend ./frontend
+# {{/frontend}}
+
+# The entrypoint reads rebase.json at boot — it is where this project declares
+# its storage buckets, so that the platform, the console and this process all
+# read one list. An image without it boots believing nothing was declared, and
+# every upload lands in the wrong bucket or 501s.
+COPY rebase.json ./
 
 # Install all deps (including devDependencies for build)
 RUN pnpm install --frozen-lockfile
 
-# Build config first, then backend
+# Build config first, then the rest: both the frontend and the backend import it.
 RUN pnpm --filter "*-config" run build
+# {{#frontend}}
+# The image serves the built site itself (see the `serveSPA` call in
+# backend/src/index.ts), so the frontend is built here rather than deployed
+# separately. Vite reads no API URL: same origin, same container.
+RUN pnpm --filter "*-frontend" run build
+# {{/frontend}}
 RUN pnpm --filter "*-backend" run build
 
 # Prune dev dependencies for a smaller runtime
@@ -63,10 +84,14 @@ RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 WORKDIR /app
 
 # Copy only production artifacts
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/.npmrc ./
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/.npmrc /app/rebase.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/config ./config
+# {{#frontend}}
+# The built site only — its sources and devDependencies stay in the builder.
+COPY --from=builder /app/frontend/dist ./frontend/dist
+# {{/frontend}}
 
 # Create uploads directory
 RUN mkdir -p /app/backend/uploads && chown -R rebase:rebase /app

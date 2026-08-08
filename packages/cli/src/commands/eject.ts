@@ -25,7 +25,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
-import { findBackendApp, loadManifest, ManifestError, writeManifest } from "../manifest";
+import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths, writeManifest } from "../manifest";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,11 +40,88 @@ function findCliRoot(from: string): string | null {
     return null;
 }
 
+/**
+ * The two ways one project's payload differs from another's.
+ *
+ * Neither is a flag: both were decided at `rebase init` time. `--headless`
+ * deletes `config/collections`, `backend/src/schema.generated.ts` and
+ * `frontend/`, so a payload that assumes them emits an entrypoint importing
+ * three files that are not there and a Dockerfile whose first `COPY` fails.
+ */
+interface ProjectShape {
+    /**
+     * Collections declared in code, under `<config>/collections`. Without them
+     * the server derives its API from the live database instead — the same
+     * signal `rebase build` reads.
+     */
+    collections: boolean;
+    /** A `frontend` workspace for the image to build and the entrypoint to serve. */
+    frontend: boolean;
+}
+
+/** The block names the payload may switch on. A typo has to be an error. */
+const SHAPE_FLAGS = ["collections", "frontend"] as const;
+
+/**
+ * Render one payload file for this project.
+ *
+ * The payload is one set of files rather than one per flavour, because the
+ * flavours differ by about a dozen lines and two copies of a 230-line
+ * entrypoint are how copies drift — the payload had already drifted from
+ * `app/backend/src/index.ts` over `cronsDir`, which silently stopped every cron
+ * job in an ejected project. So both branches live in the file, marked with
+ * lines that are comments in TypeScript, YAML and Dockerfiles alike:
+ *
+ *     // {{#collections}}
+ *     import { tables } from "./schema.generated.js";
+ *     // {{/collections}}
+ *     // {{^collections}}
+ *     // No schema module: this project introspects the database.
+ *     // {{/collections}}
+ *
+ * `{{#name}}` keeps its block when the flag is on, `{{^name}}` when it is off,
+ * and the marker lines themselves never reach the user. The template stays
+ * valid TypeScript with every marker line removed, which is the flavour a
+ * typechecker would see.
+ */
+export function renderPayload(contents: string, shape: ProjectShape, projectName: string): string {
+    const flags = shape as unknown as Record<string, boolean>;
+    const out: string[] = [];
+    let open: { name: string; keep: boolean } | null = null;
+
+    for (const line of contents.split("\n")) {
+        const marker = /^\s*(?:\/\/|#)\s*\{\{([#^/])([A-Za-z]+)\}\}\s*$/.exec(line);
+        if (!marker) {
+            if (!open || open.keep) out.push(line);
+            continue;
+        }
+        const [, kind, name] = marker;
+        if (kind === "/") {
+            if (!open || open.name !== name) {
+                throw new Error(`Eject template: {{/${name}}} does not close an open block.`);
+            }
+            open = null;
+            continue;
+        }
+        if (open) throw new Error(`Eject template: {{${kind}${name}}} inside an open ${open.name} block.`);
+        if (!(SHAPE_FLAGS as readonly string[]).includes(name)) {
+            throw new Error(`Eject template: unknown block {{${kind}${name}}}.`);
+        }
+        open = { name,
+keep: kind === "#" ? flags[name] === true : flags[name] !== true };
+    }
+
+    if (open) throw new Error(`Eject template: {{#${open.name}}} was never closed.`);
+    return out.join("\n").replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+}
+
 /** Files the eject payload contributes, as `<source> → <destination>`. */
 const PAYLOAD: { from: string; to: string; overwrite: boolean }[] = [
-    // The entrypoint IS the point of ejecting, so it is written even if
-    // something is already there — but only after the guard below has
-    // established that this project is not already ejected.
+    // The entrypoint IS the point of ejecting, so it replaces whatever is
+    // there — but only with `--force`, and only after keeping the old file as
+    // `.bak`. `runtime: "custom"` (the guard below) means "already ejected",
+    // not "nobody wrote a server here": a managed project can have a
+    // hand-written `backend/src/index.ts` that `rebase dev` has been running.
     { from: "backend/src/index.ts",
 to: "backend/src/index.ts",
 overwrite: true },
@@ -93,6 +170,8 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   --dry-run                    List what would change, and change nothing
+  --force                      Replace an existing backend/src/index.ts or
+                               env.ts, keeping the current file as <name>.bak
   -h, --help                   Show this help
 `.trim());
 }
@@ -101,6 +180,7 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     const args = arg(
         {
             "--dry-run": Boolean,
+            "--force": Boolean,
             "--help": Boolean,
             "-h": "--help"
         },
@@ -115,6 +195,7 @@ permissive: true }
 
     const projectRoot = requireProjectRoot();
     const dryRun = Boolean(args["--dry-run"]);
+    const force = Boolean(args["--force"]);
     // `_[0]` is the command itself.
     const requested = args._.slice(1).find(value => !value.startsWith("-"));
 
@@ -175,10 +256,20 @@ permissive: true }
     }
     const payloadDir = path.join(cliRoot!, "templates", "eject");
 
+    // What the payload has to look like here. Read from the project rather than
+    // asked for: `--headless` left no collections and no frontend, and an
+    // entrypoint importing either would not compile.
+    const paths = resolveBackendPaths(app, projectRoot);
+    const shape: ProjectShape = {
+        collections: paths.hasCollections,
+        frontend: fs.existsSync(path.join(projectRoot, "frontend"))
+    };
+
     // Decide everything before writing anything, so --dry-run and the real run
     // report the same list and a mid-way failure cannot leave a half-ejected
     // project.
-    const planned: { to: string; action: "write" | "keep" }[] = [];
+    const planned: { to: string; action: "write" | "keep" | "overwrite" }[] = [];
+    const blocked: string[] = [];
     for (const file of PAYLOAD) {
         const source = path.join(payloadDir, file.from);
         if (!fs.existsSync(source)) {
@@ -186,34 +277,61 @@ permissive: true }
             process.exit(1);
         }
         const exists = fs.existsSync(path.join(projectRoot, file.to));
+        if (exists && file.overwrite && !force) blocked.push(file.to);
         planned.push({
             to: file.to,
-            action: exists && !file.overwrite ? "keep" : "write"
+            action: !exists ? "write" : file.overwrite ? "overwrite" : "keep"
         });
+    }
+
+    if (blocked.length > 0) {
+        // A managed backend never loads `backend/src/index.ts`, but `rebase dev`
+        // does — it picks the entrypoint by file existence — so this file is very
+        // often a server someone is running and editing. Replacing it without
+        // being asked is the one unrecoverable thing this command could do.
+        console.error(chalk.red("✗ Ejecting would replace a file this project already has:"));
+        for (const item of blocked) console.error(chalk.red(`      ${item}`));
+        console.error(chalk.dim("  Eject writes its own entrypoint — it does not adopt yours."));
+        console.error(chalk.dim("  Move the file aside, or re-run with --force, which keeps the current"));
+        console.error(chalk.dim("  contents as <name>.bak."));
+        process.exit(1);
     }
 
     if (dryRun) {
         console.log(chalk.bold(`Would eject "${appName}" to a custom runtime:`));
         console.log("");
         for (const item of planned) {
-            console.log(item.action === "write"
-                ? `  ${chalk.green("write")}  ${item.to}`
-                : `  ${chalk.dim("keep")}   ${item.to} ${chalk.dim("(already exists)")}`);
+            if (item.action === "write") console.log(`  ${chalk.green("write")}      ${item.to}`);
+            else if (item.action === "overwrite") {
+                console.log(`  ${chalk.yellow("overwrite")}  ${item.to} ${chalk.dim(`(kept as ${item.to}.bak)`)}`);
+            } else console.log(`  ${chalk.dim("keep")}       ${item.to} ${chalk.dim("(already exists)")}`);
         }
-        console.log(`  ${chalk.green("write")}  rebase.json ${chalk.dim('(runtime: "custom")')}`);
+        console.log(`  ${chalk.green("write")}      rebase.json ${chalk.dim('(runtime: "custom")')}`);
+        // Not part of the payload table, but it is changed on the real run, and
+        // a dry run's whole purpose is to enumerate what changes.
+        if (fs.existsSync(path.join(projectRoot, "backend", "package.json"))) {
+            console.log(`  ${chalk.green("write")}      backend/package.json ${chalk.dim("(main, dev and start scripts)")}`);
+        }
         console.log("");
         console.log(chalk.dim("Nothing was changed."));
         return;
     }
 
     const projectName = projectNameOf(projectRoot);
+    const backups: string[] = [];
     for (const [index, file] of PAYLOAD.entries()) {
         if (planned[index].action === "keep") continue;
         const destination = path.join(projectRoot, file.to);
+        if (planned[index].action === "overwrite") {
+            fs.copyFileSync(destination, `${destination}.bak`);
+            backups.push(`${file.to}.bak`);
+        }
         fs.mkdirSync(path.dirname(destination), { recursive: true });
-        const contents = fs
-            .readFileSync(path.join(payloadDir, file.from), "utf8")
-            .replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+        const contents = renderPayload(
+            fs.readFileSync(path.join(payloadDir, file.from), "utf8"),
+            shape,
+            projectName
+        );
         fs.writeFileSync(destination, contents, "utf8");
     }
 
@@ -239,9 +357,16 @@ permissive: true }
     console.log(`  ${chalk.cyan(dockerfile.padEnd(26))} your image`);
     console.log(`  ${chalk.cyan("docker-compose.custom.yml".padEnd(26))} runs it`);
     console.log(`  ${chalk.cyan("rebase.json".padEnd(26))} runtime: custom`);
+    for (const backup of backups) {
+        console.log(`  ${chalk.cyan(backup.padEnd(26))} what was there before`);
+    }
     console.log("");
     console.log(chalk.yellow("  You now own CORS, auth wiring, storage and shutdown. Platform runtime"));
     console.log(chalk.yellow("  upgrades no longer reach this project."));
+    if (!shape.collections) {
+        console.log(chalk.yellow("  This project declares no collections, so the entrypoint derives them"));
+        console.log(chalk.yellow("  from the live database, as the managed runtime did."));
+    }
     console.log("");
     console.log(chalk.dim(`  ${chalk.cyan("docker compose -f docker-compose.custom.yml up --build")}`));
     console.log(chalk.dim("  docker-compose.yml is untouched — it still runs the managed shape if you go back."));

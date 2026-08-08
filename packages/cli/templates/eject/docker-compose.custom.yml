@@ -52,8 +52,16 @@ services:
       ADMIN_CONNECTION_STRING: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
       NODE_ENV: production
       PORT: "3001"
+      # {{#frontend}}
       # Your entrypoint serves the built frontend itself (see the `serveSPA`
-      # call in backend/src/index.ts), so this is one container, same origin.
+      # call in backend/src/index.ts, and the frontend build stage in the
+      # Dockerfile), so this is one container, same origin.
+      # {{/frontend}}
+      # {{^frontend}}
+      # This image serves the API only — there is no frontend workspace in this
+      # project — so CORS_ORIGINS has to list the origins your clients are
+      # served from.
+      # {{/frontend}}
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to}
       # A durable named volume, which is the case this flag acknowledges.
       STORAGE_PATH: /uploads

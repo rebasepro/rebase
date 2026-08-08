@@ -1100,8 +1100,12 @@ timeout: 10000 });
         });
         console.log("Runtime image built.");
 
-        // Still run compose build: the eject template adds services that DO
-        // declare `build:`, and a project that ejected must keep working here.
+        // Still run compose build, for any service in `docker-compose.yml` that
+        // declares `build:`.
+        //
+        // NOTE: this is the managed compose file. Nothing in this suite runs
+        // `rebase eject`, and `docker compose build` with no `-f` never reads
+        // `docker-compose.custom.yml` — the ejected image is untested here.
         console.log("Building any compose-declared services...");
         await execa("docker", ["compose", "build"], {
             cwd: projectPath,
