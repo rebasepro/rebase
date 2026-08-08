@@ -473,14 +473,29 @@ colors: true }));
                                 wsDebug(`⚡ [WebSocket Server] SQL executed. Returned ${Array.isArray(result) ? result.length : "non-array"} rows.`);
                             }
                             const auditSession = clientSessions.get(clientId);
-                            console.log("[SQL Audit] WebSocket SQL execution", JSON.stringify({
-                                sql: typeof sql === "string" ? sql.substring(0, 500) : sql,
-                                options,
+                            // Through `logger`, not `console.log`: this line is
+                            // emitted in production, and a bare console call
+                            // has no severity, no timestamp, no JSON envelope
+                            // and no LOG_LEVEL gate, so it lands in Cloud
+                            // Logging as unstructured text the queries written
+                            // for every other line cannot match.
+                            //
+                            // The bound values are counted, never written — the
+                            // statement is the audit signal, the parameters are
+                            // whatever row the operator was touching. (stdout is
+                            // not an audit sink either; a real trail belongs in
+                            // a table with an actor and a retention policy.)
+                            logger.info("[SQL Audit] WebSocket SQL execution", {
+                                sql: typeof sql === "string" ? sql.substring(0, 500) : String(sql),
+                                database: options?.database,
+                                role: options?.role,
+                                paramCount: Array.isArray(options?.params) ? options.params.length : 0,
                                 resultRows: Array.isArray(result) ? result.length : "unknown",
                                 uid: auditSession?.user?.uid ?? "unknown",
                                 roles: auditSession?.user?.roles ?? [],
                                 isAdmin: auditSession?.user?.isAdmin ?? false,
-                            }));
+                                requestId
+                            });
                             const response = {
                                 type: "EXECUTE_SQL_SUCCESS",
                                 payload: { result },

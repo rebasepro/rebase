@@ -235,6 +235,27 @@ schedule: "30 2 * * 1" })]);
             expect(log!.result).toEqual({ sync: true });
         });
 
+        it("redacts a failing query out of the persisted error", async () => {
+            // `error` is not only logged — it is written to `cron_logs` and
+            // rendered in the Studio cron panel, so Drizzle's
+            // `Failed query: <sql>\nparams: <values>` wrapper would store the
+            // statement and every bound value in a table, indefinitely.
+            const drizzleFailure = new Error(
+                'Failed query: insert into "users" ("email", "password_hash") values ($1, $2)\n'
+                + "params: alice@acme.com,$2b$12$abcdefghijklmnop"
+            );
+            scheduler.registerJobs([makeJob("leaky", {
+                handler: async () => { throw drizzleFailure; }
+            })]);
+
+            const log = await scheduler.triggerJob("leaky");
+
+            expect(log!.success).toBe(false);
+            expect(log!.error).toBe("Failed query: [redacted]");
+            expect(scheduler.getJob("leaky")!.lastError).not.toContain("alice@acme.com");
+            expect(scheduler.getJob("leaky")!.lastError).not.toContain("$2b$12$");
+        });
+
         it("handles non-Error thrown values", async () => {
             scheduler.registerJobs([makeJob("string-throw", {
                 handler: async () => { throw "plain string error"; }

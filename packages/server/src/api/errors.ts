@@ -277,8 +277,13 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         );
     }
 
-    // Suppress the huge stack trace for known DB errors (it's noisy and leaks
-    // SQL and query params — the extracted [PG …] line above carries the signal)
+    // Suppress the huge stack trace for known DB errors: it is noisy, and the
+    // extracted [PG …] line above carries the signal. The SQL and the bound
+    // params it used to leak are no longer this branch's problem — `logger`
+    // strips Drizzle's `Failed query: … / params: …` wrapper out of every
+    // message and stack it emits, so the fallbacks below (a connection dropped
+    // mid-statement carries no SQLSTATE, so `dbError` is null and the stack is
+    // logged) are covered too.
     const suppressStack = isDbSchemaMismatch || dbError !== null || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
         logger.error(String(error.stack || error));
