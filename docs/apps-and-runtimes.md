@@ -549,7 +549,11 @@ Behaviour:
 2. If `runtime` is already `custom`, exit 1: `already ejected`.
 3. Write `backend/src/index.ts` from the template that
    `packages/cli/templates/template/backend/src/index.ts` holds today. It stops
-   being scaffolded by default (§4.8) and lives on as the eject payload.
+   being scaffolded by default (§4.8) and lives on as the eject payload (now at
+   `packages/cli/templates/eject/`). If that file already exists, exit 1 rather
+   than replace it: a managed backend never loads it, but `rebase dev` does, so
+   it is often a server someone is running. `--force` replaces it and keeps the
+   old contents as `backend/src/index.ts.bak`.
 4. Write `Dockerfile` at the repository root, unless one exists — never
    overwrite.
 5. Rewrite `rebase.json`: `runtime: "custom"`, `dockerfile`, `port: 8080`.

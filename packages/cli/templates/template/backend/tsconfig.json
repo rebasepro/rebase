@@ -36,5 +36,10 @@
   // unnoticed until runtime. The inferred common root is already the project
   // root because of `../config`, so this adds no `rootDir` and moves nothing
   // that dist/ already contains.
-  "include": ["src/**/*", "functions/**/*", "../config/**/*", "drizzle.config.ts"]
+  //
+  // `crons/` for the same reason, and for one more: `rebase build` compiles it
+  // through a generated tsconfig, but an ejected project builds with *this*
+  // file — so leaving crons out meant an ejected server had no compiled jobs to
+  // load and stopped running every schedule, nightly backups included.
+  "include": ["src/**/*", "functions/**/*", "crons/**/*", "../config/**/*", "drizzle.config.ts"]
 }

@@ -534,7 +534,9 @@ runtime: "managed" };
         if (!dockerfile && exists("backend/src/index.ts")) {
             console.warn(
                 "⚠ backend/src/index.ts exists but this project's backend is managed — it is\n" +
-                "    never loaded. Delete it, or run `rebase eject` to make it the entrypoint."
+                "    never loaded. Delete it, or move it aside and run `rebase eject`, which\n" +
+                "    writes an entrypoint of its own and owns the image. Eject does not adopt\n" +
+                "    this file: it refuses to replace it unless you pass --force."
             );
         }
     }

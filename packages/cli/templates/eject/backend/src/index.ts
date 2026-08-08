@@ -3,12 +3,15 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
     initializeRebaseBackend,
     installShutdownHandlers,
+    // {{#frontend}}
     serveSPA,
+    // {{/frontend}}
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
@@ -17,10 +20,14 @@ import {
     logger
 } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
+// {{#collections}}
 import { enums, relations, tables } from "./schema.generated.js";
+// {{/collections}}
 import { storageAuthorize } from "../../config/storage.js";
 import { env } from "./env.js";
+// {{#collections}}
 import usersCollection from "../../config/collections/users.js";
+// {{/collections}}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,21 +93,44 @@ async function startServer() {
     const PORT = env.PORT;
     const server = createServer(getRequestListener(app.fetch));
 
+    // `backend/crons` holds the scheduled jobs — nightly backups among them.
+    // Passed only when the directory exists, because a configured `cronsDir`
+    // with nothing in it mounts the cron routes and warns at every boot.
+    // Sibling-relative like `functionsDir`: both compile alongside this file, so
+    // the same path is right from source and from `backend/dist/backend/src`.
+    const cronsDir = path.resolve(__dirname, "../crons");
+
     const backend = await initializeRebaseBackend({
+        // {{#collections}}
         collectionsDir: path.resolve(__dirname, "../../config/collections"),
+        // {{/collections}}
+        // {{^collections}}
+        // No `collectionsDir`: this project declares no collections in code, so
+        // the server derives them from the live database schema at boot —
+        // exactly what the managed runtime did for it.
+        // {{/collections}}
         functionsDir: path.resolve(__dirname, "../functions"),
+        cronsDir: fs.existsSync(cronsDir) ? cronsDir : undefined,
         server,
         app,
         database: createPostgresAdapter({
             connection: db,
+            // {{#collections}}
             schema: { tables,
 enums,
 relations },
+            // {{/collections}}
             adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
             connectionString
         }),
         auth: {
+            // {{#collections}}
             collection: usersCollection,
+            // {{/collections}}
+            // {{^collections}}
+            // No users collection is declared here, so auth falls back to its
+            // own default users table — the same fallback a headless bundle gets.
+            // {{/collections}}
             jwtSecret,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
@@ -189,10 +219,20 @@ pass: env.SMTP_PASS! }
         }, status);
     });
 
-    // Serve the frontend in production
+    // {{#frontend}}
+    // Serve the frontend in production.
+    //
+    // Four levels up, not two: in production this file runs compiled, from
+    // `backend/dist/backend/src`. The paths above are the same in both modes
+    // because `config/` is compiled alongside this file; `frontend/dist` is not
+    // in the compiled tree at all, so it stays where the repository put it.
+    // `serveSPA` only warns when the path is wrong, which is why the Dockerfile
+    // that builds this image also copies `frontend` — verify a mount by
+    // fetching `/`, never by reading the log.
     if (isProduction) {
-        serveSPA(app, { frontendPath: path.join(__dirname, "../../frontend/dist") });
+        serveSPA(app, { frontendPath: path.resolve(__dirname, "../../../../frontend/dist") });
     }
+    // {{/frontend}}
 
     if (!isProduction) {
         // Dev mode: retry the next port if the current one is in use

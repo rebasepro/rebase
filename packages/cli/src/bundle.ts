@@ -921,10 +921,11 @@ stdio: "pipe" }
  * deployed green, and answered 404 on every one of them, with the file still
  * sitting in the repository looking exactly like the server.
  *
- * A project that means to keep its own entrypoint runs `rebase eject`, which
- * writes the entrypoint, a Dockerfile and a compose file together and flips the
+ * A project that means to own its server process runs `rebase eject`, which
+ * writes an entrypoint, a Dockerfile and a compose file together and flips the
  * backend to `runtime: "custom"`. The warning names that route rather than
- * implying the file is a mistake.
+ * implying the file is a mistake — but eject writes *its* entrypoint, so the
+ * warning must not read as "eject will keep what you wrote here".
  */
 export function findUnusedServerEntry(projectRoot: string, functionsDir: string): string | undefined {
     // A project that relocated its functions keeps the entrypoint beside them,
@@ -991,7 +992,9 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         console.log(chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
         console.log(chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
         console.log(chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
-        console.log(chalk.dim("      or run `rebase eject` to make this file the entrypoint and own the image."));
+        console.log(chalk.dim("      or run `rebase eject`, which writes an entrypoint of its own and owns"));
+        console.log(chalk.dim("      the image — it does not adopt this file, and will not replace it"));
+        console.log(chalk.dim("      without --force."));
     }
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));
