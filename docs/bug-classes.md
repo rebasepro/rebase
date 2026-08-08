@@ -1636,7 +1636,7 @@ new class (33), and a tool.
 | `executeSql`'s fail-open when the role switch is refused | clean in reach — `EXECUTE_SQL` is in `ADMIN_ONLY_TYPES`, and an admin already has the connection. Worth knowing the asymmetry exists: the same operation fails closed on one path and open on the other. |
 | every `sql.raw` built from a template (131 sites) | clean — DDL over developer-controlled identifiers, and `BranchService` validates against `^[a-zA-Z0-9_-]+$` before quoting. |
 | email normalization across both drivers | clean — one `normalizeEmail`, called inside each repository rather than by its callers, so a caller that forgets cannot break it. |
-| every outbound `fetch` with a non-literal URL | clean — OAuth endpoints are literals or config; `WebhookDispatcher` is instantiated by the developer, not from data. |
+| every outbound `fetch` with a non-literal URL | clean — OAuth endpoints are literals or config; `WebhookDispatcher` is instantiated by the developer, not from data. **This verdict was overturned on 2026-08-08; the row is left as written, and the correction is at the end of this file.** |
 | module-level caches in server / server-postgres / saas | clean — three, all keyed on cluster id or Stripe lookup key, none per-tenant. |
 | `applyAdminGate` on every admin surface | clean — fresh router, gate, *then* route, consistently. The comment on the schema editor explains what happens when that order is reversed. |
 | `check:derived-names`, `names`, `generated`, `control-chars`, `api-surface`, `hooks`, `test-scripts`, `unused`, `untranslated`, `deps` on main | all green — unlike the previous sweep. |
@@ -1813,3 +1813,266 @@ the generated SDK — the SaaS console — had quietly stopped using the typed
 accessors and gone back to `data.collection(slug)`, which is how three of these
 survived a year. When the only user of a generated artifact routes around it,
 that is the finding.
+
+---
+
+## 36. A mechanism nothing enforces
+
+The code is written, typed, named after what it does, and in two of the three
+cases below it has tests. What is missing is the line that consults it. That
+makes it invisible from every direction a review normally comes from: it cannot
+fail a test, because the mechanism itself works; it cannot appear in a log,
+because nothing runs; and it cannot be found by reading the mechanism, because
+the defect is at a call site that does not exist. Absence is what reading is
+worst at — class 21 says the same thing about extension points.
+
+This is the security-shaped member of that family, and it is worse than either
+neighbour. Class 14 is a field that drifts because no reader can disagree with
+it, and class 21 is a slot the user is invited to fill; both are inert. Here the
+mechanism's purpose is to **deny**, and other code has already been relaxed on
+the strength of it. The system is not merely missing a control — it has been
+opened somewhere else to make room for one that never arrived.
+
+**MFA.** `aal`, the claim that says whether a session cleared a second factor,
+had five writes and one read. The writes, all in `packages/server/src/auth`: two
+in `createSessionAndTokens` (`routes.ts`), which is login, register and every
+OAuth callback; two more on the refresh path in the same file, hardcoded
+`"aal1"`; and one in the step-up (`mfa-routes.ts`). The read: a single
+`if (userCtx.aal !== "aal2")` in `mfa-routes.ts`, guarding
+`DELETE /auth/mfa/unenroll` and nothing else. `POST /auth/login` never called `hasVerifiedMfaFactors()`, so the token an
+MFA-enrolled account received after a password was byte-for-byte the token an
+account with no factors received, and RLS binds on `uid`, never on `aal`.
+Enrolling a second factor reduced an attacker's cost by zero. Session issuance is
+conditional now — `mfa-gate.ts`, `MFA_REQUIRED`, a purpose-scoped pre-auth token —
+and refresh carries the presented level forward from `refresh_tokens.aal` rather
+than restating `aal1`.
+
+**Channel authorization.** It did not exist: not a hook, not a config key, not a
+stub. Meanwhile `channel-presence.ts` and `channel-history.ts` each took their
+tables out of the RLS model and cited it by name — *"presence authorization is a
+channel rule, not a row policy"*, and *"who may replay a channel is decided by
+the channel rules the server evaluates before it reads"* — and
+`sdk/realtime.md` told users *"the server still authorizes every frame."*
+Three assertions, one gate that was never written. The revokes are real
+(`REVOKE ALL ON "rebase"."channel_presence" FROM rebase_user`, issued from
+ensure-tables rather than a migration), which is the whole point: the hardening
+left those tables **less** defended than the ones it exempted them from. Any
+socket could read the presence roster of any channel it could name, and broadcast
+into a channel it had never joined. `handleChannelMessage` is the one door now and
+`authorizeChannelAction` the one gate, with membership as a floor a
+`ChannelAuthorizer` can only narrow.
+
+**`assertKnownWriteFields`.** A guard whose doc comment stated its own premise:
+*"Unknown keys used to travel all the way into the INSERT, where Postgres
+rejected them."* They never did. Drizzle builds the INSERT from the table's own
+column list, so an unknown key is dropped — `insert into "posts" ("id",
+"title_col", "views")`, no `titel`, no error, a 201 that stored nothing. The
+guard was not a second line behind Postgres; it was the only line, and it was
+skipped on four paths, including `strictWrites: false`, whose documented meaning
+could not work either because the value was discarded a layer below regardless.
+`assertWritableColumns` is the driver-level backstop the comment had assumed, and
+`write-column-guard.test.ts` pins what Drizzle actually emits via `toSQL()`.
+
+**Sweep: grep for the reads of a security value, not the writes.** Writes are
+easy to find and easy to feel good about — they are the part that looks like the
+feature. For every claim, flag, level or scope the system mints, enumerate the
+sites that *branch on it* and ask which of them is on the path an attacker takes.
+`aal` is the model: eight occurrences in `packages/server/src`, one `if`. Then
+invert it — for every route that mints a credential, list what it consulted
+before doing so.
+
+**Watch for the comment that cites another layer as the reason this one may
+relax.** *"X is decided by Y"*, *"the server checks this first"*, *"validated
+upstream"*. Each is a factual claim about code somewhere else, it is the
+cheapest kind of claim to check, and it is almost never checked — the author of
+the relaxation is the person least likely to go looking. Every such sentence is a
+lead, and a `REVOKE`, a `disableDefaultPolicies` or a deleted validation
+alongside one is evidence the author knew the data was sensitive, not evidence
+the other layer is closed. Class 33 made the same point about an HTTP route in
+front of a revoked table; this is the same trade with no route at all.
+
+---
+
+## 37. A generator that publishes what the pipeline strips
+
+Class 35 is about how a generator *writes* the values it is handed. This is about
+which values it is handed at all. A generator describes a surface it does not
+implement, so every rule the surface enforces has to be restated in the
+description — and a rule the description omits is not a documentation gap, it is
+a promise the runtime does not make, or an invitation the runtime never issued.
+
+`excludeFromApi` is a server-side guarantee: `stripExcluded`
+(`packages/server-postgres/src/services/row-pipeline.ts:104`) deletes the
+property key *and* its `columnName` from every row the API serves, for every
+caller. Both generators that render a collection into an artefact ignored it. The
+OpenAPI generator's three loops — read schema, input schema, filter parameters —
+skipped `relation` and nothing else, so every project scaffolded by `rebase init`
+published its `users` collection's `passwordHash` and `emailVerificationToken` by
+name, as readable, as writable, and as **filterable**: a real `in: "query"`
+parameter carrying *"Filter by `passwordHash`. Supports PostgREST operators."*
+`/api/docs` is registered on the app rather than on the data router, so it
+carries none of the auth middleware `{basePath}/data` does — that document is
+served to anyone. The SDK generator had it half right, which is more interesting:
+`Row` skipped excluded properties and `Insert`/`Update` did not, with a comment
+giving the reasoning — *"they are stripped from responses, not from writes."* A
+defensible reading of the flag, and the result was the one remaining place in the
+shipped surface that named a password hash and offered it to a client as a field
+to send.
+
+The tell is a rule enforced in exactly one place and *described* in several. A
+pipeline step is a rule; an OpenAPI document, a generated SDK, an admin form and
+a fixture seeder are four more renderings of the same config, each written by
+someone holding a different one of these flags in mind.
+
+**Sweep:** take the per-property flags the runtime acts on — `excludeFromApi`,
+`readOnly`, `admin.disabled`, `validation.required` — and for each, enumerate
+every artefact generated from a collection and ask whether that artefact honours
+it. Do this by walking the flags, not the generators: a generator you read will
+tell you what it handles and cannot tell you what it never heard of.
+
+Then fix it as one predicate the loops share, not as a `continue` per loop —
+three independent `continue`s is how this survived, and it is class 2 wearing a
+generator's clothes. And **assert the rule, not the instance.** `passwordHash`
+and `emailVerificationToken` were fixed by name in generator after generator and
+the rule stayed broken each time; the test that replaced them runs a fixture with
+eight excluded properties of different shapes, and the excluded set is keyed on
+property name *and* column name so a foreign key addressing the column by its
+other spelling cannot put it back.
+
+---
+
+## 38. A correct check over a lossily transformed copy of its subject
+
+A check reads a value it did not receive. Between the subject and the predicate
+sits a transform — flatten, normalise, serialise, project — written for a
+different purpose by someone who was not thinking about the check. The predicate
+is then right about the wrong thing, and reviewing it finds nothing, because the
+defect is not in the predicate: it is in the distance between the predicate and
+its subject.
+
+Autofill's rule is "only fill blanks", and it is enforced the strong way, by
+construction: a field that already has a value is omitted from the JSON schema
+the model answers into, so there is no path by which a generated value reaches a
+filled field. The service decides a field is filled by looking up `values[key]`
+for each `key` of `properties`. Both maps arrive from the client, built by
+different functions. `getSimplifiedProperties`
+(`packages/plugin-ai/src/utils/properties.ts`) names an array by its own path and
+stops there; `flatMapEntityValues` (`utils/values.ts`) recursed into anything
+`typeof value === "object"`. So `tags: ["a", "b"]` was sent as `tags.0` and
+`tags.1`, and a `Date` was sent as nothing at all — `Object.entries(date)` is
+`[]`. Both looked up as `undefined`. Every array and every date on the form read
+as empty, went into the fillable schema, and came back into the review dialog
+pre-ticked for replacement. The array's values were still in the prompt as
+context, so the model was asked to invent tags while being shown `tags.0: news`.
+
+The invariant was written down, twice, and both statements are correct. Above the
+request field that carries the values:
+
+> Flattened to dotted paths so the keys line up with the property map: the
+> service is told about `seo.title`, so it has to be told the value of
+> `seo.title` too, not of `seo`.
+
+and in `properties.test.ts`, as the reason the suite exists: *"if the two
+disagree, the model is told a field exists and shown no value for it, and
+cheerfully overwrites what the operator already wrote."* Both are about maps, and
+the suite tested maps. **An invariant stated in prose and tested on one shape of
+input is an invariant that holds for that shape.**
+
+**Sweep:** for any check whose subject arrived through a transform, do not read
+the check — construct the subject. One value of every type the system supports,
+through the real transform, compared against the real key set. Where two
+artefacts must agree, the honest form is to derive one from the other; where they
+cannot be, assert the agreement over generated input rather than over the example
+that prompted the comment.
+
+`typeof x === "object"` is the specific tell and is worth grepping on its own. In
+JavaScript it is true of arrays, `Date`, `Map`, `RegExp` and `null`, so every
+container test or recursion written that way treats five things as records — and
+the failure is silent in both directions: a `Date` yields no keys, an array
+yields the wrong ones. A prototype-checking `isPlainObject` is the fix, and its
+absence from a codebase that walks user data is the class.
+
+### Last sweep — 2026-08-08, twenty-seven units
+
+An audit register (`docs/audit-map.md`) naming the units worth auditing on their
+own, and 27 written reports in `docs/audits/`, each recording what was checked
+and found clean alongside the findings. The rows below are the ones that named a
+new class or overturned an old verdict; the reports carry the rest.
+
+| checked | result |
+|---|---|
+| `aal`, by its readers rather than its writers | **BUG** (class 36) — five writes, one read, and the read guarded `DELETE /auth/mfa/unenroll`. Login, register, every OAuth callback, refresh, anonymous and magic-link all minted `aal1` unconditionally, so an enrolled second factor was never consulted on any path an attacker takes. |
+| the two `REVOKE` comments on the channel tables, against the gate they cite | **BUG** (class 36) — no channel authorization existed anywhere in `packages/*/src`. Hardening applied on the premise of a check nobody wrote, which left the exempted tables less defended than the ones they were exempted from. |
+| `assertKnownWriteFields`, against what Postgres is actually given | **BUG** (class 36) — Drizzle drops unknown keys from the INSERT, so the "Postgres has the last word" backstop the comment named never existed. An all-unknown UPDATE compiled to `update "posts" set` — SQLSTATE 42601, returned to the caller as a 500 for their own typo. |
+| `excludeFromApi` across every artefact rendered from a collection | **BUG** ×2 (class 37) — an unauthenticated `/api/docs` published `passwordHash` as readable, writable and filterable; the SDK's `Insert` and `Update` offered it as a field to send. |
+| the autofill "only fill blanks" rule, over values as the service receives them | **BUG** (class 38) — arrays flattened to `tags.0`, dates flattened to nothing, both read as empty, both arrived pre-ticked for replacement. |
+| `WebhookDispatcher`'s destination | **BUG** — `fetch(webhook.url)` with no scheme check, no host check and no redirect policy, returning the first 1000 bytes in `responseBody`. See the correction below: this surface had been swept and cleared. |
+| the OAuth providers' base URLs, immediately after | clean **by a constraint now written down** — `createGitLabProvider` takes `baseUrl` from config and says why it must stay there: *"a caller-supplied instance URL would make this provider an SSRF primitive and an arbitrary-identity oracle in one step."* That is a requirement stated as a requirement, which is a different artefact from the same sentence used as a reason to skip a check. |
+
+### A correction: a clean verdict that rested on a wrong premise
+
+The 2026-08-07 table records this row:
+
+> every outbound `fetch` with a non-literal URL — clean. OAuth endpoints are
+> literals or config; `WebhookDispatcher` is instantiated by the developer, not
+> from data.
+
+The webhook audit disproved it. `WebhookDispatcher.deliver` called
+`fetch(webhook.url, …)` — no scheme allowlist, no host check, no redirect policy,
+no DNS pinning — and handed the first 1000 bytes of the answer back in
+`WebhookDeliveryResult.responseBody`, which makes it a read primitive and not
+merely a blind one. On GKE that reaches the node metadata endpoint, the
+in-cluster API server and `postgres-rw`, and the class's own custom-headers
+feature supplies the `Metadata-Flavor: Google` an unauthenticated GET needs.
+
+The row is left above exactly as it was written. The thing worth correcting is
+not the file that was missed — the right file was read — but the **inference**,
+because the inference is the part that gets reused. Two things were wrong with
+it.
+
+The first: *"from config, not from data"* describes the shape of the code, not
+who controls the value. A config is a string somebody types, and the skill that
+teaches this exact class tells them where: *"Load webhook configs from
+environment or database"* (`rebase-webhooks/SKILL.md:513`). The SaaS already
+ships a `webhooks.url` column any member of the owning organization may write. A
+missing guard in a shipped library is not excused by the absence, today, in this
+repo, of a caller that abuses it — the library is what makes it reachable in
+someone else's.
+
+The second, and the more general one: the question a destination check answers is
+not *who chose this URL* but **whose network position issues the request**. A
+server-side `fetch` runs from inside the cluster, and the developer who typed the
+URL is not the party the guard protects; it protects the pod's neighbours from
+that developer's typo, from their compromised admin UI, and from their receiver's
+`307` — which replays the POST body, the signature and every custom header at an
+address no allowlist ever saw. Redirects alone make "who typed it" moot.
+
+**What re-running this sweep now has to cover.** Enumerating `fetch(` with a
+non-literal argument is still the right start; the verdict on each hit needs
+three answers rather than one.
+
+1. *Where does the process run?* A `fetch` in `packages/cli`, `packages/admin`,
+   `packages/client` or `packages/app` runs on the developer's machine or in the
+   user's browser, from that user's own network position, and is not this class.
+   `packages/server`, `packages/server-postgres`, `packages/server-mongo`, and
+   anything a function or collection callback can reach, are.
+2. *Is there an enforced guard, independent of who supplies the URL?*
+   `assertAllowedOutboundUrl` (`packages/server/src/services/outbound-url-guard.ts`)
+   exists now and has exactly one caller, `webhook-service.ts`. The other
+   server-side non-literal destinations are the OAuth providers, and
+   `createGitLabProvider`'s `baseUrl` is the one that takes an instance URL. It
+   is held safe by a doc comment, which is a constraint and not an enforcement —
+   re-check it against every deployment shape that lets a tenant supply provider
+   config.
+3. *Is the response observable to the caller?* `responseBody` is what turned this
+   from blind SSRF into a read primitive. A `fetch` whose answer is discarded is a
+   smaller finding than one whose answer is returned, and the two should not share
+   a verdict.
+
+The lesson for the log itself: **a "clean" row is an assertion with a lifetime,
+and the premise is the part that expires.** "Instantiated by the developer, not
+from data" was true when it was written and is still true; only the inference
+drawn from it was wrong. That the correction is even possible is because the row
+recorded *why* it was clean rather than just that it was — so when a sweep clears
+something on a premise rather than on a check, write the premise into the row,
+and treat the premise, not the file, as the thing to re-test.
