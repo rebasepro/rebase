@@ -3,21 +3,30 @@ import { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
 
+/**
+ * Serve the OpenAPI document, and Swagger UI outside production.
+ *
+ * `serverCollections` must be the collections the REST routes were generated
+ * from — the ones whose data source has a `"server"` transport — not every
+ * active collection. A direct-transport collection is served by the client
+ * against its own backend; documenting it here publishes a full set of CRUD
+ * paths that 404, with a Try-It button next to each.
+ */
 export async function mountOpenApiDocs(
     app: Hono<HonoEnv>,
     basePath: string,
     enableSwagger: boolean | undefined,
-    activeCollections: CollectionConfig[],
+    serverCollections: CollectionConfig[],
     requireAuth: boolean
 ): Promise<void> {
-    if (enableSwagger === false || activeCollections.length === 0) {
+    if (enableSwagger === false || serverCollections.length === 0) {
         return;
     }
 
     const { generateOpenApiSpec } = await import("../api/openapi-generator");
 
     app.get(`${basePath}/docs`, (c) => {
-        const spec = generateOpenApiSpec(activeCollections, {
+        const spec = generateOpenApiSpec(serverCollections, {
             basePath,
             requireAuth
         });

@@ -198,17 +198,21 @@ description: "Whether more records exist beyond this page" }
                 description:
                     "JWT access token obtained from `POST /auth/login` or `POST /auth/register`. " +
                     "Can also be a static service key for server-to-server authentication."
-            },
-            queryToken: {
-                type: "apiKey",
-                in: "query",
-                name: "token",
-                description: "Alternative: pass the JWT or service key as a `token` query parameter."
             }
+            // No `?token=` scheme. It was declared here — globally, so on every
+            // operation — and no data route has ever accepted one: both
+            // `createAuthMiddleware` and `createAdapterAuthMiddleware` read the
+            // `Authorization` header and nothing else, deliberately, because
+            // URLs leak into access logs, proxies, Referer headers and browser
+            // history (`auth/middleware.ts`). Following it cost a caller twice:
+            // unauthenticated, *and* a 400, since `token` is not in the query
+            // parser's `reservedQueryKeys` and so compiles as a filter on a
+            // column named `token`. `queryTokenAuth` is real but is mounted
+            // only on storage file serving, for `<img src>`; if those routes
+            // are ever documented, the scheme belongs on them, per-operation.
         };
         (spec as Record<string, unknown>).security = [
-            { bearerAuth: [] },
-            { queryToken: [] }
+            { bearerAuth: [] }
         ];
     }
 
@@ -216,9 +220,18 @@ description: "Whether more records exist beyond this page" }
     const schemas = (spec.components as Record<string, unknown>).schemas as Record<string, unknown>;
     const tags = spec.tags as Array<{ name: string; description?: string }>;
 
+    // The names a listing has already spent. A collection is free to have a
+    // `limit` or a `fields` column, and the query parser reads those names as
+    // pagination and field selection before any filter is compiled — so the
+    // per-field filter could never fire, and documenting it a second time put
+    // two parameters with the same (`name`, `in`) pair on one operation, which
+    // is invalid OpenAPI: Swagger UI renders a duplicate and several generators
+    // abort. Taken from the parameter list itself so the two cannot drift.
+    const reservedParameterNames = new Set(listQueryParameters().map(p => p.name));
+
     // ── Collection routes ────────────────────────────────────────────────
     for (const collection of (collections || [])) {
-        const schemaName = toPascalCase(collection.singularName || collection.name);
+        const schemaName = schemaNameFor(collection);
         const slug = collection.slug;
 
         tags.push({
@@ -246,7 +259,7 @@ description: "Whether more records exist beyond this page" }
                 operationId: `list${schemaName}`,
                 parameters: [
                     ...listQueryParameters(),
-                    ...buildFilterParameters(collection)
+                    ...buildFilterParameters(collection, reservedParameterNames)
                 ],
                 responses: {
                     200: {
@@ -567,14 +580,13 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
     // describe a response shape the client never gets.
     for (const collection of (collections || [])) {
         const slug = collection.slug;
-        const schemaName = toPascalCase(collection.singularName || collection.name);
+        const schemaName = schemaNameFor(collection);
         const relations = Object.values(resolveCollectionRelations(collection))
             .filter(isToMany);
         for (const relation of relations) {
             const relationName = relation.relationName;
             const targetCollection = relation.target();
-            const targetName = targetCollection.singularName || targetCollection.name;
-            const targetSchema = toPascalCase(targetName);
+            const targetSchema = schemaNameFor(targetCollection);
 
             const subPath = `/data/${slug}/{parentId}/${relationName}`;
 
@@ -629,8 +641,37 @@ description: `${collection.singularName || collection.name} ID` },
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
+ * Is this property part of the shape the document may describe?
+ *
+ * Two exclusions, and both are the document telling the truth about what the
+ * server does:
+ *
+ * - a `relation` property is virtual: the row carries the owning side's foreign
+ *   key column, never the property itself, so it is not a field of any payload.
+ *   (The FK column *is* readable, writable and filterable and is still absent
+ *   from every schema here — a separate gap, not this rule.)
+ * - `excludeFromApi` is a server-side guarantee that the column "is stripped
+ *   from every row the API serves, for every caller, including admins and
+ *   service keys" — `stripExcluded` in the row pipeline enforces it. A schema
+ *   that lists such a column describes a field that is never present, and it
+ *   describes it to everyone: `/docs` is mounted on the app, not on the data
+ *   router, so it carries none of the auth middleware `{basePath}/data` does.
+ *   Every project scaffolded by `rebase init` published its `users`
+ *   collection's `passwordHash` and `emailVerificationToken` this way.
+ *
+ * Written as one predicate rather than three `continue`s because it kept being
+ * fixed in one loop at a time: this is the same rule the SDK generator applies
+ * to its `Row` type (`packages/codegen/src/generate-types.ts`).
+ */
+function isDocumentedProperty(property: Property): boolean {
+    return property.type !== "relation" && !property.excludeFromApi;
+}
+
+/**
  * Build the component schema for a collection (output / read shape).
- * All fields are included (including relation foreign keys).
+ *
+ * Every declared property except the ones {@link isDocumentedProperty} rules
+ * out.
  */
 function buildCollectionSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {
@@ -640,8 +681,7 @@ description: "Unique identifier" }
     const required: string[] = ["id"];
 
     for (const [key, property] of Object.entries(collection.properties)) {
-        // Skip relation properties — they are virtual and not part of the REST payload
-        if (property.type === "relation") continue;
+        if (!isDocumentedProperty(property)) continue;
 
         properties[key] = convertPropertyToSchema(property);
 
@@ -721,13 +761,19 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
 
 /**
  * Build an input schema (for POST/PUT) — excludes auto-generated fields.
+ *
+ * `excludeFromApi` columns are left out too, though a write naming one is still
+ * accepted: a create the document invites and whose result it then cannot show
+ * is not a round trip anyone can verify, and naming the column here discloses
+ * it just as loudly as the read schema does — this document is served
+ * unauthenticated.
  */
 function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
 
     for (const [key, property] of Object.entries(collection.properties)) {
-        if (property.type === "relation") continue;
+        if (!isDocumentedProperty(property)) continue;
 
         // Skip auto-value date fields from the input schema
         if (property.type === "date" && property.autoValue) continue;
@@ -957,14 +1003,26 @@ function resolveEnumValues(enumDef: Record<string | number, unknown> | Array<{ i
 /**
  * Build PostgREST-style filter parameters for a collection.
  * These are additional query parameters like `?status=eq.active&price=gte.100`.
+ *
+ * `excludeFromApi` columns are not offered: the server does filter on them, and
+ * that is exactly the problem — a filter on a column no response can contain
+ * answers questions about the value one row at a time, which is a worse
+ * disclosure than the column name alone.
  */
-function buildFilterParameters(collection: CollectionConfig): Array<Record<string, unknown>> {
+function buildFilterParameters(
+    collection: CollectionConfig,
+    reservedNames: ReadonlySet<string> = new Set()
+): Array<Record<string, unknown>> {
     const params: Array<Record<string, unknown>> = [];
 
     for (const [key, property] of Object.entries(collection.properties)) {
-        if (property.type === "relation" || property.type === "map" || property.type === "array" || property.type === "geopoint") {
+        if (!isDocumentedProperty(property)) continue;
+        if (property.type === "map" || property.type === "array" || property.type === "geopoint") {
             continue;
         }
+        // A column whose name a list parameter already owns is unfilterable
+        // over the wire — see `reservedParameterNames`.
+        if (reservedNames.has(key)) continue;
 
         params.push({
             name: key,
@@ -1017,6 +1075,28 @@ function errorResponses(requireAuth: boolean): Record<string, unknown> {
  */
 function withIndefiniteArticle(noun: string): string {
     return `${/^[aeiou]/i.test(noun) ? "an" : "a"} ${noun}`;
+}
+
+/**
+ * The component-schema name for a collection — and the stem of every
+ * `operationId` and `$ref` that mentions it.
+ *
+ * `toPascalCase` keeps ASCII letters and digits and nothing else, so a name
+ * written in a script that has none of them — a Cyrillic or Japanese
+ * `singularName`, which the docs' six locales make ordinary rather than exotic
+ * — reduced to the empty string. The schema was then stored under `""` and
+ * every reference to it read `#/components/schemas/`, an unresolvable pointer:
+ * Swagger UI renders the model empty and a strict generator fails outright. So
+ * fall through the names until one survives, and keep a constant as the floor.
+ *
+ * Two collections whose names PascalCase identically still share one component;
+ * that needs a disambiguation rule, not a fallback.
+ */
+function schemaNameFor(collection: CollectionConfig): string {
+    return toPascalCase(collection.singularName || "")
+        || toPascalCase(collection.name || "")
+        || toPascalCase(collection.slug || "")
+        || "Collection";
 }
 
 /**
