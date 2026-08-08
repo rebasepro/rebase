@@ -430,8 +430,13 @@ dataType: "number" },
 
     const mockProjectsTable = {
         id: { name: "id" },
-        title: { name: "title" },
-        description: { name: "description" },
+        // `getSQLType` is what the search builder asks a column about itself —
+        // a stub without one is not searchable, which is the correct answer for
+        // a column whose type is unknowable.
+        title: { name: "title",
+getSQLType: () => "text" },
+        description: { name: "description",
+getSQLType: () => "text" },
         company_id: { name: "company_id" },
         status: { name: "status" },
         priority: { name: "priority" },

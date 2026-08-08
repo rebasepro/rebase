@@ -24,8 +24,10 @@ const mockProjectUsersTable = {
 /** Single-PK table for count / pagination tests */
 const mockItemsTable = {
     id: { name: "id", dataType: "number" },
-    name: { name: "name" },
-    description: { name: "description" },
+    // `getSQLType` is the only thing the search builder asks a column about
+    // itself — see `supportsILike`. A stub without one is not searchable.
+    name: { name: "name", getSQLType: () => "text" },
+    description: { name: "description", getSQLType: () => "text" },
     _def: { tableName: "items" }
 };
 
@@ -443,10 +445,9 @@ describe("FetchService – count", () => {
     });
 
     it("should pass searchString through to the query pipeline", async () => {
-        // With mock table columns that don't have a `columnType` property,
-        // buildSearchConditions generates ILIKE conditions (because of the
-        // fallback `!("columnType" in fieldColumn)` check). This means the
-        // search path proceeds normally rather than short-circuiting to 0.
+        // The mock columns report a text `getSQLType()`, so buildSearchConditions
+        // generates ILIKE conditions and the search path proceeds normally
+        // rather than short-circuiting to 0.
         (db as unknown as Record<string, jest.Mock>).then = jest.fn(
             (resolve: (v: unknown[]) => void) => resolve([{ count: 3 }])
         );

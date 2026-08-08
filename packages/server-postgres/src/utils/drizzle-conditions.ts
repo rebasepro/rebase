@@ -1,5 +1,5 @@
 import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
-import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
+import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
@@ -68,6 +68,35 @@ export type UnknownFilterFieldsMode = "error" | "warn";
  */
 export const escapeLikePattern = (value: string): string =>
     value.replace(/[\\%_]/g, ch => `\\${ch}`);
+
+/** Column types `ILIKE '%…%'` is defined on. */
+const ILIKE_SQL_TYPES = /^(text|varchar|character varying|char|character|bpchar|citext)\b/;
+
+/**
+ * Can this column be matched with `ILIKE`?
+ *
+ * Asked of the column's *declared SQL type*, never with `instanceof`. The
+ * previous version tested `column instanceof PgVarchar || … PgText || … PgChar`,
+ * and `instanceof` compares class identity: it is only true when the column was
+ * constructed by the very same copy of `drizzle-orm` that this module imported.
+ *
+ * An application's generated schema builds its tables with the app's own
+ * `drizzle-orm`, and this driver declares its own dependency on one. When the
+ * two ranges do not overlap — an app scaffolded against `^0.44` with a driver
+ * asking for `^0.45` — a strict installer gives the driver a second copy, every
+ * check returns false, no condition is produced, and the caller compiles that
+ * into an impossible `WHERE`. The result is a 200 with an empty page for every
+ * search on every collection without a `search` block: the failure looks
+ * exactly like "nothing matched". Observed in production, not theorised.
+ *
+ * `getSQLType()` is a value the column reports about itself, so it crosses
+ * module instances the way a class identity cannot. It also happens to fix
+ * `citext`, which the `instanceof` list never covered.
+ */
+const supportsILike = (column: AnyPgColumn): boolean => {
+    const sqlType = typeof column?.getSQLType === "function" ? column.getSQLType().toLowerCase() : "";
+    return ILIKE_SQL_TYPES.test(sqlType);
+};
 
 /**
  * Process-wide default, set once when the driver is constructed.
@@ -1346,24 +1375,32 @@ whereConditions };
             : undefined;
         if (ftsCondition) return [ftsCondition];
 
+        let declaredStringProperties = 0;
+
         for (const [key, prop] of Object.entries(properties)) {
             const p = prop as Record<string, unknown>;
             // Only include string properties that don't have enum defined
             // PostgreSQL enum and uuid columns don't support ILIKE, so we skip them
             if (p.type === "string" && !p.enum && p.isId !== "uuid") {
+                declaredStringProperties++;
                 const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
-                if (fieldColumn) {
-                    // Verify that the underlying database column supports string pattern-matching
-                    const supportsILike =
-                        fieldColumn instanceof PgVarchar ||
-                        fieldColumn instanceof PgText ||
-                        fieldColumn instanceof PgChar ||
-                        (fieldColumn && typeof fieldColumn === "object" && !("columnType" in fieldColumn));
-                    if (supportsILike) {
-                        searchConditions.push(ilike(fieldColumn, `%${escapeLikePattern(searchString)}%`));
-                    }
+                if (fieldColumn && supportsILike(fieldColumn)) {
+                    searchConditions.push(ilike(fieldColumn, `%${escapeLikePattern(searchString)}%`));
                 }
             }
+        }
+
+        // Every string property was rejected, so the caller is about to turn an
+        // empty condition list into "match nothing" — a 200 with an empty page,
+        // which reads as "no such row" rather than as the breakage it is. Say so
+        // once per query: this is how the `instanceof` version of
+        // {@link supportsILike} failed silently in the field for months.
+        if (declaredStringProperties > 0 && searchConditions.length === 0) {
+            logger.warn(
+                `[search] "${collection?.slug ?? "collection"}" declares ${declaredStringProperties} string ` +
+                "property(ies) but none compiled to a searchable column, so this search can only return nothing. " +
+                "Check that the generated schema's column types are text/varchar/char."
+            );
         }
 
         return searchConditions;
