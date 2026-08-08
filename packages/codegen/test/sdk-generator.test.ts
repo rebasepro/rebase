@@ -854,8 +854,13 @@ describe("excludeFromApi keeps a property off every generated type", () => {
         return [...body.matchAll(/^ {6}"?([^"?:]+)"?\??:/gm)].map(m => m[1]);
     }
 
-    function block(ts: string, name: "Row" | "Insert" | "Update"): string[] {
-        const start = ts.indexOf(`    ${name}: {`);
+    // Anchored on the collection, not on the first `Row: {` in the file: the
+    // generator sorts by slug, so which collection comes first is not the order
+    // the fixtures were passed in.
+    function block(ts: string, name: "Row" | "Insert" | "Update", slug = "vault"): string[] {
+        const collection = ts.indexOf(`  ${slug}: {`);
+        expect(collection).toBeGreaterThan(-1);
+        const start = ts.indexOf(`    ${name}: {`, collection);
         expect(start).toBeGreaterThan(-1);
         return emittedKeys(ts.slice(start, ts.indexOf("    };", start)));
     }
