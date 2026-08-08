@@ -260,7 +260,7 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 - **Spécification OpenAPI** : `GET /api/docs` — Renvoie la spécification JSON OpenAPI 3.0 complète
 - **Swagger UI** : `GET /api/swagger` — Explorateur d'API interactif (mode développement uniquement)
 
-La spécification OpenAPI est générée automatiquement à partir de vos définitions de collections et inclut tous les endpoints, paramètres de requête et schémas de réponse.
+La spécification OpenAPI est générée automatiquement à partir de vos définitions de collections : elle décrit les endpoints de liste, lecture, création, mise à jour, suppression et bulk de chaque collection servie par le backend, avec leurs paramètres de requête et schémas de réponse. Ce n'est pas une carte complète de la surface HTTP — les routes auth, storage, functions et cron ne sont documentées que sur ce site — et les colonnes marquées `excludeFromApi` en sont exclues.
 
 ## Clés d'API
 

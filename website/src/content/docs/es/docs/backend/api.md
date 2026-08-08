@@ -260,7 +260,7 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 - **Especificación OpenAPI**: `GET /api/docs` — Devuelve la especificación JSON completa de OpenAPI 3.0
 - **Swagger UI**: `GET /api/swagger` — Explorador de API interactivo (solo en modo desarrollo)
 
-La especificación OpenAPI se genera automáticamente a partir de las definiciones de sus colecciones e incluye todos los endpoints, parámetros de consulta y esquemas de respuesta.
+La especificación OpenAPI se genera automáticamente a partir de las definiciones de sus colecciones: describe los endpoints de listado, lectura, creación, actualización, borrado y bulk de cada colección que sirve el backend, con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de la superficie HTTP — las rutas de auth, storage, functions y cron están documentadas solo en este sitio — y las columnas marcadas con `excludeFromApi` quedan fuera de ella.
 
 ## Claves de API
 

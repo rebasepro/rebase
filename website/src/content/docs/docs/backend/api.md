@@ -260,7 +260,7 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 - **OpenAPI spec**: `GET /api/docs` — Returns the full OpenAPI 3.0 JSON specification
 - **Swagger UI**: `GET /api/swagger` — Interactive API explorer (dev mode only)
 
-The OpenAPI spec is auto-generated from your collection definitions and includes all endpoints, query parameters, and response schemas.
+The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
 ## API Keys
 

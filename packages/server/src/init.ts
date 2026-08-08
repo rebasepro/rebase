@@ -1354,6 +1354,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.info("Storage not configured — /storage returns 501 STORAGE_NOT_CONFIGURED");
     }
 
+    // Only the server-mediated collections get a backend surface. Collections
+    // on a direct/custom transport are client-only — the backend must not
+    // expose a (mis-engined) endpoint for them, nor *document* one: the routes
+    // were filtered and the OpenAPI document was not, so the one collection the
+    // backend deliberately refuses to serve was the one it advertised hardest.
+    const serverCollections = activeCollections.filter(
+        (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
+    );
+
     if (activeCollections.length > 0) {
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
@@ -1456,13 +1465,6 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             dataRouter.route("/", historyRoutes);
         }
 
-        // Only generate server data routes for server-mediated collections.
-        // Collections on a direct/custom transport are client-only — the
-        // backend must not expose a (mis-engined) endpoint for them.
-        const serverCollections = activeCollections.filter(
-            (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
-        );
-
         const restGenerator = new RestApiGenerator(
             serverCollections,
             defaultDriver,
@@ -1474,7 +1476,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
-    await mountOpenApiDocs(config.app, basePath, config.enableSwagger, activeCollections, resolveRequireAuth(config.auth));
+    await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth));
 
     // ─── Server-side singleton ────────────────────────────────────────────
     // Build the RebaseClient for control-plane APIs (auth, admin, storage,
