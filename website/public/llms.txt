@@ -5562,9 +5562,21 @@ const { data } = await client.data.talents
 
 One `tsvector` column, `GENERATED ALWAYS AS … STORED`, and one GIN index on it.
 Postgres recomputes the column on every write of a source field and refuses any
-attempt to write it directly, so the index cannot drift from the row. Both
-appear in generated DDL, in `schema.generated.ts`, and in `rebase db push`
-output like any other declared object. The column is never returned by the API.
+attempt to write it directly, so the index cannot drift from the row. The column
+is never returned by the API.
+
+They are generated into `drizzle/search.sql`, next to `schema.sql` and
+`policies.sql`, and `rebase db push` applies them for you — nothing extra to
+run. They get their own file because a generated `tsvector` column needs an
+`IMMUTABLE` helper function to exist first (`unaccent` is only `STABLE`, and
+flattening a `jsonb` document needs a set-returning function), and Atlas — the
+engine behind `db push` — cannot manage functions on its free tier.
+
+One consequence worth knowing if you deploy by migration rather than by push:
+adding a `search` block on its own produces no migration, because the schema
+Atlas compares has not changed. `rebase db generate` says so when it happens.
+The block is still applied by `rebase db push` and by the boot-time schema
+ensure; to put it in a migration explicitly, append `drizzle/search.sql` to one.
 
 ### What you can name in `fields`
 
