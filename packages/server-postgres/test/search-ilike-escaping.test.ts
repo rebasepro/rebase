@@ -19,8 +19,10 @@
  * that on a driver the same expression "occupies a server thread instead".
  */
 import { CollectionConfig } from "@rebasepro/types";
+import { SQL } from "drizzle-orm";
 import { pgTable, PgDialect, serial, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder, escapeLikePattern } from "../src/utils/drizzle-conditions";
+import { UserService } from "../src/auth/services";
 
 const docs = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -83,5 +85,53 @@ describe("a search term is matched as literal text", () => {
 describe("escapeLikePattern", () => {
     it("touches nothing else", () => {
         expect(escapeLikePattern("O'Brien & Sons, 100€")).toBe("O'Brien & Sons, 100€");
+    });
+});
+
+/**
+ * The admin user list is the second call site of the same substring search.
+ *
+ * `GET /api/admin/users?search=` reaches `UserService.listUsersPaginated`, which
+ * builds its own `ILIKE '%…%'` over email OR display name rather than going
+ * through the condition builder — so it did not inherit the escaping above. The
+ * cost is worse here than on a collection: the term is OR-ed across two columns
+ * of the users table on a sequential scan, and the count query runs the same
+ * predicate a second time.
+ */
+describe("the admin user search matches the text the admin typed", () => {
+    /** The patterns bound by the WHERE of `listUsersPaginated`, count query first. */
+    const patternsFor = async (search: string): Promise<string[]> => {
+        const executed: SQL[] = [];
+        const db = {
+            execute: async (query: SQL) => {
+                executed.push(query);
+                return { rows: executed.length === 1 ? [{ total: 0 }] : [] };
+            }
+        } as unknown as ConstructorParameters<typeof UserService>[0];
+
+        await new UserService(db).listUsersPaginated({ search });
+
+        const dialect = new PgDialect();
+        return executed.map(query => String(dialect.sqlToQuery(query).params[0]));
+    };
+
+    it("escapes the wildcards, in both the count and the page query", async () => {
+        expect(await patternsFor("50%_off")).toEqual(["%50\\%\\_off%", "%50\\%\\_off%"]);
+    });
+
+    it("escapes the escape character itself", async () => {
+        expect(await patternsFor("c:\\")).toEqual(["%c:\\\\%", "%c:\\\\%"]);
+    });
+
+    it("leaves an ordinary term exactly as it was", async () => {
+        expect(await patternsFor("ada@example.com")).toEqual([
+            "%ada@example.com%", "%ada@example.com%"
+        ]);
+    });
+
+    it("gives a hostile pattern no wildcards to backtrack over", async () => {
+        const [pattern] = await patternsFor("a%".repeat(14) + "b");
+
+        expect(pattern.match(/(?<!\\)%/g)).toHaveLength(2);
     });
 });
