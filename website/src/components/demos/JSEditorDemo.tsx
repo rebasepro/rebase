@@ -197,7 +197,7 @@ code: "// New script\n" }]);
                                 </button>
                             ))}
                             <div className="px-1.5 py-1 mt-2 text-[10px] font-semibold text-surface-500 tracking-wider">ADMIN</div>
-                            {["listUsers", "getSession", "getConfig"].map(method => (
+                            {["listUsers", "listRoles", "listUsersPaginated"].map(method => (
                                 <button
                                     key={method}
                                     onClick={() => handleCodeChange(`const result = await client.admin.${method}();\nreturn result;`)}

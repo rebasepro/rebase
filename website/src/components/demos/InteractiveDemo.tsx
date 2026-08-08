@@ -65,15 +65,17 @@ export default function InteractiveDemo() {
     );
 
     // Code generators
-    const sdkCode = `import { createClient } from "@rebasepro/client";
+    const sdkCode = `import { createRebaseClient } from "@rebasepro/client";
 
-const client = createClient();
+const client = createRebaseClient<Database>({
+  baseUrl: "http://localhost:3001"
+});
 
 // 1. Fetch record
-const order = await client.orders.retrieve("${activeOrder.id}");
+const order = await client.data.orders.findById("${activeOrder.id}");
 
 // 2. Perform type-safe update
-await client.orders.update("${activeOrder.id}", {
+await client.data.orders.update("${activeOrder.id}", {
   customer: "${activeOrder.customer}",
   status: "${activeOrder.status}"
 });`;
@@ -263,12 +265,14 @@ await client.orders.update("${activeOrder.id}", {
                 <div className="flex-1 p-5 font-mono text-[11px] leading-relaxed text-surface-300 overflow-auto bg-[#0a0a0c]">
                     {activeInspectorTab === "sdk" ? (
                         <pre className="whitespace-pre-wrap">
-                            <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">createClient</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/client"</span>;{"\n\n"}
-                            <span className="text-purple-400">const</span> client = <span className="text-blue-400">createClient</span>();{"\n\n"}
+                            <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">createRebaseClient</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/client"</span>;{"\n\n"}
+                            <span className="text-purple-400">const</span> client = <span className="text-blue-400">createRebaseClient</span>&lt;Database&gt;(&#123;{"\n"}
+                            {"  "}baseUrl: <span className="text-green-400">"http://localhost:3001"</span>{"\n"}
+                            &#125;);{"\n\n"}
                             <span className="text-surface-500">// 1. Fetch record</span>{"\n"}
-                            <span className="text-purple-400">const</span> order = <span className="text-purple-400">await</span> client.orders.<span className="text-blue-300">retrieve</span>(<span className="text-green-400">"{activeOrder.id}"</span>);{"\n\n"}
+                            <span className="text-purple-400">const</span> order = <span className="text-purple-400">await</span> client.data.orders.<span className="text-blue-300">findById</span>(<span className="text-green-400">"{activeOrder.id}"</span>);{"\n\n"}
                             <span className="text-surface-500">// 2. Perform type-safe update</span>{"\n"}
-                            <span className="text-purple-400">await</span> client.orders.<span className="text-blue-300">update</span>(<span className="text-green-400">"{activeOrder.id}"</span>, &#123;{"\n"}
+                            <span className="text-purple-400">await</span> client.data.orders.<span className="text-blue-300">update</span>(<span className="text-green-400">"{activeOrder.id}"</span>, &#123;{"\n"}
                             {"  "}customer: <span className="text-green-300 bg-green-500/5 px-1 rounded animate-pulse">"{activeOrder.customer}"</span>,{"\n"}
                             {"  "}status: <span className="text-green-300 bg-green-500/5 px-1 rounded animate-pulse">"{activeOrder.status}"</span>{"\n"}
                             &#125;);

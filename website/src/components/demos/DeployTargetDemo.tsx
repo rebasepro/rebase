@@ -36,7 +36,7 @@ const TARGETS: Target[] = [
             { kind: "cmd", text: "ssh root@box.example.eu 'cd /srv/api && docker compose up -d'" },
             { kind: "out", text: "✔ db    postgres:18-alpine   healthy" },
             { kind: "out", text: "✔ api   rebasepro/server     listening on :8080" },
-            { kind: "cmd", text: "rebase db push --database-url $PROD_DATABASE_URL" },
+            { kind: "cmd", text: "DATABASE_URL=$PROD_DATABASE_URL rebase db push" },
             { kind: "out", text: "dry run    12 tables, 34 policies, 0 destructive changes" },
             { kind: "out", text: "applied    RLS enabled on every table" },
             { kind: "ok", text: "GET https://api.example.eu/health  →  200 OK" }

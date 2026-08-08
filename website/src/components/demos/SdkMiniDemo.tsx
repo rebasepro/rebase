@@ -156,7 +156,7 @@ export function SdkMiniDemo() {
                     {/* Type annotation tooltip */}
                     {step >= 7 && (
                         <div className="mt-3 px-2 py-1.5 bg-[#252526] border border-[#454545] rounded-sm inline-block shadow-lg">
-                            <div className="text-[9px] text-[#858585] mb-0.5">const data: FindResponse&lt;Post&gt;</div>
+                            <div className="text-[9px] text-[#858585] mb-0.5">const data: FindResult&lt;Post&gt;</div>
                             <div className="text-[10px]"><span className="text-surface-500">{"{"}</span> <span className="text-[#9cdcfe]">data</span>: <span className="text-[#4ec9b0]">Entity&lt;Post&gt;</span>[], <span className="text-[#9cdcfe]">meta</span>: <span className="text-[#4ec9b0]">Meta</span> <span className="text-surface-500">{"}"}</span></div>
                         </div>
                     )}

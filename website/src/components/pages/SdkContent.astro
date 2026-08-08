@@ -50,8 +50,8 @@ const crudCode = `<span class="text-surface-500">// Find all published posts</sp
 
 const queryCode = `<span class="text-surface-500">// Chained queries</span>
 <span class="text-blue-400">const</span> { data } = <span class="text-blue-400">await</span> rebase.data.posts
-  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"eq"</span>, <span class="text-emerald-400">"published"</span>)
-  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"views"</span>, <span class="text-emerald-400">"gte"</span>, <span class="text-amber-400">100</span>)
+  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"=="</span>, <span class="text-emerald-400">"published"</span>)
+  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"views"</span>, <span class="text-emerald-400">"&gt;="</span>, <span class="text-amber-400">100</span>)
   .<span class="text-amber-400">orderBy</span>(<span class="text-emerald-400">"createdAt"</span>, <span class="text-emerald-400">"desc"</span>)
   .<span class="text-amber-400">limit</span>(<span class="text-amber-400">10</span>)
   .<span class="text-amber-400">find</span>();
@@ -69,17 +69,19 @@ const queryCode = `<span class="text-surface-500">// Chained queries</span>
 
 <span class="text-surface-500">// Realtime listening</span>
 <span class="text-blue-400">const</span> unsub = rebase.data.posts
-  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"eq"</span>, <span class="text-emerald-400">"published"</span>)
+  .<span class="text-amber-400">where</span>(<span class="text-emerald-400">"status"</span>, <span class="text-emerald-400">"=="</span>, <span class="text-emerald-400">"published"</span>)
   .<span class="text-amber-400">listen</span>(({ data }) =&gt; {
     console.log(<span class="text-emerald-400">"Live update:"</span>, data);
   });
 
 <span class="text-surface-500">// Broadcast channel</span>
-<span class="text-blue-400">const</span> channel = rebase.realtime
-  .<span class="text-amber-400">channel</span>(<span class="text-emerald-400">"chat-room"</span>)
-  .<span class="text-amber-400">on</span>(<span class="text-emerald-400">"message"</span>, (msg) =&gt; {
-    console.log(<span class="text-emerald-400">"Received:"</span>, msg);
-  });`;
+<span class="text-blue-400">const</span> channel = rebase.realtime.<span class="text-amber-400">channel</span>(<span class="text-emerald-400">"chat-room"</span>);
+
+channel.<span class="text-amber-400">onBroadcast</span>(<span class="text-emerald-400">"message"</span>, (payload) =&gt; {
+  console.log(<span class="text-emerald-400">"Received:"</span>, payload);
+});
+
+<span class="text-blue-400">await</span> channel.<span class="text-amber-400">join</span>();`;
 
 const authCode = `<span class="text-surface-500">// Sign in</span>
 <span class="text-blue-400">await</span> rebase.auth.<span class="text-amber-400">signInWithEmail</span>(
@@ -236,7 +238,7 @@ const sdkGenCode = `<span class="text-surface-500">$ rebase generate-sdk</span>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
-              @rebasepro/sdk_generator
+              rebase generate-sdk
             </div>
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Generated Types</h2>
             <p class="text-lg text-surface-400 mb-6">Run <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">rebase generate-sdk</code> to produce a <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">database.types.ts</code> file from your collection definitions. Pass it as a generic to <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">createRebaseClient&lt;Database&gt;</code> for full end-to-end type safety.</p>

@@ -644,13 +644,13 @@ export default function RebaseMosaicDemo() {
 
                         {/* Code syntax */}
                         <pre className="text-neutral-400">
-              <span className="text-purple-400">import</span> &#123; rebase &#125; <span
+              <span className="text-purple-400">import</span> &#123; createRebaseClient &#125; <span
                             className="text-purple-400">from</span> <span
                             className="text-green-400">"@rebasepro/client"</span>;{"\n"}
                             {"\n"}
-                            <span className="text-purple-400">const</span> client = rebase.<span
-                            className="text-blue-400">init</span>(&#123;{"\n"}
-                            {"  "}projectId: <span className="text-green-400">"rebase-pro"</span>{"\n"}
+                            <span className="text-purple-400">const</span> client = <span
+                            className="text-blue-400">createRebaseClient</span>(&#123;{"\n"}
+                            {"  "}baseUrl: <span className="text-green-400">"http://localhost:3001"</span>{"\n"}
                             &#125;);{"\n"}
                             {"\n"}
                             <span className="text-neutral-500">// Query active posts in real-time</span>{"\n"}
@@ -659,7 +659,7 @@ export default function RebaseMosaicDemo() {
                             className="text-blue-400">posts</span>{"\n"}
                             {"  "}.<span className="text-teal-400">where</span>(<span
                             className="text-green-400">"status"</span>, <span
-                            className="text-green-400">"eq"</span>, <span
+                            className="text-green-400">"=="</span>, <span
                             className="text-green-400">"active"</span>){"\n"}
                             <span
                                 className={`transition-all duration-300 ${tick === 3 ? "text-green-300 bg-green-500/10 border-l border-green-500 pl-1 animate-pulse" : "opacity-0 select-none pointer-events-none"}`}>

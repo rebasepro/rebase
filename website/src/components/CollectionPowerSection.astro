@@ -449,20 +449,22 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     <span class="ml-auto text-3xs font-semibold text-blue-400 font-mono">TS</span>
                 </div>
                 <div class="p-4 font-mono text-2xs leading-relaxed text-surface-400">
-                    <pre set:html={`<span class="text-primary-light">import</span> <span class="text-white">{ createClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
+                    <pre set:html={`<span class="text-primary-light">import</span> <span class="text-white">{ createRebaseClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
 
-<span class="text-primary-light">const</span> <span class="text-white">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createClient</span>();
+<span class="text-primary-light">const</span> <span class="text-white">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createRebaseClient</span>&lt;Database&gt;({
+  <span class="text-blue-300">baseUrl</span>: <span class="text-green-400">"http://localhost:3001"</span>
+});
 
 <span class="text-surface-500">// Fully typed queries</span>
-<span class="text-primary-light">const</span> <span class="text-white">{ data }</span> <span class="text-primary-light">=</span> <span class="text-primary-light">await</span> <span class="text-white">client</span>.products.<span class="text-blue-300">list</span>({
+<span class="text-primary-light">const</span> <span class="text-white">{ data }</span> <span class="text-primary-light">=</span> <span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">find</span>({
   <span class="text-blue-300">where</span>: {
-    <span class="text-blue-300">category</span>: <span class="text-green-400">"Electronics"</span>,
-    <span class="text-blue-300">in_stock</span>: <span class="text-primary-light">true</span>
+    <span class="text-blue-300">category</span>: [<span class="text-green-400">"=="</span>, <span class="text-green-400">"Electronics"</span>],
+    <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>]
   }
 });
 
 <span class="text-surface-500">// Type-safe inserts</span>
-<span class="text-primary-light">await</span> <span class="text-white">client</span>.products.<span class="text-blue-300">create</span>({
+<span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">create</span>({
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Camera"</span>,
   <span class="text-blue-300">price</span>: <span class="text-amber-500">299</span>,
   <span class="text-blue-300">category</span>: <span class="text-green-400">"Electronics"</span>

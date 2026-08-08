@@ -127,7 +127,7 @@ export default function AiAppDevelopmentDemo() {
               
               {activeMode === "recipes" ? (
                 <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] px-3 py-1 rounded border border-surface-800">
-                  <span className="text-primary font-semibold">$</span> npx rebase ext add ai-extractor
+                  <span className="text-primary font-semibold">$</span> rebase skills install --agent claude
                 </div>
               ) : (
                 <span className="text-[10px] font-mono text-slate-500">Rebase Studio · Webhook Designer</span>

@@ -85,7 +85,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/slider"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/slider"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -101,7 +101,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/button"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/button"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -119,7 +119,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/tabs"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/tabs"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -135,7 +135,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/file_upload"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/fileupload"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -152,7 +152,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/search_bar"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/searchbar"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -165,7 +165,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/alert"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/alert"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -180,7 +180,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/markdown"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/markdown"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -192,7 +192,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/skeleton"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/skeleton"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -206,7 +206,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/chip"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/chip"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -248,7 +248,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/boolean_switch"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/booleanswitch"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -275,7 +275,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/checkbox"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/checkbox"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -314,7 +314,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/icon_button"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/iconbutton"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -353,7 +353,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/dialog"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/dialog"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -379,7 +379,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/popover"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/popover"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -393,7 +393,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/text_field"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/textfield"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -417,7 +417,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/radio_group"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/radiogroup"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -451,7 +451,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/circular_progress"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/circularprogress"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -468,7 +468,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/menu"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/menu"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -484,7 +484,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/expandable_panel"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/expandablepanel"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -502,7 +502,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/datetimefield"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/datetimefield"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -517,7 +517,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/avatar"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/avatar"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -536,7 +536,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/select"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/select"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -568,7 +568,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/multiselect"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/multiselect"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -604,7 +604,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/sheet"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/sheet"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -621,7 +621,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/loading_button"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/loadingbutton"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -634,7 +634,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/badge"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/badge"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>
@@ -658,7 +658,7 @@ export default function ClientUIComponentsShowcase({
                 <IconButton className="absolute top-2 right-2 hover:no-underline"
                     component={"a"}
                     target={linksInNewTab ? "_blank" : undefined}
-                    href={(docsUrl ?? "") + "/docs/components/collapse"}
+                    href={(docsUrl ?? "") + "/docs/ui/components/collapse"}
                     size="smallest">
                     <ArrowRight size={14}/>
                 </IconButton>

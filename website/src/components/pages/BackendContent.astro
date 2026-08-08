@@ -86,11 +86,11 @@ const policyCode = `<span class="text-surface-500">-- rebase schema generate →
 
 <span class="text-primary-light">CREATE POLICY</span> orders_select_1f4c9ab <span class="text-primary-light">ON</span> orders
   <span class="text-primary-light">FOR SELECT TO</span> rebase_user
-  <span class="text-primary-light">USING</span> (customer_id = <span class="text-amber-400">auth.uid</span>());
+  <span class="text-primary-light">USING</span> (customer_id = <span class="text-amber-400">rebase.uid</span>());
 
 <span class="text-primary-light">CREATE POLICY</span> orders_update_8b02e13 <span class="text-primary-light">ON</span> orders
   <span class="text-primary-light">FOR UPDATE TO</span> rebase_user
-  <span class="text-primary-light">USING</span> (<span class="text-amber-400">string_to_array</span>(<span class="text-amber-400">auth.roles</span>(), <span class="text-green-400">','</span>)
+  <span class="text-primary-light">USING</span> (<span class="text-amber-400">string_to_array</span>(<span class="text-amber-400">rebase.roles</span>(), <span class="text-green-400">','</span>)
          &amp;&amp; <span class="text-primary-light">ARRAY</span>[<span class="text-green-400">'support'</span>]);
 
 <span class="text-surface-500">-- no policy for INSERT or DELETE:</span>
