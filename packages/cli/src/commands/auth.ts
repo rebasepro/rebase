@@ -4,7 +4,6 @@
  * Subcommands:
  *   reset-password — Reset a user's password
  */
-import arg from "arg";
 import chalk from "chalk";
 import path from "path";
 import fs from "fs";
@@ -16,6 +15,7 @@ import {
     readEnvFile,
     resolveTsx
 } from "../utils/project";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 /** A user as the admin API returns it, reduced to what this command needs. */
 export interface ResolvedUser {
@@ -76,7 +76,14 @@ export function selectUserForEmail(payload: unknown, email: string): ResolvedUse
 }
 
 export async function authCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    if (!subcommand || subcommand === "--help") {
+    // `--help` is answered here and never reaches a handler. `cli.ts` only
+    // rewrites the subcommand to `"--help"` when no subcommand was named, so
+    // `rebase auth reset-password --help` used to *run the reset*: `--help`
+    // became the email, the backend was contacted, `.tmp-reset-password.ts` was
+    // written into the user's `backend/`, and a database UPDATE ran for a user
+    // named `--help`. A flag whose whole job is to print text cannot be allowed
+    // to reach code that writes.
+    if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
         printAuthHelp();
         return;
     }
@@ -93,22 +100,55 @@ export async function authCommand(subcommand: string | undefined, rawArgs: strin
     }
 }
 
-async function resetPassword(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--email": String,
-            "--password": String,
-            "-e": "--email"
-        },
-        {
-            argv: rawArgs.slice(4), // skip "node rebase auth reset-password"
-            permissive: true
-        }
-    );
+/**
+ * The flags `rebase auth reset-password` takes.
+ *
+ * `-p` was advertised in this command's own help and never declared here, so
+ * `arg` — running permissively — pushed it into the positionals and the value
+ * *after* it shifted out of reach: anyone following the help set the account's
+ * password to the two-character string `-p`. Declared now, and `auth.test.ts`
+ * asserts that the help and this spec list the same aliases.
+ */
+export const RESET_PASSWORD_FLAGS = {
+    "--email": String,
+    "--password": String,
+    "-e": "--email",
+    "-p": "--password"
+} as const;
 
-    // Support both --email flag and positional args
-    const email = args["--email"] || args._[0];
-    const newPassword = args["--password"] || args._[1];
+/**
+ * Which account, and which password, this invocation names.
+ *
+ * Both may still be absent — the caller reports a missing email — but neither
+ * can be a flag. `parseCommandArgs` parses the whole line strictly, so an
+ * undeclared flag is an error rather than a positional. That is what stops
+ * `rebase auth reset-password bob@example.com --debug` from setting Bob's
+ * password to `--debug`, which is the flag the CLI itself prints after every
+ * failure as the thing to re-run with.
+ *
+ * Exported so its tests can drive the real parser rather than a copy of it.
+ */
+export function resolveResetPasswordArgs(rawArgs: string[]): {
+    email?: string;
+    password?: string;
+} {
+    const { flags, positionals } = parseCommandArgs({
+        spec: RESET_PASSWORD_FLAGS,
+        rawArgs,
+        commandWords: 2,
+        command: "auth reset-password",
+        maxPositionals: 2
+    });
+
+    // Both spellings are supported: `<email> [password]` and `--email/--password`.
+    return {
+        email: flags["--email"] || positionals[0],
+        password: flags["--password"] || positionals[1]
+    };
+}
+
+async function resetPassword(rawArgs: string[]): Promise<void> {
+    const { email, password: newPassword } = resolveResetPasswordArgs(rawArgs);
 
     if (!email) {
         console.error(chalk.red("✗ Email is required."));

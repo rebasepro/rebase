@@ -1105,6 +1105,15 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
     if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
         // Copy .env.example → .env (keep .env.example as a reference in the repo)
         fs.copyFileSync(envExamplePath, envPath);
+        // Owner-only from the first byte. `copyFileSync` copies the *source's*
+        // permissions and the packaged `.env.example` is 0644, so the file that
+        // is about to receive a generated JWT_SECRET, the database password and
+        // REBASE_SERVICE_KEY was world-readable for the whole of `init` — on a
+        // shared build box or a multi-user machine, any local account could read
+        // another project's service key, which the API treats as a full admin
+        // credential. `.rebase/state.json` (dev-port.ts) and `telemetry.json`
+        // are both 0600 for the same reason; this file holds strictly more.
+        fs.chmodSync(envPath, 0o600);
 
         // Generate secure random strings
         const jwtSecret = crypto.randomBytes(32).toString("hex");
@@ -1263,6 +1272,12 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             }
         }
 
-        fs.writeFileSync(envPath, envContent, "utf-8");
+        // `mode` only applies when the file is created, and this one exists
+        // already — so chmod as well, exactly as `writeStateFile` does.
+        fs.writeFileSync(envPath, envContent, {
+            encoding: "utf-8",
+            mode: 0o600
+        });
+        fs.chmodSync(envPath, 0o600);
     }
 }

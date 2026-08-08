@@ -748,6 +748,23 @@ describe(".env.example", () => {
         expect(envContent).not.toMatch(/^#\s*REBASE_SERVICE_KEY=/m);
     });
 
+    it("configureEnvFile leaves .env readable only by its owner", async () => {
+        /*
+         * This file carries the generated JWT_SECRET, the database password and
+         * REBASE_SERVICE_KEY — which the API treats as a full admin credential.
+         * It was created 0644: `copyFileSync` copies the *source's* permissions
+         * and the packaged `.env.example` is world-readable, so on a shared
+         * build box or any multi-user machine every local account could read
+         * another project's service key. `.rebase/state.json` and the telemetry
+         * config next to it are both deliberately 0600; this file holds more.
+         */
+        const targetDir = await simulateInit("env-permissions-app");
+        await configureEnvFile(targetDir);
+
+        const mode = fs.statSync(path.join(targetDir, ".env")).mode & 0o777;
+        expect(mode.toString(8)).toBe("600");
+    });
+
     it("configureEnvFile writes a CORS_ORIGINS the compose file can read", async () => {
         /*
          * `docker-compose.yml` declares `CORS_ORIGINS: ${CORS_ORIGINS:?…}` on
