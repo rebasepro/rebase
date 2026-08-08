@@ -76,6 +76,35 @@ export type FirestoreDataDriver = DataDriver & {
 }
 
 /**
+ * The window a read has to ask Firestore for in order to honour `offset`.
+ *
+ * Firestore's web SDK has no `offset()` — it pages by cursor (`startAfter`)
+ * only. Callers that page by offset (`buildRebaseData`, and through it every
+ * `findAll()` and `iterate()`) were therefore served page one every time:
+ * `count` is a real server count, so `hasMore` never went false, the walk
+ * accumulated the same rows over and over, and it ended by tripping its row
+ * cap and reporting "matched more than N rows" — a condition that had not
+ * occurred.
+ *
+ * So the read asks for `offset + limit` documents and drops the first
+ * `offset`. Those documents are billed either way: Firestore charges for every
+ * document a cursor walks past, which is why `startAfter` is the cheap way to
+ * page and offset paging over a large collection is not.
+ */
+export function resolveOffsetWindow(
+    limit: number | undefined,
+    offset: number | undefined
+): { fetchLimit: number | undefined, skip: number } {
+    const skip = offset !== undefined && Number.isFinite(offset) && offset > 0
+        ? Math.floor(offset)
+        : 0;
+    return {
+        fetchLimit: limit === undefined ? undefined : limit + skip,
+        skip
+    };
+}
+
+/**
  * Use this hook to build a {@link DataDriver} based on Firestore
  * @param firebaseApp
  * @param textSearchControllerBuilder
@@ -298,11 +327,12 @@ export function useFirestoreDriver({
      * @param collection
      * @param filter
      * @param limit
+     * @param offset
      * @param startAfter
      * @param searchString
      * @param orderBy
      * @param order
-     * @return Function to cancel subscription
+     * @return The rows in the requested window
      * @see useCollection if you need this functionality implemented as a hook
      * @group Firestore
      */
@@ -310,6 +340,7 @@ export function useFirestoreDriver({
         path,
         filter,
         limit,
+        offset,
         startAfter,
         searchString,
         orderBy,
@@ -325,15 +356,21 @@ export function useFirestoreDriver({
         console.debug("Fetching collection", {
             path,
             limit,
+            offset,
             filter,
             startAfter,
             orderBy,
             order
         });
-        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, limit, databaseId);
+        // Firestore has no `offset()`; see resolveOffsetWindow.
+        const {
+            fetchLimit,
+            skip
+        } = resolveOffsetWindow(limit, offset);
+        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId);
 
         const entity = await getDocs(query);
-        return entity.docs.map((doc) => createRowFromDocument(doc));
+        return entity.docs.slice(skip).map((doc) => createRowFromDocument(doc));
     }, [buildQuery]);
 
     /**

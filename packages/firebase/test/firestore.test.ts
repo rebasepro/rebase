@@ -1,7 +1,7 @@
 import { expect, it } from "@jest/globals";
 import { Timestamp } from "@firebase/firestore";
 import type { Firestore } from "@firebase/firestore";
-import { rebaseToFirestoreModel, firestoreToRebaseModel } from "../src/hooks/useFirestoreDriver";
+import { rebaseToFirestoreModel, firestoreToRebaseModel, resolveOffsetWindow } from "../src/hooks/useFirestoreDriver";
 
 it("rebaseToFirestoreModel", () => {
     const inputValues = {
@@ -70,4 +70,37 @@ it("vector round trip", () => {
     // On the way back a Firestore VectorValue has to become the tagged shape
     // again, or what the panel reads is not what it wrote.
     expect(firestoreToRebaseModel(stored)).toEqual(inputValues);
+});
+
+it("reads past the offset", () => {
+    // Firestore has no `offset()`, so page two has to be read as
+    // `offset + limit` documents with the first `offset` dropped. Ignoring the
+    // offset — which is what the driver did — served page one every time, and
+    // `findAll()` walked in place until it tripped its row cap.
+    expect(resolveOffsetWindow(50, 100)).toEqual({
+        fetchLimit: 150,
+        skip: 100
+    });
+});
+
+it("leaves an unpaged read alone", () => {
+    expect(resolveOffsetWindow(50, 0)).toEqual({
+        fetchLimit: 50,
+        skip: 0
+    });
+    expect(resolveOffsetWindow(50, undefined)).toEqual({
+        fetchLimit: 50,
+        skip: 0
+    });
+    expect(resolveOffsetWindow(undefined, undefined)).toEqual({
+        fetchLimit: undefined,
+        skip: 0
+    });
+});
+
+it("skips without a limit", () => {
+    expect(resolveOffsetWindow(undefined, 20)).toEqual({
+        fetchLimit: undefined,
+        skip: 20
+    });
 });

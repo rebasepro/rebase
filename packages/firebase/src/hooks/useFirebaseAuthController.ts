@@ -26,6 +26,28 @@ import { FirebaseApp } from "firebase/app";
 import { FirebaseAuthController, FirebaseSignInOption, FirebaseSignInProvider, FirebaseUserWrapper } from "../types";
 import type { User } from "@rebasepro/types";
 
+/**
+ * Resolve `user`'s roles through `defineRolesFor` and report whether they
+ * differ from the ones already applied.
+ *
+ * A plain function rather than a check inside the hook because the check that
+ * used to live there read `!equal(userRoles, userRoles)` — the local shadowed
+ * the state of the same name, so the fresh roles were compared to themselves,
+ * the guard was never true, and a `defineRolesFor` result arriving after the
+ * auth-state change never reached the controller.
+ */
+export async function resolveRoleRefresh(
+    defineRolesFor: (user: User) => Promise<string[] | undefined> | string[] | undefined,
+    user: User,
+    currentRoles: string[] | undefined
+): Promise<{ changed: boolean, roles: string[] | undefined }> {
+    const roles = await defineRolesFor(user);
+    return {
+        changed: !equal(currentRoles, roles),
+        roles
+    };
+}
+
 export interface FirebaseAuthControllerProps {
     loading?: boolean;
     firebaseApp?: FirebaseApp;
@@ -78,9 +100,12 @@ export const useFirebaseAuthController = <USER extends FirebaseUserWrapper = any
 
     const updateRoles = useCallback(async (user: User | null) => {
         if (defineRolesFor && user) {
-            const userRoles = await defineRolesFor(user);
-            if (!equal(userRoles, userRoles)) {
-                setUserRoles(userRoles);
+            const {
+                changed,
+                roles
+            } = await resolveRoleRefresh(defineRolesFor, user, userRoles);
+            if (changed) {
+                setUserRoles(roles);
             }
         }
     }, [defineRolesFor, userRoles]);

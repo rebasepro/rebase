@@ -85,7 +85,12 @@
     "packages/app/test/rebase_client_prop_types.type-test.ts",
     "packages/app/src",
     "packages/common/test",
-    "packages/common/src"
+    "packages/common/src",
+    // `packages/firebase` declares no test runner — a recorded gap in
+    // `scripts/check-test-scripts.mjs`, and the reason its tests have never
+    // executed. Until one lands, tsc reading them is the only thing standing
+    // between the assertions and the code they assert on.
+    "packages/firebase/test"
   ],
   "exclude": [
     "**/node_modules",
