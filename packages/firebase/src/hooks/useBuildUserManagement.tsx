@@ -58,6 +58,51 @@ export interface UserManagementDelegateParams<CONTROLLER extends AuthController<
 }
 
 /**
+ * Why the access gate answered the way it did.
+ *
+ * `users-unreadable` is a state of its own because it used to be
+ * indistinguishable from `bootstrap`: the users listener's `onError` empties
+ * the user list, so a `permission-denied` on the users path — a rules
+ * misconfiguration, a rules deploy that has not landed, a renamed path —
+ * reached the gate as "no users created yet" and every authenticated user was
+ * let in. An unreadable list is not an empty one, and only one of the two may
+ * open the door.
+ */
+export type AccessDecision =
+    | "loading"
+    | "no-user"
+    | "users-unreadable"
+    | "bootstrap"
+    | "known-user"
+    | "unknown-user";
+
+/**
+ * Decide whether a user may access the CMS, given the state of the user
+ * management collection.
+ *
+ * A plain function rather than logic inside the gate callback so the states
+ * that must stay distinct can be asserted without a React render.
+ */
+export function resolveAccessDecision({
+    loading,
+    usersError,
+    users,
+    user
+}: {
+    loading: boolean;
+    usersError?: Error;
+    users: { email?: string | null }[];
+    user: { email?: string | null } | null;
+}): AccessDecision {
+    if (loading) return "loading";
+    if (!user) return "no-user";
+    if (usersError) return "users-unreadable";
+    if (users.length === 0) return "bootstrap";
+    const known = users.some(u => u.email?.toLowerCase() === user.email?.toLowerCase());
+    return known ? "known-user" : "unknown-user";
+}
+
+/**
  * This hook is used to build a user management object that can be used to
  * manage users and roles in a Firestore backend.
  * @param authController
@@ -265,21 +310,37 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
 
     const accessGate: FirebaseAccessGate<USER> = useCallback(({ user }) => {
 
-        if (loading) {
+        const decision = resolveAccessDecision({
+            loading,
+            usersError,
+            users,
+            user
+        });
+
+        if (decision === "loading") {
             return false;
         }
-        if (user === null) {
+
+        if (decision === "no-user") {
             console.warn("User is null, returning");
             return false;
         }
 
-        if (users.length === 0) {
+        if (decision === "users-unreadable") {
+            // The users collection could not be read, so we do not know whether
+            // this user is in it. Denying is the only safe reading: the
+            // bootstrap branch below would otherwise admit everyone.
+            console.error("Denying access: the user management collection could not be read", usersError);
+            return false;
+        }
+
+        if (decision === "bootstrap") {
             console.warn("No users created yet");
             return true; // If there are no users created yet, we allow access to every user
         }
 
         const mgmtUser = users.find(u => u.email?.toLowerCase() === user?.email?.toLowerCase());
-        if (mgmtUser) {
+        if (decision === "known-user" && mgmtUser && user) {
             // check if the uid or photoURL needs to be updated in the user management system
             const needsUidUpdate = mgmtUser.uid !== user.uid;
             const needsPhotoUpdate = user.photoURL && mgmtUser.photoURL !== user.photoURL;
@@ -302,7 +363,7 @@ export function useBuildUserManagement<CONTROLLER extends AuthController<User> =
         }
 
         throw Error("Could not find a user with the provided email in the user management system.");
-    }, [loading, users]);
+    }, [loading, users, usersError]);
 
     const userRoles = authController.user ? defineRolesFor(authController.user) : undefined;
     const isAdmin = (userRoles ?? []).some(r => r === "admin");
