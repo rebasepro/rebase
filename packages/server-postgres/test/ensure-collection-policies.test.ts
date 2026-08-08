@@ -80,6 +80,9 @@ function fakeDb(present: string[], failOn?: RegExp): { queryable: Queryable; ran
             }
             if (/pg_type/i.test(text)) return { rows: [] };
             if (/pg_constraint/i.test(text)) return { rows: [] };
+            // Column comments — where a generated search column's fingerprint
+            // lives. A catalogue read, like the three above, not DDL.
+            if (/pg_description/i.test(text)) return { rows: [] };
             ran.push(text);
             if (failOn && failOn.test(text)) throw new Error("boom");
             return { rows: [] };

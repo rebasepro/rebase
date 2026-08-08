@@ -303,6 +303,24 @@ ordering — this returns the nearest rows that also match, not the nearest rows
 filtered afterwards. Producing `queryVector` is your job: Rebase stores and
 searches embeddings, it does not compute them.
 
+### What you have to provide
+
+- **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that
+  type comes from the `vector` extension. Rebase does not install it — an
+  extension needs a server image that carries it and a role allowed to create
+  it. The scaffold's `postgres:18-alpine` does **not** ship pgvector; use an
+  image that does (for example `pgvector/pgvector:pg18`) and run
+  `CREATE EXTENSION vector;` once. Without it the first boot fails, naming this.
+- **An index, if you want one.** Rebase creates no HNSW or IVFFlat index, so
+  every `vectorSearch` computes the distance for every row and sorts: exact
+  results, sequential cost. Create the index yourself in a migration
+  (`CREATE INDEX … USING hnsw (embedding vector_cosine_ops)`) if your table is
+  large enough to need one.
+
+`vectorSearch` is a query, not a subscription: `.listen()` on one is refused
+rather than served as a plain listing, because nothing recomputes distances on a
+write.
+
 ## Fetching Relations
 
 Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.

@@ -471,16 +471,17 @@ describe("FetchService – count", () => {
             dataService.count("items", { searchString })
         ).resolves.toBeDefined();
 
-        // The one guarantee that matters: the user's text is *bound*, never
-        // spliced into the statement. `%`, `_` and `\` reach the driver
-        // untouched inside the `%…%` wrapper — nothing here escapes them, so
-        // they still act as LIKE wildcards — but they can never terminate the
-        // literal and become SQL, which is what "should not crash" was quietly
-        // standing in for.
+        // Two guarantees. The user's text is *bound*, never spliced into the
+        // statement, so it can never terminate the literal and become SQL —
+        // which is what "should not crash" was quietly standing in for. And it
+        // is escaped, so `%` and `_` are searched for rather than obeyed: this
+        // is a substring search for the characters the user typed, and a
+        // caller who wants wildcards has the `like` operator for that.
         const { sql, params } = lastWhereCondition(db);
         expect(sql).toBe('("name" ilike $1 or "description" ilike $2)');
-        expect(params).toEqual([`%${searchString}%`, `%${searchString}%`]);
-        expect(params.every(p => typeof p === "string" && p.includes("%_done\\!"))).toBe(true);
+        expect(params).toEqual(["%100\\%\\_done\\\\!%", "%100\\%\\_done\\\\!%"]);
+        // The only unescaped wildcards are the two the substring wrapper adds.
+        expect(params.every(p => String(p).match(/(?<!\\)%/g)?.length === 2)).toBe(true);
 
         // Every searchable string property is OR-ed in; drop one and the
         // search silently stops looking in that column.

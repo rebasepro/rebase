@@ -10,6 +10,8 @@ import {
     searchHelperFunctions,
     searchExtensionStatements,
     searchColumnNames,
+    searchColumnStamps,
+    searchStampGuards,
     searchIndexNames,
     type SearchColumnSpec
 } from "./search-column";
@@ -318,9 +320,19 @@ export const generatePostgresSearchDdl = (allCollections: CollectionConfig[]): s
         // ADD COLUMN IF NOT EXISTS rather than the inline definition the
         // CREATE TABLE would use: by the time this runs the table exists,
         // whether Atlas just created it or it has been live for a year.
+        // Refuse before altering anything if the column in the database was
+        // generated from a different `search` block: `ADD COLUMN IF NOT EXISTS`
+        // is a no-op against an existing column, so without this the file would
+        // report success and leave the old expression in place — and then stamp
+        // it as current.
+        searchStampGuards(spec).forEach(s => { ddl += `${s}\n`; });
         ddl += `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${searchColumnDefinition(spec)};\n`;
         const fuzzyDef = fuzzyColumnDefinition(spec);
         if (fuzzyDef) ddl += `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${fuzzyDef};\n`;
+        // The fingerprint of the expression each column was built from — the
+        // only record of *which* block a generated column came from, and what
+        // the guard above and the boot-time ensure both compare against.
+        searchColumnStamps(spec).forEach(s => { ddl += `${s.sql}\n`; });
         searchIndexStatements(spec).forEach(s => { ddl += `${s}\n`; });
         ddl += "\n";
     }

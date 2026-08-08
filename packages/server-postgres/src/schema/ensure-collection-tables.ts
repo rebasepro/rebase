@@ -34,6 +34,8 @@ import {
     searchExtensionStatements,
     searchHelperFunctions,
     searchIndexStatements,
+    searchColumnStamps,
+    SEARCH_STAMP_PREFIX,
     SEARCH_TEXT_FN,
     SEARCH_UNACCENT_FN,
     type SearchColumnSpec
@@ -90,11 +92,19 @@ export interface ExistingSchema {
      * constraint that then fails harmlessly as a duplicate.
      */
     constraints?: Set<string>;
+    /**
+     * `schema.table.column` → that column's comment, for the columns that have
+     * one. This is where a generated search column's fingerprint lives, so it
+     * is the only evidence that a `search` block has changed since the column
+     * was built. Absent is read as "no column is stamped", which plans a stamp
+     * and reports nothing as drifted.
+     */
+    columnComments?: Map<string, string>;
 }
 
 export interface EnsureAction {
     kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column"
-        | "create-extension" | "create-function" | "create-index";
+        | "create-extension" | "create-function" | "create-index" | "comment-column";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -115,6 +125,47 @@ export interface EnsurePlan {
      * resolving to nothing — which is indistinguishable from having no data.
      */
     legacyForeignKeys: LegacyForeignKey[];
+    /**
+     * Generated search columns whose `search` block has changed since they were
+     * built. Reported, never planned into `actions` — see
+     * {@link SearchColumnDrift} for why applying it is not this path's call.
+     */
+    searchDrift: SearchColumnDrift[];
+    /**
+     * Generated search columns that exist but carry no fingerprint — created
+     * before this check existed, or by `search.sql` on an older CLI. The plan
+     * stamps them so the *next* change is detectable; whether they match the
+     * current block cannot be known, which is what the caller reports.
+     */
+    searchAdopted: { table: string; column: string }[];
+}
+
+/**
+ * A generated search column built from a `search` block that has since changed.
+ *
+ * Reported instead of applied because the two ways to apply it are both worse
+ * than stopping. `ALTER COLUMN … SET EXPRESSION` exists only on PG17+ and
+ * rewrites the table either way; `DROP COLUMN` + `ADD COLUMN` rewrites it under
+ * an ACCESS EXCLUSIVE lock and rebuilds the GIN index. This module runs
+ * unattended against live customer data with nobody reading a diff — the same
+ * reason it withholds `SET NOT NULL` from an adopted table — so a multi-minute
+ * outage is not a decision it may take on its own.
+ *
+ * Not applying it silently is not an option either: that is the bug this
+ * detection exists for. A collection that added a field, flipped `unaccent` or
+ * raised a weight kept indexing the *old* set forever, and the only symptom was
+ * searches returning nothing for content plainly in the row.
+ */
+export interface SearchColumnDrift {
+    /** `schema.table`. */
+    table: string;
+    column: string;
+    /** The fingerprint recorded on the column. */
+    found: string;
+    /** The fingerprint the current `search` block computes. */
+    expected: string;
+    /** The statements that would rebuild the column, for the operator to run. */
+    rebuild: string[];
 }
 
 /** A relation column whose old and new spellings both plausibly apply. */
@@ -129,14 +180,16 @@ export interface LegacyForeignKey {
 
 export interface EnsureOutcome extends EnsurePlan {
     /**
-     * Constraints that could not be added — always non-fatal.
+     * Actions that could not be applied and are non-fatal by nature.
      *
-     * A foreign key can only fail on data that already violates it, and the
-     * column it would police exists either way, so the collection still serves.
-     * Refusing to boot over one would turn a pre-existing data problem into an
-     * outage. Reported loudly instead.
+     * Two kinds qualify. A foreign key can only fail on data that already
+     * violates it, and the column it would police exists either way, so the
+     * collection still serves; refusing to boot over one would turn a
+     * pre-existing data problem into an outage. A column comment is the search
+     * fingerprint, which needs table ownership — losing it costs drift
+     * detection on the next boot, not the deployment. Both are reported loudly.
      */
-    failures: { target: string; error: string }[];
+    failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
 }
 
 function schemaOf(collection: CollectionConfig): string {
@@ -424,13 +477,57 @@ export function planCollectionSchemaEnsure(
     //      one is not free — but it is the same additive shape as every other
     //      column here, and the alternative (leaving it out until someone runs a
     //      migration) is a declared `search` block that silently does nothing.
+    //
+    //      Changing one is not additive, and `ADD COLUMN IF NOT EXISTS` is a
+    //      no-op against a column that is already there — which is why a `search`
+    //      block that gained a field, flipped `unaccent` or moved a weight used
+    //      to be inert forever, on every path, with nothing logged. Each column
+    //      therefore carries a fingerprint of the expression it was built from
+    //      (in its comment), and a mismatch is reported rather than applied.
+    const searchDrift: SearchColumnDrift[] = [];
+    const searchAdopted: { table: string; column: string }[] = [];
     for (const spec of searchSpecs) {
         const key = `${spec.schema}.${spec.table}`;
-        addColumn(key, spec.schema, spec.table, spec.column,
-            `tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`);
+        const definitions: Record<string, string> = {
+            [spec.column]: `tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`
+        };
         if (spec.fuzzy) {
-            addColumn(key, spec.schema, spec.table, spec.fuzzy.column,
-                `text GENERATED ALWAYS AS (${spec.fuzzy.expression}) STORED`);
+            definitions[spec.fuzzy.column] = `text GENERATED ALWAYS AS (${spec.fuzzy.expression}) STORED`;
+        }
+
+        for (const stamp of searchColumnStamps(spec)) {
+            const definition = definitions[stamp.column];
+            const exists = existing.tables.get(key)?.has(stamp.column) === true;
+            const recorded = existing.columnComments?.get(`${key}.${stamp.column}`);
+
+            if (exists && recorded?.startsWith(SEARCH_STAMP_PREFIX) && recorded !== stamp.fingerprint) {
+                searchDrift.push({
+                    table: key,
+                    column: stamp.column,
+                    found: recorded,
+                    expected: stamp.fingerprint,
+                    rebuild: [
+                        `ALTER TABLE "${spec.schema}"."${spec.table}" DROP COLUMN "${stamp.column}";`,
+                        `ALTER TABLE "${spec.schema}"."${spec.table}" ADD COLUMN "${stamp.column}" ${definition};`,
+                        stamp.sql
+                    ]
+                });
+                // The old stamp is the only evidence of what the column holds;
+                // overwriting it here would erase the drift instead of fixing it.
+                continue;
+            }
+
+            addColumn(key, spec.schema, spec.table, stamp.column, definition);
+            if (exists && recorded === undefined) {
+                searchAdopted.push({ table: key, column: stamp.column });
+            }
+            if (recorded !== stamp.fingerprint) {
+                actions.push({
+                    kind: "comment-column",
+                    target: `${key}.${stamp.column}`,
+                    sql: stamp.sql
+                });
+            }
         }
     }
 
@@ -498,7 +595,7 @@ export function planCollectionSchemaEnsure(
         }
     }
 
-    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys };
+    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys, searchDrift, searchAdopted };
 }
 
 /** Read what the database has, for the schemas the collections live in. */
@@ -553,7 +650,78 @@ export async function readExistingSchema(
     );
     for (const row of constraintRows) constraints.add(`${row.schema}.${row.table}.${row.name}`);
 
-    return { tables, enums, constraints };
+    // Column comments, which is where a generated search column records the
+    // expression it was built from. `objsubid > 0` is what makes a row a
+    // *column* comment rather than the table's own.
+    const columnComments = new Map<string, string>();
+    const { rows: commentRows } = await client.query<{
+        schema: string;
+        table: string;
+        column: string;
+        comment: string | null;
+    }>(
+        `SELECT n.nspname AS schema, c.relname AS table, a.attname AS column, d.description AS comment
+         FROM pg_description d
+         JOIN pg_class c ON d.objoid = c.oid
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = d.objsubid
+         WHERE d.objsubid > 0 AND n.nspname IN (${inList})`
+    );
+    for (const row of commentRows) {
+        if (row.comment == null) continue;
+        columnComments.set(`${row.schema}.${row.table}.${row.column}`, row.comment);
+    }
+
+    return { tables, enums, constraints, columnComments };
+}
+
+/**
+ * What to tell an operator whose `search` block no longer matches its column.
+ *
+ * Every line here is doing work: naming the collection is not enough, because
+ * the symptom (a search that finds nothing) points at the data, not the schema;
+ * and the remediation has to be exact, because it is a table rewrite the
+ * operator is being asked to schedule rather than discover.
+ */
+function searchDriftMessage(drift: SearchColumnDrift[]): string {
+    const blocks = drift.map(d =>
+        `  "${d.table}"."${d.column}" was generated from a different \`search\` block ` +
+        `(recorded ${d.found}, current ${d.expected}).\n` +
+        d.rebuild.map(s => `      ${s}`).join("\n")
+    );
+    return (
+        "The `search` block changed after its generated column was created, and Postgres cannot alter a " +
+        "generated expression in place.\n" +
+        "Rebase will not rebuild it for you: dropping and re-adding a STORED generated column rewrites the whole " +
+        "table under an ACCESS EXCLUSIVE lock and rebuilds its GIN index, which is an outage this unattended path " +
+        "may not schedule on your behalf.\n" +
+        "Until it is rebuilt the column keeps indexing the previous fields, weights and language — searches for " +
+        "anything added since return nothing, which reads from outside as \"no such row\".\n" +
+        "Run these (or revert the block to what the column was built from), then boot again:\n" +
+        blocks.join("\n") +
+        "\n  The GIN index is dropped with the column and recreated concurrently on the next boot."
+    );
+}
+
+/**
+ * The missing-pgvector explanation, appended to the error that reveals it.
+ *
+ * A `{ type: "vector" }` property compiles to `VECTOR(n)`, and nothing in the
+ * OSS pipeline installs pgvector — not this ensure, not `db push`, not the
+ * scaffold's `postgres:18-alpine`, which does not ship it. Installing an
+ * extension on someone's database is a decision with a deployment behind it
+ * (image, superuser, cloud allow-list), so this path stays a refusal; what it
+ * must not stay is a bare `type "vector" does not exist` on a crash-looping
+ * pod, which names nothing the reader can act on.
+ */
+function vectorExtensionHint(message: string): string {
+    if (!/type "(vector|halfvec|sparsevec)" does not exist/i.test(message)) return "";
+    return (
+        "\n  pgvector is not installed on this database, and Rebase does not install it: it is a server extension, " +
+        "so it needs an image that ships it (e.g. `pgvector/pgvector:pg18` — the scaffold's `postgres:18-alpine` " +
+        "does not) and a role allowed to run `CREATE EXTENSION vector;`. Install it once, then boot again. " +
+        "Note also that Rebase creates no ANN index for a vector column, so `vectorSearch` is an exact scan."
+    );
 }
 
 /**
@@ -585,7 +753,7 @@ export async function ensureCollectionTables(
 
     const existing = await readExistingSchema(client, schemas);
     const plan = planCollectionSchemaEnsure(collections, existing);
-    const failures: { target: string; error: string }[] = [];
+    const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and
     // the operator should be able to see in the log why a column changed name.
@@ -598,6 +766,29 @@ export async function ensureCollectionTables(
             "the one Rebase derived for this relation before it singularized properly; the column " +
             "keeps its data, indexes and constraints. To keep the old name instead, set " +
             `\`localKey: "${legacy.legacy}"\` on the relation and this will stop.`;
+        logger.info(`[schema] ${message}`);
+        log?.(message);
+    }
+
+    // Before anything is applied: a `search` block that changed after its column
+    // was generated cannot be honoured by an additive plan, and serving the old
+    // index while the config describes a new one is the silent failure this
+    // check exists to end. Refusing is the loud half — boot is fatal on purpose
+    // (see `ensureCollectionSchema` in the server's boot) and the message
+    // carries the exact statements that resolve it.
+    if (plan.searchDrift.length > 0) {
+        throw new Error(searchDriftMessage(plan.searchDrift));
+    }
+
+    // Said once per column, at the moment the stamp is applied: from here on a
+    // change is detected, but whether *this* column matches the block it is
+    // being stamped with is not knowable — it predates the stamp.
+    for (const adopted of plan.searchAdopted) {
+        const message =
+            `Adopting the existing generated column "${adopted.table}"."${adopted.column}" and recording what the ` +
+            "current `search` block would generate. Any later change to that block will be detected and refused; a " +
+            "change made *before* this version was deployed cannot be, so if search has been missing content, " +
+            `rebuild the column once: ALTER TABLE "${adopted.table.split(".").join('"."')}" DROP COLUMN "${adopted.column}"; and boot again.`;
         logger.info(`[schema] ${message}`);
         log?.(message);
     }
@@ -617,12 +808,18 @@ export async function ensureCollectionTables(
             // data rather than on the schema. The column it polices is already
             // there, so the collection serves either way — record it and carry
             // on rather than crash-looping the deployment.
-            if (action.kind === "add-constraint") {
-                failures.push({ target: action.target, error: message });
+            //
+            // A comment is metadata about a column that was just created
+            // successfully, and it can only fail on ownership (COMMENT requires
+            // owning the table, which an adopted table may not grant). Losing
+            // the stamp costs drift detection on the next boot; it must not cost
+            // the deployment.
+            if (action.kind === "add-constraint" || action.kind === "comment-column") {
+                failures.push({ kind: action.kind, target: action.target, error: message });
                 continue;
             }
             throw new Error(
-                `Failed to ${action.kind} ${action.target}: ${message}\n  ${action.sql}`
+                `Failed to ${action.kind} ${action.target}: ${message}${vectorExtensionHint(message)}\n  ${action.sql}`
             );
         }
     }

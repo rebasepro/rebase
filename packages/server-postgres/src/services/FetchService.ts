@@ -1081,6 +1081,15 @@ relatedTo: hop });
         searchString: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /**
+             * An `or(...)`/`and(...)` group, applied alongside `filter`.
+             *
+             * `fetchRowsWithConditions` has always applied one; it was missing
+             * from this signature, so a realtime search subscription carrying a
+             * group could not pass it on and served every row matching the text
+             * that RLS allowed.
+             */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
@@ -1453,6 +1462,19 @@ relatedTo: hop }, include
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /**
+             * An `or(...)`/`and(...)` group, applied alongside `filter`.
+             *
+             * Declared *and applied*, because this is the path every REST search
+             * and vector read takes: `fetchCollectionForRest` skips `db.query`
+             * whenever a `searchString` or a `vectorSearch` is present. The
+             * group arrived here on `options` from the very beginning and was
+             * simply never read, so `?searchString=x&or=(...)` served every row
+             * matching `x` that RLS allowed — while `count` (which does apply
+             * it) reported the narrowed total, so `meta.total` and `data`
+             * described different sets of rows.
+             */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
@@ -1518,6 +1540,11 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
+            if (logicalCondition) allConditions.push(logicalCondition);
         }
 
         if (vectorMeta?.filter) {

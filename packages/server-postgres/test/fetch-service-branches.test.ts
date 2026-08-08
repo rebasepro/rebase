@@ -25,9 +25,21 @@ describe("FetchService — read-shape branches", () => {
     // Drizzle names a table by symbol and `getTableName` reads it; a table
     // without one never resolves to a query builder, which quietly routes the
     // read down the db.select fallback instead of the path under test.
-    const table = (name: string, columns: string[]) => {
+    //
+    // The columns are reachable through `Table.Symbol.Columns` — the way
+    // `getTableColumns` reads them — and carry their SQL type, because a vector
+    // search now resolves the property it was given against the real columns
+    // rather than indexing the table object by name. A stub without them is a
+    // table whose columns do not exist, and the read is refused as such.
+    const table = (name: string, columns: string[], sqlTypes: Record<string, string> = {}) => {
         const t: Record<string, unknown> = { [Table.Symbol.Name]: name };
-        for (const c of columns) t[c] = { name: c };
+        const cols: Record<string, unknown> = {};
+        for (const c of columns) {
+            const column = { name: c, getSQLType: () => sqlTypes[c] ?? "text" };
+            t[c] = column;
+            cols[c] = column;
+        }
+        t[Table.Symbol.Columns] = cols;
         return t;
     };
 
@@ -102,7 +114,7 @@ relationName: "tags" }
             return undefined;
         });
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title", "author_id", "embedding"]) as any;
+            if (name === "posts") return table("posts", ["id", "title", "author_id", "embedding"], { embedding: "vector(2)" }) as any;
             if (name === "authors") return table("authors", ["id", "name"]) as any;
             if (name === "tags") return table("tags", ["id", "name"]) as any;
             return undefined;

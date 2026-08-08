@@ -438,15 +438,29 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return;
             }
 
+            // A vector search cannot be served here, and the parameter used to
+            // be read for one thing only — the limit default below — and then
+            // dropped: the stored request carries no `vectorSearch` and the
+            // refetch has no branch for one. So `.vectorSearch(…).listen()`
+            // delivered an ordinary `id DESC` listing, with no `_distance` and
+            // no error, forever. Refusing says what the silence did not.
+            if (request.vectorSearch) {
+                const msg =
+                    "Realtime subscriptions do not support vector search: a subscription is re-run on every " +
+                    "matching write, and nothing here computes distances. Use `.vectorSearch(...).find()` for " +
+                    "the query, and subscribe without it if you need live updates.";
+                logger.warn(`[RealtimeService] ${msg}`);
+                this.sendError(clientId, msg, subscriptionId, "VECTOR_SEARCH_NOT_LIVE");
+                return;
+            }
+
             // Bound the client-supplied limit with the SAME guarantee the REST
             // ingress applies (`resolveClientListLimit`): clamp to the hard max
             // and default an absent limit by mode. A subscription is re-fetched
             // on every matching write, so an unbounded one is a DoS amplified
             // per write — resolve it once and reuse for the stored request and
             // the initial fetch.
-            const boundedLimit = resolveClientListLimit(request.limit, {
-                vectorSearch: !!request.vectorSearch
-            });
+            const boundedLimit = resolveClientListLimit(request.limit);
 
             // Store subscription with full request parameters and auth context for RLS
             this._subscriptions.set(subscriptionId, {
@@ -770,6 +784,10 @@ roles: ["anon"] };
                         collectionRequest.searchString,
                         {
                             filter: collectionRequest.filter as FilterValues<string>,
+                            // The subscription stored a group; the search branch
+                            // did not pass it on, so a filtered live search
+                            // widened to every row matching the text.
+                            logical: collectionRequest.logical,
                             orderBy: collectionRequest.orderBy,
                             order: collectionRequest.order,
                             limit: collectionRequest.limit,
@@ -845,22 +863,28 @@ roles: activeAuth.roles },
             });
         }
 
-        // No driver — use dataService directly (no auth wrapping possible)
+        // No driver — use dataService directly (no auth wrapping possible).
+        // The `logical` group is carried here as well: this branch answers the
+        // same subscription as the one above, and a fallback that drops a
+        // condition returns *more* rows than the path it stands in for.
         if (collectionRequest.searchString) {
             return await this.dataService.searchRows(
                 notifyPath,
                 collectionRequest.searchString,
                 {
                     filter: collectionRequest.filter as FilterValues<string>,
+                    logical: collectionRequest.logical,
                     orderBy: collectionRequest.orderBy,
                     order: collectionRequest.order,
                     limit: collectionRequest.limit,
-                    databaseId: collectionRequest.databaseId
+                    databaseId: collectionRequest.databaseId,
+                    searchExplain: collectionRequest.searchExplain
                 }
             );
         }
         return await this.dataService.fetchCollection(notifyPath, {
             filter: collectionRequest.filter as FilterValues<string>,
+            logical: collectionRequest.logical,
             orderBy: collectionRequest.orderBy,
             order: collectionRequest.order,
             limit: collectionRequest.limit,
