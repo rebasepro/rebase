@@ -1,0 +1,161 @@
+---
+title: Múltiples bases de datos y buckets
+sidebar_label: Múltiples fuentes
+description: Enruta colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configura cada uno desde el entorno.
+---
+
+## Descripción general
+
+Un proyecto no se limita a una sola base de datos y un solo bucket. Las colecciones ya
+se enrutan por `dataSource`, y las propiedades de archivo se enrutan por `storageSource`; esta página
+trata sobre cómo obtiene su configuración cada fuente con nombre.
+
+Dos pasos: **declarar** las fuentes en tu paquete de configuración, luego **configurar**
+cada una con variables de entorno derivadas de su clave.
+
+## Declaración de fuentes
+
+Exporta `dataSources` y `storageSources` desde el archivo `index.ts` de tu paquete de configuración.
+Se comparten con el frontend, el cual utiliza las mismas declaraciones para decidir
+si se comunica con una fuente a través de la API de Rebase o directamente.
+
+```ts
+// config/index.ts
+import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+
+export const dataSources: DataSourceDefinition[] = [
+    { key: "(default)", engine: "postgres" },
+    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
+];
+
+export const storageSources: StorageSourceDefinition[] = [
+    { key: "(default)", engine: "local", transport: "server" },
+    { key: "media", engine: "s3", transport: "server", label: "Public media" }
+];
+```
+
+Luego, apunta una colección a una de ellas:
+
+```ts
+import { defineCollection } from "@rebasepro/admin-types";
+const pageViewsCollection = defineCollection({
+    name: "Page Views",
+    slug: "page_views",
+    table: "page_views",
+    dataSource: "analytics",
+    properties: { /* … */ }
+});
+```
+
+...o una propiedad de archivo:
+
+```ts
+coverImage: {
+    name: "Cover image",
+    type: "string",
+    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+}
+```
+
+## Configuración de cada fuente
+
+Los nombres de las variables de entorno se derivan de la clave de la fuente, por lo que no hay nada
+que mantener sincronizado manualmente:
+
+```
+<VARIABLE>              the default source     DATABASE_URL, S3_BUCKET
+<VARIABLE>__<KEY>       a named source         DATABASE_URL__ANALYTICS, S3_BUCKET__MEDIA
+```
+
+La clave se convierte a mayúsculas y los caracteres no alfanuméricos se convierten en guiones bajos, por lo que
+`media-cdn` lee `S3_BUCKET__MEDIA_CDN`.
+
+El separador es un **doble** guion bajo a propósito. Uno solo colisionaría
+con nombres de variables reales: `S3_BUCKET_NAME` se interpretaría como el bucket para una
+fuente llamada `name`.
+
+### Bases de datos
+
+```bash
+DATABASE_URL=postgres://localhost/app
+DATABASE_URL__ANALYTICS=postgres://warehouse.internal/analytics
+
+# Optional, per source:
+DB_POOL_MAX__ANALYTICS=5
+ADMIN_CONNECTION_STRING__ANALYTICS=postgres://…
+REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
+```
+
+El controlador (driver) se elige a partir del `engine` declarado (se conocen `postgres` y
+`mongodb`), y `REBASE_DRIVER__<KEY>` lo anula para cualquier otra cosa.
+
+### Almacenamiento
+
+```bash
+STORAGE_TYPE__MEDIA=s3
+S3_BUCKET__MEDIA=my-media-bucket
+S3_REGION__MEDIA=eu-central-1
+S3_ACCESS_KEY_ID__MEDIA=…
+S3_SECRET_ACCESS_KEY__MEDIA=…
+```
+
+`STORAGE_TYPE__<KEY>` se puede omitir cuando la declaración ya nombra el motor (`engine`).
+
+## Comportamiento ante fallos
+
+Una fuente de datos declarada con transporte de servidor sin cadena de conexión **hace fallar el inicio**,
+indicando el nombre de la variable que se debe definir. Esto es deliberado y vale la pena comprenderlo:
+la alternativa es que las colecciones enrutadas a la fuente faltante recurran silenciosamente a la base de datos predeterminada.
+Eso significa que los datos terminan en el lugar equivocado detrás de un servidor que se reporta como saludable,
+lo cual es mucho peor que un contenedor que se niega a iniciar.
+
+También se rechazan dos claves que derivarían en el mismo nombre de variable, porque una
+de ellas leería silenciosamente la configuración de la otra.
+
+Las fuentes declaradas con `transport: "direct"` se omiten por completo: el cliente
+se comunica directamente con ellas, por lo que el backend no mantiene ninguna conexión y no exige
+ninguna configuración para ellas.
+
+## Control de acceso al almacenamiento
+
+Las claves de almacenamiento comparten un único espacio de nombres plano y no están bajo seguridad a nivel de fila, por lo
+que sin un modelo explícito de control de acceso, el comportamiento predeterminado sería "cualquier usuario autenticado
+puede leer, sobrescribir, eliminar o listar cualquier objeto". En producción se niega a iniciar
+antes que asumir eso.
+
+La forma de definir lo que significa el acceso para tu proyecto es exportando `storageAuthorize`
+desde el paquete de configuración — una función, porque ninguna variable de entorno puede expresar
+"este usuario puede leer esta clave":
+
+```ts
+// config/index.ts
+import type { StorageAuthorize } from "@rebasepro/types";
+
+export const storageAuthorize: StorageAuthorize = async ({ key, user, operation }) => {
+    if (!user) return false;
+    const [ownerId] = key.split("/");
+    return ownerId === user.uid || operation === "read";
+};
+```
+
+Existen dos opciones de escape por entorno para los casos en que ese realmente sea el modelo:
+
+- `STORAGE_PUBLIC_READ=true` — el bucket es una CDN pública de solo lectura. Las escrituras,
+  eliminaciones y listados aún requieren autenticación.
+- `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — se confía en todos los usuarios autenticados para
+  cada archivo. Defendible para una aplicación de un solo inquilino (single-tenant), nunca para una de múltiples inquilinos (multi-tenant).
+
+## Almacenamiento en producción
+
+Sin un bucket configurado, el almacenamiento está **desactivado** en producción y las cargas de archivos responden
+`501`. El disco local es el sistema de archivos del contenedor, por lo que los archivos escritos allí desaparecen en
+el siguiente reinicio: una carga que falla ruidosamente se puede reintentar, mientras que una que tuvo éxito
+en un disco a punto de ser borrado, no. Establece `FORCE_LOCAL_STORAGE=true` solo cuando realmente
+haya un volumen durable montado.
+
+Una consecuencia que vale la pena conocer si declaras explícitamente las fuentes de almacenamiento: no
+se inventa un bucket predeterminado para ti. Declarar solo una fuente `media` significa que no
+hay una fuente `(default)`, y una propiedad que no nombre ninguna no tendrá adónde ir, deliberadamente
+y de forma idéntica en desarrollo y producción. Declara `(default)` también si deseas tener una.
+
+---

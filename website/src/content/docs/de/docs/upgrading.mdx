@@ -1,0 +1,399 @@
+---
+slug: de/docs/upgrading
+title: Upgrade
+description: Was bricht, wenn Sie eine bestehende App auf das aktuelle Release umstellen, und was Sie jeweils tun müssen.
+---
+
+# Upgrade einer bestehenden App
+
+Dieses Release entfernt das `auth`-Schema, benennt Pakete um, ändert die Bedeutung von `id`, stellt CJS ein, verschiebt das Admin-Panel zu react-router 8 und — was am wichtigsten ist — **behebt drei Wege, über die Zugriff gewährt werden konnte, nach dem Sie nicht gefragt haben**: eine Sicherheitsregel, die stillschweigend permissiv war, und zwei Fälle beim Realtime-Socket. Lesen Sie die ersten drei Abschnitte vor allem anderen. Abschnitt 0 ändert SQL, das Sie möglicherweise manuell geschrieben haben; Abschnitte 1 und 2 ändern, wer Ihre Daten lesen kann, und keiner davon kündigt sich von selbst an.
+
+Arbeiten Sie die Abschnitte in der angegebenen Reihenfolge durch. Jeder Abschnitt benennt das Symptom, das Sie sonst an der falschen Stelle debuggen würden.
+
+---
+
+## 0. Das `auth`-Schema ist entfernt — lesen Sie dies zuerst
+
+### Was sich geändert hat
+
+Die RLS-Hilfsfunktionen von Rebase wurden aus dem `auth`-Schema in das Schema `rebase` verschoben:
+
+| Vorher | Jetzt |
+|---|---|
+| `auth.uid()` | `rebase.uid()` |
+| `auth.roles()` | `rebase.roles()` |
+| `auth.jwt()` | `rebase.jwt()` |
+
+`auth` ist der Schemaname von Supabase. Die Wiederverwendung bedeutete, dass Rebase nicht auf eine Datenbank gerichtet werden konnte, die bereits ein solches Schema hatte: Die Ausführung von `CREATE OR REPLACE FUNCTION auth.uid() RETURNS text` über Supabases `RETURNS uuid` wird von Postgres direkt verweigert, und diese Verweigerung wurde früher verschluckt — was zu einer Datenbank mit Auth-Tabellen, aber ohne Hilfsfunktionen und Richtlinien führte, die nicht existierende Funktionen aufriefen.
+
+Rebase erstellt nun genau ein Schema in Ihrer Datenbank: `rebase`. Sonst nichts.
+
+### Was Sie tun müssen
+
+**Wenn Ihre `securityRules` die strukturierten Helfer verwenden** — `policy.authUid()`, `policy.rolesOverlap()`, `ownerField`, `roles` — **müssen Sie nichts tun.** Diese haben nie einen Schemanamen ausgeschrieben. Führen Sie `rebase db push` erneut aus (oder führen Sie ein Redeploy durch) und Ihre Richtlinien werden neu kompiliert.
+
+**Wenn Sie rohes Policy-SQL geschrieben haben**, funktioniert es weiterhin: Der Compiler schreibt `auth.uid()` auf dem Weg in die Datenbank zu `rebase.uid()` um. Das Boot-Log benennt jede Collection, die noch die alte Schreibweise enthält, damit Sie sie aktualisieren können. Tun Sie das — die Umschreibung ist eine Migrationshilfe, keine zweite unterstützte Schreibweise.
+
+```ts
+// Works, and warns.
+securityRules: [{ operation: "select", using: "owner_id = auth.uid()" }]
+
+// The fix.
+securityRules: [{ operation: "select", using: "owner_id = rebase.uid()" }]
+
+// Better: no schema name to get wrong.
+securityRules: [{ operation: "select",
+    condition: policy.compare(policy.field("owner_id"), "eq", policy.authUid()) }]
+```
+
+**Manuell geschriebene Richtlinien, die Sie außerhalb von Rebase erstellt haben** — eine SQL-Migration, der Studio-Editor — sind das Einzige, was nichts für Sie umschreiben kann. Bis Sie diese aktualisieren, entfernt Postgres die Funktionen nicht, von denen sie abhängen, und das `auth`-Schema bleibt bestehen. Beim Start wird Ihnen genau mitgeteilt, welche Richtlinien betroffen sind:
+
+```
+The pre-1.0 `auth` schema cannot be removed yet: 1 policy still calls
+`auth.uid()` and friends … anything listed here is hand-written SQL that has to
+be updated to `rebase.uid()` by hand, after which the schema goes on its own:
+  • public.posts → "posts_legacy"
+```
+
+### Was mit dem alten Schema passiert
+
+Es wird automatisch entfernt, sobald nichts mehr darauf verweist, und nur dann, wenn Rebase das Schema erstellt hat. Jede Funktion wird vor dem Löschen anhand ihres Ergebnistyps und ihres Körpers identifiziert, und das Schema wird mit `DROP SCHEMA auth RESTRICT` entfernt — niemals mit `CASCADE` —, sodass eine Supabase-Installation oder irgendetwas anderes im `auth`-Schema unangetastet bleibt.
+
+### Außerdem: Die Datenbankrolle des Scaffolds ist jetzt `rebase_app`
+
+Postgres löst unqualifizierte Namen über `search_path` auf, was standardmäßig auf `"$user", public` gesetzt ist — und `$user` ist die Verbindungsrolle. Eine Rolle namens `rebase` stellte daher das **Schema** `rebase` vor `public`, sodass unqualifiziertes SQL von allem, was den Pfad nicht fixiert (psql, `pg_dump`, drizzle-kit, eine manuell geschriebene Migration), stillschweigend im falschen Schema landete.
+
+Bestehende Projekte benötigen keine Änderung: Jede Verbindung, die Rebase öffnet, fixiert bereits `search_path=public`. Neue Projekte erhalten `rebase_app`, und beim Start wird nun gewarnt, wenn Ihre Verbindungsrolle denselben Namen wie ein Schema hat.
+
+---
+
+## 1. `policy.authenticated()` — lesen Sie dies zuerst
+
+### Was sich geändert hat
+
+`policy.authenticated()` wurde bisher kompiliert zu:
+
+```sql
+auth.uid() IS NOT NULL
+```
+
+Auf dem Benutzer-Pfad ist das eine **Tautologie**. `applyAuthContext` wandelt eine leere Benutzer-ID erzwingend in den Platzhalter `'anonymous'` um — bewusst, damit sie niemals als `NULL` zurückgelesen und mit dem vertrauenswürdigen Serverkontext verwechselt werden kann. Daher war `IS NOT NULL` auch für anonyme Besucher wahr.
+
+Eine Regel, die sich wie „nur angemeldete Benutzer“ liest, gewährte daher Zugriff für **jeden, einschließlich abgemeldeter Besucher**. Sie wird nun wie folgt kompiliert:
+
+```sql
+auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+```
+
+`policy.not(policy.authenticated())` war separat als Spezialfall definiert, um „der Serverkontext“ zu bedeuten. Das ist nicht mehr der Fall — verwenden Sie dafür `policy.serverContext()`.
+
+### Warum dies der gefährliche Punkt ist
+
+Das kompilierte SQL befindet sich in Ihrer **Datenbank**, nicht in Ihrem Anwendungscode. Das Aktualisieren der Pakete ändert es nicht. Die zwei Fehlermodi sind entgegengesetzt und beide verlaufen still:
+
+| Was Sie tun | Was passiert |
+|---|---|
+| Pakete aktualisieren, `db push` **nicht** erneut ausführen | Ihre Datenbank behält `auth.uid() IS NOT NULL`. **Anonyme Besucher behalten den Zugriff, den sie nie hätten haben sollen.** Nichts warnt Sie. |
+| Pakete aktualisieren **und** `db push` erneut ausführen | Die Richtlinie wird verschärft. Alles, was sich auf das permissive Verhalten verlassen hat — ein nicht authentifizierter Lesezugriff beim Laden der Seite, eine öffentliche Auflistung, ein Webhook ohne Sitzung —, gibt plötzlich null Zeilen oder 403 zurück. |
+
+> **`rebase doctor --policies` erfasst dies ab Version 0.10.0.** Es liest die Live-Werte von `qual` und `with_check` direkt aus `pg_policies` und meldet unter **Insecure** jede Richtlinie, die noch die reine `auth.uid() IS NOT NULL`-Tautologie enthält. Es meldet die andere Hälfte des Problems unter **Orphaned**: eine Richtlinie, die durch einen früheren Push ersetzt, aber nie gelöscht wurde. Das Bearbeiten einer Regel benennt ihre Richtlinie um — der generierte Name ist ein Hash der Regel —, sodass die alte zurückbleibt. Postgres verknüpft permissive Richtlinien mit ODER, wodurch eine veraltete Zugriffsgewährung Vorrang vor der Verschärfung hat, die sie ersetzen sollte. Der Befehl endet mit einem Exit-Code ungleich Null, sodass CI darauf prüfen kann.
+>
+> Das normale `rebase doctor` führt dieselben Policy-Prüfungen zusammen mit dem Schema-Diff aus; `--policies` ist die Reine-Richtlinien-Form und sollte auf eine deployed Datenbank gerichtet werden. Beide benötigen `DATABASE_URL` (oder `ADMIN_CONNECTION_STRING`) — ohne diese werden die Policy-Prüfungen *mit einer Warnung übersprungen*, anstatt fehlzuschlagen.
+
+> **Was der Scan nicht erfasst.** Er sucht genau nach dieser einen Ausdrucksform — unabhängig von den Leerzeichen, in denen Postgres sie gespeichert hat — und behandelt einen `<> 'anonymous'` (oder `!= 'anonymous'`) Guard an beliebiger Stelle in derselben Klausel als die korrigierte Form. Eine Fail-Open-Richtlinie, die manuell in einer anderen Schreibweise geschrieben wurde — `USING (true)`, `USING (1 = 1)`, `USING (current_setting('rebase.uid', true) IS NOT NULL)` —, wird **nicht** markiert, und ebenso wenig ein zusammengesetzter Ausdruck, der zufällig `'anonymous'` in einem nicht zusammenhängenden Zweig erwähnt. Er benötigt außerdem Collections zum Vergleichen: Ein Projekt, dessen Collections überhaupt keine Richtlinien generieren, erhält keinen Scan. Das Lesen von `pg_policies` in Schritt 3 zeigt Ihnen die Ausdrücke selbst.
+
+> **Nichts wendet die Korrektur automatisch für Sie an.** Richtlinien werden beim Container-Start nicht erneut ausgeführt. Das Aktualisieren der Pakete, ein erneutes Deployment und ein Neustart lassen `pg_policies` genau so, wie es war. Nur `db push` schreibt es um — und löst auch die ersetzten Richtlinien.
+
+### Was zu tun ist
+
+**Schritt 1 — finden Sie jede betroffene Regel.** Führen Sie im Projektverzeichnis aus:
+
+```bash
+grep -rn "authenticated()" config/collections/
+```
+
+Jeder Treffer ist eine Regel, deren Bedeutung sich geändert hat. Prüfen Sie auch auf die rohe Schreibweise, die der andere Weg war, dieselbe Tautologie zu schreiben:
+
+```bash
+grep -rn "auth.uid() IS NOT NULL" config/collections/
+```
+
+**Schritt 2 — entscheiden Sie, was die jeweilige Regel bedeuten sollte.** Fragen Sie sich bei jeder Regel, was Ihre Absicht war:
+
+- *"Jeder angemeldete Benutzer"* → `policy.authenticated()`. Keine Code-Änderung; das Verhalten entspricht nun dem, was Sie geschrieben haben. Führen Sie `db push` erneut aus.
+- *"Jeder, einschließlich Anonymer"* → Sie haben sich auf den Fehler verlassen, ob wissentlich oder nicht. Machen Sie es explizit: `{ operation: "select", access: "public" }`.
+- *"Nur der vertrauenswürdige Serverkontext"* → Ersetzen Sie `policy.not(policy.authenticated())` durch `policy.serverContext()`.
+
+**Schritt 3 — prüfen Sie, was Ihre Datenbank tatsächlich enthält,** vorher und nachher:
+
+```sql
+SELECT tablename, policyname, cmd, qual
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+```
+
+Jedes `qual`, das `auth.uid() IS NOT NULL` **ohne** die Klausel `<> 'anonymous'` enthält, ist eine veraltete permissive Richtlinie. `rebase doctor --policies` meldet genau diese sowie die ersetzten Richtlinien; diese Abfrage zeigt Ihnen die Ausdrücke direkt, was verbleibende Fail-Open-Richtlinien aufdeckt, die in einer nicht vom Detektor erfassten Schreibweise verfasst wurden.
+
+**Schritt 4 — führen Sie `db push` und die Abfrage erneut aus.** `db push` wendet die aktuellen Richtlinien an und löscht dann diejenigen, die durch einen früheren Push ersetzt wurden. Bestätigen Sie, dass sich jede Richtlinie, bei der Sie eine Änderung erwartet haben, tatsächlich geändert hat, und führen Sie dann aus:
+
+```bash
+rebase doctor --policies
+```
+
+Der Befehl sollte mit 0 und ohne Insecure- oder Orphaned-Einträge beendet werden.
+
+**Schritt 5 — testen Sie im abgemeldeten Zustand.** Öffnen Sie Ihre App in einem privaten Fenster ohne Sitzung und führen Sie die Lese-Pfade aus. Hier finden Sie die öffentliche Auflistung, die stillschweigend vom alten Verhalten abhing.
+
+---
+
+## 2. Der Realtime-Socket war offen — prüfen Sie, wer abonnieren konnte
+
+Zwei separate Defekte, die beide Socket-Zugriff gewährten, anstatt ihn zu verweigern, und keiner von beiden hat etwas protokolliert.
+
+**`realtime.requireAuth: true` öffnete den Socket.** Der Connection-Handler initialisiert jede Sitzung mit `authenticated: !requireAuth`, sodass Flag keine spätere Prüfung einschränkt — es entscheidet, ob ein sich verbindender Client als *bereits* authentifiziert behandelt wird. Es wurde berechnet als:
+
+```ts
+authConfig.requireAuth !== false && !!authConfig.jwtSecret
+```
+
+Auf einem Server, der über einen `AuthAdapter` oder etwas anderes als ein lokales `auth.jwtSecret` authentifiziert, ist dies `false` — somit wurde jeder Client, der sich verband, als authentifiziert markiert. Das Setzen von `requireAuth: true` war das, was den Zugriff gewährte.
+
+**Der Socket und `/api/data` stimmten nicht überein.** Beide berechneten unabhängig voneinander "erfordert dieser Server einen authentifizierten Aufrufer?". Wenn überhaupt keine Auth konfiguriert war, antworteten die HTTP-Routen bei jedem Lesezugriff mit 401, während der Socket jeden zuließ und dieselben Zeilen auslieferte.
+
+### Sind Sie betroffen?
+
+Sie waren gefährdet, wenn **eines von beiden** zutrifft:
+
+- Sie haben `realtime.requireAuth: true` gesetzt, während Sie über einen `AuthAdapter` authentifizierten (oder über einen anderen Pfad als `auth.jwtSecret`), oder
+- Sie führen die App ohne jegliche Auth-Konfiguration aus und sind davon ausgegangen, dass der Socket dem 401-Status von `/api/data` entspricht.
+
+RLS galt weiterhin für das, was ein Abonnement zurückgab, sodass eine Collection mit korrekten Richtlinien nichts preisgab. Das Risiko betrifft Collections, deren Schutz "der Socket erfordert Auth" statt einer Richtlinie war.
+
+### Was zu tun ist
+
+```bash
+# Every collection reachable over the socket relies on RLS, not on the gate.
+pnpm rebase doctor --policies
+```
+
+Testen Sie Ihre App anschließend **abgemeldet in einem privaten Fenster** mit geöffnetem Netzwerk-Panel für Websockets — dieselbe Prüfung, die Abschnitt 1 aus demselben Grund erfordert. In Ihrem Code muss nichts geändert werden: Beide Durchsetzungspunkte rufen jetzt `resolveRequireAuth` auf, und Tests stellen sicher, dass sie übereinstimmen.
+
+---
+
+## 3. Der authentifizierte Principal ist `uid`, nicht `userId`
+
+Tokens enthalten jetzt einen `uid`-Claim und `c.get("user")` gibt `{ uid, roles }` zurück.
+
+```bash
+grep -rn "\.userId\|payload.userId\|user.userId" src/ config/
+```
+
+Alles, was `payload.userId` oder `user.userId` liest, erhält `undefined` — was bei einer Berechtigungsprüfung normalerweise zu einer fälschlichen Freigabe führt oder stillschweigend fehlschlägt, anstatt einen Fehler zu werfen. Suchen Sie auch nach der defensiven Schreibweise `a ?? b`; an mehreren Stellen wurde diese unabhängig entwickelt, um mit den zwei Namen umzugehen:
+
+```bash
+grep -rn "uid ?? \|?? .*userId" src/ config/
+```
+
+---
+
+## 4. `id` ist eine Adresse, keine Spalte
+
+Zeilen enthalten ihre Spalten jetzt unter ihren eigenen Namen und Typen. Zuvor wurde beim Ausgeben eine synthetisierte `id` in Zeilen geschrieben, was auf drei Arten mit Ihren Daten kollidierte: Der Schlüssel wurde umbenannt (ein Primärschlüssel `sku` wurde als `id` ausgeliefert, während `sku` fehlte), der Typ wurde geändert (ein Integer-Schlüssel kam als `"42"` an) und echte Werte wurden überschrieben (`drizzleResultToRow` wendete es zuletzt an, wodurch es über eine echte `id`-Spalte siegte).
+
+**Wenn Ihre Tabellen den Schlüssel `id` nutzen, ändert sich für Sie nichts.**
+
+Wenn eine Tabelle einen anderen Schlüssel nutzt, muss Code, der `row.id` liest, den echten Schlüssel lesen. Beachten Sie auch die Typänderung: Ein numerischer Primärschlüssel kommt jetzt als `number` an, aus `row.id === "42"` wird also `row.sku === 42`. Ein strikter Vergleich (`===`) gegen einen String wird stillschweigend nicht mehr matchen.
+
+---
+
+## 5. Nur ESM
+
+`main`, `module` und die `import`-Bedingung zeigen alle auf `index.es.js`; die `require`-Bedingung ist entfernt. Der CJS/UMD-Teil war ohnehin nie ladbar — der Output-Banner fügt `import` / `import.meta.url` ein, was ein UMD-Bundle nicht als CommonJS parsen kann. Dadurch wird ein Build-Ziel entfernt, das ohnehin nicht funktioniert haben kann.
+
+Ein CommonJS-Konsument muss dynamisches `import()` verwenden oder zu ESM wechseln.
+
+---
+
+## 6. `react-router` 8 und `react-router-dom` ist entfernt
+
+Nur relevant, wenn Sie das Admin-Panel verwenden — `@rebasepro/admin`, `app`, `studio` oder `plugin-ai`. Eine Headless-Installation hat keinen Router.
+
+react-router 8 löscht das Paket `react-router-dom`. Es war lediglich ein Kompatibilitäts-Shim für v6; alles DOM-Spezifische wurde bereits in v7 in `react-router` selbst integriert. Entfernen Sie die Abhängigkeit und ändern Sie zwei Importe:
+
+```diff
+- import { createBrowserRouter, RouterProvider } from "react-router-dom";
++ import { createBrowserRouter } from "react-router";
++ import { RouterProvider } from "react-router/dom";
+```
+
+`RouterProvider` ist der einzige Name, der in einen Unterpfad verschoben wird. Alles andere — `useNavigate`, `useLocation`, `useSearchParams`, `useParams`, `Link`, `NavLink`, `Outlet`, `Navigate`, `Route`, `Routes`, `MemoryRouter`, `useBlocker` — behält seinen Namen und stammt aus `react-router`. Für die meisten Dateien bedeutet das eine einzige Anpassung:
+
+```bash
+grep -rl '"react-router-dom"' src | xargs sed -i '' 's|"react-router-dom"|"react-router"|g'
+```
+
+Korrigieren Sie dann den `RouterProvider`-Import dort, wo Sie den Router einbinden (mounten), was normalerweise nur eine Datei ist.
+
+Die darunterliegenden Abhängigkeiten verschieben sich mit, da react-router 8 diese erfordert: `react` und `react-dom` in Version **19.2.7** oder neuer und Node in Version **22.22.0** oder neuer.
+
+### Wenn Ihre Tests Jest verwenden
+
+Das ist der Teil, der Sie einen Nachmittag kosten wird, wenn er Sie überrascht.
+react-router 8 ist ESM-only und bricht den CommonJS-Output von ts-jest auf zwei verschiedene Arten:
+
+- react-router schützt einen Vite-HMR-Hook mit `import.meta.hot`. In CommonJS ist `import.meta` ein **Syntaxfehler**, und ts-jest kann nicht helfen — TypeScript gibt den Ausdruck unter `module: commonjs` unverändert aus, anstatt ihn abzulehnen oder umzuschreiben.
+- react-router hängt von `cookie-es` 3 ab, welches ausschließlich als `.mjs` ausgeliefert wird, ohne CJS-Build, auf den stattdessen aufgelöst werden könnte. TypeScript bestimmt das Modulformat anhand der Dateiendung, weshalb es für eine `.mjs`-Eingabe keinen CommonJS-Code ausgibt, egal was `module` angibt.
+
+Jede betroffene Test-Suite schlägt beim **Laden des Moduls mit null ausgeführten Tests** fehl, sodass sich die Ausgabe wie eine defekte Jest-Konfiguration liest und nicht wie ein Problem mit dem Abhängigkeitsformat. Die Lösung ist ein Transformer, der den HMR-Guard entfernt, nachdem ts-jest ausgeführt wurde, und `.mjs` unter einem `.js`-Dateinamen kompiliert. Der Rebase-eigene Transformer ist [`scripts/jest/react-router-esm-transform.cjs`](https://github.com/rebasepro/rebase/blob/main/scripts/jest/react-router-esm-transform.cjs) und ist zum Kopieren gedacht. Sie müssen außerdem react-router und `cookie-es` aus dem allgemeinen `node_modules`-Ausschluss in `transformIgnorePatterns` herausnehmen und `mjs` zu `moduleFileExtensions` hinzufügen.
+
+Vitest benötigt nichts davon.
+
+---
+
+## 7. Paket-Umbenennungen
+
+Nur Import-Pfade — es wurde kein Verhalten verschoben.
+
+| Alt | Neu |
+|---|---|
+| `@rebasepro/core` | `@rebasepro/app` |
+| `@rebasepro/server-core` | `@rebasepro/server` |
+| `@rebasepro/server-postgresql` | `@rebasepro/server-postgres` |
+| `@rebasepro/server-mongodb` | `@rebasepro/server-mongo` |
+| `@rebasepro/client-postgresql` | `@rebasepro/client-postgres` |
+| `@rebasepro/client-firebase` | `@rebasepro/firebase` |
+| `@rebasepro/formex` | `@rebasepro/forms` |
+| `@rebasepro/sdk-generator` | `@rebasepro/codegen` |
+| `@rebasepro/schema-inference` | `@rebasepro/inference` |
+| `@rebasepro/mcp-server` | `@rebasepro/mcp` |
+| `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
+
+Unverändert: `types`, `utils`, `common`, `client`, `admin`, `studio`, `cli`, `plugin-insights`.
+
+Die alten Namen sind auf npm als veraltet (deprecated) markiert. Wenn Sie einen davon installieren, erhalten Sie einen Hinweis, anstatt dass auf eine aufgegebene Version aufgelöst wird.
+
+Zusätzlich **wurde `@rebasepro/auth` entfernt**. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` und `clearAuthConfigCache` stammen jetzt aus `@rebasepro/app`, direkt neben den Komponenten `RebaseAuth` und `LoginView`, mit denen sie verwendet werden.
+
+**`RebaseCMS` heißt jetzt `RebaseAdmin`.** `mode: "cms"` in `RebaseBackendConfig` bleibt unverändert — es beschreibt, woher die Collections stammen, nicht die Benutzeroberfläche.
+
+---
+
+## 8. Alle veralteten Exporte wurden entfernt
+
+Elf Symbole, die `@deprecated` trugen, wurden entfernt, anstatt über die 1.0-Grenze mitgeschleift zu werden, wo das Entfernen eines Symbols eine Major-Version kosten würde.
+
+### `rebase.data` → `rebase.dataAsAdmin`
+
+Dies ist die Stelle, nach der Sie zuerst suchen sollten, da sie Sicherheitsrelevanz hat. Der Server-Singleton hatte zwei Namen für einen einzelnen **RLS-umgehenden** Accessor, und der kürzere gab keinen Hinweis darauf — während auf einem Browser-Client `data` der *benutzerbezogene* Accessor ist. Derselbe Ausdruck bedeutete zwei sehr unterschiedliche Dinge, je nachdem, auf welcher Seite des Netzwerks er ausgeführt wurde.
+
+```diff
+- const { data: rows } = await rebase.data.projects.find();
++ const { data: rows } = await rebase.dataAsAdmin.projects.find();
+```
+
+```bash
+grep -rn "rebase\.data\b" src config backend
+```
+
+`RebaseServerClient` erweitert nun `Omit<RebaseClient, "data">`, sodass dies ein Kompilierungsfehler ist und kein stillegtes Privileg mehr darstellt. Die Eigenschaft ist zur Laufzeit weiterhin vorhanden und bildet einen Alias für `dataAsAdmin`, sodass ein Backend in reinem JavaScript während der Migration weiterläuft — verlassen Sie sich jedoch nicht darauf.
+
+**Lassen Sie diese unverändert.** Sie sind benutzerbezogen und waren nie veraltet:
+
+- `context.client.data` in einem Entity-Callback — läuft unter dem RLS des Aufrufers
+- `client.data` in einem Cron-Handler — ein `RebaseClient`
+- `rebase.data` in einem generierten SDK oder einer Browser-App — ein anderes Objekt
+
+Und für benutzerbezogene Abfragen innerhalb eines Request-Handlers ist keiner der beiden Namen das, was Sie wollen: Verwenden Sie `c.var.driver`, was die Identität des Aufrufers trägt.
+
+### Die anderen zehn
+
+Hierbei handelt es sich jeweils um eine Umbenennung an der Import-Stelle:
+
+| Entfernt | Aus | Stattdessen verwenden |
+|---|---|---|
+| `buildCollection` | `@rebasepro/common` | `defineCollection` |
+| `buildProperty` | `@rebasepro/common` | ein einfaches Property-Objekt |
+| `RebaseUser` | `@rebasepro/client` | `User` |
+| `RebaseTokens` | `@rebasepro/client` | `AuthTokens` |
+| `UserInfo` | `@rebasepro/app` | `User` |
+| `Session` | `@rebasepro/app` | `DeviceSession` |
+| `AuthApiError` | `@rebasepro/app` | `RebaseApiError` |
+| `DatabaseConnection` | `@rebasepro/server` | `DriverConnection` |
+| `createApiKeyRateLimiter` | `@rebasepro/server` | `createDataRateLimiter` |
+| `resolveChannelBusConfig` | `@rebasepro/server-postgres` | `resolveChannelBusSetting` |
+
+`User`, `AuthTokens`, `DeviceSession` und `RebaseApiError` werden alle direkt aus `@rebasepro/client` und `@rebasepro/app` exportiert — Sie müssen `@rebasepro/types` nicht zu Ihrer `package.json` hinzufügen, um sie zu benennen.
+
+Drei dieser Punkte sind es wert, über die Tabelle hinaus gelesen zu werden:
+
+**`createApiKeyRateLimiter` hat jede Anfrage übersprungen, die nicht per API-Schlüssel authentifiziert war** — bei einem normalen Deployment betraf das fast alle. Wenn Sie diesen in der Erwartung von Schutz eingebunden haben, hatten Sie keinen Schutz für Browser-Traffic. `createDataRateLimiter` deckt auch angemeldete Benutzer und anonyme Aufrufer ab.
+
+**`buildCollection` und `buildProperty` wurden für Version 0.11 als entfernt angekündigt, wurden es aber nicht.** Wenn Sie damals migriert sind, ändert sich jetzt nichts. Wenn Sie es nicht getan haben, funktionierte Ihr Build weiterhin und bricht an dieser Stelle.
+
+**`DatabaseConnection` ist weiterhin aus `@rebasepro/server` importierbar** — das ist der Punkt. Zwei Strukturen hörten auf diesen Namen; der lokale Alias für `DriverConnection` ist entfernt und der kanonische Typ aus `@rebasepro/types` bleibt bestehen. Wenn Ihr Code die Typprüfung weiterhin besteht, haben Sie bereits den richtigen Typ verwendet.
+
+```bash
+grep -rnE "buildCollection|buildProperty|RebaseUser|RebaseTokens|UserInfo|AuthApiError|createApiKeyRateLimiter|resolveChannelBusConfig" src config backend
+```
+
+---
+
+## 9. `defaultSecurityRules` aus der Server-Konfiguration verschoben
+
+Es befand sich früher in `RebaseBackendConfig`, wo es nichts durchsetzte: `db push` generiert die Postgres-Richtlinien — das Einzige, was den Zugriff tatsächlich durchsetzt — aus den Collection-**Dateien** und sieht den laufenden Server nie.
+
+Deklarieren Sie es stattdessen in `config/collections/index.ts`, wo der Loader es liest und sowohl die Laufzeit als auch `db push` dasselbe sehen:
+
+```ts
+// config/collections/index.ts
+export const defaultSecurityRules: SecurityRule[] = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
+```
+
+Die alte Dokumentation behauptete, Collections ohne Regeln seien "uneingeschränkt". Das sind sie nicht — der Generator beschränkt sie auf Admin-only.
+
+Im `baas`-Modus gibt es keine Collection-Dateien und kein `db push`, sodass das RLS der Datenbank selbst das gesamte Modell darstellt und es nichts als Standard zu setzen gibt.
+
+---
+
+## 10. Kleinere Verhaltensänderungen
+
+**Ein Schreibzugriff, der ein Feld benennt, das in der Collection fehlt, führt nun zu einem 400-Fehler.** Unbekannte Schlüssel wurden früher in das INSERT übernommen, sodass ein Tippfehler als `column "titel" does not exist` zurückkam — formuliert von Postgres, aus einem Stack, den der Aufrufer nicht sehen kann, und nur dann, wenn die Spalte wirklich fehlte. Bulk-Schreibzugriffe werden vor dem Öffnen der Transaktion geprüft und melden den betroffenen Zeilen-Index.
+
+> **Auth-Collections werden ebenfalls geprüft, mit einer kleinen Ausnahme.** Ein Registrierungs-Body enthält Anmeldeinformationen — vor allem `password` —, die die Nutzer-Collection nicht als Spalten deklariert. Der Auth-Adapter benennt diese explizit, und alles andere wird wie gewohnt validiert. Ein Tippfehler wie `emial` bei einer Registrierung führt wie bei jeder anderen Collection zu einem 400-Fehler. (Eine Auth-Collection, die an einen benutzerdefinierten `onCreateUser`-Hook angebunden ist, nimmt nicht an dieser Prüfung teil, da der Hook und nicht die Collection die Form des Bodys definiert.)
+
+**Eine Collection-Datei, deren Import fehlschlägt, führt nun zu einem harten Fehler.** Der Loader hat früher eine Protokollierung vorgenommen und fortgesetzt, wodurch eine defekte Datei zu einer fehlenden API-Route und einer fehlenden Richtlinie mit einem erfolgreichen Exit-Code wurde. Beides wurde als "keine Daten" statt als Fehler gewertet.
+
+**Der BaaS-Modus stellt keine Tabellen ohne Row-Level Security bereit.** Eine Tabelle mit deaktiviertem RLS wird übersprungen und beim Start benannt. `baas: { unprotectedTables: "serve" }` stellt das alte Verhalten wieder her.
+
+---
+
+## Upgrade-Checkliste
+
+```
+[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] decide the intent of each rule; rewrite the ones that meant "public"
+[ ] replace not(authenticated()) with serverContext()
+[ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
+    having been open — verify RLS on every subscribable collection (section 2)
+[ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
+[ ] update package names and imports
+[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 8)
+[ ] grep for the other ten removed deprecated exports (section 8)
+[ ] drop react-router-dom; import RouterProvider from "react-router/dom"
+[ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
+[ ] move defaultSecurityRules into config/collections/index.ts
+[ ] grep for .userId
+[ ] grep for row.id on tables not keyed on id
+[ ] run db push
+[ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
+[ ] SELECT ... FROM pg_policies again — confirm every intended change landed
+[ ] exercise the app signed OUT, in a private window — watch the websocket too
+```
+
+`rebase doctor --policies` sollte in die CI eingebunden werden: Befehle enden mit einem Exit-Code ungleich Null, wenn eine Richtlinie noch die permissive Tautologie enthält oder eine Richtlinie durch einen früheren Push ersetzt wurde. Die `pg_policies`-Abfragen davor und danach sind die Minute wert — sie zeigen Ihnen die Ausdrücke selbst, was die einzige Möglichkeit ist, eine Fail-Open-Richtlinie zu erkennen, die in einer vom Detektor nicht erfassten Schreibweise verfasst wurde. Weder die Pakete noch das Typsystem werden es Ihnen mitteilen: Die Änderung befindet sich in der Datenbank, und `db push` ist das Einzige, was sie dort anwendet.
+
+---

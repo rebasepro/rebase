@@ -16,6 +16,32 @@ const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 const TARGET_LANGUAGES = ['es', 'de', 'fr', 'it', 'pt'];
 const CONTENT_DIR = path.resolve('./src/content/docs');
 
+/**
+ * Directories that are generated, and must not be translated.
+ *
+ * `docs/ui/**` is written by the AST generator from the `.design-sync`
+ * previews — it is regenerated wholesale, and nothing regenerates a
+ * translation of it. Translating it once produces ~495 files (99 pages × 5
+ * locales) that the generator does not own and will never update, so they
+ * start drifting from the components they document on the next UI change.
+ *
+ * Starlight already falls back to English per-page, so an untranslated API
+ * reference renders fine in every locale today. That fallback is the intended
+ * behaviour here, not a gap.
+ */
+const EXCLUDED_DIRS = ['docs/ui'];
+
+/**
+ * Individual generated files, excluded for the same reason.
+ *
+ * `docs/CHANGELOG.md` is copied from the repo-root CHANGELOG by
+ * `scripts/copy_changelog.js` on every `generate-all`, and `check:generated`
+ * gates that it matches. Only the English copy is regenerated, so a translated
+ * one is stale from the next release onward — and it is the one document where
+ * being one release behind is worst.
+ */
+const EXCLUDED_FILES = ['docs/CHANGELOG.md'];
+
 // Helper to recursively get all markdown files
 async function getMarkdownFiles(dir, fileList = []) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -28,8 +54,18 @@ async function getMarkdownFiles(dir, fileList = []) {
             if (dir === CONTENT_DIR && TARGET_LANGUAGES.includes(entry.name)) {
                 continue;
             }
+            // Skip generated trees — see EXCLUDED_DIRS.
+            const fromContentRoot = path.relative(CONTENT_DIR, fullPath);
+            if (EXCLUDED_DIRS.some(excluded => fromContentRoot === excluded || fromContentRoot.startsWith(`${excluded}/`))) {
+                console.log(`Skipping generated directory: ${fromContentRoot}`);
+                continue;
+            }
             await getMarkdownFiles(fullPath, fileList);
         } else if (entry.isFile() && (fullPath.endsWith('.md') || fullPath.endsWith('.mdx'))) {
+            if (EXCLUDED_FILES.includes(path.relative(CONTENT_DIR, fullPath))) {
+                console.log(`Skipping generated file: ${path.relative(CONTENT_DIR, fullPath)}`);
+                continue;
+            }
             fileList.push(fullPath);
         }
     }
