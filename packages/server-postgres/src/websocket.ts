@@ -39,6 +39,9 @@ interface ClientSession {
     /** Sliding window message counter for rate limiting */
     messageCount: number;
     messageWindowStart: number;
+    /** The same window, counted separately for channel frames. */
+    channelMessageCount: number;
+    channelWindowStart: number;
 }
 
 
@@ -46,6 +49,33 @@ interface ClientSession {
 const WS_RATE_LIMIT = 2000;
 /** Rate limit window in milliseconds (60 seconds) */
 const WS_RATE_WINDOW_MS = 60_000;
+
+/**
+ * Channel frames get their own budget, because they are a different workload.
+ *
+ * 2000/minute is 33/second, which is generous for queries and subscriptions and
+ * an order of magnitude below what the documented channel idiom asks for: the
+ * capacity note in `docs/backend/realtime.md` uses 60 fps cursor movement as
+ * its worked example, and the presence idiom re-`track()`s on every move, so
+ * one client sustaining that sends ~120 frames/second — 7200 a minute. Sharing
+ * one counter meant the cursor stream ate the query budget and then froze for
+ * the rest of the window.
+ *
+ * The number is sized to that documented workload and nothing more; it is not
+ * a considered product limit (see `docs/channel-authorization.md`).
+ */
+const WS_CHANNEL_RATE_LIMIT = 7200;
+
+/** Frames counted against the channel budget rather than the general one. */
+const CHANNEL_MESSAGE_TYPES = new Set([
+    "join_channel",
+    "leave_channel",
+    "broadcast",
+    "presence_track",
+    "presence_untrack",
+    "presence_state",
+    "channel_history"
+]);
 
 /** Admin-only WebSocket message types */
 const ADMIN_ONLY_TYPES = new Set([
@@ -139,7 +169,9 @@ export function createPostgresWebSocket(
         clientSessions.set(clientId, { ws,
 authenticated: !requireAuth,
 messageCount: 0,
-messageWindowStart: Date.now() });
+messageWindowStart: Date.now(),
+channelMessageCount: 0,
+channelWindowStart: Date.now() });
         realtimeService.addClient(clientId, ws);
 
         ws.on("close", () => {
@@ -247,19 +279,34 @@ roles: verifiedUser.roles }
                     }
                 }
 
-                // Rate limiting: reject if client exceeds message limit
+                // Rate limiting: reject if client exceeds message limit.
+                // Channel frames are counted against their own budget — see
+                // WS_CHANNEL_RATE_LIMIT for why one shared counter starved them.
                 {
                     const session = clientSessions.get(clientId);
                     if (session) {
                         const now = Date.now();
-                        if (now - session.messageWindowStart > WS_RATE_WINDOW_MS) {
-                            session.messageCount = 0;
-                            session.messageWindowStart = now;
-                        }
-                        session.messageCount++;
-                        if (session.messageCount > WS_RATE_LIMIT) {
-                            sendError("ERROR", "RATE_LIMITED", "Too many requests. Please slow down.");
-                            return;
+                        const isChannelFrame = CHANNEL_MESSAGE_TYPES.has(type);
+                        if (isChannelFrame) {
+                            if (now - session.channelWindowStart > WS_RATE_WINDOW_MS) {
+                                session.channelMessageCount = 0;
+                                session.channelWindowStart = now;
+                            }
+                            session.channelMessageCount++;
+                            if (session.channelMessageCount > WS_CHANNEL_RATE_LIMIT) {
+                                sendError("ERROR", "RATE_LIMITED", "Too many channel messages. Please slow down.");
+                                return;
+                            }
+                        } else {
+                            if (now - session.messageWindowStart > WS_RATE_WINDOW_MS) {
+                                session.messageCount = 0;
+                                session.messageWindowStart = now;
+                            }
+                            session.messageCount++;
+                            if (session.messageCount > WS_RATE_LIMIT) {
+                                sendError("ERROR", "RATE_LIMITED", "Too many requests. Please slow down.");
+                                return;
+                            }
                         }
                     }
                 }

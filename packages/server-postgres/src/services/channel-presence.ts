@@ -72,9 +72,16 @@ export class ChannelPresenceStore {
             ON rebase.channel_presence (last_seen)
         `);
 
-        // The roster of every client on every channel, with no RLS — presence
-        // authorization is a channel rule, not a row policy. Revoke the
-        // schema-wide grant the driver handed out before this table existed.
+        // The roster of every client on every channel, with no RLS — a row
+        // policy has nothing to match on here, since a channel name is a string
+        // a client invents rather than a row anyone owns. What guards it is the
+        // channel gate in `realtimeService.authorizeChannelAction`: presence is
+        // readable only to a client that has joined the channel, plus whatever
+        // an installed `ChannelAuthorizer` adds. That gate is the entire reason
+        // this table can sit outside the RLS model, so it fails closed —
+        // see `docs/channel-authorization.md` for what it does *not*
+        // yet decide. Revoke the schema-wide grant the driver handed out
+        // before this table existed.
         await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_presence")));
 
         this.tablesReady = true;

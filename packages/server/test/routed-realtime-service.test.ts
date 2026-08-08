@@ -2,8 +2,9 @@ import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { createRoutedRealtimeService } from "../src/services/routed-realtime-service";
 import type { RealtimeProvider } from "@rebasepro/types";
 
-function mockProvider() {
+function mockProvider(supportsChannels = false) {
     return {
+        supportsChannels,
         addClient: jest.fn(),
         handleClientMessage: jest.fn(async () => {}),
         subscribeToCollection: jest.fn(),
@@ -22,7 +23,7 @@ describe("createRoutedRealtimeService", () => {
     let routed: ReturnType<typeof createRoutedRealtimeService>;
 
     beforeEach(() => {
-        pg = mockProvider();
+        pg = mockProvider(true);
         mongo = mockProvider();
         routed = createRoutedRealtimeService({
             providers: { "(default)": pg as unknown as RealtimeProvider, mongo: mongo as unknown as RealtimeProvider },
@@ -49,12 +50,64 @@ describe("createRoutedRealtimeService", () => {
         expect(mongo.handleClientMessage).toHaveBeenCalledTimes(1);
     });
 
-    it("sends channel/presence/broadcast to the default provider only", async () => {
+    it("sends channel/presence/broadcast to the provider that implements them", async () => {
         await routed.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } });
         await routed.handleClientMessage("c1", { type: "join_channel", payload: { channel: "room" } });
         await routed.handleClientMessage("c1", { type: "presence_track", payload: { channel: "room" } });
-        expect(pg.handleClientMessage).toHaveBeenCalledTimes(3);
+        // The catch-up request belongs to the same set. It was missing from it,
+        // so it fell through to "anything else" and was routed by default-ness.
+        await routed.handleClientMessage("c1", { type: "channel_history", payload: { channel: "room" } });
+        expect(pg.handleClientMessage).toHaveBeenCalledTimes(4);
         expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Channel frames used to go to whichever provider a bootstrapper marked
+     * `isDefault`. Only Postgres implements them, and Mongo's message switch has
+     * no `default` arm — so on a Mongo-default project `broadcast()` resolved
+     * and reached nobody, `onPresence` never fired, and every join spent the
+     * full catch-up timeout waiting for a `channel_history` reply that was never
+     * coming. Nothing was logged at any point.
+     */
+    it("routes channel frames by capability, not by which provider is default", async () => {
+        const mongoDefault = createRoutedRealtimeService({
+            providers: { mongo: mongo as unknown as RealtimeProvider, pg: pg as unknown as RealtimeProvider },
+            defaultKey: "mongo",
+            resolveKey: () => "mongo"
+        });
+
+        await mongoDefault.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } });
+
+        expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
+        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+    });
+
+    it("refuses channel frames loudly when no provider implements them", async () => {
+        const noChannels = createRoutedRealtimeService({
+            providers: { mongo: mongo as unknown as RealtimeProvider },
+            defaultKey: "mongo",
+            resolveKey: () => "mongo"
+        });
+
+        await expect(
+            noChannels.handleClientMessage("c1", { type: "broadcast", payload: { channel: "room", event: "x" } })
+        ).rejects.toThrow(/not supported/i);
+        expect(mongo.handleClientMessage).not.toHaveBeenCalled();
+    });
+
+    it("still prefers the default provider when it does support channels", async () => {
+        const bothSupport = createRoutedRealtimeService({
+            providers: {
+                second: mockProvider(true) as unknown as RealtimeProvider,
+                "(default)": pg as unknown as RealtimeProvider
+            },
+            defaultKey: "(default)",
+            resolveKey: () => "(default)"
+        });
+
+        await bothSupport.handleClientMessage("c1", { type: "join_channel", payload: { channel: "room" } });
+
+        expect(pg.handleClientMessage).toHaveBeenCalledTimes(1);
     });
 
     it("addClient is forwarded to every provider", () => {
