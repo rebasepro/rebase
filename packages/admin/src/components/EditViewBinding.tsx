@@ -55,7 +55,7 @@ import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-import { withViewMode } from "../util/view_mode";
+import { withListState } from "../util/view_mode";
 import { useNavigate } from "react-router";
 
 import {
@@ -838,7 +838,7 @@ parentEntityIds,
         <EntityIdentityBar
             collection={collection as AdminCollection}
             collectionUrl={layout === "full_screen" || layout === "split"
-                ? withViewMode(urlController.buildUrlCollectionPath(path))
+                ? withListState(urlController.buildUrlCollectionPath(path))
                 : undefined}
             title={displayTitle}
             entityId={status === "existing" ? entityId : undefined}
@@ -853,7 +853,7 @@ parentEntityIds,
             // list can be unfolded back beside the record, that chevron reaches
             // the same collection and the arrow beside it is noise.
             onBack={layout === "full_screen" && !onShowList
-                ? () => navigate(withViewMode(urlController.buildUrlCollectionPath(path)))
+                ? () => navigate(withListState(urlController.buildUrlCollectionPath(path)))
                 : undefined}
             onSave={canEdit && formContext ? () => {
                 sideDialogContext.setPendingClose?.(false);

@@ -282,8 +282,15 @@ const CollectionViewBindingInner = React.memo(
         useEffect(() => {
             if (!urlView && viewMode !== defaultViewMode) {
                 // View came from saved config but URL doesn't have it - update URL without push
-                setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev);
+                // Built from `window.location.search`, not React Router's
+                // `prev`. The table controller writes the filter, sort and
+                // search params with `history.replaceState`, which React Router
+                // never observes — so `prev` is a stale snapshot, and merging
+                // into it silently dropped whatever it had not seen. Switching
+                // view mode after typing a search wiped `search=` from the URL,
+                // and the next reload came back unfiltered.
+                setSearchParams(() => {
+                    const next = new URLSearchParams(window.location.search);
                     next.set(VIEW_MODE_PARAM, viewMode);
                     return next;
                 }, { replace: true });
@@ -295,8 +302,10 @@ const CollectionViewBindingInner = React.memo(
             setViewModeState(newMode);
 
             // Update URL with __view param via React Router
-            setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
+            setSearchParams(() => {
+                // See the note above: the live URL is the only writer both
+                // this and the table controller agree on.
+                const next = new URLSearchParams(window.location.search);
                 if (newMode === defaultViewMode) {
                     next.delete(VIEW_MODE_PARAM);
                 } else {

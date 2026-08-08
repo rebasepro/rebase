@@ -1,4 +1,6 @@
-import { splitOnTerms, searchTerms, offSlotMatch } from "../../src/components/CollectionViewBinding/SearchHighlight";
+import { splitOnTerms, searchTerms, offSlotMatch, localRowMatch, snippetAround } from "../../src/components/CollectionViewBinding/SearchHighlight";
+import { withListState } from "../../src/util/view_mode";
+import { fieldLabel } from "../../src/components/CollectionViewBinding/SearchExplanation";
 
 /**
  * The browser-side half of "show me why this row matched".
@@ -113,5 +115,150 @@ describe("offSlotMatch", () => {
     it("returns nothing when the row did not match anything", () => {
         expect(offSlotMatch(undefined, ["full_name"])).toBeUndefined();
         expect(offSlotMatch([], ["full_name"])).toBeUndefined();
+    });
+});
+
+describe("localRowMatch — explaining a hit the server did not annotate", () => {
+    const properties = {
+        title: { type: "string", name: "Title" },
+        excerpt: { type: "string", name: "Excerpt" },
+        status: { type: "string", enum: [{ id: "published", label: "Published" }] },
+        tags: { type: "array", of: { type: "string" } },
+        meta: { type: "map", properties: { notes: { type: "string" } } }
+    };
+
+    it("finds the term in a field the list is not showing", () => {
+        const m = localRowMatch(
+            { title: "Nothing here", excerpt: "A note about latency budgets" },
+            properties, ["latency"], ["title"]
+        );
+        expect(m?.field).toBe("excerpt");
+        expect(m?.snippet).toContain("<mark>latency</mark>");
+    });
+
+    it("skips fields the row already displays", () => {
+        const m = localRowMatch(
+            { title: "All about latency", excerpt: "unrelated" },
+            properties, ["latency"], ["title"]
+        );
+        expect(m).toBeUndefined();
+    });
+
+    it("reaches into arrays", () => {
+        const m = localRowMatch(
+            { tags: ["perf", "latency budget"] }, properties, ["latency"], []
+        );
+        expect(m?.field).toBe("tags");
+    });
+
+    it("reaches into nested maps and reports the dotted path", () => {
+        const m = localRowMatch(
+            { meta: { notes: "watch the latency" } }, properties, ["latency"], []
+        );
+        expect(m?.field).toBe("meta.notes");
+    });
+
+    it("ignores enums — a chip from a fixed vocabulary is not an explanation", () => {
+        const m = localRowMatch({ status: "published" }, properties, ["published"], []);
+        expect(m).toBeUndefined();
+    });
+
+    it("returns the first field in declared order, so authored priority wins", () => {
+        const m = localRowMatch(
+            { title: "x", excerpt: "latency here", tags: ["latency there"] },
+            properties, ["latency"], ["title"]
+        );
+        expect(m?.field).toBe("excerpt");
+    });
+
+    it("returns nothing when the row does not contain the term", () => {
+        expect(localRowMatch({ excerpt: "nothing" }, properties, ["latency"], [])).toBeUndefined();
+    });
+});
+
+describe("snippetAround", () => {
+    const long = "The planner ignoring your index is usually correct, and the reason it does is that tail latency does not show up in a modest average at all, which is the whole point of this section.";
+
+    it("trims a long field to a readable window around the hit", () => {
+        const s = snippetAround(long, ["latency"])!;
+        expect(s).toContain("<mark>latency</mark>");
+        expect(s.length).toBeLessThan(long.length);
+        expect(s.startsWith("…")).toBe(true);
+    });
+
+    it("opens at a word boundary, not mid-word", () => {
+        const s = snippetAround(long, ["latency"])!;
+        // The first word after the ellipsis must be a whole word of the source,
+        // not the tail of one the trim cut through.
+        const firstWord = s.replace(/^…/, "").split(/\s/)[0];
+        expect(new RegExp(`(^|\\s)${firstWord}(\\s|$)`).test(long)).toBe(true);
+    });
+
+    it("keeps a short field whole rather than trimming it", () => {
+        expect(snippetAround("ISO 14001 auditor", ["iso"])).toBe("<mark>ISO</mark> 14001 auditor");
+    });
+
+    it("returns nothing when there is no hit", () => {
+        expect(snippetAround(long, ["nomatch"])).toBeUndefined();
+    });
+});
+
+describe("fieldLabel", () => {
+    const properties = {
+        title: { name: "Title", type: "string" },
+        content: { name: "Content", type: "array" },
+        questionnaire: { name: "Questionnaire", type: "map",
+            properties: { certifications: { name: "Certifications", type: "array" } } },
+        untitled_field: { type: "string" }
+    };
+
+    it("uses the declared name", () => {
+        expect(fieldLabel(properties, "title")).toBe("Title");
+    });
+
+    it("uses the nested property's name for a dotted path", () => {
+        expect(fieldLabel(properties, "questionnaire.certifications")).toBe("Certifications");
+    });
+
+    it("keeps the last declared name when the path runs deeper than the schema", () => {
+        // `content` is an array of blocks; `content.value` is not declared
+        // property-by-property. Labelling that "Value" is what shipped to the
+        // screen once — the reader wants "Content".
+        expect(fieldLabel(properties, "content.value")).toBe("Content");
+    });
+
+    it("humanises an undeclared name rather than showing a raw path", () => {
+        expect(fieldLabel(properties, "untitled_field")).toBe("Untitled field");
+    });
+
+    it("survives an unknown property", () => {
+        expect(fieldLabel(properties, "nope")).toBe("Nope");
+    });
+});
+
+describe("withListState — a record opened from a search comes back to it", () => {
+    it("carries the search onto the entity URL", () => {
+        expect(withListState("/c/posts/abc", "?search=latency"))
+            .toBe("/c/posts/abc?search=latency");
+    });
+
+    it("carries filters and sort too, which have no fixed names", () => {
+        const out = withListState("/c/posts/abc", "?search=x&__sort=title&status=eq.published");
+        expect(out).toContain("__sort=title");
+        expect(out).toContain("status=eq.published");
+    });
+
+    it("does not overwrite a param the target already sets", () => {
+        expect(withListState("/c/posts/abc?__view=table", "?__view=list"))
+            .toBe("/c/posts/abc?__view=table");
+    });
+
+    it("keeps the hash after the query, where it belongs", () => {
+        expect(withListState("/c/posts/new#new", "?search=x"))
+            .toBe("/c/posts/new?search=x#new");
+    });
+
+    it("leaves a URL alone when there is no list state to carry", () => {
+        expect(withListState("/c/posts/abc", "")).toBe("/c/posts/abc");
     });
 });

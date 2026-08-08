@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
+import { toFindParams } from "./collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
 import type { AdminCollection } from "@rebasepro/admin-types";
 /**
@@ -136,19 +137,11 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
         const includeParams = getRelationIncludeParams(collection);
 
         if (accessor.listen) {
-            return accessor.listen({
-                where: whereParams,
-                limit: itemCount,
-                offset,
-                page,
-                orderBy: orderByParams,
-                searchString,
-                // While searching, ask each row which field matched so the view can
-                // show *why* it is here. Costs a ts_headline per field per row,
-                // so it rides along only when there is a search string at all.
-                searchExplain: Boolean(searchString),
-                include: includeParams
-            }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
+            // Assembled in one place — see `toFindParams`.
+            return accessor.listen(
+                toFindParams({ where: whereParams, limit: itemCount, offset, page,
+                    orderBy: orderByParams, searchString, include: includeParams }),
+                (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onError);
         } else {
             // The one-shot fallback, taken whenever the client has no socket.
@@ -161,19 +154,9 @@ meta: res.meta }), onError);
             // on the results for whichever query the server happened to finish
             // last.
             let cancelled = false;
-            accessor.find({
-                where: whereParams,
-                limit: itemCount,
-                offset,
-                page,
-                orderBy: orderByParams,
-                searchString,
-                // While searching, ask each row which field matched so the view can
-                // show *why* it is here. Costs a ts_headline per field per row,
-                // so it rides along only when there is a search string at all.
-                searchExplain: Boolean(searchString),
-                include: includeParams
-            })
+            accessor.find(
+                toFindParams({ where: whereParams, limit: itemCount, offset, page,
+                    orderBy: orderByParams, searchString, include: includeParams }))
                 .then((res) => {
                     if (cancelled) return;
                     onEntitiesUpdate({ data: res.data as Entity<M>[],

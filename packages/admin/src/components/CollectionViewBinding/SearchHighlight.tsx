@@ -176,3 +176,110 @@ export function offSlotMatch(
     const shown = new Set(shownKeys.filter((k): k is string => Boolean(k)));
     return matches.find(m => !shown.has(m.field));
 }
+
+// ── Finding the match locally ───────────────────────────────────────────────
+
+/**
+ * Where a search term appears in a row, computed from the row itself.
+ *
+ * The server can say this too — `_matches`, from `ts_headline` — and its answer
+ * is better, because it knows the stemming the index used. This exists because
+ * the admin cannot rely on getting it: rows reach the panel over three
+ * different transports (REST, the realtime socket, the offline cache) and only
+ * one of them carries query metadata. A feature that explains a result on some
+ * loads and not others is worse than one that always gives a slightly simpler
+ * answer.
+ *
+ * So: use the server's when it is there, fall back to this. Both produce the
+ * same `{ field, snippet }` shape, and this one marks with the same `<mark>`.
+ */
+export function localRowMatch(
+    values: Record<string, unknown> | undefined,
+    properties: Record<string, unknown> | undefined,
+    terms: string[],
+    shownKeys: (string | undefined)[]
+): SearchMatch | undefined {
+    if (!values || !properties || terms.length === 0) return undefined;
+    const shown = new Set(shownKeys.filter((k): k is string => Boolean(k)));
+
+    // Declared order, so the field an author put first wins — the same rule the
+    // server's `_matches` follows.
+    for (const [key, property] of Object.entries(properties)) {
+        if (shown.has(key)) continue;
+        const found = findInValue(values[key], terms, key, property as { type?: string });
+        if (found) return found;
+    }
+    return undefined;
+}
+
+/**
+ * Context kept before and after a hit, in characters.
+ *
+ * Asymmetric on purpose. The snippet renders on one truncated line, so anything
+ * before the hit competes with the hit itself for the width available — with a
+ * generous lead-in the mark is pushed off the right edge and the reader sees a
+ * fragment with nothing highlighted in it, which is worse than no snippet at
+ * all. Lead with just enough to not start abruptly, then run on.
+ */
+const SNIPPET_LEAD = 16;
+const SNIPPET_TRAIL = 90;
+
+function findInValue(
+    value: unknown,
+    terms: string[],
+    path: string,
+    property: { type?: string } | undefined
+): SearchMatch | undefined {
+    // An enum renders as a chip from a fixed vocabulary; marking inside one
+    // reads as noise, and `where` is the right tool for those anyway.
+    if (property && "enum" in property && property.enum) return undefined;
+
+    if (typeof value === "string") {
+        const snippet = snippetAround(value, terms);
+        return snippet ? { field: path, snippet } : undefined;
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = findInValue(item, terms, path, undefined);
+            if (found) return found;
+        }
+        return undefined;
+    }
+    if (value && typeof value === "object") {
+        // Nested maps: report the path the author would recognise, which is the
+        // dotted one the `search` block uses.
+        for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+            const found = findInValue(nested, terms, `${path}.${key}`, undefined);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * The text around the first hit, with every hit in view marked.
+ *
+ * Trimmed to a readable window rather than the whole field: a match in a long
+ * body should show the sentence it is in, not the first line of the document,
+ * and certainly not the document.
+ */
+export function snippetAround(text: string, terms: string[]): string | undefined {
+    const segments = splitOnTerms(text, terms);
+    const firstHit = segments.findIndex(s => s.hit);
+    if (firstHit === -1) return undefined;
+
+    const before = segments.slice(0, firstHit).map(s => s.text).join("");
+    const head = before.length > SNIPPET_LEAD
+        // Start at a word boundary so the snippet does not open mid-word.
+        ? "…" + before.slice(before.length - SNIPPET_LEAD).replace(/^\S*\s/, "")
+        : before;
+
+    let out = head;
+    for (let i = firstHit; i < segments.length; i++) {
+        const seg = segments[i];
+        out += seg.hit ? `<mark>${seg.text}</mark>` : seg.text;
+        // Enough context after the hit to read it, then stop.
+        if (out.length > head.length + SNIPPET_TRAIL) { out += "…"; break; }
+    }
+    return out.trim();
+}

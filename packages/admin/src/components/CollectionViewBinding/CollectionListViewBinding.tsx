@@ -27,7 +27,8 @@ import { hasDeclaredDisplay } from "@rebasepro/app";
 import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
-import { Highlighted, Snippet, searchTerms, offSlotMatch } from "./SearchHighlight";
+import { Highlighted } from "./SearchHighlight";
+import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
@@ -150,32 +151,6 @@ function getIdealColumnWidth(prop: Property): { width: string, widthPx: number }
 /**
  * Get row padding/spacing classes based on size
  */
-/**
- * What to call a matched field in the results.
- *
- * The server returns the path the collection declared — `questionnaire.
- * certifications` — which is precise and unreadable. Resolve it to the
- * property's own `name`, walking into `map` properties for a dotted path, and
- * fall back to the last segment humanised. A field with no declared name still
- * reads as words rather than as a path.
- */
-function fieldLabel(collection: { properties?: Record<string, unknown> }, path: string): string {
-    const segments = path.split(".");
-    let node: Record<string, unknown> | undefined = collection.properties as Record<string, unknown> | undefined;
-    let named: string | undefined;
-
-    for (const segment of segments) {
-        const property = node?.[segment] as { name?: string; properties?: Record<string, unknown> } | undefined;
-        if (!property) { named = undefined; break; }
-        named = property.name ?? named;
-        node = property.properties;
-    }
-
-    if (named) return named;
-    const last = segments[segments.length - 1] ?? path;
-    return last.replace(/[_-]+/g, " ").replace(/^./, c => c.toUpperCase());
-}
-
 function getRowClasses(size: CollectionSize): string {
     switch (size) {
         case "xs": return "py-2 px-5";
@@ -938,15 +913,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         slotKeys
     );
 
-    // Why is this row here? Terms to mark inside values the row already shows,
-    // and — when the hit is in a field it does not show — the one match worth
-    // putting where the subtitle would have gone.
-    const terms = useMemo(() => searchTerms(searchString), [searchString]);
-    const offSlot = useMemo(
-        () => (terms.length > 0
-            ? offSlotMatch(entity.searchMatches, [slotKeys.titleKey, slotKeys.subtitleKey])
-            : undefined),
-        [entity.searchMatches, slotKeys.titleKey, slotKeys.subtitleKey, terms.length]
+    // Why is this row here? Shared with cards and board — see SearchExplanation.
+    const { terms, offSlot } = useSearchExplanation(
+        entity,
+        collection.properties as Record<string, unknown>,
+        [slotKeys.titleKey, slotKeys.subtitleKey],
+        searchString
     );
 
     const handleClick = useCallback((e: React.MouseEvent) => {
@@ -1084,19 +1056,10 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     arbitrary; the subtitle is the one line already reserved for
                     secondary context, so it carries the explanation instead. */}
                 {offSlot ? (
-                    <div className="truncate mt-0.5 flex items-baseline gap-1.5">
-                        <Typography
-                            variant="caption"
-                            component="span"
-                            className="shrink-0 text-[10px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-500/90"
-                            title={offSlot.field}
-                        >
-                            {fieldLabel(collection, offSlot.field)}
-                        </Typography>
-                        <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
-                            <Snippet text={offSlot.snippet}/>
-                        </Typography>
-                    </div>
+                    <MatchExplanation
+                        match={offSlot}
+                        label={fieldLabel(collection.properties as Record<string, unknown>, offSlot.field)}
+                    />
                 ) : slots.subtitle && (
                     <div className="truncate mt-0.5">
                         <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">

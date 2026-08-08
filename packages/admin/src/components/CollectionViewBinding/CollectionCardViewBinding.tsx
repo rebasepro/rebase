@@ -145,6 +145,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
                     key={`${entity.path}_${entity.id}`}
                     entity={entity}
                     collection={collection}
+                    searchString={tableController.searchString}
                     onClick={onClick as any}
                     selected={selected}
                     highlighted={highlighted}

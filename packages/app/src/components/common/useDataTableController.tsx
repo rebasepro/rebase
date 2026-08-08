@@ -5,6 +5,7 @@ import { useLocation } from "react-router";
 import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
+import { toFindParams } from "../../hooks/data/collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
 import { Entity, EntityReference, EntityRelation, FilterValues, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
@@ -260,29 +261,16 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const includeParams = getRelationIncludeParams(collection);
 
         if (accessor.listen) {
-            unsubscribe = accessor.listen({
-                where: whereParams,
-                limit: itemCount,
-                orderBy: orderByParams,
-                searchString,
-                // While searching, ask each row which declared field matched so
-                // the list can show *why* it is there. Costs a ts_headline per
-                // field per row, so it rides along only with a search string.
-                searchExplain: Boolean(searchString),
-                include: includeParams
-            }, (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
+            // Assembled in one place — see `toFindParams`. Listing the fields
+            // here is what let `searchExplain` reach three of four read paths.
+            unsubscribe = accessor.listen(
+                toFindParams({ where: whereParams, limit: itemCount, orderBy: orderByParams,
+                    searchString, include: includeParams }),
+                (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
         } else {
-            accessor.find({
-                where: whereParams,
-                limit: itemCount,
-                orderBy: orderByParams,
-                searchString,
-                // While searching, ask each row which declared field matched so
-                // the list can show *why* it is there. Costs a ts_headline per
-                // field per row, so it rides along only with a search string.
-                searchExplain: Boolean(searchString),
-                include: includeParams
-            })
+            accessor.find(
+                toFindParams({ where: whereParams, limit: itemCount, orderBy: orderByParams,
+                    searchString, include: includeParams }))
                 .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
                 .catch(onError);
             unsubscribe = () => undefined;

@@ -59,6 +59,42 @@ export function withViewMode(url: string, search?: string): string {
 }
 
 /**
+ * Carry the whole of the collection list's URL state onto a navigation target.
+ *
+ * `withViewMode` exists because losing the view mode mid-session is jarring.
+ * Everything else the list writes to the URL — the search string, the filters,
+ * the sort — is state the user built up deliberately, and losing *that* is
+ * worse: opening a record from a search and pressing back returned an
+ * unfiltered list with an empty search box, so the search had to be retyped
+ * for every record they wanted to look at.
+ *
+ * Copies every param the list currently has rather than an allowlist, because
+ * filters are encoded under the field's own name — there is no fixed set to
+ * list. Params already on the target win: the caller is more specific.
+ *
+ * @param url the URL to decorate. May carry a query string and/or a hash.
+ * @param search query string to read from. Defaults to the browser location.
+ */
+export function withListState(url: string, search?: string): string {
+    const source = search ?? (typeof window !== "undefined" ? window.location.search : "");
+    const carried = new URLSearchParams(source);
+    if ([...carried].length === 0) return url;
+
+    const hashIndex = url.indexOf("#");
+    const hash = hashIndex >= 0 ? url.substring(hashIndex) : "";
+    const base = hashIndex >= 0 ? url.substring(0, hashIndex) : url;
+
+    const [pathname, existing] = base.split("?");
+    const target = new URLSearchParams(existing ?? "");
+    for (const [key, value] of carried) {
+        if (!target.has(key)) target.set(key, value);
+    }
+
+    const query = target.toString();
+    return query ? `${pathname}?${query}${hash}` : `${pathname}${hash}`;
+}
+
+/**
  * Resolve the view mode for a collection, honouring the documented priority:
  * URL param > saved user config > collection default.
  */

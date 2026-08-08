@@ -1,6 +1,6 @@
 
 import type { UrlController, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/admin-types";
-import { withViewMode } from "./view_mode";
+import { withListState, withViewMode } from "./view_mode";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
 export { removeInitialAndTrailingSlashes, removeInitialSlash, removeTrailingSlash, addInitialSlash, getLastSegment, resolveCollectionPathIds, getCollectionBySlugWithin, getCollectionPathsCombinations } from "@rebasepro/app";
@@ -63,7 +63,9 @@ export function navigateToEntity({
         if (entityId && selectedTab) {
             to += `/${selectedTab}`;
         }
-        to = withViewMode(to);
+        // The whole list state, not just the view mode: a record opened from a
+        // search must come back to that search.
+        to = withListState(to);
         if (!entityId) {
             to += "#new";
         }

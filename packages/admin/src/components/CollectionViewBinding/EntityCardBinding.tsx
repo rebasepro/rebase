@@ -17,9 +17,13 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
+import { Highlighted } from "./SearchHighlight";
+import { useSearchExplanation, MatchExplanation, fieldLabel } from "./SearchExplanation";
 import { SlotValue, TagChips } from "./SlotValue";
 
 export type EntityCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /** The active search, so a card can mark the hit and say where it was. */
+    searchString?: string;
     entity: Entity<M>;
     collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
@@ -45,7 +49,8 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
     highlighted,
     onSelectionChange,
     selectionEnabled,
-    size = "m"
+    size = "m",
+    searchString
 }: EntityCardBindingProps<M>) {
     const authController = useAuthController();
     const analyticsController = useAnalyticsController();
@@ -61,6 +66,15 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         entity as Entity<Record<string, unknown>>,
         collection as AdminCollection<Record<string, unknown>>,
         slotKeys
+    );
+
+    // Same explanation the list shows, so a reader switching view modes does
+    // not lose the reason a card is in front of them.
+    const { terms, offSlot } = useSearchExplanation(
+        entity,
+        collection.properties as Record<string, unknown>,
+        [slotKeys.titleKey, slotKeys.subtitleKey],
+        searchString
     );
 
     const handleClick = (e?: React.MouseEvent) => {
@@ -152,7 +166,9 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 {/* Title slot */}
                 <div className="truncate my-1 text-sm font-medium min-h-[20px]">
                     {slots.title ? (
-                        <SlotValue slot={slots.title} size="small"/>
+                        terms.length > 0 && typeof slots.title.value === "string"
+                            ? <Highlighted text={slots.title.value} terms={terms}/>
+                            : <SlotValue slot={slots.title} size="small"/>
                     ) : (
                         <Typography variant="body2" className="text-surface-500">
                             {entity.id}
@@ -160,10 +176,19 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                     )}
                 </div>
 
-                {/* Subtitle slot */}
-                {slots.subtitle && (
+                {/* Subtitle slot — or, while searching, where the hit was. A
+                    card whose match is in a field it does not show looks as
+                    arbitrary as a list row does. */}
+                {offSlot ? (
+                    <MatchExplanation
+                        match={offSlot}
+                        label={fieldLabel(collection.properties as Record<string, unknown>, offSlot.field)}
+                    />
+                ) : slots.subtitle && (
                     <div className="line-clamp-3 [&_div]:line-clamp-3 text-xs text-surface-600 dark:text-surface-400 [&_p]:!my-1 [&_p:first-child]:!mt-0 [&_p:last-child]:!mb-0">
-                        <SlotValue slot={slots.subtitle} size="small"/>
+                        {terms.length > 0 && typeof slots.subtitle.value === "string"
+                            ? <Highlighted text={slots.subtitle.value} terms={terms}/>
+                            : <SlotValue slot={slots.subtitle} size="small"/>}
                     </div>
                 )}
 
