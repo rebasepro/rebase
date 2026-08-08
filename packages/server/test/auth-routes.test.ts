@@ -35,7 +35,9 @@ jest.mock("../src/auth/rate-limiter", () => {
     return {
         createRateLimiter: () => passthrough,
         defaultAuthLimiter: passthrough,
-        strictAuthLimiter: passthrough
+        strictAuthLimiter: passthrough,
+        // Exercised for real in `send-verification-rate-limit.test.ts`.
+        verificationEmailLimiter: passthrough
     };
 });
 

@@ -188,6 +188,37 @@ export const strictAuthLimiter = createRateLimiter({
 });
 
 /**
+ * Limiter for `POST /auth/send-verification`, keyed by the authenticated user.
+ *
+ * That route had no limiter at all while every one of its email-sending
+ * siblings had one, and being authenticated is not the protection it looks
+ * like: registration does not verify the address it is given, so an attacker
+ * registers a victim's address, signs in to the account they just made, and
+ * loops the route. Each call mints a token and mails the victim.
+ *
+ * An IP limiter cannot express what is wanted here — the recipient is the
+ * quantity being protected, not the caller — so this one keys on the uid, which
+ * on this route is one-to-one with the recipient address (emails are unique per
+ * account). `strictAuthLimiter` still runs in front of it to bound the caller by
+ * IP; this bounds what any single address can be sent.
+ *
+ * Five per 15 minutes is generous for "I didn't get the email, resend it" and
+ * useless as a mail bomb. Unauthenticated requests fall back to the IP bucket so
+ * the limiter is never a no-op if it is ever mounted before the auth middleware.
+ */
+export const verificationEmailLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    keyGenerator: (c) => {
+        const user = c.get("user") as { uid?: string } | undefined;
+        return user?.uid
+            ? `verification-email:user:${user.uid}`
+            : `verification-email:ip:${defaultKeyGenerator(c)}`;
+    },
+    message: "Too many verification emails requested, please try again later."
+});
+
+/**
  * Key generator for API-key-based rate limiting.
  *
  * Uses the API key ID (from `c.get("apiKey")`) as the rate limit key.

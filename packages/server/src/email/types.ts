@@ -88,12 +88,17 @@ export interface EmailConfig {
     /**
      * Base URL for password reset links (e.g., "https://myapp.com")
      * The reset link will be: {baseUrl}/reset-password?token={token}
+     *
+     * Must be absolute: mail clients have no base document to resolve a relative
+     * href against. `createEmailService` refuses to start when email is
+     * configured and no absolute base URL can be resolved.
      */
     resetPasswordUrl?: string;
 
     /**
      * Base URL for email verification links (e.g., "https://myapp.com")
      * The verification link will be: {baseUrl}/verify-email?token={token}
+     * Falls back to `resetPasswordUrl` if not set.
      */
     verifyEmailUrl?: string;
 
@@ -110,7 +115,12 @@ export interface EmailConfig {
     appName?: string;
 
     /**
-     * Custom email templates (optional - defaults are provided)
+     * Custom email templates (optional - defaults are provided).
+     *
+     * A template receives `user.displayName` exactly as the account was
+     * registered with it — user input, markup and all. Build the HTML with the
+     * `html` tagged template exported from `@rebasepro/server`, which escapes
+     * every interpolation, rather than a plain template literal.
      */
     templates?: {
         passwordReset?: PasswordResetTemplateFunction;
