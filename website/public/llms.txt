@@ -2951,7 +2951,8 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 **`context.data` inherits the privileges of whatever triggered the callback.** It is not a fixed trust level.
 
 - Triggered by a **user request** (REST, realtime, an admin-panel edit) → **user-scoped**. The callback runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A callback cannot see a row its caller could not.
-- Triggered by **server-context work** (`rebase.dataAsAdmin`, a cron job) → **unscoped**. It runs on the owner connection and bypasses RLS.
+- Triggered by **`rebase.dataAsAdmin` or a cron job** (the same singleton) → **admin-scoped**, not unscoped. That driver is scoped as `{ uid: "service", roles: ["admin"] }`, so the callback still runs on an RLS-bound transaction — your policies are evaluated, against that identity.
+- Triggered by **the base driver** (built-in auth flows, migrations) → **unscoped**. It runs on the owner connection and bypasses RLS.
 :::
 
 This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a callback that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write callbacks that tolerate an empty result, or reach for the admin plane deliberately:
@@ -2961,8 +2962,11 @@ afterSave: async ({ context }) => {
     // User-scoped when a user triggered this save: RLS applies.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Deliberately bypass RLS — for work the caller genuinely may not see,
-    // such as an audit trail they must not be able to read or edit.
+    // Deliberately admin-scoped — for work the caller genuinely may not see,
+    // such as an audit trail they must not be able to read or edit. Note this
+    // is an admin's reach, not a bypass: a collection whose only rule is
+    // `policy.serverContext()` stays closed to it, since that compiles to
+    // `auth.uid() IS NULL` and this accessor's uid is `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
@@ -3885,7 +3889,7 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 - **OpenAPI spec**: `GET /api/docs` — Returns the full OpenAPI 3.0 JSON specification
 - **Swagger UI**: `GET /api/swagger` — Interactive API explorer (dev mode only)
 
-The OpenAPI spec is auto-generated from your collection definitions and includes all endpoints, query parameters, and response schemas.
+The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
 ### API Keys
 
@@ -4797,15 +4801,38 @@ GET /api/storage/files/products/laptop.jpg?width=300&format=webp
 
 #### Supported Parameters
 
-- `width`: Resizes the image to the specified width (maintaining aspect ratio).
+- `width`, `height`: Resize bounds, `1`–`4096` (the image is never enlarged).
+- `quality`: `1`–`100`.
 - `format`: Converts the image format. Supported formats: `webp`, `jpeg`, `png`, `avif`.
+- `fit`: `cover`, `contain`, `fill`, `inside` or `outside`.
+
+A parameter outside these bounds is a **400**, not a silently clamped value —
+`?width=99999` used to return a 4096px image and `?format=tiff` a webp one, and
+neither said so.
 
 #### Performance & LRU Caching
 
-To prevent high CPU utilization and scaling latency under heavy traffic, processed images are stored in a memory-backed **LRU Cache**:
-- **Capacity**: Capped at **500 entries** globally.
+Transforming is CPU- and memory-heavy, and on a public object the endpoint is
+reachable anonymously, so the work is bounded rather than merely cached:
+- **Capacity**: an LRU capped at **500 entries** globally, keyed by storage
+  source, bucket and canonical key.
 - **TTL (Time to Live)**: Cached variants expire after **1 hour**.
-- Subsequent requests for the same size/format combination hit the LRU cache instantly, preventing redundant file manipulation.
+- Concurrent requests for the same uncached variant produce **one** transform,
+  not one each.
+- A small number of transforms run at once; beyond a bounded backlog the server
+  answers **503 `TRANSFORM_OVERLOADED`** rather than accepting work it will not
+  get to.
+
+#### What gets served
+
+The stored content type is whatever the uploader declared — nothing sniffs the
+bytes — so `/api/storage/file/*` will only render a **narrow allowlist** inline:
+images (except SVG), video, audio, `application/pdf` and `text/plain`. Anything
+else, `text/html` and `image/svg+xml` included, is served as
+`application/octet-stream` with `Content-Disposition: attachment`, and every
+response carries `X-Content-Type-Options: nosniff`. Storage is not a web host:
+an uploaded page rendered on the API origin can read that origin's cookies and
+call its endpoints.
 
 ### TUS Resumable Upload Protocol
 
@@ -5719,6 +5746,12 @@ three limits that no setting inside it can fix:
 - **It cannot use an index.** A leading `%` defeats a B-tree, so every search is
   a sequential scan. Fine at a thousand rows; a cliff at a million.
 
+The term is matched **literally**: `%` and `_` are LIKE metacharacters, and they
+are escaped before the pattern is built, so searching for `50%` searches for
+`50%` rather than returning every row. If you want wildcards, the `like` filter
+operator takes a pattern (`.where("title", "like", "post-%")`); `.search()` does
+not.
+
 The default does not change, and a collection that has not opted in compiles to
 exactly the SQL it always did.
 
@@ -5787,6 +5820,24 @@ adding a `search` block on its own produces no migration, because the schema
 Atlas compares has not changed. `rebase db generate` says so when it happens.
 The block is still applied by `rebase db push` and by the boot-time schema
 ensure; to put it in a migration explicitly, append `drizzle/search.sql` to one.
+
+#### Changing the block later
+
+A generated column carries its expression, and Postgres cannot alter that
+expression in place — so adding a field, moving a weight, changing the language
+or turning `unaccent` on is **not** something `ADD COLUMN IF NOT EXISTS` can
+apply to a column that already exists.
+
+Rebase records a fingerprint of the expression on the column when it creates it,
+and compares it on every boot and every `db push`. A change is refused, loudly,
+with the two statements that apply it — a `DROP COLUMN` and an `ADD COLUMN`,
+which rewrite the table and rebuild the GIN index. Run them at a time you
+choose; nothing rewrites a live table on your behalf. (Turning `fuzzy` on is
+additive — a second column — and applies without any of this.)
+
+Boot refuses rather than serving, because the alternative is what this check
+replaced: a column that keeps indexing the previous field set, and a search that
+returns nothing for content plainly in the row.
 
 ### What you can name in `fields`
 
@@ -6404,11 +6455,14 @@ Rebase will:
 | `functions/send-invoice.ts` | `/api/functions/send-invoice/*` |
 | `functions/webhooks.ts` | `/api/functions/webhooks/*` |
 
+Functions are discovered at the **top level of the directory only** — there is no recursion. `functions/admin/users.ts` is compiled by `rebase build` but never mounted; flatten the name instead (`functions/admin-users.ts`). A subdirectory is reported at boot and counted on the listing endpoint rather than ignored silently.
+
 Files that are **skipped**:
 
 - `index.ts` / `index.js` — reserved
 - `*.test.ts` / `*.test.js` — test files
 - `*.d.ts` — type declarations
+- Subdirectories, and `.mts` / `.cts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` files — reported as problems, since the build compiles more than the runtime loads
 
 ### Export Formats
 
@@ -6529,7 +6583,7 @@ When an external request passes the service key via the Authorization header (`A
      "roles": ["admin"]
    }
    ```
-3. Injects an admin-privileged `DataDriver` into `c.get("driver")` that bypasses Row-Level Security.
+3. Injects a `DataDriver` into `c.get("driver")` scoped as that same service identity. Row-Level Security still applies — it is evaluated as `{ uid: "service", roles: ["admin"] }`, not skipped.
 
 #### Internal Self-Authentication
 
@@ -6570,9 +6624,9 @@ app.get("/", async (c) => {
 export default app;
 ```
 
-#### 2. Via the Rebase Singleton (Bypasses RLS - Admin Access)
+#### 2. Via the Rebase Singleton (Admin-Scoped Access)
 
-The `@rebasepro/server` package provides a `rebase` singleton that has **full administrative privileges** (no RLS). Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
+The `@rebasepro/server` package provides a `rebase` singleton whose `dataAsAdmin` accessor runs as the service identity `{ uid: "service", roles: ["admin"] }`. Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
 
 ```typescript
 // backend/functions/approve-job.ts
@@ -6582,7 +6636,7 @@ const app = new Hono<HonoEnv>();
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
-    // Use the admin-level data API (bypasses RLS completely)
+    // Use the admin-level data API (RLS is evaluated as the `admin` role)
     await rebase.dataAsAdmin.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
@@ -6596,10 +6650,24 @@ export default app;
 
 #### RLS-Scoped Driver vs. Rebase Singleton
 
-| **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
-| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.dataAsAdmin`) |
-| **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
-| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
+|                     | `c.get("driver")` (request-scoped)             | `rebase.dataAsAdmin` (service identity)                          |
+| ------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+| **Runs as**         | The caller (`uid`, their roles)                | `{ uid: "service", roles: ["admin"] }`                            |
+| **RLS enforcement** | ✅ Yes (evaluated against the caller)          | ✅ Yes (evaluated against the service identity)                   |
+| **Performance**     | Native (direct driver call)                     | Native (direct driver call)                                       |
+| **Ideal for...**    | General user CRUD, search, and queries          | Background jobs, system triggers, webhooks                        |
+| **API style**       | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
+
+##### What `dataAsAdmin` is, precisely
+
+`rebase.dataAsAdmin` is **admin-scoped, not RLS-bypassing**. The driver is scoped once, at boot, with `withAuth({ uid: "service", roles: ["admin"] })`, so every read and write runs inside a transaction that has switched to the restricted `rebase_user` role with `app.uid = 'service'`. Your policies are evaluated — against that identity.
+
+For most projects the distinction never surfaces, because the default policies Rebase injects onto every collection admit `serverContext() OR rolesOverlap(['admin'])`, and the service identity clears the second arm. It surfaces the moment you write your own policies:
+
+- **`policy.serverContext()` is false for it.** That helper compiles to `auth.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
+- **Its reach equals an `admin` user's reach.** Granting the `admin` role to an application user grants them exactly the rows this accessor sees. It is not a private channel.
+
+If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
 #### 3. Via Direct Drizzle Access
 
@@ -6697,6 +6765,17 @@ If loading fails, the loader provides diagnostic output:
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
+
+The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The reasons stay in the boot log.
+
+### Timeouts and Rate Limits
+
+Two ceilings apply to `/api/functions/*`:
+
+- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be cancelled from the outside, so give outbound HTTP calls an `AbortSignal` — the timeout frees the client and the socket, not the work.
+- **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
+
+Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
 
 ### Next Steps
 
@@ -9976,7 +10055,7 @@ client.data.collection<Record<string, unknown>>("blog_posts")
 #### Find (List)
 
 ```typescript
-// All products (default limit: 20)
+// All products (default limit: 50)
 const { data, meta } = await client.data.products.find();
 
 // With pagination, filtering, and sorting
@@ -10212,6 +10291,11 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
+`limit` must be a whole number between 1 and 1000. A larger one — or a zero,
+negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
+clamped, because a silently smaller page cannot be told apart from the last one.
+To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
+
 ### Sorting
 
 ```typescript
@@ -10267,6 +10351,24 @@ const { data } = await client.data.docs
 ordering — this returns the nearest rows that also match, not the nearest rows
 filtered afterwards. Producing `queryVector` is your job: Rebase stores and
 searches embeddings, it does not compute them.
+
+#### What you have to provide
+
+- **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that
+  type comes from the `vector` extension. Rebase does not install it — an
+  extension needs a server image that carries it and a role allowed to create
+  it. The scaffold's `postgres:18-alpine` does **not** ship pgvector; use an
+  image that does (for example `pgvector/pgvector:pg18`) and run
+  `CREATE EXTENSION vector;` once. Without it the first boot fails, naming this.
+- **An index, if you want one.** Rebase creates no HNSW or IVFFlat index, so
+  every `vectorSearch` computes the distance for every row and sorts: exact
+  results, sequential cost. Create the index yourself in a migration
+  (`CREATE INDEX … USING hnsw (embedding vector_cosine_ops)`) if your table is
+  large enough to need one.
+
+`vectorSearch` is a query, not a subscription: `.listen()` on one is refused
+rather than served as a plain listing, because nothing recomputes distances on a
+write.
 
 ### Fetching Relations
 
@@ -11603,7 +11705,7 @@ That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, s
 
 `db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
 
-To audit a database that was pushed before this landed, run `rebase doctor --policies`. It exits non-zero on drift, so it works as a CI gate.
+To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--collections` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
 :::
 
 :::caution
@@ -11670,6 +11772,8 @@ rebase doctor
 - Collections ↔ Database — is there any unexpected drift?
 
 Run `doctor` whenever something feels out of sync. It pinpoints exactly where the mismatch is.
+
+The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
 #### `rebase generate-sdk`
 
@@ -14058,12 +14162,49 @@ function RevenueChart({ data }) {
 
 Use `afterSave` and `afterDelete` callbacks to notify external services when data changes in Rebase.
 
+Two things about those callbacks decide how this recipe is written, and neither is optional:
+
+- **They run inside the write's database transaction.** Anything you `await` there holds a pooled
+  connection and the row's locks until it comes back. A receiver that takes ten seconds is a
+  ten-second transaction; a receiver that never answers is a transaction that never ends.
+- **A throw from `afterSave` rolls the write back.** The error reaches the caller as a 500 and the
+  row is not saved. Awaiting a third party inside the callback makes their outage your data loss.
+
+So: never `await` an outbound HTTP request in a callback. Queue it.
+
 ### Slack Notification on New Order
+
+`WebhookDispatcher` is exported from `@rebasepro/server`. `enqueueEntityChange` returns
+immediately — the POST happens after the callback returns, outside the transaction — and the
+dispatcher validates the destination, signs the payload, bounds every attempt with a deadline and
+retries failures.
 
 ```typescript
 
 // The row shape, so `values.customer_name` is a string rather than nothing.
 type Order = { customer_name: string; total: number };
+
+const dispatcher = new WebhookDispatcher({
+    // Queued deliveries return nothing to the caller, so this is where their
+    // failures surface. Without it, a receiver that has been down for a week
+    // looks exactly like one that is working.
+    onDelivery: (result) => {
+        if (!result.success) {
+            console.error(`Webhook ${result.webhookId} failed: ${result.statusCode} ${result.responseBody}`);
+        }
+    }
+});
+
+dispatcher.setWebhooks([
+    {
+        id: "wh_orders_slack",
+        url: process.env.SLACK_WEBHOOK_URL!,
+        secret: process.env.WEBHOOK_SECRET,
+        events: ["INSERT"],
+        table: "orders",
+        enabled: true
+    }
+]);
 
 const ordersCollection: PostgresCollectionConfig<Order> = {
     slug: "orders",
@@ -14072,75 +14213,129 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
     callbacks: {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
-                await fetch(process.env.SLACK_WEBHOOK_URL!, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        text: `🛒 New order #${id}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
-                    })
-                });
+                // Returns void, immediately. The delivery runs after this
+                // callback returns, so the transaction is not waiting on it.
+                dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
             }
         }
     },
     properties: { /* ... */ }
-});
+};
 ```
+
+The queue is in-process and in-memory: a crash or a deploy between the enqueue and the delivery
+drops the event, and the receiver may see the notification a few milliseconds before the row is
+committed. Call `await dispatcher.flush()` on shutdown. If you need deliveries to survive a
+restart, write an outbox row in the same transaction and drain it from a job instead.
+
+#### Calling an endpoint directly
+
+If you are posting a hand-built body to one endpoint and do not want the dispatcher, the same two
+rules still apply — bound the request, and never let its failure reach the caller:
+
+```typescript
+
+type Order = { customer_name: string; total: number };
+
+const callbacks: CollectionCallbacks<Order> = {
+    afterSave: async ({ values, id, status }) => {
+        if (status !== "new") return;
+        // No `await`: the transaction must not wait for Slack. `AbortSignal.timeout`
+        // because `fetch` has no default timeout at all — without it a black-holed
+        // connection holds the transaction until the OS gives up, minutes later.
+        void fetch(process.env.SLACK_WEBHOOK_URL!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                text: `New order #${id}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
+            }),
+            signal: AbortSignal.timeout(10_000)
+        }).catch((error) => {
+            // Swallowed on purpose. A throw here would be an unhandled rejection;
+            // a throw *inside* the callback would roll the order back.
+            console.error("Slack notification failed", error);
+        });
+    }
+};
+```
+
+Never put a URL that came from your database into a bare `fetch`. The dispatcher rejects loopback,
+link-local, private and non-`http(s)` destinations before it connects, and refuses to follow
+redirects, precisely because a stored URL is attacker-controlled input.
 
 ### Sync to External API
 
+`afterDelete` receives the deleted row flat, as `row` — the table's columns, not an entity wrapper.
+
 ```typescript
-callbacks: {
-    afterSave: async ({ values, entityId }) => {
-        // Sync product to Shopify
-        await fetch("https://your-shop.myshopify.com/admin/api/2024-01/products.json", {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN!
-            },
-            body: JSON.stringify({
-                product: {
-                    id: values.shopify_id,
-                    title: values.name,
-                    body_html: values.description,
-                    variants: [{ price: values.price }]
-                }
-            })
-        });
+
+type Product = { name: string; description: string; price: number; shopify_id: string };
+
+const syncQueue: Promise<unknown>[] = [];
+
+const callbacks: CollectionCallbacks<Product> = {
+    afterSave: async ({ values, id }) => {
+        // Queued, not awaited: Shopify being down must not fail the save.
+        syncQueue.push(
+            fetch("https://your-shop.myshopify.com/admin/api/2024-01/products.json", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN!
+                },
+                body: JSON.stringify({
+                    product: {
+                        id: values.shopify_id,
+                        title: values.name,
+                        body_html: values.description,
+                        variants: [{ price: values.price }]
+                    }
+                }),
+                signal: AbortSignal.timeout(10_000)
+            }).catch((error) => console.error(`Shopify sync failed for ${id}`, error))
+        );
     },
 
-    afterDelete: async ({ entityId, entity }) => {
-        // Remove from Shopify
-        if (entity.values.shopify_id) {
-            await fetch(
-                `https://your-shop.myshopify.com/admin/api/2024-01/products/${entity.values.shopify_id}.json`,
+    afterDelete: async ({ row }) => {
+        const shopifyId = row.shopify_id;
+        if (!shopifyId) return;
+        syncQueue.push(
+            fetch(
+                `https://your-shop.myshopify.com/admin/api/2024-01/products/${shopifyId}.json`,
                 {
                     method: "DELETE",
-                    headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN! }
+                    headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_TOKEN! },
+                    signal: AbortSignal.timeout(10_000)
                 }
-            );
-        }
+            ).catch((error) => console.error(`Shopify delete failed for ${shopifyId}`, error))
+        );
     }
-}
+};
 ```
 
 ### Error Handling
 
-Use `afterSaveError` to handle failures gracefully:
+`afterSaveError` runs when the save — or any `afterSave` callback — throws. It is a notification
+hook, not a rescue: **the error is rethrown after it runs**, the transaction rolls back, and the
+row is not saved.
 
 ```typescript
-callbacks: {
-    afterSave: async ({ values, entityId }) => {
-        // This might fail
-        await syncToExternalService(values);
+
+const callbacks: CollectionCallbacks = {
+    afterSave: async ({ values }) => {
+        // If this throws, the write is rolled back. That is the right behaviour
+        // for a validation or an invariant, and the wrong one for a notification.
+        await recordAuditEntry(values);
     },
-    afterSaveError: async ({ entityId, error }) => {
-        // Log the error, send alert, or retry
-        console.error(`Webhook failed for entity ${entityId}:`, error);
-        await sendErrorAlert(entityId, error);
+    afterSaveError: async ({ id, values }) => {
+        // Runs, and then the error is rethrown. Use it to alert, not to recover.
+        console.error(`Save failed for entity ${id}`, values);
     }
-}
+};
 ```
+
+If a failure should *not* cost the user their write, it must not throw out of `afterSave` — catch
+it there, or hand the work to the dispatcher's queue.
 
 ### Next Steps
 
