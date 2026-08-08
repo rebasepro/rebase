@@ -21,7 +21,6 @@
     "packages/studio",
     "packages/admin",
     "packages/admin-types",
-    "packages/client-postgres",
     "packages/server-postgres",
     "packages/server-mongo",
     "packages/firebase",

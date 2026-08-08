@@ -41,7 +41,6 @@
     // undeclared `name` and the fact that `admin` — and every capability on it
     // — is optional. The cast is gone; this earns the test the real `SaveProps`
     // and `DeleteProps` shapes, in place of the ones it was inventing.
-    "packages/client-postgres/test",
     // `InsightsCache.test.ts` lives *under* `src`, so the package's `src` is
     // what has to be listed. It built `InsightDataResult` fixtures of
     // `{ data, columns }` — a shape the type has not had since it became

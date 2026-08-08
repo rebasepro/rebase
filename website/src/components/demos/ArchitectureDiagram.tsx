@@ -100,7 +100,7 @@ export function ArchitectureDiagram() {
                             {/* PostgreSQL */}
                             <div className="rounded-lg border border-[#336791]/20 bg-[#0f0f11] p-3 flex items-center gap-3 hover:border-[#336791]/35 transition-colors">
                                 <div className="h-10 w-10 rounded-lg bg-[#336791]/10 border border-[#336791]/20 flex items-center justify-center shrink-0">
-                                    <img src="/img/postgresql-logo.svg" alt="PostgreSQL" className="h-6 w-auto" />
+                                    <img src="/img/postgresql-logo.svg" width="432" height="445" alt="PostgreSQL" className="h-6 w-auto" />
                                 </div>
                                 <div>
                                     <div className="text-xs font-semibold text-white">PostgreSQL</div>
@@ -110,7 +110,7 @@ export function ArchitectureDiagram() {
                             {/* MongoDB */}
                             <div className="rounded-lg border border-[#4DB33D]/15 bg-[#0f0f11] p-3 flex items-center gap-3 hover:border-[#4DB33D]/30 transition-colors">
                                 <div className="h-10 w-10 rounded-lg bg-[#4DB33D]/8 border border-[#4DB33D]/15 flex items-center justify-center shrink-0">
-                                    <img src="/img/mongodb-logo.svg" alt="MongoDB" className="h-6 w-auto" />
+                                    <img src="/img/mongodb-logo.svg" width="24" height="24" alt="MongoDB" className="h-6 w-auto" />
                                 </div>
                                 <div>
                                     <div className="text-xs font-semibold text-white">MongoDB</div>

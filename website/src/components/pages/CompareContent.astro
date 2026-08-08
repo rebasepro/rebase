@@ -92,6 +92,7 @@ const headToHead = [
     { name: "Retool", href: "/rebase-vs-retool" },
     { name: "Django", href: "/rebase-vs-django" },
 ];
+import { imgDims } from "../../utils/imageDimensions";
 ---
 
 <div class="flex flex-col isolate">
@@ -141,7 +142,7 @@ const headToHead = [
                                                 <a href={translatePath(tool.href)}
                                                    aria-label={`Rebase vs ${tool.name}`}
                                                    class="inline-flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                                                    <img src={tool.logo} alt={tool.name} class={`${tool.cls} w-auto`}/>
+                                                    <img src={tool.logo} {...imgDims(tool.logo)} alt={tool.name} class={`${tool.cls} w-auto`}/>
                                                 </a>
                                         ))}
                                     </div>

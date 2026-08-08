@@ -5,7 +5,7 @@ import config from "virtual:starlight/user-config";
 
 <a href={config.locales ? "/" + (Astro.locals.starlightRoute.locale ?? "") : "/"}
    class="flex items-center relative gap-4" transition:name="site-logo">
-    <img src="/img/rebase_logo.svg" class="h-8 w-8"
+    <img src="/img/rebase_logo.svg" width="583" height="583" class="h-8 w-8"
          alt="Rebase Logo" transition:name="logo-image">
     <span class="self-center text-lg font-semibold whitespace-nowrap text-white" transition:name="logo-text">Rebase</span>
 </a>

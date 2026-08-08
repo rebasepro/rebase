@@ -65,12 +65,6 @@
       "@rebasepro/firebase/*": [
         "./packages/firebase/src/*"
       ],
-      "@rebasepro/client-postgres": [
-        "./packages/client-postgres/src"
-      ],
-      "@rebasepro/client-postgres/*": [
-        "./packages/client-postgres/src/*"
-      ],
       "@rebasepro/common": [
         "./packages/common/src"
       ],
@@ -176,7 +170,6 @@
     "packages/cli/src",
     "packages/client/src",
     "packages/firebase/src",
-    "packages/client-postgres/src",
     "packages/common/src",
     "packages/forms/src",
     "packages/mcp/src",

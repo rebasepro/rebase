@@ -5,6 +5,30 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
 
+// SITE-STORY: "/europe sells self-hosting and nothing else. There is no managed
+// Rebase offering today, so the page must not mention one — not as a footnote,
+// not as a 'coming soon', not as a waitlist."
+//
+// The waitlist lives in the global footer, so it reached /europe by inheritance
+// rather than by anyone deciding it belonged there — which is exactly why it
+// survived. It is the one page whose whole argument is that a managed backend
+// means a second party operating the service and holding the credentials, and
+// "Rebase Cloud — Hosted Rebase is on its way" undercuts that in its own footer.
+//
+// Matched on the final path segment so the localized routes (/es/europe,
+// /de/europe, /fr/europe) are covered too. Every other page keeps the capture.
+//
+// This note lives in the frontmatter rather than beside the markup on purpose:
+// an HTML comment is served to the client, so describing the cloud waitlist next
+// to the form would put the banned phrase back into /europe's HTML even with the
+// form itself suppressed. Frontmatter comments are never emitted.
+//
+// The waitlist form posts cross-origin to the control plane, which already
+// allows this origin (CORS accepts any *.rebase.pro plus the bare apex; the apex
+// is on the CSRF allow-list). `source` distinguishes these signups from the ones
+// landing on rebase.website.
+const isEuropeRoute = Astro.url.pathname.replace(/\/+$/, "").split("/").pop() === "europe";
+
 // Grouped by the two layers, same as the header — see website/SITE-STORY.md.
 const footerNavs = [
     {
@@ -99,11 +123,7 @@ const footerNavs = [
                     </svg>
                 </a>
 
-                <!-- Rebase Cloud waitlist. Posts cross-origin to the control
-                     plane, which already allows this origin (CORS accepts any
-                     *.rebase.pro plus the bare apex; the apex is on the CSRF
-                     allow-list). `source` distinguishes these signups from the
-                     ones landing on rebase.website. -->
+                {!isEuropeRoute && (
                 <form
                     id="footer-waitlist"
                     class="mt-8 max-w-xs"
@@ -136,6 +156,7 @@ const footerNavs = [
                     </div>
                     <p id="footer-waitlist-status" class="mt-2 text-sm text-surface-400" role="status" aria-live="polite"></p>
                 </form>
+                )}
             </div>
             <div class="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3 lg:grid-cols-6 xl:gap-8">
                 {footerNavs.map((nav) => (

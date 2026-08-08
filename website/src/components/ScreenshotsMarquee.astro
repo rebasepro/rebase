@@ -14,15 +14,16 @@ const images = [
     mmDark,
     oikosAviationDemo
 ];
+import { imgDims } from "../utils/imageDimensions";
 ---
 
 <div class="marquee">
     <div class="marquee-content">
         {images.map((image) => (
-            <img src={image} alt="Screenshot" class="mx-4 rounded-xl w-auto h-full max-h-72 object-cover inline-block"/>
+            <img src={image} {...imgDims(image)} alt="Screenshot" class="mx-4 rounded-xl w-auto h-full max-h-72 object-cover inline-block"/>
         ))}
          {images.map((image) => (
-            <img src={image} alt="Screenshot" class="mx-4 rounded-xl w-auto h-full max-h-72 object-cover inline-block"/>
+            <img src={image} {...imgDims(image)} alt="Screenshot" class="mx-4 rounded-xl w-auto h-full max-h-72 object-cover inline-block"/>
         ))}
     </div>
 </div>

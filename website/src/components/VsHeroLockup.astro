@@ -8,11 +8,12 @@ interface Props {
 }
 
 const { name, logo, logoClass = "h-7 sm:h-8" } = Astro.props;
+import { imgDims } from "../utils/imageDimensions";
 ---
 
 <div class="mb-8 flex items-center justify-center gap-5 sm:gap-7 animate-on-scroll fade-in">
     <div class="flex h-10 items-center gap-2.5">
-        <img src="/img/rebase_logo.svg" alt="" aria-hidden="true" class="h-7 sm:h-8 w-auto max-w-none"/>
+        <img src="/img/rebase_logo.svg" width="583" height="583" alt="" aria-hidden="true" class="h-7 sm:h-8 w-auto max-w-none"/>
         <span class="text-xl sm:text-2xl font-semibold tracking-tight text-white">Rebase</span>
     </div>
 
@@ -20,7 +21,7 @@ const { name, logo, logoClass = "h-7 sm:h-8" } = Astro.props;
 
     <div class="flex h-10 items-center">
         {logo
-            ? <img src={logo} alt={name} class={`w-auto max-w-none opacity-70 ${logoClass}`}/>
+            ? <img src={logo} {...imgDims(logo)} alt={name} class={`w-auto max-w-none opacity-70 ${logoClass}`}/>
             : <span class="text-xl sm:text-2xl font-semibold tracking-tight text-surface-300">{name}</span>}
     </div>
 </div>

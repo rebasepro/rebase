@@ -99,7 +99,6 @@ rebase/
 │   ├── server/               # BaaS — Hono coordinator. Never imports a UI package
 │   ├── server-postgres/      # database driver
 │   ├── server-mongo/         # database driver
-│   ├── client-postgres/
 │   ├── cli/
 │   ├── codegen/
 │   ├── inference/
@@ -133,7 +132,6 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `admin` is an optional peer |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/firebase` | Firebase client adapter | When connecting to a Firebase backend |
-| `@rebasepro/client-postgres` | PostgreSQL client adapter | When connecting directly to PostgreSQL from client |
 | `@rebasepro/common` | Shared utilities, `defaultUsersCollection` | Shared constants and default collection exports |
 | `@rebasepro/forms` | Form engine | Building dynamic forms from collection schemas |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |

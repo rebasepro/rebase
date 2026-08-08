@@ -29,9 +29,6 @@
       "@rebasepro/firebase": [
         "../../packages/firebase/src"
       ],
-      "@rebasepro/client-postgres": [
-        "../../packages/client-postgres/src"
-      ],
       "@rebasepro/types": [
         "../../packages/types/src"
       ],

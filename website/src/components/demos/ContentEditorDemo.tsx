@@ -184,7 +184,7 @@ export function ContentEditorDemo() {
                     <div className="flex flex-col h-full">
                         <div className="flex items-center justify-center pt-4 pb-0 px-2">
                             <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                                <img src="/img/rebase_logo.svg" alt="Rebase" className="w-[28px] h-[28px] object-contain" />
+                                <img src="/img/rebase_logo.svg" width="583" height="583" alt="Rebase" className="w-[28px] h-[28px] object-contain" />
                             </div>
                         </div>
                         <div className="mt-1 flex-grow overflow-hidden">

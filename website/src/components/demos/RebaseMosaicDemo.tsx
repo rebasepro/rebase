@@ -701,7 +701,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_blue.webp"
+                                            src="/img/dam_asset_blue.webp" width="1024" height="1024"
                                             alt="DAM Blue Fluid"
                                             className="w-full h-full object-cover"
                                         />
@@ -715,7 +715,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_gold.webp"
+                                            src="/img/dam_asset_gold.webp" width="1024" height="1024"
                                             alt="DAM Gold Fluid"
                                             className="w-full h-full object-cover"
                                         />
@@ -729,7 +729,7 @@ export default function RebaseMosaicDemo() {
                                     className="rounded-xl border border-neutral-800/60 bg-neutral-950/40 p-1 hover:border-primary/20 transition-all duration-300">
                                     <div className="aspect-[4/3] rounded-lg overflow-hidden bg-neutral-900 relative">
                                         <img
-                                            src="/img/dam_asset_green.webp"
+                                            src="/img/dam_asset_green.webp" width="1024" height="1024"
                                             alt="DAM Green Fluid"
                                             className="w-full h-full object-cover"
                                         />

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 
+import { imgDims } from "../../utils/imageDimensions";
 // ─── Types ───────────────────────────────────────────────
 interface Entity {
   id: string;
@@ -824,7 +825,7 @@ width: "100%" }}
             <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
               {/* Logo — always visible, shrink-0 w-[56px] h-[40px] centered */}
               <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                <img src="/img/rebase_logo.svg" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
+                <img src="/img/rebase_logo.svg" width="583" height="583" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
               </div>
               {/* Title — hidden when collapsed: opacity-0 w-0 */}
               <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0 ml-0"/>
@@ -996,7 +997,7 @@ width: "100%" }}
                       {/* Card thumbnail */}
                       <div className="w-full h-28 bg-surface-100 dark:bg-surface-800 overflow-hidden">
                         {merged.image ? (
-                          <img src={merged.image} alt={merged.title} className="w-full h-full object-cover" loading="lazy"/>
+                          <img src={merged.image} {...imgDims(merged.image)} alt={merged.title} className="w-full h-full object-cover" loading="lazy"/>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <MI size={28} className="text-surface-300 dark:text-surface-600">image</MI>
@@ -1079,7 +1080,7 @@ width: "100%" }}
                               >
                                 {card.image ? (
                                   <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 mr-2">
-                                    <img src={card.image} alt={card.title} className="w-full h-full object-cover" loading="lazy"/>
+                                    <img src={card.image} {...imgDims(card.image)} alt={card.title} className="w-full h-full object-cover" loading="lazy"/>
                                   </div>
                                 ) : (
                                   <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
@@ -1149,7 +1150,7 @@ width: "100%" }}
                     >
                       {draggedCard.image ? (
                         <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 mr-2">
-                          <img src={draggedCard.image} alt={draggedCard.title} className="w-full h-full object-cover"/>
+                          <img src={draggedCard.image} {...imgDims(draggedCard.image)} alt={draggedCard.title} className="w-full h-full object-cover"/>
                         </div>
                       ) : (
                         <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
@@ -1249,7 +1250,7 @@ width: "100%" }}
                     </span>
                     <div className="px-3 pt-6 pb-2">
                       {formValues.image ? (
-                        <img src={formValues.image} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
+                        <img src={formValues.image} {...imgDims(formValues.image)} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
                       ) : (
                         <div className="w-[100px] h-[100px] rounded-md bg-surface-200/40 dark:bg-surface-700/50 flex items-center justify-center">
                           <MI size={24} className="text-surface-400">image</MI>

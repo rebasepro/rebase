@@ -45,6 +45,14 @@
   await client.data.sessions.deleteMany(stale.map(s => s.id as string));
   ```
 
+### Removed
+
+- **`@rebasepro/client-postgres` is gone.** It was published on every release since the `client-postgresql` rename — 137 versions, `latest` on npm — and imported by nothing: no workspace package depended on it, no example, template, doc page or skill used it, and its own README's Quick Start did not compile (`<Rebase driver={…}>`, a prop that does not exist). Its description was wrong too: not a direct PostgreSQL client and not PostgREST, but a WebSocket passthrough to the Rebase backend, which `@rebasepro/client` already is.
+
+  It was also quietly broken. `fetchCollection` re-listed seven of `FetchCollectionProps`' twelve fields by hand and dropped `offset` and `logical`, so `find()` returned page one beside a correctly-narrowed total, `hasMore` never went false, and `findAll()`/`iterate()` returned page one N times, terminated cleanly, and reported a plausible row count — silent duplicate data. Four sibling methods had the same shape.
+
+  Use `@rebasepro/client` with a `dataSources` entry; that is what the admin panel does and what `docs/data-sources.md` has always described. The published versions stay on npm and will be deprecated there — nothing is unpublished, so an existing lockfile keeps resolving.
+
 ### Fixed
 
 - **A client with generated types could not be passed to `<Rebase>`.** `RebaseProps` was generic over `USER` and not over the database, so its `client` prop was pinned to `RebaseClient<unknown>` — and `RebaseClient<unknown>` is not a supertype of `RebaseClient<Database>`. The untyped branch of `RebaseSdkData` is an index signature (`[slug: string]: SDKCollectionClient`), and no concrete instantiation satisfies it, because `RebaseSdkData`'s own `collection` method is not an `SDKCollectionClient`.

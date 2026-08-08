@@ -76,9 +76,11 @@ const CHANNEL_MESSAGE_TYPES = new Set([
  *
  * @internal Not a stable app-facing API. `createRebaseClient()` constructs and
  * manages this internally (exposed as `client.ws`, typed by the minimal
- * `RebaseWebSocket` contract in `@rebasepro/types`). It is re-exported from the
- * package root only because the `@rebasepro/client-postgres` driver
- * instantiates it directly; its surface may change without a major bump.
+ * `RebaseWebSocket` contract in `@rebasepro/types`). It stays exported from the
+ * package root for the same reason it always was — a data-source driver may
+ * instantiate it directly — but nothing in this repo does since
+ * `@rebasepro/client-postgres` was removed; its surface may change without a
+ * major bump.
  */
 export class RebaseWebSocketClient {
     private websocketUrl: string;

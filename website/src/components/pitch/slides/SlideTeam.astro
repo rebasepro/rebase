@@ -6,7 +6,8 @@ const founders = [
     {
         name: "Francesco Gatti",
         role: "CEO & Co-Founder",
-        photo: "/img/team/francesco.webp",
+        photo: "/img/avatars/francesco_avatar.jpg",
+        photoSize: 512,
         initials: "FG",
         bio: "10+ years building developer tools and open-source products. Creator of FireCMS, used by 10,000+ projects worldwide. Full-stack engineer with deep expertise in React, Firebase, and cloud infrastructure.",
         links: { linkedin: "https://www.linkedin.com/in/fgatti675/", github: "https://github.com/fgatti675" },
@@ -14,7 +15,8 @@ const founders = [
     {
         name: "Marian Moldovan",
         role: "CTO & Co-Founder",
-        photo: "/img/team/marian.webp",
+        photo: "/img/avatars/marian_avatar.jpeg",
+        photoSize: 800,
         initials: "MM",
         bio: "Full-stack architect and systems engineer. Expert in database design, real-time infrastructure, and scalable backend systems. Co-architect of the Rebase platform and its multi-database engine.",
         links: { linkedin: "https://www.linkedin.com/in/marianmoldovan/", github: "https://github.com/marianmoldovan" },
@@ -32,7 +34,7 @@ const founders = [
                 {/* Photo placeholder */}
                 <div class="flex-shrink-0">
                     {f.photo ? (
-                        <img src={f.photo} alt={f.name} class="w-20 h-20 rounded-xl object-cover ring-2 ring-surface-700" />
+                        <img src={f.photo} alt={f.name} width={f.photoSize} height={f.photoSize} class="w-20 h-20 rounded-xl object-cover ring-2 ring-surface-700" />
                     ) : (
                         <div class="w-20 h-20 rounded-xl bg-surface-800 ring-2 ring-surface-700 flex items-center justify-center">
                             <span class="text-2xl font-semibold text-surface-400">{f.initials}</span>
