@@ -778,4 +778,4 @@ This starts both frontend and backend. The Studio is accessible at `http://local
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
-- **Icons:** [rebase.pro/docs/icons](https://rebase.pro/docs/icons) (Lucide-based)
+- **Icons:** [rebase.pro/docs/ui/icons](https://rebase.pro/docs/ui/icons) (Lucide-based)

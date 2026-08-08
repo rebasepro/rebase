@@ -96,7 +96,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
 permissive: true });
 
     // A positional URL means "this exact backend", which needs no login and no
-    // control plane. `rebase link https://api.example.com`
+    // control plane. `rebase cloud link https://api.example.com`
     const positional = args._.find(value => /^https?:\/\//i.test(value));
     if (positional) {
         await linkDirect(positional, rawArgs);

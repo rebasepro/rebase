@@ -25,7 +25,7 @@ Before using the Rebase MCP server, ensure Node.js and the required tools are in
   - Install globally: `npm install -g rebase`
 
 - **Authentication**: Sign in to Rebase Cloud
-  - Run: `rebase login` (opens browser for Google OAuth)
+  - Run: `rebase cloud login` (opens browser for Google OAuth)
   - Tokens are stored at `~/.rebase/tokens.json`
 
 - **PostgreSQL**: Required for the Rebase backend

@@ -50,8 +50,8 @@ Relations are declared on the property under `relation`, as a tagged union: pick
 | `rebase db push` | Apply schema to dev database |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Apply pending migrations |
-| `rebase login` | Authenticate with Rebase Cloud |
-| `rebase deploy` | Deploy to Rebase Cloud |
+| `rebase cloud login` | Authenticate with Rebase Cloud |
+| `rebase cloud deploy` | Deploy to Rebase Cloud |
 
 ## Building UI — read this first
 

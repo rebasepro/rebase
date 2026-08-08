@@ -613,5 +613,5 @@ afterSave: async ({ id, values, collection }) => {
 
 ## References
 
-- **Documentation:** [rebase.pro/docs/backend/webhooks](https://rebase.pro/docs/backend/webhooks)
+- **Documentation:** [rebase.pro/docs/recipes/webhooks](https://rebase.pro/docs/recipes/webhooks)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

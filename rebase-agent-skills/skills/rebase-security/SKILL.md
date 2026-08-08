@@ -282,7 +282,7 @@ SELECT
     set_config('app.jwt', :jwtClaims, true)
 ```
 
-PostgreSQL RLS policies use `auth.uid()`, `auth.roles()`, and `auth.jwt()` to read these session variables and enforce row-level access control.
+PostgreSQL RLS policies use `rebase.uid()`, `rebase.roles()`, and `rebase.jwt()` to read these session variables and enforce row-level access control. (The pre-1.0 `auth.*` spellings are rewritten on compile and still work, but the backend names the collections still carrying them at boot — write `rebase.*`.)
 
 > **IMPORTANT:** This layer is database-specific. If your project does not use PostgreSQL RLS, security is still enforced by Layers 1–3 and Layer 5. See [Securing Without Database RLS](#securing-without-database-rls).
 
@@ -500,7 +500,7 @@ applies it inside the query. Use a callback only to stamp the tenant on write.
 -- The filter: enforced by the database on every read, for every caller.
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY documents_tenant ON documents FOR ALL TO public
-    USING (tenant_id = (auth.jwt() -> 'tenant_id')::text);
+    USING (tenant_id = (rebase.jwt() -> 'tenant_id')::text);
 ```
 
 ```typescript

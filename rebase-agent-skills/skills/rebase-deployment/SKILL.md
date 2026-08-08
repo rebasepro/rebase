@@ -26,21 +26,28 @@ The simplest deployment path. Sign up at [app.rebase.pro](https://app.rebase.pro
 
 ```bash
 # 1. Authenticate
-rebase login
+rebase cloud login
 
 # 2. Initialize (if new project)
 rebase init
 
-# 3. Deploy
-rebase deploy
+# 3. Link this directory to a cloud project
+rebase cloud link
 
-# Deploy to dev environment
-rebase deploy --env dev
+# 4. Deploy
+rebase cloud deploy
+
+# Deploy and label the release
+rebase cloud deploy --message "add search to posts"
 ```
+
+> Every cloud command lives under the `cloud` namespace — there is no bare
+> `rebase deploy` or `rebase login`, and a mistyped one exits 1. Run
+> `rebase cloud --help` for the full list.
 
 ### What a Cloud Deployment Serves
 
-`rebase deploy` ships **one container** per project, served at `https://<project>.apps.rebase.pro`. That container runs your backend, which handles:
+`rebase cloud deploy` ships **one container** per project, served at `https://<project>.apps.rebase.pro`. That container runs your backend, which handles:
 
 - **`/api/*`** — the data API, auth, realtime, storage
 - **everything else** — your built `frontend/` as a static SPA (via `serveSPA()`, see below)
@@ -930,7 +937,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 ## ⛔ Agent Deployment Rules
 
 **Agents should NEVER deploy or run deployment commands unless explicitly asked by the user in the current conversation.** This includes:
-- `rebase deploy` (any variant)
+- `rebase cloud deploy` (any variant)
 - `gcloud run deploy`
 - `terraform apply` (any variant that deploys resources)
 - `docker compose up` in production

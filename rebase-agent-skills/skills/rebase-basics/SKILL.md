@@ -14,13 +14,13 @@ Please complete these setup steps before proceeding, and remember your progress 
    - If any of these checks fail, use the `rebase-local-env-setup` skill to get the environment ready.
 
 2. **Authentication:**
-   Ensure you are logged in to Rebase Cloud for MCP server access. Run `rebase login`. This opens a browser for Google OAuth.
+   Ensure you are logged in to Rebase Cloud for MCP server access. Run `rebase cloud login`. This opens a browser for Google OAuth.
    - Tokens are stored at `~/.rebase/tokens.json` and shared between CLI and MCP server.
    - If the browser fails to open, check the CLI output for a manual URL.
 
 3. **Active Project:**
    Most Rebase tasks require a project context.
-   - For Rebase Cloud: Run `rebase login` and select your project via the MCP `list_projects` tool.
+   - For Rebase Cloud: Run `rebase cloud login` and select your project via the MCP `list_projects` tool.
    - For self-hosted: Ensure your `.env` file in the project root contains a valid `DATABASE_URL`.
 
 # Rebase Usage Principles
@@ -41,7 +41,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 6. **Respect the monorepo structure:** See the [Package Reference](#package-reference) section below for the full list of packages and when to use each.
 
-7. **Never deploy unless explicitly asked:** Agents should never run `rebase deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
+7. **Never deploy unless explicitly asked:** Agents should never run `rebase cloud deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
 
 8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 

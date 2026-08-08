@@ -831,22 +831,25 @@ const unsubscribe = auth.onAuthStateChange((event, session) => {
 ### Client Types
 
 ```typescript
-interface RebaseUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  emailVerified?: boolean;
+// `User` and `RebaseSession` are exported from `@rebasepro/client` — you do
+// not need `@rebasepro/types` in package.json to name them.
+type User = {
+  readonly uid: string;
+  readonly displayName: string | null;
+  readonly email: string | null;
+  readonly photoURL: string | null;
+  readonly providerId: string;
+  readonly isAnonymous: boolean;
+  readonly emailVerified?: boolean;
   roles?: string[];
-  providerId: string;
-  isAnonymous: boolean;
-}
+  createdAt?: Date | string | null;
+};
 
 interface RebaseSession {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;           // Timestamp (ms)
-  user: RebaseUser;
+  user: User;
 }
 
 type AuthChangeEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED" | "USER_UPDATED";
@@ -893,9 +896,9 @@ Rebase implements RLS by scoping the DataDriver via `withAuth()` before each req
 1. Auth middleware verifies the JWT (or API key / service key).
 2. The middleware calls `scopeDataDriver(driver, { uid, roles })`.
 3. If the driver supports `withAuth()` (e.g. Postgres), it returns a scoped clone with Postgres session variables set:
-   - `auth.uid()` — the user's ID
-   - `auth.jwt()` — the JWT claims
-   - `auth.roles()` — the user's role IDs
+   - `rebase.uid()` — the user's ID
+   - `rebase.jwt()` — the JWT claims
+   - `rebase.roles()` — the user's role IDs
 4. All subsequent queries in that request use the scoped driver with RLS policies applied.
 
 ### Fail-Closed Security

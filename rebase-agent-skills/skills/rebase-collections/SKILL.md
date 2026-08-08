@@ -1555,7 +1555,7 @@ Rules are a discriminated union — you must use exactly one of: `ownerField`, `
 
 | Variant | Key Field | Generates |
 |---------|-----------|-----------|
-| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING (user_id = auth.uid())` |
+| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING (user_id = rebase.uid())` |
 | `PublicSecurityRule` | `access: "public"` | `USING (true)` |
 | `RawSQLSecurityRule` | `using: "..."` | Custom USING/WITH CHECK clause |
 | `RolesOnlySecurityRule` | (none of the above) | Roles-only, no row filter |
@@ -1574,10 +1574,14 @@ Rules are a discriminated union — you must use exactly one of: `ownerField`, `
 ### SQL Context Functions
 
 In raw SQL expressions (`using`, `withCheck`), these functions are available:
-- `auth.uid()` — the current user's ID
-- `auth.roles()` — comma-separated app role IDs
-- `auth.jwt()` — full JWT claims as JSONB
+- `rebase.uid()` — the current user's ID
+- `rebase.roles()` — comma-separated app role IDs
+- `rebase.jwt()` — full JWT claims as JSONB
 - `{column_name}` — resolves to `table.column_name`
+
+> The pre-1.0 spellings `auth.uid()` / `auth.roles()` / `auth.jwt()` are still
+> rewritten to the `rebase.*` ones on compile, so old rules keep working — but
+> the backend names the collections carrying them at boot. Write `rebase.*`.
 
 > **See full documentation:** [Security Rules](https://rebase.pro/docs/collections/security-rules)
 
