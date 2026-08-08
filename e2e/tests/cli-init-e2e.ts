@@ -1105,7 +1105,19 @@ timeout: 10000 });
         //
         // NOTE: this is the managed compose file. Nothing in this suite runs
         // `rebase eject`, and `docker compose build` with no `-f` never reads
-        // `docker-compose.custom.yml` — the ejected image is untested here.
+        // `docker-compose.custom.yml` — the ejected IMAGE is still built by
+        // nothing, here or anywhere.
+        //
+        // What does cover the ejected project is `pnpm check:eject`
+        // (scripts/check-eject.mts), which runs the real command into a
+        // materialized scaffold, compiles what it emits for both flavours, and
+        // asserts every `COPY` in the Dockerfile names a path the project has.
+        // That is a static gate: it would catch a `COPY` of a directory that is
+        // not there, but not a build that fails inside `pnpm install` and not a
+        // container that starts and answers nothing. Booting one belongs here,
+        // and would need the ejected image built from this project's own
+        // sources — the step above builds `rebasepro/server`, which an ejected
+        // project does not use.
         console.log("Building any compose-declared services...");
         await execa("docker", ["compose", "build"], {
             cwd: projectPath,
