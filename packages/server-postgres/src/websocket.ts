@@ -1,7 +1,7 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
-import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -359,7 +359,19 @@ roles: verifiedUser.roles }
                         wsDebug("📋 [WebSocket Server] Processing FETCH_COLLECTION request");
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
-                        const rows = await delegate.fetchCollection(request);
+                        // Bound the client-supplied limit with the SAME guarantee
+                        // the REST ingress and `subscribe_collection` apply
+                        // (`resolveClientListLimit`). Without it an absent limit
+                        // reached the driver as `undefined`, which emits no LIMIT
+                        // clause — one socket frame streamed the whole table, on
+                        // the one transport that skipped the ceiling every other
+                        // read path enforces.
+                        const rows = await delegate.fetchCollection({
+                            ...request,
+                            limit: resolveClientListLimit(request.limit, {
+                                vectorSearch: !!request.vectorSearch
+                            })
+                        });
                         wsDebug("📋 [WebSocket Server] FETCH_COLLECTION result - rows count:", rows.length);
                         const response = {
                             type: "FETCH_COLLECTION_SUCCESS",
@@ -447,6 +459,12 @@ colors: true }));
 
 
                     case "COUNT": {
+                        // Deliberately NOT routed through `resolveClientListLimit`:
+                        // this answers with a scalar, and the driver drops `limit`
+                        // on the way to `SELECT count(*)`. Clamping here could only
+                        // ever make `total` describe fewer rows than the collection
+                        // holds — the page size is the caller's business, the total
+                        // is not.
                         const request: FetchCollectionProps = payload;
                         const delegate = await getScopedDelegate();
                         const count = await delegate.count!(request);

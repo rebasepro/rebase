@@ -37,6 +37,12 @@ jest.mock("@rebasepro/server", () => {
     };
 });
 
+import {
+    resolveClientListLimit,
+    DEFAULT_LIST_LIMIT,
+    DEFAULT_VECTOR_LIST_LIMIT,
+    MAX_LIST_LIMIT
+} from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
 import { createPostgresWebSocket } from "../src/websocket";
@@ -753,5 +759,150 @@ describe("WebSocket Server SQL audit line", () => {
         expect(entry.role).toBe("postgres");
         expect(entry.uid).toBe("admin-user");
         expect(entry.requestId).toBe("req-audit");
+    });
+});
+
+
+/**
+ * The list ceiling on the socket.
+ *
+ * `FETCH_COLLECTION` handed the client's payload straight to the driver, so an
+ * absent `limit` arrived as `undefined` — and `FetchService` only emits a LIMIT
+ * clause when there is one. A single frame therefore streamed the entire table,
+ * on the one transport that skipped the bound both the REST ingress and
+ * `subscribe_collection` enforce.
+ *
+ * The assertions read the shared resolver rather than restating 50 / 1000, so
+ * moving the bound moves the test with it — a second copy of the number here
+ * would be the same defect this fixes, one layer up.
+ */
+describe("WebSocket Server list limits", () => {
+    let mockServer: Server;
+    let mockRealtimeService: RealtimeService;
+    let mockDriver: PostgresBackendDriver;
+
+    /** Send one message on an auth-disabled socket and return the client. */
+    const sendUnauthed = async (message: unknown) => {
+        const connectionCallback = mockWssInstance.on.mock.calls.find(
+            (call: any[]) => call[0] === "connection"
+        )[1];
+        const mockWs = { on: jest.fn(), send: jest.fn() } as any;
+        connectionCallback(mockWs);
+        const messageCallback = mockWs.on.mock.calls.find(
+            (call: any[]) => call[0] === "message"
+        )[1];
+        await messageCallback(Buffer.from(JSON.stringify(message)));
+        return mockWs;
+    };
+
+    /** The `limit` the driver was actually asked for. */
+    const limitReachingDriver = () =>
+        (mockDriver.fetchCollection as jest.Mock).mock.calls[0][0] as { limit?: number };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        mockServer = {} as Server;
+        mockRealtimeService = {
+            addClient: jest.fn(),
+            registerDataDriverSubscription: jest.fn()
+        } as unknown as RealtimeService;
+        mockDriver = {
+            key: "postgres",
+            initialised: true,
+            // No `withAuth`, so the request reaches this driver verbatim.
+            fetchCollection: jest.fn(async () => []),
+            count: jest.fn(async () => 12345),
+            admin: { executeSql: jest.fn() }
+        } as unknown as PostgresBackendDriver;
+
+        // Auth off: this block is about the ceiling, not the gate.
+        createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, {
+            requireAuth: false,
+            jwtSecret: "s"
+        });
+    });
+
+    it("defaults an absent limit instead of streaming the whole table", async () => {
+        await sendUnauthed({
+            type: "FETCH_COLLECTION",
+            requestId: "req-no-limit",
+            payload: { path: "posts" }
+        });
+
+        expect(mockDriver.fetchCollection).toHaveBeenCalled();
+        expect(limitReachingDriver().limit).toBe(resolveClientListLimit(undefined));
+    });
+
+    it("clamps an absurd limit to the shared ceiling", async () => {
+        await sendUnauthed({
+            type: "FETCH_COLLECTION",
+            requestId: "req-huge",
+            payload: { path: "posts", limit: 100_000_000 }
+        });
+
+        expect(limitReachingDriver().limit).toBe(MAX_LIST_LIMIT);
+    });
+
+    it("clamps `limit: 0` — historically the unlimited bypass", async () => {
+        await sendUnauthed({
+            type: "FETCH_COLLECTION",
+            requestId: "req-zero",
+            payload: { path: "posts", limit: 0 }
+        });
+
+        expect(limitReachingDriver().limit).toBe(1);
+    });
+
+    it("defaults a vector search by its own, smaller mode default", async () => {
+        await sendUnauthed({
+            type: "FETCH_COLLECTION",
+            requestId: "req-vector",
+            payload: { path: "posts", vectorSearch: { property: "embedding", vector: [0.1, 0.2] } }
+        });
+
+        expect(limitReachingDriver().limit).toBe(DEFAULT_VECTOR_LIST_LIMIT);
+        expect(DEFAULT_VECTOR_LIST_LIMIT).toBeLessThan(DEFAULT_LIST_LIMIT);
+    });
+
+    /**
+     * The mirror image: a bound that ignored the client would satisfy every
+     * assertion above by always sending the default. A reasonable limit must
+     * survive untouched, and the rest of the request with it.
+     */
+    it("passes a reasonable limit through, and the rest of the request unchanged", async () => {
+        await sendUnauthed({
+            type: "FETCH_COLLECTION",
+            requestId: "req-ok",
+            payload: { path: "posts", limit: 25, offset: 10, orderBy: "created_at", order: "desc" }
+        });
+
+        expect(limitReachingDriver()).toEqual({
+            path: "posts",
+            limit: 25,
+            offset: 10,
+            orderBy: "created_at",
+            order: "desc"
+        });
+    });
+
+    /**
+     * COUNT is the deliberate exception. It answers with a scalar and the driver
+     * drops `limit` before `SELECT count(*)`, so bounding it there would not cap
+     * a read — it would only make `total` lie about how many rows exist.
+     */
+    it("leaves COUNT unbounded — it reads no rows", async () => {
+        const mockWs = await sendUnauthed({
+            type: "COUNT",
+            requestId: "req-count",
+            payload: { path: "posts" }
+        });
+
+        expect((mockDriver.count as jest.Mock).mock.calls[0][0]).toEqual({ path: "posts" });
+        expect(JSON.parse(mockWs.send.mock.calls[0][0])).toEqual({
+            type: "COUNT_SUCCESS",
+            requestId: "req-count",
+            payload: { count: 12345 }
+        });
     });
 });
