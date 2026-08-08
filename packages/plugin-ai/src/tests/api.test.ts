@@ -6,7 +6,9 @@ import {
     DEFAULT_AI_ENDPOINT,
     autocompleteStream,
     autofillStream,
+    clearAiStatusCache,
     fetchAiStatus,
+    fetchAiStatusCached,
     fetchPromptSuggestions
 } from "../api";
 import { AutofillRequest } from "../types/data_enhancement_controller";
@@ -144,7 +146,8 @@ stock: 42 });
     });
 
     it("joins a multi-line data field", async () => {
-        const body = 'event: suggestion\ndata: {"key":"body",\ndata: "value":"two lines"}\n\n';
+        const body = 'event: suggestion\ndata: {"key":"body",\ndata: "value":"two lines"}\n\n'
+            + "event: done\ndata: {}\n\n";
         const { values } = await runAutofill([body]);
         expect(values).toEqual([["body", "two lines"]]);
     });
@@ -185,6 +188,58 @@ onValue: () => undefined })
         ).rejects.toThrow(/quota for today/);
     });
 
+    it("fails a stream that ends without a `done` record", async () => {
+        // A rolled pod, a proxy timeout, a dropped connection. The body simply
+        // stops. Returning `{ suggestions: {} }` for that is indistinguishable
+        // from the service saying there was nothing to fill — and the operator
+        // is then told, in a confident sentence, that their empty fields are
+        // fields the model would not improve on.
+        const truncated = [
+            "event: suggestion",
+            'data: {"key":"title","value":"Blue widget"}',
+            "",
+            "event: suggestion_delta",
+            'data: {"key":"summary","text":"half a sen'
+        ].join("\n");
+        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse([truncated]));
+
+        const values: [string, unknown][] = [];
+        await expect(autofillStream({
+            request: REQUEST,
+            onDelta: () => undefined,
+            onValue: (k, v) => values.push([k, v])
+        })).rejects.toThrow(/ended before it finished/);
+
+        // Whatever did arrive was still delivered — the caller keeps the fields
+        // that completed and reports the run as failed.
+        expect(values).toEqual([["title", "Blue widget"]]);
+    });
+
+    it("fails a stream whose every record was unreadable", async () => {
+        // Zero good fields plus n discarded records is not "nothing to fill".
+        const garbage = "event: suggestion\ndata: {not json\n\nevent: suggestion\ndata: {also not\n\n";
+        (global as any).fetch = jest.fn().mockResolvedValue(streamingResponse([garbage]));
+        await expect(
+            autofillStream({ request: REQUEST,
+onDelta: () => undefined,
+onValue: () => undefined })
+        ).rejects.toThrow(/could not be read|ended before it finished/);
+    });
+
+    it("accepts the empty run the service sends when there is nothing to fill", async () => {
+        // That case is a `done` with no suggestions, not an empty body, so it
+        // must stay distinguishable from a truncation.
+        (global as any).fetch = jest.fn().mockResolvedValue(
+            streamingResponse(['event: done\ndata: {"suggestions":{},"usage":{}}\n\n'])
+        );
+        await expect(
+            autofillStream({ request: REQUEST,
+onDelta: () => undefined,
+onValue: () => undefined })
+        ).resolves.toEqual({ suggestions: {},
+usage: {} });
+    });
+
     it("sends no credentials of any kind", async () => {
         // The FireCMS-era client sent the tenant's JWT as `Authorization: Basic`
         // plus a hardcoded `fcms-…` key. No external service could verify the
@@ -200,7 +255,10 @@ onValue: () => undefined });
     });
 
     it("posts to the hosted endpoint by default and to an override when given", async () => {
-        const fetchMock = jest.fn().mockResolvedValue(streamingResponse([BODY]));
+        // A fresh response per call: one `streamingResponse` is a single reader,
+        // and handing the same exhausted one to the second call makes it read an
+        // empty body — which is now, correctly, a truncated stream.
+        const fetchMock = jest.fn().mockImplementation(async () => streamingResponse([BODY]));
         (global as any).fetch = fetchMock;
 
         await autofillStream({ request: REQUEST,
@@ -260,6 +318,47 @@ features: ["autofill"] })
         // "no button" — that is the whole fix for the 404-on-click failure.
         (global as any).fetch = jest.fn().mockResolvedValue(jsonResponse({}, false, 503));
         await expect(fetchAiStatus({})).resolves.toEqual({ available: false });
+    });
+});
+
+describe("fetchAiStatusCached", () => {
+
+    beforeEach(() => clearAiStatusCache());
+    afterEach(() => clearAiStatusCache());
+
+    it("asks the host once per endpoint, however many callers there are", async () => {
+        // The provider is form-scoped, so an uncached probe is one request to
+        // the host every time any record is opened — a beacon from an install
+        // that may never use the feature, and enough traffic from one office
+        // behind one address to spend the host's per-IP limit on nothing.
+        const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: true }));
+        (global as any).fetch = fetchMock;
+
+        const answers = await Promise.all([
+            fetchAiStatusCached({}),
+            fetchAiStatusCached({}),
+            fetchAiStatusCached({})
+        ]);
+        await fetchAiStatusCached({});
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(answers.every(a => a.available)).toBe(true);
+    });
+
+    it("keeps one answer per endpoint", async () => {
+        const fetchMock = jest.fn().mockResolvedValue(jsonResponse({ available: true }));
+        (global as any).fetch = fetchMock;
+        await fetchAiStatusCached({});
+        await fetchAiStatusCached({ endpoint: "https://ai.example.com" });
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("answers unavailable, once, when the host cannot be reached", async () => {
+        const fetchMock = jest.fn().mockRejectedValue(new Error("offline"));
+        (global as any).fetch = fetchMock;
+        await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+        await expect(fetchAiStatusCached({})).resolves.toEqual({ available: false });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -46,13 +46,17 @@ Two consequences worth knowing:
   for it. Cost is bounded by rate limits and a daily ceiling instead.
 - **Your collection schema and the record's current values are sent** with each
   autofill request, because the service has no other way to know the shape of what
-  it is filling. If that is not acceptable for your data, set `endpoint` and run the
+  it is filling. Values of properties marked `admin: { readOnly: true }` or
+  `admin: { disabled: true }` are the exception — they are neither filled nor sent.
+  If the rest is not acceptable for your data, set `endpoint` and run the
   service yourself — the reference implementation is `saas/backend/functions/ai.ts`
   in the Rebase repository, and the wire format is documented in `src/api.ts`.
 
 The plugin renders nothing until the service's `GET /status` reports itself
 available, so an unreachable host or an exhausted daily quota means no Autofill
-button — never a button that fails when clicked.
+button — never a button that fails when clicked. That check is one request per
+session, not one per record opened; return `false` from `getConfigForPath` to
+keep a collection from being asked about at all.
 
 ## Key Exports
 
