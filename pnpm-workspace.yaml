@@ -50,7 +50,15 @@ minimumReleaseAgeExclude:
 # floating pin — the next major to publish gets dragged in on the next resolve,
 # whatever asked for what. js-yaml 5 arrived that way and broke the Astro build.
 overrides:
-  dompurify: ">=3.4.11 <4"
+  # GHSA-55q2-fjhq-7xh7: an IN_PLACE hook removal left a detached subtree
+  # executable. Vulnerable through 3.4.12, so the previous 3.4.11 floor sat
+  # inside the range. Reaches a shipped runtime, not just build tooling —
+  # monaco-editor pulls it into @rebasepro/studio.
+  dompurify: ">=3.4.13 <4"
+  # GHSA-2v37-7h3g-55p8: a custom generator loops forever when size is zero.
+  # Build tooling only (postcss, via Astro and Remotion). Capped below 4 for the
+  # reason at the top of this block; 3.x is what the tree's postcss asks for.
+  nanoid: ">=3.3.17 <4"
   nodemailer: ">=9.0.1 <10"
   form-data: ">=4.0.6 <5"
   tmp: ">=0.2.7 <0.3"
@@ -61,7 +69,11 @@ overrides:
   uuid: ">=11.1.1 <15"
   # Upper bound is load-bearing: js-yaml 5 is ESM-only with no default export,
   # which breaks `import yaml from "js-yaml"` inside Astro/Starlight.
-  js-yaml: ">=4.3.0 <5"
+  #
+  # Floor raised for GHSA-5p4m-2wfm-xmqj, quadratic CPU in `!!omap` resolution.
+  # 4.3.0 was itself the vulnerable version, so the floor was pinning the tree
+  # to it — a floor only helps when it sits above the range it names.
+  js-yaml: ">=4.3.1 <5"
   # Not in the tree right now; kept so it lands patched if anything pulls it back.
   tar: ">=7.5.16 <8"
   esbuild: ">=0.28.1 <0.29"

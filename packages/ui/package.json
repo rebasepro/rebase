@@ -2,7 +2,7 @@
   "name": "@rebasepro/ui",
   "type": "module",
   "version": "0.13.0",
-  "description": "Awesome Firebase/Firestore-based headless open-source CMS",
+  "description": "Rebase design system — React components and design tokens built on Radix UI, Tailwind CSS and lucide-react",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
   },

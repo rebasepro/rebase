@@ -2,7 +2,7 @@
   "name": "@rebasepro/common",
   "type": "module",
   "version": "0.13.0",
-  "description": "Awesome Firebase/Firestore-based headless open-source CMS",
+  "description": "Rebase shared core — collection registry, data driver adapter and fluent query builder. No React dependency.",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
   },
