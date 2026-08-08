@@ -221,6 +221,23 @@ h6 {
     }
 }
 
+/* Copy-to-clipboard buttons sit inside terminal and code chrome, where the icon
+   has to stay small to match the surrounding monospace — they measure 15x15 to
+   20x20, well under the 24x24 minimum WCAG 2.2 AA (2.5.8) asks of a pointer
+   target. Growing the button would break the chrome it lives in, so the hit area
+   is expanded instead: a transparent pseudo-element bleeds 6px past every edge,
+   taking the smallest of them to 27x27 without moving a single pixel of layout.
+   `inset` is negative on all four sides so the target grows symmetrically. */
+.copy-btn {
+    position: relative;
+}
+
+.copy-btn::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+}
+
 .subtle-shimmer {
     /* Set to inline-block for better compatibility with
       background-clip and transforms.

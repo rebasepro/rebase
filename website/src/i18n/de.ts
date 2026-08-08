@@ -157,7 +157,7 @@ export const de = {
   "cta.button.docs": "Docs lesen",
   "cta.button.github": "GitHub",
   "security.badge": "Security first",
-  "security.title": "Dein Schema, deine Regeln.",
+  "security.title": "In TypeScript geschrieben. Von Postgres erzwungen.",
   "security.desc": "Row-Level Security, direkt in deinem TypeScript-Schema definiert. Granulare Permissions pro Collection, pro Feld, pro Rolle. Keine handgeschriebenen SQL-Policies — nur sauberer Code in der Versionskontrolle.",
   "security.link": "Rebase Studio entdecken",
   "opensource.badge": "Open-Source",

@@ -90,10 +90,16 @@ in the dependency tree), **CMS** (BaaS + schema-driven admin panel), and **Full*
 
 - Open source, MIT, at `github.com/rebasepro/rebase`. Packages publish to npm
   under `@rebasepro/*`; current line is `0.13.x`.
-- **Self-host only.** There is no publicly offered managed Rebase tier. No public
-  surface may reference a hosted plan, waitlist, or "coming soon" — not as a
-  footnote. The internal cloud work under `saas/` is not product truth for any
-  public surface.
+- **Self-host is the only thing that ships today.** There is no purchasable
+  managed Rebase tier, and no surface may present one as available, priced, or
+  deployable. Pre-launch lead capture *is* allowed: a clearly-labelled
+  "not launched yet" lane and a waitlist are legitimate, and both ship on the
+  home page today. The internal cloud work under `saas/` is not product truth —
+  never describe its capabilities, tenancy, or timeline publicly.
+- **The `/europe` exception:** that page argues self-hosting and nothing else. Its
+  counterweight to "you are the only processor" is *"being the only processor is
+  also a job"* — never a hosted tier we would rather sell. This restriction is
+  specific to `/europe`, not site-wide.
 - `pnpm` exclusively. Node `>=22.22.0` for the server line.
 - React `>=19.2.7`, `react-router` 8, Tailwind CSS v4, Radix UI, lucide-react.
 - Authorization is Postgres RLS. A `securityRules` edit is only real once a
@@ -127,9 +133,16 @@ workspace), *BaaS / CMS / Full* (the three adoption modes).
 - `packages/rls-check` produces real terminal output that marketing renders
   verbatim (`RlsCheckReport.astro` ← `packages/rls-check/src/report.ts`).
 - Runnable example apps: `app/`, `examples/firebase`, `examples/sdk-demo`.
-- **Absences future work must not fabricate:** no customer testimonials, no named
-  logos, no case studies, no published benchmarks, no pricing for a hosted tier
-  (there is no hosted tier), no user counts.
+- **Client logos and case studies are real and already shipped** — see
+  `website/src/components/ClientLogos.astro` (logo wall, with the assets in
+  `website/public/img/logos/`) and `website/src/components/CaseStudiesCarousel.astro`
+  (three named projects with live URLs). Note the logo wall is deliberately
+  labelled as teams shipping on *"Rebase and FireCMS"*, not on Rebase alone;
+  future copy must keep that distinction rather than implying they are all
+  Rebase users.
+- **Absences future work must not fabricate:** no written testimonials or
+  pull-quotes, no published benchmarks, no user or download counts, no pricing
+  for a hosted tier.
 
 ## Product Principles
 

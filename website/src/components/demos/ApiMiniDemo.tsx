@@ -54,7 +54,7 @@ export function ApiMiniDemo() {
                 {/* Animated request line */}
                 <div className="mt-auto px-3 py-2 border-t border-surface-800/40">
                     <div className={`h-[1px] w-full bg-gradient-to-r from-green-500/0 via-green-500 to-green-500/0 transform origin-left transition-transform duration-300 ${step >= 1 ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0"}`}/>
-                    <div className="text-[8px] text-surface-600 mt-1">{step >= 1 ? "200 OK · 12ms" : "Ready"}</div>
+                    <div className="text-[8px] text-surface-500 mt-1">{step >= 1 ? "200 OK · 12ms" : "Ready"}</div>
                 </div>
             </div>
 
@@ -65,7 +65,7 @@ export function ApiMiniDemo() {
                     {step >= 2 && <span className="text-green-400 text-[7px] font-normal normal-case">200 OK</span>}
                 </div>
                 <div className="p-3 flex-1 overflow-hidden">
-                    {step === 0 && <div className="text-surface-600 italic text-[8px]">Send a request...</div>}
+                    {step === 0 && <div className="text-surface-500 italic text-[8px]">Send a request...</div>}
                     {step === 1 && (
                         <div className="absolute inset-0 bg-green-500/5 animate-pulse"></div>
                     )}

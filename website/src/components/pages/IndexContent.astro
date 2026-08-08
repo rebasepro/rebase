@@ -59,7 +59,7 @@ const faqColumns = [
 
     <!-- Hero -->
  <section id="s-hero"
-             class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
+             class="relative isolate overflow-hidden -mt-20 pt-40 pb-24 sm:pt-44 sm:pb-28 lg:pt-48 lg:pb-32">
         <!-- Animated WebGL gradient background (Neat - funky preset) -->
         <NeatBackground client:idle randomize={false} />
 
@@ -164,10 +164,21 @@ const faqColumns = [
 
 
     <!-- Social proof -->
- <section id="s-social-proof" class="relative z-0 py-20 sm:py-28">
+ <!-- The band was 340px tall to carry a 50px logo row and one line of type, so it
+      read as a gap the logos happened to be floating in. It is now sized to its
+      content and bounded by hairlines, which is what makes a logo wall read as a
+      deliberate band rather than as leftover space. The label keeps its "Rebase
+      and FireCMS" qualifier — see PRODUCT.md; these are not all Rebase users and
+      the copy must not imply otherwise. -->
+ <section id="s-social-proof" class="relative z-0 py-6 sm:py-8">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">{t("social.title")}</p>
-            <ClientLogos/>
+            <div class="border-y border-white/[0.06] py-10 sm:py-12">
+                <!-- Sentence case, not caps: this label is a nine-word sentence, and
+                     uppercase + tracking is a treatment for two or three words. Caps
+                     here cost legibility and bought nothing. -->
+                <p class="text-center text-xs text-surface-500 mb-7 animate-on-scroll fade-in">{t("social.title")}</p>
+                <ClientLogos/>
+            </div>
         </div>
     </section>
 

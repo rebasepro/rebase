@@ -87,7 +87,15 @@
     --color-surface-200: #e5e5e5;
     --color-surface-300: #d4d4d4;
     --color-surface-400: #a3a3a3;
-    --color-surface-500: #737373;
+    /* Muted text: captions, nav descriptions, table headers, eyebrows.
+       #737373 was tuned for light and measured 4.74:1 on white but only
+       4.43:1 on #000 and 4.18:1 on #0a0a0a, so every dark surface — the
+       marketing site, the console, the admin panel in dark mode — carried a
+       muted tier below AA. #797979 is the balance point: it is the single
+       value where the white and #111111 curves cross, at 4.35:1 on each,
+       and it clears 4.5:1 outright on the two backgrounds that carry most of
+       this token (4.82:1 on #000, 4.55:1 on #0a0a0a). */
+    --color-surface-500: #797979;
     --color-surface-600: #404040;
     --color-surface-700: #262626;
     --color-surface-800: #111111;

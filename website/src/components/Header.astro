@@ -176,7 +176,12 @@ const flatNavLinks = [
     <nav class="mx-auto flex max-w-7xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
         <div class="flex items-center">
             <a id="header-logo-link" href={translatePath("/")} class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
-                <img src="/img/rebase_logo.svg" class="h-8 w-8 mr-4" alt="Rebase Logo" transition:name="logo-image"/>
+                <!-- Intrinsic size is declared so the header reserves the box before
+                     the SVG lands; without it the nav shifts on first paint. Deliberately
+                     NOT lazy — this is above the fold on every route, and deferring it
+                     would trade a layout shift for a slower first render. -->
+                <img src="/img/rebase_logo.svg" width="32" height="32" fetchpriority="high"
+                     class="h-8 w-8 mr-4" alt="Rebase Logo" transition:name="logo-image"/>
                 <span class="self-center text-lg font-semibold whitespace-nowrap text-white"
                       transition:name="logo-text">Rebase</span>
             </a>

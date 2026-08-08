@@ -28,7 +28,13 @@ export const en = {
   "see.subtitle":
     "Tables, forms, relations, media, roles and workflows — every screen already laid out, and usable by the people on your team who will never open your repo.",
   "engine.badge": "What your app talks to",
-  "engine.title": "Everything your app calls, already running.",
+  // Was "Everything your app calls, already running." — the third consecutive
+  // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
+  // which flattened three different promises into one. Same claim, own words.
+  // NOTE: es/de/fr are stale on this key AND carry the pre-rework framing
+  // ("A complete backend. Not just a pretty face"), which defends the panel
+  // instead of leading with the backend — see SITE-STORY's backend-first rule.
+  "engine.title": "The whole backend, already running.",
   "engine.subtitle":
     "A typed SDK for your collections, REST over every table, and realtime on a WebSocket — plus auth, storage and backups, running against your database from minute one.",
   "engine.link": "Explore the backend",
@@ -46,10 +52,17 @@ export const en = {
   "agentera.card.desc":
     "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore all AI & Agent features",
-  "modes.badge": "One definition, all the way up",
-  "modes.title": 'Everything sits on <span class="text-primary">one definition.</span>',
+  // This beat proves claim 3 — the panel is a separate product and the API
+  // response does not move — which is what its figure actually models. The
+  // English had drifted onto claim 2 ("one definition, everything generated"),
+  // which beat 02 already owns two sections earlier, and opened on "Everything"
+  // for the third heading running. es/de/fr never drifted; this restores parity
+  // with them rather than inventing new copy. The subtitle also stops listing
+  // the layer stack, because the figure beside it already draws that.
+  "modes.badge": "Two products, one definition",
+  "modes.title": 'Take only the half <span class="text-primary">you actually need.</span>',
   "modes.subtitle":
-    "Postgres at the bottom, your collections above it, then the API your app calls, the back office your team works in, and the tools you debug with — every layer reading the same definition. Don't need one? Leave it out; the API answers exactly the same.",
+    "The backend and the panel are separate products that share a schema. Ship headless today and add the panel the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
   "modes.baas.title":
     "Backend",
   "modes.baas.desc":
@@ -225,7 +238,13 @@ export const en = {
   "cta.button.docs": "Read the Docs",
   "cta.button.github": "GitHub",
   "security.badge": "Security-first",
-  "security.title": "Your schema, your rules.",
+  // Carries claim 1 — security lives in the database — which is the page's
+  // highest-ranked claim and was previously left entirely to the body copy.
+  // "Your schema, your rules" asserted ownership, not mechanism, and reused the
+  // "Your X, your Y" shape that opensource.title already owns further down.
+  // The split line names where the rule is authored and where it is enforced,
+  // which is the whole differentiator against middleware-based authorization.
+  "security.title": "Written in TypeScript. Enforced by Postgres.",
   "security.desc":
     "Row-level security written in the same TypeScript file as the collection, compiled into real Postgres policies. Granular per collection, per field, per role — and enforced by the database itself, not by middleware someone has to remember to call.",
   "security.link": "Explore Rebase Studio",

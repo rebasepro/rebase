@@ -161,7 +161,7 @@ export function RealtimeMiniDemo() {
                                 <div className="w-12">
                                     <span className={`text-[8px] px-1 py-0.5 rounded transition-colors duration-300 ${statusColor(row.status)}`}>{row.status}</span>
                                 </div>
-                                <div className={`w-10 text-[8px] text-right truncate ${lit ? "text-primary" : "text-surface-600"}`}>{row.updated}</div>
+                                <div className={`w-10 text-[8px] text-right truncate ${lit ? "text-primary" : "text-surface-500"}`}>{row.updated}</div>
                             </div>
                         );
                     })}
@@ -202,7 +202,7 @@ export function RealtimeMiniDemo() {
                             ></span>
                         )}
                     </div>
-                    <span className={`text-[7px] uppercase tracking-wider transition-colors duration-300 ${phase === "travel" ? "text-primary" : "text-surface-600"}`}>
+                    <span className={`text-[7px] uppercase tracking-wider transition-colors duration-300 ${phase === "travel" ? "text-primary" : "text-surface-500"}`}>
                         {phase === "travel" ? (event.origin === "a" ? "a→b" : "b→a") : "live"}
                     </span>
                 </div>
@@ -213,13 +213,13 @@ export function RealtimeMiniDemo() {
             {/* Event log, on the card itself — it belongs to neither window */}
             <div className="flex items-center gap-1.5 shrink-0 overflow-hidden">
                 {phase === "idle" ? (
-                    <span className="text-[8px] text-surface-600 italic truncate">Both clients subscribed to users…</span>
+                    <span className="text-[8px] text-surface-500 italic truncate">Both clients subscribed to users…</span>
                 ) : (
                     <span className="text-[8px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm truncate rt-fade">
                         {`UPDATE users SET status='${event.status}' WHERE id=${event.rowId}`}
                     </span>
                 )}
-                <span className="ml-auto text-[8px] text-surface-600 shrink-0">ws://localhost:3000/realtime</span>
+                <span className="ml-auto text-[8px] text-surface-500 shrink-0">ws://localhost:3000/realtime</span>
             </div>
 
             <style dangerouslySetInnerHTML={{ __html: `

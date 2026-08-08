@@ -91,8 +91,12 @@ Inherits the root record. Site-specific:
 - Blog under `src/content/blog`; docs under `src/content/docs`.
 - Comparison pages are built against real competitor behaviour and must stay
   that way.
-- **Absences:** no testimonials, no customer logos, no case studies, no
-  benchmarks, no hosted-tier pricing. Do not invent them to fill a section.
+- A client logo wall (`ClientLogos.astro`) and a three-project case-study
+  carousel (`CaseStudiesCarousel.astro`) already ship on the home page, with real
+  assets and live URLs. The logo wall is labelled *"Rebase and FireCMS"* — keep
+  that qualifier; do not restate it as Rebase-only proof.
+- **Absences:** no written testimonials or pull-quotes, no benchmarks, no user
+  counts, no hosted-tier pricing. Do not invent them to fill a section.
 
 ## Product Principles
 
@@ -103,8 +107,10 @@ Inherits the root record. Site-specific:
    command — never a card grid standing in for evidence.
 4. **Defensible against an expert.** Any comparison must survive a reader who
    uses the competitor daily.
-5. **Sell only what exists.** Self-hosting is the offer; no hosted tier is
-   mentioned in any form.
+5. **Sell only what exists.** Self-hosting is what ships. A pre-launch Cloud lane
+   and waitlist are allowed and do ship on `/`, provided they are explicitly
+   labelled as not launched and offer no command, price, or deploy action. Only
+   `/europe` bans the mention outright.
 
 ## Accessibility & Inclusion
 
