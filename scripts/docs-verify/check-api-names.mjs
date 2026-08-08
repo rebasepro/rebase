@@ -24,7 +24,11 @@ import { extractSnippets } from "./extract.mjs";
 const ALL_DOC_GLOBS = [
     "website/src/content/docs/**/*.md",
     "website/src/content/docs/**/*.mdx",
-    "rebase-agent-skills/**/*.md"
+    "rebase-agent-skills/**/*.md",
+    // The example READMEs are documentation by every definition that matters,
+    // and no glob in this repository covered them. One level deep on purpose:
+    // every example has its own `node_modules` here, which a `**` glob walks.
+    "examples/*/*.md"
 ];
 
 /**

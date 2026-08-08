@@ -61,7 +61,19 @@ rebase db migrate
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
-| `rebase db studio` | Visual database browser — Drizzle Studio | Debugging |
+| `rebase db branch` | Create / list / delete a database branch | Feature work |
+| `rebase db backup` | Write a backup of the current database | Before a risky change |
+| `rebase db backups` | List the backups taken so far | Picking one to restore |
+| `rebase db restore` | Restore the database from a backup | Recovery |
+
+<!-- docs-verify: ignore -->
+> **IMPORTANT FOR AGENTS:** `push`, `generate`, `migrate`, `branch`, `backup`, `restore`
+> and `backups` are the whole list — anything else exits 1. In particular there is no
+> `rebase db studio`.
+>
+> `rebase db push` refuses a destructive change on a non-TTY (dropped column, dropped
+> table). In CI or from an agent, pass `--allow-destructive` (or `--yes`) once you have
+> confirmed the data loss is intended.
 
 ## Key Backend Packages
 

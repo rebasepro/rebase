@@ -7,12 +7,21 @@ import { findProjectRoot } from "../utils/project";
 
 const require = createRequire(import.meta.url);
 
-/** Supported agent environments and their target directories. */
+/**
+ * Supported agent environments and their target directories.
+ *
+ * `flatLayout` says where the installed rule file sits relative to the skill's
+ * own assets. A subdirectory layout writes `<skill>/SKILL.md`, so a link the
+ * skill spells `references/x.md` resolves as written; a flat layout writes
+ * `<skill>.md` one level up, so those links have to be re-pointed at the
+ * per-skill asset directory. See `rewriteAssetLinks`.
+ */
 const AGENTS = {
     cursor: {
         label: "Cursor",
         detectDir: ".cursor",
         targetDir: ".cursor/rules",
+        flatLayout: true,
         /** Cursor uses .mdc files (Markdown with Context). */
         transformFile: (skillName: string, content: string) => ({
             fileName: `${skillName}.mdc`,
@@ -23,6 +32,7 @@ const AGENTS = {
         label: "Claude Code",
         detectDir: ".claude",
         targetDir: ".claude/skills",
+        flatLayout: false,
         /** Claude Code uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -33,6 +43,7 @@ const AGENTS = {
         label: "Windsurf",
         detectDir: ".windsurf",
         targetDir: ".windsurf/rules",
+        flatLayout: true,
         /** Windsurf uses plain .md files. */
         transformFile: (skillName: string, content: string) => ({
             fileName: `${skillName}.md`,
@@ -43,6 +54,7 @@ const AGENTS = {
         label: "Gemini CLI / Antigravity",
         detectDir: ".agents",
         targetDir: ".agents/skills",
+        flatLayout: false,
         /** Gemini uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
@@ -72,22 +84,81 @@ function getSkillsSourceDir(): string {
     return skillsDir;
 }
 
-/** Read all skill directories and return their names + content. */
-function loadSkills(skillsDir: string): Array<{ name: string; content: string }> {
+export interface LoadedSkill {
+    name: string;
+    /** Absolute path of the skill's source directory. */
+    dir: string;
+    content: string;
+    /** Every file the skill ships besides SKILL.md, relative to `dir`. */
+    assets: string[];
+}
+
+/**
+ * Everything a skill ships alongside its SKILL.md — the `references/` tree the
+ * Agent Skills format uses for progressive disclosure.
+ *
+ * These used to be dropped on install, because the installer read exactly
+ * `<skill>/SKILL.md` and nothing else. That left `rebase-design-language`
+ * telling the agent three separate times to read `references/view-patterns.md`
+ * — 379 lines of view skeletons — in a project where the file had never
+ * landed, and the instruction it carries is "extend an existing pattern; do not
+ * invent a layout".
+ */
+function loadSkillAssets(skillDir: string): string[] {
+    const found: string[] = [];
+
+    const walk = (dir: string, prefix: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            // Dotfiles are bookkeeping — `.gitkeep` is what holds the empty
+            // `references/` directories in git — and install nothing.
+            if (entry.name.startsWith(".")) continue;
+            const rel = prefix ? path.join(prefix, entry.name) : entry.name;
+            if (entry.isDirectory()) walk(path.join(dir, entry.name), rel);
+            else if (rel !== "SKILL.md") found.push(rel);
+        }
+    };
+
+    walk(skillDir, "");
+    return found.sort();
+}
+
+/** Read all skill directories and return their names, content and assets. */
+export function loadSkills(skillsDir: string): LoadedSkill[] {
     const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-    const skills: Array<{ name: string; content: string }> = [];
+    const skills: LoadedSkill[] = [];
 
     for (const entry of entries) {
         if (!entry.isDirectory()) continue;
-        const skillMdPath = path.join(skillsDir, entry.name, "SKILL.md");
+        const skillDir = path.join(skillsDir, entry.name);
+        const skillMdPath = path.join(skillDir, "SKILL.md");
         if (!fs.existsSync(skillMdPath)) continue;
         skills.push({
             name: entry.name,
-            content: fs.readFileSync(skillMdPath, "utf-8")
+            dir: skillDir,
+            content: fs.readFileSync(skillMdPath, "utf-8"),
+            assets: loadSkillAssets(skillDir)
         });
     }
 
     return skills;
+}
+
+/**
+ * Re-point a skill's own asset links at the per-skill subdirectory, for the
+ * agents whose rule file does not live in it.
+ *
+ * Only paths that name a file the skill actually ships are rewritten, and only
+ * where they start a path segment — so prose that happens to contain the same
+ * words is left alone.
+ */
+export function rewriteAssetLinks(content: string, assets: string[], skillName: string): string {
+    let out = content;
+    for (const asset of assets) {
+        const posix = asset.split(path.sep).join("/");
+        const escaped = posix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        out = out.replace(new RegExp(`(?<![\\w/.-])${escaped}`, "g"), `${skillName}/${posix}`);
+    }
+    return out;
 }
 
 /** Detect which agent environments already exist in the project. */
@@ -102,11 +173,11 @@ function detectAgents(projectDir: string): AgentKey[] {
 }
 
 /** Install skills for a specific agent into the project directory. */
-function installForAgent(
+export function installForAgent(
     agentKey: AgentKey,
-    skills: Array<{ name: string; content: string }>,
+    skills: LoadedSkill[],
     projectDir: string
-): number {
+): { skills: number; assets: number } {
     const agent = AGENTS[agentKey];
     const targetBase = path.join(projectDir, agent.targetDir);
 
@@ -114,17 +185,31 @@ function installForAgent(
     fs.mkdirSync(targetBase, { recursive: true });
 
     let count = 0;
+    let assetCount = 0;
     for (const skill of skills) {
-        const { fileName, content } = agent.transformFile(skill.name, skill.content);
+        const body = agent.flatLayout
+            ? rewriteAssetLinks(skill.content, skill.assets, skill.name)
+            : skill.content;
+        const { fileName, content } = agent.transformFile(skill.name, body);
         const targetPath = path.join(targetBase, fileName);
 
         // Ensure parent directory exists (for subdirectory-based formats)
         fs.mkdirSync(path.dirname(targetPath), { recursive: true });
         fs.writeFileSync(targetPath, content, "utf-8");
         count++;
+
+        // A skill's assets always land in a directory named after the skill,
+        // whatever the rule file's layout, so two skills' `references/` trees
+        // cannot collide in a flat target directory.
+        for (const asset of skill.assets) {
+            const assetTarget = path.join(targetBase, skill.name, asset);
+            fs.mkdirSync(path.dirname(assetTarget), { recursive: true });
+            fs.copyFileSync(path.join(skill.dir, asset), assetTarget);
+            assetCount++;
+        }
     }
 
-    return count;
+    return { skills: count, assets: assetCount };
 }
 
 export async function skillsCommand(subcommand: string | undefined, rawArgs: string[]) {
@@ -246,12 +331,13 @@ async function skillsInstall(rawArgs: string[] = []) {
 
     for (const agentKey of agents) {
         const agent = AGENTS[agentKey];
-        const count = installForAgent(agentKey, skills, projectDir);
+        const { skills: count, assets } = installForAgent(agentKey, skills, projectDir);
         // Relative to where the command was typed, now that the destination is
         // the project root rather than the cwd — otherwise `.claude/skills`
         // names a directory that is not the one it wrote to.
         const shown = path.relative(process.cwd(), path.join(projectDir, agent.targetDir)) || agent.targetDir;
-        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${count} skills installed to ${chalk.gray(shown)}`);
+        const withAssets = assets > 0 ? ` (+ ${assets} reference file${assets === 1 ? "" : "s"})` : "";
+        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${count} skills installed${withAssets} to ${chalk.gray(shown)}`);
     }
 
     console.log("");

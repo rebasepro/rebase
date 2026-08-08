@@ -7,6 +7,10 @@
  *      and SDK member calls, and flags identifiers the packages do not export.
  *      Catches the class of bug where a confidently-written API is invented and
  *      then machine-translated into all six locales.
+ *      Stage 1 also carries the checks that are not about fenced TypeScript at
+ *      all: deploy build contexts, the marketing site's highlighted-HTML
+ *      snippets, the shell commands in the agent skills and example READMEs,
+ *      and the agent bundle's own MCP manifests.
  *   2. `snippets` — English + agent skills only (the other locales are
  *      generated from English by website/scripts/translate_docs.mjs). Compiles
  *      each fenced ts/js block against workspace source.
@@ -27,6 +31,8 @@ import { typecheckSnippets } from "./docs-verify/typecheck-snippets.mjs";
 import { checkApiNames } from "./docs-verify/check-api-names.mjs";
 import { checkDeployBuildContext } from "./docs-verify/check-deploy-build-context.mjs";
 import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.mjs";
+import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
+import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -52,6 +58,8 @@ if (asJson) {
         out.names = (await checkApiNames(ROOT)).unknown;
         out.deployBuildContext = checkDeployBuildContext(ROOT).findings;
         out.marketing = checkMarketingSnippets(ROOT).findings;
+        out.docCommands = checkDocCommands(ROOT).findings;
+        out.agentBundle = checkAgentBundle(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -123,6 +131,38 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} stale marketing snippet reference(s):${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Skill + example shell commands ━━━${NC}`);
+    const { findings: bad, scanned } = checkDocCommands(ROOT);
+    console.log(`${DIM}Scanned ${scanned} skill and example markdown files.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every documented CLI command, flag and run-script exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} command(s) a reader cannot run:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Agent-bundle manifests ━━━${NC}`);
+    const { findings: bad, scanned } = checkAgentBundle(ROOT);
+    console.log(`${DIM}Scanned ${scanned} MCP manifest(s) in rebase-agent-skills/.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every MCP server manifest names something that exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} manifest(s) pointing at nothing:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
         }
     }

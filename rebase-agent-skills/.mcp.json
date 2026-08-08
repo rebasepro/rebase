@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "rebase": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "node_modules/@rebasepro/mcp/dist/cli.js"
+        "-y",
+        "@rebasepro/mcp"
       ],
       "env": {
         "IS_REBASE_MCP": "true"

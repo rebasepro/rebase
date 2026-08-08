@@ -12,7 +12,7 @@ The Rebase SDK consists of two packages that work together to provide end-to-end
 
 The generated types are passed as a generic parameter to the client, providing full type safety across all operations.
 
-> **IMPORTANT FOR AGENTS:** Always generate the SDK types first before writing client code. Use the `rebase_generate_sdk` MCP tool or `npx rebase generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
+> **IMPORTANT FOR AGENTS:** Always generate the SDK types first before writing client code. Use the `rebase_generate_sdk` MCP tool or `npx @rebasepro/cli generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
 
 ## SDK Generation
 
@@ -25,7 +25,7 @@ Use the `rebase_generate_sdk` MCP tool — no parameters required. It reads coll
 **Via CLI:**
 
 ```bash
-npx rebase generate-sdk
+npx @rebasepro/cli generate-sdk
 ```
 
 ### What Gets Generated
