@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import {
     DataDriver,
     DeleteProps,
@@ -14,6 +14,18 @@ import { RebaseWebSocketClient } from "@rebasepro/client";
 
 export interface PostgresDataDriverConfig {
     wsClient?: RebaseWebSocketClient;
+
+    /**
+     * How the socket obtains an access token.
+     *
+     * `RebaseWebSocketClient` authenticates only when it has one, so a socket
+     * built by hand and given no getter connects as `anon` and every read
+     * returns whatever the anonymous policies allow: a driver that *works*,
+     * silently, on the wrong identity. A socket obtained from
+     * `createRebaseClient()` (`client.ws`) already carries the session's
+     * getter and needs nothing here.
+     */
+    getAuthToken?: () => Promise<string | null>;
 }
 
 export interface PostgresDataDriver extends DataDriver {
@@ -30,9 +42,15 @@ export interface PostgresDataDriver extends DataDriver {
 
 export function usePostgresClientDriver(config: PostgresDataDriverConfig): PostgresDataDriver {
     const client = config.wsClient;
+    const getAuthToken = config.getAuthToken;
 
     return useMemo(() => {
         if (!client) throw new Error("RebaseWebSocketClient must be provided in config.wsClient");
+
+        // Idempotent assignment, and it has to happen before the first request
+        // rather than in an effect: an unauthenticated socket does not fail, it
+        // answers as `anon`.
+        if (getAuthToken) client.setAuthTokenGetter(getAuthToken);
 
         const driver: PostgresDataDriver = {
 
@@ -43,37 +61,28 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
         client,
 
         async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
-            // Pick only the fields the client needs, ignoring extra fields from the admin layer
-            const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
-            return client.fetchCollection({ path,
-filter,
-limit,
-startAfter,
-orderBy,
-searchString,
-order });
+            // Forwarded whole, like `count` below. The hand-written list named
+            // seven of the twelve fields and dropped `offset` and `logical`
+            // (plus `searchExplain`, `vectorSearch` and `collection`), so a
+            // page-two read asked the server for page one while the `count`
+            // beside it described the query that had been asked for — a
+            // `hasMore` that never went false and an `iterate()` that yielded
+            // page one over and over, terminating cleanly.
+            return client.fetchCollection(props);
         },
 
         async fetchOne<M extends Record<string, any>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
-            const { path, id, databaseId } = props;
-            return client.fetchOne({ path,
-id,
-databaseId });
+            return client.fetchOne(props);
         },
 
         async save<M extends Record<string, any>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
-            return client.save({
-                path: props.path,
-                values: props.values,
-                id: props.id,
-                previousValues: props.previousValues,
-                status: props.status
-            });
+            // Whole, so `upsert` survives the hop: hand-listing it away turns a
+            // re-runnable import into a duplicate-key error.
+            return client.save(props);
         },
 
         async delete<M extends Record<string, any>>(props: DeleteProps<M>): Promise<void> {
-            const { row } = props;
-            return client.delete({ row });
+            return client.delete(props);
         },
 
         async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: CollectionConfig): Promise<boolean> {
@@ -101,15 +110,13 @@ databaseId });
         },
 
         listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
-            const { path, id, databaseId, onUpdate, onError } = props;
+            // Same shape as `listenCollection`: everything that is not a
+            // callback is the query, and the query is forwarded whole.
+            const { onUpdate, onError, ...query } = props;
             return client.listenOne(
-                { path,
-id,
-databaseId },
-                (row: Record<string, unknown> | null) => {
-                    props.onUpdate(row);
-                },
-                props.onError
+                query,
+                (row: Record<string, unknown> | null) => onUpdate(row),
+                onError
             );
         },
 
@@ -151,6 +158,6 @@ databaseId },
         }
     };
         return driver;
-    }, [client]);
+    }, [client, getAuthToken]);
 
 }
