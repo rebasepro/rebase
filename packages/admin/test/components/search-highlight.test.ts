@@ -262,3 +262,21 @@ describe("withListState — a record opened from a search comes back to it", () 
         expect(withListState("/c/posts/abc", "")).toBe("/c/posts/abc");
     });
 });
+
+describe("offSlotMatch with the joined shown-keys round trip", () => {
+    const matches = [
+        { field: "full_name", snippet: "a" },
+        { field: "questionnaire.certifications", snippet: "b" }
+    ];
+
+    it("round-trips dotted paths through the memo key", () => {
+        // The hook joins the shown keys into a string to make the memo compare
+        // by value, then splits them back. A separator that appears inside a
+        // path — or an empty one — silently turns one key into several and the
+        // exclusion stops working.
+        expect(offSlotMatch(matches, "full_name|questionnaire.certifications".split("|")))
+            .toBeUndefined();
+        expect(offSlotMatch(matches, "full_name|".split("|").map(k => k || undefined))?.field)
+            .toBe("questionnaire.certifications");
+    });
+});
