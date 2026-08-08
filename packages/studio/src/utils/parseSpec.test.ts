@@ -1,8 +1,14 @@
 import { parseOpenApiSpec, resolveRefName, resolveRef } from "../components/ApiExplorer/parseSpec";
-import type { OpenApiSpec } from "../components/ApiExplorer/types";
+import type { OpenApiParameter, OpenApiSpec } from "../components/ApiExplorer/types";
 
 function makeSpec(overrides: Partial<OpenApiSpec> = {}): OpenApiSpec {
     return {
+        // `openapi` and `info` are required on `OpenApiSpec` and this builder
+        // supplied neither, so every fixture below was one cast away from being
+        // a document no parser would accept.
+        openapi: "3.0.0",
+        info: { title: "Test API",
+version: "1.0.0" },
         paths: {},
         tags: [],
         ...overrides
@@ -164,7 +170,9 @@ summary: "List" }
     });
 
     it("extracts parameters and requestBody", () => {
-        const params = [{ name: "id",
+        // Annotated: inferred, `in` widens to `string` and the array is not an
+        // `OpenApiParameter[]` — the very shape this test says it extracts.
+        const params: OpenApiParameter[] = [{ name: "id",
 in: "path",
 required: true }];
         const requestBody = { content: { "application/json": { schema: {} } } };

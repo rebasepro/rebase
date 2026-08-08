@@ -1,3 +1,5 @@
+import type { EnumValues } from "@rebasepro/types";
+
 import { extractEnumFromValues, resolveEnumValues } from "../src/util";
 
 describe("extractEnumFromValues", () => {
@@ -73,7 +75,10 @@ label: "Inactive" }
     });
 
     it("converts object with EnumValueConfig values to array", () => {
-        const input = {
+        // Annotated rather than inferred: left alone, `color` widens to `string`,
+        // which `ColorKey | ColorScheme` does not accept — so the fixture named
+        // in this test's title was never an `EnumValues` at all.
+        const input: EnumValues = {
             active: { id: "active",
 label: "Active",
 color: "green" },
