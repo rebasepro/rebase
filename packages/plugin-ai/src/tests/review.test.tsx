@@ -2,13 +2,32 @@ import { TextEncoder, TextDecoder } from "util";
 Object.assign(global, { TextEncoder,
 TextDecoder });
 
+// The provider reads the auth controller, so it imports `@rebasepro/app`, whose
+// module graph probes the viewport on load. Same stub as the other suites here.
+if (typeof window !== "undefined") {
+    Object.defineProperty(window, "matchMedia", {
+        writable: true,
+        value: jest.fn().mockImplementation(query => ({
+            matches: false,
+            media: query,
+            onchange: null,
+            addEventListener: jest.fn(),
+            removeEventListener: jest.fn(),
+            dispatchEvent: jest.fn()
+        }))
+    });
+}
+
 import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+
+import { AuthControllerContext } from "@rebasepro/app";
 
 import {
     DataEnhancementControllerProvider,
     useDataEnhancementController
 } from "../components/DataEnhancementControllerProvider";
+import { clearAiStatusCache } from "../api";
 
 /**
  * The propose → review → apply contract.
@@ -87,19 +106,26 @@ json: async () => ({ prompts: [] }) });
     });
 }
 
-async function mountController(formValues: Record<string, unknown> = {}) {
+async function mountController(formValues: Record<string, unknown> = {}, options: {
+    collection?: any,
+    getConfigForPath?: (props: any) => boolean,
+    user?: any
+} = {}) {
     const setFieldValue = jest.fn();
     const formContext = { values: formValues,
 setFieldValue } as any;
 
     const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataEnhancementControllerProvider
-            path={"products"}
-            collection={COLLECTION}
-            formContext={formContext}
-            {...({} as any)}>
-            {children}
-        </DataEnhancementControllerProvider>
+        <AuthControllerContext.Provider value={{ user: options.user ?? null } as any}>
+            <DataEnhancementControllerProvider
+                path={"products"}
+                collection={options.collection ?? COLLECTION}
+                getConfigForPath={options.getConfigForPath}
+                formContext={formContext}
+                {...({} as any)}>
+                {children}
+            </DataEnhancementControllerProvider>
+        </AuthControllerContext.Provider>
     );
 
     const rendered = renderHook(() => useDataEnhancementController(), { wrapper });
@@ -107,8 +133,22 @@ setFieldValue } as any;
 setFieldValue };
 }
 
+/** The body of the `/autofill` request the last run made. */
+function autofillRequestBody() {
+    const call = ((global as any).fetch as jest.Mock).mock.calls
+        .find(([url]: [string]) => String(url).endsWith("/autofill"));
+    return JSON.parse(call[1].body);
+}
+
+beforeEach(() => {
+    // The availability probe is cached for the life of the page, so each test
+    // has to start from an unasked question.
+    clearAiStatusCache();
+});
+
 afterEach(() => {
     jest.restoreAllMocks();
+    clearAiStatusCache();
 });
 
 describe("autofill review", () => {
@@ -350,6 +390,28 @@ json: async () => ({ prompts: [] }) });
         expect(setFieldValue).toHaveBeenCalledWith("stock", 9);
     });
 
+    it("reports a truncated stream as a failure, not as an empty answer", async () => {
+        // The body simply stops — a rolled pod, a proxy timeout. The review used
+        // to close with "Nothing to fill in — every field either already has a
+        // value the model would not improve on, or is not one it can write",
+        // which is a confident, wrong answer about the operator's empty fields.
+        mockService(() => streamingResponse([
+            'event: suggestion\ndata: {"key":"title","value":"Blue widget"}\n\n'
+        ]));
+        const { result, setFieldValue } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: {} });
+        });
+
+        expect(result.current.review?.status).toBe("failed");
+        expect(result.current.review?.error).toMatch(/ended before it finished/);
+        // What did arrive is still on offer — the dialog's failure branch says so.
+        expect(result.current.review?.fields.map(f => f.key)).toEqual(["title"]);
+        expect(setFieldValue).not.toHaveBeenCalled();
+    });
+
     it("drops a date the model returned as unparseable rather than storing NaN", async () => {
         const collection = {
             name: "Posts",
@@ -389,5 +451,146 @@ setFieldValue } as any}
         act(() => result.current.applyReview());
 
         expect(setFieldValue).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * What actually goes on the wire.
+ *
+ * `request_agreement.test.ts` checks the two maps against each other directly;
+ * these go through the provider, because the provider is what builds the body —
+ * and a guard that is correct over a lossily-transformed copy of its subject is
+ * exactly the failure this is here to catch.
+ */
+describe("the autofill request body", () => {
+
+    const POSTS = {
+        name: "Posts",
+        singularName: "Post",
+        properties: {
+            title: { type: "string",
+name: "Title" },
+            summary: { type: "string",
+name: "Summary" },
+            tags: {
+                type: "array",
+                name: "Tags",
+                of: { type: "string",
+name: "Tag" }
+            },
+            publishedAt: { type: "date",
+name: "Published at" },
+            internalNotes: {
+                type: "string",
+                name: "Internal notes",
+                admin: { readOnly: true }
+            }
+        }
+    } as any;
+
+    const PUBLISHED = {
+        title: "Hello",
+        tags: ["news", "launch"],
+        publishedAt: new Date("2026-01-01T00:00:00.000Z"),
+        internalNotes: "written by a backend hook"
+    };
+
+    it("sends an array and a date under the keys the property map names", async () => {
+        // The service asks `values["tags"]` because `properties` says `tags`.
+        // Sent as `tags.0`/`tags.1` — and a `Date` not sent at all — that lookup
+        // is `undefined`, the field reads as empty, and a populated tag list and
+        // a set publication date come back pre-ticked for replacement.
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+        const { result } = await mountController(PUBLISHED, { collection: POSTS });
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: PUBLISHED });
+        });
+
+        const { values, properties } = autofillRequestBody();
+        expect(values.tags).toEqual(["news", "launch"]);
+        expect(values.publishedAt).toBe("2026-01-01T00:00:00.000Z");
+        expect(Object.keys(values).sort()).toEqual(["publishedAt", "tags", "title"]);
+        // Every key of `values` is a key the service will look up.
+        for (const key of Object.keys(values)) {
+            expect(Object.keys(properties)).toContain(key);
+        }
+    });
+
+    it("does not send the value of a read-only property", async () => {
+        // The service will not *fill* a disabled field — but it puts every value
+        // it is given into the prompt as context, so a field a backend hook owns
+        // was travelling to the provider verbatim.
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+        const { result } = await mountController(PUBLISHED, { collection: POSTS });
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: PUBLISHED });
+        });
+
+        const body = autofillRequestBody();
+        expect(body.values).not.toHaveProperty("internalNotes");
+        expect(JSON.stringify(body.values)).not.toContain("backend hook");
+        // Still declared as a property, so the service keeps refusing to fill it.
+        expect(body.properties.internalNotes.disabled).toBe(true);
+    });
+});
+
+describe("who is allowed to autofill", () => {
+
+    it("passes the signed-in user to getConfigForPath", async () => {
+        // The public prop type has always documented `user`, and the provider
+        // called `getConfigForPath({ path, collection })`. So
+        // `({ user }) => user?.roles?.includes("editor")` was `Boolean(undefined)`
+        // — an access rule that decided nothing, in whichever direction it was
+        // written.
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+        const seen: any[] = [];
+        const { result } = await mountController({}, {
+            user: { uid: "u1",
+roles: ["editor"] },
+            getConfigForPath: (props) => {
+                seen.push(props);
+                return props.user?.roles?.includes("editor");
+            }
+        });
+
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+        expect(seen[0]).toMatchObject({ path: "products",
+user: { uid: "u1" } });
+    });
+
+    it("passes null rather than undefined when nobody is signed in", async () => {
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+        const seen: any[] = [];
+        await mountController({}, {
+            getConfigForPath: (props) => {
+                seen.push(props);
+                return true;
+            }
+        });
+        await waitFor(() => expect(seen.length).toBeGreaterThan(0));
+        expect(seen[0].user).toBeNull();
+    });
+});
+
+describe("the availability probe", () => {
+
+    it("contacts the host once, however many forms are opened", async () => {
+        // The provider is form-scoped. Uncached, this is one request to the
+        // host — by default one Rebase runs — every time any record is opened,
+        // whether or not anyone ever clicks Autofill.
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+
+        const first = await mountController();
+        await waitFor(() => expect(first.result.current.enabled).toBe(true));
+        const second = await mountController();
+        await waitFor(() => expect(second.result.current.enabled).toBe(true));
+
+        const statusCalls = ((global as any).fetch as jest.Mock).mock.calls
+            .filter(([url]: [string]) => String(url).endsWith("/status"));
+        expect(statusCalls.length).toBe(1);
     });
 });

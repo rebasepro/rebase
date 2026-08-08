@@ -127,6 +127,38 @@ export async function fetchAiStatus(props: { endpoint?: string; signal?: AbortSi
     };
 }
 
+/** One in-flight or settled probe per endpoint, for the life of the page. */
+const statusProbes = new Map<string, Promise<AiStatus>>();
+
+/**
+ * {@link fetchAiStatus}, asked once per endpoint per session.
+ *
+ * The provider is form-scoped, so the uncached call meant one request to the
+ * host every time any record was opened — a beacon on an install that may never
+ * click Autofill, and enough traffic from one NAT'd office to spend the host's
+ * per-IP rate limit on nothing, which reads back as `available: false` and makes
+ * the button flicker in and out for everyone behind it.
+ *
+ * Availability changes on the order of a deploy or a daily quota reset, not of a
+ * form open, so a session-long answer is the right resolution. Failures resolve
+ * to `available: false` and are cached like any other answer — retrying per form
+ * open is the behaviour this replaces.
+ */
+export function fetchAiStatusCached(props: { endpoint?: string }): Promise<AiStatus> {
+    const key = endpointOf(props.endpoint, "/status");
+    const existing = statusProbes.get(key);
+    if (existing) return existing;
+    const probe = fetchAiStatus({ endpoint: props.endpoint })
+        .catch(() => ({ available: false }) as AiStatus);
+    statusProbes.set(key, probe);
+    return probe;
+}
+
+/** Forget every cached probe, so the next caller asks again. */
+export function clearAiStatusCache(): void {
+    statusProbes.clear();
+}
+
 /**
  * Fill a record, streaming each field as the service writes it.
  *
@@ -155,6 +187,9 @@ export async function autofillStream(props: {
     }
 
     let result: AutofillResult = { suggestions: {} };
+    let done = false;
+    let delivered = 0;
+    let discarded = 0;
 
     for await (const { event, data } of readServerSentEvents(response)) {
         let payload: any;
@@ -162,15 +197,21 @@ export async function autofillStream(props: {
             payload = JSON.parse(data);
         } catch {
             // One malformed record must not abort a stream that is otherwise
-            // delivering good fields.
+            // delivering good fields — but it is counted, because a run that
+            // delivered nothing *but* malformed records is a failure, not an
+            // answer of "there was nothing to fill in".
+            discarded++;
             continue;
         }
 
         if (event === "suggestion_delta") {
+            delivered++;
             props.onDelta(payload.key, payload.text);
         } else if (event === "suggestion") {
+            delivered++;
             props.onValue(payload.key, payload.value);
         } else if (event === "done") {
+            done = true;
             result = {
                 suggestions: payload.suggestions ?? {},
                 usage: payload.usage
@@ -178,6 +219,20 @@ export async function autofillStream(props: {
         } else if (event === "error") {
             throw new Error(payload.message ?? "The AI service reported an error.");
         }
+    }
+
+    // The service closes every run it finished with a `done` record — including
+    // the run that had nothing to fill, which is an empty `done` and not an
+    // empty body. So a body that simply stops is a truncation: a rolled pod, a
+    // proxy timeout, a dropped connection. Reported as one, because the caller's
+    // only other reading of an empty result is "nothing needed filling", and
+    // telling an operator that their empty fields are fields the model would not
+    // improve on is a confident, wrong answer they have no way to question.
+    if (!done) {
+        throw new Error("The connection to the AI service ended before it finished.");
+    }
+    if (discarded > 0 && delivered === 0) {
+        throw new Error("The AI service's response could not be read.");
     }
 
     return result;

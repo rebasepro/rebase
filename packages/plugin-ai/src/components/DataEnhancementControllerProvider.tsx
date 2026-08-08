@@ -7,11 +7,12 @@ import {
     InputProperty,
     ProposedField
 } from "../types/data_enhancement_controller";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, User } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/admin-types";
-import { autofillStream, fetchAiStatus, fetchPromptSuggestions } from "../api";
+import { useAuthController } from "@rebasepro/app";
+import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";
 import { getSimplifiedProperties } from "../utils/properties";
-import { flatMapEntityValues } from "../utils/values";
+import { flatMapEntityValues, omitDisabledValues } from "../utils/values";
 import { useEditorAIController } from "../editor/useEditorAIController";
 import { getValueInPath } from "@rebasepro/utils";
 
@@ -19,9 +20,16 @@ const DataEnhancementControllerContext = React.createContext<DataEnhancementCont
 
 type DataEnhancementControllerProviderProps = {
 
+    /**
+     * Kept in step with `DataEnhancementPluginProps.getConfigForPath`, which is
+     * the signature the host app actually writes against: the plugin hands this
+     * component through as `ComponentType<any>`, so nothing but agreement here
+     * makes the two match.
+     */
     getConfigForPath?: (props: {
         path: string,
-        collection: CollectionConfig
+        collection: CollectionConfig,
+        user: User | null
     }) => boolean;
 
     endpoint?: string;
@@ -84,15 +92,26 @@ export function DataEnhancementControllerProvider({
     const propertiesRef = useRef(properties);
     propertiesRef.current = properties;
 
-    /** The host app's own opt-out. */
+    /**
+     * The host app's own opt-out.
+     *
+     * `user` is part of the documented signature and was never passed, so
+     * `getConfigForPath: ({ user }) => user?.roles?.includes("editor")` was
+     * `Boolean(undefined)` for everyone — an access rule that silently decided
+     * nothing, in whichever direction the host had written it.
+     */
+    const authController = useAuthController();
+    const user: User | null = authController?.user ?? null;
+
     useEffect(() => {
         if (!getConfigForPath) {
             setAllowedHere(true);
             return;
         }
         setAllowedHere(Boolean(getConfigForPath({ path,
-collection })));
-    }, [getConfigForPath, path, collection]);
+collection,
+user })));
+    }, [getConfigForPath, path, collection, user]);
 
     /**
      * The service's own availability.
@@ -101,15 +120,23 @@ collection })));
      * unconfigured provider key or an exhausted daily quota all land here, and
      * all of them mean the same thing to the operator: no Autofill button,
      * rather than a button that fails when clicked.
+     *
+     * Asked through the session cache: this provider is form-scoped, so an
+     * uncached probe is one request to the host per record opened, by an install
+     * that may never use the feature. The probe is shared rather than aborted on
+     * unmount — cancelling it would cancel it for whatever else is waiting on the
+     * same answer — so unmounting only stops this component from reading it.
      */
     useEffect(() => {
         if (!allowedHere) return;
-        const abort = new AbortController();
-        fetchAiStatus({ endpoint,
-signal: abort.signal })
-            .then((status) => setServiceAvailable(status.available))
-            .catch(() => setServiceAvailable(false));
-        return () => abort.abort();
+        let cancelled = false;
+        fetchAiStatusCached({ endpoint })
+            .then((status) => {
+                if (!cancelled) setServiceAvailable(status.available);
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [allowedHere, endpoint]);
 
     const enabled = allowedHere && serviceAvailable;
@@ -131,7 +158,10 @@ fields };
     const generate = useCallback(async (params: GenerateParams<Record<string, unknown>>): Promise<void> => {
 
         const currentProperties = propertiesRef.current;
-        const flatValues = flatMapEntityValues(params.values ?? {}) as Record<string, unknown>;
+        const flatValues = omitDisabledValues(
+            flatMapEntityValues(params.values ?? {}),
+            currentProperties
+        );
 
         setReview({
             status: "generating",
@@ -150,6 +180,12 @@ fields };
                     // Flattened to dotted paths so the keys line up with the
                     // property map: the service is told about `seo.title`, so it
                     // has to be told the value of `seo.title` too, not of `seo`.
+                    // Exactly the same rule in both directions — an array or a
+                    // date is one value under one key here because it is one
+                    // property under one key there. Where they disagreed, the
+                    // service read a filled field as empty and offered to
+                    // rewrite it. Values of properties nobody may edit do not
+                    // travel at all.
                     values: flatValues,
                     properties: currentProperties,
                     propertyKey: params.propertyKey,
