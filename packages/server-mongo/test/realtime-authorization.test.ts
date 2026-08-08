@@ -154,6 +154,10 @@ describe("MongoDB realtime row authorization", () => {
         // object; every fetch reads `config.authContext`, so the subscription
         // re-fetched as nobody — and the initial fetch had already gone out.
         const scoped = await driver.withAuth(alice);
+        // `listenCollection` is optional on the driver interface. If scoping
+        // ever drops it, the subscription this test is about cannot be made at
+        // all — so say that, rather than asserting it away with `!`.
+        if (!scoped.listenCollection) throw new Error("withAuth() returned a driver with no listenCollection");
         const seen: Record<string, unknown>[][] = [];
         const unsubscribe = scoped.listenCollection({
             path: "notes",

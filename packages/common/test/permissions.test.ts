@@ -580,9 +580,15 @@ status: "draft" });
          * the MongoDB driver, all of which pass `onUnknown: "deny"` and were
          * never reached.
          */
+        // Cast through `unknown` on purpose. `makeCollection` builds the
+        // Postgres shape, and tagging it `engine: "mongodb"` selects the Mongo
+        // arm of the union, whose `properties` are a different type. That
+        // mismatch is irrelevant here — `checkOperation` reads `securityRules`
+        // and the engine tag and nothing else — and reusing the shared builder
+        // is what keeps this test comparable with the ones above it.
         function mongoCollection(securityRules: SecurityRule[]): CollectionConfig {
             return { ...makeCollection(securityRules),
-engine: "mongodb" };
+engine: "mongodb" } as unknown as CollectionConfig;
         }
 
         const ownerRule: SecurityRule[] = [
@@ -613,8 +619,13 @@ ownerField: "owner_id" } as SecurityRule
             const auth = makeAuthController({ uid: "u1" });
             const entity = makeEntity({ owner_id: "someone-else" });
             const byEngine = mongoCollection(ownerRule);
+            // `driver` is the deprecated spelling and is not on the Mongo
+            // config type at all — which is precisely why it used to leave
+            // `engine` undefined and pick up Postgres capabilities. Casting
+            // through `unknown` is the only way to express the shape a real
+            // 0.12-era config still has on disk.
             const byDriver = { ...makeCollection(ownerRule),
-driver: "mongodb" } as CollectionConfig;
+driver: "mongodb" } as unknown as CollectionConfig;
             expect(canEditEntity(byEngine, auth, "products", entity))
                 .toBe(canEditEntity(byDriver, auth, "products", entity));
         });
