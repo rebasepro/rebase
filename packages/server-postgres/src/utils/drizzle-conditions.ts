@@ -6,7 +6,7 @@ import {
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany
 } from "@rebasepro/types";
 import {
-    getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations
+    getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
 import { generateForeignKeyName } from "@rebasepro/utils";
 /**
@@ -472,11 +472,9 @@ export class DrizzleConditionBuilder {
             const target = this.resolveFilterTarget(table, field, collectionPath, mode, options);
             if (!target) continue;
 
-            const paramsList = Array.isArray(filterParam) && filterParam.length > 0 && Array.isArray(filterParam[0])
-                ? (filterParam as [WhereFilterOp, any][])
-                : [filterParam as [WhereFilterOp, any]];
-
-            for (const [op, value] of paramsList) {
+            // One tuple or an array of them — the grammar, read the same way by
+            // every compiler. See `toFilterTuples`.
+            for (const [op, value] of toFilterTuples(filterParam)) {
                 const condition = this.compileFilterTarget(target, op, value, field, collectionPath);
                 if (condition) {
                     conditions.push(condition);

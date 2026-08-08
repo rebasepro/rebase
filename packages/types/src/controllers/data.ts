@@ -3,7 +3,77 @@ import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
 
+/**
+ * Operator-blind filter value: whatever the column holds, a list of it, or null.
+ *
+ * @deprecated Superseded by {@link WhereValueFor}, which correlates the value
+ * with the operator. Kept exported because it is public API and downstream code
+ * annotates with it; every `where()` overload in this file uses `WhereValueFor`.
+ */
 export type WhereValue<T> = T | T[] | null;
+
+/**
+ * The element type of an array column, and the column's own type otherwise.
+ *
+ * A generated SDK emits an `array` property as `Array<X>` and a to-many
+ * relation as `Array<TargetRow>`, so this is what `array-contains` compares
+ * against on either.
+ */
+export type ElementOf<T> = T extends readonly (infer E)[] ? E : T;
+
+/**
+ * The `id` of a row-shaped element, and `never` for anything else.
+ *
+ * A to-many relation is emitted as `Array<TargetRow>`, but the filter compilers
+ * compare a relation by **id** — `buildRelationFilterPredicate` in
+ * `@rebasepro/server-postgres` unwraps a relation value down to its id — so
+ * `where("tags", "array-contains", tagId)` is the call that works, and the
+ * element type alone would refuse it.
+ */
+export type IdOf<E> = E extends { id: infer I } ? I : never;
+
+/**
+ * One member of an array column: its element, or — when the element is a row —
+ * that row's id, which is what a relation filter is actually compared against.
+ */
+export type WhereElementOf<T> = ElementOf<T> | IdOf<ElementOf<T>>;
+
+/**
+ * The value a given operator takes on a column of type `T`.
+ *
+ * `WhereValue<T>` was one value type for all sixteen operators, which made
+ * `array-contains` uncallable from a generated SDK — it is the one operator
+ * whose value is an *element* of the column rather than the column's own type,
+ * so on `tags: string[]` it wanted a `string[]` and the documented
+ * `.where("tags", "array-contains", "featured")` was a compile error. The
+ * spelling that did compile, `["featured"]`, builds `@> ARRAY[$1]` with the
+ * whole array bound as the single element and matches nothing: the correct
+ * query rejected, the accepted query silently wrong.
+ *
+ * The branches mirror `buildSingleFilterCondition` in `@rebasepro/server-postgres`:
+ *
+ * - `array-contains` → one element of the column (or a related row's id).
+ * - `in` / `not-in` / `array-contains-any` → a list of elements; a bare element
+ *   is read as the one-element list, and `null` is a null check.
+ * - `like` / `ilike` / `not-like` / `not-ilike` → a SQL pattern. Always a
+ *   string, including on numeric and date columns, which the driver casts.
+ * - `is-null` / `is-not-null` → nothing; the value is ignored everywhere.
+ * - everything else → the column's own type, or `null` for a null comparison.
+ *
+ * Distributes over `Op`, so a caller holding an unnarrowed `WhereFilterOp`
+ * (a dynamic filter UI, say) gets the union of every branch and stays as
+ * permissive as it was.
+ */
+export type WhereValueFor<Op extends WhereFilterOp, T> =
+    Op extends "array-contains"
+        ? WhereElementOf<T>
+        : Op extends "in" | "not-in" | "array-contains-any"
+            ? readonly WhereElementOf<T>[] | WhereElementOf<T> | null
+            : Op extends "like" | "ilike" | "not-like" | "not-ilike"
+                ? string
+                : Op extends "is-null" | "is-not-null"
+                    ? null | undefined
+                    : T | null;
 
 export interface LogicalCondition {
     type: "and" | "or";
@@ -170,7 +240,7 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
  * @group Data
  */
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
@@ -283,7 +353,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     count?(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): QueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
@@ -475,7 +545,7 @@ export type FindAllParams<M extends Record<string, unknown> = Record<string, unk
  * @group Data
  */
 export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
@@ -775,7 +845,7 @@ export interface SDKCollectionClient<
     count?(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): SDKQueryBuilderInterface<M>;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;

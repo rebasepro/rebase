@@ -1,5 +1,5 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValue, WriteOptions } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions } from "@rebasepro/types";
 import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -729,7 +729,7 @@ data: u.data as AnyRow })),
                 return builder.where(
                     columnOrCondition as keyof M & string,
                     operator!,
-                    value as WhereValue<M[keyof M & string]>
+                    value as WhereValueFor<WhereFilterOp, M[keyof M & string]>
                 );
             },
             orderBy: (column, direction) => new SDKQueryBuilder<M>(wrapped).orderBy(column, direction),

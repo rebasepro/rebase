@@ -14,7 +14,7 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue,
+    WhereValueFor,
     type ComputedSortField,
     type SearchMatch
 } from "@rebasepro/types";
@@ -371,7 +371,7 @@ ids });
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);
             }
-            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
         orderBy(column: (keyof M & string) | ComputedSortField, ascending?: "asc" | "desc") {
             return new QueryBuilder<M>(accessor).orderBy(column, ascending);
@@ -467,7 +467,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
 
     constructor(private client: SDKCollectionClient<M>) {}
 
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
@@ -628,7 +628,7 @@ data: u.data as Partial<EntityValues<M>> }))
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);
             }
-            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
         orderBy: (column: keyof M & string, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
         limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
@@ -688,7 +688,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);
             }
-            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
         orderBy: (column: keyof M & string, direction?: "asc" | "desc") => new QueryBuilder<M>(accessor).orderBy(column, direction),
         limit: (count: number) => new QueryBuilder<M>(accessor).limit(count),

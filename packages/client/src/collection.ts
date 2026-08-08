@@ -8,7 +8,7 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue,
+    WhereValueFor,
     WriteOptions,
     type ComputedSortField
 } from "@rebasepro/types";
@@ -381,7 +381,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             if (typeof columnOrCondition === "object") {
                 return builder.where(columnOrCondition);
             }
-            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
+            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
         orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc") {
             return new SDKQueryBuilder<M>(client).orderBy(column, direction);

@@ -482,6 +482,32 @@ direction: "asc" }]);
             .toEqual([{ field: "name", direction: "desc" }]);
     });
 
+    /**
+     * The shorthand is the spelling the SDK emits and the one the OpenAPI
+     * document advertises, and it was the one path that never reached
+     * `toDirection`: it went through `deserializeOrderBy` first, which is the
+     * client end of the codec and collapses anything that is not literally
+     * "desc" to "asc". So `?orderBy=created_at:DESC` answered 200 with the rows
+     * in ascending order — a "newest first" list showing the oldest rows —
+     * and `:sideways` did the same.
+     */
+    it("reads the shorthand direction in any case", () => {
+        expect(parseQueryOptions({ orderBy: "created_at:DESC" }).orderBy)
+            .toEqual([{ field: "created_at", direction: "desc" }]);
+        expect(parseQueryOptions({ orderBy: "created_at:Desc" }).orderBy)
+            .toEqual([{ field: "created_at", direction: "desc" }]);
+        expect(parseQueryOptions({ orderBy: "\"created_at:DESC\"" }).orderBy)
+            .toEqual([{ field: "created_at", direction: "desc" }]);
+        expect(parseQueryOptions({ orderBy: "[\"created_at:DESC\"]" }).orderBy)
+            .toEqual([{ field: "created_at", direction: "desc" }]);
+    });
+
+    it("refuses a shorthand direction that names no order", () => {
+        expectBadRequest({ orderBy: "created_at:sideways" }, "INVALID_ORDER_BY");
+        expectBadRequest({ orderBy: "created_at:descending" }, "INVALID_ORDER_BY");
+        expectBadRequest({ orderBy: "created_at:" }, "INVALID_ORDER_BY");
+    });
+
     it("treats an empty list as no sort at all", () => {
         expect(parseQueryOptions({ orderBy: "[]" }).orderBy).toBeUndefined();
     });

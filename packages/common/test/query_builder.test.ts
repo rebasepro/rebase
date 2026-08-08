@@ -113,7 +113,7 @@ describe("QueryBuilder", () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
-            await qb.where("status", "in" as never, ["active", "pending"]).find();
+            await qb.where("status", "in", ["active", "pending"]).find();
 
             const [op, value] = collection.find.mock.calls[0][0].where.status;
             expect(op).toBe("in");
