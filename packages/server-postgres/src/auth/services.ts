@@ -25,6 +25,7 @@ import {
     RoleData as Role
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
+import { escapeLikePattern } from "../utils/drizzle-conditions";
 
 export type { Role };
 
@@ -368,7 +369,11 @@ export class UserService implements UserRepository {
             conditions.push(sql`${roleId} = ANY(${sql.raw(usersTableName)}.roles)`);
         }
         if (search) {
-            const pattern = `%${search}%`;
+            // `search` is a substring search over the admin user list, not a
+            // pattern the caller writes: the same reasoning as the collection
+            // search path, so it shares that path's helper rather than growing
+            // a second copy that can drift. See `escapeLikePattern`.
+            const pattern = `%${escapeLikePattern(search)}%`;
             conditions.push(sql`(${sql.raw(usersTableName)}.${sql.raw(emailColumn)} ILIKE ${pattern} OR ${sql.raw(usersTableName)}.${sql.raw(displayNameColumn)} ILIKE ${pattern})`);
         }
 
