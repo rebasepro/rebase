@@ -1,7 +1,7 @@
 
 import * as React from "react";
 
-import { Entity, EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
@@ -157,11 +157,10 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         useCache: true
     });
 
-    if (entity) {
-        referencesCache.set(reference.pathWithId, entity);
-    }
-
-    const usedEntity = entity ?? referencesCache.get(reference.pathWithId);
+    // Only what the fetch currently reports — see the note in RelationPreview:
+    // the module-level Map that used to back this kept a deleted row on screen
+    // for the rest of the session, and across a sign-out.
+    const usedEntity = entity;
 
     let body: React.ReactNode;
 
@@ -234,5 +233,3 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         hover={hover}/>;
 
 }
-
-const referencesCache = new Map<string, Entity<any>>();

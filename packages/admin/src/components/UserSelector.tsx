@@ -23,6 +23,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { User } from "@rebasepro/types";
 import { apiBaseOf, useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
 import { EmptyValue } from "../preview";
+import { useResolvedUser } from "../hooks/useResolvedUsers";
 
 interface UserSelectorItem {
     uid: string;
@@ -46,10 +47,19 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
     const [currentSearch, setCurrentSearch] = useState("");
     const offsetRef = useRef(0);
     const userCacheRef = useRef<Map<string, User>>(new Map());
+    // Stamped by every request; only the newest one is allowed to write state.
+    // Typing "alice" issues one request per keystroke and nothing cancels them,
+    // so the response for "al" landing after the response for "alice" replaced
+    // the list — and `offsetRef` — with results for a string the user had
+    // already moved past. Same shape as `useRelationSelector`.
+    const requestIdRef = useRef(0);
+    const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const fetchUsers = useCallback(async (searchStr: string, offset: number, append: boolean) => {
         const apiBase = apiBaseOf(client);
         if (!apiBase) return;
+        const requestId = ++requestIdRef.current;
+        const superseded = () => requestId !== requestIdRef.current;
         setIsLoading(true);
         try {
             const token = await getAuthToken?.();
@@ -68,6 +78,7 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
             });
             if (!response.ok) throw new Error("Failed to fetch users");
             const data = await response.json();
+            if (superseded()) return;
             const rows: Record<string, unknown>[] = data.data ?? data.users ?? [];
             const newItems: UserSelectorItem[] = rows.map((r: Record<string, unknown>) => {
                 const user: User = {
@@ -88,9 +99,10 @@ user };
             setHasMore(newItems.length >= pageSize);
             offsetRef.current = offset + newItems.length;
         } catch {
+            if (superseded()) return;
             setHasMore(false);
         } finally {
-            setIsLoading(false);
+            if (!superseded()) setIsLoading(false);
         }
     }, [client?.baseUrl, client?.apiPath, getAuthToken, pageSize]);
 
@@ -100,10 +112,22 @@ user };
     }, [fetchUsers]);
 
     const search = useCallback((searchStr: string) => {
-        setCurrentSearch(searchStr);
-        offsetRef.current = 0;
-        fetchUsers(searchStr, 0, false);
+        // Debounced like the relation picker's type-ahead: a request per
+        // keystroke is both wasteful and the thing that makes an out-of-order
+        // response likely in the first place.
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = setTimeout(() => {
+            setCurrentSearch(searchStr);
+            offsetRef.current = 0;
+            fetchUsers(searchStr, 0, false);
+        }, searchStr.trim() ? 300 : 0);
     }, [fetchUsers]);
+
+    useEffect(() => {
+        return () => {
+            if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+        };
+    }, []);
 
     const loadMore = useCallback(() => {
         fetchUsers(currentSearch, offsetRef.current, true);
@@ -200,8 +224,18 @@ export const UserSelector = React.forwardRef<
         const selectedUser: User | null = value ? getUser(value) ?? null : null;
 
         // If the user isn't in the cache, try to find in available items
-        const resolvedUser: User | null = selectedUser
+        const listedUser: User | null = selectedUser
             ?? (value ? availableItems.find(i => i.uid === value)?.user ?? null : null);
+
+        // Neither the loaded page nor the cache holds it: ask for that uid
+        // specifically. The list is one page of ten, so any installation with
+        // more users than that rendered an assigned field as *empty* — and an
+        // editor who is shown "no value" sets one, overwriting an assignment
+        // the UI never admitted was there. Lookups are coalesced and cached
+        // per API base by `useResolvedUser`, so a table of these costs one
+        // request.
+        const fetchedUser = useResolvedUser(value && !listedUser ? value : undefined);
+        const resolvedUser: User | null = listedUser ?? fetchedUser;
 
         // IntersectionObserver for infinite scroll
         const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
@@ -342,6 +376,14 @@ export const UserSelector = React.forwardRef<
                                     <div className="flex flex-row items-center gap-1 truncate flex-1 min-w-0 mr-2">
                                         <UserDisplay user={resolvedUser}/>
                                     </div>
+                                ) : value ? (
+                                    // A uid we could not resolve — deleted, or
+                                    // hidden from this viewer. Show it raw: the
+                                    // placeholder here would claim the field is
+                                    // unset, which is the one thing it is not.
+                                    <span className="text-sm truncate text-text-primary dark:text-text-primary-dark">
+                                        {value}
+                                    </span>
                                 ) : (
                                     <span className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                         {resolvedPlaceholder}

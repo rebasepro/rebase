@@ -9,8 +9,10 @@
  *    Fixed by using Set<string> + String() normalization.
  *
  * 2. 🟡 M2M `through` write path
- *    — updateRelationsUsingJoins replaces a row's junction links on save:
- *    delete every existing link, then insert one row per target id.
+ *    — updateRelationsUsingJoins brings a row's junction links in line with
+ *    the ids a save carried: insert the ones that arrived, delete the ones
+ *    that left, leave the rest alone. See junction-diff-write for why it is a
+ *    diff rather than a replacement.
  *
  * 3. 🟢 resolveRelation junction table naming convention
  *    — Verifies that auto-inferred junction table names from sorted slugs
@@ -183,7 +185,12 @@ function createMockDb(resolveResults: () => unknown[]) {
                 return {
                     values: jest.fn((rows: unknown) => {
                         recorder.insertedValues.push(rows);
-                        return chain;
+                        // The junction writer diffs and inserts what arrived
+                        // with ON CONFLICT DO NOTHING, so this has to be the
+                        // builder and not the awaited result.
+                        return Object.assign({}, chain, {
+                            onConflictDoNothing: jest.fn(() => chain)
+                        });
                     })
                 };
             }),
@@ -372,7 +379,11 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
     // exists anywhere in src — so the filter always came back empty and the
     // test could not fail. It now asserts what the save is actually for: the
     // junction rows.
-    it("replaces the junction rows for an owning M2M save", async () => {
+    it("writes the junction rows for an owning M2M save", async () => {
+        // Nothing linked yet, so the whole list is an insert. The write goes
+        // to the junction and not the target table: an insert aimed at `tags`
+        // would create tag rows instead of links, which is the failure mode
+        // this shape guards.
         const { db, recorder } = createMockDb(() => []);
         const service = new RelationService(db, registry);
 
@@ -383,19 +394,19 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
             { tags: [{ id: 1 }, { id: 2 }] }
         );
 
-        // Delete-then-insert, both against the junction and not the target
-        // table: an insert aimed at `tags` would create tag rows instead of
-        // links, which is the failure mode this shape guards.
-        expect(recorder.deleteCalls).toEqual([mockPostsTagsTable]);
         expect(recorder.insertCalls).toEqual([mockPostsTagsTable]);
         expect(recorder.insertedValues).toEqual([[
             { post_id: 1, tag_id: 1 },
             { post_id: 1, tag_id: 2 }
         ]]);
+        // Nothing was linked, so nothing is deleted. The writer diffs; it no
+        // longer clears the parent's links before writing.
+        expect(recorder.deleteCalls).toEqual([]);
     });
 
     it("clears the junction rows without reinserting when the relation is emptied", async () => {
-        const { db, recorder } = createMockDb(() => []);
+        // Two links exist and the save asks for none.
+        const { db, recorder } = createMockDb(() => [{ targetId: 1 }, { targetId: 2 }]);
         const service = new RelationService(db, registry);
 
         await service.updateRelationsUsingJoins(

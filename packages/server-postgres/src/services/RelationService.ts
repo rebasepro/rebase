@@ -1006,6 +1006,87 @@ export class RelationService {
     }
 
     /**
+     * Bring one row's junction links in line with the ids a save carried,
+     * by diffing against what is stored rather than replacing the lot.
+     *
+     * The old shape was `DELETE every link for this parent` followed by
+     * `INSERT what the client sent`, which makes a save of the parent a full
+     * replacement of the membership set from a list the browser assembled out
+     * of a read it did earlier. Three things follow from that, and the diff
+     * closes all three:
+     *
+     *  - **Lost update.** Two editors with post 7 open: A adds tag X and saves;
+     *    B saves any field and the whole set is rewritten from B's older list,
+     *    dropping X with nothing to show for it. A diff only names the ids that
+     *    actually changed, so edits to disjoint tags no longer collide.
+     *  - **Partial read, partial delete.** The read that fills the form runs
+     *    under RLS, so a user who may edit the parent but cannot *see* some of
+     *    the linked rows gets a shorter list — and writing it back deleted the
+     *    links they were never shown. The DELETE now names ids instead of
+     *    "everything for this parent", and the select that produces them runs
+     *    in this same transaction under the same policies, so a link the caller
+     *    cannot read is in neither list and survives the save.
+     *  - **Junction payload columns.** A junction carrying its own columns
+     *    (`position`, `role`, `created_at`) lost them on every save, because
+     *    every row was re-inserted with only the two keys. Untouched links are
+     *    now left alone.
+     *
+     * The insert is `ON CONFLICT DO NOTHING` so that two sessions adding the
+     * same link concurrently is a no-op rather than a unique violation.
+     */
+    private async syncJunctionLinks(
+        tx: DrizzleClient,
+        junctionTable: PgTable,
+        sourceJunctionColumn: AnyPgColumn,
+        targetJunctionColumn: AnyPgColumn,
+        parsedParentId: unknown,
+        parsedTargetIds: unknown[]
+    ) {
+        const existingRows = await tx
+            .select({ targetId: targetJunctionColumn })
+            .from(junctionTable)
+            .where(eq(sourceJunctionColumn, parsedParentId));
+
+        // Keyed by `String(...)` because a junction key can come back from the
+        // driver as a string where the parsed value is a number, and a diff
+        // that misses that would delete and re-insert every link.
+        const existingById = new Map<string, unknown>();
+        for (const row of existingRows as Array<{ targetId: unknown }>) {
+            if (row.targetId === null || row.targetId === undefined) continue;
+            existingById.set(String(row.targetId), row.targetId);
+        }
+
+        const wantedById = new Map<string, unknown>();
+        for (const targetId of parsedTargetIds) {
+            if (targetId === null || targetId === undefined) continue;
+            wantedById.set(String(targetId), targetId);
+        }
+
+        const removed = [...existingById.entries()]
+            .filter(([key]) => !wantedById.has(key))
+            .map(([, value]) => value);
+        const added = [...wantedById.entries()]
+            .filter(([key]) => !existingById.has(key))
+            .map(([, value]) => value);
+
+        if (removed.length > 0) {
+            await tx.delete(junctionTable).where(and(
+                eq(sourceJunctionColumn, parsedParentId),
+                inArray(targetJunctionColumn, removed)
+            ));
+        }
+
+        if (added.length > 0) {
+            await tx.insert(junctionTable)
+                .values(added.map(targetId => ({
+                    [sourceJunctionColumn.name]: parsedParentId,
+                    [targetJunctionColumn.name]: targetId
+                })))
+                .onConflictDoNothing();
+        }
+    }
+
+    /**
      * Update many-to-many and junction relations
      */
     async updateRelationsUsingJoins<M extends Record<string, unknown>>(
@@ -1073,23 +1154,15 @@ export class RelationService {
                 const parsedParentIdObj = parseIdValues(id, parentPks);
                 const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
 
-                // Delete existing relations for this row
-                await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedParentId));
-
+                let parsedTargetIds: unknown[] = [];
                 if (targetEntityIds.length > 0) {
                     const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-
-                    const newLinks = parsedTargetIds.map(targetId => ({
-                        [sourceJunctionColumn.name]: parsedParentId,
-                        [targetJunctionColumn.name]: targetId
-                    }));
-
-                    if (newLinks.length > 0) {
-                        await tx.insert(junctionTable).values(newLinks);
-                    }
+                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                 }
+
+                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
+                    parsedParentId, parsedTargetIds);
             } else if (relation.kind === "manyToMany") {
                 // Handle many-to-many relations with junction table using 'through' property
                 const junctionTable = this.registry.getTable(relation.through.table);
@@ -1111,23 +1184,15 @@ export class RelationService {
                 const parsedParentIdObj = parseIdValues(id, parentPks);
                 const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
 
-                // Delete existing relations for this row
-                await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedParentId));
-
+                let parsedTargetIds: unknown[] = [];
                 if (targetEntityIds.length > 0) {
                     const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-
-                    const newLinks = parsedTargetIds.map(targetId => ({
-                        [sourceJunctionColumn.name]: parsedParentId,
-                        [targetJunctionColumn.name]: targetId
-                    }));
-
-                    if (newLinks.length > 0) {
-                        await tx.insert(junctionTable).values(newLinks);
-                    }
+                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                 }
+
+                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
+                    parsedParentId, parsedTargetIds);
             } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
@@ -1359,41 +1424,25 @@ export class RelationService {
                 const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
                 const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
 
-                // Clear existing entries for this source row
-                await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedSourceId));
-
-                // Add new entries if newValue is provided
+                // The membership this write asks for, as parsed keys. A single
+                // value is the one-to-one case and reads as a set of one.
+                let parsedTargetIds: unknown[] = [];
                 if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                     const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
                     // This path already read both shapes; the other two did not.
                     // Same helper now, so the three cannot drift again.
                     const targetEntityIds = relationTargetIds(newValue, relation.relationName, sourceCollection.slug);
-                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-
-                    const newLinks = parsedTargetIds.map(targetId => ({
-                        [sourceJunctionColumn!.name]: parsedSourceId,
-                        [targetJunctionColumn!.name]: targetId
-                    }));
-
-                    if (newLinks.length > 0) {
-                        await tx.insert(junctionTable).values(newLinks);
-                    }
+                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                 } else if (newValue && !Array.isArray(newValue)) {
-                    // Single value for one-to-one
                     const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
                     const targetId = typeof newValue === "object" && newValue !== null ? (newValue as Record<string, unknown>).id as string | number : newValue as string | number;
-                    const parsedTargetIdObj = parseIdValues(targetId, targetPks);
-                    const parsedTargetId = parsedTargetIdObj[targetIdInfo.fieldName];
-
-                    const newLink = {
-                        [sourceJunctionColumn.name]: parsedSourceId,
-                        [targetJunctionColumn.name]: parsedTargetId
-                    };
-
-                    await tx.insert(junctionTable).values(newLink);
+                    parsedTargetIds = [parseIdValues(targetId, targetPks)[targetIdInfo.fieldName]];
                 }
+
+                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
+                    parsedSourceId, parsedTargetIds);
             }
         } catch (error) {
             logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
@@ -1433,25 +1482,18 @@ export class RelationService {
             const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
             const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
 
-            // Clear existing entries for this source row
-            await tx.delete(junctionTable).where(eq(sourceJunctionColumn, parsedSourceId));
-
-            // Add new entries if newValue is provided
-            if (newValue && Array.isArray(newValue) && newValue.length > 0) {
+            const targetEntityIds = Array.isArray(newValue)
+                ? relationTargetIds(newValue, relation.relationName, sourceCollection.slug)
+                : [];
+            let parsedTargetIds: unknown[] = [];
+            if (targetEntityIds.length > 0) {
                 const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                 const targetIdInfo = targetPks[0];
-                const targetEntityIds = relationTargetIds(newValue, relation.relationName, sourceCollection.slug);
-                const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-
-                const newLinks = parsedTargetIds.map(targetId => ({
-                    [sourceJunctionColumn.name]: parsedSourceId,
-                    [targetJunctionColumn.name]: targetId
-                }));
-
-                if (newLinks.length > 0) {
-                    await tx.insert(junctionTable).values(newLinks);
-                }
+                parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
             }
+
+            await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
+                parsedSourceId, parsedTargetIds);
         } catch (error) {
             logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });
             throw error;

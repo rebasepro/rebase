@@ -129,6 +129,11 @@ export const RelationSelector = React.forwardRef<
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
         const isPopoverOpenRef = useRef(false);
+        // The list is only worth fetching once the picker has been opened. A
+        // table cell mounts one of these per row, and the selected value is
+        // resolved by its own effect below, not from the list. Latches on the
+        // first open so a closed popover keeps its results.
+        const [listRequested, setListRequested] = useState(false);
         const [selectedItems, setSelectedItems] = useState<RelationItem[]>([]);
         const [isLoadingSelectedItems, setIsLoadingSelectedItems] = useState(false);
         const [searchString, setSearchString] = useState<string>("");
@@ -151,7 +156,8 @@ export const RelationSelector = React.forwardRef<
             path: getCollectionDataPath(collection),
             collection,
             fixedFilter,
-            pageSize
+            pageSize,
+            enabled: listRequested
         });
 
         const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -418,6 +424,7 @@ relation } as RelationItem;
             if (next) {
                 // Capture current selection so we can pin those items to the top of the list
                 pinnedIdsRef.current = new Set(selectedItems.map(i => String(i.id)));
+                setListRequested(true);
                 setIsPopoverOpen(true);
                 isPopoverOpenRef.current = true;
             }
@@ -484,6 +491,10 @@ relation } as RelationItem;
                             disabled={disabled}
                             onClick={() => {
                                 if (disabled) return;
+                                // Unconditional: the toggle can only close a
+                                // popover that was opened, which requested the
+                                // list already.
+                                setListRequested(true);
                                 setIsPopoverOpen(o => {
                                     const next = !o;
                                     isPopoverOpenRef.current = next;

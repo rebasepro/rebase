@@ -233,6 +233,9 @@ relationName: "user" }
             innerJoin: jest.fn().mockReturnThis(),
             insert: jest.fn().mockReturnThis(),
             values: jest.fn().mockReturnThis(),
+            // The junction writer diffs and inserts what arrived with
+            // ON CONFLICT DO NOTHING — see junction-diff-write.
+            onConflictDoNothing: jest.fn().mockReturnThis(),
             returning: jest.fn().mockResolvedValue([]),
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
@@ -882,19 +885,18 @@ total: 500 }]);
                 await dataService.save("orders", orderWithProducts as never, 1);
 
                 expect(db.set).toHaveBeenCalledWith({ total: 500 });
-                expect(tableNames(db.delete as jest.Mock)).toEqual(["order_items"]);
+                expect(tableNames(db.insert as jest.Mock)).toEqual(["order_items"]);
                 expect(db.values).toHaveBeenCalledWith([
                     { order_id: "1",
 product_id: "1" },
                     { order_id: "1",
 product_id: "2" }
                 ]);
-                // Delete first, insert second, both inside the save's
-                // transaction: inserting before clearing would leave the
-                // removed products linked, which is the whole difference
-                // between "replace the set" and "add to it".
-                expect((db.delete as jest.Mock).mock.invocationCallOrder[0])
-                    .toBeLessThan((db.insert as jest.Mock).mock.invocationCallOrder[0]);
+                // Nothing is linked in this mock, so both products are new and
+                // there is nothing to remove: the writer diffs against the
+                // stored set rather than clearing it first. What a save does
+                // to an existing set is pinned in junction-diff-write.
+                expect(tableNames(db.delete as jest.Mock)).toEqual([]);
             });
         });
 
@@ -970,7 +972,9 @@ title: "Tagged Post" }]);
 
                 // Should manage junction table via joinPath
                 expect(db.transaction).toHaveBeenCalled();
-                expect(db.delete).toHaveBeenCalled(); // Should delete old junction entries
+                // The links this save asks for are all new, so the junction is
+                // written and nothing is removed — see junction-diff-write.
+                expect(db.insert).toHaveBeenCalled();
             });
         });
 
@@ -1075,7 +1079,7 @@ name: "Popular Product" }]);
 
                 // Should manage junction table from inverse side
                 expect(db.transaction).toHaveBeenCalled();
-                expect(db.delete).toHaveBeenCalled(); // Should delete old junction entries
+                expect(db.insert).toHaveBeenCalled();
             });
         });
 
@@ -1151,7 +1155,7 @@ name: "Popular Tag" }]);
 
                 // Should manage junction table via inverse joinPath
                 expect(db.transaction).toHaveBeenCalled();
-                expect(db.delete).toHaveBeenCalled(); // Should delete old junction entries
+                expect(db.insert).toHaveBeenCalled();
             });
         });
     });

@@ -41,6 +41,17 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
      * Property name to use as the secondary display field
      */
     descriptionProperty?: keyof M;
+    /**
+     * Whether the list should be fetched at all. Defaults to `true`.
+     *
+     * A picker that is mounted is not a picker that is open, and the two used
+     * to be the same thing here: the fetch ran on mount, so a collection table
+     * with a relation column paid for one query — or one realtime subscription
+     * — per rendered row before anyone clicked a cell. Pass `false` until the
+     * list is actually needed and nothing is requested; flipping it to `true`
+     * fetches once, and it never goes back.
+     */
+    enabled?: boolean;
 }
 
 export interface RelationSelectorController {
@@ -66,7 +77,8 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         pageSize = DEFAULT_PAGE_SIZE,
         getLabelFromEntity,
         getDescriptionFromEntity,
-        descriptionProperty
+        descriptionProperty,
+        enabled = true
     }: UseRelationSelectorProps<M>
 ): RelationSelectorController {
 
@@ -82,6 +94,10 @@ export function useRelationSelector<M extends Record<string, any> = any>(
 
     const unsubscribeRef = useRef<(() => void) | null>(null);
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    // Whether a fetch has ever completed. Between `enabled` flipping and the
+    // effect running there is one paint with no items and no request in
+    // flight; without this the list shows "no results" for that frame.
+    const hasLoadedRef = useRef(false);
 
     const setLoading = useCallback((loading: boolean) => {
         isLoadingRef.current = loading;
@@ -149,6 +165,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
 
         const onEntitiesUpdate = (res: { data: Entity<M>[], meta: { hasMore: boolean } }) => {
             const newItems = res.data.map((e) => entityToRelationItem(e));
+            hasLoadedRef.current = true;
             setItems(newItems);
             setHasMore(res.meta.hasMore);
             setLoading(false);
@@ -156,6 +173,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
 
         const onErrorUpdate = (fetchError: Error) => {
             console.error("useRelationSelector: Error fetching data:", fetchError);
+            hasLoadedRef.current = true;
             setError(fetchError);
             setLoading(false);
         };
@@ -231,12 +249,13 @@ meta: res.meta });
 
     // Load initial data and update upon changes
     useEffect(() => {
+        if (!enabled) return;
         fetchData();
 
         return () => {
             cleanupSubscription();
         };
-    }, [fetchData]);
+    }, [fetchData, enabled, cleanupSubscription]);
 
     useEffect(() => {
         return () => {
@@ -248,11 +267,14 @@ meta: res.meta });
 
     return useMemo(() => ({
         items,
-        isLoading,
+        // Enabled but not answered yet still counts as loading, so the frame
+        // between opening the picker and the request starting shows a spinner
+        // rather than "no results".
+        isLoading: isLoading || (enabled && !hasLoadedRef.current),
         error,
         search,
         loadMore,
         hasMore,
         entityToRelationItem
-    }), [items, isLoading, error, search, loadMore, hasMore, entityToRelationItem]);
+    }), [items, isLoading, error, search, loadMore, hasMore, entityToRelationItem, enabled]);
 }

@@ -63,14 +63,24 @@ describe("relation writes accept rows or bare keys", () => {
         ]
     } as unknown as CollectionConfig;
 
-    /** A tx that records what was inserted into the junction. */
-    const recordingTx = () => {
+    /**
+     * A tx that records what was inserted into the junction. `existing` is what
+     * the writer's own "what is linked now?" select answers with — it diffs
+     * against that rather than replacing the set. See junction-diff-write.
+     */
+    const recordingTx = (existing: (string | number)[] = []) => {
         const inserted: Record<string, unknown>[][] = [];
         const tx = {
+            select: jest.fn(() => ({
+                from: jest.fn(() => ({
+                    where: jest.fn(async () => existing.map(id => ({ targetId: id })))
+                }))
+            })),
             delete: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
             insert: jest.fn(() => ({
-                values: jest.fn(async (rows: Record<string, unknown>[]) => {
+                values: jest.fn((rows: Record<string, unknown>[]) => {
                     inserted.push(rows);
+                    return { onConflictDoNothing: jest.fn(async () => undefined) };
                 })
             }))
         };
@@ -126,7 +136,7 @@ describe("relation writes accept rows or bare keys", () => {
     });
 
     it("clears the membership when given an empty list", async () => {
-        const { tx, inserted } = recordingTx();
+        const { tx, inserted } = recordingTx(["t-1", "t-2"]);
         const service = new RelationService({} as never, registry);
         await service.updateRelationsUsingJoins(tx as never, postsCollection, "p1", { tags: [] } as never);
 
