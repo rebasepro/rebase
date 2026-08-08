@@ -11,9 +11,14 @@ import { generateOpenApiSpec } from "../src/api/openapi-generator";
  * wrongly is a request a generated client refuses to make.
  *
  * Both were wrong. `limit` was declared `default: 20, maximum: 100` while the
- * REST layer defaults to `DEFAULT_LIST_LIMIT` (50) and clamps at
+ * REST layer defaults to `DEFAULT_LIST_LIMIT` (50) and refuses anything above
  * `MAX_LIST_LIMIT` (1000) — off by 10× at the ceiling. And the subcollection
  * endpoint documented five parameters while honouring nine.
+ *
+ * The ceiling being a *refusal* rather than a clamp is why `maximum` has to be
+ * right: a generated client that trims to the documented maximum still gets a
+ * 200, but one built against the wrong number now gets a 400 instead of a
+ * quietly shortened page.
  */
 const tags = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",

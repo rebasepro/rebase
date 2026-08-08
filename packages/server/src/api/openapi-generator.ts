@@ -47,8 +47,8 @@ export function generateOpenApiSpec(
      * undocumented on both.
      */
     const listQueryParameters = () => [
-        { name: "limit", in: "query", schema: { type: "integer", default: defaultLimit, maximum: maxLimit },
-            description: "Maximum number of records to return" },
+        { name: "limit", in: "query", schema: { type: "integer", default: defaultLimit, minimum: 1, maximum: maxLimit },
+            description: `Maximum number of records to return. Must be a whole number between 1 and ${maxLimit}; a larger one is rejected with 400 INVALID_LIMIT rather than trimmed, so a short page always means a short collection. Page past the ceiling with \`offset\`.` },
         { name: "offset", in: "query", schema: { type: "integer", default: 0 },
             description: "Number of records to skip" },
         { name: "page", in: "query", schema: { type: "integer", minimum: 1 },

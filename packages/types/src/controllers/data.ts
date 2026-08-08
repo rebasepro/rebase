@@ -119,9 +119,14 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
     /**
      * Maximum number of items to return.
      *
-     * Defaults to {@link DEFAULT_LIST_LIMIT}, and is clamped to
-     * {@link MAX_LIST_LIMIT}. Both bounds are applied by the backend, so a
-     * read is never unbounded whether or not a limit was asked for.
+     * Omit it and the backend applies {@link DEFAULT_LIST_LIMIT}, so a read is
+     * never unbounded. Provide it and it must be a whole number between 1 and
+     * {@link MAX_LIST_LIMIT}: the backend **rejects** anything else with a 400
+     * rather than trimming it to fit, because a page quietly smaller than the
+     * one you asked for is indistinguishable from having reached the end of the
+     * collection. To read past the ceiling, page with `offset` — or let
+     * {@link SDKCollectionClient.iterate} / {@link SDKCollectionClient.findAll}
+     * do it for you.
      */
     limit?: number;
     /**

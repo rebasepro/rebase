@@ -1,6 +1,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EnumValueConfig } from "@rebasepro/types";
+import { Entity, EnumValueConfig, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
@@ -376,13 +376,19 @@ parentEntityIds,
         setBackfillLoading(true);
 
         try {
-            // Fetch ALL documents from collection (not relying on loaded
-            // entities). No `orderBy`: with no usable order key there is
-            // nothing to order by, and this is the same query the columns
-            // themselves run, so the keys are handed out in the order the
-            // board is showing — which is what the dialog promises.
+            // Fetch the documents to key (not relying on loaded entities). No
+            // `orderBy`: with no usable order key there is nothing to order by,
+            // and this is the same query the columns themselves run, so the
+            // keys are handed out in the order the board is showing — which is
+            // what the dialog promises.
+            //
+            // `MAX_LIST_LIMIT`, not a made-up 10 000: that is the most a single
+            // read serves, and asking for more is now refused outright rather
+            // than quietly answered with the first thousand. A board past the
+            // ceiling still gets only its first page backfilled — the same rows
+            // as before this became explicit — and wants a paged walk.
             const allDocsRes = await dataClient.collection(fullPath).find({
-                limit: 10000 // Fetch all
+                limit: MAX_LIST_LIMIT
             });
             const allDocs = allDocsRes.data as Entity<M>[];
 

@@ -1,3 +1,4 @@
+import { RebaseApiError } from "../errors";
 import type { CollectionRegistryController } from "./collection_registry";
 import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
@@ -52,12 +53,23 @@ export interface VectorSearchParams {
 // server-side callers build fetch options directly and are intentionally NOT
 // bounded here (migrations, admin exports, and CDC refetches may need the full
 // set).
+//
+// A limit the platform will not serve is REFUSED, not quietly shrunk. Clamping
+// answers a request for 100 000 rows with 1 000 of them, and a short page is
+// indistinguishable from "that is all the data there is" — which is how a CSV
+// export shipped 50 rows of a 100 000-row collection under a filename that read
+// like the whole thing. `meta.total`/`meta.hasMore` make truncation *detectable*
+// on the REST list response, but only for a caller who thinks to compare what it
+// asked for against what it got, and the WebSocket `collection_update` frame
+// carries neither — so signalling cannot be the answer on every surface and
+// rejecting is. An ABSENT limit still defaults: naming no window is not the same
+// as asking for one that cannot be served.
 
 /** Rows returned for a plain / text-search list read when the client sends no `limit`. */
 export const DEFAULT_LIST_LIMIT = 50;
 /** Rows returned for a vector-search list read when the client sends no `limit`. */
 export const DEFAULT_VECTOR_LIST_LIMIT = 10;
-/** Hard ceiling clamped onto any client-supplied `limit`, on every surface. */
+/** Largest `limit` a client may ask for on any surface. Above it, the read is refused. */
 export const MAX_LIST_LIMIT = 1000;
 
 /** Overridable bounds for {@link resolveClientListLimit}. */
@@ -66,20 +78,46 @@ export interface ListLimitBounds {
     defaultLimit?: number;
     /** Default page size for vector-search reads. */
     vectorDefaultLimit?: number;
-    /** Upper bound clamped onto any client-supplied limit. */
+    /** Largest limit a client may ask for. A larger one is rejected, not clamped. */
     maxLimit?: number;
+}
+
+/**
+ * Thrown by {@link resolveClientListLimit} for a `limit` the platform will not
+ * serve. Carries an HTTP status so an ingress that speaks HTTP can forward it
+ * verbatim, and `maxLimit` so one can be built without re-deriving the ceiling.
+ *
+ * @group Errors
+ */
+export class ListLimitError extends RebaseApiError {
+    /** The ceiling that was exceeded — what the caller should page by instead. */
+    readonly maxLimit: number;
+
+    constructor(message: string, maxLimit: number) {
+        super(message, { status: 400, code: "INVALID_LIMIT" });
+        this.name = "ListLimitError";
+        this.maxLimit = maxLimit;
+        // Keeps `instanceof` working when this is compiled down for an older
+        // target, where extending a builtin otherwise loses the prototype.
+        Object.setPrototypeOf(this, ListLimitError.prototype);
+    }
 }
 
 /**
  * Resolve a client-supplied list `limit` into a safe, always-defined value.
  *
- * - A provided limit is coerced to an integer and clamped to `[1, maxLimit]`,
- *   so `0`, negatives, and absurd values can never bypass the cap.
- * - An absent / blank / non-numeric limit falls back to the mode default:
+ * - An absent / blank limit falls back to the mode default:
  *   `vectorDefaultLimit` for a vector search, otherwise `defaultLimit`.
+ * - A limit that is present must be an integer in `[1, maxLimit]`. Anything
+ *   else — `0`, a negative, `1.5`, `abc`, `100000000` — throws
+ *   {@link ListLimitError} rather than being coerced into range, because every
+ *   coercion answers a question the caller did not ask with a page it cannot
+ *   tell apart from the whole collection.
  *
  * The return is never `undefined` — no ingress that routes its client limit
  * through this can produce an unbounded read.
+ *
+ * @throws {ListLimitError} when a present `limit` is not an integer in range.
  */
 export function resolveClientListLimit(
     rawLimit: number | string | null | undefined,
@@ -87,10 +125,24 @@ export function resolveClientListLimit(
 ): number {
     const maxLimit = opts.maxLimit ?? MAX_LIST_LIMIT;
     if (rawLimit != null && String(rawLimit).trim() !== "") {
-        const parsed = typeof rawLimit === "number" ? rawLimit : parseInt(String(rawLimit), 10);
-        if (Number.isFinite(parsed)) {
-            return Math.min(Math.max(1, Math.floor(parsed)), maxLimit);
+        // `Number`, not `parseInt`: `parseInt("50rows")` is 50, which silently
+        // reads a typo as a window the caller never wrote.
+        const parsed = typeof rawLimit === "number" ? rawLimit : Number(String(rawLimit).trim());
+        if (!Number.isInteger(parsed) || parsed < 1) {
+            throw new ListLimitError(
+                `Invalid \`limit\`: ${String(rawLimit)}. Expected a whole number between 1 and ${maxLimit}.`,
+                maxLimit
+            );
         }
+        if (parsed > maxLimit) {
+            throw new ListLimitError(
+                `\`limit\` ${parsed} is above the maximum of ${maxLimit}. Ask for at most ${maxLimit} rows ` +
+                "per read and page through the rest with `offset` — answering with a smaller page would be " +
+                "indistinguishable from there being no more rows.",
+                maxLimit
+            );
+        }
+        return parsed;
     }
     return opts.vectorSearch
         ? (opts.vectorDefaultLimit ?? DEFAULT_VECTOR_LIST_LIMIT)

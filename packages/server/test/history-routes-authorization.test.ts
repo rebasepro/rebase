@@ -233,18 +233,43 @@ describe("POST /:slug/:id/history/:historyId/revert — RLS", () => {
     });
 });
 
-describe("GET /:slug/:id/history — pagination meta", () => {
-    it("reports the limit and offset that were applied, not the ones asked for", async () => {
-        // `meta` is what a client paginates on. Echoing the requested limit
-        // while serving the clamped one makes it advance past rows it never
-        // received.
+describe("GET /:slug/:id/history — pagination window", () => {
+    it("refuses a limit above this route's ceiling instead of serving a shorter page", async () => {
+        // It used to clamp 1000 → 100 and report 100 in `meta`, which is
+        // self-consistent and still wrong: the caller asked for a thousand
+        // entries, got a hundred, and nothing distinguished that from a row
+        // with only a hundred revisions. Refuse, and name the ceiling.
         const { app, fetchHistory } = mount({ visibleToCaller: ["post-bob"] });
 
-        const res = await listHistory(app, "/api/data/posts/post-bob/history?limit=1000&offset=-5");
+        const res = await listHistory(app, "/api/data/posts/post-bob/history?limit=1000");
+
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("INVALID_LIMIT");
+        expect(body.error.message).toContain("100");
+        // Refused before the read: nothing was fetched for a request that failed.
+        expect(fetchHistory).not.toHaveBeenCalled();
+    });
+
+    it("reports the offset that was applied, not the one asked for", async () => {
+        // `meta` is what a client paginates on. Echoing a requested offset the
+        // route did not honour makes it advance past rows it never received.
+        const { app, fetchHistory } = mount({ visibleToCaller: ["post-bob"] });
+
+        const res = await listHistory(app, "/api/data/posts/post-bob/history?limit=100&offset=-5");
 
         const meta = (await res.json() as { meta: { limit: number; offset: number } }).meta;
         expect(meta.limit).toBe(100);
         expect(meta.offset).toBe(0);
         expect(fetchHistory).toHaveBeenCalledWith("posts", "post-bob", { limit: 100, offset: 0 });
+    });
+
+    it("still defaults an absent limit rather than reading every revision", async () => {
+        const { app, fetchHistory } = mount({ visibleToCaller: ["post-bob"] });
+
+        const res = await listHistory(app, "/api/data/posts/post-bob/history");
+
+        expect(res.status).toBe(200);
+        expect(fetchHistory).toHaveBeenCalledWith("posts", "post-bob", { limit: 20, offset: 0 });
     });
 });
