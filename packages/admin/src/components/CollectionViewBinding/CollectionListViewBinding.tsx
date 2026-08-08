@@ -834,7 +834,7 @@ customEntityActions });
                             />
                         </div>
                     );
-                }, [resolvedCollection, selectionEnabled, combineSelection, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
+                }, [resolvedCollection, selectionEnabled, combineSelection, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick, searchString])}
             />
         </div>
     );

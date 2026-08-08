@@ -153,7 +153,7 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
                     selectionEnabled={selectionEnabled}
                     size={size}
                 />
-            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedEntityCard])}
+            ), [collection, selectionEnabled, size, handleRowSelectionChange, ResolvedEntityCard, tableController.searchString])}
         />
     );
 }
