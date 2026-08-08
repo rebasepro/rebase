@@ -218,7 +218,14 @@ export function singularize(word: string): string {
  * e.g. "company_token" -> "companyTokenCollection"
  */
 export function toCollectionVarName(tableName: string): string {
-    return tableName.replace(/_([a-z])/g, (_g, letter: string) => letter.toUpperCase()) + "Collection";
+    const camel = tableName.replace(/_([a-z])/g, (_g, letter: string) => letter.toUpperCase()) + "Collection";
+    // Only reshapes names that are not identifiers already, so every table that
+    // generated a working file keeps the exact variable name it had. A table
+    // called `2024 archive` used to emit `const 2024 archiveCollection`, which
+    // is three syntax errors rather than a declaration.
+    if (JS_IDENTIFIER.test(camel)) return camel;
+    const sanitized = camel.replace(/[^A-Za-z0-9_$]/g, "_");
+    return /^[0-9]/.test(sanitized) ? `_${sanitized}` : sanitized;
 }
 
 export function getIconForTable(tableName: string): string {
@@ -616,6 +623,31 @@ function quote(value: string): string {
     return JSON.stringify(value);
 }
 
+const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * An object key for the generated file: verbatim when the name is a JavaScript
+ * identifier, quoted otherwise.
+ *
+ * Postgres constrains an identifier only by quoting, so `order`, `full name`
+ * and `2fa_enabled` are all ordinary column names — and all three produced a
+ * file that did not parse when written as a bare key.
+ */
+function propKey(name: string): string {
+    return JS_IDENTIFIER.test(name) ? name : quote(name);
+}
+
+/**
+ * Text safe to put after `//`.
+ *
+ * A table comment or a classification reason is free text out of the database.
+ * A newline in one ended the comment and let the rest of the value continue as
+ * code.
+ */
+function commentText(value: string): string {
+    return value.replace(/\s*[\r\n]+\s*/g, " ");
+}
+
 /**
  * The first candidate key not already used, or a numbered fallback.
  *
@@ -688,7 +720,7 @@ export function generateCollectionFile(
      */
     const importCollection = (otherTable: string): string => {
         const varName = toCollectionVarName(otherTable);
-        if (otherTable !== tableName) imports.add(`import ${varName} from "./${otherTable}";`);
+        if (otherTable !== tableName) imports.add(`import ${varName} from ${quote(`./${otherTable}`)};`);
         return varName;
     };
 
@@ -737,7 +769,7 @@ export function generateCollectionFile(
         // Enum values — generate real enum from the PG enum
         if (isEnumColumn && colEnumValues) {
             const enumEntries = colEnumValues
-                .map((v) => `{ id: "${v}", label: "${humanize(v)}" }`)
+                .map((v) => `{ id: ${quote(v)}, label: ${quote(humanize(v))} }`)
                 .join(", ");
             extra += `\n            enum: [${enumEntries}],`;
         } else if (columnChecks?.enumValues && !inferenceExtra.includes("enum:") && propType === "string") {
@@ -776,9 +808,9 @@ export function generateCollectionFile(
                 else if (innerType === "boolean") colType = "boolean[]";
             }
             if (colType) {
-                extra += `\n            columnType: "${colType}",`;
+                extra += `\n            columnType: ${quote(colType)},`;
             }
-            extra += `\n            of: { name: "${humanize(col.column_name)} Item", type: "${innerType}" },`;
+            extra += `\n            of: { name: ${quote(`${humanize(col.column_name)} Item`)}, type: ${quote(innerType)} },`;
         } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
             extra += "\n            keyValue: true,";
         }
@@ -789,7 +821,7 @@ export function generateCollectionFile(
             const isMedia = colNameLower.includes("image") || colNameLower.includes("avatar") || colNameLower.includes("photo") || colNameLower.includes("logo") || colNameLower.includes("cover");
 
             if (isMedia) {
-                extra += `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
+                extra += `\n            storage: {\n                storagePath: ${quote(`${tableName}/${col.column_name}`)}\n            },`;
             } else if (isUrl) {
                 extra += "\n            url: true,";
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
@@ -872,7 +904,7 @@ export function generateCollectionFile(
         // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
         if (meta.pks.includes(col.column_name)) {
             if (isCompositePk) {
-                extra += `\n            // Part of composite primary key (${meta.pks.join(", ")})`;
+                extra += `\n            // Part of composite primary key (${commentText(meta.pks.join(", "))})`;
             } else if (finalPropType === "number" && !inferenceExtra.includes("isId:")) {
                 extra += "\n            isId: \"increment\",";
             } else if (col.data_type.toLowerCase() === "uuid" && !inferenceExtra.includes("isId:")) {
@@ -913,10 +945,10 @@ export function generateCollectionFile(
         });
 
         propertyBlocks.set(col.column_name, `
-        ${col.column_name}: {
-            name: "${humanName}",
-            columnName: "${col.column_name}",
-            type: "${finalPropType}",${extra}
+        ${propKey(col.column_name)}: {
+            name: ${quote(humanName)},
+            columnName: ${quote(col.column_name)},
+            type: ${quote(finalPropType)},${extra}
         },`);
     }
 
@@ -962,14 +994,14 @@ export function generateCollectionFile(
             const relHumanName = humanize(relName);
 
             propertyBlocks.set(relName, `
-        ${relName}: {
-            name: "${relHumanName}",
+        ${propKey(relName)}: {
+            name: ${quote(relHumanName)},
             type: "relation",
-            // mapped from foreign key: ${fk.column_name} -> ${targetTableName}(${fk.foreign_column_name})
+            // mapped from foreign key: ${commentText(fk.column_name)} -> ${commentText(targetTableName)}(${commentText(fk.foreign_column_name)})
             relation: {
                 kind: "belongsTo",
                 target: () => ${targetCollectionCamel},
-                localKey: "${fk.column_name}"
+                localKey: ${quote(fk.column_name)}
             }
         },`);
         }
@@ -986,10 +1018,10 @@ export function generateCollectionFile(
         relationsOutput += `
         {
             kind: "hasMany",
-            relationName: "${sourceTableName}",
+            relationName: ${quote(sourceTableName)},
             target: () => ${targetCollectionCamel},
-            // the ${sourceTableName}.${fk.column_name} FK points back here
-            foreignKeyOnTarget: "${fk.column_name}"
+            // the ${commentText(sourceTableName)}.${commentText(fk.column_name)} FK points back here
+            foreignKeyOnTarget: ${quote(fk.column_name)}
         },`;
     }
 
@@ -1018,12 +1050,12 @@ export function generateCollectionFile(
             relationsOutput += `
         {
             kind: "manyToMany",
-            relationName: "${relPropName}",
-            target: () => ${tableName}Collection,
+            relationName: ${quote(relPropName)},
+            target: () => ${toCollectionVarName(tableName)},
             through: {
-                table: "${jt}",
-                sourceColumn: "${thisFk.column_name}",
-                targetColumn: "${otherFk.column_name}"
+                table: ${quote(jt)},
+                sourceColumn: ${quote(thisFk.column_name)},
+                targetColumn: ${quote(otherFk.column_name)}
             }
         },`;
             continue;
@@ -1045,13 +1077,13 @@ export function generateCollectionFile(
             const thisFk = joinFks.find((fk) => fk.foreign_table_name === tableName);
 
             const throughCode = thisFk
-                ? `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            }`
+                ? `\n            through: {\n                table: ${quote(jt)},\n                sourceColumn: ${quote(thisFk.column_name)},\n                targetColumn: ${quote(otherFk.column_name)}\n            }`
                 : "";
 
             relationsOutput += `
         {
             kind: "manyToMany",
-            relationName: "${targetTableName}",
+            relationName: ${quote(targetTableName)},
             target: () => ${targetCollectionCamel},${throughCode}
         },`;
         }
@@ -1071,7 +1103,7 @@ export function generateCollectionFile(
     // config, where they have not belonged since the admin block was split out:
     // `PostgresCollectionConfig` does not declare them, so every generated file
     // was a type error, and the panel — which reads the block — never saw them.
-    const adminEntries: string[] = [`icon: "${icon}"`];
+    const adminEntries: string[] = [`icon: ${quote(icon)}`];
 
     if (classification) {
         const derivedFacts = context.metadata
@@ -1116,17 +1148,17 @@ export function generateCollectionFile(
     // decision the reader may disagree with. Naming the evidence tells them
     // which line to delete when they do.
     const classificationNote = classification && classification.role !== "entity"
-        ? `\n// Introspected as a ${classification.role}: ${classification.reason}.\n`
+        ? `\n// Introspected as a ${commentText(classification.role)}: ${commentText(classification.reason)}.\n`
         : "";
 
     const collectionVarName = toCollectionVarName(tableName);
     const fileContent = `${Array.from(imports).join("\n")}
 ${classificationNote}
 const ${collectionVarName}: PostgresCollectionConfig = {
-    name: "${collectionName}",
-    singularName: "${singular}",
-    slug: "${tableName}",
-    table: "${tableName}",${descriptionBlock}
+    name: ${quote(collectionName)},
+    singularName: ${quote(singular)},
+    slug: ${quote(tableName)},
+    table: ${quote(tableName)},${descriptionBlock}
     properties: {${propsOutput}
     },${relationsBlock}${adminBlock}
 };
@@ -1146,7 +1178,7 @@ export function generateIndexContent(fileNames: string[]): string {
     let arrayElements = "";
     for (const f of sorted) {
         const varName = toCollectionVarName(f);
-        imports += `import ${varName} from "./${f}";\n`;
+        imports += `import ${varName} from ${quote(`./${f}`)};\n`;
         arrayElements += `    ${varName},\n`;
     }
     return `${imports}\nexport const collections = [\n${arrayElements}];\n`;
@@ -1168,7 +1200,7 @@ export function mergeIndexContent(existingContent: string, newFileNames: string[
     for (const f of sorted) {
         if (!existingImports.has(f)) {
             const varName = toCollectionVarName(f);
-            newImports += `import ${varName} from "./${f}";\n`;
+            newImports += `import ${varName} from ${quote(`./${f}`)};\n`;
             newElements += `    ${varName},\n`;
         }
     }

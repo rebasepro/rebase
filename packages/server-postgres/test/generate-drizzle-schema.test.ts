@@ -1580,3 +1580,88 @@ name: "Company ID" }
         });
     });
 });
+
+/**
+ * The generated schema file is TypeScript, assembled by concatenation, from
+ * names and values nobody promised would be identifier-shaped.
+ *
+ * A Postgres identifier only has to be quoted, so `order` and `full name` are
+ * ordinary column names; in a `baas` project the property keys *are* the
+ * database's column names. And an enum value went into the file between single
+ * quotes, where an apostrophe — `O'Brien`, `Women's` — is not an edge case but
+ * a Tuesday.
+ *
+ * Parsing is the assertion. Every substring the other tests look for was
+ * present in the broken output too.
+ */
+describe("the generated schema parses for names Postgres allows", () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ts = require("typescript");
+
+    function syntaxErrors(source: string): string[] {
+        const file = ts.createSourceFile("schema.generated.ts", source, ts.ScriptTarget.ESNext, true, ts.ScriptKind.TS);
+        return (file as unknown as { parseDiagnostics: Array<{ code: number; messageText: unknown }> })
+            .parseDiagnostics
+            .map(d => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+    }
+
+    it("for an enum value containing an apostrophe", async () => {
+        const collections: CollectionConfig[] = [{
+            slug: "people",
+            table: "people",
+            name: "People",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                surname: { type: "string", enum: ["O'Brien", "D'Angelo", "Smith"] }
+            }
+        } as unknown as CollectionConfig];
+
+        const schema = await generateSchema(collections);
+        expect(syntaxErrors(schema)).toEqual([]);
+        expect(schema).toContain('"O\'Brien"');
+    });
+
+    it("for column names that are not JavaScript identifiers", async () => {
+        const collections: CollectionConfig[] = [{
+            slug: "things",
+            table: "things",
+            name: "Things",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                "full name": { type: "string" },
+                "order": { type: "number" },
+                "2fa_enabled": { type: "boolean" }
+            }
+        } as unknown as CollectionConfig];
+
+        const schema = await generateSchema(collections);
+        expect(syntaxErrors(schema)).toEqual([]);
+        // The column keeps its real name — it is what the database is asked for.
+        expect(schema).toContain('"full name"');
+    });
+
+    it("for a relation whose foreign key is not a JavaScript identifier", async () => {
+        const authors: CollectionConfig = {
+            slug: "authors",
+            table: "authors",
+            name: "Authors",
+            properties: { id: { type: "string", isId: "uuid" } }
+        } as unknown as CollectionConfig;
+
+        const posts: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                author: {
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, localKey: "author id" }
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        const schema = await generateSchema([posts, authors]);
+        expect(syntaxErrors(schema)).toEqual([]);
+    });
+});

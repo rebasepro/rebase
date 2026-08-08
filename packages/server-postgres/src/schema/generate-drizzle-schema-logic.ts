@@ -11,6 +11,31 @@ import { logger } from "@rebasepro/server";
  * Uses the explicit `columnName` when set (e.g. from introspection),
  * falling back to `toSnakeCase(propName)` for manually-authored collections.
  */
+const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * A string literal for the generated schema file.
+ *
+ * Column names, table names and enum values are all written into this file as
+ * literals, and none of them is constrained to be quote-free: a Postgres
+ * identifier only has to be quoted, and `O'Brien` is an ordinary enum value.
+ * Interpolating them raw ended the literal early — for enum values, inside
+ * single quotes, where an apostrophe is not an edge case.
+ */
+const quote = (value: string): string => JSON.stringify(value);
+
+/** An object key: verbatim when it is an identifier, quoted otherwise. */
+const propKey = (name: string): string => (JS_IDENTIFIER.test(name) ? name : quote(name));
+
+/**
+ * A property access on a generated table variable.
+ *
+ * `users.full name` is not an expression; `users["full name"]` is, and Drizzle
+ * treats the two identically.
+ */
+const member = (object: string, key: string): string =>
+    (JS_IDENTIFIER.test(key) ? `${object}.${key}` : `${object}[${quote(key)}]`);
+
 const resolveColumnName = (propName: string, prop?: Property | null): string => {
     if (prop && "columnName" in prop && typeof prop.columnName === "string") {
         return prop.columnName;
@@ -93,23 +118,23 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             const stringProp = prop as unknown as StringProperty;
             if (stringProp.enum) {
                 const enumName = getEnumVarName(getTableName(collection), propName);
-                columnDefinition = `${enumName}("${colName}")`;
+                columnDefinition = `${enumName}(${quote(colName)})`;
             } else if ("isId" in stringProp && stringProp.isId === "uuid") {
-                columnDefinition = `uuid("${colName}")`;
+                columnDefinition = `uuid(${quote(colName)})`;
             } else if (stringProp.columnType === "uuid") {
-                columnDefinition = `uuid("${colName}")`;
+                columnDefinition = `uuid(${quote(colName)})`;
             } else if (stringProp.columnType === "char") {
-                columnDefinition = `char("${colName}", { length: ${resolveStringColumnLength(stringProp)} })`;
+                columnDefinition = `char(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
             } else if (stringProp.columnType === "varchar") {
                 // The length is not optional decoration: `varchar("col")` with
                 // no length is an UNBOUNDED varchar in Postgres, which is what
                 // this emitted while the DDL generator emitted VARCHAR(255) for
                 // the very same property.
-                columnDefinition = `varchar("${colName}", { length: ${resolveStringColumnLength(stringProp)} })`;
+                columnDefinition = `varchar(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
             } else {
                 // `text` is the default, and the only length-unbounded choice.
                 // Ask for `varchar` explicitly if you want the length constraint.
-                columnDefinition = `text("${colName}")`;
+                columnDefinition = `text(${quote(colName)})`;
             }
             if (isIdProperty(propName, prop, collection)) {
                 columnDefinition += ".primaryKey()";
@@ -135,9 +160,9 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             const numProp = prop as unknown as NumberProperty;
             const isId = isIdProperty(propName, prop, collection);
 
-            let baseType = (numProp.validation?.integer || isId) ? `integer("${colName}")` : `numeric("${colName}")`;
+            let baseType = (numProp.validation?.integer || isId) ? `integer(${quote(colName)})` : `numeric(${quote(colName)})`;
             if (numProp.columnType) {
-                if (numProp.columnType === "double precision") baseType = `doublePrecision("${colName}")`;
+                if (numProp.columnType === "double precision") baseType = `doublePrecision(${quote(colName)})`;
                 // `bigint` and `bigserial` are the only pg-core builders that
                 // *require* a config argument: without `mode`, drizzle cannot
                 // know whether to hand back a `number` or a `bigint`, and the
@@ -155,9 +180,9 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 // switching the runtime type would be a breaking change to
                 // every consumer of the generated schema.
                 else if (numProp.columnType === "bigint" || numProp.columnType === "bigserial") {
-                    baseType = `${numProp.columnType}("${colName}", { mode: "number" })`;
+                    baseType = `${numProp.columnType}(${quote(colName)}, { mode: "number" })`;
                 }
-                else baseType = `${numProp.columnType}("${colName}")`;
+                else baseType = `${numProp.columnType}(${quote(colName)})`;
             }
 
             if ("isId" in numProp && numProp.isId === "increment") {
@@ -181,16 +206,16 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             break;
         }
         case "boolean":
-            columnDefinition = `boolean("${colName}")`;
+            columnDefinition = `boolean(${quote(colName)})`;
             break;
         case "date": {
             const dateProp = prop as DateProperty;
             if (dateProp.columnType === "date") {
-                columnDefinition = `date("${colName}", { mode: 'string' })`;
+                columnDefinition = `date(${quote(colName)}, { mode: 'string' })`;
             } else if (dateProp.columnType === "time") {
-                columnDefinition = `time("${colName}")`;
+                columnDefinition = `time(${quote(colName)})`;
             } else {
-                columnDefinition = `timestamp("${colName}", { withTimezone: true, mode: 'string' })`;
+                columnDefinition = `timestamp(${quote(colName)}, { withTimezone: true, mode: 'string' })`;
             }
             // autoValue: database-level default for initial value on INSERT
             if (dateProp.autoValue === "on_create" || dateProp.autoValue === "on_update") {
@@ -201,9 +226,9 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
         case "map": {
             const mapProp = prop as MapProperty;
             if (mapProp.columnType === "json") {
-                columnDefinition = `json("${colName}")`;
+                columnDefinition = `json(${quote(colName)})`;
             } else {
-                columnDefinition = `jsonb("${colName}")`;
+                columnDefinition = `jsonb(${quote(colName)})`;
             }
             break;
         }
@@ -222,27 +247,27 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             }
 
             if (colType === "json") {
-                columnDefinition = `json("${colName}")`;
+                columnDefinition = `json(${quote(colName)})`;
             } else if (colType === "text[]") {
-                columnDefinition = `text("${colName}").array()`;
+                columnDefinition = `text(${quote(colName)}).array()`;
             } else if (colType === "integer[]") {
-                columnDefinition = `integer("${colName}").array()`;
+                columnDefinition = `integer(${quote(colName)}).array()`;
             } else if (colType === "boolean[]") {
-                columnDefinition = `boolean("${colName}").array()`;
+                columnDefinition = `boolean(${quote(colName)}).array()`;
             } else if (colType === "numeric[]") {
-                columnDefinition = `numeric("${colName}").array()`;
+                columnDefinition = `numeric(${quote(colName)}).array()`;
             } else {
-                columnDefinition = `jsonb("${colName}")`;
+                columnDefinition = `jsonb(${quote(colName)})`;
             }
             break;
         }
         case "vector": {
             const vp = prop as VectorProperty;
-            columnDefinition = `vector("${colName}", { dimensions: ${vp.dimensions} })`;
+            columnDefinition = `vector(${quote(colName)}, { dimensions: ${vp.dimensions} })`;
             break;
         }
         case "binary": {
-            columnDefinition = `customType({ dataType() { return 'bytea'; } })("${colName}")`;
+            columnDefinition = `customType({ dataType() { return 'bytea'; } })(${quote(colName)})`;
             break;
         }
         case "relation": {
@@ -283,37 +308,37 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             const refOptionsParts = [onUpdate, onDelete].filter(Boolean);
             const refOptions = refOptionsParts.length > 0 ? `{ ${refOptionsParts.join(", ")} }` : "";
 
-            let columnDef = `${baseColumn}.references(() => ${targetTableVar}.${targetIdField}${refOptions ? `, ${refOptions}` : ""})`;
+            let columnDef = `${baseColumn}.references(() => ${member(targetTableVar, targetIdField)}${refOptions ? `, ${refOptions}` : ""})`;
 
             if (required) {
                 columnDef += ".notNull()";
             }
 
-            return `    ${relation.localKey}: ${columnDef}`;
+            return `    ${propKey(relation.localKey)}: ${columnDef}`;
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
             if (!targetCollection) {
-                columnDefinition = `text("${colName}")`;
+                columnDefinition = `text(${quote(colName)})`;
                 break;
             }
 
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const targetIdField = pkProp.name;
-            const baseColumn = pkProp.type === "number" ? `integer("${colName}")` : (pkProp.isUuid ? `uuid("${colName}")` : `text("${colName}")`);
+            const baseColumn = pkProp.type === "number" ? `integer(${quote(colName)})` : (pkProp.isUuid ? `uuid(${quote(colName)})` : `text(${quote(colName)})`);
 
             const required = prop.validation?.required;
             const onDelete = required ? "cascade" : "set null";
             const refOptions = `{ onDelete: "${onDelete}" }`;
 
-            columnDefinition = `${baseColumn}.references(() => ${targetTableVar}.${targetIdField}, ${refOptions})`;
+            columnDefinition = `${baseColumn}.references(() => ${member(targetTableVar, targetIdField)}, ${refOptions})`;
             if (required) {
                 columnDefinition += ".notNull()";
             }
             // Skip the standard notNull() handling below because we did it here with references
-            return `    ${propName}: ${columnDefinition}`;
+            return `    ${propKey(propName)}: ${columnDefinition}`;
         }
         default:
             return null;
@@ -323,7 +348,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
         columnDefinition += ".notNull()";
     }
 
-    return `    ${propName}: ${columnDefinition}`;
+    return `    ${propKey(propName)}: ${columnDefinition}`;
 };
 
 /**
@@ -400,7 +425,7 @@ const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRu
     if (usingClause) parts.push(`using: ${usingClause}`);
     if (withCheckClause) parts.push(`withCheck: ${withCheckClause}`);
 
-    return `    pgPolicy("${policyName}", { ${parts.join(", ")} }),\n`;
+    return `    pgPolicy(${quote(policyName)}, { ${parts.join(", ")} }),\n`;
 };
 
 /**
@@ -532,7 +557,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                     )
                     : Object.keys(prop.enum);
                 if (values.length > 0) {
-                    schemaContent += `export const ${enumVarName} = pgEnum(\"${enumDbName}\", [${values.map(v => `'${v}'`).join(", ")}]);\n`;
+                    schemaContent += `export const ${enumVarName} = pgEnum(${quote(enumDbName)}, [${values.map(v => quote(v)).join(", ")}]);\n`;
                     if (!exportedEnumVars.includes(enumVarName)) exportedEnumVars.push(enumVarName);
                 }
             }
@@ -728,7 +753,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                 }
 
                 // Source side one(): pairs with owning table's many(junctionTable, { relationName })
-                tableRelations.push(`    "${relation.through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
+                tableRelations.push(`    ${quote(relation.through.sourceColumn)}: one(${sourceTableVar}, {\n        fields: [${member(tableVarName, relation.through.sourceColumn)}],\n        references: [${member(sourceTableVar, sourceId)}],\n        relationName: ${quote(owningRelationName)}\n    })`);
 
                 // Target side one(): pairs with inverse table's many(junctionTable, { relationName })
                 // Always emit a relationName to avoid collisions with the source-side's owningRelationName.
@@ -736,7 +761,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                 const targetRelationName = inverseRelationName
                     ? inverseRelationName
                     : `${tableName}_${relation.through.targetColumn}`;
-                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
+                tableRelations.push(`    ${quote(relation.through.targetColumn)}: one(${targetTableVar}, {\n        fields: [${member(tableVarName, relation.through.targetColumn)}],\n        references: [${member(targetTableVar, targetId)}],\n        relationName: ${quote(targetRelationName)}\n    })`);
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection);
@@ -776,7 +801,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                             // schema that does not compile. The three other
                             // emission sites normalise; this one did not.
                             const localFieldKey = resolvePropertyKeyForColumn(collection, rel.localKey);
-                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${localFieldKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                            tableRelations.push(`    ${quote(relationKey)}: one(${targetTableVar}, {\n        fields: [${member(tableVarName, localFieldKey)}],\n        references: [${member(targetTableVar, getPrimaryKeyName(target))}],\n        relationName: ${quote(drizzleRelationName)}\n    })`);
                             break;
                         }
 
@@ -841,7 +866,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                                         ? resolvePropertyKeyForColumn(otherCollection, otherRel.sourceKey)
                                         : getPrimaryKeyName(otherCollection);
                                     const synthKey = `_synth_${otherTableVar}_${drizzleFieldKey}`;
-                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${drizzleFieldKey}],\n        references: [${otherTableVar}.${referencedKey}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                                    tableRelations.push(`    ${quote(synthKey)}: one(${otherTableVar}, {\n        fields: [${member(tableVarName, drizzleFieldKey)}],\n        references: [${member(otherTableVar, referencedKey)}],\n        relationName: ${quote(drizzleRelationName)}\n    })`);
                                     emittedRelationNames.add(deduplicationKey);
                                 }
                             }
