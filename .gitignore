@@ -110,6 +110,9 @@ app/uploads/
 !examples/firebase/src/env.d.ts
 # The `virtual:starlight/*` module shims the website's own build needs.
 !website/src/starlight.d.ts
+# The API-surface gate's fixture barrel. Untracked, `pnpm test:gates` passes
+# locally off files CI never receives and the gate's own tests prove nothing.
+!scripts/test/fixtures/**/*.d.ts
 
 # Temporary test, linting, and scratch outputs
 /e2e-screenshots/

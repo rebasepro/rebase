@@ -38,8 +38,23 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
  * it shipped with, so changing that package cannot break already-deployed code
  * the way this one can. The skew it *does* cause is the corpus's job.
  */
-const TRACKED = [
-    { pkg: "@rebasepro/server", dts: "packages/server/dist/index.d.ts" }
+export const TRACKED = [
+    {
+        pkg: "@rebasepro/server",
+        dts: "packages/server/dist/index.d.ts",
+        /**
+         * Exports that MUST render with members, or the render is refused.
+         *
+         * A floor, in the same sense as `rls:check --min-tables`: this file spent
+         * its whole life reporting `const rebase` as a bare name, because reading
+         * `decl.type?.members` off a type *reference* returns nothing and nothing
+         * complained about nothing. The singleton is the export every tenant hook,
+         * function and cron imports, so the one entry that must never be empty is
+         * the one that was empty. If a TypeScript upgrade breaks the resolution
+         * again, this fails loudly instead of quietly recording a bare name.
+         */
+        mustHaveMembers: ["rebase"]
+    }
 ];
 
 export const BASELINE = path.join(ROOT, "api-surface", "server.api.txt");
@@ -53,7 +68,7 @@ export const BASELINE = path.join(ROOT, "api-surface", "server.api.txt");
  * and a gate that reddens on internal refactors is a gate people learn to
  * regenerate without reading, which is worse than no gate.
  */
-function memberNames(decl) {
+function syntacticMemberNames(decl) {
     const members = decl.members ?? decl.type?.members;
     if (!members) return null;
     return members
@@ -64,6 +79,80 @@ function memberNames(decl) {
                 : null)
         .filter(name => name && !name.startsWith("_"))
         .sort();
+}
+
+/**
+ * The members a declaration reaches through a *name* rather than through its own
+ * syntax.
+ *
+ * `decl.members` is the declaration body and nothing else, which is the whole
+ * story for `interface X { a: string }` and no story at all for the two shapes
+ * this package exports most of its surface through:
+ *
+ *     export declare const rebase: RebaseServerClient;
+ *     interface AuthRepository extends UserRepository, RoleRepository { }
+ *
+ * The first is a `TypeReferenceNode` — no `.members` — and it is the singleton
+ * every tenant hook, function and cron imports. Recording it as a bare
+ * `const rebase` meant `check-api-surface.mjs` computed its `goneMembers`
+ * against an empty list, so dropping `rebase.email` or renaming
+ * `rebase.dataAsAdmin` read as "API surface unchanged" — the exact fleet-wide
+ * boot failure the top of this file exists to catch. The second loses everything
+ * it inherits, and would lose its entire surface if the base were not itself
+ * exported.
+ *
+ * Members that arrive from an ambient global declaration are dropped: `stack` and
+ * `cause` on a class extending `Error` (lib.es5.d.ts), `captureStackTrace` on its
+ * static side (`@types/node`), every `Array.prototype` method on an exported
+ * `string[]`. Those belong to the platform, no release of this package can remove
+ * them, and a baseline listing them is one people regenerate without reading.
+ * Being declared in an external module is the test — every member this package
+ * really owns is declared in one, whether here or in `@rebasepro/types`.
+ */
+function resolvedMemberNames(decl, symbol, { checker }) {
+    const fromType = type => (type ? checker.getPropertiesOfType(type) : [])
+        .filter(member => {
+            // Zero declarations is a synthesized member — `prototype` on a class's
+            // static side — and drops out of the same test, since nothing declared
+            // nowhere was declared in a module.
+            const decls = member.declarations ?? [];
+            if (!decls.some(d => ts.isExternalModule(d.getSourceFile()))) return false;
+            return !decls.some(d => ts.getCombinedModifierFlags(d) &
+                (ts.ModifierFlags.Private | ts.ModifierFlags.Protected));
+        })
+        .map(member => member.getName());
+
+    let names;
+    if (ts.isVariableDeclaration(decl)) {
+        names = fromType(checker.getTypeAtLocation(decl));
+    } else if (ts.isModuleDeclaration(decl)) {
+        // A namespace's exports are its members. Same blindness, same fix: there
+        // is nothing to read off the declaration node.
+        names = checker.getExportsOfModule(symbol).map(member => member.getName());
+    } else {
+        names = fromType(checker.getDeclaredTypeOfSymbol(symbol));
+        if (ts.isClassDeclaration(decl)) {
+            // The declared type is the instance side only, so statics — `ApiError.notFound`
+            // and friends — need the static side too.
+            names = names.concat(fromType(checker.getTypeOfSymbolAtLocation(symbol, decl)));
+        }
+    }
+    return [...new Set(names)].filter(name => !name.startsWith("_")).sort();
+}
+
+/** True when the answer is behind a name, so syntax alone cannot see it. */
+function resolvesThroughAName(decl) {
+    if (ts.isVariableDeclaration(decl) || ts.isModuleDeclaration(decl)) return true;
+    return (ts.isInterfaceDeclaration(decl) || ts.isClassDeclaration(decl))
+        && Boolean(decl.heritageClauses?.length);
+}
+
+function memberNames(decl, symbol, ctx) {
+    if (resolvesThroughAName(decl)) {
+        const resolved = resolvedMemberNames(decl, symbol, ctx);
+        if (resolved.length) return resolved;
+    }
+    return syntacticMemberNames(decl);
 }
 
 function kindOf(decl) {
@@ -77,7 +166,7 @@ function kindOf(decl) {
     return ts.SyntaxKind[decl.kind];
 }
 
-export function extractSurface({ pkg, dts }) {
+export function extractSurface({ pkg, dts, mustHaveMembers = [] }) {
     const entry = path.join(ROOT, dts);
     if (!fs.existsSync(entry)) {
         throw new Error(
@@ -114,27 +203,39 @@ export function extractSurface({ pkg, dts }) {
         }
 
         const kind = kindOf(decl);
-        const members = memberNames(decl);
+        const members = memberNames(decl, resolved, { checker });
         if (members && members.length) {
             lines.push(`${kind} ${name} { ${members.join(", ")} }`);
         } else {
+            if (mustHaveMembers.includes(name)) {
+                throw new Error(
+                    `${pkg}: \`${name}\` rendered with no members, which is how this gate went blind ` +
+                    "before — a bare name has no members to lose, so nothing it loses is ever reported. " +
+                    "Fix the resolution in memberNames(); do NOT regenerate the baseline."
+                );
+            }
             lines.push(`${kind} ${name}`);
         }
     }
+
+    // An entry in `mustHaveMembers` that is gone from the barrel entirely is NOT
+    // an error here: that is a removed export, and the diff reports it as one,
+    // with a better message than this file could write.
 
     // Sorted so the file is a set, not a transcript of declaration order — a
     // reordered barrel must not read as a contract change.
     return lines.sort().join("\n") + "\n";
 }
 
-export function renderAll() {
+/** `targets` is a parameter so the gate's own tests can render a fixture surface. */
+export function renderAll(targets = TRACKED) {
     let out =
         "# Public API surface of the runtime-provided packages.\n" +
         "# GENERATED by scripts/api-surface.mjs — do not hand-edit.\n" +
         "#\n" +
         "# These exports change underneath already-deployed bundles when the fleet\n" +
         "# is moved onto a new image. Removing one breaks tenants at boot.\n";
-    for (const target of TRACKED) {
+    for (const target of targets) {
         out += `\n## ${target.pkg}\n${extractSurface(target)}`;
     }
     return out;

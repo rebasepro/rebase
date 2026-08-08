@@ -193,6 +193,9 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
+| `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `api-surface/server.api.txt`. This is the package `docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
+| `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
+| `node scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
 **Record a bundle fixture and a schema snapshot once per release.** The value of
@@ -201,7 +204,13 @@ backfilled after the fact.
 
 ## Changing a contract
 
-1. Decide which of the six it is. Most changes are none of them.
+1. Decide which of the six it is. Most changes are none of them — but "none of
+   the six" does not mean "uncontroversial". Removing or renaming an export of
+   `@rebasepro/server`, or a member of one, is none of the six and is the single
+   most dangerous change in the repository, because the code it breaks is already
+   built and will not be recompiled. `pnpm check:api-surface` is what holds that
+   line; whether it becomes a seventh numbered contract is an open decision
+   (`docs/audits/81-compat-policy.md`).
 2. Add a fixture or snapshot for the **old** shape first, and watch it pass.
 3. Make the change and bump the constant.
 4. Confirm the old fixture still passes, or that it now fails *with the message

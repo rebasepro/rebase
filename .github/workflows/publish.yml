@@ -322,6 +322,19 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Releasing: $CURRENT → $VERSION (from tag $LATEST_TAG)"
 
+      # ── The bump has to match what the release did ──────────
+      #
+      # `inputs.version` is free text defaulting to "patch", correlated with
+      # nothing. A release that removed an export from @rebasepro/server therefore
+      # shipped as 0.13.1, and `^0.13.0` — the range `rebase init` scaffolds —
+      # means >=0.13.0 <0.14.0, so it auto-installed for every consumer on their
+      # next `pnpm install`. This asks the committed contract baselines what the
+      # release actually did and refuses a breaking one that is not at least a
+      # minor with a declared `### Breaking` section. Before "Stamp changelog" on
+      # purpose: the section it reads is still `[Unreleased]` at this point.
+      - name: Bump level matches the diff
+        run: node scripts/check-release-bump.mjs "${{ steps.version.outputs.version }}" --from "v${{ steps.version.outputs.current }}"
+
       # ── Stamp changelog ─────────────────────────────────────
       # Promote "## [Unreleased]" → "## [VERSION] - <date>", open a fresh
       # [Unreleased], and sync the docs-site mirror. Committed back to main by

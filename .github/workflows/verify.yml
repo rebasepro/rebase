@@ -208,6 +208,13 @@ jobs:
       - name: Runtime API surface
         run: pnpm run check:api-surface
 
+      # The API-surface gate's own tests, over a fixture barrel. It spent its
+      # whole life unable to see a member disappear from `const rebase` — a bare
+      # entry has no members to lose — so the gate that guards the fleet needs a
+      # gate of its own. Fixtures only: no build, no database.
+      - name: Contract gate self-tests
+        run: pnpm run test:gates
+
       # The examples were in no pipeline and in no root script — `pnpm build`
       # covers `./packages/*` and `./app` only — so examples/firebase stopped
       # compiling at the BaaS/admin split and nothing said so for weeks. They
