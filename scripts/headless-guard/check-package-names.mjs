@@ -70,11 +70,23 @@ const BARE = new Set([
  * a compound noun, so `MCP-Server` and `SDK-Generator` in the German docs are
  * the words "MCP server" and "SDK generator", not the packages that once bore
  * those names. Capitalizing the first letter only tells the two apart.
+ *
+ * A `.` after the name is excluded for the same reason `-` is: some files kept
+ * a name their package no longer has, and citing one is naming a file that
+ * exists rather than a package that does not. `packages/codegen/test/
+ * sdk-generator.test.ts` is the case that found this — an audit doc pointing at
+ * three assertions by line number, which is exactly the kind of reference this
+ * check should leave alone.
+ *
+ * Deliberately narrow: only the extension forms real files here use, not a bare
+ * `.`, so `sdk-generator.` ending a sentence in prose is still a hit.
  */
+const FILE_SUFFIX = "(?!\\.(?:test|spec)\\.[jt]sx?)";
+
 function patternsFor(old) {
     if (BARE.has(old)) {
         const sentenceInitial = old[0].toUpperCase() + old.slice(1);
-        return [new RegExp(`(?<![\\w-])(?:${old}|${sentenceInitial})(?![\\w-])`)];
+        return [new RegExp(`(?<![\\w-])(?:${old}|${sentenceInitial})${FILE_SUFFIX}(?![\\w-])`)];
     }
     // Only the forms that actually denote the package.
     return [new RegExp(`@rebasepro/${old}(?![\\w-])`), new RegExp(`packages/${old}/`)];

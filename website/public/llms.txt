@@ -9832,6 +9832,7 @@ Then pass the `Database` type parameter to `createRebaseClient` for full autocom
 
 const client = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
 });
 
 // Full autocomplete on collection names and field types
@@ -9839,6 +9840,14 @@ const { data } = await client.data.products.find();
 ```
 
 When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
+
+`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+
+#### Field names
+
+Columns keep their real names in the generated types: a `created_at` column is `row.created_at`, and a relation's foreign key is `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
+
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ author_id: 5 }`).
 
 ### Quick Example
 
@@ -11607,8 +11616,15 @@ rebase generate-sdk
 
 | Flag | Description |
 |------|-------------|
-| `--collections` | Path to collections directory |
-| `--output` | Output directory for the SDK (default: `generated/sdk/`) |
+| `-c`, `--collections-dir` | Path to the collections directory (default: `config/collections/`) |
+| `-o`, `--output` | Output directory for the SDK (default: `generated/sdk/`) |
+| `--from <link\|url>` | Read the schema from a running project instead of local source. `link` uses this checkout's linked project. |
+| `--token` | Bearer token for the contract endpoint (default: `$REBASE_SERVICE_KEY`) |
+
+`--from` is what lets a repository that contains no collections — a separate
+frontend, a second web app, a mobile app — generate a typed client from the
+project it talks to. `REBASE_SERVICE_KEY` is only sent to the project this
+checkout is linked to; pass `--token` explicitly for any other host.
 
 **Usage after generation:**
 
@@ -11616,11 +11632,17 @@ rebase generate-sdk
 
 const client = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
 });
 
 // Full type safety and autocomplete
 const { data } = await client.data.products.find();
 ```
+
+Field names in the generated types are the ones the API serves, unchanged — a
+`created_at` column is `row.created_at`. Only the collection *accessor* is
+turned into a property name (`my-notes` → `client.data.myNotes`), which is what
+`collectionsDictionary` maps back to the slug.
 
 ### Development Workflow
 
