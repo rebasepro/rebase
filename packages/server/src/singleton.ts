@@ -71,14 +71,30 @@ export function _resetRebaseMock(): void {
  * **Admin data plane** (`rebase.dataAsAdmin`):
  * Backed by the native DataDriver — calls go directly to the database without
  * JSON serialization, HTTP dispatch, or middleware overhead. The driver is
- * scoped as `{ uid: "service", roles: ["admin"] }`, so **every read and write
- * bypasses row-level-security policies**. No `REBASE_SERVICE_KEY` is required.
+ * scoped once as `{ uid: "service", roles: ["admin"] }` (`SERVICE_IDENTITY`),
+ * which makes it **admin-scoped, not RLS-bypassing**: every read and write runs
+ * in a transaction that has done `SET LOCAL ROLE rebase_user` with
+ * `app.uid = 'service'`, and policies are evaluated against that. No
+ * `REBASE_SERVICE_KEY` is required.
  *
- * ⚠️ Because it bypasses RLS, `rebase.dataAsAdmin` is for trusted background
- * work (cron jobs, migrations, service tasks) — **not** for serving user-facing
- * data. Inside a request handler, run user-scoped queries through the
- * request-scoped driver (`c.var.driver`), which carries the caller's identity
- * so RLS applies.
+ * It clears the default policies through their `rolesOverlap(['admin'])` arm —
+ * which is why the difference rarely shows. It shows when you write your own:
+ *
+ * - `policy.serverContext()` compiles to `auth.uid() IS NULL` and is therefore
+ *   **false** for this accessor. A collection with `disableDefaultPolicies:
+ *   true` whose rule is `serverContext()` denies these writes (`42501`) and
+ *   returns zero rows — HTTP 200, empty — for these reads.
+ * - Its reach equals an `admin`-roled application user's reach. It is not a
+ *   private door.
+ *
+ * `rebase.sql()` *is* an unconditional bypass — it runs on the owner connection
+ * and never goes through `withAuth`. Of the two accessors on this object, the
+ * quieter one is the more privileged.
+ *
+ * ⚠️ `rebase.dataAsAdmin` is for trusted background work (cron jobs,
+ * migrations, service tasks) — **not** for serving user-facing data. Inside a
+ * request handler, run user-scoped queries through the request-scoped driver
+ * (`c.var.driver`), which carries the caller's identity.
  *
  * `rebase.data` is **gone from the type**: `RebaseServerClient` omits it, so the
  * admin-scoped accessor has exactly one name and the privilege is visible at the
@@ -94,7 +110,8 @@ export function _resetRebaseMock(): void {
  * ```typescript
  * import { rebase } from "@rebasepro/server";
  *
- * // In a cron job, hook, or trusted service file (admin scope, bypasses RLS):
+ * // In a cron job, hook, or trusted service file (admin scope, RLS evaluated
+ * // as `{ uid: "service", roles: ["admin"] }`):
  * await rebase.email.send({ to: "admin@co.com", subject: "Alert", html: "<p>Hi</p>" });
  * const jobs = await rebase.dataAsAdmin.jobs.find({ limit: 10 });
  * ```

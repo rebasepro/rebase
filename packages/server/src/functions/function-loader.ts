@@ -12,6 +12,29 @@ export interface LoadedFunction {
     app: Hono<import("hono").Env>;
 }
 
+/** What a directory of function files produced: what mounted, and what did not. */
+export interface LoadedFunctions {
+    /** The functions that will be served. */
+    functions: LoadedFunction[];
+    /**
+     * One entry per file the loader saw and did **not** mount, each already
+     * phrased as `<name> (<reason>)`. Returned rather than only logged so the
+     * running server can say what is missing — a boot log line is not reachable
+     * from `GET /api/functions`.
+     */
+    problems: string[];
+}
+
+/**
+ * Extensions the bundler compiles (or a developer might reasonably write) that
+ * this loader cannot import. `rebase build` globs `functions/**\/*.ts`, so the
+ * build's idea of "a function file" is strictly wider than the runtime's — the
+ * worst direction for a mismatch to go. Anything listed here is reported as a
+ * problem instead of vanishing; non-code files (`.md`, `.json`, `.txt`) stay
+ * silent, because a README next to your functions is not a mistake.
+ */
+const UNSUPPORTED_CODE_EXTENSIONS = [".mts", ".cts", ".tsx", ".jsx", ".mjs", ".cjs"];
+
 /**
  * Auto-discover Hono route files from a directory.
  *
@@ -20,11 +43,28 @@ export interface LoadedFunction {
  *   `functions/send-invoice.ts` → mounted at `/send-invoice`
  *
  * This mirrors how `loadCollectionsFromDirectory` works for collections.
+ *
+ * Returns only what loaded. Use {@link loadFunctionsWithDiagnostics} when the
+ * caller also needs to report what did not.
  */
 export async function loadFunctionsFromDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedFunction[]> {
+    return (await loadFunctionsWithDiagnostics(directory, importModule)).functions;
+}
+
+/**
+ * {@link loadFunctionsFromDirectory}, plus the list of files that were skipped.
+ *
+ * Never throws: a single malformed function must not crash server boot. The
+ * caller decides what to do with `problems` — `init.ts` mounts the router
+ * regardless and surfaces the count on the listing endpoint.
+ */
+export async function loadFunctionsWithDiagnostics(
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
+): Promise<LoadedFunctions> {
     const functions: LoadedFunction[] = [];
     // Aggregate problem files so a broken function surfaces as one loud
     // summary line, not just a warning buried per-file. We still don't throw:
@@ -32,11 +72,43 @@ export async function loadFunctionsFromDirectory(
     const problems: string[] = [];
 
     if (!fs.existsSync(directory)) {
-        return functions;
+        return { functions, problems };
     }
 
-    const files = fs.readdirSync(directory);
-    for (const file of files) {
+    // `withFileTypes` so a directory entry is a *reported* skip rather than a
+    // filter miss. `readdirSync(dir)` returned bare names, and a subdirectory
+    // simply failed the `.ts`/`.js` test — so `functions/admin/users.ts` was
+    // compiled by `rebase build`, shipped in the bundle, and then dropped at
+    // boot without a single log line.
+    const entries = fs.readdirSync(directory, { withFileTypes: true });
+    for (const entry of entries) {
+        const file = entry.name;
+
+        if (entry.isDirectory()) {
+            // Dot-directories are tooling (`.git`, `.turbo`), not intent.
+            if (file.startsWith(".") || file === "node_modules") continue;
+            logger.warn(
+                `[functions] ${file}/: subdirectory ignored. Functions are loaded from the top level of ` +
+                `${directory} only, so nothing under ${file}/ is served. Move the file up (or flatten the ` +
+                "name: `admin/users.ts` → `admin-users.ts`)."
+            );
+            problems.push(`${file}/ (subdirectory — functions are not loaded recursively)`);
+            continue;
+        }
+
+        const extension = path.extname(file);
+        if (
+            !file.startsWith(".") &&
+            !file.includes(".test.") &&
+            UNSUPPORTED_CODE_EXTENSIONS.includes(extension)
+        ) {
+            logger.warn(
+                `[functions] ${file}: ${extension} files are not loaded. Rename it to .ts (or .js) to serve it.`
+            );
+            problems.push(`${file} (unsupported extension ${extension})`);
+            continue;
+        }
+
         if (
             (file.endsWith(".ts") || file.endsWith(".js")) &&
             // Dotfiles: notably macOS bsdtar AppleDouble sidecars (`._foo.ts`),
@@ -114,7 +186,7 @@ app: result as Hono });
         );
     }
 
-    return functions;
+    return { functions, problems };
 }
 
 /**

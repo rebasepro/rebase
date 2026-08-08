@@ -63,11 +63,14 @@ Rebase will:
 | `functions/send-invoice.ts` | `/api/functions/send-invoice/*` |
 | `functions/webhooks.ts` | `/api/functions/webhooks/*` |
 
+Functions are discovered at the **top level of the directory only** — there is no recursion. `functions/admin/users.ts` is compiled by `rebase build` but never mounted; flatten the name instead (`functions/admin-users.ts`). A subdirectory is reported at boot and counted on the listing endpoint rather than ignored silently.
+
 Files that are **skipped**:
 
 - `index.ts` / `index.js` — reserved
 - `*.test.ts` / `*.test.js` — test files
 - `*.d.ts` — type declarations
+- Subdirectories, and `.mts` / `.cts` / `.tsx` / `.jsx` / `.mjs` / `.cjs` files — reported as problems, since the build compiles more than the runtime loads
 
 ## Export Formats
 
@@ -192,7 +195,7 @@ When an external request passes the service key via the Authorization header (`A
      "roles": ["admin"]
    }
    ```
-3. Injects an admin-privileged `DataDriver` into `c.get("driver")` that bypasses Row-Level Security.
+3. Injects a `DataDriver` into `c.get("driver")` scoped as that same service identity. Row-Level Security still applies — it is evaluated as `{ uid: "service", roles: ["admin"] }`, not skipped.
 
 ### Internal Self-Authentication
 
@@ -235,9 +238,9 @@ app.get("/", async (c) => {
 export default app;
 ```
 
-### 2. Via the Rebase Singleton (Bypasses RLS - Admin Access)
+### 2. Via the Rebase Singleton (Admin-Scoped Access)
 
-The `@rebasepro/server` package provides a `rebase` singleton that has **full administrative privileges** (no RLS). Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
+The `@rebasepro/server` package provides a `rebase` singleton whose `dataAsAdmin` accessor runs as the service identity `{ uid: "service", roles: ["admin"] }`. Use this for background processing, system updates, integrations, or cases where a request needs to read or write to tables that the end-user has no direct permissions for:
 
 ```typescript
 // backend/functions/approve-job.ts
@@ -250,7 +253,7 @@ const app = new Hono<HonoEnv>();
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
-    // Use the admin-level data API (bypasses RLS completely)
+    // Use the admin-level data API (RLS is evaluated as the `admin` role)
     await rebase.dataAsAdmin.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
@@ -264,10 +267,24 @@ export default app;
 
 ### RLS-Scoped Driver vs. Rebase Singleton
 
-| **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
-| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.dataAsAdmin`) |
-| **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
-| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
+|                     | `c.get("driver")` (request-scoped)             | `rebase.dataAsAdmin` (service identity)                          |
+| ------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+| **Runs as**         | The caller (`uid`, their roles)                | `{ uid: "service", roles: ["admin"] }`                            |
+| **RLS enforcement** | ✅ Yes (evaluated against the caller)          | ✅ Yes (evaluated against the service identity)                   |
+| **Performance**     | Native (direct driver call)                     | Native (direct driver call)                                       |
+| **Ideal for...**    | General user CRUD, search, and queries          | Background jobs, system triggers, webhooks                        |
+| **API style**       | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
+
+#### What `dataAsAdmin` is, precisely
+
+`rebase.dataAsAdmin` is **admin-scoped, not RLS-bypassing**. The driver is scoped once, at boot, with `withAuth({ uid: "service", roles: ["admin"] })`, so every read and write runs inside a transaction that has switched to the restricted `rebase_user` role with `app.uid = 'service'`. Your policies are evaluated — against that identity.
+
+For most projects the distinction never surfaces, because the default policies Rebase injects onto every collection admit `serverContext() OR rolesOverlap(['admin'])`, and the service identity clears the second arm. It surfaces the moment you write your own policies:
+
+- **`policy.serverContext()` is false for it.** That helper compiles to `auth.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
+- **Its reach equals an `admin` user's reach.** Granting the `admin` role to an application user grants them exactly the rows this accessor sees. It is not a private channel.
+
+If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
 ### 3. Via Direct Drizzle Access
 
@@ -373,6 +390,17 @@ If loading fails, the loader provides diagnostic output:
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
+
+The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The reasons stay in the boot log.
+
+## Timeouts and Rate Limits
+
+Two ceilings apply to `/api/functions/*`:
+
+- **Request timeout** — 30 seconds by default, answering `504` with code `FUNCTION_TIMEOUT`. Configure with `functionsTimeoutMs` (or `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` disables it. The handler cannot be cancelled from the outside, so give outbound HTTP calls an `AbortSignal` — the timeout frees the client and the socket, not the work.
+- **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
+
+Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
 
 ## Next Steps
 

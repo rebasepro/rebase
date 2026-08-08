@@ -30,10 +30,14 @@ import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
  * slot over `app.use("/*", requireAuth)`: `use()` only covers routes declared
  * *below* it, so a route appended later above it is silently unprotected.
  *
- * `rebase.dataAsAdmin` gives you admin-level access to your data and
- * **bypasses RLS** — use it only for trusted admin work. For request-scoped /
- * RLS-scoped data access, use c.get("user") and c.get("driver"), which carry
- * the caller's identity. (`rebase` also exposes auth, storage, email.)
+ * `rebase.dataAsAdmin` gives you admin-level access to your data: it runs as
+ * `{ uid: "service", roles: ["admin"] }`, which is **admin-scoped, not an RLS
+ * bypass** — your policies are still evaluated, just against that identity. So
+ * `policy.serverContext()` is false for it (that arm means "no uid at all"),
+ * and anything an `admin` user can reach, it can reach too. For request-scoped
+ * data access use c.get("user") and c.get("driver"), which carry the caller's
+ * identity. `rebase.sql()` is the real bypass — owner connection, no policies.
+ * (`rebase` also exposes auth, storage, email.)
  */
 export default defineFunction((app, { rebase }) => {
     void rebase; // available for dataAsAdmin/auth/storage/email — see commented usage below

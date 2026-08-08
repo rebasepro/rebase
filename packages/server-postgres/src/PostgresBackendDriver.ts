@@ -1605,9 +1605,13 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             // Set the RLS GUCs and downgrade to the restricted user role so RLS
             // binds every statement in this transaction — reads AND writes.
             // This is user context: the collection's securityRules are the
-            // authorization model. The server context (base driver /
-            // dataAsAdmin) never reaches here, so it stays on the owner
-            // connection and bypasses RLS. The GUCs are transaction-local and
+            // authorization model. The BASE driver never reaches here, so it
+            // stays on the owner connection and bypasses RLS — but note that
+            // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
+            // with `withAuth(SERVICE_IDENTITY)`, so it arrives here like any
+            // other user, with uid 'service' and the admin role, and its
+            // statements are RLS-evaluated. The comment used to list it as a
+            // bypass and five docblocks followed. The GUCs are transaction-local and
             // remain readable after the role switch, so `auth.uid()` /
             // `auth.roles()` in policies still resolve.
             //

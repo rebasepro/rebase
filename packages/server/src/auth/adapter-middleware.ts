@@ -9,7 +9,9 @@
  * 1. Checks for API key tokens (`rk_` prefix) first — these are Rebase-level
  * 2. Falls back to `adapter.verifyRequest(request)` to resolve the user
  * 3. Scopes the DataDriver via `withAuth()` for RLS
- * 4. Enforces auth (401) when `requireAuth` is true and no user is found
+ * 4. Rejects a presented-but-unverifiable token with 401, whatever
+ *    `requireAuth` says
+ * 5. Enforces auth (401) when `requireAuth` is true and no user is found
  *
  * The behavior is identical to `createAuthMiddleware()` — only the
  * token verification strategy is pluggable.
@@ -54,9 +56,13 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
     return async (c, next) => {
         // Pick the per-request delegate (multi-data-source) before scoping.
         const driver = resolveDriver ? resolveDriver(c) : baseDriver;
+        // Whether the caller presented a bearer token at all. A token that is
+        // present and does not verify is a 401 below, exactly as in
+        // `createAuthMiddleware` — see the comment there.
+        const presentedToken = extractBearerToken(c.req.header("authorization"));
         // ── API Key check (Rebase-level, independent of auth adapter) ────
         if (apiKeyStore) {
-            const token = extractBearerToken(c.req.header("authorization")) ?? "";
+            const token = presentedToken ?? "";
             if (token.startsWith("rk_")) {
                 const result = await validateApiKey(c, token, { store: apiKeyStore,
 driver });
@@ -93,6 +99,27 @@ code: "UNAUTHORIZED" } }, 401);
 code: "INTERNAL_ERROR" } }, 500);
             }
         } else {
+            // Token present but invalid — always reject, regardless of
+            // `requireAuth`. Presenting a malformed or expired token should
+            // never grant access, and it must not be *downgraded* to an
+            // anonymous request either: the SDK's refresh flow is driven by a
+            // 401, so a router mounted with `requireAuth: false` — the custom
+            // functions router is the only one — would answer 200 with public
+            // content to a user whose access token had merely expired, and the
+            // refresh would never fire.
+            //
+            // This is the rule `createAuthMiddleware` already applies. It lived
+            // in only one of the two implementations, and this is the path that
+            // runs whenever `config.auth` is a config object.
+            //
+            // A request with no Authorization header stays anonymous: adapters
+            // may authenticate by cookie, and "no credential" is not "a bad
+            // credential".
+            if (presentedToken !== undefined) {
+                return c.json({ error: { message: "Invalid or expired token",
+code: "UNAUTHORIZED" } }, 401);
+            }
+
             // Not authenticated — scope as anon for RLS evaluation
             try {
                 c.set("driver", await scopeDataDriver(driver, { uid: ANONYMOUS_USER_ID,

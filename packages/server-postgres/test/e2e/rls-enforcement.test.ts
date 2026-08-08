@@ -3,8 +3,14 @@
  *
  * Model: authenticated (user-context) requests run as the restricted
  * `rebase_user` role, so RLS binds EVERY statement — reads and writes. The
- * server context (owner connection / dataAsAdmin / auth flows) bypasses. A
+ * server context (owner connection / auth flows / `rebase.sql`) bypasses. A
  * collection's securityRules are the whole authorization model.
+ *
+ * `rebase.dataAsAdmin` is NOT in that list, though this header used to say it
+ * was: `init.ts` scopes it with `withAuth({ uid: "service", roles: ["admin"] })`,
+ * so it is user context with the admin role, not the owner connection. Nothing
+ * here exercises it — the object only exists after `initializeRebaseBackend`.
+ * `packages/server/test/functions-data-as-admin.test.ts` pins what it is.
  *
  * Exercised through the REAL modules (detectConnectionPosture → ensureAppRole
  * → driver.withAuth().count()/save()/delete()). Proves:
@@ -251,6 +257,9 @@ describe("Unified RLS enforcement (E2E)", () => {
 
     it("lets the server context (owner connection) bypass RLS for writes", async () => {
         // The BASE driver is the server context — it never switches role.
+        // Scope note: this proves it about the base driver ONLY. It says
+        // nothing about `rebase.dataAsAdmin`, which is a *different object* —
+        // the base driver wrapped in `withAuth(SERVICE_IDENTITY)`.
         await driver.save({
             path: "secrets", collection: secretsCollection, values: { id: "s-server", value: "ok" }
         } as never);
