@@ -206,9 +206,10 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         driver.rlsUserRole = REBASE_USER_ROLE;
         realtime.rlsUserRole = REBASE_USER_ROLE;
 
-        // Seed through the owner/server context (the trusted plane, e.g.
-        // `dataAsAdmin` or an auth flow) — it bypasses RLS, exactly as a real
-        // deployment's server-side seed would.
+        // Seed through the owner/server context (the trusted plane: an auth
+        // flow, a migration, `rebase.sql`) — it bypasses RLS, exactly as a real
+        // deployment's server-side seed would. Not `dataAsAdmin`, which is
+        // scoped with `withAuth(SERVICE_IDENTITY)` and is RLS-evaluated.
         await admin.query(`INSERT INTO public.tiers (id, label) VALUES ('t-free', 'Free'), ('t-pro', 'Pro')`);
         await admin.query(`INSERT INTO public.secrets (id, value) VALUES ('s1', 'classified')`);
     }, 180_000);

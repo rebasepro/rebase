@@ -303,7 +303,8 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 **`context.data` hérite des privilèges de ce qui a déclenché le rappel.** Ce n'est pas un niveau de confiance fixe.
 
 - Déclenché par une **requête utilisateur** (REST, temps réel, une modification dans le panneau d'administration) → **limité à l'utilisateur**. Le rappel s'exécute dans la transaction soumise au RLS ouverte pour cette requête ; les politiques s'appliquent donc aux lectures *et* aux écritures. Un rappel ne peut pas voir une ligne que son appelant ne pouvait pas voir.
-- Déclenché par un **travail en contexte serveur** (`rebase.dataAsAdmin`, une tâche cron) → **non limité**. Il s'exécute sur la connexion propriétaire et contourne le RLS.
+- Déclenché par **`rebase.dataAsAdmin` ou une tâche cron** (le même singleton) → **limité à l'administrateur**, et non pas non limité. Ce pilote est restreint à `{ uid: "service", roles: ["admin"] }` ; le rappel s'exécute donc toujours dans une transaction soumise au RLS : vos politiques sont évaluées, face à cette identité.
+- Déclenché par le **pilote de base** (les flux d'authentification intégrés, les migrations) → **non limité**. Il s'exécute sur la connexion propriétaire et contourne le RLS.
 :::
 
 C'est surtout important dans la direction qui échoue en silence. Le RLS *filtre*, il ne lève pas d'erreur — un rappel qui lit une ligne voisine la trouvera lorsqu'une tâche d'administration enregistre, et peut ne rien trouver lorsqu'un utilisateur final enregistre, sans erreur dans les deux cas. Écrivez des rappels qui tolèrent un résultat vide, ou passez délibérément par le plan d'administration :
@@ -314,8 +315,12 @@ afterSave: async ({ context }) => {
     // enregistrement : le RLS s'applique.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Contourner délibérément le RLS — pour un travail que l'appelant ne doit
-    // réellement pas voir, comme un journal d'audit qu'il ne peut ni lire ni modifier.
+    // Délibérément limité à l'administrateur — pour un travail que l'appelant ne
+    // doit réellement pas voir, comme un journal d'audit qu'il ne peut ni lire ni
+    // modifier. Attention : c'est la portée d'un administrateur, pas un
+    // contournement du RLS — une collection dont la seule règle est
+    // `policy.serverContext()` lui reste fermée, car cela compile en
+    // `auth.uid() IS NULL` et l'uid de cet accesseur est `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```

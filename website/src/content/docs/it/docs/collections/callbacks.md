@@ -303,7 +303,8 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 **`context.data` eredita i privilegi di ciò che ha attivato il callback.** Non è un livello di fiducia fisso.
 
 - Attivato da una **richiesta utente** (REST, realtime, una modifica nel pannello di amministrazione) → **con ambito utente**. Il callback viene eseguito all'interno della transazione vincolata da RLS aperta per quella richiesta, quindi le policy si applicano sia alle letture *sia* alle scritture. Un callback non può vedere una riga che il suo chiamante non poteva vedere.
-- Attivato da **lavoro in contesto server** (`rebase.dataAsAdmin`, un job cron) → **senza ambito**. Viene eseguito sulla connessione proprietaria e bypassa RLS.
+- Attivato da **`rebase.dataAsAdmin` o da un job cron** (lo stesso singleton) → **con ambito amministratore**, non senza ambito. Quel driver è limitato a `{ uid: "service", roles: ["admin"] }`, quindi il callback viene comunque eseguito in una transazione vincolata da RLS: le tue policy vengono valutate, rispetto a quell'identità.
+- Attivato dal **driver base** (i flussi di autenticazione integrati, le migrazioni) → **senza ambito**. Viene eseguito sulla connessione proprietaria e bypassa RLS.
 :::
 
 Questo conta soprattutto nella direzione che fallisce in silenzio. RLS *filtra*, non solleva errori — quindi un callback che legge una riga adiacente la troverà quando salva un'attività amministrativa e potrebbe non trovare nulla quando salva un utente finale, senza errori in nessuno dei due casi. Scrivi callback che tollerino un risultato vuoto, oppure ricorri deliberatamente al piano di amministrazione:
@@ -314,8 +315,12 @@ afterSave: async ({ context }) => {
     // RLS si applica.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // Bypassare RLS deliberatamente — per lavoro che il chiamante davvero non
-    // deve vedere, come un log di audit che non può leggere né modificare.
+    // Ambito amministratore deliberato — per lavoro che il chiamante davvero
+    // non deve vedere, come un log di audit che non può leggere né modificare.
+    // Attenzione: è la portata di un amministratore, non un bypass di RLS: una
+    // collection la cui unica regola è `policy.serverContext()` resta chiusa
+    // anche a lui, perché quella compila in `auth.uid() IS NULL` e l'uid di
+    // questo accessor è `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```

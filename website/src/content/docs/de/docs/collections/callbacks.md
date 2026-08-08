@@ -303,7 +303,8 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 **`context.data` erbt die Rechte dessen, was den Callback ausgelöst hat.** Es ist keine feste Vertrauensstufe.
 
 - Ausgelöst durch eine **Benutzeranfrage** (REST, Realtime, eine Änderung im Admin-Panel) → **benutzergebunden**. Der Callback läuft in der RLS-gebundenen Transaktion, die für diese Anfrage geöffnet wurde; Richtlinien gelten also für Lese- *und* Schreibvorgänge. Ein Callback kann keine Zeile sehen, die sein Aufrufer nicht sehen konnte.
-- Ausgelöst durch **Arbeit im Serverkontext** (`rebase.dataAsAdmin`, ein Cron-Job) → **ungebunden**. Er läuft über die Owner-Verbindung und umgeht RLS.
+- Ausgelöst durch **`rebase.dataAsAdmin` oder einen Cron-Job** (dasselbe Singleton) → **admin-gebunden**, nicht ungebunden. Dieser Treiber ist auf `{ uid: "service", roles: ["admin"] }` eingegrenzt, der Callback läuft also weiterhin in einer RLS-gebundenen Transaktion: Ihre Richtlinien werden ausgewertet — gegen diese Identität.
+- Ausgelöst durch den **Basis-Treiber** (die eingebauten Auth-Abläufe, Migrationen) → **ungebunden**. Er läuft über die Owner-Verbindung und umgeht RLS.
 :::
 
 Das ist vor allem in der Richtung wichtig, die stillschweigend fehlschlägt. RLS *filtert*, es wirft keinen Fehler — ein Callback, der eine benachbarte Zeile liest, findet sie, wenn eine Admin-Aufgabe speichert, und findet möglicherweise nichts, wenn ein Endbenutzer speichert, in beiden Fällen ohne Fehler. Schreiben Sie Callbacks, die ein leeres Ergebnis vertragen, oder greifen Sie bewusst zur Admin-Ebene:
@@ -314,8 +315,12 @@ afterSave: async ({ context }) => {
     // RLS greift.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // RLS bewusst umgehen — für Arbeit, die der Aufrufer tatsächlich nicht sehen
-    // soll, etwa ein Audit-Log, das er weder lesen noch bearbeiten darf.
+    // Bewusst admin-gebunden — für Arbeit, die der Aufrufer tatsächlich nicht
+    // sehen soll, etwa ein Audit-Log, das er weder lesen noch bearbeiten darf.
+    // Beachten Sie: das ist die Reichweite eines Admins, kein Umgehen von RLS —
+    // eine Collection, deren einzige Regel `policy.serverContext()` ist, bleibt
+    // auch dafür verschlossen, denn das kompiliert zu `auth.uid() IS NULL`, und
+    // die uid dieses Accessors ist `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```

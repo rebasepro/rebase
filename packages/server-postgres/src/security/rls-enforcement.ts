@@ -23,9 +23,14 @@ import { logger } from "@rebasepro/server";
  *    are validation/side-effects, not a security boundary.
  *
  *  - **Server context** — the base (owner) connection: auth flows, migrations,
- *    background jobs, and the explicit `rebase.dataAsAdmin` accessor. As table
- *    owner it bypasses RLS. This is the trusted plane, equivalent to
- *    Supabase's `service_role`.
+ *    and raw `rebase.sql`. As table owner it bypasses RLS. This is the trusted
+ *    plane, equivalent to Supabase's `service_role`.
+ *
+ *    `rebase.dataAsAdmin` is **not** in it, despite the name. `init.ts` scopes
+ *    that driver with `withAuth(SERVICE_IDENTITY)`, so it arrives as user
+ *    context above — `rebase_user`, `app.uid = 'service'`, policies evaluated —
+ *    and clears the default policies through their admin arm rather than the
+ *    `auth.uid() IS NULL` one.
  *
  * This module provides the three pieces:
  *
