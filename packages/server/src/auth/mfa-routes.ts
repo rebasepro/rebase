@@ -12,7 +12,7 @@ import {
     generateRecoveryCodes,
     hashRecoveryCode
 } from "./mfa";
-import { encryptTotpSecret, decryptTotpSecret } from "./mfa-crypto";
+import { encryptTotpSecret, openTotpSecret } from "./mfa-crypto";
 import {
     getAccessTokenExpiry,
     verifyAccessToken,
@@ -20,6 +20,7 @@ import {
     type AccessTokenPayload
 } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
+import type { AuthRepository } from "./interfaces";
 import { redactRefreshToken } from "./cookie-utils";
 import { resolveAuthHooks } from "./auth-hooks";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -85,6 +86,42 @@ interface StepUpPrincipal {
  * the challenge pair is that it runs before the session exists — a login by an
  * MFA-enrolled user never receives an access token until it is finished.
  */
+/**
+ * Open a factor's stored secret, re-storing it under the current key if it
+ * opened with an older one.
+ *
+ * This is what makes an `MFA_ENCRYPTION_KEY` rotation complete on its own: each
+ * factor moves to the new key the next time its owner authenticates, so the
+ * previous key can eventually be dropped. See `mfa-crypto.ts` for the sequence.
+ *
+ * A failed re-wrap must never fail the verification — the code the user typed
+ * was already checked against the right secret, and the only cost of not
+ * persisting is that this factor is re-wrapped again next time.
+ */
+async function openAndRewrap(
+    authRepo: AuthRepository,
+    factorId: string,
+    secretEncrypted: string
+): Promise<string> {
+    const { secret, rewrapped } = openTotpSecret(secretEncrypted);
+    if (!rewrapped) return secret;
+
+    // Optional on the interface: a repository that cannot re-store a secret
+    // keeps working, it just leaves the factor on its original key.
+    if (typeof authRepo.updateMfaFactorSecret !== "function") return secret;
+
+    try {
+        await authRepo.updateMfaFactorSecret(factorId, rewrapped);
+        logger.info("[MFA-Crypto] Re-wrapped a TOTP secret under the current key", { factorId });
+    } catch (error) {
+        logger.warn("[MFA-Crypto] Could not re-wrap a TOTP secret; leaving it on its original key", {
+            factorId,
+            error
+        });
+    }
+    return secret;
+}
+
 function resolveStepUpPrincipal(c: Context<HonoEnv>): StepUpPrincipal | null {
     // Respect a principal an upstream middleware already resolved, exactly as
     // `requireAuth` does.
@@ -262,7 +299,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         }
 
         // Decrypt and verify the TOTP code
-        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const decryptedSecret = await openAndRewrap(authRepo, factor.id, factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
         const matchedCounter = verifyTotpCounter(secretBuffer, code);
 
@@ -357,7 +394,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
         }
 
         // Try TOTP verification first (standard 6-digit codes)
-        const decryptedSecret = decryptTotpSecret(factor.secretEncrypted);
+        const decryptedSecret = await openAndRewrap(authRepo, factor.id, factor.secretEncrypted);
         const secretBuffer = base32Decode(decryptedSecret);
         const matchedCounter = verifyTotpCounter(secretBuffer, code);
         let isValid = matchedCounter !== null && await claimTotpStep(factor.id, matchedCounter);

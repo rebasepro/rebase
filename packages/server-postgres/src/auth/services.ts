@@ -1272,6 +1272,10 @@ collectionPermissions: null }
         return this.getMfaService().verifyMfaFactor(factorId);
     }
 
+    async updateMfaFactorSecret(factorId: string, secretEncrypted: string): Promise<void> {
+        return this.getMfaService().updateMfaFactorSecret(factorId, secretEncrypted);
+    }
+
     async deleteMfaFactor(factorId: string, uid: string): Promise<void> {
         return this.getMfaService().deleteMfaFactor(factorId, uid);
     }
@@ -1430,6 +1434,15 @@ export class MfaService implements MfaRepository {
         await this.db.execute(sql`
             UPDATE ${sql.raw(tableName)}
             SET verified = TRUE, updated_at = NOW()
+            WHERE id = ${factorId}
+        `);
+    }
+
+    async updateMfaFactorSecret(factorId: string, secretEncrypted: string): Promise<void> {
+        const tableName = this.qualify("mfa_factors");
+        await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET secret_encrypted = ${secretEncrypted}, updated_at = NOW()
             WHERE id = ${factorId}
         `);
     }

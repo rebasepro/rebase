@@ -568,6 +568,20 @@ export interface MfaRepository {
     verifyMfaFactor(factorId: string): Promise<void>;
 
     /**
+     * Replace a factor's stored ciphertext with an equivalent one.
+     *
+     * Used only to re-wrap a secret under the current `MFA_ENCRYPTION_KEY`
+     * after it opened with an older one, so that a key rotation completes as
+     * users sign in rather than needing a migration. The plaintext secret is
+     * unchanged, so a repository that does not implement this is not broken —
+     * its factors simply stay on the key that wrote them, and that key has to
+     * remain in `MFA_ENCRYPTION_KEY_PREVIOUS`.
+     *
+     * Optional for that reason: callers must check before calling.
+     */
+    updateMfaFactorSecret?(factorId: string, secretEncrypted: string): Promise<void>;
+
+    /**
      * Delete an MFA factor
      */
     deleteMfaFactor(factorId: string, uid: string): Promise<void>;
