@@ -63,7 +63,10 @@ accessExpiresIn: "2h" });
             expect(payload).toEqual({
                 uid: "user-456",
                 roles: ["viewer"],
-                aal: "aal1"
+                aal: "aal1",
+                // Carried through verification so that revocation can compare it
+                // against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 
@@ -81,7 +84,10 @@ accessExpiresIn: "2h" });
             expect(payload).toEqual({
                 uid: "user-123",
                 roles: ["admin"],
-                aal: "aal1"
+                aal: "aal1",
+                // Carried through verification so that revocation can compare it
+                // against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 

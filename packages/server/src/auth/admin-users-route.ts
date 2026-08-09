@@ -72,7 +72,8 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
     router.use("/*", createRequireAuth({
         serviceKey: config.serviceKey,
         // These routes can grant roles, so they must not trust a role claim.
-        resolveRoles: uid => authRepo.getUserRoleIds(uid)
+        resolveRoles: uid => authRepo.getUserRoleIds(uid),
+        revocationRepo: authRepo
     }));
 
     router.post("/bootstrap", async (c) => {

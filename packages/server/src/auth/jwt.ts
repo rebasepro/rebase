@@ -19,6 +19,18 @@ export interface AccessTokenPayload {
     roles: string[];
     /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
     aal?: "aal1" | "aal2";
+    /**
+     * When the token was issued, in seconds since the epoch — the standard JWT
+     * `iat` claim, which `jsonwebtoken` sets on every token it signs.
+     *
+     * Carried through verification because revocation needs it: `logout`,
+     * `change-password`, `reset-password` and `DELETE /auth/sessions` all stamp
+     * a `tokensValidAfter` watermark on the user, and a token is void if it was
+     * issued before that mark. `verifyAccessToken` used to rebuild the payload
+     * from three claims and drop this one, so nothing downstream could make the
+     * comparison and the watermark was read on exactly one path — refresh.
+     */
+    iat?: number;
     /** Email claim from the JWT, if present */
     email?: string;
     /** Display name claim from the JWT, if present */
@@ -189,7 +201,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         // `userId` is the pre-rename claim: tokens minted by an older backend
         // are still in circulation and must keep verifying until they expire,
         // or a deploy signs every active session out.
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string };
+        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
@@ -205,7 +217,8 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         return {
             uid: id,
             roles: decoded.roles || [],
-            aal
+            aal,
+            iat: decoded.iat
         };
     } catch (error) {
         logger.error("[JWT] Verification failed", { error: error, detail: token.substring(0, 15) });

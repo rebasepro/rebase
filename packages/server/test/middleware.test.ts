@@ -68,7 +68,10 @@ describe("Auth Middleware", () => {
             expect(getUser()).toEqual({
                 uid: "user-123",
                 roles: ["admin", "editor"],
-                aal: "aal1"
+                aal: "aal1",
+                // `iat` is carried through verification now: revocation compares the
+                // token\'s issue time against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 
@@ -140,7 +143,8 @@ describe("Auth Middleware", () => {
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
-aal: "aal1" });
+aal: "aal1",
+iat: expect.any(Number) });
         });
 
         it("should handle an uppercase BEARER prefix", async () => {
@@ -152,7 +156,8 @@ aal: "aal1" });
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({ uid: "user-123",
 roles: ["admin"],
-aal: "aal1" });
+aal: "aal1",
+iat: expect.any(Number) });
         });
 
         it("should still reject a non-Bearer scheme", async () => {
@@ -198,7 +203,10 @@ aal: "aal1" });
             expect(getUser()).toEqual({
                 uid: "user-123",
                 roles: ["viewer"],
-                aal: "aal1"
+                aal: "aal1",
+                // `iat` is carried through verification now: revocation compares the
+                // token\'s issue time against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 
@@ -230,7 +238,10 @@ aal: "aal1" });
             expect(getUser()).toEqual({
                 uid: "user-456",
                 roles: ["viewer"],
-                aal: "aal1"
+                aal: "aal1",
+                // `iat` is carried through verification now: revocation compares the
+                // token\'s issue time against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 
@@ -345,7 +356,10 @@ roles: ["schema-adminstration", "admins", "admin "] } });
             expect(payload).toEqual({
                 uid: "ws-user-123",
                 roles: ["admin"],
-                aal: "aal1"
+                aal: "aal1",
+                // `iat` is carried through verification now: revocation compares the
+                // token\'s issue time against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
 
@@ -366,7 +380,10 @@ roles: ["schema-adminstration", "admins", "admin "] } });
             expect(payload).toEqual({
                 uid: "user-no-roles",
                 roles: [],
-                aal: "aal1"
+                aal: "aal1",
+                // `iat` is carried through verification now: revocation compares the
+                // token\'s issue time against the user\'s `tokensValidAfter` watermark.
+                iat: expect.any(Number)
             });
         });
     });

@@ -23,6 +23,7 @@ import type {
 } from "@rebasepro/types";
 
 import { Hono } from "hono";
+import { isAccessTokenRevoked } from "./token-revocation";
 import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
@@ -147,6 +148,18 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // JWT verification
             const payload = verifyAccessToken(token);
             if (!payload) {
+                return null;
+            }
+
+            // A token issued before the user's revocation watermark is void,
+            // however well it verifies. This is the read that makes `logout`,
+            // `change-password`, `reset-password` and `DELETE /auth/sessions`
+            // reach the access token instead of only the refresh row.
+            if (await isAccessTokenRevoked(authRepository, payload)) {
+                logger.warn("[Security Audit] Refused a revoked access token", {
+                    eventType: "auth.token.revoked",
+                    uid: payload.uid
+                });
                 return null;
             }
 

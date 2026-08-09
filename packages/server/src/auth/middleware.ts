@@ -1,4 +1,6 @@
 import { MiddlewareHandler, Context } from "hono";
+import type { AuthRepository } from "./interfaces";
+import { isAccessTokenRevoked } from "./token-revocation";
 import { hasAdministrativeRole } from "./admin-roles";
 import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken } from "./jwt";
@@ -145,11 +147,21 @@ export function createRequireAuth(options?: {
      * are already administrative.
      */
     resolveRoles?: (uid: string) => Promise<string[]>;
+    /**
+     * Repository used to check the token-revocation watermark.
+     *
+     * Separate from {@link resolveRoles} only because that one is a narrow
+     * function; a caller with a repository should pass it here so a token
+     * invalidated by `logout` or a password reset stops working on admin routes
+     * too, not just on the data plane.
+     */
+    revocationRepo?: Pick<AuthRepository, "getTokensValidAfter">;
 }): MiddlewareHandler<HonoEnv> {
     if (!options?.serviceKey) return requireAuth;
 
     const key = options.serviceKey;
     const resolveRoles = options.resolveRoles;
+    const revocationRepo = options.revocationRepo;
     return async (c, next) => {
         // Respect a user already resolved upstream (e.g. API-key pre-auth).
         if (c.get("user")) return next();
@@ -186,6 +198,13 @@ roles: ["admin"] } as AccessTokenPayload);
 
         if (resolveRoles) {
             try {
+                // Same watermark the data plane checks. An admin route is the
+                // last place a revoked token should still work.
+                if (revocationRepo && await isAccessTokenRevoked(revocationRepo, payload)) {
+                    return c.json({
+                        error: { message: "Session has been revoked", code: "SESSION_REVOKED" }
+                    }, 401);
+                }
                 c.set("user", { ...payload,
 roles: await resolveRoles(payload.uid) });
                 return next();
