@@ -2,7 +2,7 @@ import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { CollectionConfig, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
 import { hasForeignKeyOnTarget, isManyToMany } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
 import { DrizzleClient } from "../interfaces";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -173,7 +173,9 @@ export class RelationWriteService {
                 const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                 const targetIdInfo = targetPks[0];
                 const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
-                const fkCol = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+                // The wire name the target's table is keyed by, not the column.
+                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
+                const fkCol = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
 
                 if (!fkCol || !targetIdCol) {
                     throw relationMisconfigured(
@@ -202,7 +204,7 @@ export class RelationWriteService {
                     const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: null })
+                        .set({ [fkField]: null })
                         // `notInArray`, not a hand-built fragment: the sibling
                         // update three lines below already uses `inArray`, and
                         // the hand-built version called `sql.join` with no
@@ -215,13 +217,13 @@ export class RelationWriteService {
                     // Set FK for the provided targets
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: parentKeyValue })
+                        .set({ [fkField]: parentKeyValue })
                         .where(inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]));
                 } else {
                     // If empty array provided, clear all existing links for this parent
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: null })
+                        .set({ [fkField]: null })
                         .where(eq(fkCol, parentKeyValue));
                 }
             } else {
@@ -307,7 +309,9 @@ export class RelationWriteService {
                     );
                 }
 
-                const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget! as keyof typeof targetTable] as AnyPgColumn;
+                // The wire name the target's table is keyed by, not the column.
+                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget!);
+                const foreignKeyColumn = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
                 if (!foreignKeyColumn) {
                     throw relationMisconfigured(
                         label,
@@ -333,7 +337,7 @@ export class RelationWriteService {
                 if (newValue === null || newValue === undefined) {
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: null })
+                        .set({ [fkField]: null })
                         .where(eq(foreignKeyColumn, sourceKeyValue));
                 } else {
                     const parsedNewTargetIdObj = parseIdValues(newValue as string | number, targetPks);
@@ -343,13 +347,13 @@ export class RelationWriteService {
                     // First, clear any existing FK that points to this source row
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: null })
+                        .set({ [fkField]: null })
                         .where(eq(foreignKeyColumn, sourceKeyValue));
 
                     // Then, update the new target row to point to this source row
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: sourceKeyValue })
+                        .set({ [fkField]: sourceKeyValue })
                         .where(eq(targetIdField, parsedNewTargetId));
                 }
             } catch (e) {
@@ -479,7 +483,16 @@ export class RelationWriteService {
             const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
             // Determine mapping of columns
-            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation);
+            //
+            // A join path is authored in SQL terms — `posts.author_id`,
+            // `user_profiles.user_id` — because that is what a join is written
+            // in. Everything below indexes a Drizzle table or builds a `set`
+            // payload with these, and both are keyed by the wire name, so the
+            // two are translated here rather than at each of the six uses.
+            const { targetFKColName: targetFKColumn, parentSourceColName: parentSourceColumn } =
+                this.resolveJoinPathWriteMapping(parentCollection, relation);
+            const targetFKColName = fieldKeyForColumn(targetCollection, targetFKColumn);
+            const parentSourceColName = fieldKeyForColumn(parentCollection, parentSourceColumn);
             const parentTable = getTableForCollection(parentCollection, this.registry);
             const parentPks = requirePrimaryKeys(parentCollection, this.registry);
             const parentIdInfo = parentPks[0];
