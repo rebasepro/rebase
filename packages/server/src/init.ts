@@ -1005,10 +1005,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logger.debug("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
     }
 
-    // One rate-limit store shared by the data and functions limiters: the
-    // budget is per caller, not per router — two private stores would
-    // silently double every caller's allowance. An operator-provided store
-    // is respected as-is.
+    // One rate-limit store shared by the data, functions and storage limiters:
+    // the budget is per caller, not per router — private stores would silently
+    // multiply every caller's allowance. An operator-provided store is
+    // respected as-is.
     const rateLimitConfig: DataRateLimitConfig | undefined =
         config.rateLimit?.enabled !== false
             ? {
@@ -1349,6 +1349,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // "storage" (or "*") permission entry for the derived operation.
         if (apiKeyPreAuth) {
             storageRouter.use("/*", apiKeyPreAuth, createStorageApiKeyGuard());
+        }
+
+        // Storage shares the data/functions limiter and its store, so a caller
+        // has one budget across the product rather than one per router.
+        //
+        // This surface was the one left without any limiter, and it is the one
+        // where a single request buys a metered third-party operation: PutObject,
+        // GetObject and its egress, ListObjectsV2. With `storagePublicRead: true`
+        // — a documented, ordinary setting — `readAuthMiddleware` resolves to a
+        // no-op and `GET /file/*` is anonymous, so one machine looping over a
+        // large public object was unbounded egress billed a month later.
+        //
+        // Registered after the API-key guard so a key's identity is already on
+        // the context and the limiter buckets by caller rather than by IP, and
+        // before `route("/")` for the ordering reason the comment above records.
+        if (rateLimitConfig) {
+            storageRouter.use("/*", createDataRateLimiter(rateLimitConfig));
         }
 
         // Apply a permissive body limit specifically for the upload endpoint
