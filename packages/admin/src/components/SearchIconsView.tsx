@@ -4,9 +4,8 @@ import {
     coolIconKeys,
     debounce,
     IconButton,
-    iconKeys,
     iconSize,
-    lucideIcons,
+    LucideIconByName,
     SearchBar,
     Tooltip
 } from "@rebasepro/ui";
@@ -14,20 +13,6 @@ import { iconsSearch } from "@rebasepro/app";
 import { useTranslation } from "@rebasepro/app";
 
 const UPDATE_SEARCH_INDEX_WAIT_MS = 220;
-
-
-function toPascalCase(str: string): string {
-    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
-}
-
-function resolveIcon(iconKey: string): React.ComponentType<{ size: number }> | null {
-    const allIcons = lucideIcons as Record<string, React.ComponentType<{ size: number }>>;
-    let icon = allIcons[iconKey];
-    if (!icon) {
-        icon = allIcons[toPascalCase(iconKey)];
-    }
-    return icon ?? null;
-}
 
 export interface SearchIconsProps {
     selectedIcon?: string;
@@ -74,23 +59,19 @@ export function SearchIconsView({
             />
 
             <div className={"flex max-w-full flex-wrap mt-4"}>
-                {icons.map((icon: string) => {
-                    const LucideIcon = resolveIcon(icon);
-                    if (!LucideIcon) return null;
-                    return (
-                        <Tooltip title={icon} key={icon}
-                            asChild={true}>
-                            <IconButton
-                                shape={"square"}
-                                toggled={selectedIcon === icon}
-                                onClick={onIconSelected ? () => onIconSelected(icon) : undefined}
-                                className="box-content m-1"
-                            >
-                                <LucideIcon size={iconSize.medium}/>
-                            </IconButton>
-                        </Tooltip>
-                    );
-                })}
+                {icons.map((icon: string) => (
+                    <Tooltip title={icon} key={icon}
+                        asChild={true}>
+                        <IconButton
+                            shape={"square"}
+                            toggled={selectedIcon === icon}
+                            onClick={onIconSelected ? () => onIconSelected(icon) : undefined}
+                            className="box-content m-1"
+                        >
+                            <LucideIconByName name={icon} size={iconSize.medium}/>
+                        </IconButton>
+                    </Tooltip>
+                ))}
             </div>
         </>
     );

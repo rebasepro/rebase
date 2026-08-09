@@ -70,6 +70,7 @@
     "record:project-snapshot": "pnpm --filter @rebasepro/server-postgres record:project-snapshot",
     "check:runtime-image": "node scripts/check-runtime-image.mjs",
     "check:runtime-image:live": "node scripts/check-runtime-image.mjs --live",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:hooks": "node scripts/check-hooks-baseline.mjs",
     "check:unused": "node scripts/check-unused-locals.mjs",
     "check:test-scripts": "node scripts/check-test-scripts.mjs",

@@ -6,7 +6,7 @@ import {
     IconColor,
     iconKeys,
     iconSize,
-    lucideIcons
+    LucideIconByName
 } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 import { hashString, slugify } from "@rebasepro/utils";
@@ -22,29 +22,13 @@ const iconKeysMap: Record<string, string> = iconKeys.reduce((acc: Record<string,
     return acc;
 }, {});
 
-function toPascalCase(str: string): string {
-    return str.split(/[-_]/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join("");
-}
-
-/**
- * Resolve a Lucide icon component by string key.
- * Tries direct match, PascalCase conversion, and falls back to CircleAlert.
- */
-function resolveIcon(iconKey: string): React.ComponentType<{ size?: number; className?: string }> | null {
-    const iconsMap = lucideIcons as Record<string, React.ComponentType<{ size?: number; className?: string }> | undefined>;
-    let icon = iconsMap[iconKey];
-    if (!icon) {
-        icon = iconsMap[toPascalCase(iconKey)];
-    }
-    if (!icon) {
-        icon = iconsMap.CircleAlert;
-    }
-    return icon ?? null;
-}
-
 /**
  * Render an icon element from a string key or existing React element.
- * This resolves the icon from the lucide-react icons map directly.
+ *
+ * Whether a key names an icon is decided here, against `iconKeys` — an array
+ * of strings. The component behind the key is fetched by `LucideIconByName` on
+ * first use: this used to index lucide's full `icons` map, which is the whole
+ * library and cannot be tree-shaken.
  */
 export function getIcon(iconKey?: string | React.ReactNode,
     className?: string,
@@ -66,11 +50,9 @@ export function getIcon(iconKey?: string | React.ReactNode,
             return undefined;
         }
 
-        const LucideIcon = resolveIcon(mappedKey);
-        if (!LucideIcon) return undefined;
-
         const sizeInPx = typeof size === "number" ? size : iconSize[size ?? "medium"];
-        return <LucideIcon
+        return <LucideIconByName
+            name={mappedKey}
             size={sizeInPx}
             className={cls(
                 color ? colorClassesMapping[color] : "",
@@ -126,11 +108,9 @@ export const IconForView = React.memo(
         if (!key)
             key = coolIconKeys[hashString(collectionOrView.slug) % iconsCount];
 
-        const LucideIcon = resolveIcon(key);
-        if (!LucideIcon) return <></>;
-
         const sizeInPx = typeof size === "number" ? size : iconSize[size];
-        return <LucideIcon
+        return <LucideIconByName
+            name={key}
             size={sizeInPx}
             className={cls(
                 color ? colorClassesMapping[color] : "",

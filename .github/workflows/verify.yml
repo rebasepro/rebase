@@ -228,6 +228,20 @@ jobs:
       - name: Runtime API surface
         run: pnpm run check:api-surface
 
+      # What a browser downloads before the login screen paints. Nothing
+      # measured it, and three separate libraries had drifted into that set:
+      # exceljs (940 kB) behind a `lazy()` that a barrel re-export cancelled,
+      # lucide's entire icon map (822 kB) re-exported by name so tree-shaking
+      # could not touch it, and every date-fns locale (641 kB) reached through
+      # `import * as locales`. None of that fails a type check or a test.
+      #
+      # Budgets the EAGER set — the entry chunk plus what index.html preloads —
+      # not the dist, which is dominated by legitimately lazy routes and would
+      # therefore punish the fix. Reads `app/frontend/dist`, hence after the
+      # build.
+      - name: Eager JavaScript budget
+        run: pnpm run check:bundle
+
       # The API-surface gate's own tests, over a fixture barrel. It spent its
       # whole life unable to see a member disappear from `const rebase` — a bare
       # entry has no members to lose — so the gate that guards the fleet needs a
