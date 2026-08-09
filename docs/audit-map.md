@@ -30,27 +30,31 @@ Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](A
 
 ---
 
-## Still open, verified against the code on 2026-08-09
+## Verification pass — 2026-08-09/10
 
 The write-ups state the code as it was on the day of the pass. Most of what they
 found was closed by the `sweep/2026-08-08` fix branches, which map one-to-one onto
-the units below. Re-checking the severity-coded findings against current `main`:
-**all 4 Criticals are fixed**, and of the 29 Highs checked so far, 26 are fixed and
-these three are not.
+the units below. Re-checking the severity-coded findings against `main`:
+**all 4 Criticals are fixed**, and of the 29 Highs checked, 26 were already fixed.
 
-1. **Anonymous sign-in ignores `disableSelfRegistration`** (unit 18, H4).
-   `POST /auth/anonymous` (`server/src/auth/session-routes.ts:359`) goes from the rate
-   limiter straight to `createUser`. It never calls `isRegistrationOpen`, which the
-   `/config` route thirty lines above does call, and no `enableAnonymous`-style flag
-   exists anywhere. A deployment that has closed registration still hands anyone a
-   user and a session.
-2. **Storage has no rate limiter at all** (unit 24, H2). `createDataRateLimiter` is
-   mounted on the data router (`server/src/init.ts:1490`) and the functions router
-   (`:1740`) and nowhere else. Upload, download and TUS are unlimited.
-3. **`checkPolicyDrift` never checks whether RLS is on** (unit 17, H3).
-   `server-postgres/src/security/policy-drift.ts:128` reads `pg_policies` only, never
-   `pg_class.relrowsecurity`. A table with correct policies and RLS switched off
-   reports zero drift — the one state the checker most needs to catch.
+The three that were not are **now fixed** (2026-08-10):
+
+1. ~~Anonymous sign-in ignores `disableSelfRegistration`~~ (unit 18, H4) — an
+   opt-in `allowAnonymous` key now gates both `/auth/anonymous` and
+   `/auth/anonymous/link` through `registration-policy.ts`, `disableSelfRegistration`
+   overrides it, and `getCapabilities()` reports `anonymousLogin`.
+   The audit's second half is **still open**: nothing downstream reads `isAnonymous`,
+   so an anonymous user holds the same `defaultRole` as a registered one and no
+   policy can say otherwise. That needs `is_anonymous` in the RLS-visible identity.
+2. ~~Storage has no rate limiter at all~~ (unit 24, H2) — the storage router now
+   shares the data/functions limiter and store. **Still open:** storage's cost is
+   bytes rather than requests, so a bytes-per-window bound per bucket is the honest
+   control; the request limiter is only the floor.
+3. ~~`checkPolicyDrift` never checks whether RLS is on~~ (unit 17, H3) — added an
+   `rlsDisabled` category from `pg_class.relrowsecurity` and PERMISSIVE/RESTRICTIVE
+   comparison from `pg_policies.permissive`. **Still open:** the audit's point (c),
+   that a body rewritten to `USING (true)` under an unchanged name still passes,
+   which needs `rls-check`'s `policy-always-true` ported in.
 
 **Coverage caveat:** 64 of the 93 High findings have not been re-checked against
 current code, so their write-ups' verdicts still stand unverified. Mediums and Lows
