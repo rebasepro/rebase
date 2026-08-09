@@ -135,13 +135,20 @@ function matchesCronFields(candidate: Date, fields: CronFields): boolean {
 }
 
 /** ~1 year in minutes — the walk bound for both search directions. */
-const MAX_SLOT_SEARCH_MINUTES = 525960;
+/**
+ * How far forward to look for the next matching slot.
+ *
+ * Four years and a day, not one year. `0 0 29 2 *` — run on 29 February — is a
+ * legitimate expression whose slot can be almost four years out, and a one-year
+ * search never found it.
+ */
+const MAX_SLOT_SEARCH_MINUTES = 4 * 525960 + 1440;
 
 /**
  * Calculate the next Date after `after` that matches the cron expression.
  * Throws on invalid expressions.
  */
-function parseCronExpression(expression: string, after: Date): Date {
+export function parseCronExpression(expression: string, after: Date): Date {
     const fields = parseCronFields(expression);
 
     // Forward-search from `after + 1 minute`
@@ -156,10 +163,22 @@ function parseCronExpression(expression: string, after: Date): Date {
         candidate.setMinutes(candidate.getMinutes() + 1);
     }
 
-    // Fallback — should not happen with valid expressions
-    const fallback = new Date(after);
-    fallback.setMinutes(fallback.getMinutes() + 1);
-    return fallback;
+    // No slot inside the window. Refuse rather than invent one.
+    //
+    // This used to return `after + 1 minute`, which is indistinguishable from a
+    // schedule that really does fire every minute — so an expression with no
+    // reachable slot ran sixty times an hour, forever. `0 0 29 2 *` was caught
+    // by it while the search window was a single year: a job meant to run once
+    // every four years became the busiest job on the deployment.
+    //
+    // The caller schedules inside a `try` and reports a job it could not
+    // schedule, which is the correct outcome for an expression that names no
+    // time. Genuinely impossible dates (`0 0 31 2 *`) land here too, and should.
+    throw new Error(
+        `Cron expression "${expression}" has no matching time within ` +
+        `${Math.round(MAX_SLOT_SEARCH_MINUTES / 525960)} years of ${after.toISOString()}. ` +
+        "Check the day-of-month and month fields — a date such as 31 February never occurs."
+    );
 }
 
 /**

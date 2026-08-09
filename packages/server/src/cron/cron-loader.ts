@@ -63,10 +63,21 @@ export async function loadCronJobsFromDirectory(
                 }
 
                 const id = path.basename(file, path.extname(file));
+                // Spread first, then normalise. Rebuilding this object field by
+                // field dropped `catchUpWindowSeconds` — and since this loader
+                // is the only production caller of `registerJobs`, catch-up
+                // never ran for any job authored the documented way: 64 lines
+                // of docblock, a docs section, a unit suite and a Postgres e2e
+                // all describing a feature that was switched off in the one
+                // path that matters. Every existing test built `LoadedCronJob`
+                // literals directly, so none of them went through here.
+                //
+                // The shape is the bug, not the missing line: a field added to
+                // `CronJobDefinition` tomorrow would be dropped the same way.
                 const definition: CronJobDefinition = {
+                    ...(def as Partial<CronJobDefinition>),
                     schedule: def.schedule as string,
                     name: (def.name as string) || id,
-                    description: def.description as string | undefined,
                     enabled: def.enabled !== false,
                     timeoutSeconds: (def.timeoutSeconds as number) || 300,
                     handler: def.handler as CronJobDefinition["handler"]
