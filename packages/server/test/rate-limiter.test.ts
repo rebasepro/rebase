@@ -138,6 +138,56 @@ windowMs: 60 * 1000 });
             return app;
         }
 
+        /**
+         * The default is the one value the other cases never exercise — every
+         * test below passes `trustedProxyHops` explicitly, which is exactly how
+         * a default of 1 survived: `X-Forwarded-For` was believed on any server
+         * with no proxy in front of it, so one header per request reset every
+         * IP-keyed limiter in the process.
+         */
+        it("does not trust X-Forwarded-For when nothing configured a proxy", async () => {
+            const saved = process.env.TRUSTED_PROXY_HOPS;
+            delete process.env.TRUSTED_PROXY_HOPS;
+            try {
+                const app = appWith({ limit: 1 }); // no trustedProxyHops, no env
+
+                const first = await app.request("/api/test", {
+                    headers: { "x-forwarded-for": "1.1.1.1" }
+                });
+                expect(first.status).toBe(200);
+
+                // A different spoofed address must NOT buy a fresh bucket.
+                const second = await app.request("/api/test", {
+                    headers: { "x-forwarded-for": "2.2.2.2" }
+                });
+                expect(second.status).toBe(429);
+            } finally {
+                if (saved === undefined) delete process.env.TRUSTED_PROXY_HOPS;
+                else process.env.TRUSTED_PROXY_HOPS = saved;
+            }
+        });
+
+        it("honours TRUSTED_PROXY_HOPS from the environment", async () => {
+            const saved = process.env.TRUSTED_PROXY_HOPS;
+            process.env.TRUSTED_PROXY_HOPS = "1";
+            try {
+                const app = appWith({ limit: 1 }); // opted in via env only
+
+                const first = await app.request("/api/test", {
+                    headers: { "x-forwarded-for": "spoof-1, 9.9.9.9" }
+                });
+                expect(first.status).toBe(200);
+
+                const second = await app.request("/api/test", {
+                    headers: { "x-forwarded-for": "spoof-2, 9.9.9.9" }
+                });
+                expect(second.status).toBe(429);
+            } finally {
+                if (saved === undefined) delete process.env.TRUSTED_PROXY_HOPS;
+                else process.env.TRUSTED_PROXY_HOPS = saved;
+            }
+        });
+
         it("ignores client-prepended X-Forwarded-For entries (1 trusted hop)", async () => {
             const app = appWith({ limit: 1, trustedProxyHops: 1 });
 

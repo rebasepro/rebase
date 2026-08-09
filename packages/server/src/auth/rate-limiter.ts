@@ -3,6 +3,7 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { isAnonymousUid } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
+import { logger } from "../utils/logger";
 
 /**
  * Sliding-window rate limiting for Hono.
@@ -36,16 +37,33 @@ interface RateLimiterOptions {
      * appends the address it saw to `X-Forwarded-For`, so the real client IP is
      * the Nth entry from the right. Anything further left is client-supplied and
      * ignored — which is what stops a caller spoofing `X-Forwarded-For` to
-     * rotate rate-limit keys. Defaults to `TRUSTED_PROXY_HOPS` (env) or `1`.
-     * Set to `0` when the server is exposed directly (no proxy): `X-Forwarded-For`
-     * is then ignored entirely in favour of `X-Real-IP`.
+     * rotate rate-limit keys.
+     *
+     * **Defaults to `0`: no proxy is trusted, and `X-Forwarded-For` and
+     * `X-Real-IP` are both ignored in favour of the socket address.** A server
+     * cannot tell from a request whether a proxy put that header there or the
+     * caller did, so the number of hops is a deployment fact that has to be
+     * declared. It previously defaulted to `1`, and nothing in the repo ever
+     * set it — so on any directly-exposed server (`rebase dev`, a self-hosted
+     * `rebase-server`, a passthrough load balancer) one header gave every
+     * IP-keyed limiter an effective limit of one request per attacker-chosen
+     * value.
+     *
+     * Set it — via this option or `TRUSTED_PROXY_HOPS` — to the number of
+     * proxies you actually run. Behind one ingress or load balancer that is
+     * `1`. Leaving it unset behind a proxy makes every client share the
+     * proxy's address as one bucket, which the boot-time warning below tells
+     * you about the first time it happens.
      */
     trustedProxyHops?: number;
 }
 
 /**
  * Resolve the number of trusted proxy hops from an explicit option, the
- * `TRUSTED_PROXY_HOPS` env var, or the default of 1.
+ * `TRUSTED_PROXY_HOPS` env var, or the fail-safe default of 0.
+ *
+ * Zero, not one: trusting a hop that is not there hands the rate-limit key to
+ * the caller, and a server has no way to detect the difference from a request.
  */
 function resolveTrustedProxyHops(optionValue?: number): number {
     if (typeof optionValue === "number" && Number.isFinite(optionValue) && optionValue >= 0) {
@@ -55,7 +73,32 @@ function resolveTrustedProxyHops(optionValue?: number): number {
     if (Number.isFinite(fromEnv) && fromEnv >= 0) {
         return Math.floor(fromEnv);
     }
-    return 1;
+    return 0;
+}
+
+/**
+ * Warn once when the deployment looks proxied but has not said so.
+ *
+ * The safe default is the wrong answer for the other common topology: behind an
+ * ingress, every request arrives from the proxy, so ignoring `X-Forwarded-For`
+ * collapses every client into one bucket and the limiter starts locking real
+ * users out of each other's quota. That is a loud failure in production and a
+ * silent one in staging, so it gets a warning rather than a guess — guessing is
+ * what made the header trustworthy in the first place.
+ */
+let warnedAboutUntrustedForwardedFor = false;
+
+function warnIfProxiedButUntrusted(hasForwardedFor: boolean): void {
+    if (!hasForwardedFor || warnedAboutUntrustedForwardedFor) return;
+    warnedAboutUntrustedForwardedFor = true;
+    logger.warn(
+        "[RateLimit] Requests carry X-Forwarded-For but TRUSTED_PROXY_HOPS is 0, so it is " +
+            "being ignored and every client behind the proxy shares one rate-limit bucket. " +
+            "If this server really is behind a reverse proxy, set TRUSTED_PROXY_HOPS to the " +
+            "number of proxies in front of it (1 for a single ingress or load balancer). " +
+            "If it is exposed directly, this warning means someone is sending the header " +
+            "themselves and 0 is the correct setting."
+    );
 }
 
 /**
@@ -149,7 +192,14 @@ function defaultKeyGenerator(
     c: Parameters<MiddlewareHandler<HonoEnv>>[0],
     trustedProxyHops: number = resolveTrustedProxyHops()
 ): string {
-    if (trustedProxyHops > 0) {
+    if (trustedProxyHops === 0) {
+        // Neither header is evidence of anything: both are trivially set by the
+        // caller, and no proxy has been declared that would overwrite them.
+        warnIfProxiedButUntrusted(!!c.req.header("x-forwarded-for"));
+        return socketAddress(c) ?? "unknown";
+    }
+
+    {
         const forwardedFor = c.req.header("x-forwarded-for");
         if (forwardedFor) {
             const ips = forwardedFor.split(",").map(s => s.trim()).filter(Boolean);
@@ -237,6 +287,14 @@ export function apiKeyKeyGenerator(c: Parameters<MiddlewareHandler<HonoEnv>>[0])
 export interface DataRateLimitConfig {
     /** Turn the whole thing off — for a deployment whose proxy already does it. */
     enabled?: boolean;
+    /**
+     * Trusted reverse-proxy hops, for the IP bucket. Same meaning and same
+     * fail-safe default of 0 as {@link RateLimiterOptions.trustedProxyHops} —
+     * threaded explicitly because this limiter builds its own key generator,
+     * and before this existed the option was accepted by the surrounding
+     * limiter and then ignored for the one bucket that keys on an address.
+     */
+    trustedProxyHops?: number;
     windowMs?: number;
     /** Fallback for an API key with no `rate_limit` of its own. Default 1000. */
     apiKey?: number;
@@ -295,6 +353,7 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         // shared store is what makes a shared limit possible.
         store = new MemoryRateLimitStore(windowMs)
     } = config;
+    const trustedProxyHops = resolveTrustedProxyHops(config.trustedProxyHops);
 
     return createRateLimiter({
         windowMs,
@@ -305,7 +364,7 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
             if (key) return `api-key:${key.id}`;
             const user = c.get("user") as { uid?: string } | undefined;
             if (user?.uid && !isAnonymousUid(user.uid)) return `user:${user.uid}`;
-            return `ip:${defaultKeyGenerator(c)}`;
+            return `ip:${defaultKeyGenerator(c, trustedProxyHops)}`;
         },
         resolveLimit: (c) => {
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;

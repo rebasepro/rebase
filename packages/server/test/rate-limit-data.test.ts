@@ -65,7 +65,13 @@ code: "RATE_LIMITED" } });
     });
 
     it("limits anonymous callers per IP", async () => {
-        const app = appWith(() => undefined, { anonymous: 1 });
+        // `hit` distinguishes callers with `X-Real-IP`, which is a proxy header:
+        // it is only evidence of anything when a proxy has been declared. The
+        // default is now to trust no hops, so a test that simulates two clients
+        // through a proxy header has to say the proxy is there — otherwise both
+        // collapse into the socket's bucket, which is the correct behaviour for
+        // a directly-exposed server and is asserted in `rate-limiter.test.ts`.
+        const app = appWith(() => undefined, { anonymous: 1, trustedProxyHops: 1 });
 
         expect((await hit(app, "9.9.9.9")).status).toBe(200);
         expect((await hit(app, "9.9.9.9")).status).toBe(429);
@@ -77,8 +83,11 @@ code: "RATE_LIMITED" } });
         // The auth middleware scopes unauthenticated requests as `anon` so RLS
         // can evaluate them — all of them, so they must not share one bucket
         // and they must not be counted as a signed-in user.
+        // Same reason as above: two callers are simulated through a proxy
+        // header, so the proxy has to be declared.
         const app = appWith((c) => c.set("user", { uid: "anon" }), { anonymous: 1,
-user: 100 });
+user: 100,
+trustedProxyHops: 1 });
 
         expect((await hit(app, "7.7.7.7")).status).toBe(200);
         expect((await hit(app, "7.7.7.7")).status).toBe(429);
