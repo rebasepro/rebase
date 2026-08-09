@@ -45,6 +45,34 @@
   await client.data.sessions.deleteMany(stale.map(s => s.id as string));
   ```
 
+### Changed
+
+- **BREAKING: the API is camelCase throughout. `author_id` is now `authorId`.** The wire carried two naming conventions at once, and which one a field landed in was not inferable from outside. `GET /api/data/users` answered `displayName`, `photoURL`, `createdAt`; `GET /api/data/posts`, next to it, answered `author_id`. Both were "the wire names". These are also the `where` and `orderBy` keys and the keys the generated SDK types, so a developer moving between two collections had to know, per collection, which convention it had happened to land in.
+
+  The rule was never stated because there wasn't one. A field's wire name is its property key, and `columnName` renames only the *column* — that part is right and does not change. But two of the four sources of keys never had a property key to use, and both fell back to the column name:
+
+  - a **foreign key derived from a relation** had no property of its own, so `belongsTo` on `author` served the `author_id` column under its own name;
+  - **introspection** wrote the raw column name as the property key, with `columnName` restating it beside it.
+
+  Both now derive a camelCase name and keep the column exactly as it was. **The database does not change.** Columns stay snake_case, because an unquoted Postgres identifier folds to lower case and a camelCase column is reachable only as `"authorId"` forever — in hand-written SQL, in psql, in an RLS policy body, in a dump, and in every third-party tool that touches the database. `\d posts` still shows `author_id`, no migration runs, and `rebase doctor` reports no drift.
+
+  ```diff
+  - GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
+  + GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+  - ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
+  + ?where={"authorId":["==",3]}
+  ```
+
+  **Who this breaks, and what to do:**
+
+  - **Everyone using the generated SDK: re-run `rebase generate-sdk`.** `row.author_id` stops compiling and `row.authorId` starts. This is the good case — the compiler names every call site for you.
+  - **Hand-written `where` and `orderBy` keys.** A filter key that no longer resolves is a 400 with `UNKNOWN_FILTER_FIELD`, and the error lists the valid names. It fails closed on purpose: a dropped condition widens a result set, which is the one failure you do not want to be silent.
+  - **Raw `fetch` consumers, and anything reading a row by key.** `row.author_id` is now `undefined`. There is no compiler to find these; grep for the column names your relations derive.
+  - **`rebase schema introspect` over an existing database no longer echoes column names on the wire.** A `customer_id` column is generated as a `customerId` property carrying `columnName: "customer_id"`, and is served, filtered and sorted as `customerId`. This is the largest single change for a project that was introspected rather than authored, and re-running introspection is what produces the new collections. The column, the constraints and the policies are untouched.
+
+  No dual-key emission and no compatibility flag: serving both spellings would leave the two conventions in place permanently, which is the defect. The one thing that is *not* camel-cased is a name someone already chose — a property key you wrote is your key, whatever its shape, and a `columnName` you set still names the column.
+
 ### Removed
 
 - **`@rebasepro/client-postgres` is gone.** It was published on every release since the `client-postgresql` rename — 137 versions, `latest` on npm — and imported by nothing: no workspace package depended on it, no example, template, doc page or skill used it, and its own README's Quick Start did not compile (`<Rebase driver={…}>`, a prop that does not exist). Its description was wrong too: not a direct PostgreSQL client and not PostgREST, but a WebSocket passthrough to the Rebase backend, which `@rebasepro/client` already is.
