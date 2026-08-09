@@ -1415,6 +1415,14 @@ export class RelationService {
                         .where(eq(targetIdField, parsedNewTargetId));
                 }
             } catch (e) {
+                // This catch is here so that one relation whose columns cannot
+                // be resolved does not abort the others. A refusal is not a
+                // misconfiguration: swallowing WRITE_DENIED here reported the
+                // save as done while the database had rejected the write, which
+                // is the whole defect this path was just fixed for. `name` as
+                // well as `instanceof`, because a skewed install can hold two
+                // copies of the server package.
+                if (e instanceof ApiError || (e as Error)?.name === "ApiError") throw e;
                 logger.warn(`Failed to update inverse relation '${relation.relationName}'`, { error: e });
             }
         }

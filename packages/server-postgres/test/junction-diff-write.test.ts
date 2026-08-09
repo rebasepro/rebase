@@ -193,6 +193,46 @@ conflictHandled };
         });
     });
 
+    it("lets that refusal out of the inverse-relation path, which warns about everything else", async () => {
+        // `updateInverseRelations` catches per relation so that one relation
+        // with unresolvable columns does not abort the others — and it used to
+        // catch the refusal too, which put the silent success back one layer up
+        // from where it was just fixed.
+        const recording = recordingTx(["t-1", "t-2"], 0);
+        const service = new RelationService({} as never, registry);
+        const inverse = [{
+            relationKey: "tags",
+            relation: (postsCollection.relations as never as Array<Record<string, unknown>>)[0],
+            newValue: []
+        }];
+
+        await expect(service.updateInverseRelations(
+            recording.tx as never, postsCollection, "p1", inverse as never
+        )).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+    });
+
+    it("still swallows a misconfigured inverse relation rather than failing the save", async () => {
+        // The other half: an unresolvable junction is a configuration problem
+        // with the *other* relations still worth writing, so it stays a warning.
+        const recording = recordingTx([]);
+        const service = new RelationService({} as never, registry);
+        const inverse = [{
+            relationKey: "tags",
+            relation: {
+                kind: "manyToMany",
+                relationName: "tags",
+                target: () => tagsCollection,
+                cardinality: "many",
+                through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
+            },
+            newValue: []
+        }];
+
+        await expect(service.updateInverseRelations(
+            recording.tx as never, postsCollection, "p1", inverse as never
+        )).resolves.toBeUndefined();
+    });
+
     it("writes a duplicated id once", async () => {
         const { inserted } = await writeTags([], ["t-1", "t-1"]);
         expect(inserted).toEqual([[{ post_id: "p1", tag_id: "t-1" }]]);
