@@ -28,6 +28,21 @@ points at that. Without this step every preview renders unstyled.
 - The Tailwind CLI is installed into `.ds-sync/`, and `.design-sync/node_modules`
   is a symlink to it so `@import 'tailwindcss'` resolves from the entry file.
   Recreate on a fresh clone: `ln -sfn ../.ds-sync/node_modules .design-sync/node_modules`.
+- **`.ds-sync/` is a toolchain, not a cache.** It is gitignored and it sits next
+  to genuinely disposable directories, so it reads as scratch and has been
+  deleted by mistake during a root cleanup. It now carries its own
+  `.ds-sync/package.json` pinning the four things that must be there —
+  `@tailwindcss/cli` and `@tailwindcss/typography` (matching the workspace's
+  `tailwindcss@^4.3.3`, and the `@plugin` on `tailwind-entry.css:20`) plus
+  `playwright`/`@playwright/test` at the repo-pinned `1.62.0` for the audit
+  scripts. Rebuild it with a plain `cd .ds-sync && npm install` — **`npm`, not a
+  workspace `pnpm install`**, which is the whole reason it lives outside the
+  workspace. Then re-link `node_modules` as above and confirm with
+  `bash .design-sync/rebuild.sh --css-only`.
+- `ds-bundle/` **is** regenerable output — the DesignSync package build writes it,
+  and `gen-ui-docs.mjs` only reads it. Losing it costs a rebuild, nothing more:
+  the docs it generates (`website/src/content/docs/docs/ui/**`) and the previews
+  it pairs them with (`.design-sync/previews/`) are both tracked.
 
 ## Install / build
 
