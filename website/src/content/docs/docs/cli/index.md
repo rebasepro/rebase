@@ -119,6 +119,19 @@ rebase auth create-user --email admin@example.com --password secret
 rebase auth reset-password --email admin@example.com
 ```
 
+### `rebase skills install`
+
+Install the Rebase reference skills for your AI coding assistant. Supports
+Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity:
+
+```bash
+rebase skills install
+rebase skills install --agent claude,cursor
+rebase skills install --agent all
+```
+
+See [Agent Skills](/docs/ai/skills) for the full list and where files are written.
+
 ## Migration Workflow
 
 The typical workflow for schema changes:
