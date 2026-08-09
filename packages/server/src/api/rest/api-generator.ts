@@ -120,7 +120,54 @@ export class RestApiGenerator {
         // The DataDriver already knows how to resolve nested relation paths.
         this.createSubcollectionRoutes();
 
+        // Last, so it only ever sees what nothing above matched.
+        this.createUnmatchedRoute();
+
         return this.router;
+    }
+
+    /**
+     * Answer anything left under `/api/data` in the canonical error envelope.
+     *
+     * Without this, `GET /api/data/nonexistent` fell through to Hono's default
+     * handler and came back as the plain text `404 Not Found` — the one error
+     * on the data API that is not `{"error":{"message","code","requestId"}}`.
+     * A client that does `res.json()` on the error path got a parse failure
+     * where every other 4xx hands it a code, so a mistyped collection name
+     * surfaced as "invalid JSON" rather than "no such collection".
+     *
+     * Registered after every real route, so a request reaches it only when the
+     * slug is unknown *or* the method/sub-path is: those are different
+     * mistakes, and the message says which. The collection list is deliberately
+     * not enumerated — an unauthenticated request to this same URL is answered
+     * 401 before routing, on purpose, and echoing the full set of slugs back
+     * would undo that for any signed-in caller.
+     *
+     * Every answer here is `expected`, so it logs at debug (see
+     * {@link ApiError.expected}). This path used to log *nothing at all* —
+     * Hono's default 404 never reaches `errorHandler` — so routing it through
+     * the handler at warn would have traded a missing error envelope for a
+     * `⚠️` line on every request from any frontend holding a stale slug. The
+     * envelope is the fix; the log volume is not part of it.
+     */
+    private createUnmatchedRoute(): void {
+        const known = new Set(this.collections.map(collection => collection.slug));
+        const notFound = (message: string): ApiError =>
+            new ApiError(404, "NOT_FOUND", message, undefined, true);
+
+        this.router.all("/:slug{.*}", (c) => {
+            const slug = (c.req.param("slug") ?? "").split("/")[0];
+            if (!slug) {
+                throw notFound("No collection in the request path. Expected /api/data/<collection>.");
+            }
+            if (known.has(slug)) {
+                throw notFound(`No ${c.req.method} route on collection '${slug}' at this path.`);
+            }
+            throw notFound(
+                `Unknown collection '${slug}'. It is not defined in this backend, `
+                + "or its route is not exposed."
+            );
+        });
     }
 
     /**

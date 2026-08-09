@@ -20,6 +20,7 @@
 import {
     WhereFilterOp,
     FilterValues,
+    ALL_WHERE_FILTER_OPS,
     CANONICAL_TO_REST,
     REST_TO_CANONICAL,
     RestFilterOp,
@@ -187,6 +188,186 @@ const REST_OP_LOOKUP = new Map<string, WhereFilterOp>(
 const CANONICAL_OP_LOOKUP = new Map<string, RestFilterOp>(
     Object.entries(CANONICAL_TO_REST) as [string, RestFilterOp][]
 );
+
+// ---------------------------------------------------------------------------
+// Unknown operators
+// ---------------------------------------------------------------------------
+
+/** The operator spellings a rejection lists back to the caller. */
+const VALID_OPERATOR_LIST = ALL_WHERE_FILTER_OPS.join(", ");
+
+/**
+ * A filter condition named an operator this dialect does not have.
+ *
+ * ## Why this throws, rather than returning a typed rejection
+ *
+ * `deserializeFilter` is the *shared* codec: the REST ingress
+ * (`packages/server/src/api/rest/query-parser.ts`), the browser SDK and the
+ * admin panel (`buildRebaseData.ts`) all decode through it. Two constraints
+ * follow.
+ *
+ * - It cannot throw the server's `ApiError`. `@rebasepro/common` does not
+ *   depend on `@rebasepro/server` (the dependency runs the other way), and a
+ *   browser client has no error handler to render an `ApiError` with. So the
+ *   rejection is this plain `Error` subclass, whose `message` reads correctly
+ *   wherever it surfaces — a rejected promise in an app, a 400 body over HTTP.
+ * - It cannot be a returned rejection *value*. Every caller assigns the result
+ *   straight into a query it is about to run; a sentinel that none of them
+ *   check would be ignored, which is exactly the silently-wrong-filter failure
+ *   this exists to stop. Throwing is also what this file already does for the
+ *   sibling cases — `serializeTuple` on an unknown canonical operator,
+ *   `deserializeLogicalCondition` past the nesting bound — and the REST parser
+ *   already converts the latter into a 400.
+ *
+ * `statusCode`, `code` and `details` are carried as fields because the server's
+ * Hono error handler duck-types those off any thrown error: a decode path that
+ * forgets to convert still answers 400 with the canonical envelope instead of a
+ * 500 that says "An unexpected error occurred". `query-parser.ts` converts
+ * explicitly all the same — that is the path the contract is stated on, and an
+ * incidental 400 is not a contract.
+ */
+export class UnknownFilterOperatorError extends Error {
+    /** The field the condition was written against. */
+    public readonly field: string;
+    /** The operator string as it arrived, verbatim. */
+    public readonly operator: string;
+    /** Every operator this dialect accepts, in canonical spelling. */
+    public readonly validOperators: readonly WhereFilterOp[] = ALL_WHERE_FILTER_OPS;
+    /** See the class docblock: read by the server's error handler. */
+    public readonly statusCode = 400;
+    public readonly code = "UNKNOWN_FILTER_OPERATOR";
+    public readonly details: { field: string; operator: string; validOperators: readonly WhereFilterOp[] };
+
+    constructor(field: string, operator: string) {
+        super(
+            `Unknown filter operator '${operator}' on field '${field}'. `
+            + `Valid operators: ${VALID_OPERATOR_LIST}`
+        );
+        this.name = "UnknownFilterOperatorError";
+        this.field = field;
+        this.operator = operator;
+        this.details = { field, operator, validOperators: ALL_WHERE_FILTER_OPS };
+    }
+}
+
+/**
+ * Two to three characters of ASCII punctuation and nothing else — the shape
+ * every symbolic operator has (`==`, `>=`, `<>`, `~~`, `!!`, `>>`, `===`), and
+ * one a column value effectively never has.
+ *
+ * Two characters minimum on purpose. A *single* punctuation character is a
+ * perfectly ordinary value — `{ grade: ["-", "+"] }` is a two-item list, not a
+ * condition — and the only single-character operator anyone actually mistypes
+ * is `=`, which is named separately below. `<` and `>` need no special case:
+ * they are real operators and resolve.
+ */
+const SYMBOLIC_OPERATOR = /^[^\p{L}\p{N}\s]{2,3}$/u;
+
+/** Lowercase, strip everything that is not a letter or digit. */
+function normalizeOperatorName(op: string): string {
+    return op.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Every real operator name with its case and separators removed, so a
+ * respelling of one — `arrayContains`, `not_in`, `NOT-LIKE`, `isNull` — is
+ * recognised as an attempt at an operator rather than read as a value.
+ *
+ * These are rejected rather than accepted: admitting a second spelling of an
+ * operator would leave two wire spellings of one thing, and the rejection
+ * message names the one that works.
+ */
+const RESPELLED_OPERATORS: ReadonlySet<string> = new Set(
+    [...ALL_WHERE_FILTER_OPS, ...Object.keys(REST_TO_CANONICAL)].map(normalizeOperatorName)
+);
+
+/**
+ * Operator names *other* query dialects use, which this one does not have.
+ *
+ * This list is curated, and deliberately so. For a word-shaped string there is
+ * no rule that separates "an operator the caller guessed" from "a value that
+ * happens to be a word": `{ tags: ["a", "b"] }` has to keep meaning a two-item
+ * `in` list, so the codec cannot simply refuse every unrecognised word in
+ * position 0. The line is therefore drawn by name, and only around names whose
+ * use as an operator is far more likely than their use as one of two sibling
+ * values. `contains` is the motivating case — the first thing a developer
+ * reaches for, and until now it compiled to `title IN ('contains', 'Hell')`.
+ *
+ * Genuinely ambiguous single words (`any`, `all`, `exists`, `search`, `not`)
+ * are left off: as operators they are rare, and as enum values they are common.
+ * Everywhere else the tie goes to *rejecting*, because a 400 naming the
+ * supported set costs the caller one round trip, and the alternative — which is
+ * what every name on this list used to produce — is a query that runs, returns
+ * rows, and is wrong.
+ */
+const NEAR_MISS_OPERATORS: ReadonlySet<string> = new Set([
+    "contains", "notcontains", "doesnotcontain", "doesnotcontains",
+    "includes", "notincludes",
+    "startswith", "notstartswith", "beginswith", "startingwith",
+    "endswith", "notendswith",
+    "matches", "notmatches", "regex", "regexp",
+    "between", "notbetween",
+    "equals", "notequals", "equalto", "isequalto", "isnotequalto",
+    "greaterthan", "greaterthanorequal", "greaterthanorequalto",
+    "lessthan", "lessthanorequal", "lessthanorequalto",
+    "isempty", "isnotempty",
+    "oneof", "noneof", "anyof", "allof",
+    "null", "isnullorempty"
+]);
+
+/**
+ * Was this string *meant* as an operator?
+ *
+ * Only consulted after {@link toCanonicalOp} has already failed to resolve it,
+ * so a `true` here is always a rejection.
+ */
+function isOperatorShaped(op: string): boolean {
+    if (op === "=") return true;
+    if (SYMBOLIC_OPERATOR.test(op)) return true;
+    const normalized = normalizeOperatorName(op);
+    if (!normalized) return false;
+    return RESPELLED_OPERATORS.has(normalized) || NEAR_MISS_OPERATORS.has(normalized);
+}
+
+/**
+ * Read a `[op, value]` tuple, if that is what this is.
+ *
+ * Three outcomes, and the middle one is the defect this function exists for:
+ *
+ * - the operator resolves (canonical *or* REST spelling) → the canonical tuple;
+ * - the operator does not resolve but was plainly meant as one → throw;
+ * - it does not look like an operator at all → `undefined`, and the caller
+ *   falls back to reading the array as a list of values.
+ *
+ * The old test was `toCanonicalOp(raw[0]) === raw[0]`, i.e. canonical spelling
+ * only, with *everything else* — including every REST short-code — dropping
+ * through to `["in", raw]`. So the operator string itself became a value in a
+ * membership test: `["!!", "Hello"]` compiled to `title IN ('!!','Hello')`,
+ * which matches, and the caller got back rows their filter was written to
+ * exclude. `["eq", "active"]` had the same shape of failure.
+ */
+function readTuple(field: string, raw: unknown): [WhereFilterOp, unknown] | undefined {
+    if (!Array.isArray(raw) || raw.length !== 2) return undefined;
+    const [op, value] = raw;
+    if (typeof op !== "string") return undefined;
+
+    const canonical = toCanonicalOp(op);
+    if (canonical) return [canonical, value];
+
+    // A dot means this is a *wire* string, not an operator token: two repeated
+    // query params arrive as `["gte.18", "lt.65"]`, which is a two-element array
+    // of strings and therefore tuple-shaped. Deferred with exactly the test the
+    // repeated-dot-string branch below uses, so the two cannot disagree.
+    //
+    // The property test found this: `["ilike", ""]` serializes to `"ilike."`,
+    // whose normalized form is a real operator name, so a well-formed
+    // round-trip was being rejected as a bad operator.
+    if (op.includes(".")) return undefined;
+
+    if (isOperatorShaped(op)) throw new UnknownFilterOperatorError(field, op);
+
+    return undefined;
+}
 
 // ---------------------------------------------------------------------------
 // Serialize: FilterValues → REST querystring
@@ -375,6 +556,9 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
  *
  * deserializeFilter({ age: ["gte.18", "lt.65"] })
  * // → { age: [[">=", "18"], ["<", "65"]] }
+ *
+ * @throws {UnknownFilterOperatorError} when a condition names an operator this
+ * dialect does not have. See that class for why a rejection here is a throw.
  */
 export function deserializeFilter(
     query: Record<string, unknown>
@@ -384,19 +568,26 @@ export function deserializeFilter(
     for (const [field, raw] of Object.entries(query)) {
         if (raw === undefined) continue;
 
-        // If it's already a canonical tuple [op, value], keep it as is
-        if (Array.isArray(raw) && raw.length === 2 && typeof raw[0] === "string" && toCanonicalOp(raw[0]) === raw[0]) {
-            result[field] = raw as [WhereFilterOp, unknown];
+        // A single `[op, value]` condition.
+        const tuple = readTuple(field, raw);
+        if (tuple) {
+            result[field] = tuple;
             continue;
         }
 
         if (Array.isArray(raw)) {
             if (raw.length === 0) continue;
-            
-            // Check if it's an array of canonical tuples
-            if (Array.isArray(raw[0]) && raw[0].length === 2 && typeof raw[0][0] === "string" && toCanonicalOp(raw[0][0]) === raw[0][0]) {
-                result[field] = raw as [WhereFilterOp, unknown][];
-                continue;
+
+            // An array of tuples: several conditions on the same field. Every
+            // element is checked, not just the first — the old test read
+            // `raw[0]` and cast the whole array, so one bad operator among
+            // several travelled on untouched.
+            if (Array.isArray(raw[0])) {
+                const tuples = raw.map(item => readTuple(field, item));
+                if (tuples.every((t): t is [WhereFilterOp, unknown] => t !== undefined)) {
+                    result[field] = tuples;
+                    continue;
+                }
             }
 
             if (raw.length === 1) {
@@ -406,7 +597,14 @@ export function deserializeFilter(
                 if (typeof raw[0] === "string" && raw[0].includes(".")) {
                     result[field] = raw.map(r => typeof r === "string" ? deserializeSingle(r) : (["==", r] as [WhereFilterOp, unknown])) as [WhereFilterOp, unknown][];
                 } else {
-                    // Otherwise assume it's a list of values for an implicit "in" or just multiple conditions
+                    // Otherwise assume it's a list of values for an implicit
+                    // "in" — `{ tags: ["a","b"] }`, and `?tags=a&tags=b`, which
+                    // arrives here identically.
+                    //
+                    // A two-element array reaches this line only after
+                    // `readTuple` has decided its first element was not meant
+                    // as an operator. Everything longer never had the
+                    // ambiguity: an operator tuple has exactly two slots.
                     result[field] = ["in", raw];
                 }
             }

@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
@@ -213,7 +213,13 @@ pass: env.SMTP_PASS! }
 
     // ─── Health check ─────────────────────────────────────────────
     // Deliberately public: an orchestrator's probe has no token to send.
-    app.get("/health", async (c) => {
+    //
+    // Answered on both paths. `/health` is what an orchestrator probes and what
+    // the generated `docker-compose.yml` already points at, so it stays.
+    // `/api/health` is where a developer looks first, because every other route
+    // this server has is under `/api` — and a reverse proxy that forwards only
+    // `/api` to the backend can reach nothing else.
+    const healthCheck = async (c: Context<HonoEnv>) => {
         const result = await backend.healthCheck();
         const status = result.healthy ? 200 : 503;
         return c.json({
@@ -221,7 +227,9 @@ pass: env.SMTP_PASS! }
             latencyMs: result.latencyMs,
             ...(result.details ? { details: result.details } : {})
         }, status);
-    });
+    };
+    app.get("/health", healthCheck);
+    app.get("/api/health", healthCheck);
 
     // {{#frontend}}
     // Serve the frontend in production.

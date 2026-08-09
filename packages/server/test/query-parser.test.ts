@@ -1,5 +1,6 @@
 import { mapOperator, parseQueryOptions, DEFAULT_LIST_LIMIT, DEFAULT_VECTOR_LIST_LIMIT, MAX_LIST_LIMIT } from "../src/api/rest/query-parser";
 import { deserializeFilter } from "@rebasepro/common";
+import { ALL_WHERE_FILTER_OPS, NULL_OPS } from "@rebasepro/types";
 
 /**
  * Assert that a query is rejected as a 400 carrying `code`.
@@ -8,6 +9,13 @@ import { deserializeFilter } from "@rebasepro/common";
  * what it got wrong and the API error handler reporting an incident with an
  * opaque "An unexpected error occurred" — so both are asserted, not just the
  * fact that something threw.
+ *
+ * `expected` is asserted for every one of them, on all the rejections this
+ * parser raises. It is the flag `errorHandler` reads to log at debug rather
+ * than warn, and a malformed query parameter is not an incident: the request
+ * never reached the database and the response body already says what to fix.
+ * Without this pin, one rejection added without the flag puts a `⚠️` line in
+ * production logs on every request from a client holding a stale field name.
  */
 function expectBadRequest(query: Record<string, unknown>, code: string): void {
     let caught: unknown;
@@ -21,6 +29,7 @@ function expectBadRequest(query: Record<string, unknown>, code: string): void {
     expect(caught).toBeInstanceOf(Error);
     expect((caught as { statusCode?: number }).statusCode).toBe(400);
     expect((caught as { code?: string }).code).toBe(code);
+    expect((caught as { expected?: boolean }).expected).toBe(true);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -375,6 +384,94 @@ direction: "desc" }]);
             where: [JSON.stringify({ status: ["==", "draft"] }), JSON.stringify({ status: ["==", "active"] })]
         });
         expect(result.where).toEqual({ status: ["==", "active"] });
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// parseQueryOptions — unknown filter operators
+//
+// The shared codec accepted a `[op, value]` tuple only when the operator was
+// spelled canonically; everything else fell through to `["in", raw]`, so the
+// *operator string became a value in a membership test*. Against a live server
+// holding one row `{id:1, title:"Hello"}`:
+//
+//   where={"title":["~~","Nope"]}       → 200, 0 rows
+//   where={"title":["!!","Hello"]}      → 200, 1 row — a FALSE POSITIVE
+//   where={"title":["contains","Hell"]} → 200, 0 rows
+//   where={"id":[">>",0]}               → 500, `invalid input syntax for integer`
+//
+// Three failure modes from one root cause: a wrong-but-plausible answer, a row
+// the caller's filter was written to exclude, and a raw Postgres error where a
+// 400 belongs. An unknown filter *field* has answered 400 UNKNOWN_FILTER_FIELD
+// with the valid set enumerated for a while; operators were left behind.
+//
+// The rejection is raised in `@rebasepro/common` — which cannot throw an
+// ApiError, since the browser SDK decodes through the same function — and
+// converted here. These assertions are on the conversion: status, code and the
+// `details` a client reads, not merely that something threw.
+// ─────────────────────────────────────────────────────────────
+describe("parseQueryOptions — unknown filter operators", () => {
+    const probes: [string, Record<string, unknown>][] = [
+        ["a symbolic operator", { title: ["~~", "Nope"] }],
+        ["the one that returned a false positive", { title: ["!!", "Hello"] }],
+        ["the name a developer guesses first", { title: ["contains", "Hell"] }],
+        ["the one that reached Postgres and 500'd", { id: [">>", 0] }]
+    ];
+
+    it.each(probes)("rejects %s in the where JSON dialect", (_label, filter) => {
+        expectBadRequest({ where: JSON.stringify(filter) }, "UNKNOWN_FILTER_OPERATOR");
+    });
+
+    it("names the operator, the field, and the supported set", () => {
+        let caught: unknown;
+        try {
+            parseQueryOptions({ where: JSON.stringify({ title: ["contains", "Hell"] }) });
+        } catch (e) {
+            caught = e;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        const error = caught as { message: string; details?: Record<string, unknown> };
+        expect(error.message).toContain("'contains'");
+        expect(error.message).toContain("'title'");
+        expect(error.message).toContain("array-contains");
+        expect(error.details).toEqual({
+            field: "title",
+            operator: "contains",
+            validOperators: ALL_WHERE_FILTER_OPS
+        });
+    });
+
+    it("rejects one inside a list of conditions on the same field", () => {
+        expectBadRequest(
+            { where: JSON.stringify({ age: [[">=", 18], ["~~", 65]] }) },
+            "UNKNOWN_FILTER_OPERATOR"
+        );
+    });
+
+    it("leaves every legitimate filter shape working", () => {
+        // A genuine two-item value list — the shape the rejection must not eat.
+        expect(parseQueryOptions({ where: JSON.stringify({ tags: ["a", "b"] }) }).where)
+            .toEqual({ tags: ["in", ["a", "b"]] });
+        // Repeated `?tags=a&tags=b` arrives at the codec identically.
+        expect(parseQueryOptions({ tags: ["a", "b"] }).where)
+            .toEqual({ tags: ["in", ["a", "b"]] });
+        // The PostgREST dot-string dialect.
+        expect(parseQueryOptions({ status: "eq.active" }).where)
+            .toEqual({ status: ["==", "active"] });
+        expect(parseQueryOptions({ age: ["gte.18", "lt.65"] }).where)
+            .toEqual({ age: [[">=", "18"], ["<", "65"]] });
+        // Every canonical operator.
+        for (const op of ALL_WHERE_FILTER_OPS) {
+            const value = NULL_OPS.has(op) ? null : "x";
+            expect(parseQueryOptions({ where: JSON.stringify({ field: [op, value] }) }).where)
+                .toEqual({ field: [op, value] });
+        }
+    });
+
+    it("rejects on the querystring dialect too, not just the JSON one", () => {
+        // `?title=~~&title=Nope` is the same two-element array one layer up.
+        expectBadRequest({ title: ["~~", "Nope"] }, "UNKNOWN_FILTER_OPERATOR");
     });
 });
 

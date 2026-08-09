@@ -70,6 +70,18 @@ export class ApiError extends Error {
      * The motivating case is `POST /auth/refresh` with no session: clients
      * refresh on page load before they know whether one exists, so every
      * anonymous page view is a 401 — correct, and not worth a warning line.
+     *
+     * The other class is a caller-caused 4xx that never reached the database: a
+     * mistyped filter operator, sort direction or limit, a request for a
+     * collection that does not exist. Nothing on this server is wrong, and the
+     * response body has already told the caller what to fix — while one client
+     * holding a stale name would otherwise write a warning per request, forever,
+     * until the level means nothing. See `api/rest/query-parser.ts`.
+     *
+     * What stays at warn is anything that says something about the *server*:
+     * a schema that has drifted from the code, a permission the database
+     * refused, a dependency that failed. Those are 4xx too, and they are still
+     * incidents.
      */
     public readonly expected: boolean;
 

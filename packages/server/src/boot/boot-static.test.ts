@@ -111,4 +111,15 @@ describe("booting a two-app static bundle", () => {
         expect((await get("/livez")).status).toBe(200);
         expect(JSON.parse((await get("/health")).body).status).toBe("ok");
     });
+
+    it("answers health under the API prefix too", async () => {
+        // Every other route a developer touches is under `/api`, and a reverse
+        // proxy that forwards only `/api` can reach nothing else — so
+        // `/api/health` answering 404 reads as "the server is broken" rather
+        // than "that is not where health lives". Both paths, one handler.
+        expect(JSON.parse((await get("/api/health")).body).status).toBe("ok");
+        // And the bare path an orchestrator is already configured with keeps
+        // working — this pair is the whole point.
+        expect((await get("/health")).status).toBe(200);
+    });
 });

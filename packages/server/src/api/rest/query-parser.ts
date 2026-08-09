@@ -1,10 +1,57 @@
 import type { FilterValues, ListLimitBounds, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
+import { deserializeFilter, deserializeLogicalCondition, UnknownFilterOperatorError } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
+
+/**
+ * A malformed query parameter, refused with a 400.
+ *
+ * Every rejection in this file is one of these, and every one of them is
+ * `expected` — the flag `errorHandler` reads to log a routine outcome at debug
+ * instead of warn. A client that mistypes an operator, a sort direction or a
+ * limit is not an incident: nothing on the server is wrong, the request never
+ * reached the database, and the caller has already been told what to fix in the
+ * response body. Left at warn, a single frontend holding a stale field name
+ * writes a `⚠️` line per request forever, and the warn level stops meaning
+ * anything — which is why "routine 4xx logs at WARN" is a standing finding
+ * against this API.
+ *
+ * Not a factory on `ApiError`: the class's members are part of the tracked
+ * runtime surface (`api-surface/server.api.txt`), and this needs no addition to
+ * it. `ApiError.unauthenticated` is the same idea one status code up.
+ */
+function invalidParam(message: string, code: string, details?: unknown): ApiError {
+    return new ApiError(400, code, message, details, true);
+}
+
+/**
+ * Decode a filter, turning the shared codec's operator rejection into a 400.
+ *
+ * `deserializeFilter` lives in `@rebasepro/common`, which cannot throw an
+ * `ApiError` — it does not depend on this package, and the browser SDK decodes
+ * through the same function and has nothing to render one with. So it throws
+ * `UnknownFilterOperatorError`, and the HTTP boundary is where that becomes a
+ * status code. Same seam `parseLogicalGroup` uses for the nesting bound.
+ *
+ * Without this the operator string became a *value*: `?where={"title":
+ * ["!!","Hello"]}` compiled to `title IN ('!!','Hello')` and answered 200 with
+ * the row the caller was filtering out, and `{"id":[">>",0]}` reached Postgres
+ * and came back a 500 quoting `invalid input syntax for type integer`. Both are
+ * malformed requests and now say so.
+ */
+function decodeFilter(query: Record<string, unknown>): FilterValues<string> {
+    try {
+        return deserializeFilter(query);
+    } catch (e) {
+        if (e instanceof UnknownFilterOperatorError) {
+            throw invalidParam(e.message, e.code, e.details);
+        }
+        throw e;
+    }
+}
 
 function getLastValue(val: unknown): unknown {
     if (Array.isArray(val)) {
@@ -38,7 +85,7 @@ function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition |
         // request problem, and without this it surfaced as a 500 — the
         // unbounded version reached `RangeError: Maximum call stack size
         // exceeded`, which tells the caller nothing about their filter.
-        throw ApiError.badRequest(
+        throw invalidParam(
             `Invalid \`${type}\` parameter: ${e instanceof Error ? e.message : String(e)}`,
             "INVALID_LOGICAL_GROUP"
         );
@@ -68,27 +115,27 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
     try {
         parsed = JSON.parse(str);
     } catch {
-        throw ApiError.badRequest(
+        throw invalidParam(
             "Invalid `where` parameter: expected a JSON object, e.g. {\"status\":[\"==\",\"active\"]}",
             "INVALID_WHERE"
         );
     }
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw ApiError.badRequest(
+        throw invalidParam(
             "Invalid `where` parameter: expected a JSON object mapping fields to conditions, "
             + "e.g. {\"status\":[\"==\",\"active\"]}",
             "INVALID_WHERE"
         );
     }
 
-    const filter = deserializeFilter(parsed as Record<string, unknown>);
+    const filter = decodeFilter(parsed as Record<string, unknown>);
     return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
 type OrderByEntry = { field: string; direction: "asc" | "desc" };
 
 function invalidOrderBy(detail: string): never {
-    throw ApiError.badRequest(
+    throw invalidParam(
         `Invalid \`orderBy\` parameter: ${detail}. Expected \`field\`, \`field:desc\`, `
         + "or a JSON array like [{\"field\":\"created_at\",\"direction\":\"desc\"}]",
         "INVALID_ORDER_BY"
@@ -221,7 +268,7 @@ export function resolveListLimitParam(
         return resolveClientListLimit(rawLimit, opts);
     } catch (e) {
         if (e instanceof ListLimitError) {
-            throw ApiError.badRequest(e.message, "INVALID_LIMIT");
+            throw invalidParam(e.message, "INVALID_LIMIT");
         }
         throw e;
     }
@@ -287,7 +334,7 @@ export function parseQueryOptions(
     const whereVal = getLastValue(query.where);
     const where = {
         ...(whereVal !== undefined && whereVal !== null ? parseWhereParam(whereVal) : undefined),
-        ...deserializeFilter(filterDict)
+        ...decodeFilter(filterDict)
     };
     if (Object.keys(where).length > 0) {
         options.where = where;
@@ -338,7 +385,7 @@ export function parseQueryOptions(
         // ApiError would be caught by its own `catch` and re-thrown as
         // something else.
         if (!Array.isArray(decoded) || !decoded.every(v => typeof v === "number")) {
-            throw ApiError.badRequest(
+            throw invalidParam(
                 "Invalid `vector` format. Expected a JSON array of numbers, e.g. [0.1,0.2,0.3]",
                 "INVALID_VECTOR"
             );
@@ -348,7 +395,7 @@ export function parseQueryOptions(
         const distanceParamVal = getLastValue(query.vector_distance);
         const distanceParam = distanceParamVal ? String(distanceParamVal) : "cosine";
         if (distanceParam !== "cosine" && distanceParam !== "l2" && distanceParam !== "inner_product") {
-            throw ApiError.badRequest(
+            throw invalidParam(
                 `Invalid \`vector_distance\`: ${distanceParam}. Expected: cosine, l2, or inner_product`,
                 "INVALID_VECTOR_DISTANCE"
             );
@@ -364,7 +411,7 @@ export function parseQueryOptions(
         if (thresholdVal) {
             const threshold = parseFloat(String(thresholdVal));
             if (isNaN(threshold)) {
-                throw ApiError.badRequest(
+                throw invalidParam(
                     "Invalid `vector_threshold`. Expected a number.",
                     "INVALID_VECTOR_THRESHOLD"
                 );
