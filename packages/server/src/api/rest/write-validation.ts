@@ -1,5 +1,5 @@
 import { CollectionConfig, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
-import { resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import { fieldKeyForColumn, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import { ApiError } from "../errors";
 
 /**
@@ -46,9 +46,13 @@ export function assertKnownWriteFields(
     const known = new Set<string>(Object.keys(collection.properties));
 
     // An owning relation stores its target in a local FK column that usually
-    // has no property of its own; writing it directly is legitimate.
+    // has no property of its own; writing it directly is legitimate. Under its
+    // *wire* name — `authorId` — which is the key the row is served under and
+    // therefore the only one a caller can be expected to send back.
     for (const relation of Object.values(resolveCollectionRelations(collection))) {
-        if (relation.kind === "belongsTo") known.add((relation as ResolvedBelongsTo).localKey);
+        if (relation.kind === "belongsTo") {
+            known.add(fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
+        }
     }
 
     for (const field of options?.extraKnownFields ?? []) known.add(field);
@@ -313,7 +317,9 @@ export function projectResponseFields<T extends Record<string, unknown>>(
     // which is the name a caller would put in `fields`.
     for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
         declared.add(key);
-        if (relation.kind === "belongsTo") declared.add((relation as ResolvedBelongsTo).localKey);
+        if (relation.kind === "belongsTo") {
+            declared.add(fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
+        }
     }
     // `include` decides what is *loaded*; `fields` decides what is *returned*.
     // So `include=author&fields=title,author` yields both, and naming the

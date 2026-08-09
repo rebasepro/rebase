@@ -26,7 +26,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 const postsTable = pgTable("posts", {
     id: serial("id").primaryKey(),
     title: varchar("title"),
-    author_id: integer("author_id")
+    authorId: integer("author_id")
 });
 
 // Declared lazily so the two collections can name each other.

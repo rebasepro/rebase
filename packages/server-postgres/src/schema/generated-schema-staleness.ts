@@ -60,11 +60,13 @@ function tableBlock(source: string, table: string): string {
  * clear the finding and the check would be permanently red.
  */
 function declaresColumn(block: string, column: string): boolean {
-    // `categorie_id: integer("categorie_id")` — the Drizzle column shape. The key
-    // and the string argument agree in generated output, so requiring both is
-    // both precise and cheap.
-    const key = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|[\\s,{])${key}\\s*:\\s*\\w+\\(\\s*["']${key}["']`, "m").test(block);
+    // `categorieId: integer("categorie_id")` — the Drizzle column shape. Only
+    // the string argument is the column; the key beside it is the *wire* name
+    // and no longer agrees with it (`authorId: integer("author_id")`). Matching
+    // both, as this did, made every camelCased key look like a column the
+    // generated file did not declare.
+    const literal = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[\\s,{])[\\w$"']+\\s*:\\s*\\w+\\(\\s*["']${literal}["']`, "m").test(block);
 }
 
 /**

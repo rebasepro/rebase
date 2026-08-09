@@ -28,7 +28,7 @@ describe("DataService - relation eager loading (admin N+1 guard)", () => {
 
     const mockUserProfilesTable = {
         id: { name: "id" },
-        user_id: { name: "user_id" },
+        userId: { name: "user_id" },
         bio: { name: "bio" },
         _def: { tableName: "user_profiles" }
     };
@@ -68,7 +68,7 @@ relationName: "user" }
     const makeProfiles = (n: number) =>
         Array.from({ length: n }, (_, i) => ({ id: i + 1,
 bio: `bio-${i + 1}`,
-user_id: 100 + i }));
+userId: 100 + i }));
 
     const makeCustomers = (n: number) =>
         Array.from({ length: n }, (_, i) => ({ id: 100 + i,
@@ -87,7 +87,7 @@ name: `Customer ${100 + i}` }));
             if (tableName === "customers") return customers;
             if (currentProjection && "parentId" in currentProjection && "fkValue" in currentProjection) {
                 return profiles.map(p => ({ parentId: p.id,
-fkValue: p.user_id }));
+fkValue: p.userId }));
             }
             return profiles;
         };

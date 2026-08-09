@@ -55,14 +55,14 @@ relationName: "comments" }
     const commentsTable = {
         id: { name: "id" },
         body: { name: "body" },
-        post_id: { name: "post_id" },
+        postId: { name: "post_id" },
         _def: { tableName: "comments" }
     };
 
     /** The rows Postgres hands back, before anything in the service sees them. */
     const dbRows = [
-        { id: 5, body: "First!", post_id: 1 },
-        { id: 6, body: "Second.", post_id: 1 }
+        { id: 5, body: "First!", postId: 1 },
+        { id: 6, body: "Second.", postId: 1 }
     ];
 
     beforeEach(() => {

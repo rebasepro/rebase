@@ -35,7 +35,7 @@ const mockPostsTable = {
     id: { name: "id",
 dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id",
+    authorId: { name: "author_id",
 dataType: "number" },
     _def: { tableName: "posts" }
 };
@@ -250,7 +250,7 @@ describe("DataService", () => {
             db.limit.mockResolvedValue([{
                 id: 4,
                 title: "Post by Jane",
-                author_id: "3" // Database stores the foreign key
+                authorId: "3" // Database stores the foreign key
             }]);
 
             const entity = await dataService.save("posts", newPost);
@@ -258,14 +258,14 @@ describe("DataService", () => {
             // 1. Check that the relation was serialized to a foreign key for the database insert
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 title: "Post by Jane",
-                author_id: "3" // Should be serialized to FK for database storage
+                authorId: "3" // Should be serialized to FK for database storage
             }));
 
             // 2. The returned row is the one `GET /:id` serves: raw columns,
             // the FK under its own name, and no relation ref — the Entity
             // view-model (refs, canonical id) is built by its consumers.
             expect(entity.id).toBe(4);
-            expect(entity.author_id).toBe("3");
+            expect(entity.authorId).toBe("3");
             expect(entity.author).toBeUndefined();
         });
 
@@ -277,7 +277,7 @@ describe("DataService", () => {
             const dbRow = {
                 id: 7,
                 title: "Same shape",
-                author_id: "3"
+                authorId: "3"
             };
             db.returning.mockResolvedValue([{ id: 7 }]);
             db.limit.mockResolvedValue([dbRow]);
@@ -383,10 +383,10 @@ describe("DataService", () => {
             const mockRelatedPosts = [
                 { id: 1,
 title: "Post by John",
-author_id: 1 },
+authorId: 1 },
                 { id: 2,
 title: "Another Post by John",
-author_id: 1 }
+authorId: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
@@ -415,16 +415,16 @@ dataType: "number" },
         email: { name: "email" },
         name: { name: "name" },
         created_at: { name: "created_at" },
-        project_id: { name: "project_id" }, // Add for relations
-        assignee_id: { name: "assignee_id" }, // Add for relations
+        projectId: { name: "project_id" }, // Add for relations
+        assigneeId: { name: "assignee_id" }, // Add for relations
         _def: { tableName: "users" }
     };
 
     const mockCompaniesTable = {
         id: { name: "id" },
         name: { name: "name" },
-        user_id: { name: "user_id" },
-        company_id: { name: "company_id" }, // Add for relations
+        userId: { name: "user_id" },
+        companyId: { name: "company_id" }, // Add for relations
         _def: { tableName: "companies" }
     };
 
@@ -437,26 +437,26 @@ dataType: "number" },
 getSQLType: () => "text" },
         description: { name: "description",
 getSQLType: () => "text" },
-        company_id: { name: "company_id" },
+        companyId: { name: "company_id" },
         status: { name: "status" },
         priority: { name: "priority" },
-        project_id: { name: "project_id" }, // Add for relations
-        assignee_id: { name: "assignee_id" }, // Add for relations
+        projectId: { name: "project_id" }, // Add for relations
+        assigneeId: { name: "assignee_id" }, // Add for relations
         _def: { tableName: "projects" }
     };
 
     const mockTasksTable = {
         id: { name: "id" },
         title: { name: "title" },
-        project_id: { name: "project_id" },
-        assignee_id: { name: "assignee_id" },
+        projectId: { name: "project_id" },
+        assigneeId: { name: "assignee_id" },
         _def: { tableName: "tasks" }
     };
 
     const mockCategoriesTable = {
         id: { name: "id" },
         name: { name: "name" },
-        parent_id: { name: "parent_id" },
+        parentId: { name: "parent_id" },
         _def: { tableName: "categories" }
     };
 
@@ -753,8 +753,8 @@ name: "Test User" };
         it("should handle entities with null relation fields", async () => {
             const mockTask = { id: 1,
 title: "Task 1",
-project_id: null,
-assignee_id: null };
+projectId: null,
+assigneeId: null };
             db.limit.mockResolvedValue([mockTask]);
 
             const entity = await dataService.fetchOne("tasks", 1);
@@ -840,10 +840,10 @@ title: "Project 2" }
             const mockTasks = [
                 { id: 1,
 title: "Task 1",
-project_id: 1 },
+projectId: 1 },
                 { id: 2,
 title: "Task 2",
-project_id: 1 }
+projectId: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
@@ -900,14 +900,14 @@ __type: "relation" }
                 id: 5,
                 title: "New Project",
                 description: "A new project",
-                company_id: 1
+                companyId: 1
             }]);
 
             const entity = await dataService.save("projects", newProject);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 title: "New Project",
-                company_id: "1"
+                companyId: "1"
             }));
             expect(entity.id).toBe(5);
         });
@@ -924,14 +924,14 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 1,
                 title: "Updated Task",
-                assignee_id: 2
+                assigneeId: 2
             }]);
 
             const entity = await dataService.save("tasks", updatedTask, 1);
 
             expect(db.set).toHaveBeenCalledWith(expect.objectContaining({
                 title: "Updated Task",
-                assignee_id: "2"
+                assigneeId: "2"
             }));
         });
 

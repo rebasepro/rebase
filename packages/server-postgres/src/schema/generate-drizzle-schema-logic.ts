@@ -1,7 +1,7 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
 import { buildSearchColumnSpec } from "./search-column";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections, sortCollectionsBySlug } from "@rebasepro/common";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, fieldKeyForColumn, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
 // --- Helper Functions ---
@@ -68,29 +68,17 @@ isUuid: isUuid ?? false };
 };
 
 /**
- * Given a raw DB column name (e.g. "client_id"), find the Drizzle property key
- * on the collection that maps to that column. A property matches if:
- *   (a) it has an explicit `columnName` equal to the given column, OR
- *   (b) its snake_case form equals the given column.
+ * Given a raw DB column name (e.g. "client_id"), the Drizzle property key that
+ * maps to it.
  *
- * Returns the property key (the Drizzle object key) if found, or the original
- * column name as a fallback.
+ * One line, because the rule is shared: the Drizzle object key is the wire
+ * name, and {@link fieldKeyForColumn} is the one definition of what a column is
+ * named on the wire. This used to be a private copy that fell back to the
+ * column verbatim, which is how a derived foreign key ended up served as
+ * `author_id` beside a hand-authored `displayName`.
  */
-const resolvePropertyKeyForColumn = (collection: CollectionConfig, column: string): string => {
-    if (!collection.properties) return column;
-    for (const [propKey, prop] of Object.entries(collection.properties)) {
-        const p = prop as Property;
-        // Explicit columnName match
-        if ("columnName" in p && typeof (p as unknown as Record<string, unknown>).columnName === "string") {
-            if ((p as unknown as Record<string, unknown>).columnName === column) return propKey;
-        }
-        // Convention match: snake_case(propKey) === column
-        if (toSnakeCase(propKey) === column) return propKey;
-        // Exact match (propKey is already the column name)
-        if (propKey === column) return propKey;
-    }
-    return column;
-};
+const resolvePropertyKeyForColumn = (collection: CollectionConfig, column: string): string =>
+    fieldKeyForColumn(collection, column);
 
 const isNumericId = (collection: CollectionConfig): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
@@ -298,9 +286,14 @@ export const getDrizzleColumn = (propName: string, prop: Property, collection: C
                 return null;
             }
 
-            // If the localKey property is defined elsewhere in the properties, it will be handled there.
-            // This logic is for when the relation property itself defines the FK.
-            if (collection.properties[relation.localKey] && propName !== relation.localKey) {
+            // If a property of its own already declares this foreign key, that
+            // property emits the column and this relation must not emit a second
+            // key for it. Asked of the *field key*, not the column: a property
+            // declared `authorId` with `columnName: "author_id"` did not answer
+            // to `properties["author_id"]`, so both sides emitted and the table
+            // carried two Drizzle keys pointing at one column.
+            const fkFieldKey = fieldKeyForColumn(collection, relation.localKey);
+            if (collection.properties[fkFieldKey] && propName !== fkFieldKey) {
                 return null;
             }
 
@@ -331,7 +324,10 @@ export const getDrizzleColumn = (propName: string, prop: Property, collection: C
                 columnDef += ".notNull()";
             }
 
-            return `    ${propKey(relation.localKey)}: ${columnDef}`;
+            // Key by the wire name, column by `localKey`. They are two different
+            // names for one thing and the generated line is where they meet:
+            // `authorId: integer("author_id")`.
+            return `    ${propKey(fkFieldKey)}: ${columnDef}`;
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;

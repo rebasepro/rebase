@@ -346,13 +346,13 @@ name: "Title" } as Property,
 
         const result = normalizeDbValues(
             { title: "Widget",
-category_id: "cat-123",
+categoryId: "cat-123",
 category: "ignored" } as any,
             collection
         );
 
         // FK column should be preserved as a primitive string
-        expect(result.category_id).toBe("cat-123");
+        expect(result.categoryId).toBe("cat-123");
         // Relation property should be skipped (db.query handles it)
         expect(result).not.toHaveProperty("category");
         // Regular property should be present
@@ -384,10 +384,10 @@ name: "Title" } as Property,
 
         const result = normalizeDbValues(
             { title: "Book",
-author_id: 42 } as any,
+authorId: 42 } as any,
             collection
         );
-        expect(result.author_id).toBe(42);
+        expect(result.authorId).toBe(42);
     });
 
     it("converts null FK columns to null", () => {
@@ -415,10 +415,10 @@ name: "Title" } as Property,
 
         const result = normalizeDbValues(
             { title: "Book",
-author_id: null } as any,
+authorId: null } as any,
             collection
         );
-        expect(result.author_id).toBeNull();
+        expect(result.authorId).toBeNull();
     });
 });
 

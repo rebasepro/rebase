@@ -13,7 +13,7 @@ column_default: null,
 character_maximum_length: 255 }
             ];
             const collection = buildCollectionFromTableMetadata("users", { columns } as TableMetadata);
-            const prop = collection.properties!.first_name as StringProperty;
+            const prop = collection.properties!.firstName as StringProperty;
             expect(prop.type).toBe("string");
             expect(prop.columnType).toBe("varchar");
             expect(prop.validation?.required).toBe(true);
@@ -33,7 +33,7 @@ column_default: null,
 character_maximum_length: 500 }
             ];
             const collection = buildCollectionFromTableMetadata("pages", { columns } as TableMetadata);
-            const prop = collection.properties!.long_slug as StringProperty;
+            const prop = collection.properties!.longSlug as StringProperty;
             expect(prop.columnType).toBe("varchar");
             expect(prop.validation?.max).toBe(500);
         });
@@ -91,7 +91,7 @@ character_maximum_length: 2 }
             ];
             const collection = buildCollectionFromTableMetadata("locations", { columns } as TableMetadata);
 
-            const prop = collection.properties!.country_code as StringProperty;
+            const prop = collection.properties!.countryCode as StringProperty;
             expect(prop.type).toBe("string");
             expect(prop.columnType).toBe("char");
         });
@@ -137,7 +137,7 @@ character_maximum_length: null }
             expect(ageProp.validation?.integer).toBe(true);
             expect(ageProp.validation?.required).toBe(true);
 
-            const statusProp = collection.properties!.status_code as NumberProperty;
+            const statusProp = collection.properties!.statusCode as NumberProperty;
             expect(statusProp.type).toBe("number");
             expect(statusProp.columnType).toBe("integer");
             expect(statusProp.validation?.integer).toBe(true);
@@ -154,7 +154,7 @@ column_default: null,
 character_maximum_length: null }
             ];
             const collection = buildCollectionFromTableMetadata("posts", { columns } as TableMetadata);
-            const prop = collection.properties!.view_count as NumberProperty;
+            const prop = collection.properties!.viewCount as NumberProperty;
             expect(prop.type).toBe("number");
             expect(prop.columnType).toBe("bigint");
             expect(prop.validation?.integer).toBe(true);
@@ -185,7 +185,7 @@ character_maximum_length: null }
 
             expect((collection.properties!.price as NumberProperty).columnType).toBe("numeric");
             expect((collection.properties!.rating as NumberProperty).columnType).toBe("real");
-            expect((collection.properties!.precision_val as NumberProperty).columnType).toBe("double precision");
+            expect((collection.properties!.precisionVal as NumberProperty).columnType).toBe("double precision");
 
             // Decimal shouldn't have integer explicitly forced
             expect((collection.properties!.price as NumberProperty).validation?.integer).toBeUndefined();
@@ -227,8 +227,8 @@ character_maximum_length: null }
 
             expect((collection.properties!.id as NumberProperty).isId).toBe("increment");
             expect((collection.properties!.id as NumberProperty).columnType).toBe("serial");
-            expect((collection.properties!.big_id as NumberProperty).isId).toBe("increment");
-            expect((collection.properties!.big_id as NumberProperty).columnType).toBe("bigserial");
+            expect((collection.properties!.bigId as NumberProperty).isId).toBe("increment");
+            expect((collection.properties!.bigId as NumberProperty).columnType).toBe("bigserial");
         });
 
         it("detects gen_random_uuid / uuid_generate as a uuid ID strategy", () => {
@@ -275,7 +275,7 @@ column_default: "true",
 character_maximum_length: null }
             ];
             const collection = buildCollectionFromTableMetadata("users", { columns } as TableMetadata);
-            const prop = collection.properties!.is_active as BooleanProperty;
+            const prop = collection.properties!.isActive as BooleanProperty;
             expect(prop.type).toBe("boolean");
         });
 
@@ -302,9 +302,9 @@ character_maximum_length: null }
             ];
             const collection = buildCollectionFromTableMetadata("events", { columns } as TableMetadata);
 
-            expect((collection.properties!.created_at as DateProperty).columnType).toBe("timestamp");
+            expect((collection.properties!.createdAt as DateProperty).columnType).toBe("timestamp");
             expect((collection.properties!.birthday as DateProperty).columnType).toBe("date");
-            expect((collection.properties!.shift_start as DateProperty).columnType).toBe("time");
+            expect((collection.properties!.shiftStart as DateProperty).columnType).toBe("time");
         });
 
         it("maps jsonb and json to MapProperty", () => {
@@ -328,8 +328,8 @@ character_maximum_length: null }
             expect((collection.properties!.metadata as MapProperty).columnType).toBe("jsonb");
             expect((collection.properties!.metadata as MapProperty).keyValue).toBe(true);
 
-            expect((collection.properties!.old_data as MapProperty).type).toBe("map");
-            expect((collection.properties!.old_data as MapProperty).columnType).toBe("json");
+            expect((collection.properties!.oldData as MapProperty).type).toBe("map");
+            expect((collection.properties!.oldData as MapProperty).columnType).toBe("json");
         });
 
         it("maps array to ArrayProperty", () => {
@@ -389,7 +389,7 @@ character_maximum_length: null }
             ];
             const collection = buildCollectionFromTableMetadata("users", { columns } as TableMetadata);
 
-            expect(collection.properties!.user_first_name.name).toBe("User First Name");
+            expect(collection.properties!.userFirstName.name).toBe("User First Name");
         });
 
         it("assigns propertiesOrder array based on iteration insertion order", () => {
@@ -429,8 +429,80 @@ character_maximum_length: null }
             ];
             const collection = buildCollectionFromTableMetadata("networks", { columns } as TableMetadata);
 
-            const prop = collection.properties!.weird_col as StringProperty;
+            const prop = collection.properties!.weirdCol as StringProperty;
             expect(prop.type).toBe("string");
+        });
+    });
+
+    describe("Wire names", () => {
+        /**
+         * The key is the API name and `columnName` is the column. They used to
+         * be one string, which is how an imported collection served `user_id`
+         * while the authored one beside it served `displayName`.
+         */
+        it("keys a property by its wire name and records the column it came from", () => {
+            const columns: TableColumnInfo[] = [
+                { column_name: "display_name",
+data_type: "varchar",
+udt_name: "varchar",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: null }
+            ];
+            const collection = buildCollectionFromTableMetadata("users", { columns } as TableMetadata);
+
+            expect(Object.keys(collection.properties!)).toEqual(["displayName"]);
+            expect(collection.properties!.displayName.columnName).toBe("display_name");
+        });
+
+        /**
+         * A single-token column is already a key and is left exactly alone —
+         * no `columnName`, because there is nothing to record.
+         */
+        it("leaves a single-word column untouched", () => {
+            const columns: TableColumnInfo[] = [
+                { column_name: "email",
+data_type: "varchar",
+udt_name: "varchar",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: null }
+            ];
+            const collection = buildCollectionFromTableMetadata("users", { columns } as TableMetadata);
+
+            expect(Object.keys(collection.properties!)).toEqual(["email"]);
+            expect(collection.properties!.email.columnName).toBeUndefined();
+        });
+
+        /**
+         * Two columns, one camel-cased name. Neither may be dropped.
+         *
+         * `user_id` reaches `userId` first and takes it. The second column is
+         * *literally* named `userId`, so both of its candidates are the same
+         * string and already taken — it lands on the numbered tail, and
+         * `columnName` is what still says which column each one is. Ugly, and
+         * an ugly key beats a column that vanished.
+         */
+        it("keeps both columns when two of them camel-case to one key", () => {
+            const columns: TableColumnInfo[] = [
+                { column_name: "user_id",
+data_type: "integer",
+udt_name: "int4",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: null },
+                { column_name: "userId",
+data_type: "integer",
+udt_name: "int4",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: null }
+            ];
+            const collection = buildCollectionFromTableMetadata("accounts", { columns } as TableMetadata);
+
+            expect(Object.keys(collection.properties!)).toEqual(["userId", "userId_2"]);
+            expect(collection.properties!.userId.columnName).toBe("user_id");
+            expect(collection.properties!.userId_2.columnName).toBe("userId");
         });
     });
 });

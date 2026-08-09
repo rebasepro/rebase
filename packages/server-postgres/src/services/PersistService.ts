@@ -2,7 +2,7 @@ import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Property, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     assertWritableColumns,
@@ -149,8 +149,14 @@ export class PersistService {
     }
 
     /**
-     * The column on the *target* table that records the parent, for a create
-     * under a nested one-to-many path.
+     * The field on the *target* row that records the parent, for a create under
+     * a nested one-to-many path.
+     *
+     * A **field**, not the column: the value is stamped into the caller's
+     * payload, which is keyed by wire names — `authorId`, never the `author_id`
+     * the relation names its link by. Stamping the column instead put a key on
+     * the payload that no property answers to, and `strictWrites` rejected the
+     * request the framework had just written to.
      *
      * Returns `undefined` when the link is not a column at all (a multi-hop
      * `joinPath`), so the caller writes the row without stamping anything.
@@ -165,13 +171,16 @@ export class PersistService {
         switch (relation.kind) {
             case "hasOne":
             case "hasMany":
-                return relation.foreignKeyOnTarget;
+                return fieldKeyForColumn(hop.targetCollection, relation.foreignKeyOnTarget);
 
             case "via":
                 // The link lives in an intermediate table, not in a column on
                 // the target — nothing to stamp.
                 return relation.joinPath.length === 1
-                    ? DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to)[0]
+                    ? fieldKeyForColumn(
+                        hop.targetCollection,
+                        DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to)[0]
+                    )
                     : undefined;
 
             default:

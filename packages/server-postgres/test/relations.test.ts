@@ -384,13 +384,13 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on profiles table
-            expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("authorId: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
 
             // Should create owning relation on profiles
-            expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: \"profiles_author_id\" }) }));");
+            expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.authorId], references: [authors.id], relationName: \"profiles_authorId\" }) }));");
 
             // Should create inverse relation on authors — inverse side has NO fields/references
-            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { relationName: \"profiles_author_id\" }) }));");
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { relationName: \"profiles_authorId\" }) }));");
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -426,9 +426,9 @@ relationName: "category" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on posts table
-            expect(cleanResult).toContain("category_id: text(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("categoryId: text(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
             // Should create owning relation on posts
-            expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"category\": one(categories, { fields: [posts.category_id], references: [categories.id], relationName: \"posts_category_id\" }) }));");
+            expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"category\": one(categories, { fields: [posts.categoryId], references: [categories.id], relationName: \"posts_categoryId\" }) }));");
         });
     });
 
@@ -483,12 +483,12 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Check owning relation from author to publisher
-            expect(cleanResult).toContain("publisher_id: text(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
-            expect(cleanResult).toContain("\"publisher\": one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: \"authors_publisher_id\" })");
+            expect(cleanResult).toContain("publisherId: text(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("\"publisher\": one(publishers, { fields: [authors.publisherId], references: [publishers.id], relationName: \"authors_publisherId\" })");
 
             // Check owning relation from book to author
-            expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
-            expect(cleanResult).toContain("\"author\": one(authors, { fields: [books.author_id], references: [authors.id], relationName: \"books_author_id\" })");
+            expect(cleanResult).toContain("authorId: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("\"author\": one(authors, { fields: [books.authorId], references: [authors.id], relationName: \"books_authorId\" })");
         });
     });
 
@@ -682,10 +682,10 @@ relationName: "a_entity" }
             // The 'owning' relation on bCollection should correctly generate the FK
             expect(cleanResult).toContain("export const aEntities = pgTable(\"a_entities\"");
             expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
-            expect(cleanResult).toContain("a_entity_id: text(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("aEntityId: text(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
-            expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_a_entity_id\" })");
-            expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"b_entities_a_entity_id\" })");
+            expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_aEntityId\" })");
+            expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.aEntityId], references: [aEntities.id], relationName: \"b_entities_aEntityId\" })");
         });
     });
 });
@@ -752,12 +752,12 @@ relationName: "company" }
         const result = await generateSchema([companiesCollection, jobsCollection]);
         const cleanResult = cleanSchema(result);
 
-        // Both sides must use the same deterministic name: jobs_company_id
-        const expectedSharedName = "jobs_company_id";
+        // Both sides must use the same deterministic name: jobs_companyId
+        const expectedSharedName = "jobs_companyId";
 
         // Owning side (jobs → companies)
         expect(cleanResult).toContain(
-            `"company": one(companies, { fields: [jobs.company_id], references: [companies.id], relationName: \"${expectedSharedName}\" })`
+            `"company": one(companies, { fields: [jobs.companyId], references: [companies.id], relationName: \"${expectedSharedName}\" })`
         );
 
         // Inverse side (companies → jobs)
@@ -811,11 +811,11 @@ relationName: "user" }
         const result = await generateSchema([usersCollection, profilesCollection]);
         const cleanResult = cleanSchema(result);
 
-        const expectedSharedName = "profiles_user_id";
+        const expectedSharedName = "profiles_userId";
 
         // Owning side (profiles → users)
         expect(cleanResult).toContain(
-            `"user": one(users, { fields: [profiles.user_id], references: [users.id], relationName: \"${expectedSharedName}\" })`
+            `"user": one(users, { fields: [profiles.userId], references: [users.id], relationName: \"${expectedSharedName}\" })`
         );
 
         // Inverse side (users → profiles) — no fields/references, paired by relationName only
@@ -882,8 +882,8 @@ relationName: "startup" }
         const allNames = extractRelationNames(result);
 
         // Each pair should have a distinct shared name
-        const employerNames = allNames.filter(n => n === "people_employer_id");
-        const startupNames = allNames.filter(n => n === "people_startup_id");
+        const employerNames = allNames.filter(n => n === "people_employerId");
+        const startupNames = allNames.filter(n => n === "people_startupId");
         expect(employerNames).toHaveLength(2);
         expect(startupNames).toHaveLength(2);
     });
@@ -896,7 +896,7 @@ relationName: "startup" }
  * for every relation. When the schema generator iterated the dictionary, it
  * emitted multiple one() definitions with the same `relationName`, causing
  * Drizzle ORM to throw:
- *   "There are multiple relations with name 'jobs_company_id' in table 'jobs'"
+ *   "There are multiple relations with name 'jobs_companyId' in table 'jobs'"
  *
  * Also, property-based entries (e.g. `company_id: { type: "relation", relationName: "company" }`)
  * duplicated explicit relation entries because the deduplication only compared
@@ -977,7 +977,7 @@ describe("Duplicate relation deduplication regression", () => {
 
         // The jobs table should have exactly ONE one() entry for company_id
         const jobsRelationNames = extractRelationNames(result);
-        const companyIdRelNames = jobsRelationNames.filter(n => n === "jobs_company_id");
+        const companyIdRelNames = jobsRelationNames.filter(n => n === "jobs_companyId");
 
         // Exactly 2: one on the owning side (jobs), one on the inverse side (companies)
         expect(companyIdRelNames).toHaveLength(2);

@@ -81,7 +81,7 @@ udt_name: "jsonb" })
             expect(propertyBlock(result, "id")).toContain('type: "string"');
             expect(propertyBlock(result, "count")).toContain('type: "number"');
             expect(propertyBlock(result, "active")).toContain('type: "boolean"');
-            expect(propertyBlock(result, "created_at")).toContain('type: "date"');
+            expect(propertyBlock(result, "createdAt")).toContain('type: "date"');
             expect(propertyBlock(result, "metadata")).toContain('type: "map"');
         });
 

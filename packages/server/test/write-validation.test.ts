@@ -55,10 +55,20 @@ isId: true },
         expect(() => assertKnownWriteFields({ title: "Hello" }, posts)).not.toThrow();
     });
 
-    it("accepts an owning relation's foreign-key column, which has no property", () => {
-        // Callers may set `author_id` directly rather than going through the
-        // relation property, and the column is real.
-        expect(() => assertKnownWriteFields({ author_id: 3 }, posts)).not.toThrow();
+    it("accepts an owning relation's foreign key, which has no property", () => {
+        // Callers may set the foreign key directly rather than going through
+        // the relation property, and the field is real. Under its wire name:
+        // `author_id` is the column, `authorId` is what the API serves and
+        // therefore the only spelling a caller can send back.
+        expect(() => assertKnownWriteFields({ authorId: 3 }, posts)).not.toThrow();
+    });
+
+    it("rejects the raw column name of a derived foreign key", () => {
+        // The wire is camelCase throughout. Accepting the column as a second
+        // spelling would be the two-conventions defect kept alive in the write
+        // path after the read path stopped emitting it.
+        expect(() => assertKnownWriteFields({ author_id: 3 }, posts))
+            .toThrow(/has no field 'author_id'/);
     });
 
     it("rejects a typo, naming it and what was available", () => {

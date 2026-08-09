@@ -29,7 +29,7 @@ const mockPostsTable = {
     id: { name: "id",
 dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id",
+    authorId: { name: "author_id",
 dataType: "number" },
     _def: { tableName: "posts" }
 };
@@ -249,10 +249,10 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
         const resultRows = [
             { id: 10,
 title: "Post A",
-author_id: "1" },
+authorId: "1" },
             { id: 20,
 title: "Post B",
-author_id: "2" }
+authorId: "2" }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -277,7 +277,7 @@ author_id: "2" }
         const resultRows = [
             { id: 10,
 title: "Post A",
-author_id: 1 }
+authorId: 1 }
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -296,10 +296,10 @@ author_id: 1 }
         const resultRows = [
             { id: 10,
 title: "Post A",
-author_id: 1 }, // number
+authorId: 1 }, // number
             { id: 20,
 title: "Post B",
-author_id: "2" } // string
+authorId: "2" } // string
         ];
 
         const { db } = createMockDb(() => resultRows);
@@ -318,7 +318,7 @@ author_id: "2" } // string
         const resultRows = [
             { id: 10,
 title: "Post A",
-author_id: "999" }
+authorId: "999" }
         ];
 
         const { db } = createMockDb(() => resultRows);

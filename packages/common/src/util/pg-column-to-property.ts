@@ -10,7 +10,7 @@ import type {
     TableColumnInfo,
     TableMetadata
 } from "@rebasepro/types";
-import { prettifyIdentifier } from "@rebasepro/utils";
+import { firstFreeKey, prettifyIdentifier, toWireKey } from "@rebasepro/utils";
 
 /**
  * A collection as introspection can describe it: the table, its columns, the
@@ -265,15 +265,37 @@ export function buildCollectionFromTableMetadata(
             const propRecord = property as unknown as Record<string, unknown>;
             Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
 
-            properties[column.column_name] = property;
-            propertiesOrder.push(column.column_name);
+            // The key is the wire name; `columnName` carries the column. This
+            // used to key by the column and rely on the two being the same
+            // string, which is what put `user_id` on the API of an imported
+            // collection and `displayName` on the API of an authored one.
+            //
+            // `columnName` is stamped unconditionally rather than left to the
+            // snake_case default, because the default is not the inverse of
+            // camel-casing for every name — the mapping has to be recorded, not
+            // recomputed.
+            //
+            // First free candidate: `user_id` and `userId` as two real columns
+            // camel-case to one key, and one of them would otherwise overwrite
+            // the other and be silently dropped.
+            const key = firstFreeKey(
+                [toWireKey(column.column_name), column.column_name],
+                { has: (candidate: string) => candidate in properties }
+            );
+            if (key !== column.column_name) propRecord.columnName = column.column_name;
+            properties[key] = property;
+            propertiesOrder.push(key);
         }
     }
 
     // Parse Outgoing Foreign Keys -> Many-to-One / One-to-One
     if (metadata.foreignKeys) {
         for (const fk of metadata.foreignKeys) {
-            const relName = fk.column_name.endsWith("_id") ? fk.column_name.substring(0, fk.column_name.length - 3) : fk.column_name;
+            const relName = toWireKey(
+                fk.column_name.endsWith("_id")
+                    ? fk.column_name.substring(0, fk.column_name.length - 3)
+                    : fk.column_name
+            );
             relations.push({
                 id: fk.column_name,
                 relationName: relName,

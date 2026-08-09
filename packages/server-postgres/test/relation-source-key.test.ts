@@ -240,11 +240,11 @@ describe("hasMany/hasOne — sourceKey", () => {
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
             if (name === "talents") return table("talents", ["id", "auth_user_id"]) as never;
-            if (name === "talent_applications") return table("talent_applications", ["id", "talent_id", "role"]) as never;
+            if (name === "talent_applications") return table("talent_applications", ["id", "talentId", "role"]) as never;
             return undefined;
         });
 
-        const { db, selectCount } = queuedDb([[{ id: 1, talent_id: 7, role: "chef" }]]);
+        const { db, selectCount } = queuedDb([[{ id: 1, talentId: 7, role: "chef" }]]);
         const relationService = new RelationService(db, registry);
 
         await relationService.fetchRelatedEntities("talents", 7, "applications");
@@ -275,11 +275,11 @@ describe("hasMany/hasOne — sourceKey", () => {
             path.startsWith("talents") ? plain : applications);
         jest.spyOn(registry, "getTable").mockImplementation(name => {
             if (name === "talents") return table("talents", ["id", "auth_user_id"]) as never;
-            if (name === "talent_applications") return table("talent_applications", ["id", "talent_id", "role"]) as never;
+            if (name === "talent_applications") return table("talent_applications", ["id", "talentId", "role"]) as never;
             return undefined;
         });
 
-        const { db, wheres } = queuedDb([[{ id: 1, talent_id: 7, role: "chef" }]]);
+        const { db, wheres } = queuedDb([[{ id: 1, talentId: 7, role: "chef" }]]);
         const relationService = new RelationService(db, registry);
 
         await relationService.fetchRelatedEntities("talents", "7", "applications");

@@ -66,7 +66,7 @@ describe("DataService - Relation Types Tests", () => {
     // Mock tables for different relation scenarios
     const mockOrdersTable = {
         id: { name: "id" },
-        customer_id: { name: "customer_id" },
+        customerId: { name: "customer_id" },
         total: { name: "total" },
         _def: { tableName: "orders" }
     };
@@ -75,7 +75,7 @@ describe("DataService - Relation Types Tests", () => {
         id: { name: "id" },
         name: { name: "name" },
         email: { name: "email" },
-        customer_id: { name: "customer_id" }, // Add for relations
+        customerId: { name: "customer_id" }, // Add for relations
         _def: { tableName: "customers" }
     };
 
@@ -83,7 +83,7 @@ describe("DataService - Relation Types Tests", () => {
         id: { name: "id" },
         name: { name: "name" },
         price: { name: "price" },
-        customer_id: { name: "customer_id" }, // Add for relations
+        customerId: { name: "customer_id" }, // Add for relations
         _def: { tableName: "products" }
     };
 
@@ -96,7 +96,7 @@ describe("DataService - Relation Types Tests", () => {
 
     const mockUserProfilesTable = {
         id: { name: "id" },
-        user_id: { name: "user_id" },
+        userId: { name: "user_id" },
         bio: { name: "bio" },
         _def: { tableName: "user_profiles" }
     };
@@ -255,10 +255,10 @@ relationName: "user" }
             const mockOrders = [
                 { id: 1,
 total: 100,
-customer_id: 1 },
+customerId: 1 },
                 { id: 2,
 total: 200,
-customer_id: 1 }
+customerId: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             db.where.mockReturnValue(resolvesTo(mockOrders) as never);
@@ -293,19 +293,19 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 3,
                 total: 150,
-                customer_id: 1
+                customerId: 1
             }]);
 
             const entity = await dataService.save("orders", newOrder);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 total: 150,
-                customer_id: "1"
+                customerId: "1"
             }));
             // Save answers with the row `GET /:id` serves: the FK column,
             // no relation ref — refs are the admin view-model's, built
             // client-side.
-            expect(entity.customer_id).toBe(1);
+            expect(entity.customerId).toBe(1);
             expect(entity.customer).toBeUndefined();
         });
 
@@ -313,7 +313,7 @@ __type: "relation" }
             const mockOrder = {
                 id: 1,
                 total: 100,
-                customer_id: 5
+                customerId: 5
             };
             db.limit.mockResolvedValue([mockOrder]);
 
@@ -391,7 +391,7 @@ product_id: "2" }
             const mockProfile = [
                 { id: 1,
 bio: "User bio",
-user_id: 1 }
+userId: 1 }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue(resolvesTo(mockProfile) as never);
@@ -414,14 +414,14 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 1,
                 bio: "New user bio",
-                user_id: 1
+                userId: 1
             }]);
 
             const entity = await dataService.save("user_profiles", newProfile);
 
             expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
                 bio: "New user bio",
-                user_id: "1"
+                userId: "1"
             }));
         });
     });
@@ -434,13 +434,13 @@ __type: "relation" }
 
             db.returning.mockResolvedValue([{ id: 5 }]);
             // This mock is used by fetchOne after save which chains .where().limit()
-            // NOTE: The mock returns customer_id: null, but due to how the DataService
+            // NOTE: The mock returns customerId: null, but due to how the DataService
             // deserializes owning relations from saved entities, it may still create a relation
             // object. This test verifies that save works without providing a customer relation.
             db.limit.mockResolvedValue([{
                 id: 5,
                 total: 150,
-                customer_id: null
+                customerId: null
             }]);
 
             const entity = await dataService.save("orders", orderWithoutCustomer);
@@ -474,7 +474,7 @@ name: "Product 1" }
             const mockOrders = [
                 { id: 1,
 total: 100,
-customer_id: 1 }
+customerId: 1 }
             ];
             // RelationService ends query chain with where()
             db.where.mockReturnValue(resolvesTo(mockOrders) as never);
@@ -498,10 +498,10 @@ customer_id: 1 }
             const mockOrders = [
                 { id: 2,
 total: 200,
-customer_id: 1 },
+customerId: 1 },
                 { id: 1,
 total: 100,
-customer_id: 1 }
+customerId: 1 }
             ];
             // The chain `where()` returns is where ORDER BY lands, so the test
             // has to hold on to it — `db.orderBy` is never the one called.
@@ -534,13 +534,13 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 1,
                 total: 100,
-                customer_id: 2
+                customerId: 2
             }]);
 
             const entity = await dataService.save("orders", updatedOrder, 1);
 
             expect(db.set).toHaveBeenCalledWith(expect.objectContaining({
-                customer_id: "2"
+                customerId: "2"
             }));
         });
 
@@ -556,13 +556,13 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 1,
                 total: 100,
-                customer_id: null
+                customerId: null
             }]);
 
             await dataService.save("orders", orderWithoutCustomer as never, 1);
 
             expect(db.update).toHaveBeenCalledWith(mockOrdersTable);
-            expect(db.set).toHaveBeenCalledWith({ customer_id: null });
+            expect(db.set).toHaveBeenCalledWith({ customerId: null });
         });
 
         it("should leave an omitted relation untouched", async () => {
@@ -574,7 +574,7 @@ __type: "relation" }
             db.limit.mockResolvedValue([{
                 id: 1,
                 total: 100,
-                customer_id: 2
+                customerId: 2
             }]);
 
             await dataService.save("orders", {}, 1);
@@ -594,14 +594,14 @@ __type: "relation" }
         const mockPostsTable = {
             id: { name: "id" },
             title: { name: "title" },
-            author_id: { name: "author_id" },
+            authorId: { name: "author_id" },
             _def: { tableName: "posts" }
         };
 
         const mockCommentsTable = {
             id: { name: "id" },
             content: { name: "content" },
-            post_id: { name: "post_id" },
+            postId: { name: "post_id" },
             _def: { tableName: "comments" }
         };
 
@@ -687,7 +687,7 @@ __type: "relation" }
                 db.returning.mockResolvedValue([{ id: 1 }]);
                 db.limit.mockResolvedValue([{ id: 1,
 title: "Test Post",
-author_id: 7 }]);
+authorId: 7 }]);
 
                 await dataService.save("posts_jp", newPost);
 
@@ -698,12 +698,12 @@ author_id: 7 }]);
                 // The value written into the profile is the *parent's*
                 // author_id, not the post's id: reading the wrong end of the
                 // first hop links the profile to a row it has no relation to.
-                expect(parentKeyRead?.val).toBe(mockPostsTable.author_id);
+                expect(parentKeyRead?.val).toBe(mockPostsTable.authorId);
                 expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
                 // To-one: whoever currently holds the parent's key is cleared
                 // before the named target takes it, or the pair ends up with
                 // two profiles claiming the same author.
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: 7 }]);
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 7 }]);
             });
 
             it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
@@ -741,7 +741,7 @@ __type: "relation" }
 
                 db.limit.mockResolvedValue([{ id: 1,
 title: "Test Post Updated",
-author_id: 1 }]);
+authorId: 1 }]);
 
                 try {
                     await dataService.save("posts_jp", postUpdate, 1);
@@ -777,7 +777,7 @@ name: "John Doe" }]);
                 // Clear-then-set, in that order: a profile that used to point
                 // at this customer has to let go before the named one takes
                 // over, or a to-one relation ends up with two holders.
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: "1" }]);
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: "1" }]);
             });
         });
 
@@ -856,7 +856,7 @@ name: "Jane Author" }]);
                 // against a value from the wrong table.
                 expect(parentKeyRead?.val).toBe(mockAuthorsTable.id);
                 expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: 3 }]);
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 3 }]);
             });
         });
 
@@ -1007,8 +1007,8 @@ name: "Big Customer" }]);
                 // are. Without the clearing pass a removed order keeps pointing
                 // at this customer and silently stays in the collection.
                 expect(setPayloads(db.set as jest.Mock)).toEqual([
-                    { customer_id: null },
-                    { customer_id: "1" }
+                    { customerId: null },
+                    { customerId: "1" }
                 ]);
             });
         });

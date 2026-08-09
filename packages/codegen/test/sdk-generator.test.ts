@@ -434,10 +434,11 @@ isId: "increment" },
         // Row should have authorId as number since authors PK (id) is number
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
-        // The foreign key is emitted under `localKey` verbatim — that is the
-        // Drizzle field key, so it is the JSON key the row arrives with.
-        expect(ts).toContain("author_id?: number | null;");
-        expect(ts).not.toContain("authorId");
+        // The foreign key is emitted under its wire name — the Drizzle field
+        // key, which is the JSON key the row arrives with. `author_id` is the
+        // column behind it and is not a name the API ever answers to.
+        expect(ts).toContain("authorId?: number | null;");
+        expect(ts).not.toContain("author_id");
     });
 
     it("defaults to string | number when target primary key cannot be resolved", () => {
@@ -465,7 +466,7 @@ isId: "increment" },
 
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
-        expect(ts).toContain("author_id?: string | number | null;");
+        expect(ts).toContain("authorId?: string | number | null;");
     });
 
     it("supports relation validation constraints making FK required", () => {
@@ -506,7 +507,7 @@ isId: "increment" },
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
         // target is a string uuid and the relation is required
-        expect(ts).toContain("author_id: string;");
+        expect(ts).toContain("authorId: string;");
     });
 
     it("types a relation as the target's own row, inlined — the shape a read serves", () => {
@@ -564,15 +565,21 @@ isId: "increment" },
 
         const ts = generateTypedefs([postsCol]);
 
-        expect(ts).toContain("author_id?: string | number | null;");
+        expect(ts).toContain("authorId?: string | number | null;");
         expect(ts).toContain("author?: Record<string, unknown>;");
     });
 
     it("a relation that shadows its own foreign key is typed as both", () => {
         // The read serves the scalar column, until `include` names the relation
         // — which nests the target under the same key and takes the column's
-        // place. Typing it as only one of the two is how `job.company_id`
+        // place. Typing it as only one of the two is how `job.companyId`
         // reached the query layer as an object.
+        //
+        // The clash is between the relation's *name* and the foreign key's
+        // *wire* name, so it takes a relation named `companyId` to produce it.
+        // A relation named `company_id` beside a `companyId` column no longer
+        // collides at all — which is a second thing camel-casing the wire
+        // bought, not a case this test stopped covering.
         const companiesCol = {
             slug: "companies",
             driver: "postgres",
@@ -592,7 +599,7 @@ isId: "uuid" }
             relations: [
                 {
                     kind: "belongsTo",
-                    relationName: "company_id",
+                    relationName: "companyId",
                     target: () => companiesCol,
                     localKey: "company_id"
                 }
@@ -601,7 +608,7 @@ isId: "uuid" }
 
         const ts = generateTypedefs([jobsCol, companiesCol]);
 
-        expect(ts).toContain("company_id?: string | Database[\"companies\"][\"Row\"] | null;");
+        expect(ts).toContain("companyId?: string | Database[\"companies\"][\"Row\"] | null;");
     });
 });
 
@@ -694,16 +701,16 @@ describe("Row, Insert and Update describe different things", () => {
         expect(update).not.toMatch(/^\s+id\??:/m);
         expect(update).toContain("title?: string;");
         // The foreign key is still writable — it is a column, not the row's own key.
-        expect(update).toContain("author_id?: number;");
+        expect(update).toContain("authorId?: number;");
     });
 
     it("accepts both write shapes for a belongsTo relation", () => {
         // The server takes either: `{ author: 5 }`, which the write transformer
-        // maps onto the foreign-key column, or `{ author_id: 5 }`, which passes
+        // maps onto the foreign-key column, or `{ authorId: 5 }`, which passes
         // through. Only the second was generated, so the documented form was a
         // type error.
         const insert = block(generateTypedefs([postsCol, authorsCol]), "Insert");
-        expect(insert).toContain("author_id?: number;");
+        expect(insert).toContain("authorId?: number;");
         expect(insert).toContain("author?: number;");
     });
 
@@ -731,7 +738,7 @@ describe("Row, Insert and Update describe different things", () => {
 
         const insert = block(generateTypedefs([renamed, authorsCol]), "Insert");
         expect(insert).toContain("author?: number;");
-        expect(insert).toContain("author_id?: number;");
+        expect(insert).toContain("authorId?: number;");
         expect(insert).not.toContain("author_rel");
     });
 
@@ -886,10 +893,11 @@ describe("excludeFromApi keeps a property off every generated type", () => {
     });
 
     it("keeps a foreign key whose own column is not excluded", () => {
-        // The excluded `auditor` relation stores its key in `auditor_id`, a
-        // column nothing marked. The server serves it, so the type says so:
-        // excluding a relation is not a claim about a different column.
-        expect(block(generated, "Row")).toContain("auditor_id");
+        // The excluded `auditor` relation stores its key in the `auditor_id`
+        // column, which nothing marked, and serves it as `auditorId`. The
+        // server serves it, so the type says so: excluding a relation is not
+        // a claim about a different column.
+        expect(block(generated, "Row")).toContain("auditorId");
     });
 });
 
