@@ -211,9 +211,11 @@ conflictHandled };
         )).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
     });
 
-    it("still swallows a misconfigured inverse relation rather than failing the save", async () => {
-        // The other half: an unresolvable junction is a configuration problem
-        // with the *other* relations still worth writing, so it stays a warning.
+    it("refuses a junction it cannot resolve rather than skipping the relation", async () => {
+        // This used to warn and carry on, so the save reported success having
+        // written no links at all. `assertRelationsResolve` fails boot on the
+        // same defect, so a running server cannot reach this — it is the second
+        // line, for a registry assembled by hand.
         const recording = recordingTx([]);
         const service = new RelationService({} as never, registry);
         const inverse = [{
@@ -224,6 +226,29 @@ conflictHandled };
                 target: () => tagsCollection,
                 cardinality: "many",
                 through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
+            },
+            newValue: []
+        }];
+
+        await expect(service.updateInverseRelations(
+            recording.tx as never, postsCollection, "p1", inverse as never
+        )).rejects.toMatchObject({ code: "RELATION_MISCONFIGURED" });
+    });
+
+    it("still carries on past a relation that fails for a reason of its own", async () => {
+        // The catch in `updateInverseRelations` earns its place for everything
+        // that is not a decision about the caller: one relation blowing up on a
+        // driver error should not abort the ones after it.
+        const recording = recordingTx([]);
+        const service = new RelationService({} as never, registry);
+        const inverse = [{
+            relationKey: "tags",
+            relation: {
+                kind: "manyToMany",
+                relationName: "tags",
+                target: () => { throw new Error("target thunk exploded"); },
+                cardinality: "many",
+                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
             },
             newValue: []
         }];

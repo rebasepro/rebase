@@ -19,7 +19,12 @@ import { parseDataFromServer } from "../data-transformer";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
-import { explainZeroRowWrite } from "./write-denial";
+import {
+    applyJunctionMembership,
+    bindJoinPathJunction,
+    bindThroughJunction,
+    removeJunctionLink
+} from "./junction-writes";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -593,49 +598,33 @@ export class RelationService {
         if (!isManyToMany(hop.relation)) {
             throw new Error(`Relation '${hop.relationKey}' has no junction table to unlink through`);
         }
-        const through = hop.relation.through;
 
-        const junctionTable = this.registry.getTable(through.table);
-        if (!junctionTable) {
-            throw new Error(`Junction table not found: ${through.table}`);
-        }
+        const binding = bindThroughJunction(
+            this.registry,
+            hop.relation.through,
+            `${hop.parentCollection.slug}.${hop.relationKey}`
+        );
 
-        const sourceJunctionColumn = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-        const targetJunctionColumn = junctionTable[through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+        await removeJunctionLink(
+            tx,
+            binding,
+            this.parsedId(hop.parentCollection, hop.parentId),
+            this.parsedId(hop.targetCollection, targetId),
+            { parent: hop.parentCollection.slug, relation: hop.relationKey }
+        );
+    }
 
-        if (!sourceJunctionColumn || !targetJunctionColumn) {
-            throw new Error(`Junction columns not found for relation '${hop.relationKey}' on table '${through.table}'`);
-        }
+    /** A collection's id, parsed to the type its primary key column holds. */
+    private parsedId(collection: CollectionConfig, id: string | number): unknown {
+        const pks = requirePrimaryKeys(collection, this.registry);
+        return parseIdValues(id, pks)[pks[0].fieldName];
+    }
 
-        const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
-        const parsedParentId = parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
-
-        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
-        const parsedTargetId = parseIdValues(targetId, targetPks)[targetPks[0].fieldName];
-
-        // The link is the row here, so the junction's own policies decide.
-        // Membership was established by `isRelated` a moment ago over the same
-        // handle, which is what makes a zero-row delete meaningful rather than
-        // ambiguous: something between read and write refused it.
-        const conditions = [
-            eq(sourceJunctionColumn, parsedParentId),
-            eq(targetJunctionColumn, parsedTargetId)
-        ];
-        const result = await tx.delete(junctionTable).where(and(...conditions));
-
-        if ((result.rowCount ?? 0) === 0) {
-            throw await explainZeroRowWrite(
-                tx,
-                junctionTable,
-                conditions,
-                `Not allowed to unlink "${parsedTargetId}" from "${hop.parentCollection.slug}" ` +
-                `"${parsedParentId}": a row-level security policy rejected the write.`,
-                `No "${hop.relationKey}" link between "${hop.parentCollection.slug}" ` +
-                `"${parsedParentId}" and "${parsedTargetId}" to remove.`
-            );
-        }
-
-        logger.info(`Unlinked '${hop.relationKey}' ${parsedTargetId} from ${hop.parentCollection.slug} ${parsedParentId}`);
+    /** The same, for the membership list a to-many write names. */
+    private parsedIds(collection: CollectionConfig, ids: Array<string | number>): unknown[] {
+        if (ids.length === 0) return [];
+        const pks = requirePrimaryKeys(collection, this.registry);
+        return ids.map(id => parseIdValues(id, pks)[pks[0].fieldName]);
     }
 
     /**
@@ -1031,113 +1020,6 @@ export class RelationService {
     }
 
     /**
-     * Bring one row's junction links in line with the ids a save carried,
-     * by diffing against what is stored rather than replacing the lot.
-     *
-     * The old shape was `DELETE every link for this parent` followed by
-     * `INSERT what the client sent`, which makes a save of the parent a full
-     * replacement of the membership set from a list the browser assembled out
-     * of a read it did earlier. Three things follow from that, and the diff
-     * closes all three:
-     *
-     *  - **Lost update.** Two editors with post 7 open: A adds tag X and saves;
-     *    B saves any field and the whole set is rewritten from B's older list,
-     *    dropping X with nothing to show for it. A diff only names the ids that
-     *    actually changed, so edits to disjoint tags no longer collide.
-     *  - **Partial read, partial delete.** The read that fills the form runs
-     *    under RLS, so a user who may edit the parent but cannot *see* some of
-     *    the linked rows gets a shorter list — and writing it back deleted the
-     *    links they were never shown. The DELETE now names ids instead of
-     *    "everything for this parent", and the select that produces them runs
-     *    in this same transaction under the same policies, so a link the caller
-     *    cannot read is in neither list and survives the save.
-     *  - **Junction payload columns.** A junction carrying its own columns
-     *    (`position`, `role`, `created_at`) lost them on every save, because
-     *    every row was re-inserted with only the two keys. Untouched links are
-     *    now left alone.
-     *
-     * The insert is `ON CONFLICT DO NOTHING` so that two sessions adding the
-     * same link concurrently is a no-op rather than a unique violation.
-     */
-    private async syncJunctionLinks(
-        tx: DrizzleClient,
-        junctionTable: PgTable,
-        sourceJunctionColumn: AnyPgColumn,
-        targetJunctionColumn: AnyPgColumn,
-        parsedParentId: unknown,
-        parsedTargetIds: unknown[]
-    ) {
-        const existingRows = await tx
-            .select({ targetId: targetJunctionColumn })
-            .from(junctionTable)
-            .where(eq(sourceJunctionColumn, parsedParentId));
-
-        // Keyed by `String(...)` because a junction key can come back from the
-        // driver as a string where the parsed value is a number, and a diff
-        // that misses that would delete and re-insert every link.
-        const existingById = new Map<string, unknown>();
-        for (const row of existingRows as Array<{ targetId: unknown }>) {
-            if (row.targetId === null || row.targetId === undefined) continue;
-            existingById.set(String(row.targetId), row.targetId);
-        }
-
-        const wantedById = new Map<string, unknown>();
-        for (const targetId of parsedTargetIds) {
-            if (targetId === null || targetId === undefined) continue;
-            wantedById.set(String(targetId), targetId);
-        }
-
-        const removed = [...existingById.entries()]
-            .filter(([key]) => !wantedById.has(key))
-            .map(([, value]) => value);
-        const added = [...wantedById.entries()]
-            .filter(([key]) => !existingById.has(key))
-            .map(([, value]) => value);
-
-        if (removed.length > 0) {
-            const removeConditions = [
-                eq(sourceJunctionColumn, parsedParentId),
-                inArray(targetJunctionColumn, removed)
-            ];
-            const result = await tx.delete(junctionTable).where(and(...removeConditions));
-
-            // Every id in `removed` came out of the select above, on this same
-            // handle, so all of them were visible. Fewer deletions than that
-            // means something refused them — and a save that reports success
-            // while the membership it was given is not the membership stored
-            // is the silent-write class this guards against.
-            if ((result.rowCount ?? 0) < removed.length) {
-                const survivors = await tx
-                    .select({ present: sql<number>`1` })
-                    .from(junctionTable)
-                    .where(and(...removeConditions))
-                    .limit(1);
-
-                // Nothing survived: a concurrent session removed the rest
-                // between the select and the delete. The membership is what
-                // the caller asked for, which is all this promised.
-                if (survivors.length > 0) {
-                    throw ApiError.forbidden(
-                        `Not allowed to remove ${removed.length - (result.rowCount ?? 0)} of ${removed.length} ` +
-                        `link(s) in "${drizzleTableName(junctionTable)}": ` +
-                        "a row-level security policy rejected the write.",
-                        "WRITE_DENIED"
-                    );
-                }
-            }
-        }
-
-        if (added.length > 0) {
-            await tx.insert(junctionTable)
-                .values(added.map(targetId => ({
-                    [sourceJunctionColumn.name]: parsedParentId,
-                    [targetJunctionColumn.name]: targetId
-                })))
-                .onConflictDoNothing();
-        }
-    }
-
-    /**
      * Update many-to-many and junction relations
      */
     async updateRelationsUsingJoins<M extends Record<string, unknown>>(
@@ -1155,95 +1037,28 @@ export class RelationService {
             const targetEntityIds = relationTargetIds(value, key, collection.slug);
             const targetCollection = relation.target();
 
-            // Use joinPath if available
+            const label = `${collection.slug}.${key}`;
+
             if (relation.kind === "via") {
-                const parentTableName = getTableName(collection);
-                const targetTableName = getTableName(targetCollection);
-
-                let junctionTable: PgTable | undefined = undefined;
-                let sourceJunctionColumn: AnyPgColumn | null = null;
-                let targetJunctionColumn: AnyPgColumn | null = null;
-
-                const junctionTableName = relation.joinPath.find(step =>
-                    step.table !== parentTableName && step.table !== targetTableName
-                )?.table;
-
-                if (junctionTableName) {
-                    junctionTable = this.registry.getTable(junctionTableName);
-
-                    if (junctionTable) {
-                        for (const joinStep of relation.joinPath) {
-                            const fromTable = DrizzleConditionBuilder.getTableNamesFromColumns(joinStep.on.from)[0];
-                            const toTable = DrizzleConditionBuilder.getTableNamesFromColumns(joinStep.on.to)[0];
-
-                            if (fromTable === parentTableName && toTable === junctionTableName) {
-                                const columnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.to);
-                                sourceJunctionColumn = junctionTable[columnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            } else if (fromTable === junctionTableName && toTable === parentTableName) {
-                                const columnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.from);
-                                sourceJunctionColumn = junctionTable[columnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            }
-
-                            if (fromTable === junctionTableName && toTable === targetTableName) {
-                                const columnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.from);
-                                targetJunctionColumn = junctionTable[columnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            } else if (fromTable === targetTableName && toTable === junctionTableName) {
-                                const columnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.to);
-                                targetJunctionColumn = junctionTable[columnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            }
-                        }
-                    }
-                }
-
-                if (!junctionTable || !sourceJunctionColumn || !targetJunctionColumn) {
-                    logger.warn(`Could not determine junction table for relation '${key}' in collection '${collection.slug}'`);
-                    continue;
-                }
-
-                const parentPks = requirePrimaryKeys(collection, this.registry);
-                const parentIdInfo = parentPks[0];
-                const parsedParentIdObj = parseIdValues(id, parentPks);
-                const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-
-                let parsedTargetIds: unknown[] = [];
-                if (targetEntityIds.length > 0) {
-                    const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                    const targetIdInfo = targetPks[0];
-                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-                }
-
-                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
-                    parsedParentId, parsedTargetIds);
+                await applyJunctionMembership(
+                    tx,
+                    bindJoinPathJunction(
+                        this.registry,
+                        relation.joinPath,
+                        getTableName(collection),
+                        getTableName(targetCollection),
+                        label
+                    ),
+                    this.parsedId(collection, id),
+                    this.parsedIds(targetCollection, targetEntityIds)
+                );
             } else if (relation.kind === "manyToMany") {
-                // Handle many-to-many relations with junction table using 'through' property
-                const junctionTable = this.registry.getTable(relation.through.table);
-                if (!junctionTable) {
-                    logger.warn(`Junction table '${relation.through.table}' not found for relation '${key}' in collection '${collection.slug}'`);
-                    continue;
-                }
-
-                const sourceJunctionColumn = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-                const targetJunctionColumn = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-                if (!sourceJunctionColumn || !targetJunctionColumn) {
-                    logger.warn(`Junction columns not found for relation '${key}'`);
-                    continue;
-                }
-
-                const parentPks = requirePrimaryKeys(collection, this.registry);
-                const parentIdInfo = parentPks[0];
-                const parsedParentIdObj = parseIdValues(id, parentPks);
-                const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-
-                let parsedTargetIds: unknown[] = [];
-                if (targetEntityIds.length > 0) {
-                    const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                    const targetIdInfo = targetPks[0];
-                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-                }
-
-                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
-                    parsedParentId, parsedTargetIds);
+                await applyJunctionMembership(
+                    tx,
+                    bindThroughJunction(this.registry, relation.through, label),
+                    this.parsedId(collection, id),
+                    this.parsedIds(targetCollection, targetEntityIds)
+                );
             } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
@@ -1439,81 +1254,42 @@ export class RelationService {
         relation: ResolvedVia,
         newValue: unknown
     ) {
+        const sourceTableName = getTableName(sourceCollection);
+        const targetTableName = getTableName(targetCollection);
+
+        // Only a path with exactly one table between the two ends holds links to
+        // write. Anything else is a read-only reach, and skipping it is a
+        // statement about the relation's shape rather than a failure to resolve
+        // one — which is why this is a `return` and the binder below throws.
+        const intermediateTables = relation.joinPath
+            .map(step => step.table)
+            .filter(table => table !== sourceTableName && table !== targetTableName);
+
+        if (intermediateTables.length !== 1 || relation.cardinality !== "many") return;
+
         try {
+            const binding = bindJoinPathJunction(
+                this.registry,
+                relation.joinPath,
+                sourceTableName,
+                targetTableName,
+                `${sourceCollection.slug}.${relation.relationName}`
+            );
 
-            const sourceTableName = getTableName(sourceCollection);
-            const targetTableName = getTableName(targetCollection);
+            // The membership this write asks for. A single value is the
+            // one-to-one case and reads as a set of one.
+            const targetIds = Array.isArray(newValue)
+                ? relationTargetIds(newValue, relation.relationName, sourceCollection.slug)
+                : newValue === null || newValue === undefined
+                    ? []
+                    : relationTargetIds([newValue], relation.relationName, sourceCollection.slug);
 
-            // Find intermediate tables that are neither source nor target
-            const intermediateTables = relation.joinPath
-                .map(step => step.table)
-                .filter(table => table !== sourceTableName && table !== targetTableName);
-
-            // If there's exactly one intermediate table, it's likely a junction table for many-to-many
-            if (intermediateTables.length === 1 && relation.cardinality === "many") {
-                const junctionTableName = intermediateTables[0];
-                const junctionTable = this.registry.getTable(junctionTableName);
-
-                if (!junctionTable) {
-                    logger.warn(`Junction table '${junctionTableName}' not found for inverse joinPath relation '${relation.relationName}'`);
-                    return;
-                }
-
-                let sourceJunctionColumn: AnyPgColumn | null = null;
-                let targetJunctionColumn: AnyPgColumn | null = null;
-
-                for (const step of relation.joinPath) {
-                    if (step.table === junctionTableName) {
-                        const fromTable = DrizzleConditionBuilder.getTableNamesFromColumns(step.on.from)[0];
-                        const toColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(step.on.to);
-                        const fromColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(step.on.from);
-
-                        if (fromTable === sourceTableName) {
-                            sourceJunctionColumn = junctionTable[toColumnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                        } else if (fromTable === targetTableName) {
-                            targetJunctionColumn = junctionTable[toColumnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                        } else {
-                            const toTable = DrizzleConditionBuilder.getTableNamesFromColumns(step.on.to)[0];
-                            if (toTable === sourceTableName) {
-                                sourceJunctionColumn = junctionTable[fromColumnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            } else if (toTable === targetTableName) {
-                                targetJunctionColumn = junctionTable[fromColumnNames[0] as keyof typeof junctionTable] as AnyPgColumn;
-                            }
-                        }
-                    }
-                }
-
-                if (!sourceJunctionColumn || !targetJunctionColumn) {
-                    logger.warn(`Could not determine junction columns for inverse joinPath relation '${relation.relationName}'`);
-                    return;
-                }
-
-                // Perform the junction table update
-                const sourcePks = requirePrimaryKeys(sourceCollection, this.registry);
-                const sourceIdInfo = sourcePks[0];
-                const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
-                const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
-
-                // The membership this write asks for, as parsed keys. A single
-                // value is the one-to-one case and reads as a set of one.
-                let parsedTargetIds: unknown[] = [];
-                if (newValue && Array.isArray(newValue) && newValue.length > 0) {
-                    const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                    const targetIdInfo = targetPks[0];
-                    // This path already read both shapes; the other two did not.
-                    // Same helper now, so the three cannot drift again.
-                    const targetEntityIds = relationTargetIds(newValue, relation.relationName, sourceCollection.slug);
-                    parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-                } else if (newValue && !Array.isArray(newValue)) {
-                    const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                    const targetIdInfo = targetPks[0];
-                    const targetId = typeof newValue === "object" && newValue !== null ? (newValue as Record<string, unknown>).id as string | number : newValue as string | number;
-                    parsedTargetIds = [parseIdValues(targetId, targetPks)[targetIdInfo.fieldName]];
-                }
-
-                await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
-                    parsedSourceId, parsedTargetIds);
-            }
+            await applyJunctionMembership(
+                tx,
+                binding,
+                this.parsedId(sourceCollection, sourceEntityId),
+                this.parsedIds(targetCollection, targetIds)
+            );
         } catch (error) {
             logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
             throw error;
@@ -1533,37 +1309,20 @@ export class RelationService {
         junctionInfo: { table: string; sourceColumn: string; targetColumn: string }
     ) {
         try {
-            const junctionTable = this.registry.getTable(junctionInfo.table);
-            if (!junctionTable) {
-                logger.warn(`Junction table '${junctionInfo.table}' not found for many-to-many inverse relation '${relation.relationName}'`);
-                return;
-            }
-
-            const sourceJunctionColumn = junctionTable[junctionInfo.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetJunctionColumn = junctionTable[junctionInfo.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-            if (!sourceJunctionColumn || !targetJunctionColumn) {
-                logger.warn(`Junction columns not found for relation '${relation.relationName}'`);
-                return;
-            }
-
-            const sourcePks = requirePrimaryKeys(sourceCollection, this.registry);
-            const sourceIdInfo = sourcePks[0];
-            const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
-            const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
-
-            const targetEntityIds = Array.isArray(newValue)
+            const targetIds = Array.isArray(newValue)
                 ? relationTargetIds(newValue, relation.relationName, sourceCollection.slug)
                 : [];
-            let parsedTargetIds: unknown[] = [];
-            if (targetEntityIds.length > 0) {
-                const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                const targetIdInfo = targetPks[0];
-                parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-            }
 
-            await this.syncJunctionLinks(tx, junctionTable, sourceJunctionColumn, targetJunctionColumn,
-                parsedSourceId, parsedTargetIds);
+            await applyJunctionMembership(
+                tx,
+                bindThroughJunction(
+                    this.registry,
+                    junctionInfo,
+                    `${sourceCollection.slug}.${relation.relationName}`
+                ),
+                this.parsedId(sourceCollection, sourceEntityId),
+                this.parsedIds(targetCollection, targetIds)
+            );
         } catch (error) {
             logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });
             throw error;
