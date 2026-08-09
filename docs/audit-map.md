@@ -206,7 +206,12 @@ Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](d
 66. **Error messages & DX surface** — a cross-cutting pass over the errors a developer
     actually hits first (bad config, missing env, wrong driver version): are they
     actionable and true? **partial (dx-audit-2026-07-25)**
-67. **MCP server** — `packages/mcp`. Tool surface, authz, what it exposes about the DB. **never**
+67. **MCP server** — `packages/mcp`. Tool surface, authz, what it exposes about the DB.
+    **done** — see [audits/67-mcp-server.md](audits/67-mcp-server.md). H1/H2/H3/M1 have since been
+    fixed, so that write-up reads worse than the current code; **M2 is still open** — zero-config
+    discovery falls back to the dev server's service key (`{uid:"service", roles:["admin"]}`,
+    `mcp/src/index.ts:261`), and the recommended startup warning naming the credential in use was
+    never implemented. The README also documents 26 tools where 40 ship.
 
 ## I. Cloud / SaaS control plane
 
