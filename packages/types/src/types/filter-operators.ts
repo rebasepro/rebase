@@ -246,6 +246,22 @@ export const ALL_WHERE_FILTER_OPS: readonly WhereFilterOp[] = [
 const CANONICAL_OPS: ReadonlySet<string> = new Set<WhereFilterOp>(ALL_WHERE_FILTER_OPS);
 
 /**
+ * The REST table as a `Map`, because the key `toCanonicalOp` is handed comes
+ * off the wire.
+ *
+ * Indexed as a plain object, every `Object.prototype` member answered:
+ * `toCanonicalOp("valueOf")` returned the inherited *function* as though it
+ * were a `WhereFilterOp`, and every caller here treats a defined result as
+ * "known operator". Same defect the REST codec's own lookup tables were
+ * converted away from in `filter-dialect.ts`; this is the copy that survived
+ * one package over, and it now sits under the operator validation the REST
+ * parser does, which would otherwise have admitted `["constructor", x]`.
+ */
+const REST_OP_LOOKUP: ReadonlyMap<string, WhereFilterOp> = new Map<string, WhereFilterOp>(
+    Object.entries(REST_TO_CANONICAL) as [string, WhereFilterOp][]
+);
+
+/**
  * Resolve any operator string (canonical or REST short-code) to its
  * canonical `WhereFilterOp` form. Returns `undefined` for unknown operators.
  *
@@ -257,5 +273,5 @@ const CANONICAL_OPS: ReadonlySet<string> = new Set<WhereFilterOp>(ALL_WHERE_FILT
  */
 export function toCanonicalOp(op: string): WhereFilterOp | undefined {
     if (CANONICAL_OPS.has(op)) return op as WhereFilterOp;
-    return (REST_TO_CANONICAL as Record<string, WhereFilterOp | undefined>)[op];
+    return REST_OP_LOOKUP.get(op);
 }
