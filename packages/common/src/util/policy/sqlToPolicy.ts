@@ -171,11 +171,36 @@ export function sqlToPolicy(sql: string): PolicyExpression {
  * is the more dangerous spelling, because it inverts a rule instead of
  * emptying a table.
  */
-const FOREIGN_CONVENTION_UIDS: Record<string, string> = {
-    anon: "Supabase",
-    authenticated: "Supabase",
-    service_role: "Supabase"
-};
+/**
+ * A `Map`, not an object literal.
+ *
+ * As `Record<string, string>` this was indexed with a literal taken straight
+ * out of a policy, so every key on `Object.prototype` answered: a rule
+ * comparing `rebase.uid()` to `"valueOf"`, `"toString"`, `"constructor"` or
+ * `"hasOwnProperty"` found a truthy "platform" and reported an anonymous-grant
+ * risk that does not exist — with the matched function interpolated into the
+ * explanation as the platform's name. A security warning that fires on
+ * innocent input is worse than none: it is what teaches people to skip the
+ * warnings that are real.
+ *
+ * Same shape as the prototype-pollution class swept out of `setIn`, `getIn`,
+ * `mergeDeep` and `unflattenObject` — a data-derived key reaching a plain
+ * object. Found by a property test, on the input `"valueOf"`.
+ */
+const FOREIGN_CONVENTION_UIDS = new Map<string, string>([
+    ["anon", "Supabase"],
+    ["authenticated", "Supabase"],
+    ["service_role", "Supabase"]
+]);
+
+/**
+ * The same foreign literals, as a pattern for SQL that could not be parsed
+ * back into structure.
+ */
+const FOREIGN_UID_LITERAL_SQL = new RegExp(
+    String.raw`rebase\.uid\(\)\s*=\s*'(${[...FOREIGN_CONVENTION_UIDS.keys()].join("|")})'`,
+    "i"
+);
 
 /** A clause that reads as a lockdown but admits anonymous callers. */
 export interface AnonymousGrantRisk {
@@ -235,7 +260,7 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
             case "existsIn":
                 visit(e.where);
                 return;
-            case "raw":
+            case "raw": {
                 if (UID_NOT_NULL.test(e.sql)) {
                     found.push({
                         pattern: "uid-not-null",
@@ -245,12 +270,33 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
                             "Use `condition: policy.authenticated()` to mean \"signed in\"."
                     });
                 }
+                // The foreign literals have to be looked for here too, not only
+                // in `compare`. `sqlToPolicy` falls back to `raw` for anything
+                // it cannot structure — an `EXISTS (...)` subquery always does —
+                // so a policy read back from the database arrives as one opaque
+                // string. Checking only the tautology meant a genuine
+                // `rebase.uid() = 'anon'` inside an `existsIn` was structurally
+                // undetectable once round-tripped, and the caller read the empty
+                // result as "no risks found".
+                const foreign = FOREIGN_UID_LITERAL_SQL.exec(e.sql);
+                if (foreign) {
+                    const literal = foreign[1];
+                    found.push({
+                        pattern: "foreign-uid-literal",
+                        detail: literal,
+                        explanation: `'${literal}' is a ${FOREIGN_CONVENTION_UIDS.get(literal)} convention. Rebase ` +
+                            `reports an anonymous request as '${ANONYMOUS_USER_ID}', so comparing against ` +
+                            `'${literal}' passes for every caller. Use \`condition: policy.authenticated()\` to ` +
+                            "mean \"signed in\"."
+                    });
+                }
                 return;
+            }
             case "compare": {
                 const literal = [e.left, e.right].find(o => o.kind === "literal") as LiteralPolicyOperand | undefined;
                 const comparesUid = e.left.kind === "authUid" || e.right.kind === "authUid";
                 if (!comparesUid || typeof literal?.value !== "string") return;
-                const platform = FOREIGN_CONVENTION_UIDS[literal.value];
+                const platform = FOREIGN_CONVENTION_UIDS.get(literal.value);
                 if (!platform) return;
                 found.push({
                     pattern: "foreign-uid-literal",

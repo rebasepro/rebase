@@ -1,6 +1,6 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { getEffectiveSecurityRules } from "@rebasepro/common";
+import { getEffectiveSecurityRules, getInjectedSecurityRules } from "@rebasepro/common";
 
 describe("auth collection default RLS policies", () => {
     const adminWrite = "string_to_array(rebase.roles(), ',') && ARRAY['admin']";
@@ -84,7 +84,20 @@ describe("auth collection default RLS policies", () => {
         expect(ddl).toContain("(id)::text = rebase.uid()");
     });
 
-    it("can be opted out with disableDefaultPolicies", () => {
+    /**
+     * The opt-out drops the permissive defaults and keeps the restrictive one.
+     *
+     * This asserted zero rules. That made
+     * `{ disableDefaultPolicies: true, securityRules: [{ operation: "all",
+     * ownerField: "id" }] }` — an ordinary "users may edit their own row"
+     * config — let any signed-in user set their own `roles` to `["admin"]`,
+     * because the restrictive `require_admin_write` gate went with the rest.
+     *
+     * A restrictive policy is ANDed with every other policy and can only ever
+     * remove access, so opting out of one cannot express anything except "let
+     * more people write". It is not part of the opt-out.
+     */
+    it("keeps the restrictive admin-write gate when defaults are disabled", () => {
         const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
@@ -94,7 +107,44 @@ describe("auth collection default RLS policies", () => {
             properties: { id: { type: "string", isId: "uuid" } }
         };
 
+        const rules = getEffectiveSecurityRules(collection);
+        expect(rules).toHaveLength(1);
+        expect(rules[0].name).toBe("users_require_admin_write");
+        expect(rules[0].mode).toBe("restrictive");
+
+        // The permissive conveniences really are gone — that is what the flag
+        // is for.
+        expect(rules.some(r => r.name === "users_default_admin_read")).toBe(false);
+        expect(rules.some(r => r.name === "users_default_self_read")).toBe(false);
+    });
+
+    it("drops everything for a NON-auth collection that opts out", () => {
+        // No privileged columns, nothing to gate: the opt-out is total.
+        const collection: PostgresCollectionConfig = {
+            slug: "products",
+            table: "products",
+            name: "Products",
+            disableDefaultPolicies: true,
+            properties: { name: { type: "string" } }
+        };
+
         expect(getEffectiveSecurityRules(collection)).toHaveLength(0);
+    });
+
+    it("reports the surviving gate as injected, so the DDL can name it", () => {
+        // A policy in the database the author never wrote and cannot find in
+        // `getInjectedSecurityRules` is exactly the surprise that function
+        // exists to prevent.
+        const collection: PostgresCollectionConfig = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            auth: true,
+            disableDefaultPolicies: true,
+            properties: { id: { type: "string", isId: "uuid" } }
+        };
+
+        expect(getInjectedSecurityRules(collection).map(r => r.name)).toEqual(["users_require_admin_write"]);
     });
 
     it("locks non-auth collections by default: server-or-admin read + write baselines", () => {

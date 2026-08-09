@@ -89,15 +89,49 @@ function getIdPropertyName(collection: CollectionConfig): string {
  *
  * Collections that opt out via `disableDefaultPolicies` are returned unchanged.
  */
+/**
+ * The restrictive write gate for an auth collection.
+ *
+ * Restrictive, so it is ANDed with everything else: whatever an author's
+ * permissive rules allow, a write to this table still has to satisfy this too.
+ * It is the only thing standing between "users may edit their own row" and
+ * "users may grant themselves any role".
+ */
+function adminWriteGate(tableName: string): SecurityRule {
+    return {
+        name: `${tableName}_require_admin_write`,
+        mode: "restrictive",
+        operations: [...DEFAULT_GUARDED_OPS],
+        condition: SERVER_OR_ADMIN_EXPR,
+        check: SERVER_OR_ADMIN_EXPR
+    };
+}
+
 export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
     const explicit = [...(collection.securityRules ?? [])];
 
-    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
-        return explicit;
-    }
-
     const tableName = getTableName(collection);
     const injected: SecurityRule[] = [];
+
+    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
+        // The opt-out drops the *permissive* defaults — the ones that grant.
+        // The restrictive admin-write gate on an auth collection is not among
+        // them, because it is different in kind: a restrictive policy is ANDed
+        // with every other policy and can only ever remove access, so opting
+        // out of it cannot express anything except "let more people write".
+        //
+        // Dropping it did exactly that. `{ disableDefaultPolicies: true,
+        // securityRules: [{ operation: "all", ownerField: "id" }] }` — an
+        // ordinary "users may edit their own row" configuration — let any
+        // signed-in user set their own `roles` to `["admin"]`, with no warning
+        // from any boot guard, doctor check or validator.
+        //
+        // An author who needs a different gate can add their own restrictive
+        // rule; they cannot end up with none by accident.
+        return isAuthCollection(collection)
+            ? [...explicit, adminWriteGate(tableName)]
+            : explicit;
+    }
 
     // Baseline read + write: the server context and admins can always operate.
     // RLS default-denies under the user role, so without these a rule-less
@@ -125,14 +159,9 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
 
         // Restrictive gate: AND'd with all other policies, so no permissive rule
         // (e.g. an owner "edit your own row" rule) can let a non-admin change
-        // privileged columns like `roles`.
-        injected.push({
-            name: `${tableName}_require_admin_write`,
-            mode: "restrictive",
-            operations: [...DEFAULT_GUARDED_OPS],
-            condition: SERVER_OR_ADMIN_EXPR,
-            check: SERVER_OR_ADMIN_EXPR
-        });
+        // privileged columns like `roles`. Survives `disableDefaultPolicies` —
+        // see the note above the opt-out.
+        injected.push(adminWriteGate(tableName));
     }
 
     return [...explicit, ...injected];
@@ -150,7 +179,13 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
  * DDL, which policies are injected and how to take them off.
  */
 export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) return [];
+    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
+        // Not empty for an auth collection: the restrictive write gate is still
+        // injected, and the generated DDL has to say so — a policy in the
+        // database that the author never wrote and cannot find in this list is
+        // exactly the surprise this function exists to prevent.
+        return isAuthCollection(collection) ? [adminWriteGate(getTableName(collection))] : [];
+    }
 
     const explicitCount = (collection.securityRules ?? []).length;
     // getEffectiveSecurityRules appends the defaults after the author's rules,
