@@ -26,8 +26,8 @@ const postsTable = pgTable("posts", {
     id: serial("id").primaryKey(),
     title: varchar("title").notNull(),
     content: varchar("content"),
-    tag_id: integer("tag_id"),
-    author_id: integer("author_id")
+    tagId: integer("tag_id"),
+    authorId: integer("author_id")
 });
 
 const authorsTable = pgTable("authors", {
@@ -41,7 +41,7 @@ const commentsTable = pgTable("comments", {
     id: serial("id").primaryKey(),
     content: varchar("content"),
     author_name: varchar("author_name"),
-    post_id: integer("post_id")
+    postId: integer("post_id")
 });
 
 // Nothing here is a string property, so a search over it compiles to no
@@ -49,7 +49,7 @@ const commentsTable = pgTable("comments", {
 const viewsTable = pgTable("views", {
     id: serial("id").primaryKey(),
     count: integer("count"),
-    post_id: integer("post_id")
+    postId: integer("post_id")
 });
 
 const tagsCollection: CollectionConfig = {

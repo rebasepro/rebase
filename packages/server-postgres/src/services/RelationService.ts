@@ -2,7 +2,7 @@ import { and, eq, inArray, notInArray, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -709,7 +709,10 @@ export class RelationService {
         //   3. Map results back to parent rows via their FK values
         if (relation.kind === "belongsTo") {
             this.assertSingleKeyAddressable(parentCollection, parentPks, relation.localKey);
-            const localKeyCol = parentTable[relation.localKey as keyof typeof parentTable] as AnyPgColumn;
+            // `localKey` is the column; the generated table is keyed by the wire
+            // name, so `author_id` finds nothing where the key is `authorId`.
+            const localKeyField = fieldKeyForColumn(parentCollection, relation.localKey);
+            const localKeyCol = parentTable[localKeyField as keyof typeof parentTable] as AnyPgColumn;
             if (!localKeyCol) {
                 throw new Error(`Local key column '${relation.localKey}' not found in parent table`);
             }
@@ -819,7 +822,9 @@ export class RelationService {
 
             // Keyed by string throughout: Drizzle returns a numeric column as a
             // number or a string depending on the column type and the driver.
-            const foreignKeyValue = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
+            const foreignKeyValue = targetRow[
+                fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget)
+            ] as string | number | undefined;
             if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
@@ -990,7 +995,9 @@ export class RelationService {
             // what reaches here names the parent with a column on the target.
             if (!hasForeignKeyOnTarget(relation)) continue;
 
-            const foreignKeyValue = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
+            const foreignKeyValue = targetRow[
+                fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget)
+            ] as string | number | undefined;
             if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
@@ -1199,7 +1206,9 @@ export class RelationService {
                 const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                 const targetIdInfo = targetPks[0];
                 const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
-                const fkCol = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+                // The wire name the target's table is keyed by, not the column.
+                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
+                const fkCol = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
 
                 if (!fkCol || !targetIdCol) {
                     logger.warn(`Invalid inverse-many config for relation '${key}' in collection '${collection.slug}'`);
@@ -1225,7 +1234,7 @@ export class RelationService {
                     const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: null })
+                        .set({ [fkField]: null })
                         // `notInArray`, not a hand-built fragment: the sibling
                         // update three lines below already uses `inArray`, and
                         // the hand-built version called `sql.join` with no
@@ -1238,13 +1247,13 @@ export class RelationService {
                     // Set FK for the provided targets
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: parentKeyValue })
+                        .set({ [fkField]: parentKeyValue })
                         .where(inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]));
                 } else {
                     // If empty array provided, clear all existing links for this parent
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: null })
+                        .set({ [fkField]: null })
                         .where(eq(fkCol, parentKeyValue));
                 }
             } else {
@@ -1317,7 +1326,9 @@ export class RelationService {
                     continue;
                 }
 
-                const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget! as keyof typeof targetTable] as AnyPgColumn;
+                // The wire name the target's table is keyed by, not the column.
+                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget!);
+                const foreignKeyColumn = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
                 if (!foreignKeyColumn) {
                     logger.warn(`Foreign key column '${relation.foreignKeyOnTarget}' not found in target table for relation '${relation.relationName}'`);
                     continue;
@@ -1340,7 +1351,7 @@ export class RelationService {
                 if (newValue === null || newValue === undefined) {
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: null })
+                        .set({ [fkField]: null })
                         .where(eq(foreignKeyColumn, sourceKeyValue));
                 } else {
                     const parsedNewTargetIdObj = parseIdValues(newValue as string | number, targetPks);
@@ -1350,13 +1361,13 @@ export class RelationService {
                     // First, clear any existing FK that points to this source row
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: null })
+                        .set({ [fkField]: null })
                         .where(eq(foreignKeyColumn, sourceKeyValue));
 
                     // Then, update the new target row to point to this source row
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: sourceKeyValue })
+                        .set({ [fkField]: sourceKeyValue })
                         .where(eq(targetIdField, parsedNewTargetId));
                 }
             } catch (e) {
@@ -1530,8 +1541,17 @@ export class RelationService {
             const targetIdInfo = targetPks[0];
             const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
-            // Determine mapping of columns
-            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation);
+            // Determine mapping of columns.
+            //
+            // A join path is authored in SQL terms — `posts.author_id`,
+            // `user_profiles.user_id` — because that is what a join is written
+            // in. Everything below indexes a Drizzle table or builds a `set`
+            // payload with these, and both are keyed by the wire name, so the
+            // two are translated here rather than at each of the six uses.
+            const { targetFKColName: targetFKColumn, parentSourceColName: parentSourceColumn } =
+                this.resolveJoinPathWriteMapping(parentCollection, relation);
+            const targetFKColName = fieldKeyForColumn(targetCollection, targetFKColumn);
+            const parentSourceColName = fieldKeyForColumn(parentCollection, parentSourceColumn);
             const parentTable = getTableForCollection(parentCollection, this.registry);
             const parentPks = requirePrimaryKeys(parentCollection, this.registry);
             const parentIdInfo = parentPks[0];

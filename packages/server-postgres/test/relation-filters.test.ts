@@ -45,14 +45,14 @@ const postsTagsTable = pgTable("posts_tags", {
 const commentsTable = pgTable("comments", {
     id: serial("id").primaryKey(),
     body: varchar("body").notNull(),
-    post_id: integer("post_id")
+    postId: integer("post_id")
 });
 
 /** A self-referential `hasMany`: the subquery's table IS the outer one. */
 const categoriesTable = pgTable("categories", {
     id: serial("id").primaryKey(),
     name: varchar("name").notNull(),
-    parent_id: integer("parent_id")
+    parentId: integer("parent_id")
 });
 
 const tagsCollection = { slug: "tags", name: "Tags", properties: {} } as CollectionConfig;

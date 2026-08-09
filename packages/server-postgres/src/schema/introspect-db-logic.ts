@@ -6,6 +6,7 @@
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
+import { firstFreeKey, toWireKey } from "@rebasepro/utils";
 import { inferPropertyFromData } from "./introspect-db-inference";
 import { humanize } from "./introspect-db-naming";
 import { mapPgType } from "./introspect-db-types";
@@ -632,6 +633,12 @@ const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
  * Postgres constrains an identifier only by quoting, so `order`, `full name`
  * and `2fa_enabled` are all ordinary column names — and all three produced a
  * file that did not parse when written as a bare key.
+ *
+ * Still needed now that keys are camel-cased rather than copied from the
+ * column: `toWireKey` splits on separators and joins, which fixes `full name`
+ * but cannot fix a name that is not an identifier for some other reason —
+ * `2fa_enabled` becomes `2faEnabled`, still leading with a digit, and `order`
+ * was never a separator problem at all.
  */
 function propKey(name: string): string {
     return JS_IDENTIFIER.test(name) ? name : quote(name);
@@ -646,24 +653,6 @@ function propKey(name: string): string {
  */
 function commentText(value: string): string {
     return value.replace(/\s*[\r\n]+\s*/g, " ");
-}
-
-/**
- * The first candidate key not already used, or a numbered fallback.
- *
- * The numbered tail exists so this is total: a table can hold two foreign keys
- * whose columns strip to the same name, and a function that returns a key it
- * cannot guarantee is free has just moved the duplicate one line down.
- */
-function firstFreeKey(candidates: string[], taken: ReadonlyMap<string, unknown>): string {
-    for (const candidate of candidates) {
-        if (!taken.has(candidate)) return candidate;
-    }
-    const base = candidates[candidates.length - 1];
-    for (let suffix = 2; ; suffix++) {
-        const candidate = `${base}_${suffix}`;
-        if (!taken.has(candidate)) return candidate;
-    }
 }
 
 /** A property-key array, one key per line, indented for the admin block. */
@@ -728,6 +717,17 @@ export function generateCollectionFile(
     let relationsOutput = "";
     const orderEntries: PropertyOrderEntry[] = [];
     const propertyBlocks = new Map<string, string>();
+    /**
+     * Column → the property key it was generated under.
+     *
+     * Needed because the structural helpers below (`deriveTitleProperty`,
+     * `deriveKanbanProperty`, `deriveSort`) answer in *columns* — they read
+     * `pg_attribute` — while `display.title`, `kanban.columnProperty` and
+     * `sort` name **properties**. The two used to be the same string, so
+     * nothing carried the translation; now `full_name` is generated as
+     * `fullName` and a title pointing at `full_name` points at nothing.
+     */
+    const keyByColumn = new Map<string, string>();
     /** Properties the list view will not render, so `listProperties` skips them. */
     const hiddenFromCollection = new Set<string>();
     let columnIndex = 0;
@@ -742,6 +742,23 @@ export function generateCollectionFile(
         if (meta.fks.some((fk) => fk.column_name === col.column_name) && !meta.pks.includes(col.column_name)) continue;
 
         const currentIndex = columnIndex++;
+
+        // The key this column is generated under — its *wire* name, which is
+        // not its column name. `columnName` below carries the column, so the
+        // two never have to agree and the API stops carrying `user_id` next to
+        // `displayName`.
+        //
+        // Camel-casing makes collisions possible where none existed: `user_id`
+        // and `userId` are two columns and one key, which is a duplicate key in
+        // an object literal — a TypeScript error that stops the whole generated
+        // collection compiling. Resolved the same way the foreign-key loop
+        // below resolves its own: first free candidate, then a numbered tail,
+        // so no column is ever dropped. The raw column name is the second
+        // candidate, so the loser of a collision still gets a name that means
+        // something. Deterministic for a given database: the columns arrive in
+        // ordinal order, so the same schema always yields the same keys.
+        const propertyKey = firstFreeKey([toWireKey(col.column_name), col.column_name], propertyBlocks);
+        keyByColumn.set(col.column_name, propertyKey);
 
         // Check if this column uses a PostgreSQL enum type
         const colEnumValues = enumMap.get(col.udt_name);
@@ -787,10 +804,10 @@ export function generateCollectionFile(
         if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
                 extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
-                hiddenFromCollection.add(col.column_name);
+                hiddenFromCollection.add(propertyKey);
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
                 extra += "\n            autoValue: \"on_update\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
-                hiddenFromCollection.add(col.column_name);
+                hiddenFromCollection.add(propertyKey);
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
                 extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true\n            },";
             }
@@ -889,7 +906,7 @@ export function generateCollectionFile(
             const options = ["readOnly: true"];
             if (isDerivedIndexColumn(col) && !hasGeneratedKey(extra, "hideFromCollection")) {
                 options.push("hideFromCollection: true");
-                hiddenFromCollection.add(col.column_name);
+                hiddenFromCollection.add(propertyKey);
             }
             extra = withAdminOptions(extra, options);
         }
@@ -933,7 +950,7 @@ export function generateCollectionFile(
         const humanName = humanize(col.column_name);
 
         orderEntries.push({
-            key: col.column_name,
+            key: propertyKey,
             ctx: {
                 propType: finalPropType,
                 isPk: meta.pks.includes(col.column_name),
@@ -944,8 +961,8 @@ export function generateCollectionFile(
             }
         });
 
-        propertyBlocks.set(col.column_name, `
-        ${propKey(col.column_name)}: {
+        propertyBlocks.set(propertyKey, `
+        ${propKey(propertyKey)}: {
             name: ${quote(humanName)},
             columnName: ${quote(col.column_name)},
             type: ${quote(finalPropType)},${extra}
@@ -968,11 +985,17 @@ export function generateCollectionFile(
             // every foreign key after the table it points at — `area_tag (area,
             // tag)` — so 67 of its 339 collections came out with a property
             // declared twice.
+            //
+            // Camel-cased for the same reason the columns above are: this is a
+            // property key, it sits in the same object literal, and a
+            // `blog_author` beside a `publishedAt` is the two-conventions
+            // defect reproduced inside a single collection.
+            const stripped = toWireKey(fk.column_name.replace(/_id$/, ""));
             const relName = firstFreeKey(
                 [
-                    fk.column_name.replace(/_id$/, ""),
-                    targetTableName,
-                    `${fk.column_name.replace(/_id$/, "")}_relation`
+                    stripped,
+                    toWireKey(targetTableName),
+                    `${stripped}Relation`
                 ],
                 propertyBlocks
             );
@@ -1120,14 +1143,17 @@ export function generateCollectionFile(
         }
 
         if (derivedFacts) {
+            // Each of these comes back as a column and is emitted as a property.
+            const asProperty = (column: string): string => keyByColumn.get(column) ?? toWireKey(column);
+
             const titleProperty = deriveTitleProperty(derivedFacts);
-            if (titleProperty) adminEntries.push(`display: { title: ${quote(titleProperty)} }`);
+            if (titleProperty) adminEntries.push(`display: { title: ${quote(asProperty(titleProperty))} }`);
 
             const kanbanProperty = deriveKanbanProperty(derivedFacts);
-            if (kanbanProperty) adminEntries.push(`kanban: {\n            columnProperty: ${quote(kanbanProperty)}\n        }`);
+            if (kanbanProperty) adminEntries.push(`kanban: {\n            columnProperty: ${quote(asProperty(kanbanProperty))}\n        }`);
 
             const sort = deriveSort(derivedFacts);
-            if (sort) adminEntries.push(`sort: [${quote(sort[0])}, "desc"]`);
+            if (sort) adminEntries.push(`sort: [${quote(asProperty(sort[0]))}, "desc"]`);
         }
 
         const listProperties = deriveListProperties(sortedPropertiesOrder, hiddenFromCollection);

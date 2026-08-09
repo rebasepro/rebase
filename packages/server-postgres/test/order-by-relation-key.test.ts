@@ -20,9 +20,9 @@ describe("orderBy on an owning relation resolves through localKey", () => {
     const postsTable = pgTable("posts", {
         id: serial("id").primaryKey(),
         title: varchar("title").notNull(),
-        user_profile_id: integer("user_profile_id"),
-        user_id: integer("user_id"),
-        created_by: integer("created_by")
+        userProfileId: integer("user_profile_id"),
+        userId: integer("user_id"),
+        createdBy: integer("created_by")
     });
 
     const profilesCollection = { slug: "user_profiles", name: "Profiles", table: "user_profiles" } as unknown as CollectionConfig;
@@ -159,7 +159,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         // Same courtesy the filter path extends — without the list, the caller
         // is told their guess was wrong and nothing else.
         expect(() => resolve("nonexistent", postsCollection))
-            .toThrow(/Valid fields: created_by, id, title, user_id, user_profile_id/);
+            .toThrow(/Valid fields: createdBy, id, title, userId, userProfileId/);
     });
 
     it("carries a machine-readable code, like the filter path", () => {

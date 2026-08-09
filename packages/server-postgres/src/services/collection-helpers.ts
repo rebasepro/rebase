@@ -2,7 +2,7 @@ import { PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
 import { getTableColumns } from "drizzle-orm";
 import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { getTableName } from "@rebasepro/common";
+import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
 
 // Row identity is derived on both sides of the wire — the driver parses an
@@ -246,7 +246,13 @@ export function sourceKeyField(
     sourceCollection: CollectionConfig,
     registry: PostgresCollectionRegistry
 ): string {
-    if (relation.sourceKey) return relation.sourceKey;
+    // A **field**, as the name says: callers index the Drizzle table and the
+    // rows it returns with what comes back from here, and both are keyed by the
+    // wire name. `sourceKey` is authored in *column* terms, like every other
+    // link on a relation, so it is translated here rather than at each of the
+    // call sites — where it used to be `tenant_id` looked up on a table whose
+    // key is `tenantId`, finding nothing.
+    if (relation.sourceKey) return fieldKeyForColumn(sourceCollection, relation.sourceKey);
     return requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
 }
 
@@ -265,7 +271,9 @@ export function joinsOnNaturalKey(
     registry: PostgresCollectionRegistry
 ): boolean {
     if (!relation.sourceKey) return false;
-    return relation.sourceKey !== requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
+    // Compared as fields, because the right-hand side is one.
+    return fieldKeyForColumn(sourceCollection, relation.sourceKey)
+        !== requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
 }
 
 /**

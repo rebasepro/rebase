@@ -145,11 +145,11 @@ describe("the generated admin block", () => {
 
     it("names a title property when the schema supports one", () => {
         expect(adminBlock(pagila.files.get("film")!)).toContain('display: { title: "title" }');
-        expect(adminBlock(northwind.files.get("products")!)).toContain('display: { title: "product_name" }');
+        expect(adminBlock(northwind.files.get("products")!)).toContain('display: { title: "productName" }');
     });
 
     it("sorts by the single database-maintained stamp", () => {
-        expect(adminBlock(pagila.files.get("film")!)).toContain('sort: ["last_update", "desc"]');
+        expect(adminBlock(pagila.files.get("film")!)).toContain('sort: ["lastUpdate", "desc"]');
     });
 
     it("caps the list view on a wide table and leaves a narrow one alone", () => {
@@ -173,7 +173,7 @@ describe("the generated admin block", () => {
 describe("properties generated from catalog facts", () => {
     it("marks a generated column read-only", () => {
         // pagila's `film.length_hours` is GENERATED ALWAYS AS … STORED.
-        expect(propertyBlock(pagila.files.get("film")!, "length_hours")).toContain("readOnly: true");
+        expect(propertyBlock(pagila.files.get("film")!, "lengthHours")).toContain("readOnly: true");
     });
 
     it("marks a tsvector read-only and hides it from the list", () => {
@@ -210,7 +210,7 @@ describe("properties generated from catalog facts", () => {
         // `payment` is unique on (uuid, payment_date) — the pair, not the parts.
         const payment = pagila.files.get("payment")!;
         expect(propertyBlock(payment, "uuid")).not.toContain("unique: true");
-        expect(propertyBlock(payment, "payment_date")).not.toContain("unique: true");
+        expect(propertyBlock(payment, "paymentDate")).not.toContain("unique: true");
     });
 
     it("turns a Postgres enum type into enum values", () => {
@@ -250,11 +250,11 @@ describe("properties generated from a schema that declares constraints", () => {
     });
 
     it("adds no validation for a constraint it refused to read", () => {
-        expect(propertyBlock(source(), "either_way")).not.toContain("validation");
+        expect(propertyBlock(source(), "eitherWay")).not.toContain("validation");
         // `not.toContain("min:")` would pass for the wrong reason and fail for a
         // sillier one: `admin:` ends in `min:`.
         expect(propertyBlock(source(), "email")).not.toMatch(/[\s{,]min\s*:/);
-        expect(propertyBlock(source(), "not_reserved")).not.toContain("enum:");
+        expect(propertyBlock(source(), "notReserved")).not.toContain("enum:");
         expect(propertyBlock(source(), "payload")).not.toContain("enum:");
     });
 
@@ -295,7 +295,7 @@ describe("relation property keys", () => {
         const areaTag = musicbrainz.files.get("area_tag")!;
         const keys = propertyKeys(areaTag);
         expect(keys).toContain("area");        // the key column
-        expect(keys).toContain("area_relation"); // the relation derived from it
+        expect(keys).toContain("areaRelation"); // the relation derived from it
     });
 
     it("holds across every real schema", () => {

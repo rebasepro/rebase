@@ -88,3 +88,79 @@ export function toPostgresIdentifier(name: string): string {
     // on the last whole character that fits, which is what Postgres does.
     return new TextDecoder("utf-8").decode(bytes.subarray(0, 63)).replace(/�+$/, "");
 }
+
+/**
+ * The API name a database column is served under.
+ *
+ * The wire name of a field is its property key, and Rebase's property keys are
+ * camelCase — `displayName`, `createdAt`, `photoURL`. Columns are snake_case,
+ * because an unquoted Postgres identifier folds to lower case and a camelCase
+ * column is therefore reachable only as `"authorId"` forever: in hand-written
+ * SQL, in psql, in an RLS policy body, in a dump, and in every third-party tool
+ * that ever touches the database. So the two conventions are both right, and
+ * this is the function that crosses between them.
+ *
+ * It exists because two sources of field names never crossed: a foreign key
+ * derived from a relation (`author_id`) and a column read back by introspection
+ * (`user_id`) both landed on the wire under their column name, while every
+ * hand-authored collection next to them used camelCase. One API, two
+ * conventions, and no rule a caller could infer from outside — those names are
+ * also the `where` and `orderBy` keys, so it was not a matter of taste.
+ *
+ * Rules, in the order they matter:
+ *
+ *  - **A name with no separator is returned unchanged.** `photoURL` stays
+ *    `photoURL` and `id` stays `id`. Lower-casing a single token is what makes
+ *    a "camelCase" helper destructive — `camelCase("photoURL")` is `photourl` —
+ *    and this function is applied to names that are *already* keys.
+ *  - **Each following segment keeps its own casing** apart from an upper-cased
+ *    first letter, so `photo_URL` → `photoURL` rather than `photoUrl`.
+ *  - **The result may still not be a JavaScript identifier.** `2fa_enabled`
+ *    becomes `2faEnabled`, which is a perfectly good object key and still needs
+ *    quoting where one is written into generated source.
+ *
+ * Not the inverse of {@link toSnakeCase}: `toSnakeCase` tokenises on case
+ * boundaries and would turn `photoURL` into `photo_url`. Round-tripping is not
+ * a property either function promises, which is why a column name that a
+ * property maps explicitly is always read off `columnName` rather than derived.
+ */
+export function toWireKey(columnName: string): string {
+    if (!columnName) return columnName;
+    const segments = columnName.split(/[-_ ]+/).filter(Boolean);
+    if (segments.length <= 1) return columnName;
+    return segments
+        .map((segment, index) =>
+            index === 0
+                ? segment.charAt(0).toLowerCase() + segment.slice(1)
+                : segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join("");
+}
+
+/**
+ * The first candidate key not already used, or a numbered fallback.
+ *
+ * Introspection turns a set of column names into a set of object keys, and the
+ * mapping is not injective: `user_id` and `userId` are two columns and one
+ * {@link toWireKey}, and two foreign keys can strip to the same relation name.
+ * A duplicate key in a generated object literal is a TypeScript error, so the
+ * whole collection stops compiling — and a duplicate key in a `Record` built at
+ * runtime is worse, because it silently drops a column instead.
+ *
+ * The numbered tail is what makes this total: a function that returns a key it
+ * cannot guarantee is free has only moved the duplicate one line down.
+ *
+ * Structurally typed on `has` so a `Map` of emitted blocks and a `Set` of taken
+ * names both satisfy it. Lives here, in the package both introspection
+ * producers and the admin's table import can reach, because they must resolve a
+ * collision the same way or one database describes itself three ways.
+ */
+export function firstFreeKey(candidates: string[], taken: { has(key: string): boolean }): string {
+    for (const candidate of candidates) {
+        if (!taken.has(candidate)) return candidate;
+    }
+    const base = candidates[candidates.length - 1];
+    for (let suffix = 2; ; suffix++) {
+        const candidate = `${base}_${suffix}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+}

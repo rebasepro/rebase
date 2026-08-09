@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { findRelation, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
+import { fieldKeyForColumn, findRelation, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSafeIdentifier } from "./utils";
 
 /**
@@ -359,14 +359,16 @@ export function generateTypedefs(input: CollectionConfig[]): string {
 
         // 2. FK columns from relations.
         //
-        // Emitted under `localKey` verbatim: that is the Drizzle field key, so
-        // it is the JSON key the row arrives with. Reshaping it into
-        // `authorId` described a column that does not exist and hid the one
-        // that does — including from `where` and `orderBy`, which are keyed off
-        // this type.
+        // Emitted under the relation's *wire* name, which is what
+        // `fieldKeyForColumn` answers: `localKey` is the database column
+        // (`author_id`) and the row arrives keyed `authorId`. Emitting the
+        // column, which this used to do, described a key the JSON does not
+        // carry and hid the one it does — including from `where` and `orderBy`,
+        // which are keyed off this type. The column name is not a second name
+        // for the field: it is the name of a different thing.
         for (const [relKey, relation] of Object.entries(resolvedRelations)) {
             if (relation.kind === "belongsTo" && relation.localKey) {
-                const fkKey = relation.localKey;
+                const fkKey = fieldKeyForColumn(collection, relation.localKey);
                 if (emittedKeys.has(fkKey)) continue;
 
                 const fkType = foreignKeyType(relation);
@@ -428,7 +430,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             emittedKeys.add(key);
         }
 
-        emitWritableRelations(lines, properties, resolvedRelations, emittedKeys, false);
+        emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
         lines.push("    };");
 
         // ── Update Type ──
@@ -447,7 +449,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             lines.push(line(key, propertyToTypeScriptType(prop), true));
             emittedKeys.add(key);
         }
-        emitWritableRelations(lines, properties, resolvedRelations, emittedKeys, true);
+        emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, true);
         lines.push("    };");
 
         lines.push("  };");
@@ -476,9 +478,10 @@ export function generateTypedefs(input: CollectionConfig[]): string {
 
 /**
  * The two ways a write can name a `belongsTo` target, both of which the server
- * accepts: the foreign-key column itself (`{ author_id: 5 }`, which passes
- * through untouched) and the relation *property* (`{ author: 5 }`, which the
- * write transformer maps onto that column).
+ * accepts: the foreign key under its own wire name (`{ authorId: 5 }`, which
+ * passes through to the `author_id` column untouched) and the relation
+ * *property* (`{ author: 5 }`, which the write transformer maps onto that
+ * column).
  *
  * Only the first was generated, so the documented and idiomatic write shape was
  * a type error.
@@ -492,6 +495,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
  */
 function emitWritableRelations(
     lines: string[],
+    collection: CollectionConfig,
     properties: Properties,
     resolvedRelations: Record<string, ResolvedRelation>,
     emittedKeys: Set<string>,
@@ -507,7 +511,9 @@ function emitWritableRelations(
     };
 
     for (const relation of Object.values(resolvedRelations)) {
-        if (relation.kind === "belongsTo" && relation.localKey) emit(relation.localKey, relation);
+        if (relation.kind === "belongsTo" && relation.localKey) {
+            emit(fieldKeyForColumn(collection, relation.localKey), relation);
+        }
     }
 
     for (const [key, rawProp] of Object.entries(properties)) {

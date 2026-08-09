@@ -70,8 +70,8 @@ relationName: "author" }
         const result = await generateSchema([usersCollection, postsCollection]);
         const cleanResult = cleanSchema(result);
 
-        expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
-        const expectedRelation = "export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"author\": one(users, { fields: [posts.author_id], references: [users.id], relationName: \"posts_author_id\" }) }));";
+        expect(cleanResult).toContain("authorId: text(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
+        const expectedRelation = "export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"author\": one(users, { fields: [posts.authorId], references: [users.id], relationName: \"posts_authorId\" }) }));";
         expect(cleanResult).toContain(cleanSchema(expectedRelation));
     });
 

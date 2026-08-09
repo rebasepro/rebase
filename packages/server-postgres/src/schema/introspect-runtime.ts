@@ -28,6 +28,7 @@ import {
     getIconForTable
 } from "./introspect-db-logic";
 import { humanize } from "./introspect-db-naming";
+import { firstFreeKey, toWireKey } from "@rebasepro/utils";
 
 export interface IntrospectedSchema {
     tablesMap: Map<string, TableMeta>;
@@ -169,6 +170,7 @@ function buildProperties(
     enumMap: Map<string, string[]>
 ): Record<string, Record<string, unknown>> {
     const properties: Record<string, Record<string, unknown>> = {};
+    const takenKeys = new Set<string>();
 
     for (const col of meta.columns) {
         const isPk = meta.pks.includes(col.column_name);
@@ -188,7 +190,17 @@ function buildProperties(
             type: propType
         };
 
-        const key = col.column_name;
+        // The wire name, with `columnName` above carrying the column. The two
+        // are different names for different things — this used to serve the
+        // column, so a runtime-introspected collection answered `user_id` while
+        // every authored one beside it answered `displayName`.
+        //
+        // `user_id` and `userId` as two real columns camel-case to one key, so
+        // the first free candidate wins and the second falls back to its own
+        // column name, then to a numbered tail. Never dropped, and stable for a
+        // given database: columns arrive in ordinal order.
+        const key = firstFreeKey([toWireKey(col.column_name), col.column_name], takenKeys);
+        takenKeys.add(key);
 
         if (isPk) {
             property.isId = idKindFor(col, propType);
@@ -239,7 +251,7 @@ function buildRelations(
         if (!targetSlug) continue;
 
         // Strip the conventional _id suffix: author_id -> author
-        let key = fk.column_name.replace(/_id$/, "");
+        let key = toWireKey(fk.column_name.replace(/_id$/, ""));
         if (meta.pks.includes(fk.column_name) && key === fk.column_name) {
             // The FK is also the PK and its name doesn't imply a relation (e.g.
             // "id"), so naming the relation after the column would collide with

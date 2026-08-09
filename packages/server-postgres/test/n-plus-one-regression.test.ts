@@ -47,7 +47,7 @@ const mockPostsTable = {
     id: { name: "id",
 dataType: "number" },
     title: { name: "title" },
-    author_id: { name: "author_id",
+    authorId: { name: "author_id",
 dataType: "number" },
     _def: { tableName: "posts" }
 };
@@ -93,11 +93,11 @@ authorsCollection = {
 const NUM_POSTS = 50;
 const NUM_AUTHORS = 5;
 
-function generateMockPosts(count: number): Array<{ id: number; title: string; author_id: number }> {
+function generateMockPosts(count: number): Array<{ id: number; title: string; authorId: number }> {
     return Array.from({ length: count }, (_, i) => ({
         id: i + 1,
         title: `Post ${i + 1}`,
-        author_id: (i % NUM_AUTHORS) + 1
+        authorId: (i % NUM_AUTHORS) + 1
     }));
 }
 
@@ -131,7 +131,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
                 if (currentSelectColumns && Object.keys(currentSelectColumns).some(k => k === "parentId" || k === "fkValue")) {
                     return mockPosts.map(p => ({
                         parentId: p.id,
-                        fkValue: p.author_id
+                        fkValue: p.authorId
                     }));
                 }
                 return mockPosts;
@@ -247,7 +247,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
             expect(authorEntity).toBeDefined();
             expect(authorEntity!.path).toBe("authors");
             // The author ID should match the FK value, not the post ID
-            expect(authorEntity!.id).toBe(String(post.author_id));
+            expect(authorEntity!.id).toBe(String(post.authorId));
         }
     });
 
@@ -255,7 +255,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
         const nullFkPosts = Array.from({ length: 5 }, (_, i) => ({
             id: i + 1,
             title: `Orphan Post ${i + 1}`,
-            author_id: null as unknown as number
+            authorId: null as unknown as number
         }));
 
         const db = createSpiedDb(nullFkPosts as ReturnType<typeof generateMockPosts>, []);
@@ -282,7 +282,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
         const sameAuthorPosts = Array.from({ length: NUM_POSTS }, (_, i) => ({
             id: i + 1,
             title: `Post ${i + 1}`,
-            author_id: 1
+            authorId: 1
         }));
         const singleAuthor = [{ id: 1,
 name: "Shared Author" }];

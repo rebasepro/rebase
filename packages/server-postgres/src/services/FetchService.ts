@@ -2,8 +2,8 @@ import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, lt, or, S
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
-import { generateForeignKeyName } from "@rebasepro/utils";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
+import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -159,14 +159,21 @@ export class FetchService {
         // Owning relation, resolved: the relation names its own local key.
         const declaredRelation = collection ? resolveCollectionRelations(collection)[orderBy] : undefined;
         if (declaredRelation?.kind === "belongsTo") {
-            const foreignKey = columnAt(declaredRelation.localKey);
+            // `localKey` is the column; the table is keyed by the wire name.
+            const foreignKey = columnAt(fieldKeyForColumn(collection, declaredRelation.localKey));
             if (foreignKey) return foreignKey;
         }
 
-        // No collection in hand — the two shapes an owning relation's key takes
-        // by default (e.g. `project` → `project_id`, `userProfile` →
-        // `user_profile_id`).
-        for (const guess of [`${orderBy}_id`, generateForeignKeyName(orderBy)]) {
+        // No collection in hand — the shapes an owning relation's key takes by
+        // default (e.g. `project` → `projectId`, `userProfile` →
+        // `userProfileId`), then the snake forms for a project that authored the
+        // property under its column name.
+        for (const guess of [
+            `${orderBy}Id`,
+            toWireKey(generateForeignKeyName(orderBy)),
+            `${orderBy}_id`,
+            generateForeignKeyName(orderBy)
+        ]) {
             const foreignKey = columnAt(guess);
             if (foreignKey) return foreignKey;
         }

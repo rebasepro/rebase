@@ -1,5 +1,5 @@
 import { CollectionConfig, isRelationalCollectionConfig, Property, ResolvedRelation, RelationProperty } from "@rebasepro/types";
-import { toSnakeCase } from "@rebasepro/utils";
+import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 
 import { resolveRelation } from "./resolve-relation";
 
@@ -116,6 +116,49 @@ export function getEnumVarName(tableName: string, propName: string): string {
 
 export function getColumnName(fullColumn: string): string {
     return fullColumn.includes(".") ? fullColumn.split(".").pop()! : fullColumn;
+}
+
+/**
+ * The field key a database column is served and addressed under.
+ *
+ * A column has two names and they are not the same name. `author_id` is what
+ * Postgres stores; `authorId` is the key on the JSON row, the key in the
+ * generated Drizzle table, and the key a caller writes in `where` and
+ * `orderBy`. Every place that starts from a column and has to reach a row, a
+ * Drizzle table or a payload goes through here, so there is one answer rather
+ * than one per call site — the two that disagreed put `displayName` and
+ * `author_id` on the same API.
+ *
+ * A declared property is the authority when there is one, because its key *is*
+ * the wire name and `columnName` is the only thing that ever renamed the
+ * column:
+ *
+ *  1. an explicit `columnName` equal to this column;
+ *  2. a property whose key is literally the column (an author who wrote
+ *     `author_id:` meant `author_id` on the wire, and gets it);
+ *  3. a property whose key snake-cases to the column, which is the default
+ *     mapping — `authorId` → `author_id`.
+ *
+ * With no property in the way — a foreign key derived from a relation, which
+ * usually has none — the name is derived: {@link toWireKey}.
+ *
+ * Note the fallback is *not* the column verbatim. That was the old behaviour
+ * and it is precisely the defect: a derived foreign key reached the wire under
+ * its column name while every hand-authored field beside it was camelCase.
+ */
+export function fieldKeyForColumn(collection: CollectionConfig | undefined, column: string): string {
+    const properties = collection?.properties;
+    if (properties) {
+        for (const [key, prop] of Object.entries(properties)) {
+            const columnName = (prop as { columnName?: unknown } | undefined)?.columnName;
+            if (typeof columnName === "string" && columnName === column) return key;
+        }
+        for (const key of Object.keys(properties)) {
+            if (key === column) return key;
+            if (toSnakeCase(key) === column) return key;
+        }
+    }
+    return toWireKey(column);
 }
 
 /**

@@ -6,9 +6,9 @@ import {
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany
 } from "@rebasepro/types";
 import {
-    getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
+    fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
-import { generateForeignKeyName } from "@rebasepro/utils";
+import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 /**
  * Postgres's own default for `pg_trgm.word_similarity_threshold`. Named here
  * because the fuzzy predicate has to know when the index-backed operator agrees
@@ -68,6 +68,38 @@ export type UnknownFilterFieldsMode = "error" | "warn";
  */
 export const escapeLikePattern = (value: string): string =>
     value.replace(/[\\%_]/g, ch => `\\${ch}`);
+
+/**
+ * The Drizzle column a relation's column name addresses on a table.
+ *
+ * A relation names its link in *column* terms — `localKey: "author_id"`,
+ * `foreignKeyOnTarget: "author_id"` — because that is what the database and
+ * every FK constraint call it. A Drizzle table is keyed by the *wire* name,
+ * `authorId`. Indexing the table with the column, which is what every one of
+ * these call sites used to do, therefore finds nothing the moment the two
+ * differ: for a `columnName`-carrying property that was already true, and it is
+ * now true of every derived foreign key.
+ *
+ * `undefined` rather than a throw: each caller already has a message naming the
+ * relation it was resolving, which is worth more than a generic one here.
+ */
+const relationColumn = (
+    table: PgTable<any>,
+    collection: CollectionConfig | undefined,
+    column: string
+): AnyPgColumn | undefined => {
+    const key = fieldKeyForColumn(collection, column);
+    return (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+};
+
+/** The target collection of a relation, or `undefined` if its thunk cannot resolve. */
+const targetOf = (relation: ResolvedRelation): CollectionConfig | undefined => {
+    try {
+        return relation.target();
+    } catch {
+        return undefined;
+    }
+};
 
 /** Column types `ILIKE '%…%'` is defined on. */
 const ILIKE_SQL_TYPES = /^(text|varchar|character varying|char|character|bpchar|citext)\b/;
@@ -303,7 +335,7 @@ export class DrizzleConditionBuilder {
 
             case "hasOne":
             case "hasMany": {
-                const fkColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+                const fkColumn = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
                 if (!fkColumn) {
                     throw new Error(
                         `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
@@ -456,7 +488,7 @@ export class DrizzleConditionBuilder {
 
             // Owning relation, resolved: the relation names its own local key.
             if (relation?.kind === "belongsTo") {
-                const foreignKey = columnAt(relation.localKey);
+                const foreignKey = relationColumn(table, collection, relation.localKey);
                 if (foreignKey) return { kind: "column", column: foreignKey };
             }
 
@@ -471,7 +503,7 @@ export class DrizzleConditionBuilder {
                 // correlating on the id anyway silently matches nothing —
                 // "filter by this relation" would quietly return zero rows.
                 const correlationColumn = hasForeignKeyOnTarget(relation) && relation.sourceKey
-                    ? columnAt(relation.sourceKey)
+                    ? relationColumn(table, collection, relation.sourceKey)
                     : sourceIdColumn;
                 if (!correlationColumn) {
                     throw new Error(
@@ -484,10 +516,17 @@ export class DrizzleConditionBuilder {
             }
         }
 
-        // No collection in hand — the two shapes an owning relation's key takes
-        // by default (e.g. `project` → `project_id`, `userProfile` →
-        // `user_profile_id`).
-        for (const guess of [`${field}_id`, generateForeignKeyName(field)]) {
+        // No collection in hand — the shapes an owning relation's key takes by
+        // default (e.g. `project` → `projectId`, `userProfile` →
+        // `userProfileId`). The snake forms stay in the list because a project
+        // may have authored the property under its column name, which is still
+        // its wire name.
+        for (const guess of [
+            `${field}Id`,
+            toWireKey(generateForeignKeyName(field)),
+            `${field}_id`,
+            generateForeignKeyName(field)
+        ]) {
             const foreignKey = columnAt(guess);
             if (foreignKey) return { kind: "column", column: foreignKey };
         }
@@ -671,7 +710,7 @@ export class DrizzleConditionBuilder {
                     `(collection '${targetCollection.slug}')`
                 );
             }
-            const fkColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+            const fkColumn = relationColumn(targetTable, targetCollection, relation.foreignKeyOnTarget);
             if (!fkColumn) {
                 throw new Error(
                     `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
@@ -1314,7 +1353,7 @@ whereConditions };
             return match(targetIdCol);
         }
 
-        const foreignKeyCol = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+        const foreignKeyCol = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
         if (!foreignKeyCol) {
             throw new Error(
                 `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of relation ` +

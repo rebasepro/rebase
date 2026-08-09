@@ -19,7 +19,7 @@ import {
 const postsTable = pgTable("posts", {
     id: serial("id").primaryKey(),
     title: varchar("title").notNull(),
-    author_id: integer("author_id")
+    authorId: integer("author_id")
 });
 
 /**
@@ -29,9 +29,9 @@ const postsTable = pgTable("posts", {
  */
 const accountsTable = pgTable("accounts", {
     id: serial("id").primaryKey(),
-    user_profile_id: integer("user_profile_id"),
-    user_id: integer("user_id"),
-    owner_uid: integer("owner_uid")
+    userProfileId: integer("user_profile_id"),
+    userId: integer("user_id"),
+    ownerUid: integer("owner_uid")
 });
 
 const target = (slug: string) => () => ({ slug, name: slug, properties: {} } as CollectionConfig);
@@ -96,11 +96,11 @@ describe("unknown filter fields", () => {
             expect(thrown!.statusCode).toBe(400);
             expect(thrown!.code).toBe("UNKNOWN_FILTER_FIELD");
             expect(thrown!.message).toContain("Unknown filter field 'titel' on collection 'posts'");
-            expect(thrown!.message).toContain("author_id");
+            expect(thrown!.message).toContain("authorId");
             expect(thrown!.details).toMatchObject({
                 field: "titel",
                 collection: "posts",
-                validFields: ["author_id", "id", "title"]
+                validFields: ["authorId", "id", "title"]
             });
         });
 
@@ -141,7 +141,7 @@ describe("unknown filter fields", () => {
                         {
                             type: "or",
                             conditions: [
-                                { column: "author_id", operator: "==", value: 1 },
+                                { column: "authorId", operator: "==", value: 1 },
                                 { column: "ghost", operator: "==", value: 2 }
                             ]
                         }
@@ -158,7 +158,7 @@ describe("unknown filter fields", () => {
                     type: "or",
                     conditions: [
                         { column: "title", operator: "==", value: "hello" },
-                        { column: "author_id", operator: "==", value: 1 }
+                        { column: "authorId", operator: "==", value: 1 }
                     ]
                 },
                 postsTable,
@@ -170,7 +170,7 @@ describe("unknown filter fields", () => {
 
     describe("relation fallback", () => {
 
-        it("resolves `author` to the `author_id` column in a flat filter", () => {
+        it("resolves `author` to the `authorId` field in a flat filter", () => {
             const { PgDialect } = require("drizzle-orm/pg-core");
             const pgDialect = new PgDialect();
 
@@ -189,7 +189,7 @@ describe("unknown filter fields", () => {
             const { PgDialect } = require("drizzle-orm/pg-core");
             const pgDialect = new PgDialect();
 
-            // `userProfile_id` is not a column; `user_profile_id` is.
+            // `userProfile_id` is not a field; `userProfileId` is.
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
                 { userProfile: ["==", 3] },
                 accountsTable,
@@ -204,7 +204,7 @@ describe("unknown filter fields", () => {
             const { PgDialect } = require("drizzle-orm/pg-core");
             const pgDialect = new PgDialect();
 
-            // `users_id` is not a column; `user_id` is.
+            // `users_id` is not a field; `userId` is.
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
                 { users: ["==", 3] },
                 accountsTable,
@@ -259,7 +259,7 @@ describe("unknown filter fields", () => {
             expect(condition).not.toBeNull();
         });
 
-        it("resolves `author` to the `author_id` column inside a logical condition", () => {
+        it("resolves `author` to the `authorId` field inside a logical condition", () => {
             const condition = DrizzleConditionBuilder.buildLogicalConditions(
                 {
                     type: "or",
@@ -344,7 +344,7 @@ describe("unknown filter fields", () => {
 
         it("`in []` selects nothing", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
-                { author_id: ["in", []] }, postsTable, "posts"
+                { authorId: ["in", []] }, postsTable, "posts"
             );
             expect(conditions).toHaveLength(1);
             expect(render(conditions[0])).toBe("FALSE");
@@ -352,7 +352,7 @@ describe("unknown filter fields", () => {
 
         it("`not-in []` selects everything, which is what excluding nothing means", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
-                { author_id: ["not-in", []] }, postsTable, "posts"
+                { authorId: ["not-in", []] }, postsTable, "posts"
             );
             expect(conditions).toHaveLength(1);
             expect(render(conditions[0])).toBe("TRUE");
@@ -375,7 +375,7 @@ describe("unknown filter fields", () => {
                     type: "and",
                     conditions: [
                         { column: "title", operator: "==", value: "hello" },
-                        { column: "author_id", operator: "in", value: [] }
+                        { column: "authorId", operator: "in", value: [] }
                     ]
                 },
                 postsTable,
@@ -385,11 +385,11 @@ describe("unknown filter fields", () => {
         });
 
         it("reads a scalar as the one-element list rather than dropping it", () => {
-            // `?filter=author_id.in.7` parses to the string `"7"` — the REST
+            // `?filter=authorId.in.7` parses to the string `"7"` — the REST
             // dialect only builds an array for a parenthesised value — so this
             // is an ordinary query, not malformed input.
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
-                { author_id: ["in", 7] }, postsTable, "posts"
+                { authorId: ["in", 7] }, postsTable, "posts"
             );
             expect(conditions).toHaveLength(1);
             const query = dialect.sqlToQuery(conditions[0]);

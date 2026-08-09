@@ -2,7 +2,7 @@ import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -126,10 +126,13 @@ joinPathRelationUpdates: [] };
         newTargetId: string | number | null;
     }> = [];
 
-    // Pre-calculate all local keys used as foreign keys
+    // Pre-calculate all local keys used as foreign keys.
+    //
+    // Keyed by the *wire* name: the payload arrives from a client, which knows
+    // the field as `authorId`, never as the `author_id` column behind it.
     const foreignKeys = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
-        if (relation.kind === "belongsTo") foreignKeys.add(relation.localKey);
+        if (relation.kind === "belongsTo") foreignKeys.add(fieldKeyForColumn(collection, relation.localKey));
     });
 
     for (const [key, value] of Object.entries(row)) {
@@ -166,7 +169,9 @@ joinPathRelationUpdates: [] };
                     // Owning relation: Map relation object to FK column on current table
                     const serializedValue = serializePropertyToServer(effectiveValue, property, key);
                     if (serializedValue !== undefined) {
-                        result[relation.localKey] = serializedValue;
+                        // The Drizzle key, not the column: Drizzle maps it back
+                        // to `author_id` when it builds the statement.
+                        result[fieldKeyForColumn(collection, relation.localKey)] = serializedValue;
                     }
                     // Don't add the original relation property to the result
                     continue;
@@ -389,9 +394,12 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
             // Find the normalized relation for this property
             const relation = findRelation(resolvedRelations, propKey);
             if (relation) {
-                if (relation.kind === "belongsTo" && relation.localKey in data) {
-                    // Owning relation: FK is in current table
-                    const fkValue = data[relation.localKey as keyof M];
+                const localField = relation.kind === "belongsTo"
+                    ? fieldKeyForColumn(collection, relation.localKey)
+                    : "";
+                if (relation.kind === "belongsTo" && localField in data) {
+                    // Owning relation: FK is in current table, under its wire name
+                    const fkValue = data[localField as keyof M];
                     if (fkValue !== null && fkValue !== undefined) {
                         try {
                             const targetCollection = relation.target();
@@ -415,7 +423,8 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             : buildCompositeId(data, pks);
 
                         if (targetTable && currentId !== undefined && currentId !== null && currentId !== "") {
-                            const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+                            const fkFieldKey = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
+                            const foreignKeyColumn = targetTable[fkFieldKey as keyof typeof targetTable] as AnyPgColumn;
                             if (foreignKeyColumn) {
                                 // Query the target table to find row that references this row
                                 const relatedRows = await db
@@ -781,9 +790,11 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
     // Identify FK columns used only for relations and not exposed as properties
     const internalFKColumns = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
-        if (relation.kind === "belongsTo" && !properties[relation.localKey]) {
-            internalFKColumns.add(relation.localKey);
-        }
+        if (relation.kind !== "belongsTo") return;
+        // The key a row carries this foreign key under, which is the wire name
+        // — `authorId`, not the `author_id` column.
+        const localField = fieldKeyForColumn(collection, relation.localKey);
+        if (!properties[localField]) internalFKColumns.add(localField);
     });
 
     for (const [key, value] of Object.entries(data)) {
