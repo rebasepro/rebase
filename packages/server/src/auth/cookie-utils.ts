@@ -30,8 +30,22 @@ export function setRefreshCookie(c: Context<HonoEnv>, refreshToken: string, conf
     if (!config) return;
 
     const settings = getCookieSettings(config);
-    const isSecure = settings.secure ??
-        (settings.sameSite === "None" ? true : c.req.url.startsWith("https"));
+    // Secure unless the deployment explicitly says otherwise.
+    //
+    // This used to be inferred from `c.req.url`, which `@hono/node-server`
+    // derives from `socket.encrypted` — so behind any TLS-terminating proxy,
+    // which is the normal production topology, the server saw `http` and
+    // omitted the flag. The refresh token is a credential with a lifetime
+    // measured in months, and it was travelling in cleartext on every request
+    // to a plain-http URL on the same host.
+    //
+    // Inverted rather than patched: no request header can downgrade this, since
+    // `X-Forwarded-Proto` is written by whoever is talking to us. Only
+    // `cookieAuth.secure: false` turns it off, which is a deployment saying so
+    // deliberately. Local development does not need that escape hatch —
+    // browsers treat `http://localhost` as a trustworthy origin and accept
+    // Secure cookies there.
+    const isSecure = settings.secure ?? true;
 
     let cookie = `${settings.name}=${encodeURIComponent(refreshToken)}; Path=${settings.path}; HttpOnly; SameSite=${settings.sameSite}`;
     if (isSecure) cookie += "; Secure";
@@ -55,6 +69,8 @@ export function clearRefreshCookie(c: Context<HonoEnv>, config: CookieAuthConfig
 
     const settings = getCookieSettings(config);
     let cookie = `${settings.name}=; Path=${settings.path}; HttpOnly; SameSite=${settings.sameSite}; Max-Age=0`;
+    // Mirror the attributes the cookie was set with, so the clear matches it.
+    if (settings.secure ?? true) cookie += "; Secure";
     if (settings.domain) cookie += `; Domain=${settings.domain}`;
     c.header("Set-Cookie", cookie, { append: true });
 }
