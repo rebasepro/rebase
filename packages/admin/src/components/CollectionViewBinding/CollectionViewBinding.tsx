@@ -1477,6 +1477,7 @@ function EntityIdHeaderWidget({
                         <div className="flex p-2 w-full gap-2">
                             <TextField
                                 autoFocus={openPopup}
+                                aria-label={t("find_entity_by_id")}
                                 placeholder={t("find_entity_by_id")}
                                 size="small"
                                 onChange={(e) => {

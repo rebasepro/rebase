@@ -302,6 +302,7 @@ function ConditionValueInput({
                 type="number"
                 size="small"
                 disabled={disabled}
+                aria-label="Condition value"
                 placeholder="Value"
                 className="flex-1 min-w-[80px]"
                 onChange={(e) => onChange(e.target.value)}

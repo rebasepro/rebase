@@ -29,7 +29,6 @@ import { EntityPreviewBindingData } from "./EntityPreviewBinding";
 import { useData, useRelationSelector } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
-import { EmptyValue } from "../preview";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -91,7 +90,20 @@ export interface RelationSelectorProps {
     pageSize?: number;
     emptyPlaceholder?: string;
     searchPlaceholder?: string;
+    /** Shown in the open list when a search matched nothing. */
     noResultsText?: string;
+    /**
+     * Shown on the closed trigger when nothing is selected. Says only that the
+     * field is empty — see the note by `resolvedPlaceholder` for why it cannot
+     * say whether there is anything to pick.
+     */
+    emptyText?: string;
+    /**
+     * Shown in the open list when the target collection turned out to hold no
+     * rows at all, as opposed to a search simply not matching. Defaults to a
+     * sentence naming the target collection.
+     */
+    emptyCollectionText?: string;
     loadingText?: string;
 }
 
@@ -115,7 +127,9 @@ export const RelationSelector = React.forwardRef<
             pageSize,
             emptyPlaceholder,
             searchPlaceholder = "Search...",
-            noResultsText = "No relations found.",
+            noResultsText = "No matches.",
+            emptyText = "Select…",
+            emptyCollectionText,
             loadingText = "Loading..."
         },
         ref
@@ -469,7 +483,22 @@ relation } as RelationItem;
             pinnedIdsRef.current = null;
         }, []);
 
-        const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"}/>;
+        // Text, not `EmptyValue`. That component draws a small grey rounded bar
+        // with no text in it, which is the same shape the `Skeleton` component
+        // uses while data is in flight — so a relation you simply had not filled
+        // in was indistinguishable from one that was still loading, and an empty
+        // Author or Tags field read as permanently stuck. It also left the trigger
+        // button with no accessible name, since the bar contains no text at all.
+        //
+        // This says "not filled in" rather than "nothing to choose from": which of
+        // those it is cannot be known here. The list is deliberately not fetched
+        // until the picker is first opened (`enabled: listRequested`, guarded by
+        // relation_cell_picker_gating.test.tsx, because a table renders one of
+        // these per row), so before that `availableItems` is empty because nobody
+        // asked, not because the target collection is. The genuine "nothing to
+        // pick yet" state is reported inside the popover below, where the fetch
+        // has actually happened.
+        const resolvedPlaceholder = placeholder || emptyPlaceholder || emptyText;
 
         // Whatever dialog, side dialog or sheet we are inside offers as its
         // portal host, falling back to `document.body`. This is not cosmetic:
@@ -677,10 +706,17 @@ relation } as RelationItem;
                                                 className="ml-2 text-sm text-text-secondary dark:text-text-secondary-dark">{loadingText}</span>
                                         </div>
                                     )}
+                                    {/* Two different nothings, which used to share one
+                                        message ("No relations found.") even though the
+                                        fix for each is the opposite: clear the search, or
+                                        go and create the first row. With the fetch done,
+                                        the search string is what tells them apart. */}
                                     {!isLoading && availableItems.length === 0 && (
                                         <CommandPrimitive.Empty
                                             className="px-4 py-6 text-center text-text-secondary dark:text-text-secondary-dark">
-                                            {noResultsText}
+                                            {searchString
+                                                ? noResultsText
+                                                : (emptyCollectionText ?? `No ${collection.name ?? "entries"} yet.`)}
                                         </CommandPrimitive.Empty>
                                     )}
                                     <CommandPrimitive.Group>

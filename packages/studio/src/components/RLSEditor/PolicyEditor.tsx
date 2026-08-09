@@ -235,6 +235,7 @@ export const PolicyEditor = ({
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_name")}</Typography>
                             <TextField
                                 value={name}
+                                aria-label={t("studio_policy_name")}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder={t("studio_policy_name_placeholder")}
                                 className="w-full"

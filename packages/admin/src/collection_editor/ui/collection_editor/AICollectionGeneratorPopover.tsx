@@ -213,6 +213,10 @@ export function AICollectionGeneratorPopover({
                     size="small"
                     multiline
                     autoFocus
+                    aria-label={existingCollection
+                        ? "Describe the changes you want to make to this collection."
+                        : "Describe the collection you want to create."
+                    }
                     className="w-full text-text-primary dark:text-text-primary-dark"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}

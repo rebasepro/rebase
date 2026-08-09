@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import { CalendarIcon, XIcon, AlertCircleIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
 import { IconButton } from "./IconButton";
@@ -32,6 +32,11 @@ export type DateTimeFieldProps = {
      * If not provided, uses the user's local timezone.
      */
     timezone?: string;
+    /**
+     * Names the control when there is no `label` — e.g. when the surrounding
+     * form draws the label itself and passes `label={undefined}`.
+     */
+    "aria-label"?: string;
 };
 
 export const DateTimeField: React.FC<DateTimeFieldProps> = ({
@@ -47,10 +52,16 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     style,
     inputClassName,
     invisible,
-    timezone
+    timezone,
+    "aria-label": ariaLabel
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const [focused, setFocused] = useState(false);
+    // The label was decorative: an InputLabel with no `htmlFor` beside an input
+    // with no `id`, so a date field announced itself by its value even when it
+    // visibly had a label. Wired the way TextField already does it.
+    const inputId = useId();
+    const labelId = `${inputId}-label`;
     const [internalValue, setInternalValue] = useState<string>("");
     const [isTyping, setIsTyping] = useState(false);
     const invalidValue = value !== undefined && value !== null && (!(value instanceof Date) || isNaN(value.getTime()));
@@ -250,6 +261,8 @@ hour12: false,
             >
                 {label && (
                     <InputLabel
+                        id={labelId}
+                        htmlFor={inputId}
                         className={cls(
                             "absolute top-1 pointer-events-none",
                             !error
@@ -268,6 +281,9 @@ hour12: false,
 
                 <input
                     ref={inputRef}
+                    id={inputId}
+                    aria-labelledby={label ? labelId : undefined}
+                    aria-label={label ? undefined : ariaLabel}
                     type={mode === "date_time" ? "datetime-local" : "date"}
                     value={isTyping ? internalValue : valueAsInputValue(value ?? null, mode)}
                     onChange={handleInputChange}

@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useRef, useState } from "react";
+import React, { ReactNode, useEffect, useId, useRef, useState } from "react";
 
 /** Google Identity Services SDK — injected by the GIS <script> tag. */
 declare global {
@@ -714,6 +714,16 @@ function LoginForm({
     const passwordRef = useRef<HTMLInputElement | null>(null);
     const { t } = useTranslation();
 
+    // `Typography variant="label"` already renders a real <label> element, it just
+    // never pointed at anything, so each field fell back to naming itself after its
+    // own placeholder — the password field announced as eight bullets. Associating
+    // the existing labels beats passing the kit's `label` prop here: that one moves
+    // the text inside the box (`pt-6 pb-2` at this size) and hides the placeholder
+    // until focus, which would redesign the login screen to fix a name.
+    const emailId = useId();
+    const passwordId = useId();
+    const displayNameId = useId();
+
     const [email, setEmail] = useState<string | undefined>(defaultEmail);
     const [password, setPassword] = useState<string | undefined>(defaultPassword);
     const [displayName, setDisplayName] = useState<string>();
@@ -819,10 +829,11 @@ function LoginForm({
 
             {registrationMode && (
                 <div className="w-full mb-3">
-                    <Typography variant="label" color="secondary" className="mb-1">
+                    <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={displayNameId}>
                         Display Name
                     </Typography>
                     <TextField placeholder="Jane Doe (optional)"
+                        id={displayNameId}
                         className={loginFieldClasses}
                         value={displayName ?? ""}
                         disabled={authController.initialLoading}
@@ -833,10 +844,11 @@ function LoginForm({
             )}
 
             <div className="w-full mb-3">
-                <Typography variant="label" color="secondary" className="mb-1">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={emailId}>
                     Email
                 </Typography>
                 <TextField placeholder="you@example.com"
+                    id={emailId}
                     className={loginFieldClasses}
                     autoFocus
                     value={email ?? ""}
@@ -847,10 +859,11 @@ function LoginForm({
             </div>
 
             <div className="w-full mb-1">
-                <Typography variant="label" color="secondary" className="mb-1">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={passwordId}>
                     Password
                 </Typography>
                 <TextField placeholder="••••••••"
+                    id={passwordId}
                     className={loginFieldClasses}
                     value={password ?? ""}
                     disabled={authController.initialLoading}
@@ -947,6 +960,7 @@ function ForgotPasswordForm({
     const [email, setEmail] = useState<string>("");
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const emailId = useId();
 
     useEffect(() => {
         if (!document) return;
@@ -1037,11 +1051,12 @@ function ForgotPasswordForm({
             )}
 
             <div className="w-full mb-3">
-                <Typography variant="label" color="secondary" className="mb-1">
+                <Typography variant="label" component="label" color="secondary" className="mb-1" htmlFor={emailId}>
                     Email
                 </Typography>
                 <TextField
                     placeholder="you@example.com"
+                    id={emailId}
                     className={loginFieldClasses}
                     autoFocus
                     value={email}

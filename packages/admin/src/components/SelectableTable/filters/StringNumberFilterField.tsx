@@ -190,6 +190,7 @@ export function StringNumberFilterField({
 
                 {!enumValues && <TextField
                     size={"medium"}
+                    aria-label={`${title ?? name} filter value`}
                     type={type === "number" ? "number" : undefined}
                     value={internalValue !== undefined && internalValue != null ? String(internalValue) : ""}
                     disabled={isNullOperation}

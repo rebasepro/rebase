@@ -38,6 +38,7 @@ export function ImportNewPropertyFieldPreview({
                     {includeName &&
                         <TextField
                             size={"medium"}
+                            aria-label={propertyKey ? `Name of property ${propertyKey}` : "Property name"}
                             className={"text-base grow"}
                             value={property?.name ?? ""}
                             onChange={(e) => {

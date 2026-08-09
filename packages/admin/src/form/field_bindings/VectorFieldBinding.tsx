@@ -166,6 +166,7 @@ export function VectorFieldBinding({
                         <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-50/20 dark:bg-surface-800/10", defaultBorderMixin)}>
                             <TextField
                                 size={size}
+                                aria-label={`${property.name ?? propertyKey} vector values`}
                                 value={textValue}
                                 onChange={onChange}
                                 autoFocus={true}

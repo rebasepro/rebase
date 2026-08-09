@@ -274,13 +274,20 @@ export function DrawerLogo({
 }) {
 
     const showFullContent = drawerOpen || drawerHovered;
+    const { t } = useTranslation();
 
     return (
         <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
             {/* Logo — always visible */}
+            {/* Named explicitly because neither branch below carries text: the
+                stock `RebaseLogo` is a bare <svg> with no <title>, and a custom
+                `logo` only ever gets the generic alt "Logo", which names the image
+                rather than saying where the link goes. The title link beside it is
+                no help either — it renders only when a `title` is set. */}
             <Link
                 className="shrink-0 flex items-center justify-center w-[56px] h-[40px]"
                 to={logoDestination}
+                aria-label={t("home") || "Home"}
             >
                 {logo
                     ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain"/>

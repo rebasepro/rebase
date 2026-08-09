@@ -207,12 +207,14 @@ function DefaultValuesField({
 }: { property: Property, onValueChange: (value: any) => void, defaultValue?: any }) {
     if (property.type === "string") {
         return <TextField size={"medium"}
+            aria-label={property.name ? `Default value for ${property.name}` : "Default value"}
             placeholder={"Default value"}
             value={defaultValue ?? ""}
             onChange={(event) => onValueChange(event.target.value)}/>;
     } else if (property.type === "number") {
         return <TextField size={"medium"}
             type={"number"}
+            aria-label={property.name ? `Default value for ${property.name}` : "Default value"}
             value={defaultValue ?? ""}
             placeholder={"Default value"}
             onChange={(event) => onValueChange(event.target.value)}/>;

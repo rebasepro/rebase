@@ -61,6 +61,18 @@ export function DrawerNavigationItem({
     const listItem = <div>
         <NavLink
             onClick={onClick}
+            // The label below is `hidden` (display:none) while the rail is
+            // collapsed, which takes it out of the accessibility tree along with
+            // the row's only text — a collapsed rail was a column of links with no
+            // accessible name at all. The tooltip does not cover this: Radix wires
+            // a trigger to its content with `aria-describedby`, which is a
+            // description rather than a name, and only while the tooltip is open —
+            // and this one is masked shut whenever the drawer is open.
+            //
+            // Named unconditionally rather than only when collapsed: expanded, this
+            // is the same string the row already displays, so the accessible name
+            // stays stable across the transition instead of appearing with it.
+            aria-label={name}
             style={{
                 width: "100%",
                 transition: drawerOpen ? "width 150ms ease-in" : undefined

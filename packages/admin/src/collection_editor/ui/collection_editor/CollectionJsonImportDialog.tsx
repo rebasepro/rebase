@@ -110,6 +110,7 @@ export function CollectionJsonImportDialog({
                 <TextField
                     multiline
                     minRows={12}
+                    aria-label="Collection JSON"
                     value={jsonValue}
                     onChange={handleJsonChange}
                     placeholder={EXAMPLE_JSON}

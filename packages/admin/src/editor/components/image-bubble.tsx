@@ -157,6 +157,7 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
             >
                 <TextField
                     size={"small"}
+                    aria-label={t("alt_text")}
                     placeholder={t("alt_text")}
                     value={alt}
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -166,6 +167,7 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                 />
                 <TextField
                     size={"small"}
+                    aria-label={t("title")}
                     placeholder={t("title")}
                     value={title}
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

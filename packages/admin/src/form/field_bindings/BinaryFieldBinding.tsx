@@ -139,6 +139,7 @@ export function BinaryFieldBinding({
                         <div className={cls("flex flex-col gap-2 p-4 rounded-xl border", defaultBorderMixin)}>
                             <TextField
                                 size={size}
+                                aria-label={`${property.name ?? propertyKey} base64 value`}
                                 value={text}
                                 onChange={onChange}
                                 autoFocus={autoFocus ?? true}
