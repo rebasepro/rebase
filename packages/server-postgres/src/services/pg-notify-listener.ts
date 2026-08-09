@@ -111,7 +111,7 @@ export class PgNotifyListener {
             await client.connect();
             await client.query(`LISTEN ${channel}`);
             this.client = client;
-            logger.info(`📡 ${logLabel} Listening on channel "${channel}".`);
+            logger.debug(`📡 ${logLabel} Listening on channel "${channel}".`);
         } catch (err) {
             // Surface the initial failure so callers can choose to fall back;
             // for reconnects, keep retrying quietly in the background.

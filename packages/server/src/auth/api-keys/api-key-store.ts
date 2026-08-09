@@ -220,7 +220,7 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             await ddl.step("Revoking end-user access to api_keys", () =>
                 exec(revokeInternalTableSql("rebase", "api_keys")));
 
-            logger.info("✅ API keys table ready");
+            logger.debug("✅ API keys table ready");
         },
 
         // ── Create ──────────────────────────────────────────────────

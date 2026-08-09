@@ -81,7 +81,7 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     // process between the developer and a stack trace.
     if (envFile && fs.existsSync(envFile)) {
         const dotenv = await import("dotenv");
-        dotenv.config({ path: envFile });
+        dotenv.config({ path: envFile, quiet: true });
     }
 
     process.env.REBASE_BUNDLE = bundleDir;

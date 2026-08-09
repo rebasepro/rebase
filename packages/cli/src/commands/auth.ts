@@ -282,7 +282,7 @@ import * as dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 
-dotenv.config({ path: process.env.REBASE_ENV_FILE_PATH });
+dotenv.config({ path: process.env.REBASE_ENV_FILE_PATH, quiet: true });
 
 const email = process.env.REBASE_RESET_EMAIL!;
 const newPassword = process.env.REBASE_RESET_PASSWORD!;

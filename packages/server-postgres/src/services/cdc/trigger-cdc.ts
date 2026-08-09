@@ -160,7 +160,11 @@ export async function provisionTriggerCdc(
         }
     }
 
-    logger.info(
+    // Wiring detail. The single `Realtime source = …` line in the
+    // bootstrapper is the fact a developer acts on; how many triggers it
+    // took is for a diagnosis, and the skipped-table warning above still
+    // fires on its own.
+    logger.debug(
         `📡 [CDC] Trigger-based change capture provisioned on ${installed.length} table(s)` +
         (skipped.length ? ` (${skipped.length} skipped)` : "") + "."
     );

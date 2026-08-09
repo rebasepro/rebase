@@ -37,7 +37,29 @@ function getVersion(): string {
     return "unknown";
 }
 
+/**
+ * Silence dotenv's own banner, for this process and everything it spawns.
+ *
+ * dotenv 17 prints `injected env (13) from .env // tip: ◈ encrypted .env
+ * [www.dotenvx.com]` on every `config()` — a third-party advertisement that
+ * appeared in `rebase dev`, `rebase build` and, because `rebase start` loads
+ * the same way, in production server logs. `DOTENV_CONFIG_QUIET` is dotenv's
+ * documented switch (`lib/main.js` reads it before `options.quiet`), and
+ * setting it in `process.env` also reaches the backend, Vite and Atlas child
+ * processes, which inherit it. Errors are unaffected — `quiet` gates the
+ * success banner only.
+ *
+ * Not forced: an explicit `DOTENV_CONFIG_QUIET=false` still turns it back on.
+ */
+function silenceDotenvBanner(): void {
+    if (process.env.DOTENV_CONFIG_QUIET === undefined) {
+        process.env.DOTENV_CONFIG_QUIET = "true";
+    }
+}
+
 export async function entry(args: string[]) {
+    silenceDotenvBanner();
+
     const parsedArgs = arg(
         {
             "--version": Boolean,

@@ -316,7 +316,7 @@ for (const envPath of [
     resolve(ENV_PROJECT_DIR, "app", ".env")
 ]) {
     if (existsSync(envPath)) {
-        loadDotenv({ path: envPath });
+        loadDotenv({ path: envPath, quiet: true });
         break;
     }
 }

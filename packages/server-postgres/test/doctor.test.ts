@@ -254,6 +254,7 @@ inactive: "Inactive" }
                 // `passed` counts phases, not issues.
                 expect(report.summary).toEqual({ passed: 0,
 skipped: 1,
+notApplicable: 0,
 warnings: 1,
 errors: 1 });
             } finally {
@@ -286,8 +287,11 @@ errors: 1 });
                 expect(report.collectionsToSdk.issues.map(i => i.severity)).toEqual(["info"]);
                 expect(report.schemaToDatabase.passed).toBe(false);
                 expect(report.schemaToDatabase.skipped).toBe("DATABASE_URL not set");
-                expect(report.summary).toEqual({ passed: 2,
+                // The SDK phase had no artifact to compare against, so it is
+                // neither passing nor skipped — see the test below.
+                expect(report.summary).toEqual({ passed: 1,
 skipped: 1,
+notApplicable: 1,
 warnings: 0,
 errors: 0 });
             } finally {
@@ -328,6 +332,7 @@ issues: [] };
                 schemaToDatabase: clean,
                 summary: { passed: 3,
 skipped: 0,
+notApplicable: 0,
 warnings: 0,
 errors: 0 }
             });
@@ -335,6 +340,36 @@ errors: 0 }
             const output = printed();
             expect(output).toContain("Collections → Database: In sync");
             expect(output).toContain("All schemas are in sync!");
+        });
+
+        // Two adjacent lines used to say `✅ Collections → SDK Types: In sync`
+        // and `ℹ Typed SDK not generated (optional).` — the report calling a
+        // file synchronised in one breath and absent in the next. A phase with
+        // nothing to compare against reports that, and nothing else.
+        it("never calls a typed SDK that was never generated 'In sync'", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-sdk-absent-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+
+            try {
+                const report = await runDoctor({
+                    collectionsPath: dir,
+                    schemaPath,
+                    sdkPath: path.join(dir, "rebase.d.ts")
+                });
+
+                expect(report.collectionsToSdk.notApplicable).toBe("not generated (optional)");
+
+                const output = printed();
+                expect(output).toContain("Collections → SDK Types: not generated (optional)");
+                expect(output).not.toContain("Collections → SDK Types: In sync");
+                expect(output).toContain("1 not applicable");
+                // An optional artifact nobody asked for is not a reason to
+                // withhold a clean verdict from the checks that did run.
+                expect(output).not.toContain("SDK Types: skipped");
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
         });
     });
 
