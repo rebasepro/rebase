@@ -277,13 +277,27 @@ offset: 0 });
             collectionAuthConfig
         });
 
-        const user = await authRepo.createUser({
+        // `beforeUserCreate` runs here too.
+        //
+        // It fired on self-service registration and nowhere else, while the
+        // boot warning and `authentication.md` name admin user management as
+        // one of the paths that bypasses collection callbacks and tell
+        // developers to use this hook instead. A hook that skips the path its
+        // own documentation sends people to is worse than no hook: they wrote
+        // the validation, and it silently does not run here.
+        let createData = {
             email: prepResult.values.email as string,
             passwordHash: prepResult.values.passwordHash as string | undefined,
             displayName: prepResult.values.displayName as string | undefined,
             photoUrl: prepResult.values.photoUrl as string | undefined,
             metadata: prepResult.values.metadata as Record<string, unknown> | undefined
-        });
+        };
+
+        if (ops.beforeUserCreate) {
+            createData = await ops.beforeUserCreate(createData) as typeof createData;
+        }
+
+        const user = await authRepo.createUser(createData);
 
         if (roles && Array.isArray(roles)) {
             await authRepo.setUserRoles(user.id, roles);
@@ -389,7 +403,33 @@ values: prepResult.values },
             }
         }
 
+        // The delete hooks fire here, because this is where users are deleted.
+        //
+        // They had a single call site — `UserManagementAdapter.deleteUser` — and
+        // no route invokes it, so `beforeUserDelete` and `afterUserDelete` fired
+        // on no reachable path at all. Both the boot warning and
+        // `authentication.md` tell developers to use exactly these hooks for the
+        // side effects their collection callbacks will not see on this path, so
+        // anyone who followed that advice had a veto that vetoed nothing and a
+        // cleanup that never ran.
+        //
+        // `beforeUserDelete` throws to prevent the deletion, so it is awaited
+        // before the write; `afterUserDelete` is fire-and-forget, so a failing
+        // listener cannot fail a deletion that already happened.
+        if (ops.beforeUserDelete) {
+            await ops.beforeUserDelete(uid);
+        }
+
         await authRepo.deleteUser(uid);
+
+        if (ops.afterUserDelete) {
+            ops.afterUserDelete(uid).catch(err => {
+                logger.error("[AuthHooks] afterUserDelete error", {
+                    error: err instanceof Error ? err.message : err
+                });
+            });
+        }
+
         return c.json({ success: true });
     });
 
