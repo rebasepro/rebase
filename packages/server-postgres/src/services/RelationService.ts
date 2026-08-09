@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, sql, SQL } from "drizzle-orm";
+import { and, eq, inArray, notInArray, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
@@ -1226,7 +1226,14 @@ export class RelationService {
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget]: null })
-                        .where(and(eq(fkCol, parentKeyValue), sql`${targetIdCol} NOT IN (${sql.join(parsedTargetIds)})`));
+                        // `notInArray`, not a hand-built fragment: the sibling
+                        // update three lines below already uses `inArray`, and
+                        // the hand-built version called `sql.join` with no
+                        // separator — the only such call in the workspace —
+                        // which renders `NOT IN ($1$2$3)`. That is a syntax
+                        // error, so writing a `hasMany` relation with two or
+                        // more children aborted the whole save transaction.
+                        .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[])));
 
                     // Set FK for the provided targets
                     await tx
