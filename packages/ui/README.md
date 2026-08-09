@@ -114,7 +114,7 @@ Tailwind class-string constants for consistent styling:
 
 Re-exports ~100 individual lucide-react icon components (e.g. `ArrowRightIcon`, `SearchIcon`, `PlusIcon`), the `Icon` component, `GitHubIcon`, `HandleIcon`, `iconKeys`, and `coolIconKeys`.
 
-To render an icon whose name is only known at runtime, use `<LucideIconByName name="ShoppingCart" />` (or `loadLucideIcons()` / `useLucideIcons()` for the map itself). The full `icons` map is **not** re-exported: it holds a reference to every icon in the library, so exporting it made the whole 822 kB set eager for anyone importing this package.
+To render an icon whose name is only known at runtime, use `<LucideIconByName name="ShoppingCart" />` (or `loadLucideIcons()` / `useLucideIcons()` for the map itself). The full `icons` map is still re-exported as `lucideIcons`, but reach for it last: it holds a reference to every icon in the library, so importing it pulls the whole 822 kB set into whatever chunk you import it from, and no tree-shaking helps. Nothing in this package imports it, so it costs nothing unless you ask for it.
 
 ## Quick Start
 

@@ -1151,11 +1151,13 @@ Maps `IconColor` values to Tailwind classes:
 
 ### `LucideIconByName` — Icon Lookup by String Name
 
-`@rebasepro/ui` used to re-export lucide's whole `icons` map as `lucideIcons`.
-It no longer does: that map holds a reference to every icon in the library, so
-exporting it defeated tree-shaking and put 822 kB of icon components in the
-entry chunk, preloaded before login. Render by name instead — the icon set is
-fetched on first use.
+`@rebasepro/ui` exports lucide's whole `icons` map as `lucideIcons`, but prefer
+this component. The map holds a reference to every icon in the library, so
+importing it pulls all ~1,750 into whatever chunk you import it from — 822 kB
+uncompressed, with no tree-shaking that helps. It used to be reached by the
+admin's own navigation chrome, which put that weight in the entry chunk,
+preloaded on the login screen for every visitor. Render by name instead: the
+icon set is fetched on first use, so nobody pays for it who does not ask.
 
 ```tsx
 import { LucideIconByName } from "@rebasepro/ui";

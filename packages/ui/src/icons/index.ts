@@ -4,14 +4,36 @@ export * from "./Icon";
 export * from "./GitHubIcon";
 export * from "./HandleIcon";
 
-// Re-export types from lucide-react. Types only: the full `icons` map used to
-// be re-exported here as `lucideIcons`, and because that map holds a reference
-// to every icon in the library, exporting it defeated tree-shaking outright —
-// 822 kB of icon components in the entry chunk, preloaded before login. Name
-// lookups go through `LucideIconByName` / `loadLucideIcons` now, which fetch
-// the map on first use.
 export type { LucideProps, LucideIcon } from "lucide-react";
 export * from "./LucideIconByName";
+
+/**
+ * lucide's full `icons` map, keyed by PascalCase name.
+ *
+ * Read the cost before reaching for it. The map holds a reference to every
+ * icon in the library, so importing it pulls all ~1,750 into whatever chunk
+ * you import it from — measured at **822 kB uncompressed**. There is no
+ * tree-shaking that helps: the object literal names them all.
+ *
+ * It used to be reached by this package's own navigation chrome, which put
+ * that 822 kB in the entry chunk, modulepreloaded on the login screen, for
+ * every visitor of every Rebase admin panel. Those call sites now use
+ * {@link LucideIconByName}, so the weight is no longer anybody's by default —
+ * it is yours only if you import this binding.
+ *
+ * Prefer, in order:
+ *
+ * - {@link LucideIconByName} — renders by name, fetches the set on first use;
+ * - {@link iconKeys} — a plain string array, if you only need to know whether
+ *   a name exists (costs nothing);
+ * - {@link loadLucideIcons} — the same map, `await`ed, so it lands in an async
+ *   chunk instead of your entry;
+ * - this, when you genuinely need the whole map synchronously at module scope.
+ *
+ * @see LucideIconByName
+ * @see loadLucideIcons
+ */
+export { icons as lucideIcons } from "lucide-react";
 
 // Re-export individual icon components used across the monorepo.
 // Sub-packages import these from @rebasepro/ui instead of declaring a direct
