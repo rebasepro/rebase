@@ -822,15 +822,23 @@ export async function ensureCollectionPolicies(
     const primary = dataSources[0];
     if (!primary) return;
     if (!primary.bootstrapper.ensureCollectionPolicies) {
-        // The tables may exist (ensureCollectionSchema ran) but their RLS does
-        // not, so every user-context read is denied. Name it: a silent skip here
-        // reads from outside the pod as "the database has no data".
+        // The tables may exist (ensureCollectionSchema ran) while their RLS does
+        // not. Name it: a silent skip here reads from outside the pod as "the
+        // database has no data".
+        //
+        // Whether that means denied or exposed depends on the driver, so the
+        // wording below does not promise either. On the Postgres driver the
+        // user role is granted DML schema-wide before policies are applied, so
+        // a table without RLS is open, not locked — that driver revokes the
+        // grant itself rather than relying on this message being true.
         const skew = describeDriverSkew(primary.driverVersion, readRuntimeVersion(bundleResolutionRoots(bundle.dir)));
         logger.warn(
             `Collection policies: skipped — the "${primary.driverPackage}" driver (engine "${primary.engine}") ` +
                 "does not apply RLS policies at boot. " +
                 (skew.detail ? `${skew.detail} ` : "") +
-                "Collections will deny reads until policies are applied.\n" +
+                "Collections are not row-secured until policies are applied — depending on the " +
+                "driver's grants that means reads are denied or that they are unfiltered. " +
+                "Do not serve traffic until this is resolved.\n" +
                 schemaRecoveryGuidance({ staleDriver: skew.stale })
         );
         return;

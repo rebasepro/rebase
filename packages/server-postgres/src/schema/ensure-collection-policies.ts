@@ -34,6 +34,7 @@
 import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies } from "./generate-postgres-ddl-logic";
 import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { REBASE_USER_ROLE } from "../security/rls-enforcement";
 
 export interface PolicyEnsureResult {
     /** `CREATE POLICY` statements that ran successfully. */
@@ -42,8 +43,23 @@ export interface PolicyEnsureResult {
     tablesSecured: number;
     /** Declared tables absent from the database — left to a real migration. */
     skipped: { table: string; reason: string }[];
-    /** Tables whose RLS could not be fully applied (fail closed). */
+    /**
+     * Tables that have RLS on but did not get every policy. They deny — RLS
+     * with no matching policy is deny-all — so they are safe but not servable.
+     */
     failures: { table: string; error: string }[];
+    /**
+     * Tables RLS could not be enabled on, whose DML grant was withdrawn instead.
+     *
+     * This state had no name, and that was the bug: `ENABLE ROW LEVEL SECURITY`
+     * failing was recorded as a `failure` and reported with the same "it stays
+     * locked (denies)" wording as a failed policy — but the two are opposites.
+     * A policy statement failing leaves RLS on and the table denying. `enableRls`
+     * failing leaves RLS *off*, and the schema-wide grant to the user role has
+     * already been made by `ensureRlsEnforcement`, so the table is readable and
+     * writable by every authenticated request with no row filtering at all.
+     */
+    unsecured: { table: string; error: string; grantWithdrawn: boolean }[];
 }
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
@@ -61,7 +77,7 @@ export async function ensureCollectionPolicies(
     collections: CollectionConfig[],
     log?: (message: string) => void
 ): Promise<PolicyEnsureResult> {
-    const result: PolicyEnsureResult = { policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [] };
+    const result: PolicyEnsureResult = { policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [] };
 
     const plans = planCollectionPolicies(collections);
     if (plans.length === 0) return result;
@@ -78,12 +94,36 @@ export async function ensureCollectionPolicies(
             continue;
         }
 
+        // Enabling RLS is its own step, because its failure is the opposite of
+        // every other failure here. Once RLS is on, anything that goes wrong
+        // afterwards leaves the table denying; while it is off, the grant made
+        // earlier in boot leaves the table wide open. Sharing one `try` meant
+        // the dangerous case was reported in the safe case's words.
         try {
-            // Enable first: if a later policy statement fails, the table is left
-            // locked (deny-all for the user role) rather than open.
             await client.query(plan.enableRls);
             result.tablesSecured++;
+        } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            // Take the privilege back rather than serve an unprotected table.
+            // This is the fail-closed step the old code assumed it already had:
+            // per-table, so one collection cannot take the rest of the
+            // deployment down, but leaving nothing readable without RLS.
+            let grantWithdrawn = false;
+            try {
+                await client.query(`REVOKE ALL PRIVILEGES ON ${plan.qualified} FROM ${REBASE_USER_ROLE}`);
+                grantWithdrawn = true;
+            } catch {
+                // Fall through: reported below with `grantWithdrawn: false`,
+                // which the caller escalates. There is nothing else this
+                // function can do to make the table safe.
+            }
+            result.unsecured.push({ table: plan.qualified,
+error,
+grantWithdrawn });
+            continue;
+        }
 
+        try {
             let created = 0;
             for (const statement of plan.policyStatements) {
                 await client.query(statement);

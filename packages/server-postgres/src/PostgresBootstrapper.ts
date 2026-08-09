@@ -892,7 +892,35 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
             for (const failure of outcome.failures) {
                 logger.warn(
-                    `🔐 [rls] Could not fully apply policies to "${failure.table}" — it stays locked (denies) until this is resolved: ${failure.error}`
+                    `🔐 [rls] Could not fully apply policies to "${failure.table}" — RLS is on, so it denies until this is resolved: ${failure.error}`
+                );
+            }
+
+            // RLS could not be turned on at all. The schema-wide grant to the
+            // user role has already run by this point, so without the revoke
+            // below the table is readable and writable by every authenticated
+            // request with no row filtering — the one state this boot path must
+            // never leave behind, and the one it used to describe as "locked".
+            const unrevoked = outcome.unsecured.filter(u => !u.grantWithdrawn);
+            for (const u of outcome.unsecured.filter(u => u.grantWithdrawn)) {
+                logger.error(
+                    `🔐 [rls] Could not enable row-level security on "${u.table}": ${u.error}. ` +
+                    `Its privileges have been revoked from ${REBASE_USER_ROLE}, so the table is ` +
+                    "unreachable rather than unprotected. Reads and writes to that collection will " +
+                    "fail until RLS can be enabled."
+                );
+            }
+            if (unrevoked.length > 0) {
+                // Neither securable nor closable. Serving here would mean
+                // handing every authenticated caller unfiltered access, so the
+                // boot fails instead — this is the one failure that is not
+                // survivable per-table.
+                throw new Error(
+                    "Refusing to start: row-level security could not be enabled on " +
+                    unrevoked.map(u => `"${u.table}" (${u.error})`).join(", ") +
+                    `, and the privileges granted to ${REBASE_USER_ROLE} could not be revoked either. ` +
+                    "The table would be served with no row filtering. Fix the database permissions " +
+                    "(the connection role must own these tables, or be able to ALTER them) and boot again."
                 );
             }
 

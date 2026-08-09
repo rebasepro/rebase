@@ -114,12 +114,59 @@ describe("ensureCollectionPolicies", () => {
         expect(result.failures).toEqual([]);
     });
 
-    it("records a per-table failure and keeps going (fail closed, never crash-loop)", async () => {
-        // Only customers' statements fail; tiers must still be secured.
-        const { queryable } = fakeDb(["public.tiers", "public.customers"], /"customers"/);
+    it("records a per-table policy failure and keeps going (denies, never crash-loop)", async () => {
+        // Only customers' CREATE POLICY fails; its RLS is on, so it denies —
+        // and tiers must still be secured.
+        const { queryable } = fakeDb(["public.tiers", "public.customers"], /^CREATE POLICY[\s\S]*"customers"/);
         const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
 
         expect(result.failures.map(f => f.table)).toEqual(["public.customers"]);
-        expect(result.tablesSecured).toBe(1); // tiers succeeded
+        expect(result.unsecured).toEqual([]);
+        expect(result.tablesSecured).toBe(2); // RLS is on for both
+    });
+
+    /**
+     * `ENABLE ROW LEVEL SECURITY` failing is the opposite of a policy failing,
+     * and the two used to share a `try` and a message.
+     *
+     * By the time this runs, `ensureRlsEnforcement` has already granted the user
+     * role DML across the schema. A policy statement failing therefore leaves
+     * the table denying — RLS on, no matching policy — but `enableRls` failing
+     * leaves RLS *off* over that grant: readable and writable by every
+     * authenticated request, with no row filtering. It was reported as a
+     * `failure`, in the failure case's words: "it stays locked (denies)".
+     */
+    describe("when RLS cannot be enabled at all", () => {
+        const enableFails = /ENABLE ROW LEVEL SECURITY[\s\S]*"customers"|"customers"[\s\S]*ENABLE ROW LEVEL SECURITY/;
+
+        it("revokes the grant instead of serving an unprotected table", async () => {
+            const { queryable, ran } = fakeDb(["public.tiers", "public.customers"], enableFails);
+            const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
+
+            // Not a `failure`: that word now means "on and denying".
+            expect(result.failures).toEqual([]);
+            expect(result.unsecured.map(u => u.table)).toEqual(["public.customers"]);
+            expect(result.unsecured[0].grantWithdrawn).toBe(true);
+
+            // The privilege is actually taken back, naming that table.
+            expect(ran.some(t => /^REVOKE ALL PRIVILEGES ON public\.customers FROM /.test(t))).toBe(true);
+            // And no policy was attempted on a table with RLS off.
+            expect(ran.some(t => /^CREATE POLICY[\s\S]*"customers"/.test(t))).toBe(false);
+            // The healthy table is untouched by its neighbour's failure.
+            expect(result.tablesSecured).toBe(1);
+        });
+
+        it("reports grantWithdrawn: false when the revoke also fails", async () => {
+            // Neither securable nor closable — the caller escalates this to a
+            // refusal to boot, because the alternative is serving it open.
+            const { queryable } = fakeDb(
+                ["public.tiers", "public.customers"],
+                /customers/  // matches the ENABLE, and the REVOKE too
+            );
+            const result = await ensureCollectionPolicies(queryable, [tiers, customers]);
+
+            expect(result.unsecured.map(u => u.table)).toEqual(["public.customers"]);
+            expect(result.unsecured[0].grantWithdrawn).toBe(false);
+        });
     });
 });
