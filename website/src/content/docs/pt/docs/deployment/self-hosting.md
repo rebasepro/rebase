@@ -74,7 +74,7 @@ npm install --omit=dev --prefix dist-bundle
 Para uma implantação (deployment) em produção, prefira embutir ambos em uma imagem, o que também fixa exatamente o que é executado:
 
 ```dockerfile
-FROM rebasepro/server:0.11.0
+FROM rebasepro/server:0.13.0
 COPY dist-bundle /bundle
 ```
 
@@ -101,7 +101,7 @@ O runtime é um contêiner comum escutando na porta `$PORT`, portanto, qualquer 
 
 ```toml
 [build]
-  image = "rebasepro/server:0.11.0"
+  image = "rebasepro/server:0.13.0"
 
 [http_service]
   internal_port = 8080
@@ -146,7 +146,7 @@ Expõe métricas do Prometheus em `/metrics`: contagem de requisições e histog
 ## Atualizando
 
 ```yaml
-image: rebasepro/server:0.12.0
+image: rebasepro/server:0.13.0
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma versão major do contrato de runtime, um bundle validado continua funcionando — veja [Compatibilidade](/docs/architecture/runtime-and-bundles/#compatibility).
