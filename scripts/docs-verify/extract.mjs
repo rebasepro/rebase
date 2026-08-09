@@ -63,6 +63,29 @@ function applyDiff(lines) {
 const META_OPT_OUT = /(^|\s)no-verify(\s|$)/;
 const COMMENT_OPT_OUT = /<!--\s*docs-verify:\s*ignore\s*-->/;
 
+/**
+ * The repository's own agent instructions.
+ *
+ * These are documentation by every definition that matters — an agent reads
+ * them before it writes a line — and no glob in this repository covered them.
+ * That is not a hypothetical gap: while every checked surface stayed clean,
+ * `AGENT.md` and `.agent/workflows/schema-migration.md` went on teaching
+ * `cardinality` + `direction` on a relation for months after the authored
+ * relation type became a closed `kind` union and `direction` stopped existing
+ * anywhere in `packages/types`.
+ *
+ * `AGENT.md` is `.gitignore`d (it is the maintainer's local copy), so it is
+ * absent in CI and contributes nothing there. It is globbed anyway: the local
+ * run is where it gets edited, and a glob that matches nothing costs nothing.
+ * The two tracked surfaces — `.agents/` and `.agent/workflows/` — are what the
+ * blocking CI gate actually holds.
+ */
+export const AGENT_INSTRUCTION_GLOBS = [
+    "AGENT.md",
+    ".agents/*.md",
+    ".agent/workflows/*.md"
+];
+
 /** Default doc + skill sources, relative to the monorepo root. */
 export const DEFAULT_GLOBS = [
     // English only: the other five locales are machine-translated from these by
@@ -73,7 +96,8 @@ export const DEFAULT_GLOBS = [
     "rebase-agent-skills/**/*.md",
     // One level deep: every example has its own `node_modules` here, and a
     // `**` glob would walk into it.
-    "examples/*/*.md"
+    "examples/*/*.md",
+    ...AGENT_INSTRUCTION_GLOBS
 ];
 
 /**

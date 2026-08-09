@@ -61,6 +61,12 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 | `website/` | Documentation site |
 | `e2e/` | End-to-end tests (Playwright) |
 | `scripts/` | Build, release, and utility scripts |
+| `examples/` | Standalone example apps |
+| `rebase-agent-skills/` | Agent skills installed by `rebase skills install` |
+| `videos/` | Remotion project for the product videos on the website (a workspace package, not part of the library) |
+
+One-off scripts, codemods and utilities go in `scripts/`, never at the repo root
+or inside a package directory.
 
 ## Code Quality
 

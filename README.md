@@ -72,6 +72,7 @@ Scaffold a complete, self-hosted Rebase application connected to your database:
 ```bash
 pnpm dlx @rebasepro/cli init my-rebase-app
 cd my-rebase-app
+pnpm install
 ```
 
 Start the database, push the schema, and launch:
@@ -82,7 +83,9 @@ pnpm run db:push
 pnpm run dev
 ```
 
-Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`.
+`rebase dev` picks a free port per project rather than fixed ones, and prints the
+admin panel and API URLs it settled on. Read them from its output — they differ
+between projects, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here.
 
 ### Just want the API?
 

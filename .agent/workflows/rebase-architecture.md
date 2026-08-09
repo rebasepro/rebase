@@ -21,23 +21,55 @@ When working on the Rebase project, adhere to the following architectural guidel
 - **Inner View Adaptability**: Internal views should conditionally render inline developer actions (like "Edit Schema") by checking if `mode === "developer"`.
 
 ## 4. View Modes
-Collections support multiple view modes, configured via:
-- `enabledViews` — Array of enabled view modes: `"table"`, `"cards"`, `"kanban"`, `"list"`
-- `defaultViewMode` — The default view when opening the collection
-- `kanban` — Kanban board configuration: `{ columnProperty: "status" }`
-- `openEntityMode` — How entities open: `"split"` (side-by-side), `"side_panel"` (right drawer), `"full_screen"` (full page)
+
+View modes are **presentation**, so they live in the collection's `admin` block,
+not at the top level — the BaaS types know nothing about them, and
+`@rebasepro/admin-types` merges them in:
+
+```ts
+import { defineCollection } from "@rebasepro/admin-types";
+
+export default defineCollection({
+    name: "Posts",
+    slug: "posts",
+    table: "posts",
+    properties: {
+        title: { name: "Title", type: "string" },
+        status: { name: "Status", type: "string" }
+    },
+    admin: {
+        // Enabled view modes: "table" | "cards" | "kanban" | "list"
+        enabledViews: ["table", "kanban"],
+        // The view a collection opens in
+        defaultViewMode: "table",
+        // Kanban needs the property it groups columns by
+        kanban: { columnProperty: "status" },
+        // How an entity opens: "split" | "side_panel" | "full_screen" | "dialog"
+        openEntityMode: "split"
+    }
+});
+```
+
+The same split applies per property: presentation options (`clearable`,
+`markdown`, `multiline`, …) go in the property's own `admin` block. If a key you
+expect at the top level is rejected, it is almost always because it belongs
+under `admin`.
 
 ## 5. Frontend Composition API
 The frontend uses a declarative composition pattern:
 
 ```tsx
-<Rebase client={rebaseClient} authController={authController} userManagement={userManagement} plugins={plugins}>
+<Rebase client={rebaseClient} authController={authController} plugins={plugins}>
     <RebaseAuth/>
     <RebaseAdmin collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
     <RebaseStudio/>
     <RebaseShell title="Rebase"/>
 </Rebase>
 ```
+
+`Rebase` and `RebaseAuth` come from `@rebasepro/app`, `RebaseAdmin` and
+`RebaseShell` from `@rebasepro/admin`, `RebaseStudio` from `@rebasepro/studio`.
+`app/frontend/src/App.tsx` is the worked version of this.
 
 Key components:
 - `<Rebase>` — Root provider (client, auth, user management, plugins)

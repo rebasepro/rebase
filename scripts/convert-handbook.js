@@ -1,8 +1,13 @@
+// Renders `rebase_cto_technical_handbook.md` at the repo root to the sibling
+// `.html`. Lives here rather than at the root because AGENT.md's own rule says
+// one-off utility scripts belong in `/scripts/`, and this file was the example
+// of the root clutter that rule exists to prevent.
 const fs = require('fs');
 const path = require('path');
 
-const mdPath = path.join(__dirname, 'rebase_cto_technical_handbook.md');
-const htmlPath = path.join(__dirname, 'rebase_cto_technical_handbook.html');
+const repoRoot = path.join(__dirname, '..');
+const mdPath = path.join(repoRoot, 'rebase_cto_technical_handbook.md');
+const htmlPath = path.join(repoRoot, 'rebase_cto_technical_handbook.html');
 
 if (!fs.existsSync(mdPath)) {
     console.error('Markdown file not found at:', mdPath);
