@@ -5319,15 +5319,29 @@ The `.listen()` method on the query builder is only available when the `RebaseCl
 
 ### Update Delivery: Instant Patch + Correctness Refetch
 
-Rebase uses a two-phase update strategy for collection subscriptions to combine extreme speed with absolute correctness:
+A change never travels to a subscriber as data. It travels as the fact that
+something changed, and every subscriber is then told what *they* can see by a
+query run as them:
 
-1. **Phase 1 — Instant entity patch:** When a single entity changes (created, updated, deleted), the server immediately pushes a lightweight `collection_patch` message containing the modified entity values directly to subscribers. The client merges this into its cached collection data for near-instant cross-tab feedback — bypassing the database entirely for sub-millisecond perceived updates.
+1. **Invalidation.** When an entity changes (created, updated, deleted), the
+   server marks the affected paths. The row that was written is not forwarded —
+   it was read under the writer's authorization, which says nothing about what
+   any subscriber is allowed to see.
 
-2. **Phase 2 — Debounced RLS refetch:** After a short delay of **300ms** (`REFETCH_DEBOUNCE_MS`), the server performs an authoritative database refetch of the collection matching your original filters and sort order. This is critical because field mutations might alter the entity's visibility (e.g. if its status changed and no longer matches a `where` filter).
-   
-   To maintain strict security boundaries, this refetch query is executed inside a transaction setting the transaction-local variables `app.user_id` and `app.user_roles` mapped from the subscriber's `SubscriptionAuthContext`. This ensures PostgreSQL Row-Level Security (RLS) constraints are evaluated correctly under the client's auth session, and only the records the user is authorized to see are sent in the final `collection_update`.
+2. **Debounced RLS refetch.** After **300ms** (`REFETCH_DEBOUNCE_MS`), the server
+   refetches the collection with your original filters and sort order. The query
+   runs inside a transaction that sets the transaction-local `app.user_id` and
+   `app.user_roles` from the subscriber's `SubscriptionAuthContext`, so Postgres
+   evaluates Row-Level Security under that client's identity and only the rows
+   they are authorized to see are sent in the `collection_update`. The debounce
+   also coalesces a burst of writes into one query.
 
-This approach guarantees that list filters and access policies remain perfectly consistent while maintaining high UI responsiveness.
+Earlier versions sent an immediate `collection_patch` carrying the written row
+before this refetch, for sub-millisecond cross-tab feedback. That row had been
+read under the writer's scope, so it could — and did — reach subscribers whose
+own policies would have denied it, and the subscription's own `where` filter was
+not applied to it either. The patch has been removed: perceived latency for an
+update is now the debounce window.
 
 ### Broadcast Channels
 
