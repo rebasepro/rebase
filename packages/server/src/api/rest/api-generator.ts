@@ -5,6 +5,7 @@ import { ApiError } from "../errors";
 import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
+import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import {
@@ -129,12 +130,25 @@ export class RestApiGenerator {
      */
     private enforceApiKeyPermission(
         c: { get: (key: string) => unknown; req: { method: string } },
-        collectionSlug: string
+        collectionSlug: string,
+        /**
+         * What this route actually does, when the verb does not say it.
+         *
+         * `POST /bulk/delete` is a POST for transport reasons the route's own
+         * docblock explains — a body on DELETE is dropped by proxies and by
+         * several OpenAPI generators. Deriving the operation from the method
+         * therefore classified it `write`, and a key scoped `["read","write"]`
+         * with `delete` deliberately withheld — the shape the docs recommend
+         * for an agent — deleted every row it named and got a 200. The verb is
+         * a transport detail; the permission is about intent, so the route
+         * states it.
+         */
+        operationOverride?: ApiKeyOperation
     ): void {
         const apiKey = c.get("apiKey") as ApiKeyMasked | undefined;
         if (!apiKey) return; // Not an API key request — skip
 
-        const operation = httpMethodToOperation(c.req.method);
+        const operation = operationOverride ?? httpMethodToOperation(c.req.method);
         if (!isOperationAllowed(apiKey.permissions, collectionSlug, operation)) {
             throw ApiError.forbidden(
                 `API key does not have "${operation}" permission for collection "${collectionSlug}"`,
@@ -516,7 +530,7 @@ export class RestApiGenerator {
         // outcome of that bet. Registered before `/bulk` cannot shadow it because
         // the path is longer and more specific.
         this.router.post(`${basePath}/bulk/delete`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, collection.slug, "delete");
             const driver = this.getScopedDriver(c);
             const path = collection.slug;
 
