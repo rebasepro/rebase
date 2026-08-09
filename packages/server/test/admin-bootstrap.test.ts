@@ -85,6 +85,48 @@ describe("POST /bootstrap", () => {
     });
 
     /**
+     * A demoted administrator must lose admin immediately, not when their
+     * access token expires.
+     *
+     * `requireAdmin` read the `roles` array out of the JWT while the data plane
+     * re-read them from the database per request. So revoking someone's admin
+     * did nothing for up to an hour — and within that window they could call
+     * `PUT /api/admin/users/<self>` and put the role back permanently. These
+     * routes are the ones that can grant roles, which is exactly why they are
+     * the ones that must not trust a claim.
+     */
+    describe("roles come from the database, not the token", () => {
+        it("refuses a caller whose admin role has been revoked since their token was issued", async () => {
+            const users = [user("u1", "2026-01-01")];
+            // The repo says u1 is not an admin; the token, minted earlier, says
+            // otherwise. `bearer` embeds no roles, so the claim is supplied
+            // explicitly here to model a stale token.
+            const { repo, setUserRoles } = mockRepo(users, []);
+            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
+
+            const staleAdminToken = generateAccessToken("u1", ["admin"]);
+            const res = await app.request("/users", {
+                headers: { authorization: `Bearer ${staleAdminToken}` }
+            });
+
+            expect(res.status).toBe(403);
+            expect(setUserRoles).not.toHaveBeenCalled();
+        });
+
+        it("admits a caller the database still says is an admin", async () => {
+            // The control: re-reading must not lock out real admins.
+            const users = [user("u1", "2026-01-01")];
+            const { repo } = mockRepo(users, ["u1"]);
+            const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
+
+            // Token carries no roles at all; the database is the authority.
+            const res = await app.request("/users", { headers: bearer("u1") });
+
+            expect(res.status).not.toBe(403);
+        });
+    });
+
+    /**
      * The composed attack this endpoint used to permit, in two requests.
      *
      * `POST /auth/anonymous` mints a real session for anyone, and an anonymous

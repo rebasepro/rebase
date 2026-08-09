@@ -127,10 +127,29 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
  * This allows admin routes (which use standalone requireAuth + requireAdmin)
  * to be accessed via service keys for scripts and server-to-server calls.
  */
-export function createRequireAuth(options?: { serviceKey?: string }): MiddlewareHandler<HonoEnv> {
+export function createRequireAuth(options?: {
+    serviceKey?: string;
+    /**
+     * Read this user's roles from the database, replacing whatever the token
+     * claims.
+     *
+     * Without it, `requireAdmin` downstream trusts the `roles` array inside the
+     * access token — so demoting an administrator does nothing until that token
+     * expires, and in the meantime the demoted admin can call
+     * `PUT /api/admin/users/<self>` and put the role back for good. The data
+     * plane already re-reads roles per request (`builtin-auth-adapter`); the
+     * admin routes, which are the ones that can grant roles, did not.
+     *
+     * Optional because two call sites have no repository in scope. A route that
+     * can supply one should: the cost is one indexed lookup on requests that
+     * are already administrative.
+     */
+    resolveRoles?: (uid: string) => Promise<string[]>;
+}): MiddlewareHandler<HonoEnv> {
     if (!options?.serviceKey) return requireAuth;
 
     const key = options.serviceKey;
+    const resolveRoles = options.resolveRoles;
     return async (c, next) => {
         // Respect a user already resolved upstream (e.g. API-key pre-auth).
         if (c.get("user")) return next();
@@ -163,6 +182,28 @@ roles: ["admin"] } as AccessTokenPayload);
                     code: "UNAUTHORIZED"
                 }
             }, 401);
+        }
+
+        if (resolveRoles) {
+            try {
+                c.set("user", { ...payload,
+roles: await resolveRoles(payload.uid) });
+                return next();
+            } catch (error) {
+                // Fail closed. The token's own claim is exactly what must not be
+                // trusted here, so falling back to it would reinstate the bug
+                // the lookup exists to close.
+                logger.warn("[Auth] Could not resolve roles for an admin-gated request", {
+                    uid: payload.uid,
+                    error
+                });
+                return c.json({
+                    error: {
+                        message: "Could not verify your permissions. Please try again.",
+                        code: "ROLE_LOOKUP_FAILED"
+                    }
+                }, 503);
+            }
         }
 
         c.set("user", payload);

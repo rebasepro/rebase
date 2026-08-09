@@ -25,7 +25,11 @@ export function createAdminRolesRoute(config: AdminRolesRouteConfig): Hono<HonoE
     const authRepo = config.authRepo;
 
     router.onError(errorHandler);
-    router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
+    router.use("/*", createRequireAuth({
+        serviceKey: config.serviceKey,
+        // These routes can grant roles, so they must not trust a role claim.
+        resolveRoles: uid => authRepo.getUserRoleIds(uid)
+    }));
 
     router.get("/roles", requireAdmin, async (c) => {
         const roles = await authRepo.listRoles();

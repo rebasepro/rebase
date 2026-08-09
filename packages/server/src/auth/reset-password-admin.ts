@@ -42,7 +42,11 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
     const ops = resolveAuthHooks(config.authHooks);
 
     router.onError(errorHandler);
-    router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
+    router.use("/*", createRequireAuth({
+        serviceKey: config.serviceKey,
+        // A demoted admin must not still be able to reset anyone's password.
+        resolveRoles: uid => authRepo.getUserRoleIds(uid)
+    }));
 
     router.post("/users/:uid/reset-password", requireAdmin, async (c) => {
         const uid = c.req.param("uid");

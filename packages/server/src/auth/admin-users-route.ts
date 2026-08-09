@@ -69,7 +69,11 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
     }
 
     router.onError(errorHandler);
-    router.use("/*", createRequireAuth({ serviceKey: config.serviceKey }));
+    router.use("/*", createRequireAuth({
+        serviceKey: config.serviceKey,
+        // These routes can grant roles, so they must not trust a role claim.
+        resolveRoles: uid => authRepo.getUserRoleIds(uid)
+    }));
 
     router.post("/bootstrap", async (c) => {
         const user = c.get("user");
