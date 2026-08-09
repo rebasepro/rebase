@@ -92,4 +92,4 @@ attention, and a long file is one an assistant skims.
 And keep the boundary in mind: this file shapes what an assistant *writes*. It
 has no bearing on what an agent connected to your database may *do* — that is
 decided by the credential it carries, and nothing in Markdown changes it. See
-[the MCP server's credential model](/docs/ai/mcp-server#what-the-server-can-reach).
+[the MCP server's credential model](/docs/ai/mcp#what-the-server-can-reach).

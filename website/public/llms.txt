@@ -11490,7 +11490,7 @@ problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp-server) | A stdio Model Context Protocol server with 40 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
+| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 40 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 20 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
@@ -11534,7 +11534,7 @@ The two-gate model above describes what an API key does. It is **not** what
 `@rebasepro/mcp` uses unless you configure it to. Left alone, the MCP server
 authenticates with your dev server's **service key** — an unscoped admin
 credential that satisfies the default admin policies on every collection. See
-[What the MCP server can reach](/docs/ai/mcp-server#what-the-server-can-reach)
+[What the MCP server can reach](/docs/ai/mcp#what-the-server-can-reach)
 before you point an assistant at anything you care about.
 :::
 
@@ -11566,7 +11566,7 @@ mechanism and the two do not interact.
 
 ### Where to go next
 
-- [MCP Server](/docs/ai/mcp-server) — connect Claude Code, Cursor or any MCP client
+- [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
 - [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 20 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern
 
@@ -11992,7 +11992,7 @@ rebase skills install
 The skills are **reference material, not tools**. They tell an assistant how
 collections are defined, why migrations are two steps, and which mistakes the
 framework will not catch for it. For tools that act on your data, see the
-[MCP server](/docs/ai/mcp-server).
+[MCP server](/docs/ai/mcp).
 
 ### Which assistant
 
@@ -12185,7 +12185,7 @@ attention, and a long file is one an assistant skims.
 And keep the boundary in mind: this file shapes what an assistant *writes*. It
 has no bearing on what an agent connected to your database may *do* — that is
 decided by the credential it carries, and nothing in Markdown changes it. See
-[the MCP server's credential model](/docs/ai/mcp-server#what-the-server-can-reach).
+[the MCP server's credential model](/docs/ai/mcp#what-the-server-can-reach).
 
 ## CLI Reference
 
@@ -13839,7 +13839,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.11.0
+FROM rebasepro/server:0.13.0
 COPY dist-bundle /bundle
 ```
 
@@ -13874,7 +13874,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.11.0"
+  image = "rebasepro/server:0.13.0"
 
 [http_service]
   internal_port = 8080
@@ -13926,7 +13926,7 @@ the port, so set one unless it is on a private network.
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.12.0
+image: rebasepro/server:0.13.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

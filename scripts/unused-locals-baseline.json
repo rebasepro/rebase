@@ -88,7 +88,6 @@
   "packages/app/src/hooks/data/useFetch.tsx::context": 1,
   "packages/app/src/hooks/useAuthSubscription.ts::setLoginSkipped": 1,
   "packages/app/src/util/useStorageUploadController.tsx::authController": 1,
-  "packages/cli/src/commands/cloud/databases.ts::projectRef": 1,
   "packages/cli/src/commands/cloud/domains.ts::projectRef": 1,
   "packages/cli/src/commands/cloud/env.ts::projectRef": 2,
   "packages/cli/templates/template/scripts/example.ts::rebase": 1,

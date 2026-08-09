@@ -135,7 +135,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Overview", slug: "docs/ai" },
-                        { label: "MCP Server", slug: "docs/ai/mcp-server" },
+                        { label: "MCP Server", slug: "docs/ai/mcp" },
                         { label: "Agent Skills", slug: "docs/ai/skills" },
                         { label: "AI Instruction Files", slug: "docs/ai/instruction-files" }
                     ]
