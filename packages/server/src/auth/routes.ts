@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ADMINISTRATIVE_ROLES, isAdministrativeRole } from "./admin-roles";
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
@@ -149,8 +150,18 @@ function getPasswordResetExpiry(): Date {
 }
 
 export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
-    if (config.defaultRole === "admin") {
-        throw new Error("CRITICAL SECURITY ERROR: defaultRole cannot be 'admin'. Administrative privilege escalation via registration is strictly forbidden. Use the POST /admin/bootstrap endpoint to promote the initial administrator.");
+    // Every administrative role, not just the one named "admin". This compared
+    // against `"admin"` alone while `requireAdmin` accepted `schema-admin` too,
+    // so `AUTH_DEFAULT_ROLE=schema-admin` walked past it and handed every public
+    // registrant the schema editor and the SQL surfaces — from which real
+    // `admin` is one user edit away.
+    if (config.defaultRole && isAdministrativeRole(config.defaultRole)) {
+        throw new Error(
+            `CRITICAL SECURITY ERROR: defaultRole cannot be '${config.defaultRole}'. ` +
+            `Administrative privilege escalation via registration is strictly forbidden ` +
+            `(administrative roles: ${ADMINISTRATIVE_ROLES.join(", ")}). ` +
+            "Use the POST /admin/bootstrap endpoint to promote the initial administrator."
+        );
     }
 
     const router = new Hono<HonoEnv>();

@@ -23,6 +23,7 @@ import type {
 } from "@rebasepro/types";
 
 import { Hono } from "hono";
+import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
@@ -157,7 +158,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
             }
 
-            const isAdmin = roles.some((r) => r === "admin" || r === "schema-admin");
+            const isAdmin = hasAdministrativeRole(roles);
 
             return {
                 uid: payload.uid,
@@ -194,7 +195,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
             }
 
-            const isAdmin = roles.some((r) => r === "admin" || r === "schema-admin");
+            const isAdmin = hasAdministrativeRole(roles);
 
             return {
                 uid: payload.uid,

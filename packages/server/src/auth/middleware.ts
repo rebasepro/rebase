@@ -1,4 +1,5 @@
 import { MiddlewareHandler, Context } from "hono";
+import { hasAdministrativeRole } from "./admin-roles";
 import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken } from "./jwt";
 import type { HonoEnv } from "../api/types";
@@ -188,9 +189,7 @@ export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
     }
 
     const roles = (typeof user === "object" && user !== null && "roles" in user) ? (user.roles || []) : [];
-    const isAdmin = roles.some((role: string) => {
-        return role === "admin" || role === "schema-admin";
-    });
+    const isAdmin = hasAdministrativeRole(roles as string[]);
 
     if (!isAdmin) {
         return c.json({
