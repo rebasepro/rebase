@@ -1,4 +1,4 @@
-import { and, eq, inArray, notInArray, or, sql, SQL } from "drizzle-orm";
+import { and, eq, inArray, notInArray, or, sql, SQL, getTableName as drizzleTableName } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
@@ -17,8 +17,9 @@ import {
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
+import { explainZeroRowWrite } from "./write-denial";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -612,10 +613,27 @@ export class RelationService {
         const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
         const parsedTargetId = parseIdValues(targetId, targetPks)[targetPks[0].fieldName];
 
-        await tx.delete(junctionTable).where(and(
+        // The link is the row here, so the junction's own policies decide.
+        // Membership was established by `isRelated` a moment ago over the same
+        // handle, which is what makes a zero-row delete meaningful rather than
+        // ambiguous: something between read and write refused it.
+        const conditions = [
             eq(sourceJunctionColumn, parsedParentId),
             eq(targetJunctionColumn, parsedTargetId)
-        ));
+        ];
+        const result = await tx.delete(junctionTable).where(and(...conditions));
+
+        if ((result.rowCount ?? 0) === 0) {
+            throw await explainZeroRowWrite(
+                tx,
+                junctionTable,
+                conditions,
+                `Not allowed to unlink "${parsedTargetId}" from "${hop.parentCollection.slug}" ` +
+                `"${parsedParentId}": a row-level security policy rejected the write.`,
+                `No "${hop.relationKey}" link between "${hop.parentCollection.slug}" ` +
+                `"${parsedParentId}" and "${parsedTargetId}" to remove.`
+            );
+        }
 
         logger.info(`Unlinked '${hop.relationKey}' ${parsedTargetId} from ${hop.parentCollection.slug} ${parsedParentId}`);
     }
@@ -1077,10 +1095,36 @@ export class RelationService {
             .map(([, value]) => value);
 
         if (removed.length > 0) {
-            await tx.delete(junctionTable).where(and(
+            const removeConditions = [
                 eq(sourceJunctionColumn, parsedParentId),
                 inArray(targetJunctionColumn, removed)
-            ));
+            ];
+            const result = await tx.delete(junctionTable).where(and(...removeConditions));
+
+            // Every id in `removed` came out of the select above, on this same
+            // handle, so all of them were visible. Fewer deletions than that
+            // means something refused them — and a save that reports success
+            // while the membership it was given is not the membership stored
+            // is the silent-write class this guards against.
+            if ((result.rowCount ?? 0) < removed.length) {
+                const survivors = await tx
+                    .select({ present: sql<number>`1` })
+                    .from(junctionTable)
+                    .where(and(...removeConditions))
+                    .limit(1);
+
+                // Nothing survived: a concurrent session removed the rest
+                // between the select and the delete. The membership is what
+                // the caller asked for, which is all this promised.
+                if (survivors.length > 0) {
+                    throw ApiError.forbidden(
+                        `Not allowed to remove ${removed.length - (result.rowCount ?? 0)} of ${removed.length} ` +
+                        `link(s) in "${drizzleTableName(junctionTable)}": ` +
+                        "a row-level security policy rejected the write.",
+                        "WRITE_DENIED"
+                    );
+                }
+            }
         }
 
         if (added.length > 0) {

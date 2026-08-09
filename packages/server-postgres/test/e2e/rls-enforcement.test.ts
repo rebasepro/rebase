@@ -18,7 +18,9 @@
  *   2. Reads are isolated per owner.
  *   3. A user WRITE that satisfies the policy succeeds.
  *   4. A user WRITE that violates the policy is DENIED by RLS (WITH CHECK).
- *   5. A user cannot UPDATE/DELETE another tenant's row (USING).
+ *   5. A user cannot UPDATE/DELETE another tenant's row (USING) — 404, because
+ *      the row is invisible; and a write the policy refuses on a row the caller
+ *      CAN read is a 403 `WRITE_DENIED`, never a silent success.
  *   6. The server context (owner connection) bypasses RLS for writes.
  *   7. Locked-by-default: with no policy, a user cannot read or write.
  *   8. Realtime refetch path is isolated.
@@ -78,12 +80,50 @@ const docsCollection: CollectionConfig = {
     properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "O", type: "string" } }
 } as unknown as CollectionConfig;
 
+// Readable by everyone, writable by no one. This is the shape that makes a
+// denied write indistinguishable from a completed one: the row is visible, so
+// the write addresses something real, and Postgres then filters the UPDATE or
+// DELETE through the (absent) policy and reports zero rows — the same thing it
+// reports for a no-op. An agent holding a key with `delete` permission and a
+// collection with only a select rule lives here.
+const noticesTable = pgTable("notices", { id: varchar("id").primaryKey(), body: varchar("body") });
+const topicsTable = pgTable("topics", { id: varchar("id").primaryKey(), label: varchar("label") });
+// Same shape one level down: the LINK is readable and not deletable, so
+// `DELETE notices/n-1/topics/tp-1` unlinks nothing and used to say it had.
+const noticeTopicsTable = pgTable("notice_topics", {
+    notice_id: varchar("notice_id"),
+    topic_id: varchar("topic_id")
+});
+
+const topicsCollection: CollectionConfig = {
+    name: "Topics", slug: "topics", table: "topics",
+    properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "Label", type: "string" } }
+} as unknown as CollectionConfig;
+
+const noticesCollection: CollectionConfig = {
+    name: "Notices", slug: "notices", table: "notices",
+    properties: { id: { name: "ID", type: "string", isId: true }, body: { name: "Body", type: "string" } },
+    relations: [
+        {
+            kind: "manyToMany",
+            relationName: "topics",
+            target: () => topicsCollection,
+            through: { table: "notice_topics", sourceColumn: "notice_id", targetColumn: "topic_id" }
+        }
+    ]
+} as unknown as CollectionConfig;
+
 function buildRegistry(): PostgresCollectionRegistry {
     const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple([tasksCollection, secretsCollection, docsCollection]);
+    registry.registerMultiple([
+        tasksCollection, secretsCollection, docsCollection, noticesCollection, topicsCollection
+    ]);
     registry.registerTable(tasksTable, "tasks");
     registry.registerTable(secretsTable, "secrets");
     registry.registerTable(docsTable, "docs");
+    registry.registerTable(noticesTable, "notices");
+    registry.registerTable(topicsTable, "topics");
+    registry.registerTable(noticeTopicsTable, "notice_topics");
     return registry;
 }
 
@@ -168,6 +208,24 @@ describe("Unified RLS enforcement (E2E)", () => {
             CREATE TABLE public.secrets (id VARCHAR(255) PRIMARY KEY, value VARCHAR(255));
             ALTER TABLE public.secrets ENABLE ROW LEVEL SECURITY;
             INSERT INTO public.secrets (id, value) VALUES ('s1', 'classified');
+
+            -- notices: readable by anyone, no update/delete policy at all.
+            CREATE TABLE public.notices (id VARCHAR(255) PRIMARY KEY, body VARCHAR(255));
+            ALTER TABLE public.notices ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY notices_select ON public.notices FOR SELECT TO public USING (true);
+            INSERT INTO public.notices (id, body) VALUES ('n-1', 'readable');
+
+            -- topics + the junction: readable, and the LINK is not deletable.
+            CREATE TABLE public.topics (id VARCHAR(255) PRIMARY KEY, label VARCHAR(255));
+            ALTER TABLE public.topics ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY topics_select ON public.topics FOR SELECT TO public USING (true);
+            CREATE TABLE public.notice_topics (
+                notice_id VARCHAR(255), topic_id VARCHAR(255), PRIMARY KEY (notice_id, topic_id)
+            );
+            ALTER TABLE public.notice_topics ENABLE ROW LEVEL SECURITY;
+            CREATE POLICY notice_topics_select ON public.notice_topics FOR SELECT TO public USING (true);
+            INSERT INTO public.topics (id, label) VALUES ('tp-1', 'weather');
+            INSERT INTO public.notice_topics (notice_id, topic_id) VALUES ('n-1', 'tp-1');
         `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
@@ -228,20 +286,70 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("DENIES a user from updating another tenant's row (USING makes it invisible)", async () => {
         const a = await userDriver("user-a");
         // Update targeting user-b's row: RLS makes the row invisible to user-a,
-        // so the UPDATE matches nothing — user-b's row is untouched.
-        await a.save({
+        // so the UPDATE matches nothing — user-b's row is untouched. Invisible,
+        // so 404: a 403 here would confirm the row exists to someone who cannot
+        // read it.
+        await expect(a.save({
             path: "tasks", collection: tasksCollection, id: "t-b", status: "existing",
             values: { title: "hijacked" }
-        } as never).catch(() => { /* invisible row */ });
+        } as never)).rejects.toMatchObject({ statusCode: 404 });
         const bTitle = await adminClient.query("SELECT title FROM public.tasks WHERE id = 't-b'");
         expect(bTitle.rows[0].title).toBe("B task");
     });
 
     it("DENIES a user from deleting another tenant's row (USING)", async () => {
         const a = await userDriver("user-a");
-        await a.delete({ row: { id: "t-b", path: "tasks" }, collection: tasksCollection } as never)
-            .catch(() => { /* invisible row */ });
+        await expect(a.delete({ row: { id: "t-b", path: "tasks" }, collection: tasksCollection } as never))
+            .rejects.toMatchObject({ statusCode: 404 });
         expect(await rawCount("tasks", "WHERE id = 't-b'")).toBe(1);
+    });
+
+    // The pair above and the pair below are the whole rule: a write that
+    // matches nothing is a 404 when the caller cannot see the target and a 403
+    // when they can. Neither is ever a success, which is what both used to be.
+    it("reports a DELETE the policy refused as denied, not as done", async () => {
+        const a = await userDriver("user-a");
+        await expect(a.delete({ row: { id: "n-1", path: "notices" }, collection: noticesCollection } as never))
+            .rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        expect(await rawCount("notices", "WHERE id = 'n-1'")).toBe(1);
+    });
+
+    it("reports an UPDATE the policy refused as denied, not as done", async () => {
+        const a = await userDriver("user-a");
+        await expect(a.save({
+            path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
+            values: { body: "rewritten" }
+        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        const body = await adminClient.query("SELECT body FROM public.notices WHERE id = 'n-1'");
+        expect(body.rows[0].body).toBe("readable");
+    });
+
+    // One level down: `DELETE notices/n-1/topics/tp-1` removes the junction row,
+    // not the topic, so the junction's own policies decide — and the same
+    // silent success was available there.
+    it("reports an UNLINK the junction's policy refused as denied, not as done", async () => {
+        const a = await userDriver("user-a");
+        await expect(a.delete({
+            row: { id: "tp-1", path: "notices/n-1/topics", values: {} },
+            collection: topicsCollection
+        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
+        expect(await rawCount("notice_topics", "WHERE notice_id = 'n-1'")).toBe(1);
+    });
+
+    // The membership-list form of the same write. Writing `topics: []` is a
+    // claim about what the links ARE, so a save that leaves one standing and
+    // reports success has told the caller something untrue about the database.
+    it("reports a membership write the junction refused as denied, not as done", async () => {
+        const a = await userDriver("user-a");
+        await expect(a.save({
+            path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
+            values: { topics: [] }
+        } as never)).rejects.toMatchObject({
+            statusCode: 403,
+            code: "WRITE_DENIED",
+            message: expect.stringContaining("link(s)")
+        });
+        expect(await rawCount("notice_topics", "WHERE notice_id = 'n-1'")).toBe(1);
     });
 
     it("locks a policy-less collection to users (no read, no write)", async () => {

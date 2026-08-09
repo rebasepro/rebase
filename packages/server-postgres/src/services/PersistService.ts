@@ -26,6 +26,7 @@ import {
 } from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage } from "../utils/pg-error-utils";
+import { explainZeroRowWrite } from "./write-denial";
 
 /**
  * Service for handling all row write operations.
@@ -42,23 +43,10 @@ export class PersistService {
 
 
     /**
-     * Explain a write that matched no rows.
-     *
-     * Row-level security filters UPDATE and DELETE through the policy's USING
-     * clause instead of raising: a denied write is reported by Postgres exactly
-     * like a successful one that happened to match nothing. Left unchecked, a
-     * caller cannot tell "denied" from "done" — the write returns 200/204 and
-     * the row is untouched.
-     *
-     * Re-reading the target over the *same* RLS-scoped handle separates the two
-     * cases. A visible row means the policy rejected the write (403); an
-     * invisible one means there is nothing there to write for this caller (404,
-     * matching what a GET would say). The re-read is bound by the caller's own
-     * policies, so it discloses nothing a plain read wouldn't.
-     *
-     * Only reached when zero rows matched, so the happy path pays nothing.
+     * Explain a row write that matched nothing — see {@link explainZeroRowWrite}
+     * for why a zero-row write cannot be reported as success.
      */
-    private async explainZeroRowWrite(
+    private explainZeroRowWrite(
         handle: DrizzleClient,
         table: PgTable,
         conditions: SQL[],
@@ -66,20 +54,11 @@ export class PersistService {
         id: string | number,
         operation: "update" | "delete"
     ): Promise<ApiError> {
-        const visible = await handle
-            .select({ present: sql<number>`1` })
-            .from(table)
-            .where(and(...conditions))
-            .limit(1);
-
-        if (visible.length > 0) {
-            return ApiError.forbidden(
-                `Not allowed to ${operation} "${id}" in "${collectionPath}": a row-level security policy rejected the write.`,
-                "WRITE_DENIED"
-            );
-        }
-
-        return ApiError.notFound(
+        return explainZeroRowWrite(
+            handle,
+            table,
+            conditions,
+            `Not allowed to ${operation} "${id}" in "${collectionPath}": a row-level security policy rejected the write.`,
             `No row "${id}" in "${collectionPath}" to ${operation}.`
         );
     }

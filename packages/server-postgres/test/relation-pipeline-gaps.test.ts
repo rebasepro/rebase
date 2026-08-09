@@ -197,7 +197,12 @@ function createMockDb(resolveResults: () => unknown[]) {
             set: jest.fn(() => chain),
             values: jest.fn(() => chain),
             then: (resolve: (val: unknown[]) => void) => {
-                resolve(resolveResults());
+                // A write's result carries `rowCount`, and the junction writer
+                // reads it: a delete that reports nothing removed is treated as
+                // a policy refusal, not as a no-op. Reporting the row count the
+                // same select answered with models a database that did as asked.
+                const rows = resolveResults();
+                resolve(Object.assign(rows, { rowCount: rows.length }));
             }
         };
         return chain;

@@ -76,7 +76,10 @@ describe("relation writes accept rows or bare keys", () => {
                     where: jest.fn(async () => existing.map(id => ({ targetId: id })))
                 }))
             })),
-            delete: jest.fn(() => ({ where: jest.fn(async () => undefined) })),
+            // `rowCount` matters: the writer compares it against how many links
+            // it named, and a delete that reports nothing removed is treated as
+            // a policy refusal. See junction-diff-write.
+            delete: jest.fn(() => ({ where: jest.fn(async () => ({ rowCount: existing.length })) })),
             insert: jest.fn(() => ({
                 values: jest.fn((rows: Record<string, unknown>[]) => {
                     inserted.push(rows);

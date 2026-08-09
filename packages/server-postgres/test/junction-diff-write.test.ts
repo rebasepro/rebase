@@ -67,19 +67,33 @@ describe("junction writes diff rather than replace", () => {
      * A tx that answers the "what is linked now?" select with `existing`, and
      * records the deletes and inserts that follow.
      */
-    const recordingTx = (existing: (string | number)[]) => {
+    const recordingTx = (existing: (string | number)[], deletedRowCount?: number) => {
         const inserted: Record<string, unknown>[][] = [];
         const deleteWheres: unknown[] = [];
         const conflictHandled: boolean[] = [];
+        // `rowCount` is not decoration: the writer compares it against the
+        // number of links it asked to remove, so a mock that omits it models a
+        // database that refused every delete. Default to "removed everything it
+        // was asked to" — `removed` is always a subset of `existing`.
+        const rowCount = deletedRowCount ?? existing.length;
         const tx = {
             select: jest.fn(() => ({
                 from: jest.fn(() => ({
-                    where: jest.fn(async () => existing.map(id => ({ targetId: id })))
+                    // Awaitable, and `.limit()`-able: the diff select awaits it
+                    // directly, while the survivor re-read after a short delete
+                    // asks for one row.
+                    where: jest.fn(() => {
+                        const rows = existing.map(id => ({ targetId: id }));
+                        return Object.assign(Promise.resolve(rows), {
+                            limit: jest.fn(async () => rows.slice(0, 1))
+                        });
+                    })
                 }))
             })),
             delete: jest.fn(() => ({
                 where: jest.fn(async (condition: unknown) => {
                     deleteWheres.push(condition);
+                    return { rowCount };
                 })
             })),
             insert: jest.fn(() => ({
@@ -109,8 +123,8 @@ conflictHandled };
         });
     });
 
-    const writeTags = async (existing: (string | number)[], value: unknown) => {
-        const recording = recordingTx(existing);
+    const writeTags = async (existing: (string | number)[], value: unknown, deletedRowCount?: number) => {
+        const recording = recordingTx(existing, deletedRowCount);
         const service = new RelationService({} as never, registry);
         await service.updateRelationsUsingJoins(recording.tx as never, postsCollection, "p1", { tags: value } as never);
         return recording;
@@ -166,6 +180,17 @@ conflictHandled };
         const { tx, inserted } = await writeTags(["t-1"], [{ id: "t-1" }]);
         expect(inserted).toEqual([]);
         expect(tx.delete).not.toHaveBeenCalled();
+    });
+
+    it("refuses to report success when the delete removed fewer links than it named", async () => {
+        // A junction policy that permits SELECT and not DELETE returns zero
+        // rows removed and no error — indistinguishable from a save that had
+        // nothing to do. The links are still readable afterwards, which is
+        // what separates "refused" from "someone else got there first".
+        await expect(writeTags(["t-1", "t-2"], ["t-1"], 0)).rejects.toMatchObject({
+            statusCode: 403,
+            code: "WRITE_DENIED"
+        });
     });
 
     it("writes a duplicated id once", async () => {

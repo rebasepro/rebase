@@ -2076,3 +2076,60 @@ drawn from it was wrong. That the correction is even possible is because the row
 recorded *why* it was clean rather than just that it was — so when a sweep clears
 something on a premise rather than on a check, write the premise into the row,
 and treat the premise, not the file, as the thing to re-test.
+
+---
+
+## 39. A refusal the database expresses as a number
+
+Row-level security does not raise on a write it forbids. `USING` is a filter, so
+a `DELETE` the policy rejects and a `DELETE` that had nothing to do are the same
+statement with the same result: zero rows, no error. Every other authorization
+failure in the stack throws — a missing permission, a bad token, a failed
+`WITH CHECK` — and this one arrives as `rowCount: 0`, which is indistinguishable
+from success unless somebody reads it.
+
+The shape of the bug is therefore an *absence*: `await tx.delete(t).where(...)`
+with the result discarded. It reads as finished code. The route above it then
+answers `204`, the SDK resolves, the agent records that the order was refunded
+and deleted, and the row is still there. Two gates that each work — an API key
+scoped to `orders:delete`, a collection whose `securityRules` grant `service`
+only `select` — combine into a caller that deletes nothing, forever, and is
+congratulated every time.
+
+Distinguishing the two cases needs one more read, on the **same RLS-scoped
+handle**: if the target is still visible, a policy refused the write (403); if it
+is not, there is nothing there for this caller (404, the same answer a `GET`
+gives). Doing it on a privileged handle instead would answer for a different
+caller and disclose the row's existence to someone who cannot read it — the
+re-read has to be bound by the same policies as the write.
+`explainZeroRowWrite` (`packages/server-postgres/src/services/write-denial.ts`)
+is the one copy of that rule.
+
+**Sweep:** `grep -rnE '(await|return) [a-z]+\.(delete|update)\(' packages/*/src`
+and look at what happens to the result. A write whose row count is never compared
+against what the caller asked for cannot report a refusal. The comparison is not
+always against zero — a membership write names *n* links to remove, so anything
+below *n* is the same defect.
+
+**Watch for:** the levels below the row. A `DELETE authors/1/tags/5` removes a
+junction row, not a tag, so the junction's own policies decide it; a save that
+rewrites a to-many relation deletes a *set* of links. Both were still silent
+after the row-level guard landed, and both are reachable from the same REST
+surface as the row-level case.
+
+**Watch for, too:** the mock that models the fix away. Three unit suites had
+`delete: jest.fn(async () => undefined)` — a fake database that reports nothing
+removed. Under the new guard they failed, correctly: what they described was a
+database refusing every delete. A mock that omits `rowCount` is not a neutral
+stand-in once `rowCount` carries meaning.
+
+### Last sweep — 2026-08-09
+
+| checked | result |
+|---|---|
+| `PersistService.delete` / `.save` (row-level UPDATE and DELETE) | already guarded, and now pinned by the readable-but-unwritable case rather than only the invisible-row one — the two answer differently (403 vs 404) and only one of them had a test |
+| `RelationService.unlinkRelatedEntity` — `DELETE parent/id/rel/id` on a m2m | **BUG** — junction delete unchecked; the route answered 204 with the link intact |
+| `RelationService.syncJunctionLinks` — the membership diff | **BUG** — a partial or fully-refused removal returned success, so the stored membership was not the one the save reported writing |
+| `RelationService`'s FK stamping — the nine `update(targetTable)` sites | **same class, not changed here.** Two of them (`set fk where inArray(ids)`, and the one-to-one `set fk where id = ?`) have a knowable expected count and are silent today; the rest are "clear whatever is linked", where zero is legitimate. Guarding the first two also changes what a *nonexistent* target id does — today it is dropped without a word — and that is a behavioural decision about relation writes, not an RLS fix. Worth doing deliberately, with its own tests |
+| `PersistService.deleteAll` | left as is: "remove everything I can see" makes no claim about a particular row, and zero is a legitimate answer |
+| `deleteMany` / `saveMany` | clean — both loop the single-row path inside one transaction, so the guard and the rollback come with them |
