@@ -99,9 +99,12 @@ describe("buildQueryString — logical conditions null safety", () => {
 // 2. buildQueryString — where clause array edge cases
 // --------------------------------------------------------------------------
 describe("buildQueryString — where clause array edge cases", () => {
-    it("serializes null value as eq.null", () => {
-        const result = buildQueryString({ where: { status: ["==", null] } });
-        expect(result).toBe("?status=eq.null");
+    it("serializes a null comparison as the null test it means", () => {
+        // Was `eq.null`, which the decoder could not tell from a search for the
+        // four-character string — so this compiled to `status = 'null'` server
+        // side. These tests pinned only the encoder, so both halves agreed with
+        // each other and neither agreed with the database.
+        expect(buildQueryString({ where: { status: ["==", null] } })).toBe("?status=isnull.null");
     });
 
     it("serializes single tuple ['in', [1,2,3]] correctly", () => {
@@ -122,19 +125,17 @@ describe("buildQueryString — where clause array edge cases", () => {
         expect(decoded).toContain("age=lte.10");
     });
 
-    it("serializes ['in', []] as in.()", () => {
-        const result = buildQueryString({
-            where: { category: ["in", []] },
-        });
-        const decoded = decodeURIComponent(result);
-        expect(decoded).toBe("?category=in.()");
+    it("serializes ['in', []] with the empty-list token", () => {
+        // `in.()` is the empty string between the parens, which decodes to
+        // `[""]` — so an empty selection became a search for the empty string.
+        // A lone backslash spells "zero items" and cannot collide with a real
+        // value, because escaping doubles every backslash.
+        const decoded = decodeURIComponent(buildQueryString({ where: { category: ["in", []] } }));
+        expect(decoded).toBe("?category=in.(\\)");
     });
 
-    it("serializes ['!=', null] as neq.null", () => {
-        const result = buildQueryString({
-            where: { status: ["!=", null] },
-        });
-        expect(result).toBe("?status=neq.null");
+    it("serializes ['!=', null] as the not-null test", () => {
+        expect(buildQueryString({ where: { status: ["!=", null] } })).toBe("?status=notnull.null");
     });
 });
 
@@ -169,8 +170,8 @@ describe("buildQueryString — combined params with null arrays", () => {
         // logical should produce and=()
         expect(result).toContain("and=");
         expect(result).toContain(encodeURIComponent("()"));
-        // where null should produce eq.null
-        expect(result).toContain("status=eq.null");
+        // where null should produce the null test, not `eq.null`
+        expect(result).toContain("status=isnull.null");
     });
 
     it("does not add search parameter when searchString is undefined", () => {

@@ -67,6 +67,14 @@ const WIRE_SPECIALS = /[\\,()]/g;
  * Escape a value for the wire format: `\` → `\\`, `,` → `\,`, `(` → `\(`,
  * `)` → `\)`.
  */
+/**
+ * The wire spelling of an empty list.
+ *
+ * A lone backslash: unproducible by {@link escapeWireValue}, which doubles
+ * every backslash it emits, so it cannot collide with any real item.
+ */
+const EMPTY_LIST_TOKEN = "\\";
+
 function escapeWireValue(value: string): string {
     return value.replace(WIRE_SPECIALS, ch => `\\${ch}`);
 }
@@ -160,8 +168,25 @@ function splitGroupItems(inner: string): string[] {
 // Typed operator map lookups (no `as any`)
 // ---------------------------------------------------------------------------
 
-const REST_OP_LOOKUP = REST_TO_CANONICAL as Readonly<Record<string, WhereFilterOp | undefined>>;
-const CANONICAL_OP_LOOKUP = CANONICAL_TO_REST as Readonly<Record<string, RestFilterOp | undefined>>;
+/**
+ * Operator tables as `Map`s, because the key comes off the wire.
+ *
+ * Indexed as plain objects, every `Object.prototype` member answered: a query
+ * string of `?f=valueOf.x` found a truthy "operator" — the inherited function —
+ * and `deserializeTuple` returned it *as the operator*, so a function object
+ * travelled on into the compilers in place of a `WhereFilterOp`. The guard one
+ * line below (`if (!canonicalOp)`) reads as though it rejects anything unknown,
+ * and does not: `Object.prototype` is not unknown to a plain object.
+ *
+ * Same shape as the prototype-key defects swept out of `setIn`, `getIn`,
+ * `mergeDeep`, `unflattenObject` and `FOREIGN_CONVENTION_UIDS`.
+ */
+const REST_OP_LOOKUP = new Map<string, WhereFilterOp>(
+    Object.entries(REST_TO_CANONICAL) as [string, WhereFilterOp][]
+);
+const CANONICAL_OP_LOOKUP = new Map<string, RestFilterOp>(
+    Object.entries(CANONICAL_TO_REST) as [string, RestFilterOp][]
+);
 
 // ---------------------------------------------------------------------------
 // Serialize: FilterValues → REST querystring
@@ -192,14 +217,43 @@ function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
         );
     }
 
-    const restOp = CANONICAL_OP_LOOKUP[op];
+    const restOp = CANONICAL_OP_LOOKUP.get(op);
     if (!restOp) {
         throw new TypeError(
             `serializeTuple: unknown operator "${op}". Valid operators: ${Object.keys(CANONICAL_TO_REST).join(", ")}`
         );
     }
 
+    // `== null` and `!= null` go out as the null-testing operators.
+    //
+    // They used to serialize as `eq.null`, and `deserializeTuple` had no way to
+    // tell that from a search for the four-character string "null" — so it
+    // returned the string, and `.where("deleted_at", "==", null)` compiled to
+    // `deleted_at = 'null'` over HTTP. The typed builder allows it, the Postgres
+    // compiler implements it as IS NULL, and only the wire trip broke it.
+    //
+    // These are the same query: SQL `= NULL` is never true, so `== null` can
+    // only mean IS NULL. Emitting it as such is unambiguous in both directions
+    // and leaves `eq.null` free to mean the literal string, which it now does.
+    if (value === null && (op === "==" || op === "!=")) {
+        return op === "==" ? "isnull.null" : "notnull.null";
+    }
+
     if (Array.isArray(value)) {
+        // The empty list needs a spelling of its own.
+        //
+        // A comma-joined format has no way to write "zero items": `()` is the
+        // empty string between the parens, which splits to `[""]`. So
+        // `.where("id", "in", [])` — which matches nothing — used to arrive as
+        // a search for the empty string: a 500 on a uuid column, silently the
+        // wrong rows on a text one.
+        //
+        // `EMPTY_LIST_TOKEN` is a single unescaped backslash, which no real
+        // value can produce: `escapeWireValue` doubles every backslash, so a
+        // one-item list holding `\` serializes as `(\\)`. That keeps both
+        // directions exact — `[]` and `[""]` stay distinct — rather than
+        // trading one lossy reading for another.
+        if (value.length === 0) return `${restOp}.(${EMPTY_LIST_TOKEN})`;
         const items = value.map(v => escapeWireValue(stringifyValue(v))).join(",");
         return `${restOp}.(${items})`;
     }
@@ -284,7 +338,7 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     // Check if the prefix is a known REST operator.
     // This is the key defense against values like "eq.something" or "gt.foo"
     // being misinterpreted — only known REST short-codes are treated as operators.
-    const canonicalOp = REST_OP_LOOKUP[prefix];
+    const canonicalOp = REST_OP_LOOKUP.get(prefix);
     if (!canonicalOp) {
         // Not a known operator (e.g., email "user@host.com" or version "1.2.3")
         // Treat the entire string as an equality value
@@ -299,7 +353,10 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
 
     // Parse list values: "(admin,editor)" → ["admin", "editor"]
     if (rest.startsWith("(") && rest.endsWith(")")) {
-        const items = splitListItems(rest.slice(1, -1));
+        const inner = rest.slice(1, -1);
+        // See EMPTY_LIST_TOKEN: `(\)` is the empty list. `()` remains a list
+        // holding one empty string, which is what splitting it yields anyway.
+        const items = inner === EMPTY_LIST_TOKEN ? [] : splitListItems(inner);
         return [canonicalOp, items];
     }
 
@@ -389,7 +446,7 @@ export function serializeLogicalCondition(
     }
 
     // FilterCondition
-    const restOp = CANONICAL_OP_LOOKUP[cond.operator] ?? "eq";
+    const restOp = CANONICAL_OP_LOOKUP.get(cond.operator) ?? "eq";
     if (Array.isArray(cond.value)) {
         const items = cond.value.map(v => escapeWireValue(stringifyValue(v))).join(",");
         return `${cond.column}.${restOp}.(${items})`;

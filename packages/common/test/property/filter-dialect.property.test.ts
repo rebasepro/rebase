@@ -131,6 +131,16 @@ describe("filter wire codec", () => {
             // that drops the field entirely preserves the operator vacuously.
             if (!result) throw new Error(`round trip dropped the field "${field}"`);
             const op = Array.isArray(result[0]) ? undefined : result[0];
+
+            // One deliberate exception: `== null` and `!= null` are carried as
+            // the null-testing operators. `eq.null` was indistinguishable from
+            // a search for the string "null", so the value was what regressed
+            // instead — `f = 'null'`. SQL `= NULL` is never true, so these are
+            // the same query, and the operator is the safe thing to change.
+            if (tuple[1] === null && (tuple[0] === "==" || tuple[0] === "!=")) {
+                expect(op).toBe(tuple[0] === "==" ? "is-null" : "is-not-null");
+                return;
+            }
             expect(op).toBe(tuple[0]);
         }), { numRuns: RUNS });
     });
@@ -149,7 +159,15 @@ describe("filter wire codec", () => {
                 const result = back[field] as [WhereFilterOp, unknown][];
                 expect(Array.isArray(result[0])).toBe(true);
                 expect(result).toHaveLength(tuples.length);
-                expect(result.map(t => t[0])).toEqual(tuples.map(t => t[0]));
+                // `== null` / `!= null` are carried as the null-testing
+                // operators — the same query, said unambiguously. See the
+                // operator-preservation property above for why.
+                const expected = tuples.map(t =>
+                    t[1] === null && (t[0] === "==" || t[0] === "!=")
+                        ? (t[0] === "==" ? "is-null" : "is-not-null")
+                        : t[0]
+                );
+                expect(result.map(t => t[0])).toEqual(expected);
             }
         ), { numRuns: RUNS });
     });

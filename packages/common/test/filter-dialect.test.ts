@@ -43,9 +43,10 @@ describe("serializeFilter", () => {
         expect(result).toEqual({ a: "eq.x" });
     });
 
-    it("serializes null values", () => {
+    it("serializes null values as a null test", () => {
+        // See "serializes a null comparison as the null test it means" below.
         const result = serializeFilter({ status: ["==", null] });
-        expect(result).toEqual({ status: "eq.null" });
+        expect(result).toEqual({ status: "isnull.null" });
     });
 
     it("serializes boolean values", () => {
@@ -160,9 +161,18 @@ describe("boolean/null string preservation", () => {
         expect(typeof (result.field as [WhereFilterOp, unknown])[1]).toBe("string");
     });
 
-    it("serializes actual null as the string 'null'", () => {
-        const result = serializeFilter({ field: ["==", null] });
-        expect(result).toEqual({ field: "eq.null" });
+    it("serializes a null comparison as the null test it means", () => {
+        // Was `eq.null`, which `deserializeFilter` could not tell from a search
+        // for the four-character string — so `.where(f, "==", null)` came back
+        // as `["==", "null"]` and compiled to `f = 'null'`. SQL `= NULL` is
+        // never true, so `== null` can only mean IS NULL; saying so on the wire
+        // is unambiguous and leaves `eq.null` free to mean the string.
+        expect(serializeFilter({ field: ["==", null] })).toEqual({ field: "isnull.null" });
+        expect(serializeFilter({ field: ["!=", null] })).toEqual({ field: "notnull.null" });
+    });
+
+    it("still serializes the literal string 'null' as eq.null", () => {
+        expect(serializeFilter({ field: ["==", "null"] })).toEqual({ field: "eq.null" });
     });
 
     it("serializes actual boolean true as the string 'true'", () => {
