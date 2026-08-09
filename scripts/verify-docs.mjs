@@ -15,6 +15,13 @@
  *      generated from English by website/scripts/translate_docs.mjs). Compiles
  *      each fenced ts/js block against workspace source.
  *
+ * Both stages also cover the repository's *own* agent instructions — `AGENT.md`,
+ * `.agents/` and `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
+ * docs-verify/extract.mjs). They were the one documentation surface no glob
+ * reached, and they drifted the whole time everything else stayed clean: the
+ * relation API they taught (`cardinality` + `direction`) had not existed since
+ * the authored relation type became a closed `kind` union.
+ *
  * Usage:
  *   node scripts/verify-docs.mjs              both stages
  *   node scripts/verify-docs.mjs --names      stage 1 only (fast, no compile)

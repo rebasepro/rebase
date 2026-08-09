@@ -18,11 +18,11 @@ description: Rules for creating UI components in the Rebase codebase
    - `Tooltip`, `Skeleton`, `CircularProgress`, `Separator`
    - `Avatar`, `Alert`, `Collapse`, `ExpandablePanel`
    - `SearchBar`, `DateTimeField`, `ColorPicker`, `FileUpload`
-   - Icons from `@rebasepro/ui` (e.g. `ArrowForwardIcon`, `AddIcon`, `DeleteIcon`, etc.)
+   - Icons from `@rebasepro/ui`. These are Lucide names with an `Icon` suffix — `PlusIcon`, `Trash2Icon`, `ArrowRightIcon`, `SearchIcon` — not Material names. If you are unsure, grep `packages/ui/src/icons/` rather than guessing a name that reads plausibly.
 
 2. **Never use `as any`** in TypeScript code. Use proper typing or explicit type narrowing instead.
 
-3. **Follow existing patterns**: When building new views, look at how existing components like `NavigationCard`, `DefaultHomePage`, or `RolesView` structure their layouts using the UI kit.
+3. **Follow existing patterns**: `UIReferenceView` (`packages/app/src/components/Debug/UIReferenceView.tsx`, served at `/debug/ui`) is the design source of truth for the kit. For layout, read `ContentHomePage`, `StudioHomePage` or `NavigationCardBinding` and follow how they compose kit components.
 
 4. **Use `cls()` from `@rebasepro/ui`** for conditional class merging instead of template literals.
 
@@ -32,7 +32,7 @@ description: Rules for creating UI components in the Rebase codebase
 
 ## Design Token Rules (MANDATORY — NO EXCEPTIONS)
 
-1. **All borders MUST use `defaultBorderMixin`** from `@rebasepro/ui/styles`. NEVER hardcode border colors. Import and apply via `cls()`.
+1. **All borders MUST use `defaultBorderMixin`** from `@rebasepro/ui` — the package barrel, not a `@rebasepro/ui/styles` subpath, which is not in the package's `exports` map and would not resolve for an installed consumer. NEVER hardcode border colors. Import and apply via `cls()`.
 
 2. **Use the established color token scale for interactive states**. Look at existing components in the codebase for the correct tokens. NEVER invent arbitrary color values — always reference the existing design system (`surface-accent-*`, `primary-*`, etc.).
 

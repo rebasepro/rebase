@@ -39,6 +39,32 @@ against workspace *source*. English only, because the other five locales are
 generated from it by `website/scripts/translate_docs.mjs`; stage 1 is the net
 for locale-only drift.
 
+## What is globbed
+
+`website/`, `rebase-agent-skills/`, `examples/*/`, the marketing components, the
+MCP manifests — and the repository's own agent instructions: `AGENT.md`,
+`.agents/*.md` and `.agent/workflows/*.md` (`AGENT_INSTRUCTION_GLOBS` in
+`extract.mjs`).
+
+That last group was added because the gap was load-bearing. While every checked
+surface reported zero findings, `AGENT.md` and
+`.agent/workflows/schema-migration.md` went on teaching relations as `target` +
+`cardinality` + `direction` on the property — a shape the authored relation type
+had replaced with a closed `kind` union, and `direction` had stopped existing
+anywhere in `packages/types`. An agent that read them wrote code that did not
+compile. A documentation surface nothing globs is a documentation surface that
+drifts.
+
+`AGENT.md` is `.gitignore`d, so CI never sees it and it contributes nothing
+there; it is globbed for the local run, where it is edited. The blocking gate
+rests on the two tracked surfaces.
+
+One wrinkle worth knowing if you extend this: `checkRunScripts` derives a fence's
+working directory from the doc's own path, which is right for an example README
+and wrong for `.agent/workflows/deployment.md` — its `pnpm run build` means the
+monorepo root, not a `package.json` beside the file. `ROOT_CWD_GLOBS` in
+`check-doc-commands.mjs` is that exception.
+
 ## Why the snippet stage needs accommodations
 
 Docs snippets are fragments, not programs. Three of them, each chosen to keep

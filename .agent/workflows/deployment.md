@@ -7,7 +7,7 @@ description: Deployment rules and restrictions for the Rebase backend and all se
 **Do not deploy or run deployment commands unless the user explicitly asks you to in the current conversation.**
 
 This applies to:
-- `rebase deploy` (any variant)
+- `rebase cloud deploy` (any variant; the CLI has no top-level deploy command)
 - `gcloud run deploy`
 - `terraform apply` (any variant that deploys resources)
 - Any command that pushes code, functions, or configuration to a live environment

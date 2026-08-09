@@ -26,16 +26,40 @@
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { CLI_INVOCATIONS, loadCliCommands, loadCliFlags, loadWorkspaceBins } from "./cli-commands.mjs";
+import { AGENT_INSTRUCTION_GLOBS } from "./extract.mjs";
 
 /**
  * Everything outside `website/` that a reader copies a shell command from.
  * One level deep under `examples/` on purpose: every example has its own
  * `node_modules` here, and a `**` glob would walk into it.
+ *
+ * The repo's own agent instructions are in the list for the same reason the
+ * skills are: `rebase db studio` was documented as a working command in the
+ * schema-migration workflow, and `db studio` has never been in the driver's
+ * allowlist.
  */
-const DOC_GLOBS = ["rebase-agent-skills/**/*.md", "examples/*/*.md", "examples/*.md"];
+const DOC_GLOBS = [
+    "rebase-agent-skills/**/*.md",
+    "examples/*/*.md",
+    "examples/*.md",
+    ...AGENT_INSTRUCTION_GLOBS
+];
 
 /** Only these files get the run-script check — see `checkRunScripts`. */
-const RUN_SCRIPT_GLOBS = ["examples/*/*.md", "examples/*.md"];
+const RUN_SCRIPT_GLOBS = ["examples/*/*.md", "examples/*.md", ...AGENT_INSTRUCTION_GLOBS];
+
+/**
+ * Files whose fences run at the monorepo root rather than in the directory the
+ * file sits in.
+ *
+ * `checkRunScripts` derives the working directory from the doc's own path,
+ * which is right for an example README and wrong for the agent instructions:
+ * `.agent/workflows/deployment.md` says `pnpm run build`, and it means the
+ * root's `build`, not a `package.json` in `.agent/workflows/` that does not and
+ * will not exist. Without this the check would report the correct instruction
+ * as a finding.
+ */
+const ROOT_CWD_GLOBS = AGENT_INSTRUCTION_GLOBS;
 
 /**
  * Package-manager subcommands that are not run-scripts. `pnpm build` runs the
@@ -174,7 +198,7 @@ function* tableFlags(text) {
  * write both). A skill's fences run in the reader's own project, which this
  * repository does not have.
  */
-function checkRunScripts(root, rel, text, findings) {
+function checkRunScripts(root, rel, text, findings, home = path.dirname(rel)) {
     const scriptsOf = dir => {
         const pkgPath = path.join(root, dir, "package.json");
         if (!existsSync(pkgPath)) return null;
@@ -194,7 +218,6 @@ function checkRunScripts(root, rel, text, findings) {
         } catch { /* not a package we can read */ }
     }
 
-    const home = path.dirname(rel);
     let cwd = home;
     let inFence = false;
     let offset = 0;
@@ -283,6 +306,7 @@ export function checkDocCommands(root) {
     let scanned = 0;
 
     const runScriptFiles = new Set(RUN_SCRIPT_GLOBS.flatMap(g => globSync(g, { cwd: root })));
+    const rootCwdFiles = new Set(ROOT_CWD_GLOBS.flatMap(g => globSync(g, { cwd: root })));
 
     for (const rel of new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))) {
         if (rel.split(path.sep).some(part => part === "node_modules" || part === "dist")) continue;
@@ -353,7 +377,9 @@ export function checkDocCommands(root) {
         }
 
         // 5. Example READMEs: every `pnpm run <script>` must exist.
-        if (runScriptFiles.has(rel)) checkRunScripts(root, rel, text, findings);
+        if (runScriptFiles.has(rel)) {
+            checkRunScripts(root, rel, text, findings, rootCwdFiles.has(rel) ? "" : undefined);
+        }
     }
 
     return { findings, scanned };
