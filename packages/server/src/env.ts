@@ -104,6 +104,10 @@ const rebaseEnvSchema = z.object({
     // that ALLOW_REGISTRATION=false deliberately leaves open. Optional so an
     // unset variable means "not configured" rather than an explicit false.
     DISABLE_SELF_REGISTRATION: optionalBoolString,
+    // Anonymous sign-in, off unless asked for. Optional for the same reason as
+    // the line above: unset must read as "not configured", not as an explicit
+    // false that would override a value set in code.
+    ALLOW_ANONYMOUS: optionalBoolString,
     ALLOW_LOCALHOST_IN_PRODUCTION: optionalBoolString,
     CORS_ORIGINS: z.string().optional(),
     FRONTEND_URL: z.string().optional(),

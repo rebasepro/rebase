@@ -51,6 +51,13 @@ export interface AuthModuleConfig {
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
     /**
+     * Opt-in: allow `POST /auth/anonymous` to mint a user without credentials.
+     *
+     * Off by default. See {@link isAnonymousAuthOpen} for why this is opt-in
+     * rather than opt-out, and why `disableSelfRegistration` overrides it.
+     */
+    allowAnonymous?: boolean;
+    /**
      * Auth hooks for customizing password hashing, credential
      * verification, lifecycle hooks, etc.
      */

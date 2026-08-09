@@ -186,6 +186,8 @@ interface Scenario {
     allowRegistration: boolean;
     /** Users already in the table. 0 is the bootstrap window. */
     existingUsers: number;
+    /** Opt-in anonymous sign-in. Absent means the default, which is off. */
+    allowAnonymous?: boolean;
 }
 
 function build(scenario: Scenario) {
@@ -198,7 +200,8 @@ function build(scenario: Scenario) {
     const adapter = createBuiltinAuthAdapter({
         authRepository: repo,
         allowRegistration: scenario.allowRegistration,
-        disableSelfRegistration: scenario.disableSelfRegistration
+        disableSelfRegistration: scenario.disableSelfRegistration,
+        allowAnonymous: scenario.allowAnonymous
     });
 
     const app = new Hono<HonoEnv>();
@@ -278,5 +281,128 @@ describe("the kill switch reaches the adapter", () => {
         // uses it to explain why there is nothing to sign in to. What must not
         // happen is offering a registration form alongside it.
         expect(capabilities.needsSetup).toBe(true);
+    });
+});
+
+// ── Anonymous sign-in ───────────────────────────────────────────────────────
+
+/**
+ * Anonymous sign-in is registration that never asked.
+ *
+ * `POST /auth/anonymous` inserts a `users` row and assigns `defaultRole`
+ * exactly as `POST /auth/register` does. It was mounted unconditionally and
+ * consulted none of the gates above, and there was no key to turn it off — so
+ * the "hard kill switch" closed the front door while this stayed open. Two
+ * unauthenticated requests then produced a permanent email/password account:
+ * `/auth/anonymous` for the row and the session, `/auth/anonymous/link` to put
+ * credentials on it.
+ *
+ * These drive the adapter rather than `createAuthRoutes`, for the reason at the
+ * top of this file: the wiring is where the flag went missing last time.
+ */
+describe("anonymous sign-in obeys the registration gates", () => {
+    const post = (app: ReturnType<typeof build>["app"], path: string, body?: unknown) =>
+        app.request(path, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body ?? {})
+        });
+
+    it("is off by default, so an untouched config does not hand out accounts", async () => {
+        const { app } = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1
+        });
+
+        const res = await post(app, "/auth/anonymous");
+
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("ANONYMOUS_AUTH_DISABLED");
+    });
+
+    it("works once the deployment opts in", async () => {
+        const { app } = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1,
+            allowAnonymous: true
+        });
+
+        const res = await post(app, "/auth/anonymous");
+
+        expect(res.status).toBe(201);
+    });
+
+    it("stays shut when disableSelfRegistration overrides the opt-in", async () => {
+        // The scenario from the audit: an operator sets the kill switch AND
+        // someone has enabled anonymous. The kill switch is documented to block
+        // self-registration outright, so it wins.
+        const { app } = build({
+            disableSelfRegistration: true,
+            allowRegistration: false,
+            existingUsers: 1,
+            allowAnonymous: true
+        });
+
+        const res = await post(app, "/auth/anonymous");
+
+        expect(res.status).toBe(403);
+    });
+
+    it("closes the link route too, so a session minted earlier cannot finish the upgrade", async () => {
+        // /anonymous/link is the second half of the two-request path to a
+        // permanent account. Gating only the first half would leave any
+        // already-issued anonymous session able to complete it.
+        const { app } = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1,
+            allowAnonymous: true
+        });
+        const created = await post(app, "/auth/anonymous");
+        expect(created.status).toBe(201);
+        const token = (await created.json() as { tokens: { accessToken: string } }).tokens.accessToken;
+
+        const { app: shut } = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1,
+            allowAnonymous: false
+        });
+        const res = await shut.request("/auth/anonymous/link", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+            body: JSON.stringify({ email: "someone@test.dev", password: "a-strong-password" })
+        });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("advertises the state it enforces", async () => {
+        // A capability that exists and is not in the capability surface is how
+        // a client ends up calling a route it cannot discover is off.
+        const off = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1
+        });
+        expect((await off.adapter.getCapabilities()).anonymousLogin).toBe(false);
+
+        const on = build({
+            disableSelfRegistration: false,
+            allowRegistration: true,
+            existingUsers: 1,
+            allowAnonymous: true
+        });
+        expect((await on.adapter.getCapabilities()).anonymousLogin).toBe(true);
+
+        const killed = build({
+            disableSelfRegistration: true,
+            allowRegistration: true,
+            existingUsers: 1,
+            allowAnonymous: true
+        });
+        expect((await killed.adapter.getCapabilities()).anonymousLogin).toBe(false);
     });
 });

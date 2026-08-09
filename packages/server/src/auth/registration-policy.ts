@@ -64,3 +64,38 @@ export function isSteadyStateRegistrationOpen(
 ): boolean {
     return isRegistrationOpen({ ...policy, needsSetup: false });
 }
+
+/**
+ * Whether `POST /auth/anonymous` may mint a user.
+ *
+ * Anonymous sign-in *is* registration: it inserts a `users` row and assigns
+ * `defaultRole` exactly as `POST /auth/register` does. It simply never asked.
+ * Both anonymous routes were mounted unconditionally and consulted none of the
+ * gates above, so a backend with `allowRegistration: false` **and**
+ * `disableSelfRegistration: true` — the documented hard kill switch — still
+ * handed a permanent account to any caller in two unauthenticated requests:
+ * `POST /auth/anonymous` for the row and the session, then
+ * `POST /auth/anonymous/link` to put an email and password on it.
+ *
+ * Two terms, because the two questions are genuinely different:
+ *
+ *   - `allowAnonymous` is the feature switch, and it is **opt-in**. There was no
+ *     key at all before, so a deployment could not turn anonymous auth off even
+ *     after finding it on; defaulting it to `true` here would keep that hole
+ *     open for everyone who never learns the key exists.
+ *   - `disableSelfRegistration` still wins over it. Its docstring calls it a
+ *     hard kill switch that blocks "self-registration outright", and an account
+ *     created without credentials is still an account created by the public.
+ *     An operator who sets both gets the kill switch they asked for.
+ *
+ * `allowRegistration` deliberately does **not** gate this. A public read-mostly
+ * app that wants anonymous sessions but no sign-up forms is a real deployment,
+ * and `allowAnonymous: true` says so precisely.
+ */
+export function isAnonymousAuthOpen(policy: {
+    allowAnonymous?: boolean;
+    disableSelfRegistration?: boolean;
+}): boolean {
+    if (policy.disableSelfRegistration) return false;
+    return !!policy.allowAnonymous;
+}

@@ -18,9 +18,50 @@ function collection(slug: string): CollectionConfig {
     } as unknown as CollectionConfig;
 }
 
-/** Stands in for pg_policies. */
-function dbWith(rows: Record<string, unknown>[]): Queryable {
-    return { query: async () => ({ rows: rows as never[] }) };
+/** A collection whose write rule is declared RESTRICTIVE, so the DDL says `AS RESTRICTIVE`. */
+function restrictiveCollection(slug: string): CollectionConfig {
+    return {
+        name: slug,
+        slug,
+        table: slug,
+        schema: "public",
+        properties: { id: { name: "ID", type: "string", isId: "uuid" } },
+        securityRules: [
+            { operation: "select", access: "public" },
+            { operations: ["insert", "update", "delete"], roles: ["admin"], mode: "restrictive" }
+        ]
+    } as unknown as CollectionConfig;
+}
+
+/**
+ * Stands in for the two catalogue reads: `pg_policies`, then `pg_class`.
+ *
+ * The second one is dispatched on the query text rather than call order, so a
+ * test that stops caring about ordering does not silently start feeding policy
+ * rows to the RLS-status read — which would report every table as RLS-off,
+ * since a policy row has no `relrowsecurity` column and `undefined` is falsy.
+ *
+ * `rlsOff` names tables whose RLS switch is off. Anything not listed is on,
+ * which is what a healthy `db push` leaves behind.
+ */
+function dbWith(rows: Record<string, unknown>[], rlsOff: string[] = []): Queryable {
+    return {
+        query: async (text: string, values?: unknown[]) => {
+            if (!text.includes("pg_class")) return { rows: rows as never[] };
+            const wanted = (values?.[0] as string[] | undefined) ?? [];
+            return {
+                rows: wanted.map((qualified) => {
+                    const [schemaname, tablename] = qualified.split(".");
+                    return {
+                        schemaname,
+                        tablename,
+                        relrowsecurity: !rlsOff.includes(tablename),
+                        relforcerowsecurity: !rlsOff.includes(tablename)
+                    };
+                }) as never[]
+            };
+        }
+    };
 }
 
 /** A pg_policies row matching an expected policy, clauses and all. */
@@ -30,6 +71,7 @@ function liveRow(p: PolicyRef, overrides: Record<string, unknown> = {}) {
         // Postgres rewrites the text it stores; only presence is compared.
         qual: p.hasUsing ? "(rewritten by postgres)" : null,
         with_check: p.hasWithCheck ? "(rewritten by postgres)" : null,
+        permissive: p.mode ?? "PERMISSIVE",
         ...overrides
     };
 }
@@ -54,6 +96,65 @@ describe("checkPolicyDrift", () => {
 
         expect(hasDrift(drift)).toBe(false);
         expect(formatPolicyDrift(drift)).toBe("");
+    });
+
+    it("flags a table whose RLS switch is off, though every policy still matches", async () => {
+        // The whole point: DISABLE ROW LEVEL SECURITY leaves pg_policies
+        // untouched, so name, roles, command and clause presence all agree and
+        // every other check here passes. Before this category the report was
+        // empty on a table Postgres was filtering nothing on.
+        const cols = [collection("authors")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+
+        const drift = await checkPolicyDrift(
+            dbWith(expected.map((p) => liveRow(p)), ["authors"]),
+            cols
+        );
+
+        expect(drift.missing).toHaveLength(0);
+        expect(drift.diverged).toHaveLength(0);
+        expect(drift.orphaned).toHaveLength(0);
+        expect(drift.rlsDisabled).toEqual([{ schema: "public", table: "authors", forced: false }]);
+        expect(hasDrift(drift)).toBe(true);
+        expect(formatPolicyDrift(drift)).toContain("RLS DISABLED");
+    });
+
+    it("flags a RESTRICTIVE rule the database stores as PERMISSIVE", async () => {
+        // A gate that should be ANDed in is now ORed in — it widens access
+        // instead of narrowing it, with identical name, roles, command and
+        // clauses. Only the `AS` clause differs, and it used to be discarded by
+        // the DDL parser and never selected from pg_policies.
+        const cols = [restrictiveCollection("ledger")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const restrictive = expected.filter((p) => p.mode === "RESTRICTIVE");
+        // Guards the test itself: if the generator stops emitting AS RESTRICTIVE
+        // this must fail loudly rather than pass by having nothing to compare.
+        expect(restrictive.length).toBeGreaterThan(0);
+
+        const live = expected.map((p) =>
+            p.name === restrictive[0].name ? liveRow(p, { permissive: "PERMISSIVE" }) : liveRow(p)
+        );
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+
+        expect(drift.diverged).toHaveLength(1);
+        expect(drift.diverged[0].differences.join(" ")).toContain("mode: expected RESTRICTIVE");
+        expect(formatPolicyDrift(drift)).toContain("widens access");
+    });
+
+    it("does not invent drift when either side's mode is unreadable", async () => {
+        // An older server or a driver that hands back a shape we do not know
+        // must not turn into a wall of false positives.
+        const cols = [collection("authors")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+
+        const drift = await checkPolicyDrift(
+            dbWith(expected.map((p) => liveRow(p, { permissive: null }))),
+            cols
+        );
+
+        expect(drift.diverged).toHaveLength(0);
+        expect(hasDrift(drift)).toBe(false);
     });
 
     it("flags a policy the database never received as missing", async () => {

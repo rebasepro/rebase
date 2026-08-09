@@ -30,6 +30,20 @@ export interface PolicyRef {
     /** Whether a WITH CHECK clause is present at all (not what it says). */
     hasWithCheck: boolean;
     /**
+     * PERMISSIVE or RESTRICTIVE — the `AS` clause.
+     *
+     * An exact catalogue value on both sides, so it belongs with roles and
+     * command rather than with the expression text. It matters more than either:
+     * permissive policies are ORed together and restrictive ones ANDed, so a rule
+     * declared `mode: "restrictive"` whose live policy is PERMISSIVE has had its
+     * gate turned from a requirement into an alternative — the maximally
+     * permissive way for this to be wrong.
+     *
+     * The DDL regex captured this from the start and the destructuring threw it
+     * away; `pg_policies.permissive` was never selected.
+     */
+    mode?: "PERMISSIVE" | "RESTRICTIVE";
+    /**
      * The live clause text, when read from `pg_policies`. Present only for live
      * policies (the expected side is parsed from DDL and does not carry it).
      * Used solely for the insecure-tautology scan, not for divergence — Postgres
@@ -59,6 +73,22 @@ export interface PolicyDrift {
      * @see reason  a sentence naming the clause and what to do.
      */
     insecure: { policy: PolicyRef; reason: string }[];
+    /**
+     * A table the collections describe whose RLS switch is off.
+     *
+     * `ALTER TABLE posts DISABLE ROW LEVEL SECURITY` leaves every row in
+     * `pg_policies` untouched, so before this category every expected policy
+     * still matched on name, roles, command and clause presence and the checker
+     * reported clean — on a table Postgres was applying no filter to at all.
+     * Requests run as `rebase_user`, which holds full DML, so the table is wide
+     * open while `doctor` certifies it.
+     *
+     * `forced` reports `relforcerowsecurity`, which is what also subjects the
+     * table's *owner* to its policies. Its absence is not drift on its own —
+     * Rebase does not connect as the owner in the request path — so it is
+     * reported for context rather than raised as a failure.
+     */
+    rlsDisabled: { schema: string; table: string; forced: boolean }[];
 }
 
 export interface Queryable {
@@ -98,11 +128,29 @@ function clauseEnd(ddl: string, open: number): number {
     return ddl.length;
 }
 
+/**
+ * `AS PERMISSIVE` / `AS RESTRICTIVE` from either side, or undefined.
+ *
+ * The DDL spells it as a bare word; `pg_policies.permissive` is the string
+ * `"PERMISSIVE"`/`"RESTRICTIVE"` on modern Postgres but a boolean on some
+ * drivers and older servers, so both are accepted. Anything unrecognised
+ * becomes `undefined` and the comparison below skips it rather than inventing
+ * drift from a shape we did not anticipate.
+ */
+function normalizeMode(raw: unknown): "PERMISSIVE" | "RESTRICTIVE" | undefined {
+    if (typeof raw === "boolean") return raw ? "PERMISSIVE" : "RESTRICTIVE";
+    if (typeof raw !== "string") return undefined;
+    const upper = raw.trim().toUpperCase();
+    if (upper === "PERMISSIVE" || upper === "TRUE" || upper === "T") return "PERMISSIVE";
+    if (upper === "RESTRICTIVE" || upper === "FALSE" || upper === "F") return "RESTRICTIVE";
+    return undefined;
+}
+
 /** Parse the generated DDL rather than rebuilding the shape by hand. */
 export function parseExpectedPolicies(ddl: string): PolicyRef[] {
     const found: PolicyRef[] = [];
     for (const m of ddl.matchAll(CREATE_POLICY)) {
-        const [, name, schema, table, , command, rolesRaw, clause] = m;
+        const [, name, schema, table, modeRaw, command, rolesRaw, clause] = m;
         const roles = rolesRaw
             .split(",")
             .map((r) => r.trim().replace(/^"|"$/g, ""))
@@ -115,7 +163,12 @@ export function parseExpectedPolicies(ddl: string): PolicyRef[] {
             ? WITH_CHECK_NEXT.test(ddl.slice(clauseEnd(ddl, m.index + m[0].length)))
             : /WITH CHECK/i.test(clause);
 
-        found.push({ schema, table, name, roles, command: command.toUpperCase(), hasUsing, hasWithCheck });
+        found.push({
+            schema, table, name, roles,
+            command: command.toUpperCase(),
+            hasUsing, hasWithCheck,
+            mode: normalizeMode(modeRaw)
+        });
     }
     return found;
 }
@@ -123,9 +176,9 @@ export function parseExpectedPolicies(ddl: string): PolicyRef[] {
 async function readLivePolicies(client: Queryable, schemas: string[]): Promise<PolicyRef[]> {
     const { rows } = await client.query<{
         schemaname: string; tablename: string; policyname: string; roles: string[] | string; cmd: string;
-        qual: string | null; with_check: string | null;
+        qual: string | null; with_check: string | null; permissive: string | boolean | null;
     }>(
-        `SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check
+        `SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check, permissive
          FROM pg_policies
          WHERE schemaname = ANY($1)`,
         [schemas]
@@ -144,9 +197,49 @@ async function readLivePolicies(client: Queryable, schemas: string[]): Promise<P
         // drop a clause: NULL here means the policy genuinely has none.
         hasUsing: r.qual != null,
         hasWithCheck: r.with_check != null,
+        mode: normalizeMode(r.permissive),
         qual: r.qual,
         withCheck: r.with_check
     }));
+}
+
+/**
+ * Tables the collections describe whose RLS switch is off.
+ *
+ * Read from `pg_class` because `pg_policies` cannot answer it: disabling RLS
+ * leaves the policy rows in place, so every other comparison in this file keeps
+ * matching while Postgres applies none of them.
+ *
+ * Only tables that expect at least one policy are considered. A table with no
+ * declared rules is not asserting anything about RLS, and reporting it would
+ * make the check noisy on exactly the projects least able to judge the noise.
+ */
+async function readTablesWithRlsOff(
+    client: Queryable,
+    tables: { schema: string; table: string }[]
+): Promise<{ schema: string; table: string; forced: boolean }[]> {
+    if (tables.length === 0) return [];
+    const { rows } = await client.query<{
+        schemaname: string; tablename: string; relrowsecurity: boolean; relforcerowsecurity: boolean;
+    }>(
+        `SELECT n.nspname AS schemaname,
+                c.relname AS tablename,
+                c.relrowsecurity,
+                c.relforcerowsecurity
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relkind = 'r'
+            AND (n.nspname || '.' || c.relname) = ANY($1)`,
+        [tables.map((t) => `${t.schema}.${t.table}`)]
+    );
+
+    return rows
+        .filter((r) => !r.relrowsecurity)
+        .map((r) => ({
+            schema: r.schemaname,
+            table: r.tablename,
+            forced: !!r.relforcerowsecurity
+        }));
 }
 
 /**
@@ -195,13 +288,21 @@ export async function checkPolicyDrift(
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.
-    if (schemas.length === 0) return { missing: [], orphaned: [], diverged: [], insecure: [] };
+    if (schemas.length === 0) return { missing: [], orphaned: [], diverged: [], insecure: [], rlsDisabled: [] };
 
     const live = await readLivePolicies(client, schemas);
     const liveByKey = new Map(live.map((p) => [keyOf(p), p]));
     const expectedByKey = new Map(expected.map((p) => [keyOf(p), p]));
 
-    const drift: PolicyDrift = { missing: [], orphaned: [], diverged: [], insecure: [] };
+    const drift: PolicyDrift = { missing: [], orphaned: [], diverged: [], insecure: [], rlsDisabled: [] };
+
+    // Before comparing policy against policy: is the switch even on? A table
+    // with RLS disabled matches every expected policy on every field compared
+    // below, so this has to be asked separately or it cannot be asked at all.
+    const expectedTables = [...new Map(
+        expected.map((p) => [`${p.schema}.${p.table}`, { schema: p.schema, table: p.table }])
+    ).values()];
+    drift.rlsDisabled = await readTablesWithRlsOff(client, expectedTables);
 
     // Scan every live policy for the permissive tautology. This is deliberately
     // independent of the name-keyed diff below: a database pushed before the
@@ -233,6 +334,16 @@ export async function checkPolicyDrift(
         }
         if (want.command !== got.command) {
             differences.push(`command: expected ${want.command}, database has ${got.command}`);
+        }
+        // Skipped when either side is unknown: an unrecognised catalogue shape
+        // should not manufacture drift. See `normalizeMode`.
+        if (want.mode && got.mode && want.mode !== got.mode) {
+            differences.push(
+                `mode: expected ${want.mode}, database has ${got.mode}` +
+                (got.mode === "PERMISSIVE"
+                    ? " — a RESTRICTIVE rule is ANDed with the others, a PERMISSIVE one is ORed, so this policy now widens access instead of narrowing it"
+                    : " — a PERMISSIVE rule is ORed with the others, a RESTRICTIVE one is ANDed, so this policy now narrows access instead of widening it")
+            );
         }
         for (const clause of ["USING", "WITH CHECK"] as const) {
             const key = clause === "USING" ? "hasUsing" : "hasWithCheck";
@@ -308,13 +419,24 @@ export async function dropOrphanedPolicies(
 }
 
 export const hasDrift = (d: PolicyDrift): boolean =>
-    d.missing.length > 0 || d.orphaned.length > 0 || d.diverged.length > 0 || d.insecure.length > 0;
+    d.missing.length > 0 || d.orphaned.length > 0 || d.diverged.length > 0 || d.insecure.length > 0
+    || d.rlsDisabled.length > 0;
 
 /** Human-readable report; empty string when the database matches the config. */
 export function formatPolicyDrift(drift: PolicyDrift): string {
     if (!hasDrift(drift)) return "";
     const lines: string[] = [];
 
+    // First, because it subsumes every other finding on the same table: if RLS
+    // is off, the policies listed below are not being applied at all.
+    if (drift.rlsDisabled.length > 0) {
+        lines.push("  RLS DISABLED — the table has policies, and Postgres is applying none of them:");
+        for (const t of drift.rlsDisabled) {
+            lines.push(`    • ${t.schema}.${t.table}${t.forced ? "" : " (and FORCE is off)"}`);
+        }
+        lines.push("    Every row is readable and writable by any request that reaches the table.");
+        lines.push(`    Fix: ALTER TABLE "<schema>"."<table>" ENABLE ROW LEVEL SECURITY; or re-run \`rebase db push\`.`);
+    }
     if (drift.missing.length > 0) {
         lines.push("  Missing — described by your collections, absent from the database:");
         for (const p of drift.missing) lines.push(`    • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`);
