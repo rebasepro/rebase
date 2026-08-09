@@ -269,6 +269,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
         if (type === "string" || type === "number") {
             return <TextField
                 key={type}
+                aria-label={fieldKey ? `${t("value")}: ${fieldKey}` : t("value")}
                 placeholder={"value"}
                 value={entryValue as string | number | undefined}
                 type={type === "number" ? "number" : "text"}
@@ -390,6 +391,7 @@ function MapKeyValueRow<T extends Record<string, unknown>>({
                 <div className="w-[300px] max-w-[30%]">
                     <TextField
                         value={fieldKey}
+                        aria-label={t("key")}
                         placeholder={"key"}
                         disabled={disabled || (entryValue !== undefined && entryValue !== null && entryValue !== "")}
                         size={"medium"}
@@ -459,6 +461,7 @@ function ArrayKeyValueRow<T>({
     function buildInput(entryValue: unknown, type: DataType) {
         if (type === "string" || type === "number") {
             return <TextField value={entryValue as string | number | undefined}
+                              aria-label={`Value ${index + 1}`}
                               type={type === "number" ? "number" : "text"}
                               size={"medium"}
                               onChange={(event) => {

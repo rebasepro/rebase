@@ -212,6 +212,7 @@ export function LogsExplorer() {
                 </Select>
                 <TextField
                     size="small"
+                    aria-label="Search logs"
                     placeholder="Search logs..."
                     value={searchInput}
                     onChange={e => setSearchInput(e.target.value)}

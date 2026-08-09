@@ -275,6 +275,7 @@ function DefaultDatabaseField({
         side={"top"}
         align={"start"}>
         <TextField size={"small"}
+            aria-label={"Database ID"}
             invisible={true}
             inputClassName={"text-end"}
             disabled={disabled}

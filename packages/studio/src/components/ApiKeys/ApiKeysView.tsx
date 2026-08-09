@@ -478,6 +478,7 @@ function CreateApiKeyDialog({ onClose, onCreated }: { onClose: () => void; onCre
                             <div key={idx} className={cls("flex items-center gap-2 p-2 rounded-lg border", defaultBorderMixin)}>
                                 <TextField
                                     size="small"
+                                    aria-label={`Permission ${idx + 1} collection`}
                                     value={row.collection}
                                     onChange={(e) => updateRow(idx, "collection", e.target.value)}
                                     placeholder="Collection slug or *"

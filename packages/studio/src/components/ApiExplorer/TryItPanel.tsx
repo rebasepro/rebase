@@ -244,6 +244,7 @@ value: "" }])}
                         <TextField
                             multiline
                             minRows={10}
+                            aria-label="Request Body"
                             value={body}
                             onChange={(e) => { setBody(e.target.value); setValidationError(null); }}
                             spellCheck={false}
@@ -341,6 +342,7 @@ function ParamSection({
     values: Record<string, string>;
     onChange: (_key: string, _value: string) => void;
 }) {
+    const paramIdBase = React.useId();
     return (
         <div>
             <Typography
@@ -350,13 +352,14 @@ function ParamSection({
                 {title}
             </Typography>
             <div className="space-y-2">
-                {params.map((p) => (
+                {params.map((p, index) => (
                     <div key={p.name} className="flex items-center gap-3">
-                        <label className="w-32 shrink-0">
+                        <label className="w-32 shrink-0" htmlFor={`${paramIdBase}-${index}-param`}>
                             <code className="text-xs font-mono font-semibold">{p.name}</code>
                             {p.required && <span className="text-red-500 ml-0.5 text-xs">*</span>}
                         </label>
                         <TextField
+                            id={`${paramIdBase}-${index}-param`}
                             size="small"
                             placeholder={p.description ?? p.name}
                             value={values[p.name] ?? ""}
@@ -408,6 +411,7 @@ function CustomKeyValueSection({
                     <div key={i} className="flex items-center gap-2">
                         <TextField
                             size="small"
+                            aria-label={`Header ${i + 1} name`}
                             placeholder="Header name"
                             value={v.key}
                             onChange={(e) => onChange(i, e.target.value, v.value)}
@@ -416,6 +420,7 @@ function CustomKeyValueSection({
                         />
                         <TextField
                             size="small"
+                            aria-label={`Header ${i + 1} value`}
                             placeholder="Value"
                             value={v.value}
                             onChange={(e) => onChange(i, v.key, e.target.value)}

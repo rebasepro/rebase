@@ -442,7 +442,7 @@ function InlinePolicyEditor({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Policy Name</Typography>
-                            <TextField value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
+                            <TextField aria-label="Policy Name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Behavior</Typography>
@@ -484,7 +484,7 @@ function InlinePolicyEditor({
                             </Typography>
                         )}
                         <div className="flex gap-2 items-center">
-                            <TextField size="small" value={customRole}
+                            <TextField size="small" aria-label="Add a custom role" value={customRole}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCustomRole(e.target.value)}
                                 onKeyDown={(e: React.KeyboardEvent) => {
                                     if (e.key === "Enter") {
@@ -502,13 +502,13 @@ function InlinePolicyEditor({
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">USING expression</Typography>
-                            <TextField value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <TextField aria-label="USING expression" value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">WITH CHECK expression</Typography>
-                            <TextField value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <TextField aria-label="WITH CHECK expression" value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                 </Paper>

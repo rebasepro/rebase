@@ -90,6 +90,7 @@ export const LinkSelector = ({
                 <TextField
                     inputRef={inputRef}
                     autoFocus={open}
+                    aria-label={t("editor_paste_or_type_link")}
                     placeholder={t("editor_paste_or_type_link")}
                     defaultValue={href}
                     size="small"

@@ -60,6 +60,10 @@ export function DateTimeFieldBinding({
                         required={property.validation?.required}
                         className={showError ? "text-red-500 dark:text-red-500" : "text-text-secondary dark:text-text-secondary-dark"}
                         title={property.name ?? propertyKey}/>}
+                    // The entity form sets `hideLabel` for every field FieldBlock
+                    // labels on its behalf, and FieldBlock's label is a <span> that
+                    // points at nothing — so without this the control is nameless.
+                    aria-label={hideLabel ? (property.name ?? propertyKey) : undefined}
                 />
             </PropertyIdCopyTooltip>
 

@@ -118,7 +118,11 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 {...(inputProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
                 ref={inputRef}
                 id={inputId}
-                aria-labelledby={label ? labelId : undefined}
+                // Falls back to the caller's own value rather than to `undefined`:
+                // this sits after the spread, so hardcoding `undefined` silently
+                // erased an `aria-labelledby` a consumer had passed, and the
+                // unlabelled field it was meant to name stayed unnamed.
+                aria-labelledby={label ? labelId : inputProps["aria-labelledby"]}
                 aria-invalid={error || undefined}
                 aria-disabled={disabled || undefined}
                 placeholder={focused || hasValue || !label ? placeholder : undefined}
@@ -142,7 +146,9 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 {...inputProps}
                 ref={inputRef}
                 id={inputId}
-                aria-labelledby={label ? labelId : undefined}
+                // See the textarea branch: preserve a caller-supplied
+                // `aria-labelledby` instead of overwriting it with `undefined`.
+                aria-labelledby={label ? labelId : inputProps["aria-labelledby"]}
                 aria-invalid={error || undefined}
                 aria-disabled={disabled || undefined}
                 disabled={disabled}

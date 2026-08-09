@@ -97,6 +97,22 @@ export function TextFieldBinding<T extends string | number>({
                 required={property.validation?.required || property.isId === true}
                 title={property.name ?? propertyKey}/>
         );
+
+    // The control needs a name of its own in two cases, and between them they
+    // cover every text field in an entity form:
+    //
+    //  - `hideLabel`, which the form sets for anything FieldBlock labels for it
+    //    (`hideLabel: !selfLabelling`). FieldBlock draws the name in a <span>
+    //    inside a <div> — not a <label>, and pointing at nothing — so suppressing
+    //    the field's own label left the input with no accessible name at all and
+    //    a screen reader fell back to reading its value back to you.
+    //  - the multiline branch below, which never associated anything: its label
+    //    is a decorative absolutely-positioned <div>, so it is unnamed whether or
+    //    not the form also drew one.
+    //
+    // The single-line TextField is already handled by the kit when a label is
+    // present — it wires `aria-labelledby` — so it only needs this as a fallback.
+    const accessibleName = property.name ?? propertyKey;
     return (<>
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 {isMultiline ? (
@@ -115,6 +131,7 @@ export function TextFieldBinding<T extends string | number>({
                             onChange={onChange}
                             autoFocus={autoFocus}
                             disabled={disabled}
+                            aria-label={accessibleName}
                             className={cls(
                                 "rounded-md resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
                                 label ? "pt-8 pb-2" : "py-2",
@@ -138,6 +155,7 @@ export function TextFieldBinding<T extends string | number>({
                         onChange={onChange}
                         autoFocus={autoFocus}
                         label={label}
+                        aria-label={label ? undefined : accessibleName}
                         type={inputType}
                         disabled={disabled}
                         endAdornment={
