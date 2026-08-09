@@ -106,6 +106,17 @@ export interface RebaseAuthConfig {
      */
     disableSelfRegistration?: boolean;
     /**
+     * Opt-in: allow `POST /auth/anonymous` to mint a user with no credentials.
+     *
+     * Off by default. Anonymous sign-in inserts a `users` row and assigns
+     * `defaultRole` exactly as registration does, so leaving it always-on meant
+     * a backend with `allowRegistration: false` and `disableSelfRegistration:
+     * true` still handed out permanent accounts: `/auth/anonymous` for the row
+     * and the session, then `/auth/anonymous/link` to put an email and password
+     * on it. `disableSelfRegistration` overrides this key.
+     */
+    allowAnonymous?: boolean;
+    /**
      * Opt-in: expose `POST /auth/find-user` so an authenticated user can resolve
      * an email address to a minimal public profile (`uid`, `displayName`,
      * `photoURL` only). This powers invite-by-email flows without a custom
@@ -1065,6 +1076,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 emailConfig: safeAuthConfig.email,
                 allowRegistration: safeAuthConfig.allowRegistration ?? false,
                 disableSelfRegistration: safeAuthConfig.disableSelfRegistration ?? false,
+                allowAnonymous: safeAuthConfig.allowAnonymous ?? false,
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,

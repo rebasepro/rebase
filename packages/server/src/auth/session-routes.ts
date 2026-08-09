@@ -12,7 +12,7 @@ import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie } from "./cookie-utils";
-import { isRegistrationOpen } from "./registration-policy";
+import { isAnonymousAuthOpen, isRegistrationOpen } from "./registration-policy";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
 
@@ -44,6 +44,28 @@ interface SessionRoutesConfig {
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
     const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = opts;
     const authRepo = config.authRepo;
+
+    /**
+     * Refuse the anonymous routes unless the deployment opted in.
+     *
+     * 403 rather than 404: the route exists, and a client that was told
+     * `anonymousLogin: true` by `GET /auth/config` and then sees a 404 has no
+     * way to tell a disabled feature from a version skew. The error names the
+     * key, because the failure this closes was an operator believing they had
+     * already switched registration off.
+     */
+    function assertAnonymousAuthOpen(): void {
+        if (isAnonymousAuthOpen({
+            allowAnonymous: config.allowAnonymous,
+            disableSelfRegistration: config.disableSelfRegistration
+        })) return;
+        throw ApiError.forbidden(
+            config.disableSelfRegistration
+                ? "Anonymous sign-in is disabled: disableSelfRegistration blocks it."
+                : "Anonymous sign-in is disabled. Set `auth.allowAnonymous: true` to enable it.",
+            "ANONYMOUS_AUTH_DISABLED"
+        );
+    }
 
     const logoutSchema = z.object({
         refreshToken: z.string().optional()
@@ -348,6 +370,12 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             registrationEnabled: registrationAllowed,
             emailServiceEnabled: isEmailConfigured(),
             magicLinkEnabled: !!config.enableMagicLink && isEmailConfigured(),
+            // A capability that exists and is not in the capability surface is
+            // how a client ends up calling a route it cannot discover is off.
+            anonymousLoginEnabled: isAnonymousAuthOpen({
+                allowAnonymous: config.allowAnonymous,
+                disableSelfRegistration: config.disableSelfRegistration
+            }),
             enabledProviders
         });
     });
@@ -357,6 +385,8 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Create an anonymous user with temporary credentials
      */
     router.post("/anonymous", strictAuthLimiter, async (c) => {
+        assertAnonymousAuthOpen();
+
         // `email` is NOT NULL, so an anonymous user needs a synthetic address —
         // and it lands under a unique index, which makes the width of this
         // string a correctness property rather than cosmetics. It used to keep 8
@@ -416,7 +446,14 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * POST /auth/anonymous/link
      * Upgrade an anonymous user to a permanent account with email/password
      */
-    router.post("/anonymous/link", requireAuth, async (c) => {
+    router.post("/anonymous/link", strictAuthLimiter, requireAuth, async (c) => {
+        // Gated on the same predicate as `/anonymous`, not on registration: this
+        // route cannot create an account, only put credentials on one that
+        // `/anonymous` already made. If anonymous auth is off, any session
+        // reaching here predates the switch, and letting it finish would be a
+        // second way to reach the state the switch exists to prevent.
+        assertAnonymousAuthOpen();
+
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");

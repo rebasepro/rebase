@@ -112,6 +112,13 @@ export interface AuthAdapterCapabilities {
     emailVerification: boolean;
     /** Supports passwordless magic link login. */
     magicLink: boolean;
+    /**
+     * Whether `POST /auth/anonymous` will mint a credential-less session.
+     *
+     * Optional so an external adapter that predates the key keeps typechecking;
+     * absent means "this adapter does not offer anonymous sign-in".
+     */
+    anonymousLogin?: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
     enabledProviders: string[];
 

@@ -28,7 +28,7 @@ import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
-import { isRegistrationOpen } from "./registration-policy";
+import { isAnonymousAuthOpen, isRegistrationOpen } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
@@ -68,6 +68,15 @@ export interface BuiltinAuthAdapterConfig {
      * wiring path a real backend uses).
      */
     disableSelfRegistration?: boolean;
+    /**
+     * Opt-in: allow `POST /auth/anonymous` to mint a user without credentials.
+     *
+     * Off by default, and overridden by `disableSelfRegistration`. Anonymous
+     * sign-in inserts a `users` row and assigns `defaultRole` exactly as
+     * registration does, so before this key existed a closed backend still
+     * handed out permanent accounts via `/auth/anonymous` + `/auth/anonymous/link`.
+     */
+    allowAnonymous?: boolean;
     /** Whether to expose the authenticated email→minimal-profile lookup route. */
     allowUserLookup?: boolean;
     /** Default role to assign to new users. */
@@ -102,6 +111,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         emailConfig,
         allowRegistration = false,
         disableSelfRegistration = false,
+        allowAnonymous = false,
         allowUserLookup = false,
         defaultRole,
         oauthProviders = [],
@@ -230,6 +240,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 allowRegistration,
                 disableSelfRegistration,
+                allowAnonymous,
                 allowUserLookup,
                 defaultRole,
                 oauthProviders,
@@ -331,6 +342,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowRegistration,
                 needsSetup
             });
+            const anonymousAllowed = isAnonymousAuthOpen({
+                allowAnonymous,
+                disableSelfRegistration
+            });
 
             return {
                 hasBuiltInAuthRoutes: true,
@@ -346,6 +361,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 profileUpdate: true,
                 emailVerification: !!emailService?.isConfigured(),
                 magicLink: enableMagicLink && !!emailService?.isConfigured(),
+                // Anonymous auth was reachable and undiscoverable: no key turned
+                // it off and no capability announced it was on.
+                anonymousLogin: anonymousAllowed,
                 enabledProviders,
                 needsSetup
             };
