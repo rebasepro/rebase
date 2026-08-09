@@ -4,9 +4,14 @@ export * from "./Icon";
 export * from "./GitHubIcon";
 export * from "./HandleIcon";
 
-// Re-export types and the full icons map from lucide-react.
+// Re-export types from lucide-react. Types only: the full `icons` map used to
+// be re-exported here as `lucideIcons`, and because that map holds a reference
+// to every icon in the library, exporting it defeated tree-shaking outright —
+// 822 kB of icon components in the entry chunk, preloaded before login. Name
+// lookups go through `LucideIconByName` / `loadLucideIcons` now, which fetch
+// the map on first use.
 export type { LucideProps, LucideIcon } from "lucide-react";
-export { icons as lucideIcons } from "lucide-react";
+export * from "./LucideIconByName";
 
 // Re-export individual icon components used across the monorepo.
 // Sub-packages import these from @rebasepro/ui instead of declaring a direct

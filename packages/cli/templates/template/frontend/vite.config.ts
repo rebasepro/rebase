@@ -36,7 +36,28 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks(id) {
-                    // Heavy vendor libraries — split into individually cached chunks
+                    // Heavy vendor libraries — split into individually cached chunks.
+                    //
+                    // A name here says these modules travel TOGETHER. It does not
+                    // say they travel late: a chunk becomes a static dependency of
+                    // the entry — and so a `modulepreload` in index.html — the
+                    // moment any one module in it is statically reachable. Naming
+                    // a library that is only partly lazy therefore drags the lazy
+                    // part onto the critical path. Read the two exceptions below
+                    // before adding a line.
+
+                    // @rollup/plugin-commonjs emits its shared helpers as two
+                    // virtual modules ("\0commonjsHelpers.js" and
+                    // "\0commonjs-dynamic-modules") that every CommonJS
+                    // dependency reaches, the entry's included. They match no
+                    // rule below, so Rollup parks them in one of the chunks
+                    // that use them — and it chose `vendor-exceljs`, which
+                    // meant the entry statically imported 940 kB of
+                    // spreadsheet reader to get a ten-line `require` shim.
+                    // Give the helpers a chunk of their own so they can never
+                    // anchor a heavy one to the critical path.
+                    if (id.includes("commonjsHelpers") || id.includes("commonjs-dynamic-modules")) return "vendor-commonjs-helpers";
+
                     if (id.includes("exceljs")) return "vendor-exceljs";
                     if (id.includes("prosemirror")) return "vendor-prosemirror";
                     if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "vendor-monaco";
@@ -45,6 +66,10 @@ export default defineConfig({
                     if (id.includes("prism-react-renderer")) return "vendor-prism";
                     if (id.includes("markdown-it")) return "vendor-markdown";
                     if (id.includes("react-dropzone")) return "vendor-dropzone";
+                    // date-fns core only. The ~77 locales are imported one at a
+                    // time by the admin's date preview; sharing a chunk name with
+                    // the core would make all of them eager again.
+                    if (id.includes("date-fns/locale")) return undefined;
                     if (id.includes("date-fns")) return "vendor-datefns";
                     if (id.includes("fuse.js")) return "vendor-fuse";
                     if (id.includes("node_modules/react-dom/")) return "vendor-react-dom";
@@ -56,7 +81,13 @@ export default defineConfig({
                     if (id.includes("node_modules/@floating-ui/")) return "vendor-floating-ui";
                     if (id.includes("node_modules/tailwind-merge/")) return "vendor-tailwind-merge";
                     if (id.includes("node_modules/notistack/")) return "vendor-notistack";
-                    if (id.includes("node_modules/lucide-react/")) return "vendor-lucide-react";
+
+                    // lucide-react has no line on purpose. The ~130 icons the
+                    // chrome imports by name are static; the by-name lookup map
+                    // is fetched on demand. One chunk name cannot hold both apart,
+                    // and naming it welded 822 kB of icons into the preload set.
+                    // Left to Rollup, the named icons land in the entry and the
+                    // map gets its own async chunk.
 
                     return undefined;
                 }

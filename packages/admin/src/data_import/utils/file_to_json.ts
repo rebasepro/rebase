@@ -1,4 +1,3 @@
-import ExcelJS from "exceljs";
 import { getWorksheetHeaders } from "./file_headers";
 import { mapJsonParse, unflattenObject } from "./transforms";
 import { parseCsvToObjects } from "./csv";
@@ -10,6 +9,31 @@ export { unflattenObject } from "./transforms";
 type ConversionResult = {
     data: object[];
     propertiesOrder: string[]
+}
+
+/**
+ * ExcelJS, fetched the first time somebody actually opens a workbook.
+ *
+ * It was a top-level `import ExcelJS from "exceljs"`, and that one line put
+ * 940 kB of spreadsheet reader into the admin's entry chunk — preloaded on the
+ * login screen, before anyone has authenticated, let alone clicked Import.
+ * `CollectionViewActions` lazy-loads the import and export actions and says so
+ * in a comment, but the package's own barrel (`src/index.ts` re-exports
+ * `./data_import`) puts this module back in the entry's static graph, so the
+ * `lazy()` bought nothing. A static import inside a module the barrel reaches
+ * is eager no matter what the component above it does; the only thing that
+ * makes a dependency lazy is importing it lazily, here.
+ */
+type ExcelJsModule = typeof import("exceljs");
+
+let excelJsModule: Promise<ExcelJsModule> | undefined;
+
+function loadExcelJs(): Promise<ExcelJsModule> {
+    // exceljs is CommonJS, so the namespace a bundler hands back wraps the real
+    // module under `default`. Native ESM (and the type declarations) put the
+    // members at the top level. Accept either.
+    excelJsModule ??= import("exceljs").then(mod => (mod as { default?: ExcelJsModule }).default ?? mod);
+    return excelJsModule;
 }
 
 /**
@@ -86,6 +110,7 @@ export function convertFileToJson(file: File): Promise<ConversionResult> {
             reader.onload = async function (e) {
                 try {
                     const buffer = e.target?.result as ArrayBuffer;
+                    const ExcelJS = await loadExcelJs();
                     const workbook = new ExcelJS.Workbook();
                     await workbook.xlsx.load(buffer);
                     const worksheet = workbook.worksheets[0];
