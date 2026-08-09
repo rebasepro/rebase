@@ -326,6 +326,14 @@ export class FetchService {
                         );
                     }
                 } catch (e) {
+                    // A relation that failed to load is not a relation that is absent.
+                    // Without this the request answers 200 with the field quietly
+                    // missing — and because a Postgres error poisons the surrounding
+                    // transaction, every later relation in the same request is
+                    // swallowed too, so one failure becomes a response missing
+                    // several fields. Same guard the four other catches in this file
+                    // already use.
+                    if (reachedDatabase(e)) throw e;
                     logger.warn(`Could not resolve joinPath relation '${key}'`, { error: e });
                 }
             });
@@ -404,6 +412,14 @@ export class FetchService {
                     }
                 }
             } catch (e) {
+                // A relation that failed to load is not a relation that is absent.
+                // Without this the request answers 200 with the field quietly
+                // missing — and because a Postgres error poisons the surrounding
+                // transaction, every later relation in the same request is
+                // swallowed too, so one failure becomes a response missing
+                // several fields. Same guard the four other catches in this file
+                // already use.
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`Could not batch resolve joinPath relation '${key}' for REST`, { error: e });
             }
         }
@@ -727,6 +743,14 @@ idColumn };
                                 values[key] = createRelationRef(e.id, e.path);
                             }
                         } catch (e) {
+                            // A relation that failed to load is not a relation that is absent.
+                            // Without this the request answers 200 with the field quietly
+                            // missing — and because a Postgres error poisons the surrounding
+                            // transaction, every later relation in the same request is
+                            // swallowed too, so one failure becomes a response missing
+                            // several fields. Same guard the four other catches in this file
+                            // already use.
+                            if (reachedDatabase(e)) throw e;
                             logger.warn(`Could not resolve one-to-one relation property: ${key}`, { error: e });
                         }
                     }
@@ -998,6 +1022,14 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                         }
                     });
                 } catch (e) {
+                    // A relation that failed to load is not a relation that is absent.
+                    // Without this the request answers 200 with the field quietly
+                    // missing — and because a Postgres error poisons the surrounding
+                    // transaction, every later relation in the same request is
+                    // swallowed too, so one failure becomes a response missing
+                    // several fields. Same guard the four other catches in this file
+                    // already use.
+                    if (reachedDatabase(e)) throw e;
                     logger.warn(`Could not batch load one-to-one relation property: ${key}`, { error: e });
                 }
             }
@@ -1025,6 +1057,14 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                         );
                     });
                 } catch (e) {
+                    // A relation that failed to load is not a relation that is absent.
+                    // Without this the request answers 200 with the field quietly
+                    // missing — and because a Postgres error poisons the surrounding
+                    // transaction, every later relation in the same request is
+                    // swallowed too, so one failure becomes a response missing
+                    // several fields. Same guard the four other catches in this file
+                    // already use.
+                    if (reachedDatabase(e)) throw e;
                     logger.warn(`Could not batch load many relation property: ${key}`, { error: e });
                 }
             }
@@ -1324,6 +1364,14 @@ relatedTo: hop }, include
                     }
                 }
             } catch (e) {
+                // A relation that failed to load is not a relation that is absent.
+                // Without this the request answers 200 with the field quietly
+                // missing — and because a Postgres error poisons the surrounding
+                // transaction, every later relation in the same request is
+                // swallowed too, so one failure becomes a response missing
+                // several fields. Same guard the four other catches in this file
+                // already use.
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[include] Failed to batch load one-to-one '${key}'`, { error: e });
             }
         }
@@ -1340,6 +1388,14 @@ relatedTo: hop }, include
                     (row as Record<string, unknown>)[key] = relatedList;
                 }
             } catch (e) {
+                // A relation that failed to load is not a relation that is absent.
+                // Without this the request answers 200 with the field quietly
+                // missing — and because a Postgres error poisons the surrounding
+                // transaction, every later relation in the same request is
+                // swallowed too, so one failure becomes a response missing
+                // several fields. Same guard the four other catches in this file
+                // already use.
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[include] Failed to batch load many '${key}'`, { error: e });
             }
         }
@@ -1448,6 +1504,14 @@ relatedTo: hop }, include
                     }));
                 }
             } catch (e) {
+                // A relation that failed to load is not a relation that is absent.
+                // Without this the request answers 200 with the field quietly
+                // missing — and because a Postgres error poisons the surrounding
+                // transaction, every later relation in the same request is
+                // swallowed too, so one failure becomes a response missing
+                // several fields. Same guard the four other catches in this file
+                // already use.
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[include] Failed to load relation '${key}'`, { error: e });
             }
         }
