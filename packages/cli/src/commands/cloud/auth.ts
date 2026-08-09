@@ -15,7 +15,11 @@ import {
     success,
     fail,
     keyValues,
-    reportError
+    reportError,
+    emit,
+    note,
+    noteBlank,
+    requireInteractive
 } from "./context";
 
 export async function loginCommand(rawArgs: string[]): Promise<void> {
@@ -28,11 +32,16 @@ permissive: true }
     );
     const url = resolveCloudUrl(rawArgs);
 
-    console.log("");
-    console.log(`  Signing in to ${chalk.cyan(url)}`);
-    console.log("");
+    noteBlank();
+    note(`Signing in to ${chalk.cyan(url)}`);
+    noteBlank();
 
-    // Collect any missing credentials interactively.
+    // Collect any missing credentials interactively — but only where a terminal
+    // can supply them. Piped, this used to hang on a password prompt.
+    if (!args["--email"] || !args["--password"]) {
+        requireInteractive("credentials", "--email and --password");
+    }
+
     const prompts: Array<Record<string, unknown>> = [];
     if (!args["--email"]) {
         prompts.push({ type: "input",
@@ -72,17 +81,27 @@ mask: "•" });
         }
 
         success(`Logged in as ${chalk.bold(user.email ?? email)}`);
-        keyValues([
-            ["Host", url],
-            ["User", user.email ?? undefined],
-            ["Active org", getContextOrg(url)]
-        ]);
-        console.log("");
+        emit(
+            () => {
+                keyValues([
+                    ["Host", url],
+                    ["User", user.email ?? undefined],
+                    ["Active org", getContextOrg(url)]
+                ]);
+                console.log("");
+            },
+            {
+                success: true,
+                host: url,
+                user: user.email ?? null,
+                activeOrg: getContextOrg(url) ?? null
+            }
+        );
     } catch (e) {
         // Auth failures are the common case — give a clean message, not a stack.
         const err = e as { status?: number; message?: string };
         if (err?.status === 401) {
-            fail("Invalid email or password.");
+            fail("Invalid email or password.", undefined, "invalid_credentials");
         }
         reportError(e, "Login failed");
     }
@@ -92,9 +111,19 @@ export async function logoutCommand(rawArgs: string[]): Promise<void> {
     const url = resolveCloudUrl(rawArgs);
     const client = createCloudClient(url);
     if (!client.auth.getSession()) {
-        console.log("");
-        console.log(chalk.gray(`  Not logged in to ${url}.`));
-        console.log("");
+        // Not an error: `logout` is idempotent and a script should be able to
+        // run it unconditionally. `wasLoggedIn` is how a caller tells the two
+        // outcomes apart without reading the prose.
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.gray(`  Not logged in to ${url}.`));
+                console.log("");
+            },
+            { success: true,
+host: url,
+wasLoggedIn: false }
+        );
         return;
     }
     try {
@@ -103,26 +132,52 @@ export async function logoutCommand(rawArgs: string[]): Promise<void> {
         // signOut clears local state even if the network call fails
     }
     success(`Logged out of ${url}`);
+    emit(() => {}, { success: true,
+host: url,
+wasLoggedIn: true });
 }
 
 export async function whoamiCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     try {
         const user = await client.auth.getUser();
-        if (!user) fail("Session is no longer valid.", "Run `rebase cloud login` again.");
+        if (!user) {
+            fail("Session is no longer valid.", "Run `rebase cloud login` again.", "session_invalid");
+        }
         const link = readLink();
-        console.log("");
-        console.log(chalk.bold("  🔐 Rebase Cloud session"));
-        console.log("");
-        keyValues([
-            ["Host", url],
-            ["User", user.email ?? undefined],
-            ["User ID", user.uid],
-            ["Roles", user.roles?.length ? user.roles.join(", ") : undefined],
-            ["Active org", getContextOrg(url)],
-            ["Linked project", link ? `${link.projectName ?? ""} (${link.projectId})`.trim() : undefined]
-        ]);
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold("  🔐 Rebase Cloud session"));
+                console.log("");
+                keyValues([
+                    ["Host", url],
+                    ["User", user.email ?? undefined],
+                    ["User ID", user.uid],
+                    ["Roles", user.roles?.length ? user.roles.join(", ") : undefined],
+                    ["Active org", getContextOrg(url)],
+                    [
+                        "Linked project",
+                        link ? `${link.projectName ?? ""} (${link.projectId})`.trim() : undefined
+                    ]
+                ]);
+                console.log("");
+            },
+            {
+                host: url,
+                user: {
+                    email: user.email ?? null,
+                    uid: user.uid,
+                    roles: user.roles ?? []
+                },
+                activeOrg: getContextOrg(url) ?? null,
+                linkedProject: link
+                    ? { id: link.projectId,
+name: link.projectName ?? null,
+slug: link.slug ?? null }
+                    : null
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to fetch session");
     }

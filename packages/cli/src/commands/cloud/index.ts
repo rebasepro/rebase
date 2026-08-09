@@ -30,7 +30,7 @@ import {
     billingCommand,
     printStorageHelp
 } from "./resources";
-import { requireProjectRef, initOutputMode, GLOBAL_CLOUD_FLAGS } from "./context";
+import { requireProjectRef, initOutputMode, emitHelp, fail, GLOBAL_CLOUD_FLAGS } from "./context";
 
 /**
  * Positional tokens after `rebase cloud` (group, action, …).
@@ -244,10 +244,17 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
 
         default:
-            console.error(chalk.red(`Unknown cloud command: ${group}`));
-            console.log("");
-            printCloudHelp();
-            process.exit(1);
+            // Through `fail`, like every other refusal in the family — and like
+            // the two group dispatchers below, which now match.
+            //
+            // It used to print a red line to stderr and then the ENTIRE help
+            // page to stdout before exiting 1. Two things wrong with that: a
+            // piped `rebase cloud typo` handed its caller ~60 lines of
+            // ANSI-coloured help where the contract promises one JSON value,
+            // and even on a terminal it put the remedy on the RESULTS stream of
+            // a command that produced no result. The hint names `--help`, which
+            // is the one command whose result the page actually is.
+            fail(`Unknown cloud command: ${group}`, "Run `rebase cloud --help`.", "unknown_command");
     }
 }
 
@@ -275,8 +282,7 @@ async function projectsGroup(action: string | undefined, rawArgs: string[]): Pro
             printCloudHelp();
             break;
         default:
-            console.error(chalk.red(`Unknown projects command: ${action}`));
-            process.exit(1);
+            fail(`Unknown projects command: ${action}`, "Run `rebase cloud --help`.", "unknown_command");
     }
 }
 
@@ -290,13 +296,33 @@ async function deploymentsGroup(action: string | undefined, rawArgs: string[]): 
             printCloudHelp();
             break;
         default:
-            console.error(chalk.red(`Unknown deployments command: ${action}`));
-            process.exit(1);
+            fail(`Unknown deployments command: ${action}`, "Run `rebase cloud --help`.", "unknown_command");
     }
 }
 
+/**
+ * Every group `cloudCommand` dispatches, canonical name first.
+ *
+ * This is the index page's JSON form, and the list an agent discovers the
+ * family from. `cloud-help.test.ts` holds it to the dispatch switch, so a group
+ * added there without being added here is a test failure rather than a
+ * command that exists but cannot be found.
+ */
+const CLOUD_GROUPS = [
+    "login", "logout", "whoami",
+    "link", "unlink", "use", "open",
+    "projects",
+    "deploy", "logs", "deployments", "rollback", "cancel",
+    "start", "stop", "restart", "status", "metrics", "debug",
+    "env", "domains", "extensions", "settings",
+    "orgs",
+    "db",
+    "webhooks", "storage", "clusters", "billing"
+];
+
 function printCloudHelp(): void {
-    console.log(`
+    emitHelp("cloud", CLOUD_GROUPS, () => {
+        console.log(`
 ${chalk.bold("rebase cloud")} — Manage your apps on Rebase Cloud
 
 ${chalk.green.bold("Usage")}
@@ -361,4 +387,5 @@ ${chalk.green.bold("Global options")}
 ${chalk.gray("Most commands act on the linked project (.rebase/cloud.json) unless --project is given.")}
 ${chalk.gray("Docs: https://rebase.pro/docs")}
 `);
+    });
 }

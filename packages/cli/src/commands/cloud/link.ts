@@ -20,7 +20,12 @@ import {
     openUrl,
     success,
     fail,
-    reportError
+    reportError,
+    emit,
+    note,
+    noteBlank,
+    warn,
+    requireInteractive
 } from "./context";
 
 interface ProjectRow {
@@ -48,12 +53,12 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
     try {
         base = new URL(target);
     } catch {
-        fail(`"${target}" is not a valid URL.`);
+        fail(`"${target}" is not a valid URL.`, undefined, "invalid_url");
         return;
     }
 
     if (base.protocol !== "http:" && base.protocol !== "https:") {
-        fail("A project URL must be http or https.");
+        fail("A project URL must be http or https.", undefined, "invalid_url");
     }
 
     const apiUrl = base.toString().replace(/\/+$/, "");
@@ -70,9 +75,15 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
     }
 
     if (!reachable) {
-        console.log(chalk.yellow(`⚠ Could not reach ${probe}${detail ? ` (${detail})` : ""}.`));
-        console.log(chalk.dim("  Linking anyway — the server may not be running yet."));
-        console.log(chalk.dim("  It must be a Rebase backend of version 0.11 or newer."));
+        // A real warning, not narration: the link is being written against an
+        // address that did not answer, and that is as worth saying when piped as
+        // when watched. It used to be `console.log(chalk.yellow(…))` — a caution
+        // rendered in warning colours on the results stream, which put it inside
+        // whatever a caller was parsing.
+        warn(
+            `Could not reach ${probe}${detail ? ` (${detail})` : ""}.`,
+            "Linking anyway — the server may not be running yet. It must be a Rebase backend of version 0.11 or newer."
+        );
     }
 
     writeLink({
@@ -84,9 +95,21 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
     });
 
     success(`Linked to ${apiUrl}`);
-    console.log(chalk.dim(`  Written to ${projectLinkPath()}`));
-    console.log("");
-    console.log(`Next: ${chalk.cyan("rebase generate-sdk --from link")}`);
+    emit(
+        () => {
+            note(chalk.dim(`Written to ${projectLinkPath()}`));
+            noteBlank();
+            note(`Next: ${chalk.cyan("rebase generate-sdk --from link")}`, "");
+        },
+        {
+            success: true,
+            mode: "direct",
+            apiUrl,
+            reachable,
+            projectName: base.host,
+            linkPath: projectLinkPath()
+        }
+    );
     void rawArgs;
 }
 
@@ -111,8 +134,13 @@ permissive: true });
         if (args["--project"]) {
             const projectId = await resolveProjectRef(args["--project"], client);
             project = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
-            if (!project) fail(`Project ${args["--project"]} not found.`);
+            if (!project) {
+                fail(`Project ${args["--project"]} not found.`, undefined, "project_not_found");
+            }
         } else {
+            // The picker needs a terminal. Without this, `rebase cloud link`
+            // run by an agent parked on a select prompt forever.
+            requireInteractive("a project to link", "--project <slug>");
             const org = getContextOrg(url);
             const projects = (await client.data.collection("projects").find({
                 where: org ? { organization: ["==", org] } : undefined,
@@ -122,7 +150,8 @@ permissive: true });
             if (projects.length === 0) {
                 fail(
                     "No projects found for your account.",
-                    `Create one with ${chalk.bold("rebase cloud projects create")}.`
+                    `Create one with ${chalk.bold("rebase cloud projects create")}.`,
+                    "no_projects"
                 );
             }
 
@@ -140,19 +169,34 @@ permissive: true });
             project = picked as ProjectRow;
         }
 
-        if (!project) fail("No project selected.");
+        if (!project) fail("No project selected.", undefined, "no_project");
 
+        const orgId = project.organization !== undefined ? String(project.organization) : undefined;
         writeLink({
             url,
             projectId: String(project.id),
             slug: project.subdomain,
             projectName: project.name,
-            orgId: project.organization !== undefined ? String(project.organization) : undefined
+            orgId
         });
 
         success(`Linked to ${chalk.bold(project.name ?? project.subdomain ?? "")}`);
-        console.log(chalk.gray(`  Wrote ${projectLinkPath()}`));
-        console.log("");
+        emit(
+            () => {
+                note(chalk.gray(`Wrote ${projectLinkPath()}`));
+                noteBlank();
+            },
+            {
+                success: true,
+                mode: "cloud",
+                host: url,
+                projectId: String(project.id),
+                slug: project.subdomain ?? null,
+                projectName: project.name ?? null,
+                org: orgId ?? null,
+                linkPath: projectLinkPath()
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to link project");
     }
@@ -161,13 +205,25 @@ permissive: true });
 export function unlinkCommand(): void {
     const link = readLink();
     if (!link) {
-        console.log("");
-        console.log(chalk.gray("  This directory is not linked to a cloud project."));
-        console.log("");
+        // Idempotent, like `logout`: `unlinked: false` is how a caller tells
+        // "there was nothing to remove" from "removed it".
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.gray("  This directory is not linked to a cloud project."));
+                console.log("");
+            },
+            { success: true,
+unlinked: false,
+linkPath: projectLinkPath() }
+        );
         return;
     }
     removeLink();
     success("Unlinked from cloud project");
+    emit(() => {}, { success: true,
+unlinked: true,
+linkPath: projectLinkPath() });
 }
 
 export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
@@ -182,13 +238,16 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
             slug?: string;
         }>;
 
-        if (orgs.length === 0) fail("You are not a member of any organization.");
+        if (orgs.length === 0) {
+            fail("You are not a member of any organization.", undefined, "no_orgs");
+        }
 
         let chosen = target
             ? orgs.find((o) => String(o.id) === target || o.slug === target)
             : undefined;
 
         if (!chosen && !target) {
+            requireInteractive("an organization", "rebase cloud use <org-id|slug>");
             const { picked } = await inquirer.prompt([
                 {
                     type: "select",
@@ -203,10 +262,17 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
             chosen = picked;
         }
 
-        if (!chosen) fail(`Organization "${target}" not found.`);
+        if (!chosen) fail(`Organization "${target}" not found.`, undefined, "org_not_found");
 
         setContextOrg(url, String(chosen.id));
         success(`Active organization set to ${chalk.bold(chosen.name ?? chosen.id)}`);
+        emit(() => {}, {
+            success: true,
+            host: url,
+            org: { id: String(chosen.id),
+name: chosen.name ?? null,
+slug: chosen.slug ?? null }
+        });
     } catch (e) {
         reportError(e, "Failed to set organization");
     }
@@ -218,4 +284,9 @@ export function openCommand(rawArgs: string[]): void {
     const link = readLink();
     const target = link ? `${url}/projects/${link.projectId}` : url;
     openUrl(target);
+    // The URL is the result. `openUrl` only narrates it (on stderr, and not at
+    // all in JSON mode), so it has to be emitted here or a piped `cloud open`
+    // produces nothing at all to act on.
+    emit(() => {}, { url: target,
+projectId: link?.projectId ?? null });
 }

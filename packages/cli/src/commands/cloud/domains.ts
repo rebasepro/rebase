@@ -19,6 +19,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
+    emitHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -252,7 +253,8 @@ projectId }
 }
 
 export function printDomainsHelp(): void {
-    console.log(`
+    emitHelp("domains", ["list", "add", "verify", "remove"], () => {
+        console.log(`
 ${chalk.bold("rebase cloud domains")} — Custom domain
 
 ${chalk.green.bold("Commands")}
@@ -265,4 +267,5 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--json")}                    Machine-readable output
   ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
+    });
 }

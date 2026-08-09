@@ -19,6 +19,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
+    emitHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -254,7 +255,8 @@ extensionName: name }, { path: "disable" });
 }
 
 export function printExtensionsHelp(): void {
-    console.log(`
+    emitHelp("extensions", ["list", "enable", "disable"], () => {
+        console.log(`
 ${chalk.bold("rebase cloud extensions")} — Postgres extensions
 
 ${chalk.green.bold("Commands")}
@@ -267,4 +269,5 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--json")}                    Machine-readable output
   ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 `);
+    });
 }

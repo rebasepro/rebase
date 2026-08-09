@@ -523,14 +523,21 @@ describe("cloud subcommand dispatch", () => {
         // No group at all: help, and nothing dispatched. The help printer uses
         // `console.log`, which vitest intercepts above `process.stdout.write`,
         // so the stdout shim the rest of this file uses would see nothing.
+        // No group at all: the index, and nothing dispatched. Under vitest
+        // stdout is not a TTY, so `initOutputMode` latches JSON — and the index
+        // answers in JSON rather than printing the human page to a caller that
+        // asked for one parseable value. `storage` is a group either way, so the
+        // assertion holds across both renderings; the parse is what pins WHICH
+        // one we got.
         storage.mockClear();
-        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        const cap = captureStdout();
         await cloudCommand(undefined, ["node", "cli", "cloud"]);
-        const printed = log.mock.calls.map(c => String(c[0])).join("\n");
-        log.mockRestore();
+        cap.restore();
 
         expect(storage).not.toHaveBeenCalled();
-        expect(printed).toContain("storage");
+        const help = JSON.parse(cap.output()) as { command: string; actions: string[] };
+        expect(help.command).toBe("cloud");
+        expect(help.actions).toContain("storage");
     });
 
     /**
