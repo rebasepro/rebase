@@ -4,13 +4,19 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
- * A `collection_patch` names a row by address; the subscriber's cached rows are
+ * A realtime message names rows by address; the subscriber's cached rows are
  * columns only, and the SDK holds no collection config to derive an address
- * from. So the patch carries the key columns, and this pins that it actually
+ * from. So the message carries the key columns, and this pins that it actually
  * does — the client-side half lives in `@rebasepro/client`
  * (realtime-row-identity.test.ts), and the two only work together.
+ *
+ * This used to be asserted on `collection_patch`, the immediate row patch that
+ * preceded the refetch. That patch carried the writer's row to every
+ * subscriber, so it was removed; the key columns now ride the
+ * `collection_update` that the subscriber-scoped refetch sends. Same contract,
+ * one message later.
  */
-describe("collection_patch — the key columns ride along", () => {
+describe("realtime updates — the key columns ride along", () => {
     class MockWebSocket {
         public readyState = 1;
         public send = jest.fn();
@@ -50,7 +56,7 @@ isId: true },
     const messagesOfType = (type: string) => ws.send.mock.calls
         .map(call => JSON.parse(call[0] as string))
         .filter(message => message.type === type);
-    const patchesSent = () => messagesOfType("collection_patch");
+    const updatesSent = () => messagesOfType("collection_update");
 
     beforeEach(async () => {
         jest.useFakeTimers();
@@ -81,8 +87,14 @@ isId: true },
             if (path.startsWith("notes")) return notesCollection;
             return undefined;
         });
-        jest.spyOn(registry, "getTable").mockImplementation(name =>
-            name === "sku_items" ? table("sku_items", ["sku", "label"]) as never : undefined);
+        // `notes` is registered too — otherwise subscribing to it errors before
+        // any message is built, and the point here is what the message says
+        // about keys, not what happens to an unregistered path.
+        jest.spyOn(registry, "getTable").mockImplementation(name => {
+            if (name === "sku_items") return table("sku_items", ["sku", "label"]) as never;
+            if (name === "notes") return table("notes", ["body"]) as never;
+            return undefined;
+        });
 
         realtimeService = new RealtimeService(
             db,
@@ -111,36 +123,32 @@ isId: true },
 subscriptionId: "sub-1" }
         });
 
-    it("includes the resolved key columns in the patch", async () => {
+    it("includes the resolved key columns in the update", async () => {
         await subscribe("sku_items");
+        ws.send.mockClear(); // drop the initial subscribe payload
 
         await realtimeService.notifyUpdate(
             "sku_items", "ABC-1", { sku: "ABC-1",
 label: "Widget" }, undefined, false
         );
+        await jest.advanceTimersByTimeAsync(400);
 
-        const [patch] = patchesSent();
-        expect(patch).toBeDefined();
-        expect(patch.id).toBe("ABC-1");
-        expect(patch.pks).toEqual([{ fieldName: "sku",
+        const [update] = updatesSent();
+        expect(update).toBeDefined();
+        expect(update.pks).toEqual([{ fieldName: "sku",
 type: "string",
 isUUID: false }]);
     });
 
-    it("omits `pks` for a collection whose keys it cannot resolve", async () => {
-        // No primary key and no `id` column: these rows have no address, and
-        // saying so is the honest answer — a subscriber that invented one would
-        // recognise rows that are not there.
-        await subscribe("notes");
-
-        await realtimeService.notifyUpdate(
-            "notes", "n-1", { body: "hello" }, undefined, false
-        );
-
-        const [patch] = patchesSent();
-        expect(patch).toBeDefined();
-        expect(patch.pks).toBeUndefined();
-    });
+    // Gone with the patch: "omits `pks` for a collection whose keys it cannot
+    // resolve". That case used to be observable because the immediate
+    // `collection_patch` was sent regardless of whether the collection could be
+    // read. Delivery is now the scoped refetch, and a collection with no
+    // resolvable key fails in the read path before any message is built — so
+    // there is no message left to assert `pks === undefined` on. The branch
+    // still exists in `primaryKeysForPath`; it is private, and faking a
+    // readable-but-unkeyable collection would be testing the mock rather than
+    // the code. Recorded here rather than silently dropped.
 
     it("sends the keys with the rows of the initial subscription", async () => {
         // The subscriber needs them before any patch exists — the first merge
@@ -154,11 +162,12 @@ type: "string",
 isUUID: false }]);
     });
 
-    it("sends the keys on a refetch that no patch preceded", async () => {
-        // A CDC-originated change carries an invalidation marker: no patch is
-        // sent at all, only the deferred refetch. Keys that rode on patches
-        // alone would never reach a collection written from outside the API,
-        // and every refetch would replace every row's reference.
+    it("sends the keys on the refetch, which is now the only delivery", async () => {
+        // Keys used to ride the immediate patch, so a collection written from
+        // outside the API — where no patch was ever sent — never received them
+        // and every refetch replaced every row's reference. There is no patch
+        // on any path now, so this is the case that used to be the exception
+        // and is now the rule.
         await subscribe("sku_items");
         ws.send.mockClear();
 
@@ -168,7 +177,7 @@ isUUID: false }]);
         // The refetch is debounced behind a timer, and its body awaits the read.
         await jest.advanceTimersByTimeAsync(500);
 
-        expect(patchesSent()).toHaveLength(0);
+        expect(messagesOfType("collection_patch")).toHaveLength(0);
         const [update] = messagesOfType("collection_update");
         expect(update).toBeDefined();
         expect(update.pks).toEqual([{ fieldName: "sku",

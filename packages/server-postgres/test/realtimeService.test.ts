@@ -246,7 +246,17 @@ subscriptionId: "sub-1" }
             expect(parsed.rows[0].values.title).toBe("Refetched Title");
         });
 
-        it("sends instant row patch for valid row updates without _rebase_invalidated", async () => {
+        /**
+         * Rewritten into its opposite.
+         *
+         * This asserted that a local mutation's row is patched straight to the
+         * subscriber before any refetch — "Phase 1: It SHOULD send immediate
+         * patch". That row was read under the *writer's* scope, so the
+         * assertion was pinning a leak: it is exactly how a subscriber received
+         * a row its own RLS policies would have denied. The immediate patch is
+         * gone; the refetch is the only delivery.
+         */
+        it("never patches the writer's row — the refetch is the only delivery", async () => {
              const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-1", ws);
 
@@ -256,26 +266,28 @@ subscriptionId: "sub-1" }
 subscriptionId: "sub-1" }
             });
 
-            // Simulated normal Local update
+            const sendsBefore = ws.send.mock.calls.length;
+
+            // A local mutation, carrying the row the writer just saved.
             const freshEntity = { id: "1",
 path: "posts",
 values: { title: "Immediate Patch" } } as any;
             await realtimeService.notifyUpdate("posts", "1", freshEntity, undefined, false);
 
-            // Phase 1: It SHOULD send immediate patch
-            expect(ws.send).toHaveBeenCalled();
-            let lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
-            let parsed = JSON.parse(lastCall);
-            expect(parsed.type).toBe("collection_patch");
-            expect(parsed.row.values.title).toBe("Immediate Patch");
+            // Nothing may go out before the scoped refetch, and in particular
+            // the writer's title must never appear on this socket.
+            const immediate = ws.send.mock.calls.slice(sendsBefore).map((c: any[]) => String(c[0]));
+            expect(immediate.some(m => m.includes("collection_patch"))).toBe(false);
+            expect(immediate.some(m => m.includes("Immediate Patch"))).toBe(false);
 
-            // Phase 2: Refetch
+            // The refetch, read under this subscriber's own context, is what
+            // reaches them.
             jest.advanceTimersByTime(350);
             for (let i = 0; i < 10; i++) {
                 await Promise.resolve();
             }
-            lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
-            parsed = JSON.parse(lastCall);
+            const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
+            const parsed = JSON.parse(lastCall);
             expect(parsed.type).toBe("collection_update");
         });
     });
@@ -317,7 +329,17 @@ subscriptionId: "sub-2" }
             expect(parsed.row.values.title).toBe("Refetched Entity Title");
         });
 
-        it("sends instant row update if valid payload (local mutation)", async () => {
+        /**
+         * Rewritten into its opposite, and this was the sharper of the two.
+         *
+         * A single-row subscription had no later correction: the collection
+         * variant was at least overwritten ~300 ms on by the debounced refetch,
+         * after the bytes had reached the browser, but this one simply pushed
+         * the writer's row and stopped. `subscribe_one` on a row RLS denies is
+         * accepted and answered `null` — and then the first update handed over
+         * the whole row.
+         */
+        it("never pushes the writer's row to a single-row subscriber", async () => {
              const ws = new MockWebSocket() as any;
             realtimeService.addClient("client-2", ws);
 
@@ -328,17 +350,23 @@ id: "1",
 subscriptionId: "sub-2" }
             });
 
+            const sendsBefore = ws.send.mock.calls.length;
+
             const freshEntity = { id: "1",
 path: "posts",
 values: { title: "Pure Patch" } } as any;
             await realtimeService.notifyUpdate("posts", "1", freshEntity, undefined, false);
 
-            expect(ws.send).toHaveBeenCalled();
-            const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
-            const parsed = JSON.parse(lastCall);
+            const immediate = ws.send.mock.calls.slice(sendsBefore).map((c: any[]) => String(c[0]));
+            expect(immediate.some(m => m.includes("Pure Patch"))).toBe(false);
 
-            expect(parsed.type).toBe("single_update");
-            expect(parsed.row.values.title).toBe("Pure Patch");
+            // What arrives is the scoped re-read, not the payload.
+            jest.advanceTimersByTime(350);
+            for (let i = 0; i < 10; i++) {
+                await Promise.resolve();
+            }
+            const lastCall = ws.send.mock.calls[ws.send.mock.calls.length - 1][0];
+            expect(JSON.parse(lastCall).type).toBe("single_update");
         });
     });
 

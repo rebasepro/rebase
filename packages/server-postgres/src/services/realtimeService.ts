@@ -655,7 +655,39 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     }
 
     /**
-     * Notify subscriptions for a specific path
+     * Notify subscriptions for a specific path.
+     *
+     * **A subscriber only ever receives rows re-read under its own scope.**
+     * `row` is used to decide *that* something changed, never to say *what* —
+     * every delivery below goes through a refetch that binds the subscription's
+     * own auth context.
+     *
+     * It used to be conditional. The CDC path already did the right thing: it
+     * discards the captured tuple and emits `{_rebase_invalidated: true}`, and
+     * that marker selected the refetch branch. But the marker is produced in
+     * exactly two places, and the *other* side of each branch here shipped the
+     * row it was handed straight to the socket. Two of the three entry paths
+     * took that side — every API mutation (`PostgresBackendDriver.save` passes
+     * the row it just wrote, read under the **writer's** scope) and the legacy
+     * cross-instance LISTEN handler (which re-reads on the owner connection,
+     * bypassing RLS altogether). Path matching was the only filter applied: the
+     * subscription's own `filter`/`logical` was never evaluated, and any
+     * `afterRead` redaction was the writer's rather than the reader's.
+     *
+     * A single-row subscription was the sharpest case. `subscribe_one` on a row
+     * RLS denies is accepted and answered `null`; the next update then pushed
+     * the full row with no later correction. The collection variant was merely
+     * papered over ~300 ms later by the debounced refetch — after the bytes had
+     * already reached the browser.
+     *
+     * The same defect was found and fixed on the Mongo driver in `065e2b615`
+     * (see `packages/server-mongo/test/realtime-authorization.test.ts`); this is
+     * the Postgres half, stated as one rule rather than three patched branches.
+     *
+     * The cost is the instant row-level patch that used to precede the refetch:
+     * cross-tab feedback now waits for the debounce. That is the price of not
+     * being able to know, without asking the database as this subscriber,
+     * whether this subscriber may see the row at all.
      */
     private async notifyPathUpdate(notifyPath: string, originalPath: string, id: string, row: Record<string, unknown> | null, _databaseId?: string) {
         this.debugLog(`📡 [RealtimeService] Notifying path: ${notifyPath} (original: ${originalPath})`);
@@ -690,21 +722,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         for (const [subscriptionId, subscription] of webSocketSubscriptions) {
             try {
                 if (subscription.type === "single" && notifyPath === originalPath) {
-                    // Send row update directly (only for exact path matches)
-                    if (row && (row as Record<string, unknown>)?._rebase_invalidated) {
-                        this.debouncedSingleRefetch(subscriptionId, notifyPath, id, subscription);
-                    } else {
-                        this.sendSingleUpdate(subscription.clientId, subscriptionId, row);
-                    }
+                    this.debouncedSingleRefetch(subscriptionId, notifyPath, id, subscription);
                 } else if (subscription.type === "collection" && subscription.collectionRequest) {
-                    // Phase 1: Send instant row-level patch (no DB query)
-                    // This gives immediate cross-tab feedback
-                    if (!row || !(row as Record<string, unknown>)?._rebase_invalidated) {
-                        this.sendCollectionPatch(subscription.clientId, subscriptionId, id, row, notifyPath);
-                    }
-
-                    // Phase 2: Schedule a deferred full refetch for correctness
-                    // Handles filter/sort changes and ensures consistency
                     this.debouncedCollectionRefetch(subscriptionId, notifyPath, subscription);
                 }
             } catch (error) {
@@ -720,12 +739,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 if (!callback) continue;
 
                 if (subscription.type === "single" && notifyPath === originalPath) {
-                    if (row && (row as Record<string, unknown>)?._rebase_invalidated) {
-                        this.debouncedSingleDriverRefetch(subscriptionId, notifyPath, id, subscription, callback);
-                    } else {
-                        // Call the callback directly with the row (only for exact path matches)
-                        callback(row);
-                    }
+                    this.debouncedSingleDriverRefetch(subscriptionId, notifyPath, id, subscription, callback);
                 } else if (subscription.type === "collection" && subscription.collectionRequest) {
                     // Debounce collection refetches for DataDriver subscriptions too
                     this.debouncedDriverRefetch(subscriptionId, notifyPath, subscription, callback);
@@ -1098,23 +1112,6 @@ roles: activeAuth.roles },
      * columns and no address. The SDK holds no collection config to derive one
      * from, so this is the only place the mapping can come from.
      */
-    private sendCollectionPatch(
-        clientId: string,
-        subscriptionId: string,
-        id: string,
-        row: Record<string, unknown> | null,
-        notifyPath: string
-    ) {
-        const message: CollectionPatchMessage = {
-            type: "collection_patch",
-            subscriptionId,
-            id,
-            row: row,
-            pks: this.primaryKeysForPath(notifyPath)
-        };
-        this.sendMessage(clientId, message);
-    }
-
     /** The key columns of the collection at `path`, if they can be resolved. */
     private primaryKeysForPath(path: string): PrimaryKeyInfo[] | undefined {
         try {

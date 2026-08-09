@@ -113,7 +113,14 @@ describe("RealtimeService — database-level CDC", () => {
         });
         ws.send.mockClear();
 
+        // Delivery is the debounced, subscriber-scoped refetch — nothing is
+        // pushed straight from the event any more. So the row really is gone
+        // when the refetch runs, which is what makes `row: null` correct rather
+        // than an artefact of the event payload.
+        mockFetchEntity.mockResolvedValueOnce(null);
+
         await emitCdc(service, { schema: "public", table: "posts", op: "DELETE", row: { id: 1 } });
+        await flushTimers();
 
         const sent = JSON.parse(ws.send.mock.calls.at(-1)![0]);
         expect(sent.type).toBe("single_update");
@@ -147,8 +154,11 @@ describe("RealtimeService — database-level CDC", () => {
         });
         ws.send.mockClear();
 
-        // App path (Rebase-API mutation) delivers the row locally and records the emit.
+        // App path (Rebase-API mutation) records the emit and schedules the
+        // subscriber-scoped refetch. It no longer delivers the written row
+        // inline, so the delivery only happens once the debounce fires.
         await service.notifyUpdate("posts", "1", { id: 1, path: "posts", values: { title: "via API" } } as any, undefined, true, "app");
+        await flushTimers();
         const afterApp = ws.send.mock.calls.length;
         expect(afterApp).toBeGreaterThan(0);
 
