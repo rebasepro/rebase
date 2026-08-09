@@ -20,6 +20,10 @@ import {
     success,
     fail,
     reportError,
+    emit,
+    note,
+    noteBlank,
+    confirmDestructive,
     type CloudClient
 } from "./context";
 
@@ -58,23 +62,41 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
             fetchTenantBaseDomain(client, url)
         ]);
 
-        console.log("");
-        console.log(chalk.bold("  📦 Projects") + (org ? chalk.gray(`  (org ${org})`) : ""));
-        console.log("");
-
-        if (projects.length === 0) {
-            console.log(chalk.gray("  No projects yet. Create one with `rebase cloud projects create`."));
-            console.log("");
-            return;
-        }
-
         const linkedId = readLink()?.projectId;
-        for (const p of projects) {
-            const marker = String(p.id) === linkedId ? chalk.green(" ●") : "  ";
-            console.log(`${marker}${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
-            console.log(`    ${chalk.gray(projectHost(p, baseDomain) ?? "—")}${p.provider ? chalk.gray(`  ·  ${p.provider}`) : ""}`);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold("  📦 Projects") + (org ? chalk.gray(`  (org ${org})`) : ""));
+                console.log("");
+
+                if (projects.length === 0) {
+                    console.log(
+                        chalk.gray("  No projects yet. Create one with `rebase cloud projects create`.")
+                    );
+                    console.log("");
+                    return;
+                }
+
+                for (const p of projects) {
+                    const marker = String(p.id) === linkedId ? chalk.green(" ●") : "  ";
+                    console.log(`${marker}${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
+                    console.log(`    ${chalk.gray(projectHost(p, baseDomain) ?? "—")}${p.provider ? chalk.gray(`  ·  ${p.provider}`) : ""}`);
+                }
+                console.log("");
+            },
+            {
+                org: org ?? null,
+                projects: projects.map((p) => ({
+                    id: String(p.id),
+                    name: p.name ?? null,
+                    slug: p.subdomain ?? null,
+                    host: projectHost(p, baseDomain) ?? null,
+                    status: p.status ?? null,
+                    provider: p.provider ?? null,
+                    linked: String(p.id) === linkedId
+                }))
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to list projects");
     }
@@ -154,7 +176,8 @@ async function resolveRequestedTarget(
     if (!chosen) {
         fail(
             "This control plane has no deploy targets configured.",
-            `Register a cluster, or pass ${chalk.bold("--provider")} and ${chalk.bold("--region")} to record one anyway.`
+            `Register a cluster, or pass ${chalk.bold("--provider")} and ${chalk.bold("--region")} to record one anyway.`,
+            "no_deploy_targets"
         );
     }
     return chosen;
@@ -192,7 +215,8 @@ export async function createProject(rawArgs: string[]): Promise<void> {
     if (!org) {
         fail(
             "No organization selected.",
-            `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`
+            `Pass ${chalk.bold("--org <id>")} or run ${chalk.bold("rebase cloud use")}.`,
+            "no_org"
         );
     }
 
@@ -230,7 +254,11 @@ message: "Subdomain:" });
     const vmSize = (args["--vm-size"] || defaults.vmSize).trim();
 
     if (!name || !subdomain) {
-        fail("Name and subdomain are required.");
+        fail(
+            "Name and subdomain are required.",
+            `Pass ${chalk.bold("--name <name>")} and ${chalk.bold("--subdomain <slug>")}.`,
+            "input_required"
+        );
     }
 
     // Validate subdomain availability up front for a clean error.
@@ -241,7 +269,9 @@ message: "Subdomain:" });
         );
         if (!check.available) {
             fail(
-                `Subdomain "${subdomain}" is not available${check.reason ? ` (${check.reason})` : ""}.`
+                `Subdomain "${subdomain}" is not available${check.reason ? ` (${check.reason})` : ""}.`,
+                undefined,
+                "subdomain_unavailable"
             );
         }
     } catch {
@@ -251,7 +281,9 @@ message: "Subdomain:" });
 
     try {
         const user = await client.auth.getUser();
-        if (!user) fail("Session is no longer valid.", "Run `rebase cloud login` again.");
+        if (!user) {
+            fail("Session is no longer valid.", "Run `rebase cloud login` again.", "session_invalid");
+        }
         const created = (await client.data.collection("projects").create({
             name,
             subdomain,
@@ -265,25 +297,44 @@ message: "Subdomain:" });
             status: "provisioning"
         })) as unknown as ProjectRow;
 
-        success(`Created project ${chalk.bold(name)}`);
-        keyValues([
-            ["Slug", String(created.subdomain ?? "")],
-            ["URL", projectHost(created, await fetchTenantBaseDomain(client, url))],
-            ["Provider", provider],
-            ["Branch", gitBranch]
-        ]);
-
-        if (args["--link"]) {
+        const host = projectHost(created, await fetchTenantBaseDomain(client, url));
+        const linked = Boolean(args["--link"]);
+        if (linked) {
             writeLink({ url,
 projectId: String(created.id),
 slug: created.subdomain,
 projectName: name,
 orgId: String(org) });
-            console.log(chalk.gray("  Linked this directory to the new project."));
         }
-        console.log("");
-        console.log(chalk.gray(`  Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.subdomain ?? created.id}`)}`));
-        console.log("");
+
+        success(`Created project ${chalk.bold(name)}`);
+        emit(
+            () => {
+                keyValues([
+                    ["Slug", String(created.subdomain ?? "")],
+                    ["URL", host],
+                    ["Provider", provider],
+                    ["Branch", gitBranch]
+                ]);
+                if (linked) note(chalk.gray("Linked this directory to the new project."));
+                noteBlank();
+                note(chalk.gray(`Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.subdomain ?? created.id}`)}`));
+                noteBlank();
+            },
+            {
+                success: true,
+                id: String(created.id),
+                name,
+                slug: created.subdomain ?? null,
+                host: host ?? null,
+                provider,
+                region,
+                vmSize,
+                branch: gitBranch,
+                org: String(org),
+                linked
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to create project");
     }
@@ -322,7 +373,7 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
     try {
         const projectId = await resolveProjectRef(projectRef, client);
         const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
-        if (!p) fail(`Project ${projectRef} not found.`);
+        if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
 
         const [db, lastDeploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
@@ -330,21 +381,45 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
             fetchTenantBaseDomain(client, url)
         ]);
 
-        console.log("");
-        console.log(`  ${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
-        console.log("");
-        keyValues([
-            ["Subdomain", projectHost(p, baseDomain)],
-            ["Custom domain", p.customDomain],
-            ["Repository", p.gitRepoUrl],
-            ["Branch", p.gitBranch],
-            ["Provider", p.provider],
-            ["Region", p.region],
-            ["Organization", p.organization !== undefined ? String(p.organization) : undefined],
-            ["Database", db ? `${db.type} (${colorStatus(db.connectionStatus as string)})` : "none"],
-            ["Last deploy", lastDeploy ? `${colorStatus(lastDeploy.status)} · ${fmtDate(lastDeploy.createdAt)}` : "never"]
-        ]);
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(`  ${chalk.bold(p.name ?? "(unnamed)")} ${chalk.gray(`[${p.subdomain ?? p.id}]`)} ${colorStatus(p.status)}`);
+                console.log("");
+                keyValues([
+                    ["Subdomain", projectHost(p, baseDomain)],
+                    ["Custom domain", p.customDomain],
+                    ["Repository", p.gitRepoUrl],
+                    ["Branch", p.gitBranch],
+                    ["Provider", p.provider],
+                    ["Region", p.region],
+                    ["Organization", p.organization !== undefined ? String(p.organization) : undefined],
+                    ["Database", db ? `${db.type} (${colorStatus(db.connectionStatus as string)})` : "none"],
+                    ["Last deploy", lastDeploy ? `${colorStatus(lastDeploy.status)} · ${fmtDate(lastDeploy.createdAt)}` : "never"]
+                ]);
+                console.log("");
+            },
+            {
+                id: String(p.id),
+                name: p.name ?? null,
+                slug: p.subdomain ?? null,
+                host: projectHost(p, baseDomain) ?? null,
+                customDomain: p.customDomain ?? null,
+                repository: p.gitRepoUrl ?? null,
+                branch: p.gitBranch ?? null,
+                provider: p.provider ?? null,
+                region: p.region ?? null,
+                status: p.status ?? null,
+                org: p.organization !== undefined ? String(p.organization) : null,
+                database: db ? { type: db.type ?? null,
+connectionStatus: db.connectionStatus ?? null } : null,
+                lastDeploy: lastDeploy
+                    ? { id: String(lastDeploy.id),
+status: lastDeploy.status ?? null,
+createdAt: lastDeploy.createdAt ?? null }
+                    : null
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to load project");
     }
@@ -366,26 +441,28 @@ export async function deleteProject(rawArgs: string[], projectRef: string): Prom
     const p = (await client.data.collection("projects").findById(projectId).catch(() => undefined)) as
         | ProjectRow
         | undefined;
-    if (!p) fail(`Project ${projectRef} not found.`);
+    if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
 
-    if (!args["--yes"]) {
-        const { confirmed } = await inquirer.prompt([
-            {
-                type: "confirm",
-                name: "confirmed",
-                default: false,
-                message: `Permanently delete project "${p.name ?? projectRef}" (${p.subdomain ?? projectRef})? This tears down its deployment.`
-            }
-        ] as unknown as Parameters<typeof inquirer.prompt>[0]);
-        if (!confirmed) {
-            console.log(chalk.gray("  Aborted."));
-            return;
-        }
-    }
+    // Through the shared guard, not a bare `inquirer.prompt`. This was the one
+    // destructive command in the family that rolled its own confirm, and it was
+    // the only one that could HANG: piped or agent-run, the other nine refuse
+    // with `confirmation_required` while this one sat on a prompt reading a
+    // stdin that would never answer — on the single command whose whole job is
+    // to tear a project down.
+    await confirmDestructive({
+        yes: Boolean(args["--yes"]),
+        prompt: `Permanently delete project "${p.name ?? projectRef}" (${p.subdomain ?? projectRef})? This tears down its deployment.`
+    });
 
     try {
         await client.data.collection("projects").delete(projectId);
         success(`Deleted project ${chalk.bold(p.name ?? projectId)}`);
+        emit(() => {}, {
+            success: true,
+            id: projectId,
+            name: p.name ?? null,
+            slug: p.subdomain ?? null
+        });
     } catch (e) {
         reportError(e, "Failed to delete project");
     }

@@ -22,7 +22,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
-    isJsonMode,
+    emitHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -442,11 +442,8 @@ skipped }
 }
 
 export function printEnvHelp(): void {
-    if (isJsonMode()) {
-        printEnvHelpJson();
-        return;
-    }
-    console.log(`
+    emitHelp("env", ["list", "set", "unset", "reveal", "pull"], () => {
+        console.log(`
 ${chalk.bold("rebase cloud env")} — Environment variables
 
 ${chalk.green.bold("Commands")}
@@ -466,13 +463,5 @@ ${chalk.gray("Values are encrypted at rest (AES-256-GCM) and only decrypted at d
 ${chalk.gray("VITE_* / NEXT_PUBLIC_* / PUBLIC_* / REACT_APP_* are read by your bundler at BUILD time;")}
 ${chalk.gray("these are applied at rollout, after the image is built, so they never reach the bundle.")}
 `);
-}
-
-function printEnvHelpJson(): void {
-    process.stdout.write(
-        JSON.stringify({
-            command: "env",
-            actions: ["list", "set", "unset", "reveal", "pull"]
-        }) + "\n"
-    );
+    });
 }

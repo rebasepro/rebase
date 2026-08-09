@@ -15,12 +15,16 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
+    emitHelp,
     confirmDestructive,
     colorStatus,
     keyValues,
     success,
     fail,
-    reportError
+    reportError,
+    note,
+    noteBlank,
+    requireInteractive
 } from "./context";
 
 interface DatabaseRow {
@@ -63,7 +67,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
             printDbHelp();
             break;
         default:
-            fail(`Unknown db command: ${subcommand}`);
+            fail(`Unknown db command: ${subcommand}`, "Run `rebase cloud db --help`.", "unknown_command");
     }
 }
 
@@ -77,22 +81,36 @@ async function listDatabases(rawArgs: string[]): Promise<void> {
             limit: 50
         })).data as unknown as DatabaseRow[];
 
-        console.log("");
-        console.log(chalk.bold(`  🗄  Databases — project ${projectRef}`));
-        console.log("");
-        if (dbs.length === 0) {
-            console.log(chalk.gray("  No database attached. Add one with `rebase cloud db create`."));
-            console.log("");
-            return;
-        }
-        for (const d of dbs) {
-            console.log(`  ${chalk.bold(d.type ?? "unknown")} ${chalk.gray(`[${d.id}]`)}  ${colorStatus(d.connectionStatus)}`);
-            keyValues([
-                ["SSH tunnel", d.useSshTunnel ? "yes" : undefined],
-                ["PITR", d.pitrEnabled ? "enabled" : undefined]
-            ]);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  🗄  Databases — project ${projectRef}`));
+                console.log("");
+                if (dbs.length === 0) {
+                    console.log(chalk.gray("  No database attached. Add one with `rebase cloud db create`."));
+                    console.log("");
+                    return;
+                }
+                for (const d of dbs) {
+                    console.log(`  ${chalk.bold(d.type ?? "unknown")} ${chalk.gray(`[${d.id}]`)}  ${colorStatus(d.connectionStatus)}`);
+                    keyValues([
+                        ["SSH tunnel", d.useSshTunnel ? "yes" : undefined],
+                        ["PITR", d.pitrEnabled ? "enabled" : undefined]
+                    ]);
+                }
+                console.log("");
+            },
+            {
+                projectId,
+                databases: dbs.map((d) => ({
+                    id: String(d.id),
+                    type: d.type ?? null,
+                    connectionStatus: d.connectionStatus ?? null,
+                    useSshTunnel: Boolean(d.useSshTunnel),
+                    pitrEnabled: Boolean(d.pitrEnabled)
+                }))
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to list databases");
     }
@@ -113,6 +131,7 @@ permissive: true }
 
     let type = args["--type"];
     if (!type) {
+        requireInteractive("a database type", "--type <managed|byodb>");
         const { picked } = await inquirer.prompt([
             {
                 type: "select",
@@ -131,13 +150,20 @@ value: "byodb" }
 
     let connectionString = args["--connection-string"];
     if (type === "byodb" && !connectionString) {
+        requireInteractive("a connection string", "--connection-string <url>");
         const { cs } = await inquirer.prompt([
             { type: "input",
 name: "cs",
 message: "PostgreSQL connection string:" }
         ] as unknown as Parameters<typeof inquirer.prompt>[0]);
         connectionString = (cs as string)?.trim();
-        if (!connectionString) fail("A connection string is required for bring-your-own databases.");
+        if (!connectionString) {
+            fail(
+                "A connection string is required for bring-your-own databases.",
+                "Pass `--connection-string <url>`.",
+                "input_required"
+            );
+        }
     }
 
     try {
@@ -148,11 +174,22 @@ message: "PostgreSQL connection string:" }
             connectionStatus: "untested"
         })) as unknown as DatabaseRow;
         success(`Attached ${type} database to project ${projectRef}`);
-        keyValues([["ID", String(created.id)]]);
-        if (type === "byodb") {
-            console.log(chalk.gray("  Verify it with `rebase cloud db test`."));
-            console.log("");
-        }
+        emit(
+            () => {
+                keyValues([["ID", String(created.id)]]);
+                if (type === "byodb") {
+                    note(chalk.gray("Verify it with `rebase cloud db test`."));
+                    noteBlank();
+                }
+            },
+            {
+                success: true,
+                id: String(created.id),
+                projectId,
+                type,
+                connectionStatus: "untested"
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to attach database");
     }
@@ -162,14 +199,30 @@ async function testDatabase(rawArgs: string[]): Promise<void> {
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-    console.log("");
-    console.log(`  Testing database connectivity for project ${chalk.bold(projectId)}...`);
+    noteBlank();
+    note(`Testing database connectivity for project ${chalk.bold(projectRef)}...`);
     try {
         const res = await client.functions.invoke<{ success: boolean; logs?: string }>("db-test", { projectId });
-        console.log("");
-        if (res.logs) console.log(res.logs);
-        if (res.success) success("Database connection succeeded");
-        else fail("Database connection failed. See logs above.");
+
+        // The connection log is diagnostics, not the result, so it goes to
+        // stderr — in both modes. Echoing it to stdout put arbitrary
+        // server-generated text in front of whatever was parsing the output,
+        // and on the failure path it is the only thing that explains WHY, so
+        // suppressing it in JSON mode would have left the refusal below
+        // pointing at logs that were never printed.
+        if (res.logs) console.error(`\n${res.logs}`);
+
+        if (!res.success) {
+            fail(
+                "Database connection failed.",
+                "The connection log above (stderr) has the reason.",
+                "db_connection_failed"
+            );
+        }
+        success("Database connection succeeded");
+        emit(() => {}, { success: true,
+projectId,
+logs: res.logs ?? null });
     } catch (e) {
         reportError(e, "Failed to test database");
     }
@@ -543,7 +596,8 @@ acknowledgeNoCutover: true },
 }
 
 export function printDbHelp(): void {
-    console.log(`
+    emitHelp("db", ["list", "create", "info", "test", "backup", "pitr"], () => {
+        console.log(`
 ${chalk.bold("rebase cloud db")} — Database & backups
 
 ${chalk.green.bold("Commands")}
@@ -568,4 +622,5 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--connection-string")}       External DB URL ${chalk.gray("(byodb)")}
   ${chalk.blue("--json")}                    Machine-readable output
 `);
+    });
 }

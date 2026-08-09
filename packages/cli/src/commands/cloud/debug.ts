@@ -44,6 +44,7 @@ import {
     colorStatus,
     keyValues,
     emit,
+    emitHelp,
     isJsonMode,
     fail,
     reportError,
@@ -1020,7 +1021,8 @@ title: "📄 Logs" });
 }
 
 export function printDebugHelp(): void {
-    console.log(`
+    emitHelp("debug", ["health", "logs", "errors", "requests", "boot", "pod", "db"], () => {
+        console.log(`
 ${chalk.bold("rebase cloud debug")} — Find out why a deployed project is misbehaving
 
 ${chalk.green.bold("Usage")}
@@ -1051,4 +1053,5 @@ ${chalk.green.bold("Options")}
 ${chalk.gray("Everything here is read-only. `health` exits non-zero when a check fails,")}
 ${chalk.gray("so it works in a deploy script. To restart a workload, use `rebase cloud restart`.")}
 `);
+    });
 }

@@ -194,10 +194,21 @@ export type CloudClient = ReturnType<typeof createRebaseClient>;
 export function createCloudClient(url: string): CloudClient {
     return createRebaseClient({
         baseUrl: url,
-        // Empty string disables the realtime socket — a short-lived CLI has no
-        // use for it, and leaving it on opens a connection (and noisy errors)
-        // on every invocation.
-        websocketUrl: "",
+        // No cloud subcommand needs a socket. The one that looks like it might —
+        // `logs -f` — polls `deployments.findById` on a timer (see
+        // `streamBuildLogs`), so nothing here ever opens a channel or an
+        // `observe()`.
+        //
+        // This used to say `websocketUrl: ""` and mean the same thing. It stopped
+        // meaning it when the client grew a diagnostic for the case it produces:
+        // realtime is on unless you switch it off, so "on, with no usable URL"
+        // reads as a misconfiguration and warns. The warning is right — and it
+        // was firing on every single `rebase cloud` invocation, telling the user
+        // to fix the CLI's own client construction, in prose they had no way to
+        // act on. `realtime: false` is the escape it names: it is the difference
+        // between "no socket, because I never asked for one" and "no socket, and
+        // I do not know why".
+        realtime: false,
         auth: {
             storage: createFileAuthStorage(url),
             persistSession: true,
@@ -222,7 +233,8 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     if (!session || !session.accessToken) {
         fail(
             `Not logged in to ${chalk.cyan(url)}.`,
-            `Run ${chalk.bold("rebase cloud login")} first.`
+            `Run ${chalk.bold("rebase cloud login")} first.`,
+            "not_logged_in"
         );
     }
 
@@ -232,7 +244,11 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
         } catch {
             fail(
                 `Your session for ${chalk.cyan(url)} has expired.`,
-                `Run ${chalk.bold("rebase cloud login")} to sign in again.`
+                `Run ${chalk.bold("rebase cloud login")} to sign in again.`,
+                // Distinct from `not_logged_in`: a caller retrying on a stale
+                // session should re-authenticate, not conclude it was never set
+                // up. Same remedy, different diagnosis.
+                "session_expired"
             );
         }
     }
@@ -462,7 +478,8 @@ permissive: true });
     if (link?.projectId) return link.projectId;
     fail(
         "No project specified and this directory is not linked.",
-        `Pass ${chalk.bold("--project <slug>")} or run ${chalk.bold("rebase cloud link")}.`
+        `Pass ${chalk.bold("--project <slug>")} or run ${chalk.bold("rebase cloud link")}.`,
+        "no_project"
     );
 }
 
@@ -488,7 +505,8 @@ export async function resolveProjectRef(ref: string, client: CloudClient): Promi
     if (id === undefined) {
         fail(
             `No project with slug ${chalk.bold(ref)}.`,
-            `List yours with ${chalk.bold("rebase cloud projects")}.`
+            `List yours with ${chalk.bold("rebase cloud projects")}.`,
+            "project_not_found"
         );
     }
     return id;
@@ -530,6 +548,28 @@ permissive: true });
    else; errors print `{"error":{...}}` and exit non-zero. The mode is a
    process-global set once, at dispatch, by `initOutputMode` — every helper here
    (fail, reportError, emit) reads it so the whole family is consistent.
+
+   ── The stream contract ─────────────────────────────────────────────────────
+
+   The mode decides the SHAPE of the result. It does not decide which stream
+   anything lands on; that rule is fixed and holds in both modes:
+
+     stdout  the command's result, and nothing else — one human rendering or
+             one JSON value. A caller may redirect it into a parser.
+     stderr  everything that is not the result: progress, advice, warnings,
+             errors, and the interactive prompts.
+
+   Nothing is written to both. That is the whole rule, and it is worth stating
+   because the family drifted off it in a way that reads as a bug in the report
+   itself: a warning from the SDK went to stderr while the report went to
+   stdout, so `whoami 2>&1` interleaved two unrelated voices and the header
+   looked like it had been printed twice.
+
+   The practical consequence for a new command: the ONLY things that may call
+   `console.log` are inside an `emit` human closure. Progress and next-step
+   advice go through `note`, cautions through `warn`, outcomes through
+   `success` — all of which write to stderr. `keyValues` prints result rows and
+   so stays on stdout, which is why it belongs inside the `emit` closure too.
 */
 
 let JSON_MODE = false;
@@ -589,6 +629,32 @@ export function emit(human: () => void, json: unknown): void {
     else human();
 }
 
+/**
+ * Print a help page — the human one, or a machine-readable description of the
+ * same command in JSON mode.
+ *
+ * `--help` is the one place where "stdout is not a TTY" is a weak signal: a
+ * person runs `rebase cloud db --help | less` and wants the page. But the rule
+ * this family promises is that stdout carries one JSON value whenever it is not
+ * a terminal, and a help page is the easiest possible thing to describe
+ * structurally — so rather than carve out an exception, help answers the same
+ * question in the reader's own language. For an agent, `--help` piped is then a
+ * discovery call rather than 60 lines of ANSI to scrape.
+ *
+ * `env` shipped this shape first, alone; this generalises it so every group
+ * answers the same way.
+ */
+export function emitHelp(
+    command: string,
+    actions: string[],
+    human: () => void,
+    extra: Record<string, unknown> = {}
+): void {
+    emit(human, { command,
+actions,
+...extra });
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Output helpers
    ═══════════════════════════════════════════════════════════════ */
@@ -623,11 +689,26 @@ export function warn(message: string, hint?: string): void {
     if (hint) console.error(chalk.gray(`    ${hint}`));
 }
 
-/** Print an error (+ optional hint) and exit non-zero. Never returns. */
+/**
+ * Print an error (+ optional hint) and exit non-zero. Never returns.
+ *
+ * `code` is the field a caller branches on, and it defaults to `"error"` rather
+ * than `null`. An envelope whose only machine-readable field is null is not
+ * machine-readable — `{"error":{"message":"No project specified…","code":null}}`
+ * forced the very substring-matching on `message` that the envelope exists to
+ * make unnecessary, and `message` is the field most likely to be reworded.
+ *
+ * `"error"` is deliberately a poor code: it says "this refusal has not been
+ * classified yet" without ever being absent. Anything a caller might plausibly
+ * want to distinguish — `usage`, `not_found`, `unauthenticated` — passes a real
+ * one. Codes are part of the CLI's contract once shipped; see
+ * `cloud-reporting.test.ts`, which pins the ones commands are documented to
+ * return.
+ */
 export function fail(message: string, hint?: string, code?: string): never {
     if (JSON_MODE) {
         printJson({ error: { message: stripAnsi(message),
-code: code ?? null,
+code: code ?? "error",
 hint: hint ? stripAnsi(hint) : undefined } });
         process.exit(1);
     }
@@ -662,8 +743,35 @@ default: false,
 message: opts.prompt }
     ] as unknown as Parameters<typeof inquirer.prompt>[0])) as { confirmed: boolean };
     if (!confirmed) {
-        console.log(chalk.gray("  Aborted."));
+        // stderr: declining is not a result. Unreachable in JSON mode — the
+        // guard above already refused rather than prompt — so stdout stays
+        // empty and the exit code carries the outcome.
+        console.error(chalk.gray("  Aborted."));
         process.exit(0);
+    }
+}
+
+/**
+ * Refuse, rather than prompt, when there is nobody to answer.
+ *
+ * `confirmDestructive` has always done this for yes/no confirmations. The
+ * *value* prompts had no such guard: `cloud login`, `cloud link`, `cloud use`,
+ * `cloud orgs create` and `cloud db create` all called `inquirer.prompt`
+ * unconditionally, so piping any of them — which is how an agent runs every
+ * command in this family — parked the process on a prompt reading from a stdin
+ * that was never going to produce a line. A hang is the worst failure mode
+ * available here: no output, no exit code, nothing to retry on.
+ *
+ * @param what   what the prompt would have asked for, e.g. "an email and password"
+ * @param flags  the flags that supply it non-interactively
+ */
+export function requireInteractive(what: string, flags: string): void {
+    if (JSON_MODE || process.stdin.isTTY !== true) {
+        fail(
+            `This command needs ${what}, and there is no terminal to ask on.`,
+            `Pass ${chalk.bold(flags)}.`,
+            "input_required"
+        );
     }
 }
 
@@ -734,10 +842,55 @@ positionals: parsed.positionals };
     }
 }
 
+/**
+ * Announce an outcome — "Logged in as …", "Deleted project …".
+ *
+ * On **stderr**, in both modes. It reads like a result and is not one: the
+ * result is the JSON value (or the table) on stdout, and every JSON payload in
+ * this family already carries `success: true`. Leaving this on stdout meant a
+ * successful `rebase cloud link | jq` was handed a green tick followed by an
+ * object — one stream, two syntaxes, and only the second parseable.
+ *
+ * It stays visible in JSON mode, unlike `note`: an agent that got a `success`
+ * line on a command it expected to refuse has learned something.
+ */
 export function success(message: string): void {
-    console.log("");
-    console.log(chalk.bold.green(`  ✓ ${message}`));
-    console.log("");
+    if (JSON_MODE) {
+        process.stderr.write(`${stripAnsi(message)}\n`);
+        return;
+    }
+    console.error("");
+    console.error(chalk.bold.green(`  ✓ ${message}`));
+    console.error("");
+}
+
+/**
+ * Narrate progress, or point at the next step — "Signing in to …", "Redeploy
+ * for the tenant to pick this up".
+ *
+ * stderr, and **suppressed entirely in JSON mode**. This is the one helper that
+ * a mode may silence, and the distinction from `warn` is worth keeping sharp:
+ *
+ *   - A warning is a *condition*. It is as true when piped as when watched, so
+ *     silencing it hides something the caller would want to know. `warn` never
+ *     silences.
+ *   - A note is *hand-holding*. "Next: run `rebase generate-sdk`" tells a person
+ *     what to type; the agent reading the JSON already has the same information
+ *     structurally, or does not need it. Printing it anyway is transcript noise.
+ *
+ * When in doubt it is a warning. The cost of a needless warning is a line; the
+ * cost of a swallowed one is the deploy that ejected a project off the managed
+ * runtime and said so only to a terminal nobody was looking at.
+ */
+export function note(message: string, indent = "  "): void {
+    if (JSON_MODE) return;
+    console.error(`${indent}${message}`);
+}
+
+/** A blank spacer line on the narration stream. No-op in JSON mode. */
+export function noteBlank(): void {
+    if (JSON_MODE) return;
+    console.error("");
 }
 
 /** Colorize a deployment / resource status token. */
@@ -784,7 +937,11 @@ export function reportError(e: unknown, context: string): never {
         printJson({
             error: {
                 message: err?.message ? stripAnsi(err.message) : String(e),
-                code: err?.code ?? null,
+                // The SDK supplies a code for errors the API classified. When it
+                // does not, the HTTP status still classifies it well enough to
+                // branch on — `http_401` and `http_502` want very different
+                // handling, and both used to arrive as `null`.
+                code: err?.code ?? (err?.status ? `http_${err.status}` : "request_failed"),
                 status: err?.status ?? null,
                 context
             }
@@ -796,13 +953,18 @@ export function reportError(e: unknown, context: string): never {
 }
 
 /**
- * Open a URL in the user's default browser (best effort). Always prints the URL
- * first so it stays usable over SSH or when no browser is available.
+ * Open a URL in the user's default browser (best effort). Always announces the
+ * URL first so it stays usable over SSH or when no browser is available.
+ *
+ * The announcement is narration, not the result — it goes to stderr, and in
+ * JSON mode it is silent. Every caller `emit`s the same URL in its payload, so
+ * a machine reader gets it from the one place it is guaranteed to be parseable
+ * rather than from a line that happens to end in a URL.
  */
 export function openUrl(target: string, label = "Opening"): void {
-    console.log("");
-    console.log(`  ${label} ${chalk.cyan(target)}`);
-    console.log("");
+    noteBlank();
+    note(`${label} ${chalk.cyan(target)}`);
+    noteBlank();
     const opener =
         process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
     try {

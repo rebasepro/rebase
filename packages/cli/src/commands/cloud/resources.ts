@@ -13,6 +13,7 @@ import {
     readLink,
     colorStatus,
     emit,
+    emitHelp,
     keyValues,
     fetchTenantBaseDomain,
     projectHost,
@@ -20,7 +21,9 @@ import {
     parseCloudArgs,
     success,
     fail,
-    reportError
+    reportError,
+    note,
+    noteBlank
 } from "./context";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 
@@ -216,16 +219,28 @@ export async function metricsCommand(rawArgs: string[]): Promise<void> {
         }>("metrics", undefined, { method: "GET",
 path: projectId });
 
-        console.log("");
-        console.log(chalk.bold(`  📊 Metrics — project ${displayProjectRef(rawArgs)}`));
-        console.log("");
-        keyValues([
-            ["Status", m.status ? colorStatus(m.status === "running" ? "active" : m.status) : undefined],
-            ["CPU", m.cpu],
-            ["Memory", m.memory ? `${m.memory}${m.memoryPercent ? ` (${m.memoryPercent})` : ""}` : undefined],
-            ["Disk", m.disk]
-        ]);
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  📊 Metrics — project ${displayProjectRef(rawArgs)}`));
+                console.log("");
+                keyValues([
+                    ["Status", m.status ? colorStatus(m.status === "running" ? "active" : m.status) : undefined],
+                    ["CPU", m.cpu],
+                    ["Memory", m.memory ? `${m.memory}${m.memoryPercent ? ` (${m.memoryPercent})` : ""}` : undefined],
+                    ["Disk", m.disk]
+                ]);
+                console.log("");
+            },
+            {
+                projectId,
+                status: m.status ?? null,
+                cpu: m.cpu ?? null,
+                memory: m.memory ?? null,
+                memoryPercent: m.memoryPercent ?? null,
+                disk: m.disk ?? null
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to fetch metrics");
     }
@@ -273,7 +288,9 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
         }).flags
         : undefined;
     const deleteId = subcommand === "delete" ? resolveWebhookIdArg(rawArgs) : undefined;
-    if (subcommand === "delete" && !deleteId) fail("Usage: rebase cloud webhooks delete <id>");
+    if (subcommand === "delete" && !deleteId) {
+        fail("Usage: rebase cloud webhooks delete <id>", undefined, "usage");
+    }
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -281,9 +298,9 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
     try {
         if (subcommand === "create") {
             const args = create!;
-            const name = args["--name"] || fail("--name is required.");
-            const table = args["--table"] || fail("--table is required.");
-            const url = args["--url"] || fail("--url (endpoint) is required.");
+            const name = args["--name"] || fail("--name is required.", undefined, "usage");
+            const table = args["--table"] || fail("--table is required.", undefined, "usage");
+            const url = args["--url"] || fail("--url (endpoint) is required.", undefined, "usage");
             const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
 
             const created = (await client.data.collection("webhooks").create({
@@ -295,12 +312,25 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
                 enabled: true
             })) as unknown as { id: string | number };
             success(`Created webhook ${chalk.bold(name)} [${created.id}]`);
+            emit(() => {}, {
+                success: true,
+                id: String(created.id),
+                projectId,
+                name,
+                table,
+                url,
+                events,
+                enabled: true
+            });
             return;
         }
 
         if (subcommand === "delete") {
             await client.data.collection("webhooks").delete(deleteId!);
             success(`Deleted webhook ${deleteId}`);
+            emit(() => {}, { success: true,
+id: deleteId!,
+projectId });
             return;
         }
 
@@ -310,20 +340,35 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
             limit: 100
         })).data as unknown as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
 
-        console.log("");
-        console.log(chalk.bold(`  🔗 Webhooks — project ${displayProjectRef(rawArgs)}`));
-        console.log("");
-        if (hooks.length === 0) {
-            console.log(chalk.gray("  No webhooks. Add one with `rebase cloud webhooks create`."));
-            console.log("");
-            return;
-        }
-        for (const h of hooks) {
-            const state = h.enabled ? chalk.green("enabled") : chalk.gray("disabled");
-            console.log(`  ${chalk.bold(h.name ?? "(unnamed)")} ${chalk.gray(`[${h.id}]`)} ${state}`);
-            console.log(`    ${chalk.gray(`${h.table ?? "?"} → ${h.url ?? "?"}  (${(h.events ?? []).join(", ")})`)}`);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  🔗 Webhooks — project ${displayProjectRef(rawArgs)}`));
+                console.log("");
+                if (hooks.length === 0) {
+                    console.log(chalk.gray("  No webhooks. Add one with `rebase cloud webhooks create`."));
+                    console.log("");
+                    return;
+                }
+                for (const h of hooks) {
+                    const state = h.enabled ? chalk.green("enabled") : chalk.gray("disabled");
+                    console.log(`  ${chalk.bold(h.name ?? "(unnamed)")} ${chalk.gray(`[${h.id}]`)} ${state}`);
+                    console.log(`    ${chalk.gray(`${h.table ?? "?"} → ${h.url ?? "?"}  (${(h.events ?? []).join(", ")})`)}`);
+                }
+                console.log("");
+            },
+            {
+                projectId,
+                webhooks: hooks.map((h) => ({
+                    id: String(h.id),
+                    name: h.name ?? null,
+                    table: h.table ?? null,
+                    url: h.url ?? null,
+                    events: h.events ?? [],
+                    enabled: h.enabled ?? null
+                }))
+            }
+        );
     } catch (e) {
         reportError(e, "Webhook operation failed");
     }
@@ -354,44 +399,60 @@ export async function storageCommand(action: string | undefined, rawArgs: string
             limit: 50
         })).data as unknown as Array<{ id: string | number; type?: string; provider?: string; bucketName?: string; status?: string }>;
 
-        console.log("");
-        console.log(chalk.bold(`  🪣 Storage — project ${displayProjectRef(rawArgs)}`));
-        console.log("");
-        if (stores.length === 0) {
-            console.log(chalk.gray("  No storage buckets attached."));
-            console.log("");
-            return;
-        }
-        for (const s of stores) {
-            console.log(`  ${chalk.bold(s.bucketName ?? s.type ?? "bucket")} ${chalk.gray(`[${s.id}]`)} ${colorStatus(s.status)}`);
-            keyValues([["Provider", s.provider], ["Type", s.type]]);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  🪣 Storage — project ${displayProjectRef(rawArgs)}`));
+                console.log("");
+                if (stores.length === 0) {
+                    console.log(chalk.gray("  No storage buckets attached."));
+                    console.log("");
+                    return;
+                }
+                for (const s of stores) {
+                    console.log(`  ${chalk.bold(s.bucketName ?? s.type ?? "bucket")} ${chalk.gray(`[${s.id}]`)} ${colorStatus(s.status)}`);
+                    keyValues([["Provider", s.provider], ["Type", s.type]]);
+                }
+                console.log("");
+            },
+            {
+                projectId,
+                stores: stores.map((s) => ({
+                    id: String(s.id),
+                    bucketName: s.bucketName ?? null,
+                    type: s.type ?? null,
+                    provider: s.provider ?? null,
+                    status: s.status ?? null
+                }))
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to list storage");
     }
 }
 
 export function printStorageHelp(): void {
-    console.log("");
-    console.log(chalk.bold("  rebase cloud storage"));
-    console.log("");
-    console.log("  " + chalk.blue.bold("storage") + "                   List this project's storage");
-    console.log("  " + chalk.blue.bold("storage create") + "            Provision platform-managed storage");
-    console.log("  " + chalk.blue.bold("storage attach") + "            Attach your own S3-compatible bucket");
-    console.log("");
-    console.log(chalk.gray("  attach options:"));
-    console.log(chalk.gray("    --bucket <name>          Bucket name (required)"));
-    console.log(chalk.gray("    --access-key-id <id>     Access key ID (required)"));
-    console.log(chalk.gray("    --secret-access-key <s>  Secret access key (required)"));
-    console.log(chalk.gray("    --endpoint <url>         S3 endpoint; omit for AWS"));
-    console.log(chalk.gray("    --region <region>        Region"));
-    console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
-    console.log("");
-    console.log(chalk.gray("  Without either, file storage stays off: uploads are refused with"));
-    console.log(chalk.gray("  501 STORAGE_NOT_CONFIGURED rather than written to a container"));
-    console.log(chalk.gray("  filesystem that is erased on the next restart."));
-    console.log("");
+    emitHelp("storage", ["list", "create", "attach"], () => {
+        console.log("");
+        console.log(chalk.bold("  rebase cloud storage"));
+        console.log("");
+        console.log("  " + chalk.blue.bold("storage") + "                   List this project's storage");
+        console.log("  " + chalk.blue.bold("storage create") + "            Provision platform-managed storage");
+        console.log("  " + chalk.blue.bold("storage attach") + "            Attach your own S3-compatible bucket");
+        console.log("");
+        console.log(chalk.gray("  attach options:"));
+        console.log(chalk.gray("    --bucket <name>          Bucket name (required)"));
+        console.log(chalk.gray("    --access-key-id <id>     Access key ID (required)"));
+        console.log(chalk.gray("    --secret-access-key <s>  Secret access key (required)"));
+        console.log(chalk.gray("    --endpoint <url>         S3 endpoint; omit for AWS"));
+        console.log(chalk.gray("    --region <region>        Region"));
+        console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
+        console.log("");
+        console.log(chalk.gray("  Without either, file storage stays off: uploads are refused with"));
+        console.log(chalk.gray("  501 STORAGE_NOT_CONFIGURED rather than written to a container"));
+        console.log(chalk.gray("  filesystem that is erased on the next restart."));
+        console.log("");
+    });
 }
 
 /* ─── storage create: platform-managed ─────────────────────────── */
@@ -411,8 +472,8 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
     const projectId = await requireProject(rawArgs, client);
 
     try {
-        console.log("");
-        console.log(chalk.gray("  Provisioning managed storage — this creates a bucket and its credentials..."));
+        noteBlank();
+        note(chalk.gray("Provisioning managed storage — this creates a bucket and its credentials..."));
 
         const res = await client.functions.invoke<{
             data: { bucketName: string; region: string; endpoint: string; accessKeyId: string };
@@ -421,18 +482,35 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
         const info = (res as unknown as { data?: typeof res.data }).data ?? res.data;
 
         success(`Managed storage provisioned for ${displayProjectRef(rawArgs)}.`);
-        keyValues([
-            ["Bucket", info.bucketName],
-            ["Region", info.region],
-            ["Endpoint", info.endpoint],
-            ["Access key", info.accessKeyId]
-        ]);
-        console.log("");
-        // The secret is never returned by the endpoint — it goes to the row and
-        // to the tenant's environment. Say so, or the absence reads as a bug.
-        console.log(chalk.gray("  The secret key is stored encrypted and injected at deploy time; it is not displayed."));
-        console.log(chalk.gray("  Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
-        console.log("");
+        emit(
+            () => {
+                keyValues([
+                    ["Bucket", info.bucketName],
+                    ["Region", info.region],
+                    ["Endpoint", info.endpoint],
+                    ["Access key", info.accessKeyId]
+                ]);
+                noteBlank();
+                // The secret is never returned by the endpoint — it goes to the
+                // row and to the tenant's environment. Say so, or the absence
+                // reads as a bug.
+                note(chalk.gray("The secret key is stored encrypted and injected at deploy time; it is not displayed."));
+                note(chalk.gray("Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
+                noteBlank();
+            },
+            {
+                success: true,
+                projectId,
+                bucketName: info.bucketName,
+                region: info.region,
+                endpoint: info.endpoint,
+                accessKeyId: info.accessKeyId,
+                // Stated, not omitted: a caller that finds no secret in the
+                // payload should know it was withheld, not lost.
+                secretAccessKey: null,
+                pendingRedeploy: true
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to provision managed storage");
     }
@@ -475,7 +553,8 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
         fail(
             `Missing ${missing.join(", ")}.`,
             "A bucket without credentials cannot be used, and would be stored as though it could. " +
-            "Run `rebase cloud storage --help` for the full list."
+            "Run `rebase cloud storage --help` for the full list.",
+            "usage"
         );
     }
 
@@ -506,6 +585,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
         // would be noise in every project that does not need it.
         if (parsed["--force-path-style"]) row.s3ForcePathStyle = true;
 
+        const replaced = Boolean(existing?.id);
         if (existing?.id) {
             await client.data.collection("storages").update(String(existing.id), row);
         } else {
@@ -513,14 +593,31 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
         }
 
         success(`Storage attached to ${displayProjectRef(rawArgs)}.`);
-        keyValues([
-            ["Bucket", bucket],
-            ["Endpoint", parsed["--endpoint"] ?? "AWS S3"],
-            ["Region", parsed["--region"] ?? "(default)"]
-        ]);
-        console.log("");
-        console.log(chalk.gray("  Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
-        console.log("");
+        emit(
+            () => {
+                keyValues([
+                    ["Bucket", bucket],
+                    ["Endpoint", parsed["--endpoint"] ?? "AWS S3"],
+                    ["Region", parsed["--region"] ?? "(default)"]
+                ]);
+                noteBlank();
+                note(chalk.gray("Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
+                noteBlank();
+            },
+            {
+                success: true,
+                projectId,
+                bucket,
+                endpoint: parsed["--endpoint"] ?? null,
+                region: parsed["--region"] ?? null,
+                forcePathStyle: Boolean(parsed["--force-path-style"]),
+                // The one fact the human rendering does not carry: `attach` over
+                // an existing row is an overwrite, and a caller re-running it in
+                // a script should be able to tell that it replaced something.
+                replaced,
+                pendingRedeploy: true
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to attach storage");
     }
@@ -539,19 +636,32 @@ export async function clustersCommand(rawArgs: string[]): Promise<void> {
             status?: string;
         }>;
 
-        console.log("");
-        console.log(chalk.bold("  ☸  Clusters"));
-        console.log("");
-        if (clusters.length === 0) {
-            console.log(chalk.gray("  No clusters registered."));
-            console.log("");
-            return;
-        }
-        for (const c of clusters) {
-            console.log(`  ${chalk.bold(c.name ?? "(unnamed)")} ${chalk.gray(`[${c.id}]`)} ${colorStatus(c.status)}`);
-            keyValues([["Provider", c.provider], ["Region", c.region]]);
-        }
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold("  ☸  Clusters"));
+                console.log("");
+                if (clusters.length === 0) {
+                    console.log(chalk.gray("  No clusters registered."));
+                    console.log("");
+                    return;
+                }
+                for (const c of clusters) {
+                    console.log(`  ${chalk.bold(c.name ?? "(unnamed)")} ${chalk.gray(`[${c.id}]`)} ${colorStatus(c.status)}`);
+                    keyValues([["Provider", c.provider], ["Region", c.region]]);
+                }
+                console.log("");
+            },
+            {
+                clusters: clusters.map((c) => ({
+                    id: String(c.id),
+                    name: c.name ?? null,
+                    provider: c.provider ?? null,
+                    region: c.region ?? null,
+                    status: c.status ?? null
+                }))
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to list clusters");
     }
@@ -576,22 +686,26 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).
     if (action === "setup") {
-        if (!org) fail("No active organization.", "Run `rebase cloud use` first.");
+        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
         try {
             const res = await client.functions.invoke<{ url?: string; simulated?: boolean }>(
                 "stripe-billing",
                 { organizationId: org },
                 { path: "setup-session" }
             );
-            if (!res.url) fail("Could not start billing setup.");
+            if (!res.url) fail("Could not start billing setup.", undefined, "billing_setup_failed");
             openUrl(res.url, "Add a payment method in your browser:");
-            if (res.simulated) {
-                console.log(chalk.gray("  (dev mode — Stripe not configured; complete setup from the console)"));
-                console.log("");
-            } else {
-                console.log(chalk.gray("  Once you've added a card, `rebase cloud deploy` runs without further prompts."));
-                console.log("");
-            }
+            emit(
+                () => {
+                    note(chalk.gray(res.simulated
+                        ? "(dev mode — Stripe not configured; complete setup from the console)"
+                        : "Once you've added a card, `rebase cloud deploy` runs without further prompts."));
+                    noteBlank();
+                },
+                { url: res.url,
+org,
+simulated: Boolean(res.simulated) }
+            );
         } catch (e) {
             reportError(e, "Failed to start billing setup");
         }
@@ -607,11 +721,17 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
                 { projectId },
                 { path: "session" }
             );
-            if (!res.url) fail("Billing session could not be created.");
-            console.log("");
-            console.log("  Complete checkout in your browser:");
-            console.log(`  ${chalk.cyan(res.url)}`);
-            console.log("");
+            if (!res.url) fail("Billing session could not be created.", undefined, "checkout_failed");
+            emit(
+                () => {
+                    console.log("");
+                    console.log("  Complete checkout in your browser:");
+                    console.log(`  ${chalk.cyan(res.url)}`);
+                    console.log("");
+                },
+                { url: res.url,
+projectId }
+            );
         } catch (e) {
             reportError(e, "Failed to start checkout");
         }
@@ -619,16 +739,25 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     }
 
     // default: show the active org's billing account.
-    if (!org) fail("No active organization.", "Run `rebase cloud use` first.");
+    if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
     try {
         const orgRow = (await client.data.collection("organizations").findById(org)) as
             | { billing_account_id?: string | number; billingAccount?: string | number }
             | undefined;
         const billingId = orgRow?.billing_account_id ?? orgRow?.billingAccount;
         if (!billingId) {
-            console.log("");
-            console.log(chalk.gray(`  Organization ${org} has no billing account yet.`));
-            console.log("");
+            // Not an error — an org simply may not have been billed yet.
+            emit(
+                () => {
+                    console.log("");
+                    console.log(chalk.gray(`  Organization ${org} has no billing account yet.`));
+                    console.log("");
+                },
+                { org,
+account: null,
+plan: null,
+paymentMethod: null }
+            );
             return;
         }
         const acct = (await client.data.collection("billing-accounts").findById(billingId)) as
@@ -684,22 +813,42 @@ permissive: true });
             // no linked/resolvable project — skip the Plan line
         }
 
-        console.log("");
-        console.log(chalk.bold(`  💳 Billing — org ${org}`));
-        console.log("");
-        keyValues([
-            ["Account", acct ? String(acct.id) : undefined],
-            ["Email", acct?.billingEmail],
-            ["Status", acct?.status ? colorStatus(acct.status) : undefined],
-            ["Plan", plan],
-            [
-                "Payment method",
-                card.hasPaymentMethod
-                    ? `${card.brand ?? "card"} •••• ${card.last4 ?? "????"}${card.expMonth ? ` (exp ${card.expMonth}/${card.expYear})` : ""}`
-                    : chalk.yellow("none — run `rebase cloud billing setup`")
-            ]
-        ]);
-        console.log("");
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  💳 Billing — org ${org}`));
+                console.log("");
+                keyValues([
+                    ["Account", acct ? String(acct.id) : undefined],
+                    ["Email", acct?.billingEmail],
+                    ["Status", acct?.status ? colorStatus(acct.status) : undefined],
+                    ["Plan", plan],
+                    [
+                        "Payment method",
+                        card.hasPaymentMethod
+                            ? `${card.brand ?? "card"} •••• ${card.last4 ?? "????"}${card.expMonth ? ` (exp ${card.expMonth}/${card.expYear})` : ""}`
+                            : chalk.yellow("none — run `rebase cloud billing setup`")
+                    ]
+                ]);
+                console.log("");
+            },
+            {
+                org,
+                account: acct
+                    ? { id: String(acct.id),
+billingEmail: acct.billingEmail ?? null,
+status: acct.status ?? null }
+                    : null,
+                plan: plan ?? null,
+                paymentMethod: {
+                    hasPaymentMethod: Boolean(card.hasPaymentMethod),
+                    brand: card.brand ?? null,
+                    last4: card.last4 ?? null,
+                    expMonth: card.expMonth ?? null,
+                    expYear: card.expYear ?? null
+                }
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to load billing");
     }
