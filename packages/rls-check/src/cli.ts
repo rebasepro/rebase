@@ -23,7 +23,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
-import { introspect } from "./introspect";
+import { introspectWithDiagnostics } from "./introspect";
 import { formatEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
@@ -66,7 +66,10 @@ export interface ScanOptions {
  * and this has an integration test.
  */
 export async function scan(options: ScanOptions): Promise<ScanResult> {
-    const snapshot = await introspect({
+    // `introspectWithDiagnostics`, not `introspect`: the latter drops the record
+    // of what could not be read, and a check whose inputs went missing returns
+    // no findings — which is indistinguishable from a clean table.
+    const { snapshot, diagnostics } = await introspectWithDiagnostics({
         connectionString: options.connectionString,
         schemas: options.schemas && options.schemas.length > 0 ? options.schemas : undefined,
         statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
@@ -77,7 +80,8 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
     return buildScanResult(snapshot, findings, {
         connectionString: options.connectionString,
         checksRun: selectCheckIds(options).length,
-        scannedAt: (options.now ?? new Date()).toISOString()
+        scannedAt: (options.now ?? new Date()).toISOString(),
+        diagnostics
     });
 }
 
@@ -99,10 +103,33 @@ export function selectCheckIds(options: { only?: string[]; skip?: string[] }): s
     );
 }
 
+/**
+ * The verdict, as an exit code.
+ *
+ * Pulled out of `runCli` so it can be tested: `runCli` needs a database, and
+ * the one line that decides whether CI goes red had no coverage at all —
+ * deleting it broke no test.
+ *
+ * A degraded scan exits 2, the same code a crash uses, rather than 0. Checks
+ * whose catalogue reads failed return no findings, which is indistinguishable
+ * from finding none, so exiting 0 would have the scanner answer "no problems"
+ * to a question it never managed to ask. Both codes mean the same thing here:
+ * no verdict.
+ */
+export function exitCodeFor(result: ScanResult, failOn: Severity | "none"): number {
+    if (result.diagnostics.degraded.length > 0) return EXIT_ERROR;
+    return exceedsThreshold(result.findings, failOn) ? EXIT_FINDINGS : EXIT_OK;
+}
+
 function buildScanResult(
     snapshot: DbSnapshot,
     findings: Finding[],
-    meta: { connectionString: string; checksRun: number; scannedAt: string }
+    meta: {
+        connectionString: string;
+        checksRun: number;
+        scannedAt: string;
+        diagnostics: ScanResult["diagnostics"];
+    }
 ): ScanResult {
     const target = parseConnectionString(meta.connectionString);
     const tables = snapshot.relations.filter((relation) => TABLE_KINDS.has(relation.kind));
@@ -124,7 +151,8 @@ function buildScanResult(
             tablesWithoutRls: tables.filter((relation) => !relation.rlsEnabled).length,
             checksRun: meta.checksRun
         },
-        findings
+        findings,
+        diagnostics: meta.diagnostics
     };
 }
 
@@ -806,7 +834,12 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
             );
         }
 
-        return exceedsThreshold(result.findings, options.failOn) ? EXIT_FINDINGS : EXIT_OK;
+        // A degraded scan is not a clean scan. Checks whose catalogue reads
+        // failed return nothing, which is indistinguishable from finding
+        // nothing — so reporting EXIT_OK here would be the scanner answering
+        // "no problems" to a question it never managed to ask. Exit 2, the same
+        // code an outright crash uses, because both mean "no verdict".
+        return exitCodeFor(result, options.failOn);
     } catch (error) {
         // Anything that escapes the expected paths. Exit 2, never 1: a crash is
         // not a clean bill of health and it is not a finding either.

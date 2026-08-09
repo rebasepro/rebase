@@ -223,4 +223,25 @@ export interface ScanResult {
         checksRun: number;
     };
     findings: Finding[];
+    /**
+     * What the scan could not read.
+     *
+     * `introspect` records every catalogue query that failed, and `introspect()`
+     * threw the record away before `scan` saw it — `ScanResult` had no field for
+     * it, and neither the report nor the exit code mentioned it. A single failed
+     * grants read silently disables `rls-disabled`, both view checks and
+     * `anonymous-write-allowed`, and the run then prints "✓ No unexpected RLS
+     * findings" and exits 0.
+     *
+     * A scanner that cannot say "I could not look" is worse than no scanner: it
+     * answers the question it was asked with the wrong word.
+     */
+    diagnostics: {
+        /** Catalogue reads that failed, and why. Non-empty means degraded. */
+        degraded: { what: string; error: string }[];
+        /** TLS certificate verification was turned off to connect. */
+        tlsVerificationDisabled: boolean;
+        /** Schemas left out of the scan, and why. */
+        excludedSchemas: { schema: string; reason: "system" | "platform" | "not-requested" }[];
+    };
 }

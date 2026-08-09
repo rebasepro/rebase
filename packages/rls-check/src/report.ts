@@ -221,6 +221,31 @@ export interface RenderOptions {
 
 const RULE = "─";
 
+/**
+ * What the scan could not read, and what that costs.
+ *
+ * Named per failed read rather than summarised, because which catalogue failed
+ * decides which checks went quiet — and the reader is the only one who can
+ * judge whether the missing ones mattered.
+ */
+function renderDegradedCaveat(
+    degraded: { what: string; error: string }[],
+    style: Style,
+    width: number
+): string[] {
+    const out: string[] = [];
+    out.push(style.yellow(`⚠ This scan was incomplete: ${degraded.length} catalogue read(s) failed.`));
+    out.push(...wrap(
+        "Checks that depend on what could not be read report nothing, which looks exactly " +
+        "like finding nothing. Treat this run as inconclusive rather than clean.",
+        width
+    ));
+    for (const item of degraded) {
+        out.push(`  • ${item.what}: ${item.error}`);
+    }
+    return out;
+}
+
 export function renderReport(result: ScanResult, options: RenderOptions): string {
     const style = options.color ? COLOUR : PLAIN;
     const width = clampWidth(options.width);
@@ -241,8 +266,22 @@ export function renderReport(result: ScanResult, options: RenderOptions): string
         out.push("");
     }
 
+    // Same reasoning as the privilege caveat above, and it survives --quiet for
+    // the same reason: a check whose catalogue read failed returns no findings,
+    // which is indistinguishable in the output from a check that found nothing.
+    // One failed grants read silently disables `rls-disabled`, both view checks
+    // and `anonymous-write-allowed`.
+    const degraded = result.diagnostics?.degraded ?? [];
+    if (degraded.length > 0) {
+        out.push(...renderDegradedCaveat(degraded, style, width));
+        out.push("");
+    }
+
     if (certain.length === 0 && heuristic.length === 0) {
-        out.push(style.green("No findings. Every table, view and policy in scope passed all checks."));
+        out.push(degraded.length > 0
+            // Not "no findings": the scan did not finish looking.
+            ? style.yellow("No findings from the checks that ran — but the scan was incomplete. See above.")
+            : style.green("No findings. Every table, view and policy in scope passed all checks."));
         out.push("");
     }
 

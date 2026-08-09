@@ -16,8 +16,7 @@ import {
     resolveColor,
     resolveConnection,
     runCli,
-    type CliIo
-} from "./cli";
+    type CliIo, exitCodeFor } from "./cli";
 import { formatEndpoint, parseConnectionString, redactConnectionString, redactSecrets } from "./redact";
 import {
     exceedsThreshold,
@@ -53,6 +52,11 @@ function finding(overrides: Partial<Finding> = {}): Finding {
 
 function result(overrides: Partial<ScanResult> = {}): ScanResult {
     return {
+        // A clean bill of health by default: nothing failed to read. Tests that
+        // care about the degraded path override it.
+        diagnostics: { degraded: [],
+tlsVerificationDisabled: false,
+excludedSchemas: [] },
         scannedAt: "2026-07-26T09:00:00.000Z",
         database: { host: "db.abcdefghijkl.supabase.co", name: "postgres" },
         serverVersion: "PostgreSQL 15.6 on aarch64-unknown-linux-gnu",
@@ -357,8 +361,12 @@ describe("renderJson", () => {
     it("emits exactly the ScanResult shape, with no colour and no extra keys", () => {
         const parsed = JSON.parse(renderJson(result())) as ScanResult;
 
+        // `diagnostics` is part of the JSON contract on purpose: a consumer
+        // reading `findings: []` needs to be able to tell "nothing was wrong"
+        // from "the scan could not look". Without it the two are the same
+        // document.
         expect(Object.keys(parsed).sort()).toEqual(
-            ["database", "findings", "platform", "scannedAt", "scannerIsPrivileged", "serverVersion", "stats"].sort()
+            ["database", "diagnostics", "findings", "platform", "scannedAt", "scannerIsPrivileged", "serverVersion", "stats"].sort()
         );
         expect(parsed.database).toEqual({ host: "db.abcdefghijkl.supabase.co", name: "postgres" });
         expect(parsed.scannedAt).toBe("2026-07-26T09:00:00.000Z");
@@ -596,4 +604,89 @@ describe("runCli", () => {
         expect(code).toBe(2);
         expect(io.out.join("") + io.err.join("")).not.toContain(PASSWORD);
     }, 30_000);
+});
+
+/**
+ * A scan that could not read the catalogue must not read as a clean scan.
+ *
+ * `introspect` records every failed catalogue query; `introspect()` threw that
+ * record away before `scan` saw it, `ScanResult` had no field for it, and
+ * neither the report nor the exit code mentioned it. A single failed grants
+ * read silently disables `rls-disabled`, both view checks and
+ * `anonymous-write-allowed` — and the run then printed "No findings" and
+ * exited 0.
+ */
+describe("degraded scans", () => {
+    const degradedResult = () => result({
+        findings: [],
+        diagnostics: {
+            degraded: [{ what: "table grants", error: "permission denied for table pg_class" }],
+            tlsVerificationDisabled: false,
+            excludedSchemas: []
+        }
+    });
+
+    it("does not claim a clean bill of health", () => {
+        const out = renderReport(degradedResult(), { color: false, quiet: false, failOn: "high", width: 100 });
+
+        expect(out).not.toContain("No findings. Every table, view and policy in scope passed all checks.");
+        expect(out).toContain("incomplete");
+    });
+
+    it("names what could not be read, and why it matters", () => {
+        const out = renderReport(degradedResult(), { color: false, quiet: false, failOn: "high", width: 100 });
+
+        expect(out).toContain("table grants");
+        expect(out).toContain("permission denied for table pg_class");
+        // Which check went quiet is the reader's call to make, so the cost is
+        // stated rather than the conclusion.
+        expect(out).toMatch(/looks exactly like finding nothing|inconclusive/);
+    });
+
+    it("survives --quiet, like the privilege caveat", () => {
+        // Suppressing it would let someone read a clean report from a scan that
+        // could not look.
+        const out = renderReport(degradedResult(), { color: false, quiet: true, failOn: "high", width: 100 });
+        expect(out).toContain("incomplete");
+    });
+
+    it("still says clean when nothing failed", () => {
+        // The control: a report that always warned would satisfy the above.
+        const out = renderReport(result({ findings: [] }), { color: false, quiet: false, failOn: "high", width: 100 });
+        expect(out).toContain("No findings.");
+        expect(out).not.toContain("incomplete");
+    });
+});
+
+/**
+ * The one line that decides whether CI goes red.
+ *
+ * It lived inside `runCli`, which needs a database, so it had no coverage:
+ * deleting it broke no test. It is a pure function now.
+ */
+describe("exitCodeFor", () => {
+    const clean = { degraded: [], tlsVerificationDisabled: false, excludedSchemas: [] };
+    const broken = {
+        degraded: [{ what: "table grants", error: "permission denied" }],
+        tlsVerificationDisabled: false,
+        excludedSchemas: []
+    };
+
+    it("is 0 for a clean scan with no findings", () => {
+        expect(exitCodeFor(result({ findings: [], diagnostics: clean }), "high")).toBe(0);
+    });
+
+    it("is 1 when a finding meets the threshold", () => {
+        expect(exitCodeFor(result({ findings: [finding()], diagnostics: clean }), "high")).toBe(1);
+    });
+
+    it("is 2 for a degraded scan, even with no findings", () => {
+        // The whole point: no findings from a scan that could not look is not
+        // the same answer as no findings from a scan that did.
+        expect(exitCodeFor(result({ findings: [], diagnostics: broken }), "high")).toBe(2);
+    });
+
+    it("is 2 for a degraded scan even when findings would not meet the threshold", () => {
+        expect(exitCodeFor(result({ findings: [], diagnostics: broken }), "none")).toBe(2);
+    });
 });
