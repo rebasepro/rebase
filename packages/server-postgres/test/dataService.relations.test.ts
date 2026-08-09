@@ -725,7 +725,7 @@ __type: "relation" }
                 const expectedOps: string[] = [];
 
                 // Track updateJoinPathOneToOneRelations
-                const relationService = dataService.getPersistService().getRelationService();
+                const relationService = dataService.getPersistService().getRelationWriteService();
                 const spyJoinPath = jest.spyOn(relationService, "updateJoinPathOneToOneRelations").mockImplementation(async () => {
                     expectedOps.push("joinPathUpdate");
                 });

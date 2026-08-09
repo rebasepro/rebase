@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
+import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
@@ -125,7 +126,7 @@ conflictHandled };
 
     const writeTags = async (existing: (string | number)[], value: unknown, deletedRowCount?: number) => {
         const recording = recordingTx(existing, deletedRowCount);
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         await service.updateRelationsUsingJoins(recording.tx as never, postsCollection, "p1", { tags: value } as never);
         return recording;
     };
@@ -199,7 +200,7 @@ conflictHandled };
         // catch the refusal too, which put the silent success back one layer up
         // from where it was just fixed.
         const recording = recordingTx(["t-1", "t-2"], 0);
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         const inverse = [{
             relationKey: "tags",
             relation: (postsCollection.relations as never as Array<Record<string, unknown>>)[0],
@@ -217,7 +218,7 @@ conflictHandled };
         // same defect, so a running server cannot reach this — it is the second
         // line, for a registry assembled by hand.
         const recording = recordingTx([]);
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         const inverse = [{
             relationKey: "tags",
             relation: {
@@ -240,7 +241,7 @@ conflictHandled };
         // that is not a decision about the caller: one relation blowing up on a
         // driver error should not abort the ones after it.
         const recording = recordingTx([]);
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         const inverse = [{
             relationKey: "tags",
             relation: {

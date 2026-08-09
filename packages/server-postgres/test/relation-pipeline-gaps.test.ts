@@ -19,6 +19,7 @@
  *    match expectations for various collection name patterns.
  */
 import { RelationService } from "../src/services/RelationService";
+import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
@@ -390,7 +391,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
         // would create tag rows instead of links, which is the failure mode
         // this shape guards.
         const { db, recorder } = createMockDb(() => []);
-        const service = new RelationService(db, registry);
+        const service = new RelationWriteService(db, registry);
 
         await service.updateRelationsUsingJoins(
             db as any,
@@ -412,7 +413,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
     it("clears the junction rows without reinserting when the relation is emptied", async () => {
         // Two links exist and the save asks for none.
         const { db, recorder } = createMockDb(() => [{ targetId: 1 }, { targetId: 2 }]);
-        const service = new RelationService(db, registry);
+        const service = new RelationWriteService(db, registry);
 
         await service.updateRelationsUsingJoins(
             db as any,

@@ -14,6 +14,7 @@ import {
 } from "./collection-helpers";
 import { sanitizeAndConvertDates, serializeDataToServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
+import { RelationWriteService } from "./RelationWriteService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -33,11 +34,15 @@ import { explainZeroRowWrite } from "./write-denial";
  * Handles saving, deleting, and updating rows.
  */
 export class PersistService {
+    /** Reads: whether a row is under a parent, the key a link joins on. */
     private relationService: RelationService;
+    /** Writes: junction membership, foreign-key stamping, links. */
+    private relationWrites: RelationWriteService;
     private fetchService: FetchService;
 
     constructor(private db: DrizzleClient, private registry: PostgresCollectionRegistry) {
         this.relationService = new RelationService(db, registry);
+        this.relationWrites = new RelationWriteService(db, registry);
         this.fetchService = new FetchService(db, registry);
     }
 
@@ -87,7 +92,7 @@ export class PersistService {
                         "RELATION_NOT_UNLINKABLE"
                     );
                 }
-                await this.relationService.unlinkRelatedEntity(this.db, hop, id);
+                await this.relationWrites.unlinkRelatedEntity(this.db, hop, id);
                 return;
             }
             // Owned child (inverse FK): deleting the row is the right meaning,
@@ -316,7 +321,7 @@ export class PersistService {
                     // Example: changing author A→B with stale profile P1 (A's):
                     //   reads old author_id=A → clears P1.author_id → re-sets P1.author_id=A (no-op).
                     if (joinPathRelationUpdates.length > 0) {
-                        await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
                     }
 
                     // Only issue an UPDATE if there are scalar columns to set.
@@ -417,18 +422,18 @@ export class PersistService {
 
                     // For inserts, apply joinPath after since the parent row didn't exist before
                     if (joinPathRelationUpdates.length > 0) {
-                        await this.relationService.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
                     }
                 }
 
                 // Handle inverse relation updates
                 if (inverseRelationUpdates.length > 0) {
-                    await this.relationService.updateInverseRelations(tx, collection, currentId, inverseRelationUpdates);
+                    await this.relationWrites.updateInverseRelations(tx, collection, currentId, inverseRelationUpdates);
                 }
 
                 // Update many-to-many relations
                 if (Object.keys(relationValues).length > 0) {
-                    await this.relationService.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
+                    await this.relationWrites.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
                 }
 
                 // Attach the row to the parent's set. Runs for updates as well as
@@ -437,7 +442,7 @@ export class PersistService {
                 // path. The insert is idempotent, so re-asserting a link is a
                 // no-op rather than a duplicate-key error.
                 if (junctionTableInfo) {
-                    await this.relationService.handleJunctionTableCreation(tx, currentId, junctionTableInfo);
+                    await this.relationWrites.handleJunctionTableCreation(tx, currentId, junctionTableInfo);
                 }
 
                 return currentId;
@@ -464,6 +469,16 @@ export class PersistService {
      */
     getRelationService(): RelationService {
         return this.relationService;
+    }
+
+    /**
+     * The write half, for external use. Separate from
+     * {@link getRelationService} because they are separate objects now: reads
+     * answer questions, writes change rows, and the callers of one are not the
+     * callers of the other.
+     */
+    getRelationWriteService(): RelationWriteService {
+        return this.relationWrites;
     }
 
     /**

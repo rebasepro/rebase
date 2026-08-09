@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
+import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
@@ -102,7 +103,7 @@ describe("relation writes accept rows or bare keys", () => {
 
     const writeTags = async (value: unknown) => {
         const { tx, inserted } = recordingTx();
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         await service.updateRelationsUsingJoins(tx as never, postsCollection, "p1", { tags: value } as never);
         return inserted;
     };
@@ -140,7 +141,7 @@ describe("relation writes accept rows or bare keys", () => {
 
     it("clears the membership when given an empty list", async () => {
         const { tx, inserted } = recordingTx(["t-1", "t-2"]);
-        const service = new RelationService({} as never, registry);
+        const service = new RelationWriteService({} as never, registry);
         await service.updateRelationsUsingJoins(tx as never, postsCollection, "p1", { tags: [] } as never);
 
         expect(tx.delete).toHaveBeenCalled();
