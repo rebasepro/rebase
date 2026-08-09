@@ -60,17 +60,17 @@ const CAPABILITIES: Capability[] = [
                     <span>key</span><span>scope</span><span>rate</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3">
-                    <span className="text-surface-300">rsk_live_a91…</span>
+                    <span className="text-surface-300">rk_live_a91…</span>
                     <span className="text-primary">docs:read</span>
-                    <span className="text-surface-500">60/min</span>
+                    <span className="text-surface-500">1000/15m</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3">
-                    <span className="text-surface-300">rsk_live_7c2…</span>
+                    <span className="text-surface-300">rk_live_7c2…</span>
                     <span className="text-primary">orders:rw</span>
-                    <span className="text-surface-500">600/min</span>
+                    <span className="text-surface-500">5000/15m</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3 opacity-50">
-                    <span className="text-surface-400 line-through">rsk_live_44f…</span>
+                    <span className="text-surface-400 line-through">rk_live_44f…</span>
                     <span className="text-surface-500">revoked</span>
                     <span className="text-surface-600">—</span>
                 </div>
@@ -106,11 +106,11 @@ const CAPABILITIES: Capability[] = [
         body: (
             <>
                 {line(0, <span className="text-surface-500">→ initialize</span>)}
-                {line(0, <span className="text-emerald-400">← 12 tools registered</span>)}
+                {line(0, <span className="text-emerald-400">← 40 tools registered</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(1, <span className="text-primary">data.query</span>, <span className="text-surface-500"> — read any collection under RLS</span>)}
-                    {line(1, <span className="text-primary">schema.describe</span>, <span className="text-surface-500"> — tables, relations, enums</span>)}
-                    {line(1, <span className="text-primary">db.migrate</span>, <span className="text-surface-500"> — apply a pending migration</span>)}
+                    {line(1, <span className="text-primary">list_documents</span>, <span className="text-surface-500"> — read any collection under RLS</span>)}
+                    {line(1, <span className="text-primary">rebase_schema_introspect</span>, <span className="text-surface-500"> — tables, relations, enums</span>)}
+                    {line(1, <span className="text-primary">rebase_db_migrate</span>, <span className="text-surface-500"> — apply pending migrations</span>)}
                 </div>
             </>
         )
@@ -255,7 +255,7 @@ export function AgentConsoleDemo() {
                                 type="button"
                                 onClick={() => setActiveKey(cap.key)}
                                 aria-pressed={on}
-                                className={`flex-none lg:w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
+                                className={`flex-none lg:w-full flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
                                     on
                                         ? "bg-primary/10 text-white ring-1 ring-inset ring-primary/25"
                                         : "text-surface-400 hover:text-surface-200 hover:bg-white/[0.03]"

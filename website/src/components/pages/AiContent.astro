@@ -279,7 +279,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                 </p>
             </div>
 
-            <div class="mx-auto max-w-6xl" inert aria-hidden="true">
+            <!-- Not `inert`, unlike the decorative mockups elsewhere on the site:
+                 this console's left rail is a real control, and marking the
+                 wrapper inert made every capability unclickable. -->
+            <div class="mx-auto max-w-6xl">
                 <AgentConsoleDemo client:visible/>
             </div>
         </div>
@@ -328,9 +331,9 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                    class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">
                     Try the demo
                 </a>
-                <a href="/docs"
+                <a href="/docs/ai"
                    class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
-                    Read the docs
+                    Read the AI docs
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>

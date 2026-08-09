@@ -40,6 +40,21 @@ interface Call {
     ok: string;
     /** Why Postgres refuses, when it does. */
     rlsNote: string;
+    /**
+     * The wire answer when gate one passes and Postgres does not. Only the
+     * delete row can reach that state here. Postgres does not raise for a
+     * policy-filtered DELETE — it reports zero rows, exactly like a delete that
+     * had nothing to do — so the driver re-reads the target on the same handle:
+     * still visible means refused (403 WRITE_DENIED), gone means 404.
+     */
+    blocked?: string;
+    /**
+     * The `error.code` in the 403 body. Collection routes raise
+     * API_KEY_FORBIDDEN from the permission guard; the admin surfaces
+     * (`/admin/users`, which is what list_users calls) raise FORBIDDEN from
+     * requireAdmin.
+     */
+    deniedCode: string;
 }
 
 const CALLS: Call[] = [
@@ -49,7 +64,8 @@ const CALLS: Call[] = [
         needs: { collection: "products", op: "read" },
         rlsAllows: true,
         ok: `20 rows · id, title, price, stock`,
-        rlsNote: `products has a select policy naming "service"`
+        rlsNote: `products has a select policy naming "service"`,
+        deniedCode: "API_KEY_FORBIDDEN"
     },
     {
         tool: "update_document",
@@ -57,7 +73,8 @@ const CALLS: Call[] = [
         needs: { collection: "orders", op: "write" },
         rlsAllows: true,
         ok: `1 row updated · orders/8f21`,
-        rlsNote: `orders grants update to "service"`
+        rlsNote: `orders grants update to "service"`,
+        deniedCode: "API_KEY_FORBIDDEN"
     },
     {
         tool: "delete_document",
@@ -65,7 +82,9 @@ const CALLS: Call[] = [
         needs: { collection: "orders", op: "delete" },
         rlsAllows: false,
         ok: `1 row deleted · orders/8f21`,
-        rlsNote: `no delete policy on orders names "service", so 0 rows match`
+        rlsNote: `no delete policy on orders names "service", so 0 rows match`,
+        blocked: `403  WRITE_DENIED · orders/8f21 is still there`,
+        deniedCode: "API_KEY_FORBIDDEN"
     },
     {
         tool: "list_users",
@@ -73,7 +92,8 @@ const CALLS: Call[] = [
         needs: null,
         rlsAllows: false,
         ok: `142 users · id, email, roles`,
-        rlsNote: `the users table is covered by default_admin, which the service role is not`
+        rlsNote: `the users table is covered by default_admin, which the service role is not`,
+        deniedCode: "FORBIDDEN"
     }
 ];
 
@@ -126,7 +146,7 @@ export function McpSessionDemo() {
                                     type="button"
                                     onClick={() => toggle(i)}
                                     aria-pressed={g.on}
-                                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
+                                    className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
                                         g.on
                                             ? "bg-primary/[0.07] text-surface-200 ring-1 ring-inset ring-primary/25"
                                             : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
@@ -147,7 +167,7 @@ export function McpSessionDemo() {
                         type="button"
                         onClick={() => setAdmin((a) => !a)}
                         aria-pressed={admin}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
+                        className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left font-mono text-[12.5px] transition-all duration-200 ${
                             admin
                                 ? "bg-amber-500/[0.08] text-amber-200 ring-1 ring-inset ring-amber-500/30"
                                 : "text-surface-600 ring-1 ring-inset ring-surface-800 hover:text-surface-400"
@@ -208,8 +228,8 @@ export function McpSessionDemo() {
                                         {pass
                                             ? `200  ${call.ok}`
                                             : gateKey
-                                                ? `200  0 rows affected`
-                                                : `403  permission_denied`}
+                                                ? call.blocked ?? `200  0 rows affected`
+                                                : `403  ${call.deniedCode}`}
                                     </p>
 
                                     {!pass && (
@@ -217,7 +237,7 @@ export function McpSessionDemo() {
                                             {gateKey
                                                 /* The most useful state in the figure: permission granted,
                                                    database unmoved. Granting a key does not write a policy. */
-                                                ? <>The key permits this. Postgres does not — {call.rlsNote}.</>
+                                                ? <>The key permits this. Postgres does not — {call.rlsNote}, so the row survives and the write is reported as refused.</>
                                                 : gateRls
                                                     ? <>Postgres would have allowed it; the key is what stopped it.</>
                                                     : <>Refused twice: the key has no such permission, and {call.rlsNote}.</>}
@@ -231,8 +251,9 @@ export function McpSessionDemo() {
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
                         The two gates are independent, which is the part worth sitting with: grant
                         <span className="font-mono text-surface-400"> orders:delete</span> above and the call still
-                        deletes nothing, because a key permission is not a policy. No prompt, jailbreak or bug in the
-                        tool layer widens what the database will return.
+                        deletes nothing, because a key permission is not a policy — and it comes back 403 rather
+                        than reporting a delete that never happened. No prompt, jailbreak or bug in the tool layer
+                        widens what the database will return.
                     </p>
                 </div>
             </div>
