@@ -8,6 +8,7 @@ import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
     getTableForCollection,
+    relationMisconfigured,
     requirePrimaryKeys,
     parseIdValues,
     buildCompositeId,
@@ -918,19 +919,17 @@ export class RelationService {
             // The junction names its parent with one column, so the same
             // single-key limit applies as for a direct foreign key.
             this.assertSingleKeyAddressable(parentCollection, parentPks, `${relation.through.table}.${relation.through.sourceColumn}`);
-            const junctionTable = this.registry.getTable(relation.through.table);
-            if (!junctionTable) {
-                logger.warn(`[batchFetchRelatedEntitiesMany] Junction table '${relation.through.table}' not found`);
-                return new Map();
-            }
 
-            const sourceJunctionCol = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetJunctionCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-            if (!sourceJunctionCol || !targetJunctionCol) {
-                logger.warn(`[batchFetchRelatedEntitiesMany] Junction columns not found in '${relation.through.table}'`);
-                return new Map();
-            }
+            // An empty map here is a lie a caller cannot see through: `posts/1/tags`
+            // answering `[]` is exactly what a post with no tags looks like. That
+            // is the failure `assertRelationsResolve` was written to make
+            // impossible at boot; this says the same thing if one gets past it.
+            const { table: junctionTable, parentColumn: sourceJunctionCol, targetColumn: targetJunctionCol } =
+                bindThroughJunction(
+                    this.registry,
+                    relation.through,
+                    `${parentCollection.slug}.${relation.relationName}`
+                );
 
             // SELECT target.*, junction.sourceColumn FROM junction
             // INNER JOIN target ON junction.targetColumn = target.id
@@ -1070,8 +1069,11 @@ export class RelationService {
                 const fkCol = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
 
                 if (!fkCol || !targetIdCol) {
-                    logger.warn(`Invalid inverse-many config for relation '${key}' in collection '${collection.slug}'`);
-                    continue;
+                    throw relationMisconfigured(
+                        label,
+                        `the target table '${getTableName(targetCollection)}' has no ` +
+                        `${fkCol ? `'${targetIdInfo.fieldName}' key column` : `'${relation.foreignKeyOnTarget}' foreign-key column`}`
+                    );
                 }
 
                 // What the children's foreign key must hold — the parent's id
@@ -1116,7 +1118,16 @@ export class RelationService {
                         .where(eq(fkCol, parentKeyValue));
                 }
             } else {
-                logger.warn(`Many relation '${key}' in collection '${collection.slug}' lacks write configuration and will be skipped during save.`);
+                // Every to-many kind in the union is handled above — TypeScript
+                // narrows `relation` to `never` here — so reaching this means a
+                // relation resolved to something no writer knows. It used to be
+                // skipped with a warning, which told the caller their membership
+                // had been stored when nothing had happened.
+                throw relationMisconfigured(
+                    label,
+                    "it is a to-many relation with no way to write links — a `manyToMany` " +
+                    "needs `through`, a `hasMany` needs `foreignKeyOnTarget`"
+                );
             }
         }
     }
@@ -1180,17 +1191,23 @@ export class RelationService {
                 }
 
                 // What is left names the parent with a column on the target.
+                const label = `${sourceCollection.slug}.${relation.relationName}`;
                 if (!hasForeignKeyOnTarget(relation)) {
-                    logger.warn(`Relation '${relation.relationName}' has no column on the target to write. Skipping.`);
-                    continue;
+                    throw relationMisconfigured(
+                        label,
+                        `a '${relation.kind}' relation names no column on the target to write the link into`
+                    );
                 }
 
                 // The wire name the target's table is keyed by, not the column.
                 const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget!);
                 const foreignKeyColumn = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
                 if (!foreignKeyColumn) {
-                    logger.warn(`Foreign key column '${relation.foreignKeyOnTarget}' not found in target table for relation '${relation.relationName}'`);
-                    continue;
+                    throw relationMisconfigured(
+                        label,
+                        `'${relation.foreignKeyOnTarget}' is not a column on the target table ` +
+                        `'${getTableName(targetCollection)}'`
+                    );
                 }
 
                 // The value the target's foreign key holds: this row's id, or
@@ -1373,13 +1390,20 @@ export class RelationService {
             const parentSourceCol = parentTable[parentSourceColName as keyof typeof parentTable] as AnyPgColumn;
             const targetFKCol = targetTable[targetFKColName as keyof typeof targetTable] as AnyPgColumn;
 
+            const label = `${parentCollection.slug}.${relation.relationName}`;
             if (!parentSourceCol) {
-                logger.warn(`Parent source column '${parentSourceColName}' not found for joinPath relation '${relation.relationName}'`);
-                continue;
+                throw relationMisconfigured(
+                    label,
+                    `its joinPath reads '${parentSourceColName}', which is not a column on ` +
+                    `'${getTableName(parentCollection)}'`
+                );
             }
             if (!targetFKCol) {
-                logger.warn(`Target FK column '${targetFKColName}' not found for joinPath relation '${relation.relationName}'`);
-                continue;
+                throw relationMisconfigured(
+                    label,
+                    `its joinPath writes '${targetFKColName}', which is not a column on ` +
+                    `'${getTableName(targetCollection)}'`
+                );
             }
 
             // Fetch the parent row to obtain the value for parentSourceCol
@@ -1411,8 +1435,16 @@ export class RelationService {
                     .set({ [targetFKColName]: null })
                     .where(eq(targetFKCol, String(parentFKValue)));
             } else {
-                logger.warn(`Cannot set joinPath relation '${relation.relationName}' because parent FK value is null/undefined`);
-                continue;
+                // Not a configuration problem: the row is simply missing the
+                // value the link joins on, so there is nothing for the target
+                // to point at. The `hasMany` writer already refuses this case
+                // in the same words rather than saving a row it did not write.
+                throw ApiError.badRequest(
+                    `Cannot write relation '${label}': row '${parentId}' has no value in ` +
+                    `'${parentSourceColName}', which is the column its joinPath joins on, so there ` +
+                    "is nothing for the related row to point at.",
+                    "RELATION_SOURCE_KEY_EMPTY"
+                );
             }
 
             // Now set the FK on the target row
@@ -1477,37 +1509,25 @@ parentSourceColName };
         const targetCollection = relation.target();
 
         try {
-            const junctionTable = this.registry.getTable(relation.through.table);
-            if (!junctionTable) {
-                logger.warn(`Junction table '${relation.through.table}' not found for relation '${relationKey}'`);
-                return;
-            }
+            const binding = bindThroughJunction(
+                this.registry,
+                relation.through,
+                `${parentCollection.slug}.${relationKey}`
+            );
 
-            const sourceJunctionColumn = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetJunctionColumn = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-            if (!sourceJunctionColumn || !targetJunctionColumn) {
-                logger.warn(`Junction columns not found for relation '${relationKey}'`);
-                return;
-            }
-
-            // Parse the new row ID to the correct type
-            const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-            const targetIdInfo = targetPks[0];
-            const parsedNewEntityIdObj = parseIdValues(newEntityId, targetPks);
-            const parsedNewEntityId = parsedNewEntityIdObj[targetIdInfo.fieldName];
+            const parsedNewEntityId = this.parsedId(targetCollection, newEntityId);
 
             // Create the junction table entry linking parent to the target row.
             const junctionData = {
-                [sourceJunctionColumn.name]: parentId,
-                [targetJunctionColumn.name]: parsedNewEntityId
+                [binding.parentColumn.name]: parentId,
+                [binding.targetColumn.name]: parsedNewEntityId
             };
 
             // Idempotent: a link either exists or it does not, so asking for one
             // twice is not an error. This is what lets `PUT parent/id/child/childId`
             // mean "this row belongs to this parent's set" — the only way to
             // attach an *existing* row, which previously had none.
-            await tx.insert(junctionTable).values(junctionData).onConflictDoNothing();
+            await tx.insert(binding.table).values(junctionData).onConflictDoNothing();
 
             logger.info(`Linked '${relationKey}' ${parsedNewEntityId} to ${parentId}`);
         } catch (error) {

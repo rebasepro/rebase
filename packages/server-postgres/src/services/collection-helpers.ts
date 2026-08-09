@@ -129,6 +129,30 @@ export function assertWritableColumns(
     );
 }
 
+/**
+ * A relation whose names do not resolve against the registered schema.
+ *
+ * Every one of these used to be a `logger.warn` followed by `continue`, so a
+ * save reported success for a relation it had not written and a read answered
+ * `[]` for one it could not resolve. `assertRelationsResolve` (validate-relations)
+ * fails boot on the same defects, which is where they belong — a server that
+ * refuses to start is recoverable in a minute. This is the second line, for the
+ * paths that assemble a registry by hand, and it exists so that "cannot resolve"
+ * is never again reported as "done".
+ *
+ * @param label  `<collection>.<relation>`
+ * @param detail what does not resolve, in terms of the schema
+ */
+export function relationMisconfigured(label: string, detail: string): ApiError {
+    return ApiError.internal(
+        `Relation '${label}' does not resolve against the registered schema: ${detail}. ` +
+        "The operation was refused rather than skipped — silently dropping it would report " +
+        "success for a write that never happened, or emptiness for rows that exist. Run " +
+        "`rebase schema generate` if the generated schema is older than the database.",
+        "RELATION_MISCONFIGURED"
+    );
+}
+
 export function getTableForCollection(collection: CollectionConfig, registry: PostgresCollectionRegistry): PgTable<any> {
     const tableName = getTableName(collection);
     const table = registry.getTable(tableName);

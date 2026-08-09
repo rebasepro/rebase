@@ -534,8 +534,12 @@ title: "Post Z" } }
     // ━━━ Error handling ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
     describe("Error handling", () => {
-        it("should return empty map when junction table is not found", async () => {
-            // Override getTable to return undefined for junction
+        it("refuses a junction it cannot resolve instead of answering with no rows", async () => {
+            // It used to warn and return an empty map, and an empty map is what
+            // a post with no tags looks like — so a relation pointing at a table
+            // that does not exist was indistinguishable from a correct answer.
+            // `assertRelationsResolve` fails boot on this; if one gets past it,
+            // saying so beats inventing an emptiness.
             jest.spyOn(registry, "getTable").mockImplementation(tableName => {
                 if (tableName === "posts_tags") return undefined;
                 if (tableName === "posts") return mockPostsTable as any;
@@ -543,21 +547,13 @@ title: "Post Z" } }
                 return undefined;
             });
 
-            const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
             const { db } = createMockDb(() => []);
             const service = new RelationService(db, registry);
             const relation = postsCollection.relations![0] as Relation;
 
-            const results = await service.batchFetchRelatedEntitiesMany(
+            await expect(service.batchFetchRelatedEntitiesMany(
                 "posts", [1], "tags", relation
-            );
-
-            expect(results.size).toBe(0);
-            expect(consoleSpy).toHaveBeenCalledWith(
-                expect.stringContaining("Junction table 'posts_tags' not found")
-            );
-
-            consoleSpy.mockRestore();
+            )).rejects.toMatchObject({ code: "RELATION_MISCONFIGURED" });
         });
     });
 

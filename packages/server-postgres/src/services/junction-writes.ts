@@ -4,6 +4,7 @@ import { ApiError, logger } from "@rebasepro/server";
 import type { ResolvedVia } from "@rebasepro/types";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { relationMisconfigured } from "./collection-helpers";
 import { explainZeroRowWrite } from "./write-denial";
 
 /**
@@ -35,14 +36,8 @@ export interface JunctionBinding {
 }
 
 /** A junction that cannot be resolved is a broken relation, not a no-op. */
-function misconfigured(label: string, detail: string): ApiError {
-    return ApiError.internal(
-        `Relation '${label}' declares a junction this server cannot resolve: ${detail}. ` +
-        "The write was refused rather than skipped — a save that silently drops a " +
-        "relation reports success for a membership it never stored.",
-        "RELATION_MISCONFIGURED"
-    );
-}
+const misconfigured = (label: string, detail: string): ApiError =>
+    relationMisconfigured(label, detail);
 
 function column(table: PgTable, name: string | undefined, label: string, role: string): AnyPgColumn {
     const col = name ? table[name as keyof typeof table] as AnyPgColumn : undefined;
