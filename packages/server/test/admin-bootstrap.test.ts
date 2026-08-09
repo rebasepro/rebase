@@ -84,6 +84,46 @@ describe("POST /bootstrap", () => {
         expect(setUserRoles).not.toHaveBeenCalled();
     });
 
+    /**
+     * The composed attack this endpoint used to permit, in two requests.
+     *
+     * `POST /auth/anonymous` mints a real session for anyone, and an anonymous
+     * principal is a users-table row like any other — so on a fresh deployment
+     * it was also the *earliest* row, which is the only thing the land-grab gate
+     * checks. Anonymous session, then bootstrap, and the caller is admin. It
+     * worked with `disableSelfRegistration: true` too, the flag documented as
+     * leaving "an empty backend with no self-service path in at all".
+     */
+    describe("an anonymous session cannot seize the initial admin role", () => {
+        it.each(["anonymous", "anon"])("refuses the anonymous uid %p", async anonId => {
+            // The anonymous row is the only user, and therefore the earliest.
+            const users = [user(anonId, "2026-01-01")];
+            const { repo, setUserRoles } = mockRepo(users);
+            const app = createAdminUsersRoute({ authRepo: repo });
+
+            const res = await app.request("/bootstrap", { method: "POST", headers: bearer(anonId) });
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as { error: { code: string } };
+            expect(body.error.code).toBe("BOOTSTRAP_ANONYMOUS");
+            expect(setUserRoles).not.toHaveBeenCalled();
+        });
+
+        it("does not let an anonymous row block the real first user", async () => {
+            // The other half: anonymous principals are excluded from "earliest
+            // registered", so an anonymous session created before the first real
+            // registration must not lock that user out of bootstrapping.
+            const users = [user("anonymous", "2026-01-01"), user("u1", "2026-02-01")];
+            const { repo, setUserRoles } = mockRepo(users);
+            const app = createAdminUsersRoute({ authRepo: repo });
+
+            const res = await app.request("/bootstrap", { method: "POST", headers: bearer("u1") });
+
+            expect(res.status).toBe(200);
+            expect(setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
+        });
+    });
+
     it("breaks equal-timestamp ties deterministically by id", async () => {
         const users = [user("u2", "2026-01-01"), user("u1", "2026-01-01")];
         const { repo, setUserRoles } = mockRepo(users);

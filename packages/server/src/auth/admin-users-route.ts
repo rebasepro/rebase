@@ -11,6 +11,7 @@
  */
 
 import { Hono } from "hono";
+import { isAnonymousUid } from "@rebasepro/types";
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
@@ -98,9 +99,31 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.", "BOOTSTRAP_COMPLETED");
         }
 
-        const uid = "uid" in user ? (user as { uid: string }).uid : ("uid" in user ? (user as { uid: string }).uid : undefined);
+        const uid = "uid" in user ? (user as { uid: string }).uid : undefined;
         if (!uid) {
             throw ApiError.unauthorized("User ID not found in auth context");
+        }
+
+        // An anonymous session may not claim the initial admin role.
+        //
+        // `POST /auth/anonymous` mints a real session for anyone who asks, and
+        // an anonymous principal is a row in the users table like any other —
+        // so on an empty backend it was also the *earliest* one, which is the
+        // only thing the land-grab gate below checks. Two unauthenticated
+        // requests therefore took a fresh deployment: anonymous session, then
+        // bootstrap. It worked with `disableSelfRegistration: true` as well,
+        // the flag whose docblock promises "an empty backend has no
+        // self-service path in at all".
+        if (isAnonymousUid(uid)) {
+            logger.warn("[Security Audit] Bootstrap denied: anonymous caller", {
+                eventType: "auth.bootstrap.denied.anonymous",
+                callerId: uid
+            });
+            throw ApiError.forbidden(
+                "An anonymous session cannot claim the initial admin role. Register a real " +
+                "account and bootstrap from it, or assign the admin role using the service key.",
+                "BOOTSTRAP_ANONYMOUS"
+            );
         }
         const caller = await authRepo.getUserById(uid);
         if (!caller) {
@@ -115,8 +138,13 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         // could then seize admin: a land-grab. The genuine first user is
         // deterministic; tie-break by id so identical timestamps still resolve to
         // a single winner.
-        if (users.length > 0) {
-            const earliest = users.reduce((a, b) => {
+        // Anonymous principals are excluded from "earliest registered" for the
+        // same reason they cannot bootstrap: they are sessions, not
+        // registrations. Leaving them in would also let an anonymous row that
+        // happens to predate the real first user block that user forever.
+        const registeredUsers = users.filter(u => !isAnonymousUid(u.id));
+        if (registeredUsers.length > 0) {
+            const earliest = registeredUsers.reduce((a, b) => {
                 const at = new Date(a.createdAt).getTime();
                 const bt = new Date(b.createdAt).getTime();
                 if (at !== bt) return at < bt ? a : b;
