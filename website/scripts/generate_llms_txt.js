@@ -293,8 +293,15 @@ async function buildSlugMap(directoryPath, slugMap) {
         // Convert H1 to H2 and so on, but leave # comments in code blocks alone
         result = mapLinesOutsideCodeFences(result, (line) => line.replaceAll("# ", "## "));
         result = intro + result; // Add the intro to the beginning
-        result = result.replaceAll("](./", "](https://rebase.pro/docs/"); // Replace relative links with absolute links
-        result = result.replaceAll("](../", "](https://rebase.pro/docs/"); // Replace relative links with absolute links
+        // Replace relative links with absolute ones — but only in prose. A
+        // relative link inside a code fence is usually the literal content of a
+        // file being documented (the scaffolded `CLAUDE.md` points at
+        // `./ai-instructions.md`), and rewriting it to a rebase.pro URL would
+        // misreport what that file actually says.
+        result = mapLinesOutsideCodeFences(result, (line) =>
+            line
+                .replaceAll("](./", "](https://rebase.pro/docs/")
+                .replaceAll("](../", "](https://rebase.pro/docs/"));
 
         await fs.promises.appendFile(outputFilePath, result, "utf-8");
 
