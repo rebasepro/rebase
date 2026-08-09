@@ -33,7 +33,7 @@ The package exports five modules:
 export * from "./components";  // All UI components
 export * from "./styles";      // Tailwind style mixin strings
 export * from "./util";        // cls(), debounce(), chip_colors, keyToIconComponent
-export * from "./icons";       // Icon component, iconSize, lucideIcons map, iconKeys, cool_icon_keys
+export * from "./icons";       // Icon component, iconSize, LucideIconByName, iconKeys, cool_icon_keys
 export * from "./hooks";       // React hooks
 ```
 
@@ -1149,15 +1149,42 @@ Maps `IconColor` values to Tailwind classes:
 | `"disabled"` | `text-text-disabled dark:text-text-disabled-dark` |
 | `"inherit"` | _(none)_ |
 
-### `lucideIcons` — Full Icon Map
+### `LucideIconByName` — Icon Lookup by String Name
+
+`@rebasepro/ui` used to re-export lucide's whole `icons` map as `lucideIcons`.
+It no longer does: that map holds a reference to every icon in the library, so
+exporting it defeated tree-shaking and put 822 kB of icon components in the
+entry chunk, preloaded before login. Render by name instead — the icon set is
+fetched on first use.
 
 ```tsx
-import { lucideIcons } from "@rebasepro/ui";
+import { LucideIconByName } from "@rebasepro/ui";
 
-// Dynamic lookup by string name
-const IconComponent = lucideIcons["Database"]; // LucideIcon component
-<IconComponent size={24} />
+<LucideIconByName name="Database" size={24} />
 ```
+
+Whether a name exists can be answered *before* the fetch, against `iconKeys`,
+which is a plain string array and costs nothing:
+
+```tsx
+import { iconKeys } from "@rebasepro/ui";
+
+const exists = iconKeys.includes("Database");
+```
+
+Outside React, or when you need the map itself:
+
+```tsx
+import { loadLucideIcons, getLoadedLucideIcons } from "@rebasepro/ui";
+
+const icons = await loadLucideIcons();   // Promise<Record<string, LucideIcon | undefined>>
+const Icon = icons["Database"];
+
+getLoadedLucideIcons();                  // the map if already fetched, else undefined
+```
+
+Inside React, `useLucideIcons()` returns the map once it has landed and
+`undefined` before that.
 
 ### `iconKeys` and `cool_icon_keys`
 
@@ -1165,7 +1192,7 @@ const IconComponent = lucideIcons["Database"]; // LucideIcon component
 - **`cool_icon_keys`** — Curated subset of ~50 visually distinctive icon names for icon pickers.
 
 ```tsx
-import { iconKeys, coolIconKeys, lucideIcons } from "@rebasepro/ui";
+import { iconKeys, coolIconKeys, LucideIconByName } from "@rebasepro/ui";
 ```
 
 ### `keyToIconComponent(key: string): string`
