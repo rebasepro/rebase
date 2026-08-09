@@ -32,7 +32,8 @@
  * exactly which collection is not yet servable and why.
  */
 import { type CollectionConfig } from "@rebasepro/types";
-import { planCollectionPolicies } from "./generate-postgres-ddl-logic";
+import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
+import { isGeneratedPolicyName } from "../security/policy-drift";
 import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
 import { REBASE_USER_ROLE } from "../security/rls-enforcement";
 
@@ -60,6 +61,19 @@ export interface PolicyEnsureResult {
      * writable by every authenticated request with no row filtering at all.
      */
     unsecured: { table: string; error: string; grantWithdrawn: boolean }[];
+    /**
+     * Generated policies removed because no current rule produces them.
+     *
+     * A policy's name embeds a hash of the rule's semantics, so editing a rule
+     * does not update a policy — it creates a new one and abandons the old.
+     * Postgres ORs permissive policies, so the abandoned one keeps granting:
+     * a `USING (true)` tightened to an owner check went on admitting everyone,
+     * forever, while the deploy logged success.
+     *
+     * `db push` reconciles this, and cannot reach a managed tenant's in-cluster
+     * database — which is the reason this module exists. So boot has to do it.
+     */
+    orphansDropped: number;
 }
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
@@ -72,12 +86,46 @@ const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test
  * to create (a junction, or a relation left to a migration). Enabling RLS on a
  * non-existent table would error, so those are recorded as skipped, not failed.
  */
+
+/**
+ * Remove generated policies on this table that the current plan does not
+ * produce.
+ *
+ * Scoped hard, because dropping a policy is destructive: only this one table,
+ * only names matching the generated `<table>_<op>_<sha1>` shape, and only names
+ * absent from the statements just applied. A hand-written policy, or one
+ * belonging to another table, is never touched — `isGeneratedPolicyName` is the
+ * same predicate `db push` uses to draw that line.
+ */
+async function dropOrphanedPoliciesOn(client: Queryable, plan: CollectionPolicyPlan): Promise<number> {
+    const expected = new Set<string>();
+    for (const statement of plan.policyStatements) {
+        const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
+        if (match) expected.add(match[1]);
+    }
+
+    const existing = await client.query<{ policyname: string }>(
+        `SELECT policyname FROM pg_policies WHERE schemaname = '${plan.schema.replace(/'/g, "''")}' ` +
+        `AND tablename = '${plan.table.replace(/'/g, "''")}'`
+    );
+
+    let dropped = 0;
+    for (const row of existing.rows) {
+        const name = row.policyname;
+        if (expected.has(name)) continue;
+        if (!isGeneratedPolicyName(name, plan.table)) continue;
+        await client.query(`DROP POLICY IF EXISTS "${name}" ON "${plan.schema}"."${plan.table}"`);
+        dropped++;
+    }
+    return dropped;
+}
+
 export async function ensureCollectionPolicies(
     client: Queryable,
     collections: CollectionConfig[],
     log?: (message: string) => void
 ): Promise<PolicyEnsureResult> {
-    const result: PolicyEnsureResult = { policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [] };
+    const result: PolicyEnsureResult = { policiesApplied: 0, tablesSecured: 0, skipped: [], failures: [], unsecured: [], orphansDropped: 0 };
 
     const plans = planCollectionPolicies(collections);
     if (plans.length === 0) return result;
@@ -132,7 +180,12 @@ grantWithdrawn });
                     created++;
                 }
             }
-            log?.(`${plan.qualified}: RLS enabled, ${created} policy(ies) applied`);
+
+            const orphans = await dropOrphanedPoliciesOn(client, plan);
+            result.orphansDropped += orphans;
+
+            log?.(`${plan.qualified}: RLS enabled, ${created} policy(ies) applied` +
+                (orphans > 0 ? `, ${orphans} orphan(s) dropped` : ""));
         } catch (err) {
             result.failures.push({
                 table: plan.qualified,
