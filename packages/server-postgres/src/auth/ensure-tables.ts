@@ -21,7 +21,7 @@ import {
  *                     When omitted, a default `rebase.users` table is created.
  */
 export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: CollectionConfig): Promise<void> {
-    logger.info("🔍 Checking auth tables...");
+    logger.debug("🔍 Checking auth tables...");
 
     // Before anything else, and deliberately outside the catch below: refuse to
     // run against a database that a newer framework version has already
@@ -88,7 +88,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 } else {
                     userIdType = "TEXT";
                 }
-                logger.info(`✨ Detected ${usersTableName}.id type from database: ${dbType}. Using user_id type: ${userIdType}`);
+                logger.debug(`✨ Detected ${usersTableName}.id type from database: ${dbType}. Using user_id type: ${userIdType}`);
             }
         } catch (err) {
             // Ignore introspection errors, fallback to derived/default type
@@ -628,7 +628,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 WHERE table_name = 'refresh_tokens'
             `);
             const found = (rtTables.rows as { table_schema: string; table_name: string }[]);
-            logger.info(`🔍 refresh_tokens reconcile: found ${found.length} table(s): ${found.map(r => `"${r.table_schema}"."${r.table_name}"`).join(", ") || "(none)"}`);
+            logger.debug(`🔍 refresh_tokens reconcile: found ${found.length} table(s): ${found.map(r => `"${r.table_schema}"."${r.table_name}"`).join(", ") || "(none)"}`);
             for (const { table_schema } of found) {
                 const qualified = `"${table_schema}"."refresh_tokens"`;
                 try {
@@ -678,7 +678,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                     // live tokens of one session (a rotation in flight) share a
                     // uid, and usually a user agent and IP too.
                     await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
-                    logger.info(`✅ refresh_tokens reconciled for session-scoped rotation: ${qualified}`);
+                    logger.debug(`✅ refresh_tokens reconciled for session-scoped rotation: ${qualified}`);
                 } catch (perTableError: unknown) {
                     logger.warn(`⚠️  refresh_tokens reconcile failed for ${qualified}: ${perTableError instanceof Error ? perTableError.message : String(perTableError)}`);
                 }
@@ -881,7 +881,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             }
         );
 
-        logger.info("✅ Auth tables ready");
+        logger.debug("✅ Auth tables ready");
     } catch (error) {
         // The one failure that must not be survived. Continuing here is what
         // produced a server that answered /health with 200 while every login

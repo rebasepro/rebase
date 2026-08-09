@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { logger } from "@rebasepro/server";
+import { out, outWarn, outError } from "./cli-output";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
@@ -41,7 +42,7 @@ async function loadEnv(): Promise<void> {
 
         for (const p of envPaths) {
             if (fs.existsSync(p)) {
-                const parsed = dotenv.config({ path: p });
+                const parsed = dotenv.config({ path: p, quiet: true });
                 if (parsed.parsed) {
                     for (const [key, val] of Object.entries(parsed.parsed)) {
                         if (process.env[key] === undefined) {
@@ -58,6 +59,13 @@ async function loadEnv(): Promise<void> {
 }
 
 export async function runPluginCommand(args: string[]) {
+    // Also set as an environment variable, not just per `config()` call: this
+    // command spawns `tsx` subprocesses (the schema generator, the DDL
+    // generator, doctor) that load `.env` themselves, and they inherit this.
+    // dotenv reads it before `options.quiet`; an explicit `false` still wins.
+    if (process.env.DOTENV_CONFIG_QUIET === undefined) {
+        process.env.DOTENV_CONFIG_QUIET = "true";
+    }
     await loadEnv();
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
@@ -69,7 +77,7 @@ export async function runPluginCommand(args: string[]) {
     } else if (domain === "doctor") {
         await doctorPluginCommand(args);
     } else {
-        logger.error(chalk.red(`Unknown domain command: ${domain}`));
+        outError(chalk.red(`Unknown domain command: ${domain}`));
         process.exit(1);
     }
 }
@@ -84,7 +92,7 @@ function listMigrationFiles(): string[] {
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
-        logger.error(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
+        outError(chalk.red(`Unknown db command. Valid: ${VALID_ACTIONS.join(", ")}`));
         process.exit(1);
     }
 
@@ -117,15 +125,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
 
     if (subcommand === "generate") {
-        logger.info("");
-        logger.info(chalk.bold("  📦 Rebase DB Generate"));
-        logger.info(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from collections..."));
-        logger.info("");
+        out("");
+        out(chalk.bold("  📦 Rebase DB Generate"));
+        out(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from collections..."));
+        out("");
         await schemaCommand("generate", rawArgs);
         await generatePostgresDdlCommand(rawArgs);
-        logger.info("");
-        logger.info(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
-        logger.info("");
+        out("");
+        out(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
+        out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"], collectionsPath);
@@ -165,12 +173,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     const searchContent = readSearchDdl();
                     if (searchContent && wroteNewMigration) {
                         migrationContent = `${migrationContent}\n\n${searchContent}`;
-                        logger.info(chalk.gray("  ✓ Appended search DDL to the migration"));
+                        out(chalk.gray("  ✓ Appended search DDL to the migration"));
                     } else if (searchContent) {
                         // Reachable whenever a `search` block is the *only*
                         // thing that changed: Atlas cannot see one, so it finds
                         // nothing to diff and writes no file.
-                        logger.info(chalk.gray(
+                        out(chalk.gray(
                             "  ℹ Search DDL not written to a migration — this change produced none.\n" +
                             "    It is applied by `rebase db push`, and at boot by the schema ensure.\n" +
                             "    For a migration-only deployment, add drizzle/search.sql to a migration by hand."
@@ -187,35 +195,35 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     if (fs.existsSync(policiesFile)) {
                         const policiesContent = fs.readFileSync(policiesFile, "utf-8");
                         fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
-                        logger.info(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
+                        out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
                         
                         // Re-hash the migration directory
-                        logger.info(chalk.gray("  Re-hashing migration files..."));
+                        out(chalk.gray("  Re-hashing migration files..."));
                         await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
-                        logger.info(chalk.gray("  ✓ Migration directory checksum updated successfully."));
+                        out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
                     }
                 }
             }
         } catch (err) {
-            logger.warn(chalk.yellow(`  ⚠️  Failed to append policies or re-hash migration: ${err instanceof Error ? err.message : String(err)}`));
+            outWarn(chalk.yellow(`  ⚠️  Failed to append policies or re-hash migration: ${err instanceof Error ? err.message : String(err)}`));
         }
 
-        logger.info("");
-        logger.info(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
-        logger.info("");
+        out("");
+        out(`  You can now run ${chalk.bold.green("rebase db migrate")} to apply the migrations to your database.`);
+        out("");
     } else {
-        logger.info("");
-        logger.info(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
-        logger.info("");
+        out("");
+        out(chalk.bold(`  🗄️  Rebase DB ${subcommand.charAt(0).toUpperCase() + subcommand.slice(1)}`));
+        out("");
 
         if (subcommand === "push") {
-            logger.info(chalk.gray("  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
-            logger.info("");
+            out(chalk.gray("  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
+            out("");
             await schemaCommand("generate", rawArgs);
             await generatePostgresDdlCommand(rawArgs);
-            logger.info("");
-            logger.info(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
-            logger.info("");
+            out("");
+            out(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
+            out("");
             const databaseUrl = process.env.DATABASE_URL;
             if (databaseUrl) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
@@ -240,19 +248,19 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             });
 
             if (destructive.length > 0) {
-                logger.warn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
-                logger.warn("");
+                outWarn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
+                outWarn("");
                 for (const d of destructive) {
-                    logger.warn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                    outWarn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
                 }
-                logger.warn("");
-                logger.warn(chalk.yellow("  Full planned changes:"));
-                logger.warn(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
-                logger.warn("");
+                outWarn("");
+                outWarn(chalk.yellow("  Full planned changes:"));
+                outWarn(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                outWarn("");
 
                 if (decision === "refuse") {
-                    logger.error(chalk.red("  ✗ Aborting: destructive changes require confirmation."));
-                    logger.error(chalk.gray("    Re-run interactively, or pass --allow-destructive to proceed. Back up first: rebase db backup"));
+                    outError(chalk.red("  ✗ Aborting: destructive changes require confirmation."));
+                    outError(chalk.gray("    Re-run interactively, or pass --allow-destructive to proceed. Back up first: rebase db backup"));
                     process.exit(1);
                 }
                 if (decision === "confirm") {
@@ -260,17 +268,17 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         chalk.yellow("  Type 'yes' to apply these destructive changes (this cannot be undone): ")
                     );
                     if (!confirmed) {
-                        logger.info(chalk.gray("  Aborted. No changes were made."));
+                        out(chalk.gray("  Aborted. No changes were made."));
                         process.exit(1);
                     }
                 } else {
                     // decision === "apply" via --allow-destructive
-                    logger.warn(chalk.yellow("  Proceeding because --allow-destructive was passed."));
+                    outWarn(chalk.yellow("  Proceeding because --allow-destructive was passed."));
                 }
             }
 
             await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
-            logger.info("");
+            out("");
             
             if (databaseUrl) {
                 await ensureAuthTables(databaseUrl, collectionsPath);
@@ -283,7 +291,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
             } else {
-                logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
+                outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
         } else if (subcommand === "migrate") {
             const databaseUrl = process.env.DATABASE_URL;
@@ -298,9 +306,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
         }
 
-        logger.info("");
-        logger.info(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
-        logger.info("");
+        out("");
+        out(chalk.green(`  ✓ rebase db ${subcommand} completed successfully.`));
+        out("");
     }
 }
 
@@ -323,7 +331,7 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
             await client.end();
         }
     } catch (err) {
-        logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
+        outWarn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
@@ -360,7 +368,7 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
             await client.end();
         }
     } catch (err) {
-        logger.warn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
+        outWarn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
@@ -391,7 +399,7 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
     } catch (err) {
         // A module-resolution failure here is a build problem, not a database
         // one, and it is exactly the case that used to produce the silent exit.
-        logger.error(chalk.red(
+        outError(chalk.red(
             `\n  ✗ Could not load the RLS provisioning module: ${err instanceof Error ? err.message : String(err)}`
         ));
         return;
@@ -406,17 +414,17 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
             const posture = await rls.detectConnectionPosture(runSql);
             if (posture.privileged) {
                 await rls.ensureAppRole(runSql, schemas);
-                logger.info(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
+                out(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
             }
         } finally {
             await client.end();
         }
     } catch (err) {
-        logger.error(chalk.red(
+        outError(chalk.red(
             `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
             `provisioned: ${err instanceof Error ? err.message : String(err)}`
         ));
-        logger.error(chalk.gray(rls.appRoleSetupInstructions("your database user", schemas)));
+        outError(chalk.gray(rls.appRoleSetupInstructions("your database user", schemas)));
     }
 }
 
@@ -438,8 +446,8 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
             await dropLegacyAuthSchema(
                 async (text) => (await client.query(text)).rows as Record<string, unknown>[],
                 {
-                    info: (m) => logger.info(chalk.gray(`  ${m}`)),
-                    warn: (m) => logger.warn(chalk.yellow(`  ⚠️  ${m}`))
+                    info: (m) => out(chalk.gray(`  ${m}`)),
+                    warn: (m) => outWarn(chalk.yellow(`  ⚠️  ${m}`))
                 }
             );
         } finally {
@@ -455,8 +463,8 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
         const policiesPath = path.resolve(process.cwd(), "drizzle", "policies.sql");
         if (!fs.existsSync(policiesPath)) return;
         
-        logger.info(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
-        logger.info("");
+        out(chalk.gray("  Step 3/3: Applying RLS policies to database..."));
+        out("");
         
         const policiesContent = fs.readFileSync(policiesPath, "utf-8");
         const { Client } = await import("pg");
@@ -464,16 +472,16 @@ async function applyPolicies(databaseUrl: string): Promise<void> {
         await client.connect();
         try {
             await client.query(policiesContent);
-            logger.info(chalk.green("  ✓ RLS policies applied successfully."));
+            out(chalk.green("  ✓ RLS policies applied successfully."));
         } finally {
             await client.end();
         }
     } catch (err) {
         const hint = diagnoseDbError(err, databaseUrl);
         if (hint) {
-            logger.error(hint);
+            outError(hint);
         } else {
-            logger.error(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
+            outError(chalk.red(`  ✗ Failed to apply RLS policies: ${err instanceof Error ? err.message : String(err)}`));
         }
         process.exit(1);
     }
@@ -507,34 +515,34 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
             const { dropped, kept } = await dropOrphanedPolicies(client as never, drift, collections);
 
             for (const p of dropped) {
-                logger.info(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));
+                out(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));
             }
             if (dropped.length > 0) {
-                logger.info(chalk.green(`  ✓ Removed ${dropped.length} superseded RLS ${dropped.length === 1 ? "policy" : "policies"}.`));
+                out(chalk.green(`  ✓ Removed ${dropped.length} superseded RLS ${dropped.length === 1 ? "policy" : "policies"}.`));
             }
 
             // Custom-named orphans are indistinguishable from policies someone
             // wrote in SQL deliberately, so they are reported, never dropped.
             if (kept.length > 0) {
-                logger.warn(chalk.yellow("  ⚠️  Policies in the database that no collection describes:"));
+                outWarn(chalk.yellow("  ⚠️  Policies in the database that no collection describes:"));
                 for (const p of kept) {
-                    logger.warn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
+                    outWarn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
                 }
-                logger.warn(chalk.yellow("       These still grant access. Drop them by hand if they are stale."));
+                outWarn(chalk.yellow("       These still grant access. Drop them by hand if they are stale."));
             }
 
             // Missing/diverged are not push's to fix, but staying silent about
             // them is how a database ends up not matching its config.
             const remaining = { ...drift, orphaned: kept };
             if (hasDrift(remaining) && (remaining.missing.length > 0 || remaining.diverged.length > 0)) {
-                logger.warn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
-                logger.warn(formatPolicyDrift({ ...remaining, orphaned: [] }));
+                outWarn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
+                outWarn(formatPolicyDrift({ ...remaining, orphaned: [] }));
             }
         } finally {
             await client.end();
         }
     } catch (err) {
-        logger.warn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
+        outWarn(chalk.yellow(`  ⚠️  Could not reconcile RLS policies: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
@@ -551,9 +559,9 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
         const dotenv = await import("dotenv");
         const envPath = process.env.DOTENV_CONFIG_PATH;
         if (envPath) {
-            dotenv.config({ path: envPath });
+            dotenv.config({ path: envPath, quiet: true });
         } else {
-            dotenv.config();
+            dotenv.config({ quiet: true });
         }
     } catch {
         // dotenv may not be installed
@@ -561,7 +569,7 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
 
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
     if (!databaseUrl) {
-        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        outError(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
 
@@ -585,8 +593,8 @@ max: 3 });
             case "create": {
                 const name = rawArgs[3];
                 if (!name) {
-                    logger.error(chalk.red("✗ Branch name is required."));
-                    logger.info(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
+                    outError(chalk.red("✗ Branch name is required."));
+                    out(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
                     process.exit(1);
                 }
                 let source: string | undefined;
@@ -594,81 +602,81 @@ max: 3 });
                 if (fromIdx !== -1 && rawArgs[fromIdx + 1]) {
                     source = rawArgs[fromIdx + 1];
                 }
-                logger.info("");
-                logger.info(chalk.bold("  🌿 Creating database branch..."));
-                logger.info(chalk.gray(`  Name:   ${name}`));
-                if (source) logger.info(chalk.gray(`  Source: ${source}`));
-                logger.info("");
+                out("");
+                out(chalk.bold("  🌿 Creating database branch..."));
+                out(chalk.gray(`  Name:   ${name}`));
+                if (source) out(chalk.gray(`  Source: ${source}`));
+                out("");
                 const branch = await branchService.createBranch(name, source ? { source } : undefined);
-                logger.info(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
-                logger.info(chalk.gray(`    Database: rb_${branch.name}`));
-                logger.info(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
-                logger.info("");
+                out(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
+                out(chalk.gray(`    Database: rb_${branch.name}`));
+                out(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
+                out("");
                 break;
             }
 
             case "list": {
                 const branches = await branchService.listBranches();
-                logger.info("");
+                out("");
                 if (branches.length === 0) {
-                    logger.info(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
+                    out(chalk.gray("  No branches found. Create one with: rebase db branch create <name>"));
                 } else {
-                    logger.info(chalk.bold(`  🌿 ${branches.length} branch(es):`));
-                    logger.info("");
+                    out(chalk.bold(`  🌿 ${branches.length} branch(es):`));
+                    out("");
                     for (const b of branches) {
                         const size = b.sizeBytes != null
                             ? chalk.gray(` (${formatBytes(b.sizeBytes)})`)
                             : "";
                         const age = chalk.gray(` — created ${timeAgo(b.createdAt)}`);
-                        logger.info(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
-                        logger.info(chalk.gray(`    from ${b.parentDatabase}`));
+                        out(`  ${chalk.green("●")} ${chalk.bold(b.name)}${size}${age}`);
+                        out(chalk.gray(`    from ${b.parentDatabase}`));
                     }
                 }
-                logger.info("");
+                out("");
                 break;
             }
 
             case "delete": {
                 const name = rawArgs[3];
                 if (!name) {
-                    logger.error(chalk.red("✗ Branch name is required."));
-                    logger.info(chalk.gray("  Usage: rebase db branch delete <name>"));
+                    outError(chalk.red("✗ Branch name is required."));
+                    out(chalk.gray("  Usage: rebase db branch delete <name>"));
                     process.exit(1);
                 }
-                logger.info("");
-                logger.info(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
+                out("");
+                out(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
                 await branchService.deleteBranch(name);
-                logger.info(chalk.green(`  ✓ Branch "${name}" deleted.`));
-                logger.info("");
+                out(chalk.green(`  ✓ Branch "${name}" deleted.`));
+                out("");
                 break;
             }
 
             case "info": {
                 const name = rawArgs[3];
                 if (!name) {
-                    logger.error(chalk.red("✗ Branch name is required."));
-                    logger.info(chalk.gray("  Usage: rebase db branch info <name>"));
+                    outError(chalk.red("✗ Branch name is required."));
+                    out(chalk.gray("  Usage: rebase db branch info <name>"));
                     process.exit(1);
                 }
                 const info = await branchService.getBranchInfo(name);
-                logger.info("");
+                out("");
                 if (!info) {
-                    logger.error(chalk.red(`  ✗ Branch "${name}" not found.`));
+                    outError(chalk.red(`  ✗ Branch "${name}" not found.`));
                 } else {
-                    logger.info(chalk.bold(`  🌿 Branch: ${info.name}`));
-                    logger.info(chalk.gray(`    Database: rb_${info.name}`));
-                    logger.info(chalk.gray(`    Parent:   ${info.parentDatabase}`));
-                    logger.info(chalk.gray(`    Created:  ${info.createdAt.toISOString()}`));
+                    out(chalk.bold(`  🌿 Branch: ${info.name}`));
+                    out(chalk.gray(`    Database: rb_${info.name}`));
+                    out(chalk.gray(`    Parent:   ${info.parentDatabase}`));
+                    out(chalk.gray(`    Created:  ${info.createdAt.toISOString()}`));
                     if (info.sizeBytes != null) {
-                        logger.info(chalk.gray(`    Size:     ${formatBytes(info.sizeBytes)}`));
+                        out(chalk.gray(`    Size:     ${formatBytes(info.sizeBytes)}`));
                     }
                 }
-                logger.info("");
+                out("");
                 break;
             }
 
             default:
-                logger.error(chalk.red(`Unknown branch action: "${branchAction}".`));
+                outError(chalk.red(`Unknown branch action: "${branchAction}".`));
                 printBranchHelp();
                 process.exit(1);
         }
@@ -679,7 +687,7 @@ max: 3 });
 }
 
 function printBranchHelp() {
-    logger.info(`
+    out(`
 ${chalk.bold("rebase db branch")} — Database branching commands
 
 ${chalk.green.bold("Usage")}
@@ -734,28 +742,28 @@ async function runAtlas(
         // other — see `diagnoseMissingBin`. This used to say "Install it with:
         // pnpm add -D @ariga/atlas" unconditionally, which is the exact command
         // that produces the far more common of the two states.
-        logger.error(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
+        outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
 
         if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
-            logger.error(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
-            logger.error(chalk.gray(
+            outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
+            outError(chalk.gray(
                 "  It downloads that binary in a `preinstall` script, and pnpm 10+ does not\n" +
                 "  run a dependency's scripts unless you allow it. The install still exits 0,\n" +
                 "  so the only sign is `Ignored build scripts: @ariga/atlas` in its output.\n"
             ));
-            logger.error("  Fix it with either:\n");
-            logger.error(chalk.bold("    pnpm approve-builds\n"));
-            logger.error("  or, to record it in the project (what `rebase init` scaffolds):\n");
-            logger.error(chalk.bold(
+            outError("  Fix it with either:\n");
+            outError(chalk.bold("    pnpm approve-builds\n"));
+            outError("  or, to record it in the project (what `rebase init` scaffolds):\n");
+            outError(chalk.bold(
                 "    // package.json\n" +
                 "    \"pnpm\": { \"onlyBuiltDependencies\": [\"@ariga/atlas\"] }\n"
             ));
-            logger.error(chalk.gray("  Then re-run `pnpm install`.\n"));
+            outError(chalk.gray("  Then re-run `pnpm install`.\n"));
         } else {
-            logger.error(chalk.gray("  It is not installed in this project.\n"));
-            logger.error("  Install it with:\n");
-            logger.error(chalk.bold("    pnpm add -D @ariga/atlas\n"));
-            logger.error(chalk.gray(
+            outError(chalk.gray("  It is not installed in this project.\n"));
+            outError("  Install it with:\n");
+            outError(chalk.bold("    pnpm add -D @ariga/atlas\n"));
+            outError(chalk.gray(
                 "  If pnpm then reports `Ignored build scripts`, also run `pnpm approve-builds` —\n" +
                 "  the package carries a `preinstall` script that fetches the binary.\n"
             ));
@@ -775,7 +783,7 @@ async function runAtlas(
 
         for (const p of envPaths) {
             if (fs.existsSync(p)) {
-                const parsed = dotenv.config({ path: p });
+                const parsed = dotenv.config({ path: p, quiet: true });
                 if (parsed.parsed) {
                     for (const [key, val] of Object.entries(parsed.parsed)) {
                         if (env[key] === undefined) {
@@ -792,7 +800,7 @@ async function runAtlas(
 
     const databaseUrl = env.DATABASE_URL;
     if (!databaseUrl) {
-        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        outError(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
 
@@ -852,11 +860,11 @@ async function runAtlas(
             excludes = await getTableExcludes(databaseUrl, collectionsPath);
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
-                logger.error(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
-                logger.error(chalk.gray(`  ${err.message}`));
-                logger.error(chalk.gray("  Refusing to apply — a partial exclude list could drop tables Rebase does not manage."));
+                outError(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
+                outError(chalk.gray(`  ${err.message}`));
+                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop tables Rebase does not manage."));
                 const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
-                if (hint) logger.error(hint);
+                if (hint) outError(hint);
                 process.exit(1);
             }
             throw err;
@@ -891,11 +899,11 @@ async function runAtlas(
     try {
         await subprocess;
     } catch {
-        logger.error(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
+        outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
         // Surface actionable recovery guidance for recognized failures.
         const hint = diagnoseDbError({ message: stderrText }, databaseUrl);
         if (hint) {
-            logger.error(hint);
+            outError(hint);
         }
         process.exit(1);
     }
@@ -925,7 +933,7 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
     const ddlScript = path.join(__cliDirname, "schema", "generate-postgres-ddl.ts");
     const tsxBin = resolveLocalBin("tsx");
     if (!tsxBin) {
-        logger.error(chalk.red("✗ Could not find tsx binary."));
+        outError(chalk.red("✗ Could not find tsx binary."));
         process.exit(1);
     }
 
@@ -946,7 +954,7 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
             env: { ...process.env as Record<string, string> }
         });
     } catch (err: unknown) {
-        logger.error(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
         process.exit(1);
     }
 }
@@ -1005,23 +1013,23 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
 
     if (stale.length === 0) return;
 
-    logger.info("");
-    logger.warn(chalk.yellow(
+    out("");
+    outWarn(chalk.yellow(
         `  ⚠️  ${outputPath} names ${stale.length} foreign key(s) the way an earlier release did:`
     ));
-    logger.info(chalk.gray(describeLegacyForeignKeyNames(stale)));
-    logger.info("");
+    out(chalk.gray(describeLegacyForeignKeyNames(stale)));
+    out("");
 
     if (!argsList["--fix"]) {
-        logger.error(chalk.red(
+        outError(chalk.red(
             "  The database column has already been renamed at boot, so the generated schema no " +
             "longer matches it and the server will refuse to start."
         ));
-        logger.error(chalk.red("  Run `rebase schema generate` to regenerate it."));
+        outError(chalk.red("  Run `rebase schema generate` to regenerate it."));
         process.exit(1);
     }
 
-    logger.info(chalk.gray("  Regenerating the Drizzle schema so it matches..."));
+    out(chalk.gray("  Regenerating the Drizzle schema so it matches..."));
     await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
 }
 
@@ -1051,13 +1059,13 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         // If installed in node_modules, __cliDirname is node_modules/@rebasepro/server-postgres/dist or src.
         const generatorScript = path.join(__cliDirname, "schema", "generate-drizzle-schema.ts");
         if (!fs.existsSync(generatorScript)) {
-            logger.error(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
+            outError(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
             process.exit(1);
         }
 
         const tsxBin = resolveLocalBin("tsx");
         if (!tsxBin) {
-            logger.error(chalk.red("✗ Could not find tsx binary."));
+            outError(chalk.red("✗ Could not find tsx binary."));
             process.exit(1);
         }
 
@@ -1065,9 +1073,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
         const watch = argsList["--watch"] || false;
 
-        logger.info("");
-        logger.info(chalk.bold("  🔧 Rebase Schema Generator"));
-        logger.info("");
+        out("");
+        out(chalk.bold("  🔧 Rebase Schema Generator"));
+        out("");
 
         const cmdParts = [
             tsxBin,
@@ -1086,7 +1094,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            logger.error(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            outError(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
     } else if (subcommand === "introspect") {
@@ -1108,21 +1116,21 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         const introspectScript = path.join(__cliDirname, "schema", "introspect-db.ts");
         if (!fs.existsSync(introspectScript)) {
-            logger.error(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
+            outError(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
             process.exit(1);
         }
 
         const tsxBin = resolveLocalBin("tsx");
         if (!tsxBin) {
-            logger.error(chalk.red("✗ Could not find tsx binary."));
+            outError(chalk.red("✗ Could not find tsx binary."));
             process.exit(1);
         }
 
         const outputPath = argsList["--output"] || argsList["--collections"] || path.join("..", "config", "collections");
 
-        logger.info("");
-        logger.info(chalk.bold("  🔍 Rebase Schema Introspector"));
-        logger.info("");
+        out("");
+        out(chalk.bold("  🔍 Rebase Schema Introspector"));
+        out("");
 
         const cmdParts = [
             tsxBin,
@@ -1139,11 +1147,11 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            logger.error(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
+            outError(chalk.red(`✗ Failed to run schema introspector: ${err instanceof Error ? err.message : String(err)}`));
             process.exit(1);
         }
     } else {
-        logger.error(chalk.red("Unknown schema command."));
+        outError(chalk.red("Unknown schema command."));
         process.exit(1);
     }
 }
@@ -1167,13 +1175,13 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 
     const doctorScript = path.join(__cliDirname, "schema", "doctor-cli.ts");
     if (!fs.existsSync(doctorScript)) {
-        logger.error(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
+        outError(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
         process.exit(1);
     }
 
     const tsxBin = resolveLocalBin("tsx");
     if (!tsxBin) {
-        logger.error(chalk.red("✗ Could not find tsx binary."));
+        outError(chalk.red("✗ Could not find tsx binary."));
         process.exit(1);
     }
 

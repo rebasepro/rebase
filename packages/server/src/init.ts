@@ -621,7 +621,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         configureLogLevel();
     }
 
-    logger.info("Initializing Rebase Backend");
+    logger.debug("Initializing Rebase Backend");
 
     // One floating promise in application code — a fire-and-forget call in a
     // custom function is the usual one — otherwise ends the process, and on the
@@ -670,11 +670,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // `collectionsDir` pointing at nothing declares nothing, and treating that
     // as "declared" would serve an empty API and never look at the database.
     const introspectCollections = activeCollections.length === 0;
-    logger.info(
-        introspectCollections
-            ? "No collections declared — deriving them from the database schema"
-            : "Serving declared collections"
-    );
+    // Only the surprising branch is worth a line every boot. Serving what you
+    // declared is what a developer already expects; deriving collections from
+    // the database because nothing was declared is the state people debug for
+    // an hour before finding out it happened.
+    if (introspectCollections) {
+        logger.info("No collections declared — deriving them from the database schema");
+    } else {
+        logger.debug("Serving declared collections");
+    }
 
     // Directory-level `defaultSecurityRules` are applied by the collection
     // loader, so the server and `db push` agree on what a collection's rules
@@ -688,7 +692,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let bootstrappers: BackendBootstrapper[] = config.bootstrappers || [];
     if (config.database) {
         const dbAdapter = config.database;
-        logger.info("Using DatabaseAdapter", { type: dbAdapter.type });
+        logger.debug("Using DatabaseAdapter", { type: dbAdapter.type });
         bootstrappers = [wrapDatabaseAdapter(dbAdapter)];
     }
 
@@ -703,7 +707,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
         const b = bootstrapper;
-        logger.info("Running bootstrapper for driver", { driverId: b.id || bootstrapper.type });
+        logger.debug("Running bootstrapper for driver", { driverId: b.id || bootstrapper.type });
         if (b.isDefault) {
             defaultDriverId = b.id || bootstrapper.type;
         }
@@ -832,7 +836,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 await authAdapter.initialize();
             }
 
-            logger.info("Using AuthAdapter", { id: authAdapter.id });
+            logger.debug("Using AuthAdapter", { id: authAdapter.id });
 
             // Populate authConfigResult for backward compatibility
             // (the return type still exposes `auth?: BootstrappedAuth`)
@@ -851,7 +855,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 });
                 if (foundAuthCollection) {
                     safeAuthConfig.collection = foundAuthCollection;
-                    logger.info("Auto-discovered auth collection from collection definitions", { slug: foundAuthCollection.slug });
+                    logger.debug("Auto-discovered auth collection from collection definitions", { slug: foundAuthCollection.slug });
                 }
             }
 
@@ -896,11 +900,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     );
                 }
                 serviceKey = safeAuthConfig.serviceKey;
-                logger.info("Service key configured for script/server-to-server authentication");
+                logger.debug("Service key configured for script/server-to-server authentication");
             }
 
             if (defaultBootstrapper.initializeAuth) {
-                logger.info("Bootstrapping authentication via driver protocol");
+                logger.debug("Bootstrapping authentication via driver protocol");
                 authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
 
                 // The built-in auth adapter is created after OAuth providers
@@ -916,7 +920,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
     if (config.history) {
         if (defaultBootstrapper.initializeHistory) {
-            logger.info("Bootstrapping entity history via driver protocol");
+            logger.debug("Bootstrapping entity history via driver protocol");
             historyConfigResult = await defaultBootstrapper.initializeHistory(config.history, defaultDriverResult) as { historyService: import("./history/history-routes").HistoryService } | undefined;
 
             // Inject the historyService into the driver so save/delete can record history.
@@ -966,7 +970,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (apiKeyStoreResult) {
         apiKeyStore = apiKeyStoreResult;
         await apiKeyStore.ensureTable();
-        logger.info("Service API Keys initialized");
+        logger.debug("Service API Keys initialized");
     }
 
     // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
@@ -987,7 +991,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             serviceKey: internalServiceKey
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
-        logger.info("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
+        logger.debug("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
     }
 
     // One rate-limit store shared by the data and functions limiters: the
@@ -1091,7 +1095,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const authRoutes = authAdapter.createAuthRoutes();
             if (authRoutes) {
                 config.app.route(`${basePath}/auth`, authRoutes);
-                logger.info("Auth routes mounted via adapter", { adapter: authAdapter.id });
+                logger.debug("Auth routes mounted via adapter", { adapter: authAdapter.id });
             }
         }
 
@@ -1099,7 +1103,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) {
                 config.app.route(`${basePath}/admin`, adminRoutes);
-                logger.info("Admin routes mounted via adapter", { adapter: authAdapter.id });
+                logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
         }
     }
@@ -1270,7 +1274,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         config.app.route(`${basePath}/schema-editor`, schemaEditorRouter);
         if (schemaEditorRoutes) {
-            logger.info("Schema Editor mounted", { path: `${basePath}/schema-editor` });
+            logger.debug("Schema Editor mounted", { path: `${basePath}/schema-editor` });
         } else {
             logger.debug("Schema Editor unavailable", {
                 path: `${basePath}/schema-editor`,
@@ -1415,12 +1419,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 .map(c => c.slug);
 
             if (publicSelect.length > 0) {
+                // One line, not the paragraph this used to be.
+                //
+                // The explanation is right and worth having somewhere; it was
+                // 90 words of documentation printed on every single boot,
+                // which is how a log trains people to stop reading it. The
+                // sentence below carries the fact (public rows still need a
+                // token) and the switch (AUTH_REQUIRE); the reasoning lives in
+                // the docs, at the link, where it can be read once. The full
+                // text stays reachable at `debug`.
                 logger.info(
-                    `${publicSelect.length} collection(s) grant unfiltered reads (${publicSelect.join(", ")}), ` +
-                    "but every /api/data route still requires a token: `access: \"public\"` widens which ROWS a " +
-                    "caller sees, not who may call. An unauthenticated read answers 401 regardless. " +
-                    "To let RLS alone decide — the usual choice for a public website reading its own backend — " +
-                    "set AUTH_REQUIRE=false (or `auth.requireAuth: false`)."
+                    `${publicSelect.length} collection(s) grant unfiltered reads (${publicSelect.join(", ")}) — ` +
+                    "reads still require a token. Set AUTH_REQUIRE=false to let RLS alone decide: " +
+                    "https://rebase.pro/docs/collections/security-rules"
+                );
+                logger.debug(
+                    "`access: \"public\"` widens which ROWS a caller sees, not who may call, so an " +
+                    "unauthenticated read of a public collection answers 401 rather than returning rows. " +
+                    "Setting AUTH_REQUIRE=false (or `auth.requireAuth: false`) removes the API-level gate " +
+                    "and delegates the decision entirely to the Postgres RLS policies — the usual choice " +
+                    "for a public website reading its own backend."
                 );
             }
         }
@@ -1504,7 +1522,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const serverClient = createRebaseClient({
         baseUrl: "http://localhost",
         apiPath: basePath,
-        websocketUrl: "",
+        // `realtime: false`, not `websocketUrl: ""`.
+        //
+        // Both leave the client without a socket, but only one of them says so.
+        // The empty string reached `options.websocketUrl ?? derive(baseUrl)`,
+        // which `??` passes through unchanged, and the client then reported
+        // "Realtime is enabled but no WebSocket URL could be derived from
+        // baseUrl \"http://localhost\" … pass `realtime: false` to say this was
+        // intended" — on every boot, a framework telling its own operator to
+        // fix the framework's construction of its own client. This singleton
+        // dispatches control-plane calls straight into the Hono app; there is
+        // no socket for it to open and never was.
+        realtime: false,
         token: internalServiceKey,
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
             return await config.app.request(input as string | Request | URL, init);
@@ -1564,7 +1593,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // change instead of the compile error TypeScript now gives. Both names point
     // at the same admin-scoped object — admin-scoped, not RLS-bypassing.
     Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
-    logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
+    logger.debug("Native data plane attached to singleton (bypasses HTTP loop)");
 
     // Same treatment for storage: server-side `rebase.storage` must talk to the
     // controller directly, not loop back through `POST /api/storage/upload`. The
@@ -1575,7 +1604,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // exposes the same StorageSource surface (putObject/getObject/…).
     if (storageController) {
         Object.assign(serverClient, { storage: storageController });
-        logger.info("Native storage attached to singleton (bypasses HTTP loop)");
+        logger.debug("Native storage attached to singleton (bypasses HTTP loop)");
     }
 
     // Attach email service to the server client when configured.
@@ -1589,14 +1618,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     if (emailService) {
         Object.assign(serverClient, { email: emailService });
-        logger.info("Email service attached to singleton", { configured: emailService.isConfigured() });
+        logger.debug("Email service attached to singleton", { configured: emailService.isConfigured() });
 
         if (emailService.isConfigured() && typeof emailService.verifyConnection === "function") {
             emailService.verifyConnection().then((success) => {
                 if (!success) {
                     logger.warn("Warning: SMTP connection verification failed. Email delivery may fail.");
                 } else {
-                    logger.info("SMTP connection verified successfully.");
+                    logger.debug("SMTP connection verified successfully.");
                 }
             }).catch((err) => {
                 logger.warn("Warning: SMTP connection verification failed. Email delivery may fail.", { error: err });
@@ -1612,7 +1641,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             sql: (query: string, options?: { database?: string; role?: string; params?: unknown[] }) =>
                 driverAdmin.executeSql(query, options)
         });
-        logger.info("SQL capability attached to singleton");
+        logger.debug("SQL capability attached to singleton");
     }
 
     // The server client is assembled dynamically above (native data plane,
@@ -1627,7 +1656,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // means one type in one place.
     const serverSingleton = serverClient as unknown as import("@rebasepro/types").RebaseServerClient;
     _initRebase(serverSingleton);
-    logger.info("Rebase singleton initialized");
+    logger.debug("Rebase singleton initialized");
 
     // Retroactively inject the server client into the driver so that
     // entity callbacks receive `context.client` at runtime.
@@ -1810,7 +1839,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             storage: storageController
         }));
         config.app.route(`${basePath}/admin/backups`, backupRouter);
-        logger.info("Backup admin routes mounted", { path: `${basePath}/admin/backups` });
+        logger.debug("Backup admin routes mounted", { path: `${basePath}/admin/backups` });
     }
 
     // 6c. Mount Logs routes (for the Studio Logs Explorer). Request logs expose
@@ -1824,7 +1853,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         logsRouter.route("/", logsRoutes);
         config.app.route(`${basePath}/logs`, logsRouter);
-        logger.info("Logs routes mounted", { path: `${basePath}/logs` });
+        logger.debug("Logs routes mounted", { path: `${basePath}/logs` });
     }
 
     // 6d. Mount the project contract — what lets a repository that does *not*
@@ -1880,7 +1909,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }));
 
         config.app.route(`${basePath}/meta`, contractRouter);
-        logger.info("Contract routes mounted", { path: `${basePath}/meta` });
+        logger.debug("Contract routes mounted", { path: `${basePath}/meta` });
     }
 
     // With multiple realtime-capable engines, route subscriptions to the
@@ -1899,7 +1928,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         await defaultBootstrapper.initializeWebsockets(config.server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 
-    logger.info("Rebase Backend Initialized");
+    logger.debug("Rebase Backend Initialized");
 
     // ── Deep Health Check ─────────────────────────────────────────────────
     // The auth probe is only available when a driver bootstrapped auth — an

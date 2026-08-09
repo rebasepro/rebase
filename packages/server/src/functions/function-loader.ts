@@ -139,7 +139,7 @@ export async function loadFunctionsWithDiagnostics(
                     const name = path.basename(file, path.extname(file));
                     functions.push({ name,
 app: exported as Hono });
-                    logger.info(`⚡ Loaded function route: ${name}`);
+                    logger.debug(`⚡ Loaded function route: ${name}`);
                     continue;
                 }
 
@@ -150,7 +150,7 @@ app: exported as Hono });
                         const name = path.basename(file, path.extname(file));
                         functions.push({ name,
 app: result as Hono });
-                        logger.info(`⚡ Loaded function route: ${name}`);
+                        logger.debug(`⚡ Loaded function route: ${name}`);
                         continue;
                     }
                 }

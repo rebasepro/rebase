@@ -2071,7 +2071,9 @@ lastSeen: Date.now() });
             throw err;
         }
         this.cdcActive = true;
-        logger.info(
+        // The bootstrapper says the same thing one line later, in the
+        // vocabulary of the setting that produced it (REALTIME_CDC).
+        logger.debug(
             `📡 [RealtimeService] Database-level change capture ACTIVE — writes from ANY source now emit realtime events ` +
             `(${this.cdcTableMap.size} mapped table key(s)).`
         );

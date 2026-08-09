@@ -113,7 +113,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // Where dev-only state (the port file, the MCP discovery file) lives. A
     // source boot runs from the project root; a built bundle sits inside it.
     const devRoot = process.env.REBASE_DEV_PROJECT_ROOT || process.cwd();
-    logger.info("Loaded bundle", {
+    logger.debug("Loaded bundle", {
         app: bundle.manifest.app,
         kind: bundle.manifest.kind,
         schemaVersion: bundle.manifest.schemaVersion,
@@ -764,13 +764,16 @@ export async function ensureCollectionSchema(
     const { applied } = await primary.bootstrapper.ensureCollectionSchema(
         collections,
         preInitDriverResult(primary),
-        message => logger.info(`schema: ${message}`)
+        message => logger.debug(`schema: ${message}`)
     );
-    logger.info(
-        applied > 0
-            ? `Applied ${applied} additive schema change(s) before boot.`
-            : "Collection schema is up to date."
-    );
+    // Only the change is news. "Collection schema is up to date" is the
+    // overwhelmingly common outcome and says nothing a developer can act on;
+    // at `debug` it is still there for anyone diagnosing a boot.
+    if (applied > 0) {
+        logger.info(`Applied ${applied} additive schema change(s) before boot.`);
+    } else {
+        logger.debug("Collection schema is up to date.");
+    }
 }
 
 /**
@@ -855,11 +858,13 @@ export async function ensureCollectionPolicies(
     const { applied } = await primary.bootstrapper.ensureCollectionPolicies(
         collections,
         preInitDriverResult(primary),
-        message => logger.info(`policies: ${message}`)
+        message => logger.debug(`policies: ${message}`)
     );
-    logger.info(
-        applied > 0
-            ? `Applied ${applied} RLS policy statement(s) before serving.`
-            : "RLS policies are up to date."
-    );
+    // Same rule as the schema summary above: report the change, not the
+    // steady state.
+    if (applied > 0) {
+        logger.info(`Applied ${applied} RLS policy statement(s) before serving.`);
+    } else {
+        logger.debug("RLS policies are up to date.");
+    }
 }

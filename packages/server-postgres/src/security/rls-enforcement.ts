@@ -266,7 +266,7 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
         });
     }
 
-    logger.info(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);
+    logger.debug(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);
 }
 
 /**

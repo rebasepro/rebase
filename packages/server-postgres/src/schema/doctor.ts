@@ -18,6 +18,8 @@ import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
+// The report is CLI output, not application logging — see cli-output.ts.
+import { out, outError } from "../cli-output";
 
 /**
  * Resolve the SQL column name for a property.
@@ -32,22 +34,6 @@ const resolveColumnName = (propName: string, prop?: Property | null): string => 
 };
 
 // ── Types ────────────────────────────────────────────────────────────────
-
-/**
- * The report is CLI output, not application logging.
- *
- * `logger.info` is gated by `LOG_LEVEL`, which is a documented setting and
- * ships in the scaffold's own `.env.example`: a developer who quietened their
- * dev server with `LOG_LEVEL=warn` got a `rebase doctor` that printed nothing
- * at all and still exited 1, with no way to tell a failing run from a crashed
- * one. At the default level every line of the ASCII box arrived with
- * `ℹ️ [INFO] ` glued to the front of it, and under `NODE_ENV=production` the
- * whole report became JSON log records with the chalk escapes inside.
- * `packages/cli` writes all of its output this way for the same reason.
- */
-const out = (line = ""): void => {
-    console.log(line);
-};
 
 export type IssueSeverity = "error" | "warning" | "info";
 
@@ -76,13 +62,30 @@ export interface DoctorPhase {
      * ticks and exit 0 against a database with no tables in it.
      */
     skipped?: string;
+    /**
+     * Why this phase had nothing to compare against, when it had nothing.
+     *
+     * Distinct from `skipped`, which means "the check could not run, and that
+     * is probably worth fixing". This one means "the artifact is optional and
+     * you have not asked for it": no drift is possible, so the run is still a
+     * clean bill of health.
+     *
+     * It exists because the alternative was a contradiction. The typed-SDK
+     * phase returned `{ passed: true }` when `generated/sdk/database.types.ts`
+     * did not exist, so a fresh project's report read
+     * `✅ Collections → SDK Types: In sync` directly above
+     * `ℹ Typed SDK not generated (optional).` — one line calling a file
+     * synchronised and the next saying it is absent. "In sync" is a claim about
+     * a comparison, and no comparison happened.
+     */
+    notApplicable?: string;
 }
 
 export interface DoctorReport {
     collectionsToSchema: DoctorPhase;
     collectionsToSdk: DoctorPhase;
     schemaToDatabase: DoctorPhase;
-    summary: { passed: number; skipped: number; warnings: number; errors: number };
+    summary: { passed: number; skipped: number; notApplicable: number; warnings: number; errors: number };
 }
 
 // ── Column type mapping (mirrors generate-drizzle-schema-logic.ts) ───────
@@ -257,7 +260,8 @@ export async function checkCollectionsVsSdk(
             fix: "Run `rebase generate-sdk` if you want typed collection access"
         });
         return { passed: true,
-issues };
+issues,
+notApplicable: "not generated (optional)" };
     }
 
     try {
@@ -660,11 +664,12 @@ export function renderReport(report: DoctorReport): void {
 
     // Summary
     out(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-    const { passed, skipped, warnings, errors } = report.summary;
+    const { passed, skipped, notApplicable, warnings, errors } = report.summary;
 
     const parts: string[] = [];
     parts.push(chalk.green(`${passed} passed`));
     if (skipped > 0) parts.push(chalk.yellow(`${skipped} skipped`));
+    if (notApplicable > 0) parts.push(chalk.gray(`${notApplicable} not applicable`));
     if (warnings > 0) parts.push(chalk.yellow(`${warnings} warnings`));
     if (errors > 0) parts.push(chalk.red(`${errors} errors`));
 
@@ -691,6 +696,18 @@ function renderPhase(label: string, phase: DoctorPhase): void {
     // doctor certify a database it had not opened.
     if (phase.skipped) {
         out(`  ${chalk.yellow("⏭")}  ${label}: ${chalk.yellow(`skipped (${phase.skipped})`)}`);
+        out();
+        return;
+    }
+
+    // Nothing to compare against. Its own marker, and only the remedy under it
+    // — the phase header already carries the reason, so re-printing the note
+    // would say the same thing twice. See DoctorPhase.notApplicable.
+    if (phase.notApplicable) {
+        out(`  ${chalk.gray("➖")} ${label}: ${chalk.gray(phase.notApplicable)}`);
+        for (const issue of phase.issues.filter((i) => i.severity === "info")) {
+            out(`     ${chalk.gray(issue.fix)}`);
+        }
         out();
         return;
     }
@@ -769,7 +786,7 @@ export async function runDoctor(options: {
     out(chalk.bold("  🩺 Loading collections..."));
     const collections = await loadCollections(options.collectionsPath);
     if (collections.length === 0) {
-        console.error(chalk.red("  ✗ No collections found."));
+        outError(chalk.red("  ✗ No collections found."));
         process.exit(1);
     }
     out(chalk.gray(`  Found ${collections.length} collection(s)`));
@@ -801,8 +818,11 @@ skipped: "DATABASE_URL not set" };
     const allIssues = phases.flatMap((p) => p.issues);
     const summary = {
         // A skipped phase is not a passing one, however few issues it collected.
-        passed: phases.filter((p) => p.passed && !p.skipped).length,
+        // Nor is one with nothing to compare against: "passed" would put a
+        // never-generated SDK in the same column as a verified one.
+        passed: phases.filter((p) => p.passed && !p.skipped && !p.notApplicable).length,
         skipped: phases.filter((p) => p.skipped).length,
+        notApplicable: phases.filter((p) => p.notApplicable && !p.skipped).length,
         warnings: allIssues.filter((i) => i.severity === "warning").length,
         errors: allIssues.filter((i) => i.severity === "error").length
     };

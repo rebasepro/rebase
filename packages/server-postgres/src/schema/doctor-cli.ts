@@ -26,9 +26,9 @@ async function main() {
         const dotenv = await import("dotenv");
         const envPath = process.env.DOTENV_CONFIG_PATH;
         if (envPath) {
-            dotenv.config({ path: envPath });
+            dotenv.config({ path: envPath, quiet: true });
         } else {
-            dotenv.config();
+            dotenv.config({ quiet: true });
         }
     } catch {
         // dotenv may not be installed

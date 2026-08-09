@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { logger } from "@rebasepro/server";
+import { outWarn, outError } from "./cli-output";
 
 /**
  * Detect whether an error (or AggregateError wrapping multiple attempts)
@@ -220,20 +220,20 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
         await client.query("SELECT 1");
     } catch (err: unknown) {
         if (isEconnrefused(err)) {
-            logger.error(formatConnectionRefusedBanner(databaseUrl));
+            outError(formatConnectionRefusedBanner(databaseUrl));
             process.exit(1);
         }
         if (isAuthFailure(err)) {
-            logger.error(formatAuthFailureBanner(databaseUrl));
+            outError(formatAuthFailureBanner(databaseUrl));
             process.exit(1);
         }
         if (isSslNotEnabled(err)) {
-            logger.error(formatSslNotEnabledBanner(databaseUrl));
+            outError(formatSslNotEnabledBanner(databaseUrl));
             process.exit(1);
         }
         // Unknown error — warn but don't block; let the downstream tool surface details
-        logger.warn(chalk.yellow(`  ⚠  Could not verify database connectivity: ${err instanceof Error ? err.message : String(err)}`));
-        logger.warn(chalk.gray("    Proceeding anyway — the command may fail if the database is unreachable."));
+        outWarn(chalk.yellow(`  ⚠  Could not verify database connectivity: ${err instanceof Error ? err.message : String(err)}`));
+        outWarn(chalk.gray("    Proceeding anyway — the command may fail if the database is unreachable."));
     } finally {
         try {
             await client?.end();

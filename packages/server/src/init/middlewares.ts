@@ -42,7 +42,7 @@ export function configureMiddlewares(
     // would silently do nothing on the very responses this exists to shrink.
     if (config.compression !== false) {
         app.use(`${basePath}/*`, responseCompression());
-        logger.info("Response compression enabled");
+        logger.debug("Response compression enabled");
     }
 
     // Request Body Size Limit
@@ -59,7 +59,7 @@ export function configureMiddlewares(
                 }, 413);
             }
         }));
-        logger.info("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
+        logger.debug("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
     }
 
     // CSRF Protection (opt-in)
@@ -67,7 +67,7 @@ export function configureMiddlewares(
         app.use(`${basePath}/*`, csrf({
             origin: config.csrf.origin
         }));
-        logger.info("CSRF protection enabled");
+        logger.debug("CSRF protection enabled");
     }
 
     // CORS Warning. The framework does not install a CORS middleware itself —

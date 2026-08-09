@@ -138,6 +138,50 @@ export function resolveDriftCheckName(
 }
 
 /**
+ * Is this the local database `rebase init` scaffolds — i.e. the one case where
+ * "you are connected as a superuser" is not news?
+ *
+ * The scaffold's own `docker-compose.yml` sets `POSTGRES_USER: rebase_app`,
+ * which makes that role the cluster superuser, so the superuser advisory below
+ * was the only WARN a brand-new project ever saw and it was about a decision
+ * the tool had made for the developer.
+ *
+ * Of the two available fixes — provision a non-superuser table-owner role in
+ * the scaffold, or recognise the local shape and stay quiet — this is the
+ * second, because the first breaks the scaffold it is meant to improve: a
+ * non-superuser owner cannot `CREATE EXTENSION` (search collections need
+ * `pg_trgm`/`unaccent`, applied by `rebase db push` and again by the boot
+ * schema-ensure), so the very first `pnpm run db:push` on a scaffolded project
+ * with a search block would fail. Trading a working first run for a quieter log
+ * line is the wrong trade.
+ *
+ * The condition is deliberately narrow — a *non-production* process talking to
+ * a database on the loopback interface. A genuine production superuser
+ * connection still warns, and so does a non-production process pointed at a
+ * remote database (the usual "my dev machine writes to staging" mistake, where
+ * the advisory is exactly right). NODE_ENV alone would not do: the scaffold
+ * ships `NODE_ENV=development` and some deployments inherit it.
+ */
+export function isScaffoldedLocalDatabase(connectionString: string | undefined): boolean {
+    if (process.env.NODE_ENV === "production") return false;
+    if (!connectionString) return false;
+    let host: string;
+    try {
+        host = new URL(connectionString).hostname;
+    } catch {
+        return false;
+    }
+    // `new URL` keeps IPv6 literals in brackets.
+    const bare = host.replace(/^\[|\]$/g, "").toLowerCase();
+    return bare === "localhost"
+        || bare === "::1"
+        || bare === "0.0.0.0"
+        || bare === ""
+        || /^127\./.test(bare)
+        || bare.endsWith(".localhost");
+}
+
+/**
  * Default PostgreSQL bootstrapper.
  *
  * Use it to register Postgres with `initializeRebaseBackend()`:
@@ -395,11 +439,15 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     realtimeService.rlsUserRole = REBASE_USER_ROLE;
                     logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);
                     if (posture.superuser || posture.bypassRLS) {
-                        logger.warn(
-                            `⚠️ The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
+                        const message =
+                            `The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
                             `User requests are isolated via SET LOCAL ROLE, but connect as a non-superuser ` +
-                            `table-owner role in production so the server/owner context is least-privilege.`
-                        );
+                            `table-owner role in production so the server/owner context is least-privilege.`;
+                        if (isScaffoldedLocalDatabase(pgConfig.connectionString)) {
+                            logger.debug(`🔐 ${message}`);
+                        } else {
+                            logger.warn(`⚠️ ${message}`);
+                        }
                     }
                 } else {
                     logger.info(`🔐 RLS enforcement: connection role "${posture.role}" is subject to RLS natively; no role switch needed.`);

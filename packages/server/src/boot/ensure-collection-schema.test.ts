@@ -23,6 +23,7 @@ import { logger } from "../utils/logger";
 let scratch: string;
 let infoSpy: ReturnType<typeof jest.spyOn>;
 let warnSpy: ReturnType<typeof jest.spyOn>;
+let debugSpy: ReturnType<typeof jest.spyOn>;
 
 const collectionFile = (slug: string) => `
 export default {
@@ -71,8 +72,23 @@ function source(over: Partial<InitializedDataSource> = {}): InitializedDataSourc
 
 const env = (over: Partial<RebaseBootEnv> = {}): RebaseBootEnv => over as RebaseBootEnv;
 
-/** Every message this call logged, at any level. */
+/**
+ * Every message this call logged, at any level — `debug` included.
+ *
+ * These tests are about whether a reason was *stated*, not about which level
+ * carries it, and the two questions have to stay separate: the steady-state
+ * summaries ("Collection schema is up to date") were demoted to `debug`
+ * because they fired on every boot and said nothing anyone could act on, while
+ * every skip reason and every applied-change count stayed where an operator
+ * reads them. A `logged()` that only saw info and warn would fail on the
+ * demotion and pass on an outright deletion, which is backwards.
+ */
 const logged = (): string =>
+    [...infoSpy.mock.calls, ...warnSpy.mock.calls, ...debugSpy.mock.calls]
+        .map(call => String(call[0])).join("\n");
+
+/** Only what an operator sees at the default level. */
+const loggedAtDefaultLevel = (): string =>
     [...infoSpy.mock.calls, ...warnSpy.mock.calls].map(call => String(call[0])).join("\n");
 
 beforeEach(() => {
@@ -80,6 +96,7 @@ beforeEach(() => {
     fs.mkdirSync(path.join(scratch, "collections"), { recursive: true });
     infoSpy = jest.spyOn(logger, "info").mockImplementation(() => {});
     warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => {});
+    debugSpy = jest.spyOn(logger, "debug").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -179,12 +196,18 @@ describe("ensureCollectionSchema — the path that does the work", () => {
         expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it("says so when the schema is already up to date", async () => {
+    // "Nothing changed" is the overwhelmingly common outcome of this call, and
+    // an operator cannot act on it. It is still said — a boot that goes quiet
+    // here is indistinguishable from one that never reached the ensure — but at
+    // `debug`, where a diagnosis will find it and a first boot will not be
+    // padded by it.
+    it("records that the schema is already up to date, below the default level", async () => {
         fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
 
         await ensureCollectionSchema(bundle(), [source()], env());
 
         expect(logged()).toContain("up to date");
+        expect(loggedAtDefaultLevel()).not.toContain("up to date");
         expect(warnSpy).not.toHaveBeenCalled();
     });
 });

@@ -6,7 +6,7 @@ import { createRequire } from "module";
 import readline from "readline";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { logger } from "@rebasepro/server";
+import { out, outWarn } from "./cli-output";
 import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
 
@@ -140,7 +140,7 @@ export async function loadCollectionsForCli(collectionsPath: string): Promise<Co
     const resolvedPath = path.resolve(collectionsPath);
     const collections: CollectionConfig[] = [];
     if (!fs.existsSync(resolvedPath)) {
-        logger.warn(chalk.yellow(
+        outWarn(chalk.yellow(
             `  ⚠  Collections path not found: "${collectionsPath}"\n` +
             `     Resolved to: ${resolvedPath}\n` +
             `     (relative to cwd: ${process.cwd()})\n` +
@@ -198,7 +198,7 @@ export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUr
             const res = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [devDbName]);
             if (res.rowCount === 0) {
                 await client.query(`CREATE DATABASE "${devDbName}"`);
-                logger.info(chalk.gray(`  ✓ Created validation database "${devDbName}"`));
+                out(chalk.gray(`  ✓ Created validation database "${devDbName}"`));
             }
         } finally {
             await client.end();
@@ -248,7 +248,7 @@ export async function applySearchDdl(
     } finally {
         await client.end();
     }
-    logger.info(chalk.gray("  ✓ Applied full-text search columns and indexes"));
+    out(chalk.gray("  ✓ Applied full-text search columns and indexes"));
 }
 
 /**

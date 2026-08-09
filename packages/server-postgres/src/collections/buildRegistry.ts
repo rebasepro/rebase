@@ -34,7 +34,9 @@ export function buildCollectionRegistry(schema: RegistrySchema): PostgresCollect
 
     if (schema.collections) {
         registry.registerMultiple(schema.collections);
-        logger.info(
+        // `Auto-discovered collections` already reports the count and the
+        // directory they came from; this is the same fact with the names.
+        logger.debug(
             `📋 [PostgresRegistry] Registered ${registry.getCollections().length} collections: ` +
             `[${registry.getCollections().map(c => c.slug).join(", ")}]`
         );

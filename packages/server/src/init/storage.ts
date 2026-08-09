@@ -14,7 +14,7 @@ export async function initializeStorage(
 ): Promise<{ storageRegistry?: StorageRegistry; storageController?: StorageController }> {
     if (!storageConfig) return {};
 
-    logger.info("Configuring storage");
+    logger.debug("Configuring storage");
     const controllers: Record<string, StorageController> = {};
 
     const toController = async (entry: BackendStorageConfig | StorageController, label: string): Promise<StorageController | undefined> => {

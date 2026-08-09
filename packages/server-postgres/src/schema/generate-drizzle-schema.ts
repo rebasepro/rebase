@@ -5,7 +5,8 @@ import { pathToFileURL } from "url";
 import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { CollectionConfig } from "@rebasepro/types";
-import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
+import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { out, outError } from "../cli-output";
 
 
 // --- Helper Functions ---
@@ -49,7 +50,7 @@ const formatTerminalText = (text: string, options: {
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
     try {
         if (!collectionsFilePath) {
-            logger.error("Error: No collections file path provided. Skipping schema generation.");
+            outError("Error: No collections file path provided. Skipping schema generation.");
             return;
         }
 
@@ -75,20 +76,20 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             const outputDir = path.dirname(outputPath);
             await fsPromises.mkdir(outputDir, { recursive: true });
             await fsPromises.writeFile(outputPath, schemaContent);
-            logger.info(`✅ Drizzle schema generated successfully at ${outputPath}`);
+            out(`✅ Drizzle schema generated successfully at ${outputPath}`);
         } else {
-            logger.info("✅ Drizzle schema generated successfully.");
-            logger.info(String(schemaContent));
+            out("✅ Drizzle schema generated successfully.");
+            out(String(schemaContent));
         }
 
-        logger.info(`You can now run ${formatTerminalText("rebase db generate", {
+        out(`You can now run ${formatTerminalText("rebase db generate", {
             bold: true,
             backgroundColor: "blue",
             textColor: "black"
         })} to generate the SQL migration files.`);
 
     } catch (error) {
-        logger.error("Error generating schema", { error: error });
+        outError(`Error generating schema: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
     }
 };
 
@@ -102,7 +103,7 @@ const main = () => {
     const watch = process.argv.includes("--watch");
 
     if (!collectionsFilePath) {
-        logger.info("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
+        out("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
         return;
     }
 
@@ -110,14 +111,14 @@ const main = () => {
     const resolvedOutputPath = outputPath ? path.resolve(process.cwd(), outputPath) : undefined;
 
     if (watch) {
-        logger.info(`Watching for changes in ${resolvedPath}...`);
+        out(`Watching for changes in ${resolvedPath}...`);
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,
             ignoreInitial: false
         });
 
         watcher.on("all", (event, filePath) => {
-            logger.info(`[${event}] ${filePath}. Regenerating schema...`);
+            out(`[${event}] ${filePath}. Regenerating schema...`);
             runGeneration(resolvedPath, resolvedOutputPath);
         });
     } else {

@@ -17,7 +17,7 @@ import {
 import { countRowsUpTo, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
-import { logger } from "@rebasepro/server";
+import { out, outWarn, outError } from "../cli-output";
 
 async function main() {
     const args = arg(
@@ -59,14 +59,14 @@ async function main() {
 
     for (const p of envPaths) {
         if (fs.existsSync(p)) {
-            dotenv.config({ path: p });
+            dotenv.config({ path: p, quiet: true });
             break;
         }
     }
 
     const databaseUrl = process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING;
     if (!databaseUrl) {
-        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        outError(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
 
@@ -75,15 +75,15 @@ async function main() {
     try {
         await client.connect();
     } catch (err) {
-        logger.error(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
-        logger.error(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
+        outError(chalk.red(`✗ Failed to connect to database: ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.gray("  Check your DATABASE_URL and ensure the database is reachable."));
         process.exit(1);
     }
 
     // Log the host portion safely — handle URLs without "@"
     const hostPart = safeHostFromUrl(databaseUrl);
-    logger.info(chalk.gray(`Connected to database: ${hostPart}`));
-    logger.info(chalk.gray(`Introspecting schema '${pgSchema}'...`));
+    out(chalk.gray(`Connected to database: ${hostPart}`));
+    out(chalk.gray(`Introspecting schema '${pgSchema}'...`));
 
     try {
         const metadata = await readSchemaMetadata(client, pgSchema);
@@ -101,7 +101,7 @@ async function main() {
             } catch (err) {
                 // A table this run cannot read is simply not classified as a code
                 // list; everything else about it still generates.
-                logger.info(chalk.gray(`  (skipped row count for ${table}: ${err instanceof Error ? err.message : String(err)})`));
+                out(chalk.gray(`  (skipped row count for ${table}: ${err instanceof Error ? err.message : String(err)})`));
             }
         }
 
@@ -116,8 +116,8 @@ async function main() {
         const roleCount = (role: string) =>
             Array.from(classifications.values()).filter((c) => c.role === role).length;
 
-        logger.info(chalk.blue(`Found ${tablesMap.size} tables.`));
-        logger.info(chalk.gray(
+        out(chalk.blue(`Found ${tablesMap.size} tables.`));
+        out(chalk.gray(
             `  ${roleCount("entity")} entities, ${joinTables.size} join tables (folded into relations), ` +
             `${roleCount("lookup")} code lists, ${roleCount("owned-child")} owned by another table (hidden from navigation).`
         ));
@@ -130,7 +130,7 @@ async function main() {
         } else if (!process.stdin.isTTY) {
             // No terminal to answer the question below (scaffolding scripts, CI,
             // `rebase init --introspect`) — asking would hang forever.
-            logger.info(chalk.gray("Skipping data inference (non-interactive run; pass --data-inference to enable)."));
+            out(chalk.gray("Skipping data inference (non-interactive run; pass --data-inference to enable)."));
         } else {
             const rl = readline.createInterface({
                 input: process.stdin,
@@ -142,7 +142,7 @@ async function main() {
         }
 
         if (runDataInference) {
-            logger.info(chalk.gray("Sampling database rows for data inference..."));
+            out(chalk.gray("Sampling database rows for data inference..."));
         }
 
         // Generate Collections
@@ -169,7 +169,7 @@ async function main() {
                         const { rows } = await client.query(`SELECT * FROM "${pgSchema}"."${tableName}" LIMIT 100`);
                         sampleData = rows;
                     } catch (err) {
-                        logger.error(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
+                        outError(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
                     }
                 }
 
@@ -186,7 +186,7 @@ async function main() {
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");
                 generatedFiles.push(tableName);
-                logger.info(chalk.green(`  ✓ ${filePath}`));
+                out(chalk.green(`  ✓ ${filePath}`));
             }));
         }
 
@@ -213,21 +213,21 @@ async function main() {
                 const indexContent = generateIndexContent(allFiles);
                 fs.writeFileSync(indexPath, indexContent, "utf-8");
             }
-            logger.info(chalk.green(`  ✓ ${indexPath}`));
+            out(chalk.green(`  ✓ ${indexPath}`));
         }
 
-        logger.info("");
+        out("");
         if (skippedFiles.length > 0) {
-            logger.info(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
-            logger.info(chalk.gray("  Use --force to overwrite existing files."));
-            logger.info("");
+            out(chalk.yellow(`⚠ Skipped ${skippedFiles.length} existing file(s): ${skippedFiles.join(", ")}`));
+            out(chalk.gray("  Use --force to overwrite existing files."));
+            out("");
         }
-        logger.info(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
-        logger.info(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
-        logger.info("");
+        out(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
+        out(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
+        out("");
 
     } catch (e) {
-        logger.error(chalk.red(`✗ Error introspecting database: ${e instanceof Error ? e.message : String(e)}`));
+        outError(chalk.red(`✗ Error introspecting database: ${e instanceof Error ? e.message : String(e)}`));
         process.exit(1);
     } finally {
         await client.end();
@@ -235,6 +235,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    logger.error(String(err));
+    outError(String(err));
     process.exit(1);
 });

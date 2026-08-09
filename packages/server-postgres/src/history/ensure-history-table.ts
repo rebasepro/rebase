@@ -9,7 +9,7 @@ import { revokeInternalTableSql } from "@rebasepro/common";
  * pattern as `ensureAuthTablesExist`.
  */
 export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void> {
-    logger.info("🔍 Checking row history table...");
+    logger.debug("🔍 Checking row history table...");
 
     try {
         // Create the rebase schema (idempotent — may already exist from auth init)
@@ -45,7 +45,7 @@ export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void
         // (created here, after that grant ran), so take it back.
         await db.execute(sql.raw(revokeInternalTableSql("rebase", "entity_history")));
 
-        logger.info("✅ Entity history table ready");
+        logger.debug("✅ Entity history table ready");
     } catch (error) {
         logger.error("❌ Failed to create row history table", { error: error });
         logger.warn("⚠️ Continuing without creating history table.");

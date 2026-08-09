@@ -9,7 +9,9 @@ import fs from "fs";
 import os from "os";
 import readline from "readline";
 import chalk from "chalk";
-import { logger } from "@rebasepro/server";
+// Aliased: `out` is already a local in two of the commands below (the `--out`
+// backup destination).
+import { out as print, outWarn, outError } from "../cli-output";
 import type { StorageController } from "@rebasepro/server";
 import {
     BackupDestination,
@@ -73,7 +75,7 @@ async function resolveStorageForDestination(
 function requireConnection(): string {
     const conn = resolveConnectionString(process.env);
     if (!conn) {
-        logger.error(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
+        outError(chalk.red("✗ DATABASE_URL is not set. Make sure your .env file is configured."));
         process.exit(1);
     }
     return conn;
@@ -117,19 +119,19 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
     const out = args["--out"] || process.env.BACKUP_DESTINATION || path.join(process.cwd(), "backups");
     const dest = parseBackupDestination(out);
 
-    logger.info("");
-    logger.info(chalk.bold("  💾 Rebase DB Backup"));
-    logger.info(chalk.gray(`  Database:    ${dbName}`));
-    logger.info(chalk.gray(`  Destination: ${out}`));
-    logger.info("");
+    print("");
+    print(chalk.bold("  💾 Rebase DB Backup"));
+    print(chalk.gray(`  Database:    ${dbName}`));
+    print(chalk.gray(`  Destination: ${out}`));
+    print("");
 
     // Version pre-flight (doctor-style).
     const pf = await preflight("pg_dump", connectionString);
     if (!pf.compatible) {
-        logger.error(chalk.red(`  ✗ ${pf.reason}`));
+        outError(chalk.red(`  ✗ ${pf.reason}`));
         process.exit(1);
     }
-    logger.info(chalk.gray(`  Using pg_dump ${pf.toolMajor} against server ${pf.serverMajor}.`));
+    print(chalk.gray(`  Using pg_dump ${pf.toolMajor} against server ${pf.serverMajor}.`));
 
     // Opt-in, and loud. With row security on, pg_dump stops refusing to read
     // rows it cannot see and starts leaving them out — an exit-0 backup that
@@ -139,13 +141,13 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
         : undefined;
 
     if (rowSecurity) {
-        logger.warn("");
-        logger.warn(chalk.yellow("  ⚠  Dumping with row-level security ON."));
-        logger.warn(chalk.gray(`     Reading as roles [${rowSecurity.roles.join(", ")}], which satisfies the generated`));
-        logger.warn(chalk.gray("     `admin_full_access` policy. This backup contains exactly the rows those"));
-        logger.warn(chalk.gray("     policies admit — a table whose policies have no admin rule comes out short,"));
-        logger.warn(chalk.gray("     and pg_dump will not say so. Prefer granting the dumping role BYPASSRLS."));
-        logger.warn("");
+        outWarn("");
+        outWarn(chalk.yellow("  ⚠  Dumping with row-level security ON."));
+        outWarn(chalk.gray(`     Reading as roles [${rowSecurity.roles.join(", ")}], which satisfies the generated`));
+        outWarn(chalk.gray("     `admin_full_access` policy. This backup contains exactly the rows those"));
+        outWarn(chalk.gray("     policies admit — a table whose policies have no admin rule comes out short,"));
+        outWarn(chalk.gray("     and pg_dump will not say so. Prefer granting the dumping role BYPASSRLS."));
+        outWarn("");
     }
 
     try {
@@ -164,10 +166,10 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
                 rowSecurity
             });
             await assertDumpValid(dump.localFile);
-            logger.info("");
-            logger.info(chalk.green(`  ✓ Backup written to ${dump.localFile} (${formatBytes(dump.sizeBytes)})`));
+            print("");
+            print(chalk.green(`  ✓ Backup written to ${dump.localFile} (${formatBytes(dump.sizeBytes)})`));
             if (dump.globalsFile) {
-                logger.info(chalk.gray(`    ✓ Roles captured to ${dump.globalsFile} (needed so RLS survives a restore).`));
+                print(chalk.gray(`    ✓ Roles captured to ${dump.globalsFile} (needed so RLS survives a restore).`));
             }
         } else {
             const storage = await resolveStorageForDestination(dest, process.env);
@@ -182,21 +184,21 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
             try {
                 await assertDumpValid(dump.localFile);
                 const uploaded = await uploadBackup(storage!, dump.localFile, dest);
-                logger.info("");
-                logger.info(chalk.green(`  ✓ Backup uploaded to ${uploaded.storageUrl} (${formatBytes(dump.sizeBytes)})`));
+                print("");
+                print(chalk.green(`  ✓ Backup uploaded to ${uploaded.storageUrl} (${formatBytes(dump.sizeBytes)})`));
                 // Upload the roles sidecar next to the dump so a restore can
                 // recreate roles the dump's GRANT/RLS statements depend on.
                 if (dump.globalsFile && fs.existsSync(dump.globalsFile)) {
                     const globalsUpload = await uploadBackup(storage!, dump.globalsFile, dest);
-                    logger.info(chalk.gray(`    ✓ Roles uploaded to ${globalsUpload.storageUrl} (needed so RLS survives a restore).`));
+                    print(chalk.gray(`    ✓ Roles uploaded to ${globalsUpload.storageUrl} (needed so RLS survives a restore).`));
                 }
-                logger.info(chalk.gray("    Ensure this bucket is private — backups may contain secrets and PII."));
+                print(chalk.gray("    Ensure this bucket is private — backups may contain secrets and PII."));
             } finally {
                 if (fs.existsSync(dump.localFile)) fs.unlinkSync(dump.localFile);
                 if (dump.globalsFile && fs.existsSync(dump.globalsFile)) fs.unlinkSync(dump.globalsFile);
             }
         }
-        logger.info("");
+        print("");
     } catch (err) {
         reportError(err);
         process.exit(1);
@@ -236,11 +238,11 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         ? withDatabaseName(baseConnection, args["--target-db"])
         : baseConnection;
 
-    logger.info("");
-    logger.info(chalk.bold("  ♻️  Rebase DB Restore"));
-    logger.info(chalk.gray(`  Source:  ${backupArg}`));
-    logger.info(chalk.gray(`  Target:  ${targetDb ?? "(from DATABASE_URL)"}`));
-    logger.info("");
+    print("");
+    print(chalk.bold("  ♻️  Rebase DB Restore"));
+    print(chalk.gray(`  Source:  ${backupArg}`));
+    print(chalk.gray(`  Target:  ${targetDb ?? "(from DATABASE_URL)"}`));
+    print("");
 
     // Resolve the local file to restore from (download object-storage keys).
     // Also resolve the `.globals.sql` roles sidecar so cluster roles can be
@@ -267,7 +269,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         } else {
             localFile = path.resolve(backupArg);
             if (!fs.existsSync(localFile)) {
-                logger.error(chalk.red(`  ✗ Backup file not found: ${localFile}`));
+                outError(chalk.red(`  ✗ Backup file not found: ${localFile}`));
                 process.exit(1);
             }
             const globalsPath = globalsFileForDump(localFile);
@@ -279,29 +281,29 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // exist yet when --create-db is used.
         const pf = await preflight("pg_restore", baseConnection);
         if (!pf.compatible) {
-            logger.error(chalk.red(`  ✗ ${pf.reason}`));
+            outError(chalk.red(`  ✗ ${pf.reason}`));
             process.exit(1);
         }
 
         // Create the target database when requested.
         if (args["--create-db"]) {
             if (!targetDb) {
-                logger.error(chalk.red("  ✗ --create-db requires a resolvable target database name (use --target-db)."));
+                outError(chalk.red("  ✗ --create-db requires a resolvable target database name (use --target-db)."));
                 process.exit(1);
             }
             const created = await ensureDatabaseExists(baseConnection, targetDb);
-            logger.info(chalk.gray(created ? `  ✓ Created database "${targetDb}".` : `  • Database "${targetDb}" already exists.`));
+            print(chalk.gray(created ? `  ✓ Created database "${targetDb}".` : `  • Database "${targetDb}" already exists.`));
         }
 
         // Destructive-action gate. Restores overwrite data; never run without
         // an explicit yes (interactive confirmation or --yes).
         if (!args["--yes"]) {
-            logger.warn(chalk.yellow(
+            outWarn(chalk.yellow(
                 `  ⚠️  This will restore into "${targetDb ?? "the target database"}" and may overwrite existing data.`
             ));
             const confirmed = await promptConfirm(chalk.yellow("     Type 'yes' to continue: "));
             if (!confirmed) {
-                logger.info(chalk.gray("  Aborted. No changes were made."));
+                print(chalk.gray("  Aborted. No changes were made."));
                 process.exit(1);
             }
         }
@@ -309,17 +311,17 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
         // Recreate cluster roles before restoring so GRANT/RLS statements in
         // the dump apply. Best-effort and idempotent (see applyGlobals).
         if (globalsSql) {
-            logger.info(chalk.gray("  Recreating cluster roles from the backup's roles sidecar…"));
+            print(chalk.gray("  Recreating cluster roles from the backup's roles sidecar…"));
             const { applied, skipped } = await applyGlobals(
                 targetConnection,
                 globalsSql,
-                (m) => logger.info(chalk.gray(m))
+                (m) => print(chalk.gray(m))
             );
-            logger.info(chalk.gray(`  ✓ Roles: ${applied} applied, ${skipped} skipped (already present or not permitted).`));
+            print(chalk.gray(`  ✓ Roles: ${applied} applied, ${skipped} skipped (already present or not permitted).`));
         } else {
-            logger.warn(chalk.yellow("  ⚠️  No roles sidecar (.globals.sql) accompanies this backup."));
-            logger.warn(chalk.yellow("     If the dump grants to roles that don't exist (e.g. rebase_user), the restore"));
-            logger.warn(chalk.yellow("     will fail — recreate those roles first, or use a backup that includes its globals."));
+            outWarn(chalk.yellow("  ⚠️  No roles sidecar (.globals.sql) accompanies this backup."));
+            outWarn(chalk.yellow("     If the dump grants to roles that don't exist (e.g. rebase_user), the restore"));
+            outWarn(chalk.yellow("     will fail — recreate those roles first, or use a backup that includes its globals."));
         }
 
         await restoreDump({
@@ -332,9 +334,9 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             inheritStdio: true
         });
 
-        logger.info("");
-        logger.info(chalk.green(`  ✓ Restore completed into "${targetDb ?? "the target database"}".`));
-        logger.info("");
+        print("");
+        print(chalk.green(`  ✓ Restore completed into "${targetDb ?? "the target database"}".`));
+        print("");
     } catch (err) {
         reportError(err);
         process.exit(1);
@@ -355,7 +357,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         return;
     }
     if (action !== "list") {
-        logger.error(chalk.red(`Unknown backups action: "${action}". Valid: list`));
+        outError(chalk.red(`Unknown backups action: "${action}". Valid: list`));
         process.exit(1);
     }
 
@@ -366,19 +368,19 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
     try {
         const storage = await resolveStorageForDestination(dest, process.env);
         const backups = await listBackups(dest, storage ?? undefined);
-        logger.info("");
+        print("");
         if (backups.length === 0) {
-            logger.info(chalk.gray(`  No backups found at ${out}.`));
+            print(chalk.gray(`  No backups found at ${out}.`));
         } else {
-            logger.info(chalk.bold(`  💾 ${backups.length} backup(s) at ${out}:`));
-            logger.info("");
+            print(chalk.bold(`  💾 ${backups.length} backup(s) at ${out}:`));
+            print("");
             for (const b of backups) {
                 const when = b.createdAt ? b.createdAt.toISOString() : "unknown date";
                 const name = dest.kind === "local" ? path.basename(b.key) : b.key;
-                logger.info(`  ${chalk.green("●")} ${chalk.bold(name)} ${chalk.gray(`— ${when}`)}`);
+                print(`  ${chalk.green("●")} ${chalk.bold(name)} ${chalk.gray(`— ${when}`)}`);
             }
         }
-        logger.info("");
+        print("");
     } catch (err) {
         reportError(err);
         process.exit(1);
@@ -398,15 +400,15 @@ async function assertDumpValid(localFile: string): Promise<void> {
 
 function reportError(err: unknown): void {
     if (err instanceof BackupToolError) {
-        logger.error(chalk.red(`  ✗ ${err.message}`));
-        if (err.hint) logger.error(chalk.gray(`    ${err.hint}`));
+        outError(chalk.red(`  ✗ ${err.message}`));
+        if (err.hint) outError(chalk.gray(`    ${err.hint}`));
     } else {
-        logger.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
 function printBackupHelp(): void {
-    logger.info(`
+    print(`
 ${chalk.bold("rebase db backup")} — Create a database backup (pg_dump, custom format)
 
 ${chalk.green.bold("Usage")}
@@ -442,7 +444,7 @@ ${chalk.green.bold("Notes")}
 }
 
 function printRestoreHelp(): void {
-    logger.info(`
+    print(`
 ${chalk.bold("rebase db restore")} — Restore a database from a backup (pg_restore)
 
 ${chalk.green.bold("Usage")}
@@ -472,7 +474,7 @@ ${chalk.red.bold("Warning")}
 }
 
 function printBackupsHelp(): void {
-    logger.info(`
+    print(`
 ${chalk.bold("rebase db backups")} — Manage stored backups
 
 ${chalk.green.bold("Usage")}
