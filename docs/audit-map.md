@@ -11,14 +11,15 @@ Status legend:
 - **partial** — covered incidentally inside a broader audit or sweep, never on its own.
 - **never** — no dedicated pass.
 
-Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](docs/AUDIT-2026-07-28.md),
-[AUDIT-storage-2026-08-07.md](docs/AUDIT-storage-2026-08-07.md),
-[api-surface-audit-2026-08-05.md](docs/api-surface-audit-2026-08-05.md),
-[dx-audit-2026-07-25.md](docs/dx-audit-2026-07-25.md),
-[sdk-generation-audit-2026-08-08.md](docs/sdk-generation-audit-2026-08-08.md),
-[type-placement-audit-2026-07-28.md](docs/type-placement-audit-2026-07-28.md),
-[saas/SWEEP-2026-08-07.md](saas/SWEEP-2026-08-07.md), and the sweep log in
-[bug-classes.md](docs/bug-classes.md).
+Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](AUDIT-2026-07-28.md),
+[AUDIT-storage-2026-08-07.md](AUDIT-storage-2026-08-07.md),
+[api-surface-audit-2026-08-05.md](api-surface-audit-2026-08-05.md),
+[dx-audit-2026-07-25.md](dx-audit-2026-07-25.md),
+[dx-audit-2026-08-09.md](dx-audit-2026-08-09.md),
+[sdk-generation-audit-2026-08-08.md](sdk-generation-audit-2026-08-08.md),
+[type-placement-audit-2026-07-28.md](type-placement-audit-2026-07-28.md),
+[saas/SWEEP-2026-08-07.md](../saas/SWEEP-2026-08-07.md), and the sweep log in
+[bug-classes.md](bug-classes.md).
 
 ---
 
@@ -205,7 +206,9 @@ Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](d
     was found here. **partial**
 66. **Error messages & DX surface** — a cross-cutting pass over the errors a developer
     actually hits first (bad config, missing env, wrong driver version): are they
-    actionable and true? **partial (dx-audit-2026-07-25)**
+    actionable and true? **partial (dx-audit-2026-07-25, dx-audit-2026-08-09)** — the
+    later pass drove the published CLI against real Postgres rather than the repo, so
+    its findings are reproductions; still not a dedicated pass over error text alone.
 67. **MCP server** — `packages/mcp`. Tool surface, authz, what it exposes about the DB.
     **done** — see [audits/67-mcp-server.md](audits/67-mcp-server.md). H1/H2/H3/M1 have since been
     fixed, so that write-up reads worse than the current code; **M2 is still open** — zero-config
