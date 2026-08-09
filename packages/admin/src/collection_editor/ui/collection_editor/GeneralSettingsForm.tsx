@@ -1,5 +1,5 @@
 
-import { IconForView } from "@rebasepro/app";
+import { IconForView, useTranslation } from "@rebasepro/app";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 
@@ -271,11 +271,13 @@ function DefaultDatabaseField({
     onDatabaseIdUpdate
 }: { databaseId?: string, disabled?: boolean, onDatabaseIdUpdate: (databaseId: string) => void }) {
 
-    return <Tooltip title={"Database ID"}
+    const { t } = useTranslation();
+
+    return <Tooltip title={t("database_id")}
         side={"top"}
         align={"start"}>
         <TextField size={"small"}
-            aria-label={"Database ID"}
+            aria-label={t("database_id")}
             invisible={true}
             inputClassName={"text-end"}
             disabled={disabled}

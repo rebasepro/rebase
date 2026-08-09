@@ -2,7 +2,7 @@
 import { IconForView } from "@rebasepro/app";
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
-import { useAuthController, useCustomizationController } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
 import { Property } from "@rebasepro/types";
 import {
@@ -372,11 +372,13 @@ function DefaultDatabaseField({
     onDatabaseIdUpdate
 }: { databaseId?: string, onDatabaseIdUpdate: (databaseId: string) => void }) {
 
-    return <Tooltip title={"Database ID"}
+    const { t } = useTranslation();
+
+    return <Tooltip title={t("database_id")}
         side={"top"}
         align={"start"}>
         <TextField size={"small"}
-            aria-label={"Database ID"}
+            aria-label={t("database_id")}
             invisible={true}
             inputClassName={"text-end"}
             value={databaseId ?? ""}

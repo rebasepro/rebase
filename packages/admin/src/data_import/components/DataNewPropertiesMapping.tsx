@@ -17,6 +17,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { getIn, setIn } from "@rebasepro/forms";
+import { useTranslation } from "@rebasepro/app";
 import { ImportConfig } from "../types";
 
 export interface DataPropertyMappingProps {
@@ -36,6 +37,7 @@ export function DataNewPropertiesMapping({
     buildPropertyView
 }: DataPropertyMappingProps) {
 
+    const { t } = useTranslation();
     const headersMapping = importConfig.headersMapping;
     const headingsOrder = importConfig.headingsOrder;
     const idColumn = importConfig.idColumn;
@@ -117,7 +119,7 @@ export function DataNewPropertiesMapping({
                         <TableCell header={true}>
                         </TableCell>
                         <TableCell header={true} style={{ width: "65%" }}>
-                            Default value
+                            {t("default_value")}
                         </TableCell>
                     </TableHeader>
                     <TableBody>
@@ -205,18 +207,31 @@ function DefaultValuesField({
     onValueChange,
     defaultValue
 }: { property: Property, onValueChange: (value: any) => void, defaultValue?: any }) {
+    const { t } = useTranslation();
+    const defaultValueLabel = t("default_value");
+    // Named fields stay distinguishable from each other — several of these sit
+    // in one table, and an aria-label repeated verbatim tells a screen reader
+    // nothing about which row it is on.
+    //
+    // Composed with a separator rather than a phrase: there is no key for the
+    // possessive form, and `t` returns the key itself for one that does not
+    // exist, so inventing `default_value_for` here would read out the literal
+    // string "default_value_for" in every locale, English included.
+    const ariaLabel = property.name
+        ? `${defaultValueLabel}: ${property.name}`
+        : defaultValueLabel;
     if (property.type === "string") {
         return <TextField size={"medium"}
-            aria-label={property.name ? `Default value for ${property.name}` : "Default value"}
-            placeholder={"Default value"}
+            aria-label={ariaLabel}
+            placeholder={defaultValueLabel}
             value={defaultValue ?? ""}
             onChange={(event) => onValueChange(event.target.value)}/>;
     } else if (property.type === "number") {
         return <TextField size={"medium"}
             type={"number"}
-            aria-label={property.name ? `Default value for ${property.name}` : "Default value"}
+            aria-label={ariaLabel}
             value={defaultValue ?? ""}
-            placeholder={"Default value"}
+            placeholder={defaultValueLabel}
             onChange={(event) => onValueChange(event.target.value)}/>;
     } else if (property.type === "boolean") {
         return <BooleanSwitchWithLabel

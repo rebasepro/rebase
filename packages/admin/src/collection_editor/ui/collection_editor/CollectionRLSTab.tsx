@@ -40,7 +40,7 @@ import {
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
-import { useRebaseContext } from "@rebasepro/app";
+import { useRebaseContext, useTranslation } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
 
@@ -394,6 +394,7 @@ function InlinePolicyEditor({
     onSave: (policyData: Partial<PostgresPolicy>) => void;
     onCancel: () => void;
 }) {
+    const { t } = useTranslation();
     const [name, setName] = useState(policy?.policyname || "");
     const [behavior, setBehavior] = useState<"PERMISSIVE" | "RESTRICTIVE">(policy?.permissive || "PERMISSIVE");
     const [command, setCommand] = useState<PolicyCommand>((policy?.cmd as PolicyCommand) || "ALL");
@@ -441,8 +442,8 @@ function InlinePolicyEditor({
                 <Paper className={cls("p-4 md:p-6 flex flex-col gap-6 bg-white dark:bg-surface-800 border-none sm:border-solid rounded-none sm:rounded-xl", defaultBorderMixin)}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Policy Name</Typography>
-                            <TextField aria-label="Policy Name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
+                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_name")}</Typography>
+                            <TextField aria-label={t("studio_policy_name")} value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setName(e.target.value)} placeholder="e.g. allow_read_all"/>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Behavior</Typography>
@@ -501,14 +502,14 @@ function InlinePolicyEditor({
                     </div>
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
-                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">USING expression</Typography>
-                            <TextField aria-label="USING expression" value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_using_expr")}</Typography>
+                            <TextField aria-label={t("studio_policy_using_expr")} value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
-                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">WITH CHECK expression</Typography>
-                            <TextField aria-label="WITH CHECK expression" value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_check_expr")}</Typography>
+                            <TextField aria-label={t("studio_policy_check_expr")} value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
                         </div>
                     )}
                 </Paper>

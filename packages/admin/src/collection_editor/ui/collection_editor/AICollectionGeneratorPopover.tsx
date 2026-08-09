@@ -1,5 +1,5 @@
 
-import { AIIcon } from "@rebasepro/app";
+import { AIIcon, useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
@@ -70,6 +70,7 @@ export function AICollectionGeneratorPopover({
     showLabel = true,
     onAnalyticsEvent
 }: AICollectionGeneratorPopoverProps) {
+    const { t } = useTranslation();
     const [menuOpen, setMenuOpen] = useState(false);
     const [prompt, setPrompt] = useState("");
     const [loading, setLoading] = useState(false);
@@ -204,8 +205,8 @@ export function AICollectionGeneratorPopover({
 
                 <Typography variant="caption" color="secondary">
                     {existingCollection
-                        ? "Describe the changes you want to make to this collection."
-                        : "Describe the collection you want to create."
+                        ? t("describe_changes_to_make")
+                        : t("describe_collection_to_create")
                     }
                 </Typography>
 
@@ -214,8 +215,8 @@ export function AICollectionGeneratorPopover({
                     multiline
                     autoFocus
                     aria-label={existingCollection
-                        ? "Describe the changes you want to make to this collection."
-                        : "Describe the collection you want to create."
+                        ? t("describe_changes_to_make")
+                        : t("describe_collection_to_create")
                     }
                     className="w-full text-text-primary dark:text-text-primary-dark"
                     value={prompt}
