@@ -1,6 +1,7 @@
 import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
+    ALL_WHERE_FILTER_OPS,
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany
@@ -951,8 +952,24 @@ export class DrizzleConditionBuilder {
             case "is-not-null":
                 return sql`${column} IS NOT NULL`;
             default:
-                logger.warn(`Unsupported filter operation: ${op}`);
-                return null;
+                // The relation path five hundred lines up already refuses this,
+                // and says why: "returning `null` for an operator this cannot
+                // express would drop the condition", and a dropped condition
+                // widens the result. The column path is its twin and kept the
+                // warning — so `{ status: ["contains", "x"] }` filtered on
+                // nothing and answered 200 with every row, which reads as data
+                // that matched.
+                //
+                // The wire layer rejects operator-shaped unknowns before they
+                // arrive (`UnknownFilterOperatorError`, 400). What reaches here
+                // came from in-process `rebase.data`, a stored filter preset or
+                // a config — none of them typechecked at the call site, all of
+                // them able to name an operator that no longer exists.
+                throw ApiError.badRequest(
+                    `Unknown filter operator '${op}'. Valid operators: ${ALL_WHERE_FILTER_OPS.join(", ")}.`,
+                    "UNKNOWN_FILTER_OPERATOR",
+                    { operator: op, validOperators: ALL_WHERE_FILTER_OPS }
+                );
         }
     }
 

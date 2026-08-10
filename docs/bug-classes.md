@@ -2133,3 +2133,27 @@ stand-in once `rowCount` carries meaning.
 | `RelationService`'s FK stamping — the nine `update(targetTable)` sites | **same class, not changed here.** Two of them (`set fk where inArray(ids)`, and the one-to-one `set fk where id = ?`) have a knowable expected count and are silent today; the rest are "clear whatever is linked", where zero is legitimate. Guarding the first two also changes what a *nonexistent* target id does — today it is dropped without a word — and that is a behavioural decision about relation writes, not an RLS fix. Worth doing deliberately, with its own tests |
 | `PersistService.deleteAll` | left as is: "remove everything I can see" makes no claim about a particular row, and zero is a legitimate answer |
 | `deleteMany` / `saveMany` | clean — both loop the single-row path inside one transaction, so the guard and the rollback come with them |
+
+### The read-side sibling — 2026-08-10
+
+Widening the sweep from "a write that changed nothing" to "an operation the
+caller asked for that did nothing" found the same defect pointing the other
+way. `RelationService` answered `[]` for a relation it could not resolve, which
+is what an empty relation looks like; and `buildSingleFilterCondition` returned
+`null` for an operator it did not recognise, which drops the condition — so
+`{ status: ["contains", "x"] }` filtered on nothing and answered 200 with every
+row. A write that silently does nothing loses data; a read that silently does
+nothing *shows* it.
+
+The tell was in the same file. `buildRelationFilterPredicate`, five hundred
+lines up, refuses an unknown operator and says why in its docblock: *"returning
+`null` for an operator this cannot express would drop the condition"*. One of
+the pair had been fixed and its twin had not — class 2, and class 31's
+observation that these sites come in pairs.
+
+| checked | result |
+|---|---|
+| `buildSingleFilterCondition`'s `default:` | **BUG** — unknown operator warned and dropped the condition. Now a 400 `UNKNOWN_FILTER_OPERATOR` naming the valid ones, matching what the wire layer already raises before the driver sees it |
+| `resolveFilterTarget` (unknown filter *field*) | clean — already defaults to `error`, with `warn` as a deployment-wide opt-out |
+| `realtimeService.ts`, sixteen swallowing catches | clean — each is a delivery or housekeeping concern, and the two that a caller waits on (`persistAndFanOut`, `handleChannelHistoryRequest`) already answer the client with an error frame |
+| `orderBy` | already fixed — a typo'd sort is a 400 rather than an unsorted 200 |

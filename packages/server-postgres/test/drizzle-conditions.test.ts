@@ -986,16 +986,30 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(new PgDialect().sqlToQuery(condition!).sql).toBe("FALSE");
         });
 
-        it("should warn and return null for unsupported operators", () => {
-            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
-            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
+        it("refuses an unknown operator instead of dropping the condition", () => {
+            // It used to warn and return null, and a null condition is not
+            // added to the WHERE — so a filter naming an operator that does not
+            // exist answered 200 with every row, which reads as data that
+            // matched. The relation path already refuses the same thing.
+            expect(() => DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
                 "unknown-op" as any,
                 42
-            );
-            expect(condition).toBeNull();
-            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unsupported filter operation: unknown-op"));
-            warnSpy.mockRestore();
+            )).toThrow(/Unknown filter operator 'unknown-op'/);
+
+            try {
+                DrizzleConditionBuilder.buildSingleFilterCondition(mockUsersTable.age, "unknown-op" as any, 42);
+            } catch (e) {
+                expect(e).toMatchObject({ statusCode: 400, code: "UNKNOWN_FILTER_OPERATOR" });
+            }
+        });
+
+        it("names the operators that do exist, so the caller can fix the call", () => {
+            expect(() => DrizzleConditionBuilder.buildSingleFilterCondition(
+                mockUsersTable.age,
+                "contains" as any,
+                42
+            )).toThrow(/array-contains-any/);
         });
     });
 
