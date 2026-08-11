@@ -205,6 +205,30 @@ function checkAdminTypesDeclared() {
 }
 
 /**
+ * The headless config package must declare `@rebasepro/common`.
+ *
+ * `rebase schema introspect` writes its collections against `defineCollection`, and
+ * which one it imports is *detected* from the manifests above the output directory —
+ * `@rebasepro/admin-types` for a CMS project, `@rebasepro/common` for this one. Drop
+ * the dependency and the detection silently falls back to a plain
+ * `PostgresCollectionConfig` annotation, which widens the property keys to `string`
+ * and takes the checking on `propertiesOrder` and friends away again.
+ *
+ * The typecheck below cannot see this: `node_modules` is symlinked at the pnpm
+ * store, so the import resolves whether or not the manifest declares it. Same reason
+ * `checkAdminTypesDeclared` exists, one flavour over.
+ */
+function checkHeadlessBuilderDeclared() {
+    const manifest = path.join(baasOverlay, "config", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    return deps["@rebasepro/common"]
+        ? []
+        : ["overlays/baas/config/package.json does not depend on @rebasepro/common, "
+            + "so introspection has no defineCollection to generate against"];
+}
+
+/**
  * Every ambient type library a template tsconfig pins must be a declared
  * dependency of the workspace that pins it.
  *
@@ -335,6 +359,15 @@ if (declarationProblems.length > 0) {
     for (const p of declarationProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   admin-types wiring");
+}
+
+const headlessBuilderProblems = checkHeadlessBuilderDeclared();
+if (headlessBuilderProblems.length > 0) {
+    failed++;
+    console.log("  FAIL headless builder wiring");
+    for (const p of headlessBuilderProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   headless builder wiring");
 }
 
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));

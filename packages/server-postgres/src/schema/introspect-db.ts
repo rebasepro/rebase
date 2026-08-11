@@ -14,6 +14,7 @@ import {
     mergeIndexContent,
     safeHostFromUrl
 } from "./introspect-db-logic";
+import { detectCollectionBuilder } from "./introspect-db-project";
 import { countRowsUpTo, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
@@ -107,6 +108,22 @@ async function main() {
 
         const classifications = classifyTables(metadata, tablesMap);
         const checkFacts = parseCheckConstraints(metadata.checks);
+
+        // Which builder the generated files may import — read from the manifests
+        // above `outDir`, because a project without `@rebasepro/admin-types` cannot
+        // resolve that import and has no `admin` block to write into either.
+        const builder = detectCollectionBuilder(outDir);
+        if (builder === "annotation") {
+            outWarn(chalk.yellow(
+                "⚠ Neither @rebasepro/admin-types nor @rebasepro/common is declared above " +
+                `${outDir}.`
+            ));
+            outWarn(chalk.gray(
+                "  Generating plain type annotations, which widen the property keys to `string`: " +
+                "`propertiesOrder` and friends will not be checked. Add @rebasepro/common to the " +
+                "config package to turn that checking on."
+            ));
+        }
         const joinTables = new Set(
             Array.from(classifications.values())
                 .filter((c) => c.role === "junction")
@@ -181,7 +198,7 @@ async function main() {
                     tablesMap,
                     enumMap,
                     sampleData,
-                    { metadata, classifications, checkFacts }
+                    { metadata, classifications, checkFacts, builder }
                 );
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");

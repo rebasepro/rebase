@@ -102,6 +102,24 @@
 
 ### Fixed
 
+- **Introspected collections opted out of key checking.** `rebase schema introspect` opened every generated file with `const ordersCollection: PostgresCollectionConfig = {`, and that annotation widens `properties` to `Record<string, …>`. Every key-shaped field in the `admin` block is derived from those keys — `propertiesOrder`, `listProperties`, `sort`, `display.title`, `fixedFilter` — so annotated, they accept any string. Introspection was emitting a `propertiesOrder` array that nothing checked: rename a column, re-introspect, and the stale key compiled silently and reordered nothing. Introspected keys are precisely the ones nobody typed and nobody remembers, so this was backwards.
+
+  Generated collections now use `defineCollection`, which `rebase init` has always written, and which keeps the keys literal. A `propertiesOrder` entry naming no property is a compile error, and the compiler names the column the rename left behind.
+
+  Which `defineCollection` is detected per run, from the package manifests above the output directory — the same path Node resolves a bare specifier along:
+
+  | Your project declares | Generated collections use | `admin` block |
+  |------|------|------|
+  | `@rebasepro/admin-types` | `defineCollection` from `@rebasepro/admin-types` | yes |
+  | `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
+  | neither | a `PostgresCollectionConfig` annotation, with a warning | no |
+
+  **The headless flavours emit no `admin` block, on the collection or on any property.** That is a fix rather than a downgrade: `@rebasepro/types` declares no `admin` field at all — the augmentation in `@rebasepro/admin-types` is what adds it — so the block introspection used to emit was a type error in every headless project it was ever written into. What is dropped is presentation (`icon`, `propertiesOrder`, `multiline`, `readOnly`) for a project with no panel to present it; nothing about the schema, the API or your data depends on it.
+
+  `@rebasepro/common` is a dependency of the headless config package now, which is what makes that branch reachable. A project scaffolded before this keeps the old annotation and is told what it is missing.
+
+  One thing changed in the generated relations to make inference survive a real schema: the `target` thunk's return type is written out, `target: (): AnyCollectionConfig => authorsCollection`. Without an explicit type on the const, a relation cycle — `posts` belongs to `authors`, `authors` has many `posts`, or a self-referencing `employees.reports_to` — makes the inference circular and every file in the cycle fails to compile.
+
 - **Storage was the one router with no rate limiter, and the one where a request costs money.** `createDataRateLimiter` was mounted on the data router and the functions router and nowhere else. Upload, download and the whole tus sequence were unbounded — and storage is the surface where a single HTTP request buys a metered third-party operation: `PutObject`, `GetObject` and its egress bytes, `ListObjectsV2`.
 
   The download path was the worst of it. With `storagePublicRead: true` — a documented, ordinary setting — `readAuthMiddleware` resolves to a no-op, so `GET /file/*` was anonymous, unauthenticated and unlimited. One machine looping over a large public object is a full `GetObject` and a full egress charge per request, with no ceiling and no per-caller accounting; the bill arrives a month later.

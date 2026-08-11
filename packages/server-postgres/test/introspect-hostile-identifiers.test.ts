@@ -188,9 +188,11 @@ describe("generated collections compile for identifiers Postgres allows", () => 
             "child", child, [], new Set(), new Map([["child", child], [hostile, parent]]), new Map()
         );
 
-        // One import for the types package, one for the target, and nothing else.
-        expect(topLevelDeclarations(source).filter(d => d === "import").length).toBeLessThanOrEqual(2);
-        expect(topLevelDeclarations(source)).toEqual(["import", "import", "childCollection", "export="]);
+        // One import for `defineCollection`, one for `AnyCollectionConfig` (which
+        // the relation thunk's return type names), one for the target, and nothing
+        // else — in particular nothing the hostile table name smuggled in.
+        expect(topLevelDeclarations(source).filter(d => d === "import").length).toBeLessThanOrEqual(3);
+        expect(topLevelDeclarations(source)).toEqual(["import", "import", "import", "childCollection", "export="]);
     });
 
     it("keeps a multi-line classification reason inside its comment", () => {

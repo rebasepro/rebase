@@ -12415,6 +12415,18 @@ rebase schema introspect
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
+**What the generated files look like**
+
+Introspection writes collections against `defineCollection`, which keeps the property keys *literal* — so `propertiesOrder`, `listProperties`, `sort` and `titleProperty` complete over your own column names, and a key left behind by a renamed column is a compile error rather than a line that quietly does nothing. Which one it imports depends on what your project depends on, and is decided per run:
+
+| Your project declares | Generated collections use | `admin` block |
+|------|------|------|
+| `@rebasepro/admin-types` (a project with the panel) | `defineCollection` from `@rebasepro/admin-types` | yes |
+| `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
+| neither | a `PostgresCollectionConfig` annotation, with a warning | no |
+
+A headless project has no admin panel, and the core types declare no `admin` field at all — so the block is not emitted there. It is presentation (`icon`, `propertiesOrder`, `multiline`); nothing about the schema, the API or your data depends on it.
+
 #### `rebase db push`
 
 Push schema changes directly to the database without migration files:
