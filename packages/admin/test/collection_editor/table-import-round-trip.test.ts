@@ -158,12 +158,20 @@ describe("importing a table and saving the collection", () => {
     });
 
     it("maps the columns to properties, id included", () => {
+        // camelCase keys carrying the real column, not the column verbatim: a
+        // property key is the wire name, and the API is camelCase throughout.
+        // `columnName` is the only thing that names the column, and it still
+        // does — importing a table must produce the same shape `rebase schema
+        // introspect` does, or the panel and the CLI describe one database two
+        // ways.
         expect(Object.keys(imported.properties)).toEqual(
-            expect.arrayContaining(["id", "title", "author_id", "published_at"])
+            expect.arrayContaining(["id", "title", "authorId", "publishedAt"])
         );
+        expect(imported.properties.authorId).toMatchObject({ columnName: "author_id" });
+        expect(imported.properties.publishedAt).toMatchObject({ columnName: "published_at" });
         // `uuid`, not `true`: the generation strategy is read off the column default.
         expect(imported.properties.id).toMatchObject({ type: "string", isId: "uuid" });
-        expect(imported.properties.published_at).toMatchObject({ type: "date" });
+        expect(imported.properties.publishedAt).toMatchObject({ type: "date" });
         expect(imported.propertiesOrder.length).toBeGreaterThan(0);
     });
 });
