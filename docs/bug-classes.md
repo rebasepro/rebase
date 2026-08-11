@@ -2157,3 +2157,24 @@ observation that these sites come in pairs.
 | `resolveFilterTarget` (unknown filter *field*) | clean — already defaults to `error`, with `warn` as a deployment-wide opt-out |
 | `realtimeService.ts`, sixteen swallowing catches | clean — each is a delivery or housekeeping concern, and the two that a caller waits on (`persistAndFanOut`, `handleChannelHistoryRequest`) already answer the client with an error frame |
 | `orderBy` | already fixed — a typo'd sort is a 400 rather than an unsorted 200 |
+
+### Widening it to every surface — 2026-08-10
+
+The class generalises past queries and writes: **an operation a caller asked
+for, that did not happen, reported as though it had.** Swept that way across
+the server packages, with the caller's evidence as the test each time — what
+does the client actually receive?
+
+| checked | result |
+|---|---|
+| `finalize` in `tus-handler.ts` | **BUG, the worst of the sweep.** A resumable upload that could not be stored answered `204` with `Upload-Offset: <size>`, which in TUS *is* "I have your file". No controller returned quietly; a failing `putObject` was caught and logged. It also set `completed = true` before writing, and a completed upload is refused a retry and skipped by the stale sweeper — so the client was locked out of the one thing it could do and the bytes leaked. Now 503/502, and complete means stored |
+| `cron-loader.ts` | **BUG.** Three kinds of unloadable file skipped with one `warn` each, nothing aggregated, and `GET /api/cron` listing only what loaded — so a job that failed to load looks exactly like a job nobody wrote. Its twin `loadFunctionsWithDiagnostics` had already been given `problems`, a summary and a count on the listing endpoint; the cron loader's docblock claims to follow that pattern and did not |
+| `MongoDataService.delete` vs `PersistService.delete` | **divergent, left for a decision.** Deleting a missing row throws 404 on Postgres and resolves quietly on Mongo, and each driver has a test asserting its own answer. REST hides it (the route fetches first), so only `rebase.data` callers see it. It wants one contract in a shared suite, not two local habits |
+| `MongoConditionBuilder` | clean, and instructive — it already throws for an unknown operator, and its comment describes the exact Postgres defect fixed above. The pair was Mongo-fixed, Postgres-not |
+| `collections/loader.ts` | clean — collects failures and throws, naming every file |
+| `boot/bundle.ts` + `ensureCollectionSchema` | clean — a declared-but-missing entry is deliberately non-fatal for optional dirs (there is a test saying why), and the collections case is reported loudly one layer up with the rebuild command |
+| `cron-store.tryClaimRun` | clean by this standard — it fails open on purpose and says so: a duplicate run beats a broken claims table stopping all cron |
+| MFA pre-auth tokens (`verifyMfaPendingToken` / `verifyAccessToken`) | clean, both directions — a purpose-scoped token is refused as a session and vice versa, and `mfa-enforcement.test.ts` spends every string in the 401 body against a protected route |
+| catch blocks with an empty body, all six server packages | none. 111 have a comment saying why, which is the standard this file asks for |
+
+**Sweep, for the next pass:** `grep -rnE "logger\.(warn|error)" packages/*/src` and read the *next* line. `continue`, `return` and a fall-through to a success response are the three shapes. Then ask the question that separates this class from ordinary logging: **what does the caller receive?** If the answer is a 2xx, a resolved promise, or an empty list, the log line is the only place the failure exists — and nobody reads logs for an operation that reported success.
