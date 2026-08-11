@@ -367,11 +367,23 @@ export class TusHandler {
     // -----------------------------------------------------------------------
 
     /**
-     * Move a completed upload into the storage controller.
+     * Move a fully-received upload into the storage controller.
+     *
+     * Everything here used to be best-effort: no controller warned and
+     * returned, a failing `putObject` was caught and logged, and either way the
+     * `PATCH` that carried the last chunk answered `204` with
+     * `Upload-Offset: <size>` — which in TUS is the server saying "I have your
+     * file". The object did not exist. For the one operation a user can spend
+     * minutes on, the failure mode was silent data loss with a success code.
+     *
+     * `completed` is now set only once the bytes are stored, and that matters
+     * twice over: a "completed" upload is refused a retry (`patch` answers
+     * "Upload already completed") and is skipped by the stale sweeper, so
+     * marking it up front both locked the client out of retrying and leaked the
+     * temp file forever. Left false, a client that retries sends an empty chunk
+     * at `offset === size`, which lands straight back here.
      */
     private async finalize(upload: TusUpload): Promise<void> {
-        upload.completed = true;
-
         // Resolve the target controller from the storage source decided — and
         // authorized — in `create`. Reading `upload.metadata.storageId` here
         // instead is how the hook's answer and the write came apart.
@@ -384,9 +396,17 @@ export class TusHandler {
         }
 
         if (!targetController) {
-            // No controller — leave temp file in place
-            logger.warn("[TUS] Upload completed but no StorageController configured. Temp file remains:", { filePath: upload.filePath });
-            return;
+            logger.error(
+                "[TUS] Upload received but no StorageController is configured — nothing can be written",
+                { uploadId: upload.id, storageId }
+            );
+            throw new ApiError(
+                503,
+                "STORAGE_NOT_CONFIGURED",
+                storageId
+                    ? `Storage source "${storageId}" is not configured on this server, so the upload cannot be stored.`
+                    : "No storage is configured on this server, so the upload cannot be stored."
+            );
         }
 
         try {
@@ -411,6 +431,10 @@ export class TusHandler {
                 bucket: upload.bucket
             });
 
+            // Stored: only now is the upload complete, and only now is the temp
+            // file redundant.
+            upload.completed = true;
+
             // Clean up temp file
             try { await unlink(upload.filePath); } catch { /* ok */ }
             this.uploads.delete(upload.id);
@@ -418,6 +442,17 @@ export class TusHandler {
             logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`, storageId ? { storageId } : {});
         } catch (err) {
             logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
+            // The bytes stay on disk and the upload stays incomplete, so a
+            // retry can re-run this. Answering 204 here told the client its
+            // file was safe when the store had refused it — a full bucket,
+            // expired credentials and a deleted bucket all looked like success.
+            if (err instanceof ApiError) throw err;
+            throw new ApiError(
+                502,
+                "STORAGE_WRITE_FAILED",
+                `Upload ${upload.id} was received but could not be stored: ` +
+                (err instanceof Error ? err.message : String(err))
+            );
         }
     }
 }
