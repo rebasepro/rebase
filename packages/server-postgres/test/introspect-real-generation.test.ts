@@ -22,6 +22,7 @@ import ts from "typescript";
 import {
     buildEnumMap,
     generateCollectionFile,
+    type CollectionBuilder,
     type GenerationContext
 } from "../src/schema/introspect-db-logic";
 import { classifyTables } from "../src/schema/introspect-db-structure";
@@ -37,7 +38,7 @@ interface GeneratedSchema {
 }
 
 /** Runs the whole pipeline over a captured schema, as the CLI does. */
-function generateAll(name: RealSchemaName): GeneratedSchema {
+function generateAll(name: RealSchemaName, builder: CollectionBuilder = "admin-types"): GeneratedSchema {
     const { metadata, tables } = loadRealSchema(name);
     const enumMap = buildEnumMap(metadata.enumValues);
     const classifications = classifyTables(metadata, tables);
@@ -46,7 +47,7 @@ function generateAll(name: RealSchemaName): GeneratedSchema {
         Array.from(classifications.values()).filter((c) => c.role === "junction").map((c) => c.table)
     );
 
-    const context: GenerationContext = { metadata, classifications, checkFacts };
+    const context: GenerationContext = { metadata, classifications, checkFacts, builder };
     const files = new Map<string, string>();
     for (const [table, meta] of tables) {
         if (junctions.has(table)) continue;
@@ -438,7 +439,7 @@ describe("generated collections typecheck", () => {
      * `@rebasepro/*`, with the admin-block augmentation in the program — the
      * arrangement a scaffolded project has via `config/admin.d.ts`.
      */
-    function diagnosticsFor(schemas: GeneratedSchema[]): string[] {
+    function diagnosticsFor(schemas: GeneratedSchema[], flavour: CollectionBuilder = "admin-types"): string[] {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-introspect-tc-"));
         try {
             const entryFiles: string[] = [];
@@ -452,11 +453,26 @@ describe("generated collections typecheck", () => {
                     entryFiles.push(path.join(schemaDir, `${table}.ts`));
                 }
             }
-            // A scaffolded project pulls the admin block in through
-            // `config/admin.d.ts` and `typeRoots`. Naming the augmentation's
-            // source directly gets the same declaration merging into the program
-            // without depending on node_modules layout.
-            entryFiles.push(path.join(REPO_ROOT, "packages/admin-types/src/augment.ts"));
+            if (flavour === "admin-types") {
+                // A scaffolded project pulls the admin block in through
+                // `config/admin.d.ts` and `typeRoots`. Naming the augmentation's
+                // source directly gets the same declaration merging into the program
+                // without depending on node_modules layout.
+                entryFiles.push(path.join(REPO_ROOT, "packages/admin-types/src/augment.ts"));
+            }
+
+            // A headless project has no `@rebasepro/admin-types` to resolve. Leaving
+            // the mapping in place would let an accidental admin-types import
+            // compile here and fail for the user, which is the failure this whole
+            // change is about — so the path is dropped along with the augmentation.
+            const paths: Record<string, string[]> = {
+                "@rebasepro/types": [path.join(REPO_ROOT, "packages/types/src")],
+                "@rebasepro/common": [path.join(REPO_ROOT, "packages/common/src")],
+                "@rebasepro/utils": [path.join(REPO_ROOT, "packages/utils/src")]
+            };
+            if (flavour === "admin-types") {
+                paths["@rebasepro/admin-types"] = [path.join(REPO_ROOT, "packages/admin-types/src")];
+            }
 
             const program = ts.createProgram(entryFiles, {
                 noEmit: true,
@@ -469,12 +485,7 @@ describe("generated collections typecheck", () => {
                 esModuleInterop: true,
                 baseUrl: REPO_ROOT,
                 types: [],
-                paths: {
-                    "@rebasepro/types": [path.join(REPO_ROOT, "packages/types/src")],
-                    "@rebasepro/admin-types": [path.join(REPO_ROOT, "packages/admin-types/src")],
-                    "@rebasepro/common": [path.join(REPO_ROOT, "packages/common/src")],
-                    "@rebasepro/utils": [path.join(REPO_ROOT, "packages/utils/src")]
-                }
+                paths
             });
 
             const generated = new Set(entryFiles);
@@ -570,5 +581,60 @@ describe("generated collections typecheck", () => {
             pagila, northwind, chinook, openstreetmap, musicbrainz, generateAll("constraint-shapes")
         ]);
         expect(diagnostics).toEqual([]);
+    });
+
+    /**
+     * The same schemas, generated for a project that does not have
+     * `@rebasepro/admin-types` — and compiled in a program that cannot resolve it
+     * either, which is the arrangement a headless project actually has.
+     *
+     * This is the half that was broken and unmeasured: the generator emitted an
+     * `admin` block regardless, and `@rebasepro/types` declares no `admin` field,
+     * so every file introspection wrote into a BaaS project was a type error.
+     */
+    it("compiles every collection generated for a headless project", () => {
+        const headless = (["pagila", "northwind", "chinook", "openstreetmap", "musicbrainz", "constraint-shapes"] as const)
+            .map((name) => generateAll(name, "common"));
+
+        // The flavour is real, not a relabelling: no admin surface anywhere.
+        for (const schema of headless) {
+            for (const source of schema.files.values()) {
+                expect(source).not.toContain("admin: {");
+                expect(source).not.toContain("@rebasepro/admin-types");
+            }
+        }
+
+        expect(diagnosticsFor(headless, "common")).toEqual([]);
+    });
+
+    /**
+     * The point of the whole change, stated as the failure it prevents.
+     *
+     * `propertiesOrder` names property keys. Under the old
+     * `const x: PostgresCollectionConfig = { … }` annotation those keys were
+     * widened to `string`, so a key naming nothing — the residue of a renamed
+     * column — compiled silently and reordered nothing. If this test ever passes
+     * with an empty diagnostics list, the inference is no longer reaching the
+     * admin block and the generated files are back to being unchecked.
+     */
+    it("rejects a propertiesOrder key that names no property", () => {
+        // The whole schema, because `film` imports four siblings — and it compiles
+        // clean, which the test above already establishes.
+        const good = pagila.files.get("film")!;
+        const stale = good.replace(
+            /propertiesOrder: \[\n/,
+            "propertiesOrder: [\n            \"rentalDuratoin\",\n"
+        );
+        expect(stale).not.toEqual(good);
+
+        const files = new Map(pagila.files);
+        files.set("film", stale);
+        const diagnostics = diagnosticsFor([{ files, junctions: pagila.junctions, context: pagila.context }]);
+        expect(diagnostics).toHaveLength(1);
+        expect(diagnostics[0]).toContain("TS2769");
+        expect(diagnostics[0]).toContain("'\"rentalDuratoin\"' is not assignable");
+        // The literal keys are close enough for the compiler to name the column the
+        // rename left behind, which is the whole benefit in one line.
+        expect(diagnostics[0]).toContain("Did you mean '\"rentalDuration\"'?");
     });
 });
