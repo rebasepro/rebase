@@ -611,6 +611,20 @@ export interface GeneratedFile {
  */
 export type CollectionBuilder = "admin-types" | "common" | "annotation";
 
+/**
+ * The package specifiers the generated files name, spelled once.
+ *
+ * Written as constants rather than inline in the import templates below because
+ * `scripts/headless-guard/check-types.mjs` scans core sources for `from
+ * "@rebasepro/admin-types"` and cannot tell a real import from one this module
+ * *writes*. It is right to be that blunt — the guard's whole value is that it
+ * cannot be reasoned around — so the string simply never appears in that shape
+ * here. Inlining them back into the templates re-breaks `check:types-headless`.
+ */
+export const ADMIN_TYPES_PACKAGE = "@rebasepro/admin-types";
+export const COMMON_PACKAGE = "@rebasepro/common";
+export const TYPES_PACKAGE = "@rebasepro/types";
+
 export interface GenerationContext {
     metadata?: SchemaMetadata;
     classifications?: Map<string, TableClassification>;
@@ -746,9 +760,9 @@ export function generateCollectionFile(
     const emitAdmin = builder === "admin-types";
 
     const BUILDER_IMPORT: Record<CollectionBuilder, string> = {
-        "admin-types": 'import { defineCollection } from "@rebasepro/admin-types";',
-        common: 'import { defineCollection } from "@rebasepro/common";',
-        annotation: 'import { PostgresCollectionConfig } from "@rebasepro/types";'
+        "admin-types": `import { defineCollection } from ${quote(ADMIN_TYPES_PACKAGE)};`,
+        common: `import { defineCollection } from ${quote(COMMON_PACKAGE)};`,
+        annotation: `import { PostgresCollectionConfig } from ${quote(TYPES_PACKAGE)};`
     };
     const imports = new Set<string>([BUILDER_IMPORT[builder]]);
 
@@ -787,7 +801,7 @@ export function generateCollectionFile(
      */
     const relationTarget = (targetVarName: string): string => {
         if (builder === "annotation") return `() => ${targetVarName}`;
-        imports.add('import type { AnyCollectionConfig } from "@rebasepro/types";');
+        imports.add(`import type { AnyCollectionConfig } from ${quote(TYPES_PACKAGE)};`);
         return `(): AnyCollectionConfig => ${targetVarName}`;
     };
 

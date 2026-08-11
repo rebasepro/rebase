@@ -8,10 +8,7 @@
 import fs from "fs";
 import path from "path";
 
-import type { CollectionBuilder } from "./introspect-db-logic";
-
-const ADMIN_TYPES = "@rebasepro/admin-types";
-const COMMON = "@rebasepro/common";
+import { ADMIN_TYPES_PACKAGE, COMMON_PACKAGE, type CollectionBuilder } from "./introspect-db-logic";
 
 /** How far up to look before giving up, if no project root announces itself. */
 const MAX_LEVELS = 8;
@@ -75,7 +72,7 @@ export function detectCollectionBuilder(outDir: string): CollectionBuilder {
         dir = parent;
     }
 
-    if (declared.has(ADMIN_TYPES)) return "admin-types";
-    if (declared.has(COMMON)) return "common";
+    if (declared.has(ADMIN_TYPES_PACKAGE)) return "admin-types";
+    if (declared.has(COMMON_PACKAGE)) return "common";
     return "annotation";
 }

@@ -16,8 +16,9 @@
  * `const x: PostgresCollectionConfig = { … }` annotation widens the property
  * keys to `string`, so nothing checks the keys named elsewhere in the config —
  * and the keys an introspected collection has are precisely the ones nobody
- * typed and nobody remembers. `common` is the headless half of the pair: same
- * key inference as `@rebasepro/admin-types`, no admin surface, no React.
+ * typed and nobody remembers. `common` is the headless half of the pair: the
+ * same key inference the admin layer's builder gives a CMS project, with no
+ * admin surface and no React.
  */
 
 export { storageAuthorize } from "./storage.js";
