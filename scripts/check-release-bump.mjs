@@ -175,6 +175,29 @@ export function checkReleaseBump({
     }
 
     if (!breaks.length) {
+        // The tracked artifacts answer for themselves only where they existed at
+        // the baseline. `api-surface/` and `contracts/` were both added during
+        // 0.13, so for the 0.13 → 0.14 release every axis above reported
+        // "unguarded" and this function was about to bless a PATCH for the
+        // release that renamed every foreign key on the wire.
+        //
+        // A `### Breaking` heading is written by a human who knew, so it is the
+        // one signal that survives an artifact not existing yet. It cannot
+        // replace the checks above — it is a claim, not a diff, and its absence
+        // proves nothing — but its *presence* is decisive on its own.
+        const declared = readNow(CHANGELOG);
+        const declaredSection = declared === null ? null : unreleasedSection(declared);
+        if (level === "patch" && declaredSection !== null && /^###\s+Breaking\b/m.test(declaredSection)) {
+            const range = `^${previous.split(".").slice(0, 2).join(".")}.0`;
+            console.error(red("✗ The changelog declares a breaking change and the bump is a PATCH.\n"));
+            console.error(red(
+                `  ✗ ${CHANGELOG}'s [Unreleased] section has a "### Breaking" heading, so this release\n` +
+                `    breaks something. Every consumer on "${range}" — the range \`rebase init\` scaffolds —\n` +
+                `    installs ${version} on their next install. Under 0.x the minor is the breaking\n` +
+                "    position: release this as a minor.\n"
+            ));
+            return 1;
+        }
         console.log(green(`✓ Nothing breaking in the tracked contracts — ${level} is fine.`));
         return 0;
     }

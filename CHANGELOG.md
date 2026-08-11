@@ -2,50 +2,7 @@
 
 ## [Unreleased]
 
-### Added
-
-- **`admin.display` — one block for how a record presents itself.** A record shows up as a heading, a card, a row, a board tile and a reference chip, and each of those needs to know which property is the title, which is the image, which is the status. That was `admin.titleProperty` and a great deal of per-surface guessing: the detail view had grown its own copy of the title logic and the two had already drifted, so the same record could be headed one way in the list and another way when you opened it.
-
-  `display` names the roles instead — `title`, `subtitle`, `image`, `status`, `date`, `tags` — and one resolver (`entity-display.ts`, `useEntityDisplay`, cached) answers for every surface: the table, list, board and card bindings, the preview slots, the form, the entity views and `useColumnsIds`. The property paths are checked against your own properties the way the rest of the `admin` block is, so a renamed field is a compile error rather than a column that quietly stops appearing.
-
-  ```diff ts
-   import { defineCollection } from "@rebasepro/admin-types";
-
-   export default defineCollection({
-       name: "Posts",
-       slug: "posts",
-       table: "posts",
-       properties: { title: { name: "Title", type: "string" } },
-  -    admin: { titleProperty: "title" }
-  +    admin: { display: { title: "title" } }
-   });
-  ```
-
-  **`admin.titleProperty` still works.** It is deprecated, not removed: it shipped in 0.13.0 and is still read at runtime, with `display.title` winning when both are set. Postgres introspection codegen emits the new block, and the collections docs and skill are updated in all six locales.
-
-- **The self-host runtime image is published by the release, not by remembering to.** The scaffolded `docker-compose.yml` presents `rebase build` + `docker compose up` as the way to self-host and pins `REBASE_VERSION` to the released version, but nothing published `rebasepro/server` on a release — `cloudbuild-runtime.yaml` has had a Docker Hub push for months and runs only when someone types `gcloud builds submit`. So the first command in the file a new project is handed ended at `pull access denied for rebasepro/server, repository does not exist`. The release workflow now builds and pushes it (amd64 + arm64) after npm and the tag, then verifies the tag is pullable from outside with no credentials.
-
-  `scripts/check-runtime-image.mjs` keeps it honest: every image reference in a shipped compose file must have an automatically-triggered publisher, and a build config only a human can run does not count. `verify-selfhost.mts` could never have caught this — its own header says what it leaves out, "a container and an image tag".
-
-- **`rebase skills install --agent all`**, for scripted and CI use. Without a TTY the command has to be told which agents to install for, because a scaffolded project ships a marker file for every one of them (`.cursorrules`, `CLAUDE.md`, `.windsurfrules`, `AGENTS.md`) and detection therefore has no signal — guessing would install four agents' skills unasked.
-
-- **`updateMany` and `deleteMany`, the counterparts `createMany` never had.** An ETL job could insert 1000 rows in one transaction and then had to delete them one HTTP request at a time. The asymmetry was not a gap in one layer but in all of them — contract, driver, REST, SDK, offline queue and generated spec.
-
-  Both shapes are the conservative reading rather than the inherited one. `updateMany` takes `{ id, data }` entries, not flat rows carrying their own key: on a table keyed on a `sku` or a composite key a flat row cannot say whether a column is the address or a value to write, so naming the address separately mirrors single-row `update(id, data)` and leaves nothing to infer. `deleteMany` takes ids, not a filter — a filter-shaped bulk delete is a different and far more dangerous operation, whose failure mode is an omitted or mistyped condition emptying a table, and unlike an explicit list it cannot be reviewed at the call site. Read first, pass the ids you meant.
-
-  The delete is served at `POST /<collection>/bulk/delete` rather than `DELETE /<collection>/bulk`. A DELETE body is the honest verb and the one request shape the HTTP ecosystem handles unreliably: bodies on DELETE are permitted but widely dropped by proxies, and several OpenAPI generators ignore `requestBody` on a DELETE operation, so a generated client would send the request with no ids at all. "Deletes nothing" is the good outcome of that bet.
-
-  ```typescript
-  await client.data.products.updateMany([
-      { id: "sku-1", data: { price: 1200 } },
-      { id: "sku-2", data: { price: 900 } }
-  ]);
-
-  const stale = await client.data.sessions.findAll({ where: { expires_at: ["<", cutoff] } });
-  await client.data.sessions.deleteMany(stale.map(s => s.id as string));
-  ```
-
-### Changed
+### Breaking
 
 - **BREAKING: the API is camelCase throughout. `author_id` is now `authorId`.** The wire carried two naming conventions at once, and which one a field landed in was not inferable from outside. `GET /api/data/users` answered `displayName`, `photoURL`, `createdAt`; `GET /api/data/posts`, next to it, answered `author_id`. Both were "the wire names". These are also the `where` and `orderBy` keys and the keys the generated SDK types, so a developer moving between two collections had to know, per collection, which convention it had happened to land in.
 
@@ -91,6 +48,49 @@
   `disableSelfRegistration` overrides it — an account created without credentials is still an account created by the public. `allowRegistration` deliberately does not gate it: a public read-mostly app that wants anonymous sessions and no sign-up form is a real deployment, and `allowAnonymous: true` says exactly that. `/auth/anonymous/link` is gated on the same predicate, so a session minted before the switch cannot finish the upgrade, and it gains the limiter it never had. `GET /auth/config` and `getCapabilities()` now report `anonymousLogin`, so a client can discover the state instead of finding out by calling.
 
   Still open, and not addressed here: nothing downstream reads `isAnonymous`, so an anonymous user holds the same `defaultRole` as a registered one and no policy can say otherwise. That needs `is_anonymous` in the RLS-visible identity.
+
+### Added
+
+- **`admin.display` — one block for how a record presents itself.** A record shows up as a heading, a card, a row, a board tile and a reference chip, and each of those needs to know which property is the title, which is the image, which is the status. That was `admin.titleProperty` and a great deal of per-surface guessing: the detail view had grown its own copy of the title logic and the two had already drifted, so the same record could be headed one way in the list and another way when you opened it.
+
+  `display` names the roles instead — `title`, `subtitle`, `image`, `status`, `date`, `tags` — and one resolver (`entity-display.ts`, `useEntityDisplay`, cached) answers for every surface: the table, list, board and card bindings, the preview slots, the form, the entity views and `useColumnsIds`. The property paths are checked against your own properties the way the rest of the `admin` block is, so a renamed field is a compile error rather than a column that quietly stops appearing.
+
+  ```diff ts
+   import { defineCollection } from "@rebasepro/admin-types";
+
+   export default defineCollection({
+       name: "Posts",
+       slug: "posts",
+       table: "posts",
+       properties: { title: { name: "Title", type: "string" } },
+  -    admin: { titleProperty: "title" }
+  +    admin: { display: { title: "title" } }
+   });
+  ```
+
+  **`admin.titleProperty` still works.** It is deprecated, not removed: it shipped in 0.13.0 and is still read at runtime, with `display.title` winning when both are set. Postgres introspection codegen emits the new block, and the collections docs and skill are updated in all six locales.
+
+- **The self-host runtime image is published by the release, not by remembering to.** The scaffolded `docker-compose.yml` presents `rebase build` + `docker compose up` as the way to self-host and pins `REBASE_VERSION` to the released version, but nothing published `rebasepro/server` on a release — `cloudbuild-runtime.yaml` has had a Docker Hub push for months and runs only when someone types `gcloud builds submit`. So the first command in the file a new project is handed ended at `pull access denied for rebasepro/server, repository does not exist`. The release workflow now builds and pushes it (amd64 + arm64) after npm and the tag, then verifies the tag is pullable from outside with no credentials.
+
+  `scripts/check-runtime-image.mjs` keeps it honest: every image reference in a shipped compose file must have an automatically-triggered publisher, and a build config only a human can run does not count. `verify-selfhost.mts` could never have caught this — its own header says what it leaves out, "a container and an image tag".
+
+- **`rebase skills install --agent all`**, for scripted and CI use. Without a TTY the command has to be told which agents to install for, because a scaffolded project ships a marker file for every one of them (`.cursorrules`, `CLAUDE.md`, `.windsurfrules`, `AGENTS.md`) and detection therefore has no signal — guessing would install four agents' skills unasked.
+
+- **`updateMany` and `deleteMany`, the counterparts `createMany` never had.** An ETL job could insert 1000 rows in one transaction and then had to delete them one HTTP request at a time. The asymmetry was not a gap in one layer but in all of them — contract, driver, REST, SDK, offline queue and generated spec.
+
+  Both shapes are the conservative reading rather than the inherited one. `updateMany` takes `{ id, data }` entries, not flat rows carrying their own key: on a table keyed on a `sku` or a composite key a flat row cannot say whether a column is the address or a value to write, so naming the address separately mirrors single-row `update(id, data)` and leaves nothing to infer. `deleteMany` takes ids, not a filter — a filter-shaped bulk delete is a different and far more dangerous operation, whose failure mode is an omitted or mistyped condition emptying a table, and unlike an explicit list it cannot be reviewed at the call site. Read first, pass the ids you meant.
+
+  The delete is served at `POST /<collection>/bulk/delete` rather than `DELETE /<collection>/bulk`. A DELETE body is the honest verb and the one request shape the HTTP ecosystem handles unreliably: bodies on DELETE are permitted but widely dropped by proxies, and several OpenAPI generators ignore `requestBody` on a DELETE operation, so a generated client would send the request with no ids at all. "Deletes nothing" is the good outcome of that bet.
+
+  ```typescript
+  await client.data.products.updateMany([
+      { id: "sku-1", data: { price: 1200 } },
+      { id: "sku-2", data: { price: 900 } }
+  ]);
+
+  const stale = await client.data.sessions.findAll({ where: { expires_at: ["<", cutoff] } });
+  await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+  ```
 
 ### Removed
 
