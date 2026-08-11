@@ -50,6 +50,53 @@ description: Every released change to Rebase — new features, fixes, and the br
   await client.data.sessions.deleteMany(stale.map(s => s.id as string));
   ```
 
+### Changed
+
+- **BREAKING: the API is camelCase throughout. `author_id` is now `authorId`.** The wire carried two naming conventions at once, and which one a field landed in was not inferable from outside. `GET /api/data/users` answered `displayName`, `photoURL`, `createdAt`; `GET /api/data/posts`, next to it, answered `author_id`. Both were "the wire names". These are also the `where` and `orderBy` keys and the keys the generated SDK types, so a developer moving between two collections had to know, per collection, which convention it had happened to land in.
+
+  The rule was never stated because there wasn't one. A field's wire name is its property key, and `columnName` renames only the *column* — that part is right and does not change. But two of the four sources of keys never had a property key to use, and both fell back to the column name:
+
+  - a **foreign key derived from a relation** had no property of its own, so `belongsTo` on `author` served the `author_id` column under its own name;
+  - **introspection** wrote the raw column name as the property key, with `columnName` restating it beside it.
+
+  Both now derive a camelCase name and keep the column exactly as it was. **The database does not change.** Columns stay snake_case, because an unquoted Postgres identifier folds to lower case and a camelCase column is reachable only as `"authorId"` forever — in hand-written SQL, in psql, in an RLS policy body, in a dump, and in every third-party tool that touches the database. `\d posts` still shows `author_id`, no migration runs, and `rebase doctor` reports no drift.
+
+  ```diff
+  - GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
+  + GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+  - ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
+  + ?where={"authorId":["==",3]}
+  ```
+
+  **Who this breaks, and what to do:**
+
+  - **Everyone using the generated SDK: re-run `rebase generate-sdk`.** `row.author_id` stops compiling and `row.authorId` starts. This is the good case — the compiler names every call site for you.
+  - **Hand-written `where` and `orderBy` keys.** A filter key that no longer resolves is a 400 with `UNKNOWN_FILTER_FIELD`, and the error lists the valid names. It fails closed on purpose: a dropped condition widens a result set, which is the one failure you do not want to be silent.
+  - **Raw `fetch` consumers, and anything reading a row by key.** `row.author_id` is now `undefined`. There is no compiler to find these; grep for the column names your relations derive.
+  - **`rebase schema introspect` over an existing database no longer echoes column names on the wire.** A `customer_id` column is generated as a `customerId` property carrying `columnName: "customer_id"`, and is served, filtered and sorted as `customerId`. This is the largest single change for a project that was introspected rather than authored, and re-running introspection is what produces the new collections. The column, the constraints and the policies are untouched.
+
+  No dual-key emission and no compatibility flag: serving both spellings would leave the two conventions in place permanently, which is the defect. The one thing that is *not* camel-cased is a name someone already chose — a property key you wrote is your key, whatever its shape, and a `columnName` you set still names the column.
+
+- **BREAKING: anonymous sign-in is opt-in. `POST /auth/anonymous` answers 403 until you set `auth.allowAnonymous: true`.** Anonymous sign-in is registration that never asked: it inserts a `users` row and assigns `defaultRole` exactly as `POST /auth/register` does. But both anonymous routes were mounted unconditionally and consulted none of the registration gates, and no config key existed to turn them off.
+
+  So a backend that had closed the door still handed out permanent accounts. With `allowRegistration: false` and `disableSelfRegistration: true` — whose own docstring calls it a *"hard kill switch: block self-registration outright"* — `POST /auth/register` correctly answered 403, and two unauthenticated requests produced an email/password account anyway: `POST /auth/anonymous` for the row and the session, then `POST /auth/anonymous/link` to put credentials on it. The second was authenticated only by the token the first had just issued, and carried no rate limiter at all.
+
+  ```diff ts
+   auth: {
+       allowRegistration: false,
+       disableSelfRegistration: true,
+  +    // Anonymous sessions are now a thing you ask for.
+  +    allowAnonymous: true
+   }
+  ```
+
+  Opt-in rather than opt-out, and this is the part that will cost an upgrade some downtime: **a project relying on anonymous sign-in today stops working until it sets the key.** Defaulting it to `true` would have preserved that at the cost of leaving the hole open for everyone who never learns the key exists, and the key did not exist before, so no deployment had yet made a choice. The 403 names the key it needs (`ANONYMOUS_AUTH_DISABLED`); `ALLOW_ANONYMOUS` is the env spelling.
+
+  `disableSelfRegistration` overrides it — an account created without credentials is still an account created by the public. `allowRegistration` deliberately does not gate it: a public read-mostly app that wants anonymous sessions and no sign-up form is a real deployment, and `allowAnonymous: true` says exactly that. `/auth/anonymous/link` is gated on the same predicate, so a session minted before the switch cannot finish the upgrade, and it gains the limiter it never had. `GET /auth/config` and `getCapabilities()` now report `anonymousLogin`, so a client can discover the state instead of finding out by calling.
+
+  Still open, and not addressed here: nothing downstream reads `isAnonymous`, so an anonymous user holds the same `defaultRole` as a registered one and no policy can say otherwise. That needs `is_anonymous` in the RLS-visible identity.
+
 ### Removed
 
 - **`@rebasepro/client-postgres` is gone.** It was published on every release since the `client-postgresql` rename — 137 versions, `latest` on npm — and imported by nothing: no workspace package depended on it, no example, template, doc page or skill used it, and its own README's Quick Start did not compile (`<Rebase driver={…}>`, a prop that does not exist). Its description was wrong too: not a direct PostgreSQL client and not PostgREST, but a WebSocket passthrough to the Rebase backend, which `@rebasepro/client` already is.
@@ -59,6 +106,18 @@ description: Every released change to Rebase — new features, fixes, and the br
   Use `@rebasepro/client` with a `dataSources` entry; that is what the admin panel does and what `docs/data-sources.md` has always described. The published versions stay on npm and will be deprecated there — nothing is unpublished, so an existing lockfile keeps resolving.
 
 ### Fixed
+
+- **Storage was the one router with no rate limiter, and the one where a request costs money.** `createDataRateLimiter` was mounted on the data router and the functions router and nowhere else. Upload, download and the whole tus sequence were unbounded — and storage is the surface where a single HTTP request buys a metered third-party operation: `PutObject`, `GetObject` and its egress bytes, `ListObjectsV2`.
+
+  The download path was the worst of it. With `storagePublicRead: true` — a documented, ordinary setting — `readAuthMiddleware` resolves to a no-op, so `GET /file/*` was anonymous, unauthenticated and unlimited. One machine looping over a large public object is a full `GetObject` and a full egress charge per request, with no ceiling and no per-caller accounting; the bill arrives a month later.
+
+  Storage now shares the same limiter *and the same store* as data and functions, so a caller has one budget across the product rather than one per router. It is registered after the API-key guard, so a key's identity is on the context and requests bucket by caller rather than by IP. The request limiter is the floor, not the whole answer: storage's cost profile is bytes rather than requests, and a bytes-per-window bound per bucket needs accounting this layer does not have yet.
+
+- **`rebase doctor --policies` reported a clean database with row level security switched off.** `ALTER TABLE posts DISABLE ROW LEVEL SECURITY` leaves every row in `pg_policies` untouched, and `pg_policies` was all the drift checker read. So every expected policy still matched on name, roles, command and clause presence, and doctor printed `✓ RLS policies match your collections` for a table Postgres was applying no filter to at all. Requests run as `rebase_user`, which holds full DML — the table was wide open while the check certified it.
+
+  Nothing else on the declared-collections path covered this either: the only reader of `relrowsecurity` in the driver serves the *introspection* branch, i.e. only when there are no declared collections, and the re-enable runs only on the managed-runtime boot path. A self-hosted project's next `db push` would have fixed it; until then, doctor said it was fine.
+
+  Drift now reports `rlsDisabled` first, because it subsumes every other finding on the same table — if RLS is off, the policies listed under it are not being applied. The same pass closes a second blind spot: `mode: "restrictive"` is a public `SecurityRule` field and the generator emits `AS RESTRICTIVE`, but the DDL parser captured that group into a discarded slot and `pg_policies.permissive` was never selected, so a restrictive rule stored as PERMISSIVE read clean — with its gate being ORed in rather than ANDed, which is the maximally permissive way for it to be wrong. Both are exact catalogue values, so neither can cry wolf; an unreadable value on either side is skipped rather than guessed.
 
 - **A client with generated types could not be passed to `<Rebase>`.** `RebaseProps` was generic over `USER` and not over the database, so its `client` prop was pinned to `RebaseClient<unknown>` — and `RebaseClient<unknown>` is not a supertype of `RebaseClient<Database>`. The untyped branch of `RebaseSdkData` is an index signature (`[slug: string]: SDKCollectionClient`), and no concrete instantiation satisfies it, because `RebaseSdkData`'s own `collection` method is not an `SDKCollectionClient`.
 
