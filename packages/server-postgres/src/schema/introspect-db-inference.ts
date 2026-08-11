@@ -15,7 +15,14 @@ export function inferPropertyFromData(
     pgDataType: string,
     currentPropType: string,
     sampleValues: unknown[],
-    isPk: boolean
+    isPk: boolean,
+    /**
+     * False when generating for a project without `@rebasepro/admin-types`, where
+     * `BaseProperty` declares no `admin` field and the block below would not
+     * compile. The type-level inferences (`propType`, `url`, `storage`) are
+     * unaffected — only the form-widget hints are dropped.
+     */
+    emitAdmin = true
 ): InferenceResult {
     const result: InferenceResult = {};
     const extraLines: string[] = [];
@@ -239,7 +246,7 @@ export function inferPropertyFromData(
         }
     }
 
-    if (adminOptions.length > 0) {
+    if (emitAdmin && adminOptions.length > 0) {
         extraLines.push(`            admin: {\n${adminOptions.map((o) => `                ${o}`).join(",\n")}\n            }`);
     }
 

@@ -580,10 +580,47 @@ export interface GeneratedFile {
  * have no database to read constraints or row counts from, and they must keep
  * producing a valid collection.
  */
+/**
+ * Which `defineCollection` — if any — the project being generated into can import.
+ *
+ * A bare `const x: PostgresCollectionConfig = { … }` annotation widens `properties`
+ * to `Record<string, …>`, and every key-shaped field in the admin block —
+ * `titleProperty`, `sort`, `propertiesOrder`, `listProperties`, `fixedFilter` — is
+ * derived from those keys. Annotated, they accept any string: introspection was
+ * emitting a `propertiesOrder` array that nothing checked, so renaming a column and
+ * re-introspecting left a stale key that compiled silently. `defineCollection` is
+ * the identity function whose `const P` type parameter keeps the keys literal, which
+ * is what turns that checking on.
+ *
+ * There are two of them and they are not interchangeable:
+ *
+ * - `admin-types` — `@rebasepro/admin-types`. Its index side-effect-imports
+ *   `augment.ts`, so importing it is also what *declares* the `admin` block. Only a
+ *   project that depends on the package can resolve it.
+ * - `common` — `@rebasepro/common`. Same key inference, no admin surface, no React
+ *   anywhere in its graph (`scripts/headless-guard` lists it as core). This is the
+ *   headless flavour.
+ * - `annotation` — neither package is declared, so neither import would resolve and
+ *   the old annotation is the only honest thing to emit. Projects scaffolded before
+ *   `@rebasepro/common` joined the headless config package land here.
+ *
+ * The last two emit **no admin block, on the collection or on any property**. That is
+ * not a downgrade: `@rebasepro/types` declares no `admin` field at all, so the block
+ * introspection used to emit was a type error in every headless project it was
+ * written into. See `packages/admin-types/src/augment.ts`.
+ */
+export type CollectionBuilder = "admin-types" | "common" | "annotation";
+
 export interface GenerationContext {
     metadata?: SchemaMetadata;
     classifications?: Map<string, TableClassification>;
     checkFacts?: CheckFactsByTable;
+    /**
+     * Defaults to `admin-types`, which is what the generator has always emitted.
+     * The CLI never relies on the default — `introspect-db.ts` detects the flavour
+     * from the target project and passes it. See `detectCollectionBuilder`.
+     */
+    builder?: CollectionBuilder;
 }
 
 /** Adds entries to a property's `validation` block, creating it if absent. */
@@ -609,8 +646,17 @@ function hasGeneratedKey(extra: string, key: string): boolean {
     return new RegExp(`(^|[\\s{,])${key}\\s*:`).test(extra);
 }
 
-/** Adds entries to a property's `admin` block, creating it if absent. */
-function withAdminOptions(extra: string, entries: string[]): string {
+/**
+ * Adds entries to a property's `admin` block, creating it if absent.
+ *
+ * `emitAdmin` is false for the headless flavours, where `BaseProperty` has no
+ * `admin` field to put them in — see {@link CollectionBuilder}. The options are
+ * dropped rather than relocated: every one of them (`readOnly`, `multiline`,
+ * `hideFromCollection`, `urlPreview`) describes a form widget, and there is no
+ * form.
+ */
+function withAdminOptions(extra: string, entries: string[], emitAdmin = true): string {
+    if (!emitAdmin) return extra;
     if (entries.length === 0) return extra;
     const block = entries.map((e) => `                ${e}`).join(",\n");
     if (extra.includes("admin: {")) {
@@ -695,7 +741,16 @@ export function generateCollectionFile(
             .map((u) => u.column_names[0])
     );
 
-    const imports = new Set<string>(['import { PostgresCollectionConfig } from "@rebasepro/types";']);
+    const builder: CollectionBuilder = context.builder ?? "admin-types";
+    /** Whether the target project has an `admin` field to write into at all. */
+    const emitAdmin = builder === "admin-types";
+
+    const BUILDER_IMPORT: Record<CollectionBuilder, string> = {
+        "admin-types": 'import { defineCollection } from "@rebasepro/admin-types";',
+        common: 'import { defineCollection } from "@rebasepro/common";',
+        annotation: 'import { PostgresCollectionConfig } from "@rebasepro/types";'
+    };
+    const imports = new Set<string>([BUILDER_IMPORT[builder]]);
 
     /**
      * Imports the collection a relation points at — unless it is this one.
@@ -711,6 +766,29 @@ export function generateCollectionFile(
         const varName = toCollectionVarName(otherTable);
         if (otherTable !== tableName) imports.add(`import ${varName} from ${quote(`./${otherTable}`)};`);
         return varName;
+    };
+
+    /**
+     * A relation's `target` thunk, with its return type spelled out.
+     *
+     * The annotation is what makes `defineCollection` survive a relational schema.
+     * Without an explicit type on the const, the collection's type is *inferred*,
+     * and a relation cycle — `posts` belongs to `authors`, `authors` has many
+     * `posts`; or `employees.reports_to -> employees`, which northwind, chinook and
+     * musicbrainz all have — makes that inference circular: `TS7022: implicitly has
+     * type 'any' because it is referenced directly or indirectly in its own
+     * initializer`, plus `TS7023` on the thunk and `TS2303` on the import alias.
+     * Naming the return type lets the checker type the thunk without resolving the
+     * collection it points at, which breaks the cycle. Nothing else is given up:
+     * the inference that matters runs over `properties`, not over `relations`.
+     *
+     * The annotated flavour has no cycle to break — its const is already typed — so
+     * it keeps the plainer thunk it has always emitted.
+     */
+    const relationTarget = (targetVarName: string): string => {
+        if (builder === "annotation") return `() => ${targetVarName}`;
+        imports.add('import type { AnyCollectionConfig } from "@rebasepro/types";');
+        return `(): AnyCollectionConfig => ${targetVarName}`;
     };
 
     let propsOutput = "";
@@ -776,7 +854,7 @@ export function generateCollectionFile(
 
         if (!isEnumColumn && sampleData && sampleData.length > 0) {
             const values = sampleData.map(r => r[col.column_name]);
-            const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name));
+            const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
             if (inferred.propType) finalPropType = inferred.propType;
             if (inferred.extra) inferenceExtra = inferred.extra;
         }
@@ -803,13 +881,16 @@ export function generateCollectionFile(
         // Date auto-value heuristics
         if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                extra += "\n            autoValue: \"on_create\",";
+                extra = withAdminOptions(extra, ["readOnly: true", "hideFromCollection: true"], emitAdmin);
                 hiddenFromCollection.add(propertyKey);
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra += "\n            autoValue: \"on_update\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                extra += "\n            autoValue: \"on_update\",";
+                extra = withAdminOptions(extra, ["readOnly: true", "hideFromCollection: true"], emitAdmin);
                 hiddenFromCollection.add(propertyKey);
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true\n            },";
+                extra += "\n            autoValue: \"on_create\",";
+                extra = withAdminOptions(extra, ["readOnly: true"], emitAdmin);
             }
         }
 
@@ -842,16 +923,16 @@ export function generateCollectionFile(
             } else if (isUrl) {
                 extra += "\n            url: true,";
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
-                extra += "\n            admin: {\n                multiline: true\n            },";
+                extra = withAdminOptions(extra, ["multiline: true"], emitAdmin);
             } else if (colNameLower === "content" || colNameLower === "body") {
                 // Inside `admin`, because that is where both options live. At the
                 // top of the property — where these were — the generated file
                 // does not compile: `StringProperty` declares neither. Six of
                 // OpenStreetMap's tables have a `body` column, which is how this
                 // surfaced.
-                extra += "\n            admin: {\n                multiline: true,\n                markdown: true\n            },";
+                extra = withAdminOptions(extra, ["multiline: true", "markdown: true"], emitAdmin);
             } else if (col.data_type === "text") {
-                extra += "\n            admin: {\n                multiline: true\n            },";
+                extra = withAdminOptions(extra, ["multiline: true"], emitAdmin);
             }
         }
 
@@ -908,7 +989,7 @@ export function generateCollectionFile(
                 options.push("hideFromCollection: true");
                 hiddenFromCollection.add(propertyKey);
             }
-            extra = withAdminOptions(extra, options);
+            extra = withAdminOptions(extra, options, emitAdmin);
         }
 
         // `COMMENT ON COLUMN` — documentation the author already wrote, which
@@ -1023,7 +1104,7 @@ export function generateCollectionFile(
             // mapped from foreign key: ${commentText(fk.column_name)} -> ${commentText(targetTableName)}(${commentText(fk.foreign_column_name)})
             relation: {
                 kind: "belongsTo",
-                target: () => ${targetCollectionCamel},
+                target: ${relationTarget(targetCollectionCamel)},
                 localKey: ${quote(fk.column_name)}
             }
         },`);
@@ -1042,7 +1123,7 @@ export function generateCollectionFile(
         {
             kind: "hasMany",
             relationName: ${quote(sourceTableName)},
-            target: () => ${targetCollectionCamel},
+            target: ${relationTarget(targetCollectionCamel)},
             // the ${commentText(sourceTableName)}.${commentText(fk.column_name)} FK points back here
             foreignKeyOnTarget: ${quote(fk.column_name)}
         },`;
@@ -1074,7 +1155,7 @@ export function generateCollectionFile(
         {
             kind: "manyToMany",
             relationName: ${quote(relPropName)},
-            target: () => ${toCollectionVarName(tableName)},
+            target: ${relationTarget(toCollectionVarName(tableName))},
             through: {
                 table: ${quote(jt)},
                 sourceColumn: ${quote(thisFk.column_name)},
@@ -1107,7 +1188,7 @@ export function generateCollectionFile(
         {
             kind: "manyToMany",
             relationName: ${quote(targetTableName)},
-            target: () => ${targetCollectionCamel},${throughCode}
+            target: ${relationTarget(targetCollectionCamel)},${throughCode}
         },`;
         }
     }
@@ -1164,7 +1245,14 @@ export function generateCollectionFile(
 
     adminEntries.push(`propertiesOrder: ${formatKeyList(sortedPropertiesOrder)}`);
 
-    const adminBlock = `\n    admin: {\n        ${adminEntries.join(",\n        ")}\n    }`;
+    // Every entry above names a property key, and with `defineCollection` those
+    // keys are now checked against `properties` — a stale `propertiesOrder` entry
+    // left behind by a renamed column is a compile error rather than a silent
+    // no-op. Which is also why the block cannot be emitted where the field is not
+    // declared: see {@link CollectionBuilder}.
+    const adminBlock = emitAdmin
+        ? `\n    admin: {\n        ${adminEntries.join(",\n        ")}\n    }`
+        : "";
 
     const descriptionBlock = tableComment
         ? `\n    description: ${quote(tableComment)},`
@@ -1178,16 +1266,32 @@ export function generateCollectionFile(
         : "";
 
     const collectionVarName = toCollectionVarName(tableName);
-    const fileContent = `${Array.from(imports).join("\n")}
+    // `const x = defineCollection({ … })` is also the shape the ts-morph schema
+    // editor in `@rebasepro/server` expects — `COLLECTION_FACTORIES` — so an
+    // introspected collection is now editable from the panel the way a scaffolded
+    // one is.
+    const [open, close] = builder === "annotation"
+        ? [`const ${collectionVarName}: PostgresCollectionConfig = {`, "};"]
+        : [`const ${collectionVarName} = defineCollection({`, "});"];
+    // Package imports first, then siblings. `AnyCollectionConfig` is added the
+    // moment the first relation needs it — which is after the sibling collections
+    // it points at have already been added — and only when a relation needs it, so
+    // a project with `noUnusedLocals` never sees an import it does not use.
+    const importLines = Array.from(imports);
+    const orderedImports = [
+        ...importLines.filter((line) => !line.includes('from "./')),
+        ...importLines.filter((line) => line.includes('from "./'))
+    ];
+    const fileContent = `${orderedImports.join("\n")}
 ${classificationNote}
-const ${collectionVarName}: PostgresCollectionConfig = {
+${open}
     name: ${quote(collectionName)},
     singularName: ${quote(singular)},
     slug: ${quote(tableName)},
     table: ${quote(tableName)},${descriptionBlock}
     properties: {${propsOutput}
     },${relationsBlock}${adminBlock}
-};
+${close}
 
 export default ${collectionVarName};
 `;

@@ -1,7 +1,7 @@
 import {
     generateCollectionFile, buildTablesMap, buildEnumMap,
     identifyJoinTables, TableRow, TableColumn, PrimaryKeyRow,
-    ForeignKeyRow, EnumValue, TableMeta
+    ForeignKeyRow, EnumValue, TableMeta, CollectionBuilder
 } from "../src/schema/introspect-db-logic";
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -537,12 +537,61 @@ is_nullable: "NO" }),
     });
 
     describe("import generation", () => {
-        it("always imports PostgresCollectionConfig", () => {
+        /**
+         * The import has to name a builder the target project can resolve, and
+         * `defineCollection` is what keeps the property keys literal — without it
+         * the `admin` block's key-shaped fields (`propertiesOrder`, `sort`,
+         * `listProperties`) are checked against `string` and a stale key left by a
+         * renamed column compiles silently. See `CollectionBuilder`.
+         */
+        it("imports the builder the project can resolve", () => {
             const meta = makeSimpleTable("t", [mkCol("t", "id", { data_type: "uuid",
 udt_name: "uuid",
 is_nullable: "NO" })]);
-            const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-            expect(result).toContain('import { PostgresCollectionConfig } from "@rebasepro/types"');
+            const gen = (builder: CollectionBuilder) => generateCollectionFile(
+                "t", meta, [], new Set(), new Map([["t", meta]]), new Map(), undefined, { builder }
+            );
+
+            expect(gen("admin-types")).toContain('import { defineCollection } from "@rebasepro/admin-types"');
+            expect(gen("admin-types")).toContain("const tCollection = defineCollection({");
+
+            // No admin-types in a headless project, so the headless builder — same
+            // key inference, no admin surface, nothing React in its graph.
+            expect(gen("common")).toContain('import { defineCollection } from "@rebasepro/common"');
+            expect(gen("common")).not.toContain("@rebasepro/admin-types");
+
+            // Neither package declared: neither import would resolve, so the old
+            // annotation is the only honest thing to emit.
+            expect(gen("annotation")).toContain('import { PostgresCollectionConfig } from "@rebasepro/types"');
+            expect(gen("annotation")).toContain("const tCollection: PostgresCollectionConfig = {");
+        });
+
+        /**
+         * `@rebasepro/types` declares no `admin` field at all — the augmentation in
+         * `@rebasepro/admin-types` is what adds it — so emitting the block into a
+         * project that does not have that package writes a type error into every
+         * generated file. It did, until this.
+         */
+        it("emits no admin block where the field is not declared", () => {
+            const meta = makeSimpleTable("t", [
+                mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
+                // `created_at` and a `text` column are the two that carry a
+                // property-level admin block: readOnly/hideFromCollection and
+                // multiline respectively.
+                mkCol("t", "created_at", { data_type: "timestamp with time zone", udt_name: "timestamptz" }),
+                mkCol("t", "description", { data_type: "text", udt_name: "text" })
+            ]);
+            const gen = (builder: CollectionBuilder) => generateCollectionFile(
+                "t", meta, [], new Set(), new Map([["t", meta]]), new Map(), undefined, { builder }
+            );
+
+            expect(gen("admin-types")).toContain("admin: {");
+            for (const builder of ["common", "annotation"] as const) {
+                expect(gen(builder)).not.toContain("admin: {");
+                // The core options next to them survive: `autoValue` is declared on
+                // `DateProperty` in the core types and describes a write, not a form.
+                expect(gen(builder)).toContain('autoValue: "on_create"');
+            }
         });
 
         it("does not duplicate imports for multiple relations to same table", () => {
