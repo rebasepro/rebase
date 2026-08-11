@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadCronJobsFromDirectory } from "../src/cron/cron-loader";
+import { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics } from "../src/cron/cron-loader";
 import { parseCronExpression } from "../src/cron/cron-scheduler";
 
 /**
@@ -78,6 +78,67 @@ describe("cron loader", () => {
         expect(jobs[0].definition.name).toBe("plain");
         expect(jobs[0].definition.enabled).toBe(true);
         expect(jobs[0].definition.timeoutSeconds).toBe(300);
+    });
+
+    /**
+     * A cron file that does not load does not run, and it is written once and
+     * then trusted for months — so "it silently never ran" is this surface's
+     * characteristic failure. The skips were one `warn` per file in the boot
+     * log and nothing else: not counted, not summarised, and absent from
+     * `GET /api/cron`, where a job that failed to load looks exactly like a job
+     * nobody wrote.
+     *
+     * `loadFunctionsWithDiagnostics` had already been given this treatment. The
+     * cron loader's own docblock says it follows that pattern; it did not.
+     */
+    describe("files that will not be scheduled", () => {
+        it("reports one that exports nothing usable", async () => {
+            writeJob("broken.js", "not an object");
+
+            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+
+            expect(jobs).toHaveLength(0);
+            expect(problems).toEqual(["broken.js (no default export)"]);
+        });
+
+        it("reports one missing `schedule` or `handler`", async () => {
+            writeJob("half.js", { schedule: "* * * * *" });
+
+            const { problems } = await loadCronJobsWithDiagnostics(dir, importer);
+
+            expect(problems).toEqual(["half.js (default export has no 'schedule' or no 'handler')"]);
+        });
+
+        it("reports one whose import threw, naming the reason", async () => {
+            // The worst case: a syntax error or a bad import inside the file.
+            fs.writeFileSync(path.join(dir, "explodes.js"), "// fixture", "utf8");
+
+            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+
+            expect(jobs).toHaveLength(0);
+            expect(problems).toHaveLength(1);
+            expect(problems[0]).toMatch(/^explodes\.js \(threw: /);
+        });
+
+        it("schedules the good files alongside the bad, and counts only the bad", async () => {
+            // One malformed file must not cost the others their schedule —
+            // the same call this makes for functions.
+            writeJob("good.js", { schedule: "0 3 * * *", handler: async () => {} });
+            writeJob("bad.js", { schedule: "0 3 * * *" });
+
+            const { jobs, problems } = await loadCronJobsWithDiagnostics(dir, importer);
+
+            expect(jobs.map(j => j.id)).toEqual(["good"]);
+            expect(problems).toHaveLength(1);
+        });
+
+        it("says nothing when every file loaded", async () => {
+            writeJob("fine.js", { schedule: "0 3 * * *", handler: async () => {} });
+
+            const { problems } = await loadCronJobsWithDiagnostics(dir, importer);
+
+            expect(problems).toEqual([]);
+        });
     });
 });
 

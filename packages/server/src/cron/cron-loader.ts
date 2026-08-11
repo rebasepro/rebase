@@ -12,6 +12,13 @@ export interface LoadedCronJob {
     definition: CronJobDefinition;
 }
 
+/** {@link loadCronJobsWithDiagnostics}' answer: what loaded, and what did not. */
+export interface LoadedCronJobs {
+    jobs: LoadedCronJob[];
+    /** One entry per file that will NOT be scheduled, with the reason. */
+    problems: string[];
+}
+
 /**
  * Auto-discover cron job files from a directory.
  *
@@ -19,16 +26,44 @@ export interface LoadedCronJob {
  * The filename (without extension) becomes the job ID:
  *   `crons/cleanup-sessions.ts` → id = "cleanup-sessions"
  *
- * Follows the same discovery pattern as `loadFunctionsFromDirectory`.
+ * Follows the same discovery pattern as `loadFunctionsFromDirectory` — see
+ * {@link loadCronJobsWithDiagnostics} for what happens to the files it cannot
+ * load.
  */
 export async function loadCronJobsFromDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
 ): Promise<LoadedCronJob[]> {
+    return (await loadCronJobsWithDiagnostics(directory, importModule)).jobs;
+}
+
+/**
+ * {@link loadCronJobsFromDirectory}, plus the list of files that were skipped.
+ *
+ * A job that does not load does not run, and until now the only trace was one
+ * `warn` per file in the boot log — next to nothing at 3am when the report that
+ * should have been mailed was not. A cron file is written once and then trusted
+ * for months, so "it silently never ran" is the failure mode this surface has,
+ * and a log line is not a surface.
+ *
+ * Never throws, for the same reason `loadFunctionsWithDiagnostics` does not: one
+ * malformed file must not take the server down, and the other jobs in the
+ * directory are still worth scheduling. The difference is that the skips are now
+ * counted, summarised in one place, and answered by `GET /api/cron` — so the
+ * question "why did nothing run?" has an answer that does not require log
+ * access.
+ */
+export async function loadCronJobsWithDiagnostics(
+    directory: string,
+    importModule: ModuleImporter = nativeDynamicImport
+): Promise<LoadedCronJobs> {
     const jobs: LoadedCronJob[] = [];
+    // Aggregated so a broken job surfaces as one loud summary rather than a
+    // warning buried per-file among the boot noise.
+    const problems: string[] = [];
 
     if (!fs.existsSync(directory)) {
-        return jobs;
+        return { jobs, problems };
     }
 
     const files = fs.readdirSync(directory);
@@ -52,12 +87,14 @@ export async function loadCronJobsFromDirectory(
                 const exported: unknown = mod.default;
 
                 if (!exported || typeof exported !== "object") {
+                    problems.push(`${file} (no default export)`);
                     logger.warn(`[cron] ${file}: no valid default export. Skipping.`);
                     continue;
                 }
 
                 const def = exported as Record<string, unknown>;
                 if (typeof def.schedule !== "string" || typeof def.handler !== "function") {
+                    problems.push(`${file} (default export has no 'schedule' or no 'handler')`);
                     logger.warn(`[cron] ${file}: default export missing required 'schedule' or 'handler'. Skipping.`);
                     continue;
                 }
@@ -89,10 +126,19 @@ definition });
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
+                problems.push(`${file} (threw: ${message})`);
                 logger.error(`[cron] Failed to load ${file}: ${message}`);
             }
         }
     }
 
-    return jobs;
+    if (problems.length > 0) {
+        logger.warn(
+            `[cron] ${problems.length} cron file(s) were skipped and will NOT be scheduled:\n` +
+            problems.map((p) => `  - ${p}`).join("\n") + "\n" +
+            "  Fix these or author them with `defineCron(...)` for a typed, compile-checked contract."
+        );
+    }
+
+    return { jobs, problems };
 }

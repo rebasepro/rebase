@@ -13,7 +13,7 @@ import { ApiError, errorHandler } from "../api/errors";
  *   GET    /:id/logs  → get execution logs for a job
  *   PUT    /:id       → update job (enable/disable)
  */
-export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
+export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     // Hono's onError does NOT propagate from parent to child routers, so this
     // child router registers its own handler to format thrown ApiErrors.
@@ -22,7 +22,18 @@ export function createCronRoutes(scheduler: CronScheduler): Hono<HonoEnv> {
     // List all jobs
     router.get("/", (c) => {
         const jobs = scheduler.listJobs();
-        return c.json({ jobs });
+        // A file that failed to load is not a job, so it appears nowhere in
+        // this list — and "my job is missing" and "my job is not scheduled"
+        // look identical from here. Say how many were dropped, as the
+        // functions listing does, so the Studio panel and anyone with curl can
+        // see it without boot-log access.
+        return c.json({
+            jobs,
+            ...(skipped > 0 && {
+                skipped,
+                note: `${skipped} cron file(s) failed to load and are NOT scheduled — see the server log for the reason.`
+            })
+        });
     });
 
     // Get single job

@@ -62,6 +62,27 @@ description: "First job" }),
             expect(jobs.map((j) => j.id).sort()).toEqual(["job-a", "job-b"]);
         });
 
+        it("says nothing about skipped files when there are none", async () => {
+            const body = await jsonBody(await app.request("/cron"));
+            expect(body.skipped).toBeUndefined();
+            expect(body.note).toBeUndefined();
+        });
+
+        it("reports files that failed to load, which are in no other answer", async () => {
+            // A cron file that does not load is not a job, so it appears
+            // nowhere in `jobs` — and "my job is missing" reads exactly like
+            // "nobody wrote one". The count is the only thing that separates
+            // them without boot-log access.
+            const withProblems = new Hono();
+            withProblems.route("/cron", createCronRoutes(scheduler, 2));
+
+            const body = await jsonBody(await withProblems.request("/cron"));
+
+            expect(body.skipped).toBe(2);
+            expect(body.note).toMatch(/NOT scheduled/);
+            expect((body.jobs as unknown[])).toHaveLength(2);
+        });
+
         it("each job has the expected shape", async () => {
             const res = await app.request("/cron");
             const body = await jsonBody(res);

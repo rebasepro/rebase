@@ -1797,12 +1797,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 6. Mount Cron Jobs
     let cronScheduler: import("./cron").CronScheduler | undefined;
     if (config.cronsDir) {
-        const { loadCronJobsFromDirectory } = await import("./cron/cron-loader");
+        const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
         const { createCronStore } = await import("./cron/cron-store");
 
-        const loadedCronJobs = await loadCronJobsFromDirectory(config.cronsDir);
+        const { jobs: loadedCronJobs, problems: cronProblems } =
+            await loadCronJobsWithDiagnostics(config.cronsDir);
 
         cronScheduler = new CronScheduler();
 
@@ -1834,7 +1835,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Cron admin routes require authentication + admin role
         applyAdminGate(cronRouter, "Cron");
 
-        cronRouter.route("/", createCronRoutes(cronScheduler));
+        cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
         config.app.route(`${basePath}/cron`, cronRouter);
 
         if (loadedCronJobs.length > 0) {
@@ -1846,7 +1847,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         } else {
             logger.warn(
                 `Cron routes mounted at ${basePath}/cron, but no jobs loaded from ${config.cronsDir}. ` +
-                "Nothing is scheduled — check the messages above for files that failed to load."
+                (cronProblems.length > 0
+                    ? `Nothing is scheduled — ${cronProblems.length} file(s) were skipped, see the messages above.`
+                    : "The directory holds no .ts/.js cron files, so nothing is scheduled.")
             );
         }
     }

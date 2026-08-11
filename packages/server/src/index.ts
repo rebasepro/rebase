@@ -171,7 +171,7 @@ export type { LoadedFunction, RebaseFunctionContext } from "./functions";
 // =============================================================================
 // Cron Jobs (auto-discovered scheduled tasks)
 // =============================================================================
-export { loadCronJobsFromDirectory, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
+export { loadCronJobsFromDirectory, loadCronJobsWithDiagnostics, CronScheduler, validateCronExpression, createCronRoutes, createCronStore, defineCron } from "./cron";
 export type { LoadedCronJob, CronStore } from "./cron";
 
 // =============================================================================
