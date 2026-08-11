@@ -64,6 +64,24 @@ export function useJsonCollectionsConfigController({
     const storeRef = useRef(store);
     storeRef.current = store;
 
+    /**
+     * The current collections, readable outside a state updater.
+     *
+     * Three mutators used to compute their new value inside
+     * `setCollections(prev => …)` and persist from in there, which cost them
+     * both halves of a save: the promise they returned resolved before the
+     * store had answered, so a failed write reached the caller as a success,
+     * and a `setState` updater must be pure — under `StrictMode` React invokes
+     * it twice, so every one of those saves wrote to the store twice in
+     * development. Reading `prev` from a ref lets them do what
+     * `updatePropertiesOrder` already did: compute, set, then await.
+     */
+    const collectionsRef = useRef<AdminCollection[]>([]);
+    const applyCollections = useCallback((next: AdminCollection[]) => {
+        collectionsRef.current = next;
+        setCollections(next);
+    }, []);
+
     // ── Load on mount ─────────────────────────────────────────────────
     useEffect(() => {
         if (!autoLoad) return;
@@ -78,7 +96,7 @@ export function useJsonCollectionsConfigController({
                 if (cancelled) return;
                 // Deserialized as a set: a relation's target is a slug, and a slug only
                 // resolves against the other collections it arrived with.
-                setCollections(fromSerializableCollectionConfigs(serialized));
+                applyCollections(fromSerializableCollectionConfigs(serialized));
                 setNavigationEntries(navEntries);
             } catch (e) {
                 console.error("useJsonCollectionsConfigController: failed to load collections", e);
@@ -88,7 +106,10 @@ export function useJsonCollectionsConfigController({
         })();
 
         return () => { cancelled = true; };
-    }, [autoLoad]);
+        // `applyCollections` is `useCallback(…, [])`, so naming it here cannot
+        // re-run the mount effect — it is listed because a stable identity is a
+        // fact about today's code, not a reason to leave a dependency out.
+    }, [autoLoad, applyCollections]);
 
     // ── Helpers ────────────────────────────────────────────────────────
 
@@ -116,49 +137,44 @@ export function useJsonCollectionsConfigController({
     ) => {
         const collection = collectionData as AdminCollection;
         await persistCollection(collection);
-        setCollections(prev => {
-            const idx = prev.findIndex(c => c.slug === id);
-            if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = collection;
-                return next;
-            }
-            return [...prev, collection];
-        });
-    }, [persistCollection]);
+        const prev = collectionsRef.current;
+        const idx = prev.findIndex(c => c.slug === id);
+        if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = collection;
+            applyCollections(next);
+        } else {
+            applyCollections([...prev, collection]);
+        }
+    }, [persistCollection, applyCollections]);
 
     const updateCollection = useCallback(async <M extends Record<string, unknown>>(
         { id, collectionData, previousId }: UpdateCollectionParams<M>
     ) => {
-        setCollections(prev => {
-            const lookupId = previousId ?? id;
-            const idx = prev.findIndex(c => c.slug === lookupId);
-            if (idx < 0) return prev;
+        const prev = collectionsRef.current;
+        const lookupId = previousId ?? id;
+        const idx = prev.findIndex(c => c.slug === lookupId);
+        if (idx < 0) return;
 
-            const merged = { ...prev[idx], ...collectionData } as AdminCollection;
-            const next = [...prev];
-            next[idx] = merged;
+        const merged = { ...prev[idx], ...collectionData } as AdminCollection;
+        const next = [...prev];
+        next[idx] = merged;
+        applyCollections(next);
 
-            // Persist async — fire-and-forget with error logging
-            persistCollection(merged).catch(e =>
-                console.error("useJsonCollectionsConfigController: failed to update collection", e)
-            );
+        await persistCollection(merged);
 
-            // If slug changed, clean up the old entry in the store
-            if (previousId && previousId !== id) {
-                storeRef.current.delete(previousId).catch(e =>
-                    console.error("useJsonCollectionsConfigController: failed to delete old slug", e)
-                );
-            }
-
-            return next;
-        });
-    }, [persistCollection]);
+        // If the slug changed, clean up the old entry in the store. After the
+        // save, not beside it: dropping the old key first and then failing to
+        // write the new one loses the collection outright.
+        if (previousId && previousId !== id) {
+            await storeRef.current.delete(previousId);
+        }
+    }, [persistCollection, applyCollections]);
 
     const deleteCollection = useCallback(async ({ id }: DeleteCollectionParams) => {
         await storeRef.current.delete(id);
-        setCollections(prev => prev.filter(c => c.slug !== id));
-    }, []);
+        applyCollections(collectionsRef.current.filter(c => c.slug !== id));
+    }, [applyCollections]);
 
     const saveProperty = useCallback(async ({
         path,
@@ -166,56 +182,48 @@ export function useJsonCollectionsConfigController({
         property,
         newPropertiesOrder,
     }: SavePropertyParams) => {
-        setCollections(prev => {
-            const idx = prev.findIndex(c => c.slug === path);
-            if (idx < 0) return prev;
+        const prev = collectionsRef.current;
+        const idx = prev.findIndex(c => c.slug === path);
+        if (idx < 0) return;
 
-            const collection = { ...prev[idx] };
-            collection.properties = {
-                ...collection.properties,
-                [propertyKey]: property,
-            } as EngineProperties;
-            if (newPropertiesOrder) {
-                collection.propertiesOrder = newPropertiesOrder as typeof collection.propertiesOrder;
-            }
+        const collection = { ...prev[idx] };
+        collection.properties = {
+            ...collection.properties,
+            [propertyKey]: property,
+        } as EngineProperties;
+        if (newPropertiesOrder) {
+            collection.propertiesOrder = newPropertiesOrder as typeof collection.propertiesOrder;
+        }
 
-            const next = [...prev];
-            next[idx] = collection as AdminCollection;
+        const next = [...prev];
+        next[idx] = collection as AdminCollection;
+        applyCollections(next);
 
-            persistCollection(next[idx]).catch(e =>
-                console.error("useJsonCollectionsConfigController: failed to save property", e)
-            );
-
-            return next;
-        });
-    }, [persistCollection]);
+        await persistCollection(next[idx]);
+    }, [persistCollection, applyCollections]);
 
     const deleteProperty = useCallback(async ({
         path,
         propertyKey,
         newPropertiesOrder,
     }: DeletePropertyParams) => {
-        setCollections(prev => {
-            const idx = prev.findIndex(c => c.slug === path);
-            if (idx < 0) return prev;
+        const prev = collectionsRef.current;
+        const idx = prev.findIndex(c => c.slug === path);
+        if (idx < 0) return;
 
-            const collection = { ...prev[idx] };
-            const { [propertyKey]: _removed, ...remaining } = collection.properties;
-            collection.properties = remaining;
-            if (newPropertiesOrder) {
-                collection.propertiesOrder = newPropertiesOrder as typeof collection.propertiesOrder;
-            }
+        const collection = { ...prev[idx] };
+        const { [propertyKey]: _removed, ...remaining } = collection.properties;
+        collection.properties = remaining;
+        if (newPropertiesOrder) {
+            collection.propertiesOrder = newPropertiesOrder as typeof collection.propertiesOrder;
+        }
 
-            const next = [...prev];
-            next[idx] = collection as AdminCollection;
+        const next = [...prev];
+        next[idx] = collection as AdminCollection;
+        applyCollections(next);
 
-            persistCollection(next[idx]).catch(e =>
-                console.error("useJsonCollectionsConfigController: failed to delete property", e)
-            );
-
-            return next;
-        });
-    }, [persistCollection]);
+        await persistCollection(next[idx]);
+    }, [persistCollection, applyCollections]);
 
     const updatePropertiesOrder = useCallback(async ({
         collection,
@@ -226,16 +234,16 @@ export function useJsonCollectionsConfigController({
             propertiesOrder: newPropertiesOrder,
         } as AdminCollection;
 
-        setCollections(prev => {
-            const idx = prev.findIndex(c => c.slug === collection.slug);
-            if (idx < 0) return prev;
+        const prev = collectionsRef.current;
+        const idx = prev.findIndex(c => c.slug === collection.slug);
+        if (idx >= 0) {
             const next = [...prev];
             next[idx] = updated;
-            return next;
-        });
+            applyCollections(next);
+        }
 
         await persistCollection(updated);
-    }, [persistCollection]);
+    }, [persistCollection, applyCollections]);
 
     const updateKanbanColumnsOrder = useCallback(async ({
         collection,
