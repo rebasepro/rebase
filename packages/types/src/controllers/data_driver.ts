@@ -350,9 +350,41 @@ export interface DataDriver {
     updateMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
-     * Delete a entity
-     * @param props
-     * @return was the whole deletion flow successful
+     * Delete the row `props.row` addresses.
+     *
+     * **Resolving means the row is gone because this call removed it.** A
+     * delete that matched nothing must reject with a not-found error
+     * (`ApiError.notFound`, `statusCode: 404`) rather than resolving quietly.
+     *
+     * The rule is here rather than in each driver because the two
+     * implementations answered differently and each had a test pinning its own
+     * habit: Postgres threw, Mongo logged a warning and resolved. Three things
+     * decide it in favour of rejecting.
+     *
+     * The REST layer already says 404 — `DELETE /api/data/<c>/<id>` reads the
+     * row before removing it — so a quiet resolve made the driver API disagree
+     * with the HTTP API about the same operation, and only in-process
+     * `rebase.data` callers could see the difference.
+     *
+     * A caller cannot tell "deleted" from "there was nothing there" without it,
+     * and those are different facts: one means the caller's model of the data
+     * was right, the other that it was stale. Silence hands back the wrong one
+     * and the caller carries on.
+     *
+     * And on a driver with row-level security, "matched nothing" is *also* how
+     * a policy refusal arrives — Postgres filters `DELETE` through `USING`
+     * rather than raising. A driver that resolves on zero rows therefore
+     * reports a refused delete as a completed one, which is the defect
+     * `explainZeroRowWrite` exists to prevent (see `write-denial.ts`).
+     *
+     * Conformance for both server drivers lives in
+     * `packages/server/test/contract/delete-contract.ts`, run by each driver's
+     * own suite against its own database. `packages/firebase`'s Firestore
+     * driver does not honour it: `deleteDoc` resolves for a missing document
+     * and reporting otherwise would cost a read on every delete. It runs in the
+     * browser against Firestore's own semantics rather than behind
+     * `rebase.data`, and that exception is stated here rather than left to be
+     * discovered.
      */
     delete<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteProps<M>): Promise<void>;
 

@@ -8,7 +8,7 @@
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
 import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
-import { logger } from "@rebasepro/server";
+import { ApiError } from "@rebasepro/server";
 
 /**
  * MongoDB Row Service
@@ -356,7 +356,14 @@ id: newId.toString() });
     }
 
     /**
-     * Delete an row by ID
+     * Delete a row by ID.
+     *
+     * Rejects when nothing matched, which is the `DataDriver.delete` contract:
+     * resolving means the row is gone because this call removed it. This used
+     * to log a warning and resolve, so a caller could not tell a delete from a
+     * no-op — and the same call on the Postgres driver threw. The wording is
+     * the Postgres driver's, verbatim, because two spellings of one answer is
+     * how the two came apart in the first place.
      */
     async delete(
         collectionPath: string,
@@ -369,7 +376,7 @@ id: newId.toString() });
         const result = await collection.deleteOne({ _id: objectId } as Filter<Document>);
 
         if (result.deletedCount === 0) {
-            logger.warn(`Row ${id} not found in collection ${collectionPath}`);
+            throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to delete.`);
         }
     }
 

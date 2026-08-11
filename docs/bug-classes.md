@@ -2169,7 +2169,7 @@ does the client actually receive?
 |---|---|
 | `finalize` in `tus-handler.ts` | **BUG, the worst of the sweep.** A resumable upload that could not be stored answered `204` with `Upload-Offset: <size>`, which in TUS *is* "I have your file". No controller returned quietly; a failing `putObject` was caught and logged. It also set `completed = true` before writing, and a completed upload is refused a retry and skipped by the stale sweeper — so the client was locked out of the one thing it could do and the bytes leaked. Now 503/502, and complete means stored |
 | `cron-loader.ts` | **BUG.** Three kinds of unloadable file skipped with one `warn` each, nothing aggregated, and `GET /api/cron` listing only what loaded — so a job that failed to load looks exactly like a job nobody wrote. Its twin `loadFunctionsWithDiagnostics` had already been given `problems`, a summary and a count on the listing endpoint; the cron loader's docblock claims to follow that pattern and did not |
-| `MongoDataService.delete` vs `PersistService.delete` | **divergent, left for a decision.** Deleting a missing row throws 404 on Postgres and resolves quietly on Mongo, and each driver has a test asserting its own answer. REST hides it (the route fetches first), so only `rebase.data` callers see it. It wants one contract in a shared suite, not two local habits |
+| `MongoDataService.delete` vs `PersistService.delete` | **divergent — since settled, see below.** Deleting a missing row threw 404 on Postgres and resolved quietly on Mongo, and each driver had a test asserting its own answer |
 | `MongoConditionBuilder` | clean, and instructive — it already throws for an unknown operator, and its comment describes the exact Postgres defect fixed above. The pair was Mongo-fixed, Postgres-not |
 | `collections/loader.ts` | clean — collects failures and throws, naming every file |
 | `boot/bundle.ts` + `ensureCollectionSchema` | clean — a declared-but-missing entry is deliberately non-fatal for optional dirs (there is a test saying why), and the collections case is reported loudly one layer up with the rebuild command |
@@ -2178,3 +2178,49 @@ does the client actually receive?
 | catch blocks with an empty body, all six server packages | none. 111 have a comment saying why, which is the standard this file asks for |
 
 **Sweep, for the next pass:** `grep -rnE "logger\.(warn|error)" packages/*/src` and read the *next* line. `continue`, `return` and a fall-through to a success response are the three shapes. Then ask the question that separates this class from ordinary logging: **what does the caller receive?** If the answer is a 2xx, a resolved promise, or an empty list, the log line is the only place the failure exists — and nobody reads logs for an operation that reported success.
+
+### When the two answers are both defended by a test — 2026-08-10
+
+The `delete` divergence above is worth its own note, because it is the shape
+that survives longest. Neither driver was *unreviewed*: Mongo's suite asserted
+`"should not throw for non-existent entity"` and Postgres's asserted a 404 for
+the same call, and both had passed for as long as they had existed. A test that
+describes its own implementation's habit reads exactly like a test that
+describes the contract, and it is the only kind of test that can make a
+divergence stable — each side is defended, so each side stays.
+
+What made it invisible from outside was a layer above being right. The REST
+route reads the row before deleting it, so `DELETE /api/data/<c>/<id>` answered
+404 on both engines; only in-process `rebase.data` callers and anyone writing
+against the driver API could see the disagreement. A correct outer layer hides
+an incoherent inner one until something bypasses it — which is what
+`rebase.data` in a callback, a cron job, or a custom function does.
+
+Settled toward rejecting, on three grounds and not on taste:
+
+  * The REST layer already answers 404, so a quiet resolve made the driver API
+    disagree with the HTTP API about one operation.
+  * A caller cannot tell "deleted" from "there was nothing there" without it,
+    and those are different facts about whether the caller's model was stale.
+  * On Postgres, "matched nothing" is *also* how a policy refusal arrives —
+    `USING` filters the `DELETE` rather than raising — so a driver that resolves
+    on zero rows reports a refused delete as a completed one. That is class 39
+    itself, which means the Postgres side could not have been made quiet without
+    reintroducing the defect the class is named for.
+
+**Watch for:** the fix that leaves the rule in two places. Conforming Mongo and
+stopping there would have left two suites each asserting the same thing about
+its own driver — the arrangement that produced the divergence. The rule is on
+`DataDriver.delete` now, and the assertions are a kit in
+`packages/server/test/contract/delete-contract.ts` that both suites run: Postgres
+in its container e2e, Mongo on `mongodb-memory-server`. They cannot share a
+runner — `@rebasepro/server` depends on neither driver — so what is shared is
+the rule, not the harness.
+
+**Watch for, too:** the third implementation. `packages/firebase`'s Firestore
+driver is typed `DataDriver` and does *not* honour this: `deleteDoc` resolves
+for a missing document, and reporting otherwise costs a read on every delete. It
+runs in the browser against Firestore's own semantics rather than behind
+`rebase.data`. That exception is written into the interface docblock, because an
+undocumented exception is how the next person concludes the contract is
+advisory.

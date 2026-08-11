@@ -8,6 +8,9 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import { EntityReference } from "@rebasepro/types";
 import { MongoDataService } from "../src/db/MongoDataService";
+// The shared contract, run by the Postgres suite too. A relative path because
+// `@rebasepro/server` does not export test scaffolding — see the kit's header.
+import { assertDeleteContract } from "../../server/test/contract/delete-contract";
 
 /**
  * `save` and `fetchOne` return flat rows typed `Record<string, unknown>` — the
@@ -395,13 +398,37 @@ status: "pending" }
             expect(fetched).toBeUndefined();
         });
 
-        it("should not throw for non-existent entity", async () => {
-            const nonExistentId = new ObjectId().toString();
-
-            // Should not throw
-            await expect(
-                dataService.delete("users", nonExistentId)
-            ).resolves.not.toThrow();
+        /**
+         * This used to assert the opposite — "should not throw for non-existent
+         * entity" — while the Postgres driver's suite asserted a 404 for the
+         * same call. Both passed for as long as they existed, because each
+         * described its own driver's habit rather than the contract, and the
+         * REST layer's read-before-delete hid the disagreement from everyone
+         * except in-process `rebase.data` callers.
+         *
+         * The rule now lives in `DataDriver.delete`'s docblock and is checked
+         * by the shared kit below, which the Postgres suite runs too.
+         */
+        it("meets the DataDriver.delete contract", async () => {
+            await assertDeleteContract(
+                {
+                    path: "users",
+                    create: async () => String(rowId(await dataService.save("users", { name: "Contract" }))),
+                    delete: (id) => dataService.delete("users", id),
+                    exists: async (id) => (await dataService.fetchOne("users", id)) !== undefined,
+                    // A well-formed ObjectId that names nothing: an arbitrary
+                    // string would fail as a cast rather than as a miss.
+                    missingId: () => new ObjectId().toString()
+                },
+                {
+                    rejectsNotFound: async (promise, id) => {
+                        await expect(promise).rejects.toMatchObject({
+                            statusCode: 404,
+                            message: expect.stringContaining(`"${id}"`)
+                        });
+                    }
+                }
+            );
         });
     });
 
