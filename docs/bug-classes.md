@@ -2224,3 +2224,26 @@ runs in the browser against Firestore's own semantics rather than behind
 `rebase.data`. That exception is written into the interface docblock, because an
 undocumented exception is how the next person concludes the contract is
 advisory.
+
+### The same class on the caller's side — 2026-08-10
+
+Sweeping the client and the admin turned the question around. On the server the
+shape is a skip; in a UI or an SDK it is an **empty success** — a resolved
+promise, a `{}`, a state update that says the thing happened. Same defect, and
+harder to see, because an empty result is a perfectly ordinary thing for a
+read to return.
+
+| checked | result |
+|---|---|
+| `transport.request` in `@rebasepro/client` | **BUG.** A body that failed `JSON.parse` left `body = {}` and, on a success status, returned it. `find()` answered `{}` instead of an array with nothing thrown. Point the base URL at the frontend's own host and the SPA fallback answers 200 with `index.html` — so the misconfiguration the 404 branch explains at length arrives, in its commonest form, as an empty success. Now `INVALID_JSON_RESPONSE`, quoting the first 120 characters. The post-refresh retry was a second copy of the same block and had it too |
+| `useJsonCollectionsConfigController` | **BUG ×3.** `updateCollection`, `saveProperty` and `deleteProperty` persisted from inside `setCollections(prev => …)`, fire-and-forget behind a `console.error`, while the same hook's `saveCollection`, `deleteCollection` and `updatePropertiesOrder` awaited. The editor reported schema changes the store had refused — and a `setState` updater with a side effect in it runs twice under `StrictMode`, so each save also wrote twice in development |
+| `CollectionViewBinding`'s count fetch | clean — a failed count reports `undefined`, which is "unknown", not a wrong number |
+| success toasts across admin/studio | clean — every one sampled sits after the `await` it reports on |
+| `allSettled` with uninspected rejections (3 sites) | clean — all three are shutdown or cleanup paths, and two say in a comment why a rejection must not break shutdown |
+| boolean-returning functions used as statements | clean — the ones that look dropped (`registerMultiple`, `setDataSources`) answer "did this change anything", not "did this work" |
+
+**Sweep:** for a UI, find the state update and ask what happens to it when the
+write fails; for an SDK, find every `catch` around a parse or a fetch and ask
+what the caller gets. The tell in both is a **default value produced inside a
+failure path** — `{}`, `[]`, `undefined`, or a state update issued before the
+promise resolves. A default is an answer, and a failure is not.
