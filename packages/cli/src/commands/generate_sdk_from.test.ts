@@ -229,7 +229,7 @@ describe("generate-sdk --from", () => {
     });
 
     describe("what reaches disk", () => {
-        it("writes types built from the remote contract, with the real column names", async () => {
+        it("writes types built from the remote contract, keyed by the wire names", async () => {
             project();
             await run("https://api.acme.com");
 
@@ -237,7 +237,15 @@ describe("generate-sdk --from", () => {
             // The relation survives the serialize/deserialize round trip, so the
             // foreign key is typed from the target's own primary key rather than
             // degrading to `string | number`.
-            expect(types).toContain("author_id?: number | null;");
+            //
+            // `authorId`, not `author_id`: a generated Row is keyed by what the
+            // API answers, and the API is camelCase throughout. The column is
+            // still `author_id` — that is the point of the split, and it is why
+            // this assertion is on the SDK rather than on the schema. This test
+            // read `author_id` until the wire was unified, and asserting the
+            // column name here is how a Row type comes to describe a key no
+            // response carries.
+            expect(types).toContain("authorId?: number | null;");
             expect(types).toContain('Database["authors"]["Row"]');
             expect(types).toContain('posts: "posts",');
         });
