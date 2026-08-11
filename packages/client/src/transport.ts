@@ -325,6 +325,27 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         };
     }
 
+    /**
+     * The refusal for a success status carrying a body this client cannot read.
+     *
+     * The first 120 characters go in the message because they identify the
+     * sender at a glance: `<!doctype html>` says "you are talking to a web
+     * server, not to this API" faster than any wording here could.
+     *
+     * One function for both the first attempt and the post-refresh retry — the
+     * retry is a second copy of this whole response-reading path, and copies
+     * are how one of them ends up fixed and the other not.
+     */
+    function unreadableResponse(status: number, text: string): RebaseApiError {
+        return new RebaseApiError(
+            `The server answered ${status} with a body that is not JSON, so there is nothing to return. ` +
+            "This usually means the request reached something other than the Rebase API — a single-page-app " +
+            "fallback serving index.html, or a proxy error page — so check the API URL configuration " +
+            `(e.g. VITE_API_URL). The body began: ${JSON.stringify(text.slice(0, 120))}`,
+            { status, code: "INVALID_JSON_RESPONSE" }
+        );
+    }
+
     async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
         const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
 
@@ -356,11 +377,27 @@ headers });
 
         const text = await res.text().catch(() => "");
         let body: Record<string, unknown> = {};
+        /**
+         * Whether the body was there and could not be read as JSON.
+         *
+         * On an error status this does not matter — the status is the answer
+         * and the message falls back to `statusText`. On a *success* status it
+         * is the whole answer, and `{}` was being returned as though the server
+         * had sent it: `find()` answered `{}` instead of an array, `getOne()`
+         * an empty object, with nothing thrown.
+         *
+         * The case that produces it is not exotic. Point `VITE_API_URL` at the
+         * frontend's own host and `/api/data/posts` lands on the SPA fallback,
+         * which answers `200` with `index.html` — so the misconfiguration the
+         * 404 branch below spends four lines explaining reaches the caller, in
+         * its most common form, as an empty success.
+         */
+        let unreadableBody = false;
         if (text) {
             try {
                 body = JSON.parse(text, rebaseReviver) as Record<string, unknown>;
             } catch (e) {
-                // If not valid JSON, fallback
+                unreadableBody = true;
             }
         }
 
@@ -393,10 +430,13 @@ headers: retryHeaders });
                 if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");
                 let retryBody: Record<string, unknown> = {};
+                let retryUnreadable = false;
                 if (retryText) {
                     try {
                         retryBody = JSON.parse(retryText, rebaseReviver);
-                    } catch (e) { /* ignore */ }
+                    } catch (e) {
+                        retryUnreadable = true;
+                    }
                 }
                 if (!retryRes.ok) {
                     let fallbackMessage = retryRes.statusText;
@@ -413,6 +453,7 @@ headers: retryHeaders });
                         }
                     );
                 }
+                if (retryUnreadable) throw unreadableResponse(retryRes.status, retryText);
                 return retryBody as T;
             }
         }
@@ -432,6 +473,8 @@ headers: retryHeaders });
                 }
             );
         }
+
+        if (unreadableBody) throw unreadableResponse(res.status, text);
 
         return body as T;
     }

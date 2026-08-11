@@ -132,6 +132,69 @@ fetch: fetchMock as typeof globalThis.fetch });
         expect(transport.fetchFn).toBe(fetchMock);
     });
 
+    /**
+     * A success this client cannot read used to be returned as `{}`.
+     *
+     * `find()` answered an empty object instead of an array and nothing threw,
+     * which reads as "no data" rather than "you are not talking to the API".
+     * The case is ordinary: point the base URL at the frontend's own host and
+     * `/api/data/posts` lands on the SPA fallback, which serves `index.html`
+     * with a 200.
+     */
+    describe("a success status carrying something that is not JSON", () => {
+        const html = "<!doctype html>\n<html><body>app shell</body></html>";
+
+        it("refuses it rather than returning an empty object", async () => {
+            const transport = createTransport({
+                baseUrl: "https://app.example.com",
+                fetch: fetchMock as typeof globalThis.fetch
+            });
+            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => html });
+
+            await expect(transport.request("/data/posts")).rejects.toMatchObject({
+                name: "RebaseApiError",
+                status: 200,
+                code: "INVALID_JSON_RESPONSE"
+            });
+        });
+
+        it("quotes the start of the body, which is what names the sender", async () => {
+            const transport = createTransport({
+                baseUrl: "https://app.example.com",
+                fetch: fetchMock as typeof globalThis.fetch
+            });
+            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => html });
+
+            await expect(transport.request("/data/posts")).rejects.toThrow(/<!doctype html>/);
+        });
+
+        it("still returns an empty object for a success with no body at all", async () => {
+            // Not the same thing: a 200 with nothing in it is an answer, and
+            // some endpoints give it.
+            const transport = createTransport({
+                baseUrl: "https://api.example.com",
+                fetch: fetchMock as typeof globalThis.fetch
+            });
+            fetchMock.mockResolvedValueOnce({ ok: true, status: 200, text: async () => "" });
+
+            await expect(transport.request("/ping")).resolves.toEqual({});
+        });
+
+        it("leaves an error status reporting its status, not the parse", async () => {
+            // A 500 behind an HTML error page is still a 500: the status is the
+            // answer and the unreadable body adds nothing.
+            const transport = createTransport({
+                baseUrl: "https://api.example.com",
+                fetch: fetchMock as typeof globalThis.fetch
+            });
+            fetchMock.mockResolvedValueOnce({
+                ok: false, status: 500, statusText: "Internal Server Error", text: async () => html
+            });
+
+            await expect(transport.request("/data/posts")).rejects.toMatchObject({ status: 500 });
+        });
+    });
+
     // --- Basic requests ---
     it("makes a basic GET request", async () => {
         const transport = createTransport({ baseUrl: "https://api.example.com",
