@@ -379,8 +379,26 @@ export const getDrizzleColumn = (propName: string, prop: Property, collection: C
 
 /**
  * Wraps a compiled SQL clause in a Drizzle `sql\`...\`` template literal.
+ *
+ * The clause is SQL being written into a TypeScript file, so it has to survive
+ * being read back as a template literal. Three characters do not:
+ *
+ * - `` ` `` closes the template early, and the rest of the clause becomes code.
+ * - `${` opens an interpolation — the file stops compiling, or worse, compiles
+ *   against whatever identifier happens to be in scope.
+ * - `\` is an escape, and Drizzle's `sql` tag reads the *cooked* strings, not
+ *   `.raw`. So a policy written as `email ~ '^admin\.user@corp\.com$'` reaches
+ *   the database as `^admin.user@corp.com$`, where every `\.` now matches any
+ *   character. A `USING` clause is a security boundary and that one silently
+ *   widened it — the SQL file emitted by the DDL generator kept the backslashes
+ *   while this path dropped them, so the two disagreed about who could read the
+ *   table.
+ *
+ * Escaping here rather than in the compiler: the clause is correct SQL, and it
+ * is only this destination that has an opinion about backslashes.
  */
-const wrapSql = (clause: string): string => `sql\`${clause}\``;
+const wrapSql = (clause: string): string =>
+    `sql\`${clause.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${")}\``;
 
 /**
  * Generates a deterministic hash based on the rule configuration.
