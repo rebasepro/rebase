@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-12
+
 ### Breaking
 
 - **A `validation.matches` pattern that will not compile is now fatal at boot, instead of silently deleting the rule.** `toPattern` rebuilds the `RegExp` per request and answers `undefined` when the pattern is malformed, and its caller reads `if (pattern && !pattern.test(value))` — so an unclosed bracket did not reject writes, it removed the constraint. Every value passed, for the lifetime of the deployment, while the author went on believing something guarded that column.
