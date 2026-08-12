@@ -146,6 +146,55 @@ name: "Auditor" });
         });
     });
 
+    /**
+     * MFA is not implemented on this engine, and the auth router mounts the
+     * MFA routes for every backend — so `POST /auth/mfa/enroll` is live here
+     * and lands in these stubs.
+     *
+     * They used to throw a bare `Error`, which the central handler classifies
+     * as unhandled: a 500, whose message is sanitized on the way out. Someone
+     * turning on two-factor auth was told "Internal Server Error" while the
+     * reason stayed in the server log — every time, not as a race.
+     */
+    describe("MFA on an engine that does not implement it", () => {
+        it("answers 501 with the reason rather than a sanitized 500", async () => {
+            const repo = new MongoAuthRepository(db);
+
+            await expect(repo.createMfaFactor("uid-1", "totp", "secret")).rejects.toMatchObject({
+                statusCode: 501,
+                code: "MFA_NOT_SUPPORTED"
+            });
+            await expect(repo.createMfaFactor("uid-1", "totp", "secret")).rejects.toThrow(/MongoDB/);
+        });
+
+        it("says the same for every write in the group", async () => {
+            const repo = new MongoAuthRepository(db);
+            const writes: Array<Promise<unknown>> = [
+                repo.verifyMfaFactor("f-1"),
+                repo.deleteMfaFactor("f-1", "uid-1"),
+                repo.createMfaChallenge("f-1"),
+                repo.verifyMfaChallenge("c-1"),
+                repo.createRecoveryCodes("uid-1", ["hash"])
+            ];
+
+            for (const write of writes) {
+                await expect(write).rejects.toMatchObject({ statusCode: 501, code: "MFA_NOT_SUPPORTED" });
+            }
+        });
+
+        it("still reads as an account with no factors, which is what keeps the login gate correct", async () => {
+            // `assertMfaSatisfied` asks `hasVerifiedMfaFactors` and returns
+            // early on false. That is right here — no factor can exist on this
+            // engine — and it must not become a throw, or every login on a
+            // Mongo backend would 501.
+            const repo = new MongoAuthRepository(db);
+
+            await expect(repo.hasVerifiedMfaFactors("uid-1")).resolves.toBe(false);
+            await expect(repo.getMfaFactors("uid-1")).resolves.toEqual([]);
+            await expect(repo.getUnusedRecoveryCodeCount("uid-1")).resolves.toBe(0);
+        });
+    });
+
     describe("MongoRoleService", () => {
         it("should manage roles", async () => {
             const service = new MongoRoleService(db);

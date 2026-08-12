@@ -785,9 +785,27 @@ export class MongoAuthRepository implements AuthRepository {
         await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
     }
 
-    // MFA Repository Stub
+    // ── MFA: not implemented on this engine ──────────────────────────────
+    //
+    // The routes are mounted for every backend, so `POST /auth/mfa/enroll`
+    // is live here and reaches these. Throwing a bare `Error` made every one
+    // of them a 500 — and a 500's message is sanitized on the way out, so the
+    // caller was told "Internal Server Error" while the reason stayed in the
+    // server log. Someone turning on two-factor auth got a server fault
+    // instead of an answer, every time, on this engine.
+    //
+    // 501 with the reason, which is what `init.ts` already does for an admin
+    // surface it mounts and cannot serve: "they answer 501 instead, and stay
+    // mounted to say why". The reads below stay as they are — no factor can
+    // exist here, so `[]`, `null` and `false` are true rather than merely
+    // convenient, and `assertMfaSatisfied` reading `false` correctly leaves
+    // the login gate inert.
     async createMfaFactor(uid: string, factorType: "totp", secretEncrypted: string, friendlyName?: string): Promise<MfaFactor> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so a factor cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async getMfaFactors(uid: string): Promise<MfaFactor[]> {
         return [];
@@ -796,22 +814,42 @@ export class MongoAuthRepository implements AuthRepository {
         return null;
     }
     async verifyMfaFactor(factorId: string): Promise<void> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so a factor's verification cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async deleteMfaFactor(factorId: string, uid: string): Promise<void> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so a factor cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async createMfaChallenge(factorId: string, ipAddress?: string): Promise<MfaChallengeInfo> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so a challenge cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async getMfaChallengeById(challengeId: string): Promise<MfaChallengeInfo | null> {
         return null;
     }
     async verifyMfaChallenge(challengeId: string): Promise<void> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so a challenge's verification cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async createRecoveryCodes(uid: string, codeHashes: string[]): Promise<void> {
-        throw new Error("MFA is not implemented for MongoDB");
+        throw new ApiError(
+            501,
+            "MFA_NOT_SUPPORTED",
+            "Multi-factor authentication is not implemented for the MongoDB backend, so recovery codes cannot be stored. Use a Postgres data source for accounts that need a second factor."
+        );
     }
     async useRecoveryCode(uid: string, codeHash: string): Promise<boolean> {
         return false;
