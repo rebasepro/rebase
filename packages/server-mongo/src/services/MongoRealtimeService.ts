@@ -40,6 +40,22 @@ interface Subscription {
     config: (CollectionSubscriptionConfig | SingleSubscriptionConfig) & { authContext?: SubscriptionAuthContext };
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
+    /**
+     * How many deliveries have been started for this subscription, and the
+     * highest that has already reached the callback.
+     *
+     * Every delivery here is a re-fetch, and three independent things start one
+     * for the same subscription: the initial fetch, the change stream, and
+     * `notifyUpdate` after a save. They overlap, and a fetch that started
+     * earlier can finish later — at which point the callback replaces the
+     * client's whole list with the state before the change. Nothing corrects it
+     * until something else happens to that collection.
+     *
+     * A counter taken before the await and checked after it is what makes the
+     * last *started* delivery the last *delivered* one.
+     */
+    started: number;
+    delivered: number;
 }
 
 /**
@@ -64,6 +80,35 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private getCollectionName(path: string): string {
         return path.replace(/\//g, "_");
+    }
+
+    /**
+     * Claim a delivery slot for a subscription, before doing the work.
+     *
+     * Returns the check to run immediately before calling the callback. It
+     * refuses in three cases, all of which used to deliver:
+     *
+     * - **Out of order.** A newer fetch has already delivered, so this one is
+     *   stale — the client would go back to the state before the change.
+     * - **Unsubscribed.** The subscription was cancelled while the fetch was in
+     *   flight, and its callback belongs to a client that stopped listening.
+     * - **Re-subscribed.** `subscribeToCollection` unsubscribes first, so the
+     *   same id can name a *different* subscription by the time a fetch lands —
+     *   with a different filter, and a different caller's rows.
+     *
+     * Synchronous deliveries claim a slot too. A `delete` notification with no
+     * fetch behind it is the newest thing known about the row, so it must also
+     * be the thing that closes the door on an older fetch still in flight —
+     * otherwise the deleted row reappears a moment after it vanished.
+     */
+    private beginDelivery(subscriptionId: string, subscription: Subscription): () => boolean {
+        const seq = ++subscription.started;
+        return () => {
+            if (this.subscriptions.get(subscriptionId) !== subscription) return false;
+            if (seq <= subscription.delivered) return false;
+            subscription.delivered = seq;
+            return true;
+        };
     }
 
     /**
@@ -100,19 +145,21 @@ export class MongoRealtimeService implements RealtimeProvider {
                 type: "collection",
                 config,
                 changeStream,
-                callback
+                callback,
+                started: 0,
+                delivered: 0
             };
 
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyCollection(subscriptionId, config, callback);
+            this.fetchAndNotifyCollection(subscriptionId, subscription);
 
             // Listen for changes
             changeStream.on("change", async (change: ChangeStreamDocument) => {
                 // Re-fetch the entire collection when any change happens
                 // This is simpler and ensures consistent sorting/filtering
-                await this.fetchAndNotifyCollection(subscriptionId, config, callback);
+                await this.fetchAndNotifyCollection(subscriptionId, subscription);
             });
 
             changeStream.on("error", (error: Error) => {
@@ -127,13 +174,15 @@ export class MongoRealtimeService implements RealtimeProvider {
             const subscription: Subscription = {
                 type: "collection",
                 config,
-                callback
+                callback,
+                started: 0,
+                delivered: 0
             };
 
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyCollection(subscriptionId, config, callback);
+            this.fetchAndNotifyCollection(subscriptionId, subscription);
         }
     }
 
@@ -142,9 +191,11 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private async fetchAndNotifyCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext },
-        callback?: (rows: Record<string, unknown>[]) => void
+        subscription: Subscription
     ): Promise<void> {
+        const config = subscription.config as CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext };
+        const callback = subscription.callback;
+        const canDeliver = this.beginDelivery(subscriptionId, subscription);
         try {
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
             // One path, authenticated or not. The `else` branch used to reach
@@ -166,7 +217,7 @@ export class MongoRealtimeService implements RealtimeProvider {
                 searchString: config.searchString
             });
 
-            if (callback) {
+            if (callback && canDeliver()) {
                 callback(rows);
             }
         } catch (error) {
@@ -226,22 +277,28 @@ roles: authContext?.roles ?? [] } as User;
                 type: "single",
                 config,
                 changeStream,
-                callback
+                callback,
+                started: 0,
+                delivered: 0
             };
 
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyOne(subscriptionId, config, callback);
+            this.fetchAndNotifyOne(subscriptionId, subscription);
 
             // Listen for changes
             changeStream.on("change", async (change: ChangeStreamDocument) => {
                 if (change.operationType === "delete") {
-                    if (callback) {
+                    // Claims a slot like any other delivery: the deletion is the
+                    // newest fact about this row, so an older fetch still in
+                    // flight must not put it back.
+                    const canDeliver = this.beginDelivery(subscriptionId, subscription);
+                    if (callback && canDeliver()) {
                         callback(null);
                     }
                 } else {
-                    await this.fetchAndNotifyOne(subscriptionId, config, callback);
+                    await this.fetchAndNotifyOne(subscriptionId, subscription);
                 }
             });
 
@@ -255,13 +312,15 @@ roles: authContext?.roles ?? [] } as User;
             const subscription: Subscription = {
                 type: "single",
                 config,
-                callback
+                callback,
+                started: 0,
+                delivered: 0
             };
 
             this.subscriptions.set(subscriptionId, subscription);
 
             // Fetch initial data
-            this.fetchAndNotifyOne(subscriptionId, config, callback);
+            this.fetchAndNotifyOne(subscriptionId, subscription);
         }
     }
 
@@ -270,9 +329,11 @@ roles: authContext?.roles ?? [] } as User;
      */
     private async fetchAndNotifyOne(
         subscriptionId: string,
-        config: SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext },
-        callback?: (row: Record<string, unknown> | null) => void
+        subscription: Subscription
     ): Promise<void> {
+        const config = subscription.config as SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext };
+        const callback = subscription.callback;
+        const canDeliver = this.beginDelivery(subscriptionId, subscription);
         try {
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
             const driver = await this.scopedDriver(config.authContext);
@@ -282,7 +343,7 @@ roles: authContext?.roles ?? [] } as User;
                 collection: registryCollection
             });
 
-            if (callback) {
+            if (callback && canDeliver()) {
                 callback(row || null);
             }
         } catch (error) {
@@ -319,21 +380,24 @@ roles: authContext?.roles ?? [] } as User;
                 const config = subscription.config as SingleSubscriptionConfig & { authContext?: SubscriptionAuthContext };
                 if (config.path === path && config.id.toString() === id) {
                     if (row === null) {
-                        // A deletion carries no row to authorize.
-                        subscription.callback?.(null);
+                        // A deletion carries no row to authorize — but it still
+                        // claims a delivery slot, so a re-fetch already in
+                        // flight cannot land after it and resurrect the row.
+                        const canDeliver = this.beginDelivery(subscriptionId, subscription);
+                        if (canDeliver()) subscription.callback?.(null);
                     } else {
                         // Re-fetched through the subscriber's own driver rather
                         // than pushed verbatim: `notifyUpdate` runs after every
                         // save, and handing it the row as written broadcast any
                         // document to whoever happened to be watching its id.
-                        await this.fetchAndNotifyOne(subscriptionId, config, subscription.callback);
+                        await this.fetchAndNotifyOne(subscriptionId, subscription);
                     }
                 }
             } else if (subscription.type === "collection") {
                 const config = subscription.config as CollectionSubscriptionConfig & { authContext?: SubscriptionAuthContext };
                 if (config.path === path) {
                     // Re-fetch the collection to get updated data
-                    await this.fetchAndNotifyCollection(subscriptionId, config, subscription.callback);
+                    await this.fetchAndNotifyCollection(subscriptionId, subscription);
                 }
             }
         }
