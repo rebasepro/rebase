@@ -9,6 +9,12 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Breaking
 
+- **A `validation.matches` pattern that will not compile is now fatal at boot, instead of silently deleting the rule.** `toPattern` rebuilds the `RegExp` per request and answers `undefined` when the pattern is malformed, and its caller reads `if (pattern && !pattern.test(value))` — so an unclosed bracket did not reject writes, it removed the constraint. Every value passed, for the lifetime of the deployment, while the author went on believing something guarded that column.
+
+  The lenient runtime branch stays: refusing every write over a config typo blames the wrong party. What was missing was anyone telling the author. `validate-config.ts` now compiles every `validation.matches` at boot and refuses to start on one that does not, naming the pattern, the engine's reason, and what it would have cost — the same way this repo already refuses to start on a relation that cannot resolve.
+
+  **This can stop a project that boots today.** If you are carrying a malformed pattern, it has not been validating anything, and the error names it. A `RegExp` literal is unaffected — the engine compiled it where it was written.
+
 - **BREAKING: the API is camelCase throughout. `author_id` is now `authorId`.** The wire carried two naming conventions at once, and which one a field landed in was not inferable from outside. `GET /api/data/users` answered `displayName`, `photoURL`, `createdAt`; `GET /api/data/posts`, next to it, answered `author_id`. Both were "the wire names". These are also the `where` and `orderBy` keys and the keys the generated SDK types, so a developer moving between two collections had to know, per collection, which convention it had happened to land in.
 
   The rule was never stated because there wasn't one. A field's wire name is its property key, and `columnName` renames only the *column* — that part is right and does not change. But two of the four sources of keys never had a property key to use, and both fell back to the column name:
@@ -106,6 +112,12 @@ description: Every released change to Rebase — new features, fixes, and the br
   Use `@rebasepro/client` with a `dataSources` entry; that is what the admin panel does and what `docs/data-sources.md` has always described. The published versions stay on npm and will be deprecated there — nothing is unpublished, so an existing lockfile keeps resolving.
 
 ### Fixed
+
+- **A 200 the SDK could not parse was returned as an empty object.** `request()` kept `body = {}` when `JSON.parse` threw. On an error status that is harmless, because the status is the answer; on a *success* it was the whole answer — `find()` resolved to `{}` rather than an array and `getOne()` to an empty object, with nothing thrown. To a caller that reads as "no data", not as "you are not talking to the API".
+
+  The case is ordinary: point `VITE_API_URL` at the frontend's own host and `/api/data/posts` lands on the single-page-app fallback, which answers 200 with `index.html`. So the misconfiguration the 404 branch spends four lines explaining reached callers in its most common form as an empty success, because an SPA fallback returns 200, not 404. A proxy error page does the same.
+
+  A success whose body this client cannot read is now a `RebaseApiError` with `INVALID_JSON_RESPONSE`, quoting the first 120 characters — `<!doctype html>` identifies the sender faster than any wording could. A 200 with no body at all still resolves to `{}`: some endpoints legitimately answer that, and it is a different thing from an unreadable one.
 
 - **Introspected collections opted out of key checking.** `rebase schema introspect` opened every generated file with `const ordersCollection: PostgresCollectionConfig = {`, and that annotation widens `properties` to `Record<string, …>`. Every key-shaped field in the `admin` block is derived from those keys — `propertiesOrder`, `listProperties`, `sort`, `display.title`, `fixedFilter` — so annotated, they accept any string. Introspection was emitting a `propertiesOrder` array that nothing checked: rename a column, re-introspect, and the stale key compiled silently and reordered nothing. Introspected keys are precisely the ones nobody typed and nobody remembers, so this was backwards.
 
