@@ -2247,3 +2247,37 @@ write fails; for an SDK, find every `catch` around a parse or a fetch and ask
 what the caller gets. The tell in both is a **default value produced inside a
 failure path** — `{}`, `[]`, `undefined`, or a state update issued before the
 promise resolves. A default is an answer, and a failure is not.
+
+### Sweeping on the tell rather than the symptom — 2026-08-10
+
+The previous passes hunted shapes: a `warn` before a `continue`, a `catch` that
+logs. Those run out. The tell recorded above — **a default value produced inside
+a failure path** — is mechanical enough to grep for and does not:
+
+    catch { return [] }   catch { return null }   catch { return undefined }
+
+Sixty-eight sites across the six server and client packages, forty-eight of them
+without so much as a log line. Almost all are right, and reading them is the
+fastest tour of what "right" looks like here: `tryCanonicalStorageKey` returns
+`null` so a download token "simply matches nothing"; `canonicalRedirectUri`
+returns `null` and its caller reads it as *not allowed*; `searchColumnNames`
+returns `[]` and says the malformed block "is reported at boot, loudly".
+
+Every one of those defaults is safe because it is the **conservative** answer —
+deny, exclude, no-match. The one that was not:
+
+| checked | result |
+|---|---|
+| `toPattern` in `write-validation.ts` | **BUG.** `undefined` for a `validation.matches` that will not compile, and the caller reads `if (pattern && !pattern.test(value))` — so a typo'd regex does not reject writes, it *removes the rule*. Every value passes, for the lifetime of the deployment. `undefined` here means "no pattern", and "no pattern" is the permissive answer |
+| `targetOf` / `relationColumn` in `drizzle-conditions.ts` | clean — an unresolvable target degrades to "column not found", which throws |
+| the storage controllers' `null` returns | clean — "not found", which is what the callers ask about |
+
+So the question to ask of a default is not whether it is documented but **which
+way it fails**. A default that denies, excludes or reports nothing-found is a
+decision; a default that permits is the rule going missing.
+
+And the fix for that one was not at the site. Refusing every write over a config
+author's typo blames the caller for someone else's mistake — the runtime comment
+was right about that. What was missing was anyone telling the author, so the
+check went where this repo already puts config defects with no runtime signal:
+`validate-config.ts`, at boot, fatal. The lenient branch stays, pointing at it.
