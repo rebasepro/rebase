@@ -2331,3 +2331,48 @@ statement.
 written from its own habit rather than from a stated rule — the third time that
 shape has produced a finding in this document (`delete`, the filter operators,
 this). The rule now sits on `UserRepository.createUser`, where both can read it.
+
+---
+
+## 41. A capability the router mounts and the engine cannot provide
+
+A driver that does not implement something writes a stub. The stub is honest —
+it throws, or answers `null` — and the routes above it are mounted for every
+backend regardless, because mounting is decided by the auth config and not by
+which engine is underneath. So the stub is not a placeholder waiting for an
+implementation: it *is* the production behaviour on that engine, for every
+caller, every time.
+
+That makes what it throws a user-facing answer, and a bare `Error` is the wrong
+one. The central handler classifies an unclassified error as a 500 — and
+sanitizes a 500's message on the way out, which is right for a database error
+carrying schema internals and exactly wrong here. `POST /auth/mfa/enroll` on a
+Mongo backend answered `500 "Internal Server Error"` while the sentence that
+explained it, "MFA is not implemented for MongoDB", stayed in the server log.
+The person switching on two-factor authentication saw a broken server; the
+operator got a ticket about a fault that does not exist.
+
+`init.ts` already had the shape for this, for admin surfaces it mounts and
+cannot serve: *"They answer 501 instead, and stay mounted to say why."* An
+unimplemented capability is a 501 with the engine and the remedy named, not a
+500 with the reason stripped.
+
+**Sweep:** `grep -rn "not implemented\|not supported" packages/*/src` and, for
+each, find whether anything routes to it. A stub reachable from a mounted route
+is production behaviour. Then read what it throws: a bare `Error` is a 500 with
+its message removed.
+
+**Watch for:** the reads in the same group. Six MFA writes throwing had four
+sibling reads answering `[]`, `null`, `false`, `0` — and those are *correct*,
+because no factor can exist on that engine, which is also what keeps
+`assertMfaSatisfied` from gating every login on a backend that has no factors
+to gate on. Making a group consistent by turning them all into throws would
+have taken the login path down. The rule is not "stubs must throw"; it is that
+a stub must answer the question it is actually asked, and a read asked "are
+there factors?" can answer truthfully while a write asked to store one cannot.
+
+**Watch for, too:** this being the fourth finding this session from one rule
+implemented twice, after `delete`, the filter operators and `createUser`. The
+sweep that found it is worth keeping: take the interface, list the methods both
+drivers implement, and diff the refusals each can raise. Two engines answering
+one question differently is the contract being written twice.
