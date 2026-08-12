@@ -126,6 +126,13 @@ function toPattern(matches: string | RegExp): RegExp | undefined {
     } catch {
         // A pattern the config author wrote wrong is their bug, not the
         // caller's; refusing every write over it would be the wrong blame.
+        //
+        // Which leaves the rule silently not running, so this is no longer
+        // where the problem is caught: `checkValidationPattern` in
+        // `collections/validate-config.ts` compiles every `matches` at boot and
+        // refuses to start on one that will not. A booted server does not reach
+        // this branch, and it stays lenient for the paths that build a config
+        // by hand.
         return undefined;
     }
 }

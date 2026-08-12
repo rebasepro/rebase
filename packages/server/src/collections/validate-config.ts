@@ -381,6 +381,47 @@ function checkRelation(
     }
 }
 
+/**
+ * `validation.matches`, checked by compiling it.
+ *
+ * This file is about key *identity* and this is a value — but it is a value
+ * with the property the file exists for: no runtime signal. `toPattern` in
+ * `write-validation.ts` builds the `RegExp` per request and answers `undefined`
+ * when the pattern will not compile, and the caller reads
+ * `if (pattern && !pattern.test(value))` — so a pattern with an unclosed
+ * bracket does not reject the write, it removes the rule. Every value passes,
+ * for the lifetime of the deployment, and the only trace is that the author
+ * believes a validation is running.
+ *
+ * Fatal for the reason a renamed key is fatal: the author wrote a rule to keep
+ * something out of their database, and a minute of downtime beats finding out
+ * from the data.
+ *
+ * A `RegExp` literal cannot be wrong here — the engine already compiled it — so
+ * only strings are checked.
+ */
+function checkValidationPattern(
+    validation: unknown,
+    path: string,
+    collect: ProblemCollector
+): void {
+    if (!isPlainObject(validation)) return;
+    const matches = validation.matches;
+    if (typeof matches !== "string") return;
+
+    try {
+        new RegExp(matches);
+    } catch (e) {
+        collect.error(
+            `${path}.matches`,
+            `\`matches: ${JSON.stringify(matches)}\` is not a valid regular expression ` +
+            `(${e instanceof Error ? e.message : String(e)}). It would compile to nothing at ` +
+            "write time, which does not reject values — it silently drops the rule, and every " +
+            "value passes."
+        );
+    }
+}
+
 function checkProperty(
     property: unknown,
     path: string,
@@ -429,6 +470,8 @@ function checkProperty(
     if (type === "relation" && property.relation !== undefined) {
         checkRelation(property.relation, `${path}.relation`, collect);
     }
+
+    checkValidationPattern(property.validation, `${path}.validation`, collect);
 
     // Recurse into the two composites. `of` may be one property or an array of
     // them; `oneOf.properties` is a record like a map's.

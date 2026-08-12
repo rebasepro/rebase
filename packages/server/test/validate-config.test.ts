@@ -146,6 +146,51 @@ describe("known-renamed keys", () => {
     });
 });
 
+/**
+ * A pattern that will not compile is not a strict rule — it is no rule.
+ *
+ * `toPattern` in `write-validation.ts` rebuilds the `RegExp` per request and
+ * answers `undefined` when it cannot, and the caller reads
+ * `if (pattern && !pattern.test(value))`. So an unclosed bracket does not
+ * reject writes: it removes the check, every value passes, and the author goes
+ * on believing something guards that column.
+ */
+describe("a `validation.matches` that cannot compile", () => {
+    const withMatches = (matches: unknown) => {
+        const collection = valid();
+        return {
+            ...collection,
+            properties: {
+                ...collection.properties,
+                slug: { name: "Slug", type: "string", validation: { matches } }
+            }
+        };
+    };
+
+    it("errors, naming the pattern and what it would cost", () => {
+        const [problem] = errors([withMatches("[a-z")]);
+        expect(problem?.path).toBe("posts.properties.slug.validation.matches");
+        expect(problem?.message).toContain("[a-z");
+        expect(problem?.message).toMatch(/every value passes/);
+    });
+
+    it("refuses to boot on it, as it does for a renamed key", () => {
+        expect(() => assertCollectionConfigs([withMatches("(unclosed")])).toThrow(/not a valid regular expression/);
+    });
+
+    it("accepts a pattern that does compile", () => {
+        expect(errors([withMatches("^[a-z0-9-]+$")])).toEqual([]);
+    });
+
+    it("says nothing about a RegExp literal, which the engine already compiled", () => {
+        expect(errors([withMatches(/^[a-z]+$/)])).toEqual([]);
+    });
+
+    it("says nothing when there is no `matches` rule", () => {
+        expect(errors([valid()])).toEqual([]);
+    });
+});
+
 describe("unrecognised keys", () => {
     it("warns rather than failing, because configs carry legitimate metadata", () => {
         const collection = { ...valid(), somethingOfOurOwn: true };
