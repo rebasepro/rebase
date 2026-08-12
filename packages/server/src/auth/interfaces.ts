@@ -248,7 +248,20 @@ export interface PaginatedUsersResult {
  */
 export interface UserRepository {
     /**
-     * Create a new user
+     * Create a new user.
+     *
+     * **An email already in use is a 409 `EMAIL_EXISTS`, not a 500.** Every
+     * caller checks first — `POST /auth/register` reads `getUserByEmail` and
+     * answers 409 — and every engine backs that check with a unique index,
+     * because a check cannot hold its answer still. What is left is the window
+     * between the two, and a double-clicked signup button is wide enough: both
+     * requests read "no such user", both insert, one wins.
+     *
+     * The loser's insert violates the index either way; the only question is
+     * what it is turned into. An unmapped driver error is a 500 "Internal
+     * Server Error", which tells the person who clicked twice that the server
+     * is broken rather than that they already have an account — and tells the
+     * operator to go looking for a fault that is not there.
      */
     createUser(data: CreateUserData): Promise<UserData>;
 

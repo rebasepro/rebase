@@ -68,6 +68,35 @@ describe("MongoDB Auth Services", () => {
             expect(deleted).toBeNull();
         });
 
+    /**
+     * Registration reads `getUserByEmail` and answers 409 before inserting.
+     * The read cannot hold its answer still, so both engines back it with a
+     * unique index — and two clicks on a signup button are enough to reach it.
+     *
+     * The insert then fails either way; the only question is what the person
+     * who clicked twice is told. An unmapped `E11000` is a 500 "Internal
+     * Server Error", which sends them to support and the operator looking for
+     * a fault that is not there.
+     */
+    it("answers a duplicate email with the same 409 the pre-check gives", async () => {
+        const service = new MongoUserService(db);
+        await service.createUser({ email: "racer@rebase.pro" });
+
+        await expect(service.createUser({ email: "racer@rebase.pro" })).rejects.toMatchObject({
+            statusCode: 409,
+            code: "EMAIL_EXISTS"
+        });
+    });
+
+    it("catches the case-folded duplicate too, which is what the index is on", async () => {
+        const service = new MongoUserService(db);
+        await service.createUser({ email: "Mixed@Rebase.pro" });
+
+        await expect(service.createUser({ email: "mixed@rebase.pro" })).rejects.toMatchObject({
+            statusCode: 409
+        });
+    });
+
         it("should link and retrieve user identities", async () => {
             const service = new MongoUserService(db);
             const user = await service.createUser({ email: "user@rebase.pro" });

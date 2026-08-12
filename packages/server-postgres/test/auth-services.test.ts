@@ -206,6 +206,50 @@ describe("Auth Services", () => {
                 );
             });
 
+            /**
+             * `POST /auth/register` reads `getUserByEmail` and answers 409
+             * before inserting. The read cannot hold its answer still, so the
+             * `email` UNIQUE and the `lower(email)` index behind it are what
+             * actually enforce one account per address — and two clicks on a
+             * signup button are enough to get both requests past the check.
+             *
+             * The loser's insert then raises 23505. Unmapped, that reaches the
+             * person who clicked twice as a 500 "Internal Server Error", and
+             * sends the operator looking for a fault that is not there.
+             * `PersistService` has mapped 23505 to a conflict for collection
+             * writes since the layer holding the SQLSTATE was made responsible
+             * for saying whose fault a failure is; this is the auth writes
+             * getting the same treatment.
+             */
+            it("answers a lost duplicate-email race with the 409 the pre-check gives", async () => {
+                // Drizzle wraps the pg error, so the SQLSTATE sits on `cause`.
+                const wrapped = Object.assign(new Error("insert failed"), {
+                    cause: Object.assign(new Error("duplicate key value violates unique constraint"), {
+                        code: "23505",
+                        constraint: "users_email_lower_key"
+                    })
+                });
+                mockInsertReturning.mockRejectedValueOnce(wrapped);
+
+                await expect(userService.createUser({ email: "racer@example.com" })).rejects.toMatchObject({
+                    statusCode: 409,
+                    code: "EMAIL_EXISTS"
+                });
+            });
+
+            it("lets every other database failure through unchanged", async () => {
+                // A dropped connection is not the caller's fault and must not
+                // be dressed up as one — 42501 is an RLS refusal, 08006 a
+                // connection failure, and neither means "email taken".
+                const wrapped = Object.assign(new Error("insert failed"), {
+                    cause: Object.assign(new Error("connection terminated"), { code: "08006" })
+                });
+                mockInsertReturning.mockRejectedValueOnce(wrapped);
+
+                await expect(userService.createUser({ email: "someone@example.com" }))
+                    .rejects.toThrow(/insert failed/);
+            });
+
             it("clears the RLS GUCs inside a transaction before the insert", async () => {
                 mockInsertReturning.mockResolvedValueOnce([{ id: "user-123", email: "test@example.com" }]);
 

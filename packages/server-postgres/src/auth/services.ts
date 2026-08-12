@@ -22,10 +22,12 @@ import {
     PaginatedUsersResult,
     MfaFactor,
     MfaChallengeInfo,
-    RoleData as Role
+    RoleData as Role,
+    ApiError
 } from "@rebasepro/server";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
 import { escapeLikePattern } from "../utils/drizzle-conditions";
+import { extractPgError } from "../utils/pg-error-utils";
 
 export type { Role };
 
@@ -249,12 +251,31 @@ export class UserService implements UserRepository {
         return payload;
     }
 
+    /**
+     * @see UserRepository.createUser — an email already in use is a 409.
+     *
+     * The route checks first and answers 409; this is the same answer for the
+     * requests that get past the check, which two clicks on a signup button
+     * are enough to produce. `PersistService` has mapped `23505` to a conflict
+     * for collection writes since the layer that holds the SQLSTATE was made
+     * responsible for saying whose fault a failure is; the auth writes never
+     * got the same treatment and reached the client as "Internal Server Error".
+     */
     async createUser(data: CreateUserData): Promise<UserData> {
         const payload = this.mapPayload(data);
-        const [row] = await this.withServerContext(async (db) =>
-            (await db.insert(this.usersTable).values(payload).returning()) as Record<string, unknown>[]
-        );
-        return this.mapRowToUser(row);
+        try {
+            const [row] = await this.withServerContext(async (db) =>
+                (await db.insert(this.usersTable).values(payload).returning()) as Record<string, unknown>[]
+            );
+            return this.mapRowToUser(row);
+        } catch (error) {
+            // Drizzle wraps the pg error, so the SQLSTATE is down the `cause`
+            // chain rather than on the error itself.
+            if (extractPgError(error)?.code === "23505") {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            throw error;
+        }
     }
 
     async getUserById(id: string): Promise<UserData | null> {

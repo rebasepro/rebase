@@ -20,7 +20,8 @@ import {
     ListUsersOptions,
     PaginatedUsersResult,
     MfaFactor,
-    MfaChallengeInfo
+    MfaChallengeInfo,
+    ApiError
 } from "@rebasepro/server";
 
 export type Role = RoleData;
@@ -77,7 +78,19 @@ export class MongoUserService implements UserRepository {
             createdAt: now,
             updatedAt: now
         };
-        await this.collection.insertOne(doc);
+        try {
+            await this.collection.insertOne(doc);
+        } catch (error) {
+            // 11000 is Mongo's duplicate key, and the unique index on `email`
+            // in `ensure-collections.ts` is what raises it. Same answer as
+            // Postgres gives for its 23505, and the same answer the route
+            // gives when its pre-check sees the row — see
+            // `UserRepository.createUser`.
+            if ((error as { code?: number })?.code === 11000) {
+                throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
+            }
+            throw error;
+        }
         return toUser(doc);
     }
 
