@@ -43,6 +43,7 @@ function assertAllowedOutboundUrl
 function assertCollectionConfigs
 function assertDistinctSuffixes
 function assertEmailLinkBases
+function assertWriteRequestValid
 function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }

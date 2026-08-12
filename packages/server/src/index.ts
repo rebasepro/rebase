@@ -146,6 +146,10 @@ export type {
 // =============================================================================
 export * from "./api/types";
 export * from "./api/errors";
+// The one exception to "route builder stays internal": the sockets in the
+// driver packages are the other request boundary, and this is the rule they
+// have to apply to be that boundary rather than a way around it.
+export { assertWriteRequestValid } from "./api/rest/write-validation";
 
 // =============================================================================
 // Email

@@ -7,7 +7,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, ApiError } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -320,6 +320,20 @@ roles: verifiedUser.roles }
                     }
                 }
 
+                /**
+                 * Apply the REST layer's write checks to a socket payload.
+                 *
+                 * Silent when the path names no registered collection: the
+                 * driver decides what a path means, and refusing here would
+                 * turn "unknown collection" into a validation error.
+                 */
+                const assertWriteRequest = (path: string | undefined, values: unknown): void => {
+                    if (!path || !values || typeof values !== "object") return;
+                    const collection = driver.registry?.getCollectionByPath(path);
+                    if (!collection) return;
+                    assertWriteRequestValid(values as Record<string, unknown>, collection);
+                };
+
                 // Helper to get correctly scoped delegate for the current request
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
@@ -404,6 +418,18 @@ roles: verifiedUser.roles }
                         const request: SaveProps = payload;
                         wsDebug("💾 [WebSocket Server] Saving row with request:", inspect(request, { depth: null,
 colors: true }));
+                        // The same two checks the REST write routes run, on the
+                        // same input, at the same point. This socket is the
+                        // other request boundary — the comment on `requireAuth`
+                        // above says so — and it used to hand the client's
+                        // payload straight to the driver, so a value the HTTP
+                        // API answers 400 for was written when it arrived here.
+                        //
+                        // The collection comes from the registry by path, never
+                        // from `request.collection`: that field is client-
+                        // supplied, and reading the rules out of it would let
+                        // the caller choose which rules to be checked against.
+                        assertWriteRequest(request.path, request.values as Record<string, unknown>);
                         const delegate = await getScopedDelegate();
                         const row = await delegate.save(request);
                         wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(row, { depth: null,
@@ -738,6 +764,23 @@ roles: ["anon"] };
                         requestId,
                         payload: { error: { message: error.message,
 code: "INVALID_LIMIT" } }
+                    }));
+                    return;
+                }
+                // A refused write is the caller's mistake, and its message is
+                // the only thing that says what to send instead — the same
+                // reasoning as `ListLimitError` above. Left to the generic
+                // branch it becomes INTERNAL_ERROR with the text dropped in
+                // production, so the socket would refuse the write and decline
+                // to say why.
+                if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
+                    const apiError = error as ApiError;
+                    logger.warn(`[WebSocket Server] Refused a write: ${apiError.message}`);
+                    ws.send(JSON.stringify({
+                        type: "ERROR",
+                        requestId,
+                        payload: { error: { message: apiError.message,
+code: apiError.code } }
                     }));
                     return;
                 }
