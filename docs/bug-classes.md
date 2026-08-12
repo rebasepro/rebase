@@ -2281,3 +2281,53 @@ author's typo blames the caller for someone else's mistake — the runtime comme
 was right about that. What was missing was anyone telling the author, so the
 check went where this repo already puts config defects with no runtime signal:
 `validate-config.ts`, at boot, fatal. The lenient branch stays, pointing at it.
+
+---
+
+## 40. Check-then-act where the backstop exists but its failure is untranslated
+
+The textbook version of this class is a missing guarantee: two callers read
+"no such row", both write, and the uniqueness the check promised is gone. Swept
+for that here — registration, MFA enrolment, magic links, identity linking, cron
+claims, idempotency keys — and the guarantee held every time. Every check has a
+unique index, an `ON CONFLICT`, an upsert or a claim row behind it, and where
+one did not the repair is already in the history.
+
+What was missing is one layer further out: **what the loser is told**. A check
+that exists at all exists because the answer matters to the caller — and the
+race path returned a different answer from the sequential path for the same
+situation.
+
+`POST /auth/register` reads `getUserByEmail` and answers `409 EMAIL_EXISTS`.
+Two clicks on a signup button are two concurrent POSTs; both complete that read
+before either insert, and the loser's insert raises 23505 on Postgres or E11000
+on Mongo. Neither `createUser` mapped it, so it reached the central handler
+unclassified and came back **500 "Internal Server Error"** — the person who
+double-clicked is told the server is broken rather than that they already have
+an account, and the operator goes looking for a fault that is not there.
+
+Note what is *not* wrong: no deployment ever gets two accounts on one address.
+The data is right and the report is wrong, which is why this survives review —
+reading the check finds nothing, reading the index finds nothing, and the defect
+only appears when you ask what the second caller receives.
+
+**Sweep:** find each check that gates a write, then find the constraint behind
+it, then ask **what the constraint's violation turns into**. Three answers and
+only one is right:
+
+| the write | the loser gets | verdict |
+|---|---|---|
+| unmapped insert | 500 from an unclassified driver error | the defect |
+| `ON CONFLICT DO NOTHING` / upsert | success, idempotently | right where repeating is a no-op — `linkUserIdentity` on both engines |
+| mapped violation | the same 4xx the sequential path gives | right where the caller must know — `createUser`, and `PersistService` for collection writes |
+
+**Watch for:** the difference between those last two being a *decision*. Linking
+an identity twice is the same request twice, so the second may quietly succeed.
+Registering an email twice is not, so the second must be told. A driver that
+picks one of the two by accident is picking a product answer in an insert
+statement.
+
+**Watch for, too:** the pair. Both engines had the same hole because each was
+written from its own habit rather than from a stated rule — the third time that
+shape has produced a finding in this document (`delete`, the filter operators,
+this). The rule now sits on `UserRepository.createUser`, where both can read it.
