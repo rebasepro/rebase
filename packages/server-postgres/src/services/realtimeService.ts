@@ -2296,8 +2296,15 @@ lastSeen: Date.now() });
     private async connectListenClient(): Promise<void> {
         if (!this.listenConnectionString) return;
 
+        let pending: PgClient | undefined;
         try {
+            // See `PgNotifyListener.connect` — same shape, same reason. Until
+            // `this.listenClient` is assigned, nothing else in this class knows
+            // the connection exists, so a throw between `connect()` and that
+            // assignment leaks a live backend and `scheduleReconnect` opens
+            // another one three seconds later.
             const client = new PgClient({ connectionString: this.listenConnectionString });
+            pending = client;
 
             client.on("error", (err) => {
                 logger.error("❌ [RealtimeService] LISTEN client error", { detail: err.message });
@@ -2365,9 +2372,14 @@ lastSeen: Date.now() });
             await client.connect();
             await client.query(`LISTEN ${PG_NOTIFY_CHANNEL}`);
             this.listenClient = client;
+            // Adopted: `destroy()` and `scheduleReconnect` close it now.
+            pending = undefined;
 
             this.debugLog(`📡 [RealtimeService] LISTEN client connected on channel "${PG_NOTIFY_CHANNEL}"`);
         } catch (err) {
+            if (pending) {
+                try { await pending.end(); } catch { /* already dead */ }
+            }
             logger.error("❌ [RealtimeService] Failed to connect LISTEN client", { error: err });
             this.scheduleReconnect();
         }
