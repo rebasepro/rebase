@@ -237,6 +237,23 @@ export interface CollectionSubscriptionConfig {
     clientId: string;
     path: string;
     filter?: unknown;
+    /**
+     * An `or(...)`/`and(...)` group, applied alongside `filter`.
+     *
+     * Declared here because a subscription is a query, and every field a query
+     * has this one needs too. It was missing, so the type-checked boundary
+     * dropped it: the client sent the group, nothing rejected it, and the
+     * subscription re-fetched with the group gone — pushing every row the
+     * caller's policies allowed rather than the ones they asked for. The same
+     * defect `FetchCollectionProps.logical` documents, one layer up.
+     */
+    logical?: LogicalCondition;
+    /**
+     * Where the subscription's page starts. Missing for the same reason, with
+     * a quieter symptom: a subscriber watching page two was pushed page one,
+     * and a `collection_update` frame carries no window for it to notice with.
+     */
+    offset?: number;
     orderBy?: string;
     order?: "desc" | "asc";
     limit?: number;

@@ -29,6 +29,22 @@ export interface SubscriptionAuthContext {
     roles: string[];
 }
 
+/**
+ * The query half of a subscription config — everything except who is watching.
+ *
+ * Spread into the re-fetch rather than re-listed field by field. Re-listing is
+ * how `logical` and `offset` went missing twice on this path: the type declares
+ * them, every boundary accepted them, and each hand-written list quietly named
+ * a subset. A function that removes the two non-query fields cannot fall behind
+ * the type the way a list of the other nine can.
+ */
+const queryOf = <T extends { clientId: string; authContext?: SubscriptionAuthContext }>(
+    config: T
+): Omit<T, "clientId" | "authContext"> => {
+    const { clientId: _clientId, authContext: _authContext, ...query } = config;
+    return query;
+};
+
 interface Subscription {
     type: "collection" | "single";
     /**
@@ -206,15 +222,14 @@ export class MongoRealtimeService implements RealtimeProvider {
             // against the anonymous uid, and a rule that needs a real one
             // matches nothing.
             const driver = await this.scopedDriver(config.authContext);
+            // The stored config forwarded whole. Re-listing its fields here is
+            // how `logical` and `offset` went missing a second time, one layer
+            // below where they went missing the first time: the subscription
+            // carried them and the re-fetch did not ask for them.
             const rows = await driver.fetchCollection({
-                path: config.path,
-                collection: registryCollection,
+                ...queryOf(config),
                 filter: config.filter as FilterValues<string> | undefined,
-                orderBy: config.orderBy,
-                order: config.order,
-                limit: config.limit,
-                startAfter: config.startAfter,
-                searchString: config.searchString
+                collection: registryCollection
             });
 
             if (callback && canDeliver()) {
@@ -493,11 +508,20 @@ roles: (_authContext.roles ?? []).map(String) } : undefined;
                         clientId,
                         path: message.payload?.path,
                         filter: message.payload?.filter,
+                        // `logical` and `offset` were absent from this list, so
+                        // an `or(...)` subscription was pushed every row the
+                        // caller's policies allowed and a subscription to page
+                        // two was pushed page one. The client has been sending
+                        // both since it stopped stringifying `offset` into
+                        // `startAfter`; nothing here read them.
+                        logical: message.payload?.logical,
+                        offset: message.payload?.offset,
                         orderBy: message.payload?.orderBy,
                         order: message.payload?.order,
                         limit: boundedLimit,
                         startAfter: message.payload?.startAfter,
                         searchString: message.payload?.searchString,
+                        searchExplain: message.payload?.searchExplain,
                         authContext
                     },
                     (rows) => {
