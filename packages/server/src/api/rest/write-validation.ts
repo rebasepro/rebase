@@ -365,3 +365,36 @@ export function projectResponseFields<T extends Record<string, unknown>>(
         return projected as T;
     });
 }
+
+/**
+ * Both write checks, as one call, for a transport that is not the REST router.
+ *
+ * The REST routes run `assertKnownWriteFields` and `assertWriteValuesValid`
+ * back to back on the caller's body, seven times over — and they were the only
+ * place either ran. The WebSocket `SAVE` handler took a client payload straight
+ * to `driver.save`, so the same write arrived validated through one door and
+ * unvalidated through the other: `PATCH /api/data/users/1 { age: 999 }` was a
+ * 400, and the socket wrote it.
+ *
+ * Exported for the sockets in `@rebasepro/server-postgres` and
+ * `@rebasepro/server-mongo`, which are the other request boundaries. Not the
+ * route builder — `index.ts` keeps that internal, and this is a rule rather
+ * than wiring.
+ *
+ * It stays at the boundary rather than moving into the driver deliberately: it
+ * validates what a *caller sent*, before `beforeSave` gets a chance to fill in
+ * or rewrite anything. In-process writes through `rebase.data` are trusted
+ * server code and are not run through it, which is the placement the REST layer
+ * already chose.
+ *
+ * @param values     the caller's payload, exactly as it arrived
+ * @param collection resolved from the registry by path — never the copy the
+ *                   client sent, or the rules would be the caller's to pick
+ */
+export function assertWriteRequestValid(
+    values: Record<string, unknown>,
+    collection: CollectionConfig
+): void {
+    assertKnownWriteFields(values, collection);
+    assertWriteValuesValid(values, collection);
+}

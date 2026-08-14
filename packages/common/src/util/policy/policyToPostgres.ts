@@ -192,9 +192,62 @@ function schemaOf(collection?: CollectionConfig): string | undefined {
 function resolveColumnName(propName: string, collection?: CollectionConfig): string {
     const prop = collection?.properties?.[propName] as Property | undefined;
     if (prop && "columnName" in prop && typeof (prop as { columnName?: unknown }).columnName === "string") {
-        return (prop as { columnName: string }).columnName;
+        return quoteColumnIdentifier((prop as { columnName: string }).columnName);
     }
-    return toSnakeCase(propName);
+    return quoteColumnIdentifier(toSnakeCase(propName));
+}
+
+/**
+ * Every PostgreSQL keyword that cannot stand as a bare column reference.
+ * Appendix C's two reserved categories — plain "reserved", and "reserved (can
+ * be function or type name)" — since neither may name a column unquoted.
+ */
+const RESERVED_SQL_WORDS = new Set([
+    "all", "analyse", "analyze", "and", "any", "array", "as", "asc", "asymmetric", "authorization",
+    "binary", "both", "case", "cast", "check", "collate", "collation", "column", "concurrently",
+    "constraint", "create", "cross", "current_catalog", "current_date", "current_role",
+    "current_schema", "current_time", "current_timestamp", "current_user", "default", "deferrable",
+    "desc", "distinct", "do", "else", "end", "except", "false", "fetch", "for", "foreign", "freeze",
+    "from", "full", "grant", "group", "having", "ilike", "in", "initially", "inner", "intersect",
+    "into", "is", "isnull", "join", "lateral", "leading", "left", "like", "limit", "localtime",
+    "localtimestamp", "natural", "not", "notnull", "null", "offset", "on", "only", "or", "order",
+    "outer", "overlaps", "placing", "primary", "references", "returning", "right", "select",
+    "session_user", "similar", "some", "symmetric", "system_user", "table", "tablesample", "then",
+    "to", "trailing", "true", "union", "unique", "user", "using", "variadic", "verbose", "when",
+    "where", "window", "with"
+]);
+
+/** An identifier Postgres reads back unchanged without quotes. */
+const BARE_IDENTIFIER = /^[a-z_][a-z0-9_$]*$/;
+
+/**
+ * Quote a column reference when Postgres would not read the bare name as that
+ * column — and only then.
+ *
+ * Three ways a bare name goes wrong, in ascending order of how long it takes to
+ * notice:
+ *
+ * - **Case.** `columnName` is used verbatim, and `rebase schema introspect`
+ *   populates it from a live database, so a legacy `"createdAt"` column arrives
+ *   spelled exactly that way. Unquoted, Postgres folds it to `createdat` and
+ *   `CREATE POLICY` fails with "column does not exist" — the collection keeps
+ *   RLS enabled with no policy, which denies every row.
+ * - **Syntax.** A column named `order` or `default` is a syntax error mid-clause.
+ * - **Silent rebinding.** `user`, `current_user`, `session_user`, `current_date`
+ *   and friends are *valid bare expressions*, so the policy compiles, applies,
+ *   and is reported as a success — while comparing against the connected role
+ *   or the wall clock instead of the column. Under RLS every request runs as the
+ *   same `rebase_user` role, so `USING (user = rebase.uid())` is a constant: it
+ *   denies everything, and its negation admits everything.
+ *
+ * Only the names that need it are quoted, so an ordinary snake_case policy body
+ * is emitted byte-for-byte as before. That keeps generated artifacts and the
+ * policies already stored in shipped databases stable — this fix reaches the
+ * clauses that were broken and no others.
+ */
+function quoteColumnIdentifier(name: string): string {
+    if (BARE_IDENTIFIER.test(name) && !RESERVED_SQL_WORDS.has(name)) return name;
+    return `"${name.replace(/"/g, "\"\"")}"`;
 }
 
 function quoteLiteral(value: string | number | boolean | null): string {

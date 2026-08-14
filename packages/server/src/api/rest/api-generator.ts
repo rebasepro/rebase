@@ -314,7 +314,7 @@ export class RestApiGenerator {
                     },
                     queryOptions.include
                 )
-                : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
+                : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString, searchExplain);
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
@@ -1138,7 +1138,7 @@ id: parsed.id });
     /**
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string) {
+    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string, searchExplain?: boolean) {
         const entities = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
@@ -1148,9 +1148,21 @@ id: parsed.id });
             // group exactly as the Postgres path did.
             logical: queryOptions.logical,
             limit: queryOptions.limit,
+            // The whole sort, not just its first key: forwarding
+            // `orderBy[0].field` alone silently dropped every tie-breaker on
+            // the driver-agnostic path, so a two-key sort asked for over HTTP
+            // came back ordered by one of them.
             orderBy: orderByEntriesToTuples(queryOptions.orderBy),
-            startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
+            // `?offset=` is a row count. It used to be stringified into
+            // `startAfter`, which is a cursor *row* — so the driver was handed
+            // "20" where it expected a keyset value and the offset it does
+            // understand never arrived. Every page served page one, while the
+            // `meta` block this route returns reported the offset that was
+            // asked for and computed `hasMore` from it. The same mistake was
+            // fixed on the client; this is the server half.
+            offset: queryOptions.offset,
             searchString,
+            searchExplain,
             vectorSearch: queryOptions.vectorSearch
         });
 
@@ -1166,9 +1178,14 @@ id: parsed.id });
             collection,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set
-            // of rows from the one that was served.
+            // of rows from the one that was served. `vectorSearch` was the
+            // parameter still missing from that list: its `threshold` drops
+            // rows on the fetch path, so a similarity-filtered listing reported
+            // the size of the plain-filtered set and `hasMore` stayed true
+            // across pages that came back empty.
             logical: queryOptions.logical,
-            searchString
+            searchString,
+            vectorSearch: queryOptions.vectorSearch
         }) : 0;
     }
 

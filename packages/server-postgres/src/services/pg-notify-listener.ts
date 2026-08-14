@@ -84,8 +84,16 @@ export class PgNotifyListener {
 
     private async connect({ initial = false }: { initial?: boolean } = {}): Promise<void> {
         const { connectionString, channel, onPayload, logLabel } = this.options;
+        // Held here rather than only inside the `try` so the failure path can
+        // still reach it: everything below `connect()` can throw, and until
+        // `this.client` is assigned nothing else in this class knows the
+        // connection exists. Left unreleased it stays open on the server while
+        // `scheduleReconnect` opens another — one leaked backend per attempt,
+        // every few seconds, for as long as the failure lasts.
+        let pending: PgClient | undefined;
         try {
             const client = new PgClient({ connectionString });
+            pending = client;
 
             client.on("error", (err) => {
                 logger.error(`❌ ${logLabel} LISTEN client error`, { detail: err.message });
@@ -111,8 +119,14 @@ export class PgNotifyListener {
             await client.connect();
             await client.query(`LISTEN ${channel}`);
             this.client = client;
+            // Adopted: `stop()` and `scheduleReconnect` will close it now.
+            pending = undefined;
             logger.debug(`📡 ${logLabel} Listening on channel "${channel}".`);
         } catch (err) {
+            // Never adopted, so nothing else will ever close it.
+            if (pending) {
+                try { await pending.end(); } catch { /* already dead */ }
+            }
             // Surface the initial failure so callers can choose to fall back;
             // for reconnects, keep retrying quietly in the background.
             if (initial) throw err;

@@ -99,6 +99,42 @@ type StoredCollectionRequest = {
 type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
 
 /**
+ * A registered subscription, plus the two counters that order its deliveries.
+ *
+ * Every update a subscription delivers is a full re-fetch, and more than one
+ * thing starts one for the same subscription without coordinating: the initial
+ * fetch at subscribe time, and a debounced refetch per notification (app
+ * mutation, cross-instance NOTIFY, or CDC). A fetch that started earlier can
+ * finish later, and the delivery replaces everything the subscriber has — so
+ * the subscriber goes back to the state before the change and stays there,
+ * silently, until the next write to that collection.
+ *
+ * The debounce is not a fix for this. It collapses a burst into one refetch and
+ * does nothing about two refetches that overlap: notification A fires its timer
+ * and starts fetch A, notification B arrives while A is still in flight, and B's
+ * timer fires and starts fetch B regardless. See class 44 in
+ * `docs/bug-classes.md`.
+ *
+ * `started` is taken before the work, `delivered` after it — which makes the
+ * last delivery *started* the last one *delivered*.
+ */
+type Subscription = {
+    clientId: string;
+    type: "collection" | "single";
+    path: string;
+    id?: string | number;
+    // Store full collection request parameters for proper refetching
+    collectionRequest?: StoredCollectionRequest;
+    // Auth context for RLS — when set, refetches run in a transaction
+    // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
+    authContext?: SubscriptionAuthContext;
+    /** How many deliveries have been started for this subscription. */
+    started: number;
+    /** The highest started-sequence that has already reached the subscriber. */
+    delivered: number;
+};
+
+/**
  * PostgreSQL-specific realtime service.
  * Handles WebSocket connections and subscriptions for real-time row updates.
  *
@@ -195,17 +231,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private static readonly PRESENCE_SWEEP_INTERVAL_MS = 10000; // 10s
     private dataService: DataService;
     // Enhanced subscriptions storage with full request parameters
-    private _subscriptions = new Map<string, {
-        clientId: string;
-        type: "collection" | "single";
-        path: string;
-        id?: string | number;
-        // Store full collection request parameters for proper refetching
-        collectionRequest?: StoredCollectionRequest;
-        // Auth context for RLS — when set, refetches run in a transaction
-        // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
-        authContext?: SubscriptionAuthContext;
-    }>();
+    private _subscriptions = new Map<string, Subscription>();
 
     // Add callback storage for DataDriver subscriptions
     private subscriptionCallbacks = new Map<string, (data: Record<string, unknown>[] | Record<string, unknown> | null) => void>();
@@ -279,6 +305,34 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         return this._subscriptions;
     }
 
+    /**
+     * Claim a delivery slot for a subscription, before doing the work.
+     *
+     * Returns the check to run immediately before delivering. It refuses in
+     * three cases, all of which used to deliver:
+     *
+     * - **Out of order.** A newer refetch has already delivered, so this one is
+     *   stale — the subscriber would go back to the state before the change.
+     * - **Unsubscribed.** The subscription was cancelled while the fetch was in
+     *   flight. The `has(subscriptionId)` check the debounced refetches ran
+     *   *before* the await cannot answer this; only a check after it can.
+     * - **Replaced.** The same id can name a *different* subscription by the
+     *   time a fetch lands — a re-subscribe overwrites the map entry, and the
+     *   old filter's rows would be delivered to the new subscriber.
+     *
+     * The last two are identity, not presence: the map has to still hold *this
+     * exact object*, not merely something under this id.
+     */
+    private beginDelivery(subscriptionId: string, subscription: Subscription): () => boolean {
+        const seq = ++subscription.started;
+        return () => {
+            if (this._subscriptions.get(subscriptionId) !== subscription) return false;
+            if (seq <= subscription.delivered) return false;
+            subscription.delivered = seq;
+            return true;
+        };
+    }
+
     // Add public method to register DataDriver subscriptions
     registerDataDriverSubscription(subscriptionId: string, subscription: {
         clientId: string;
@@ -289,7 +343,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         authContext?: SubscriptionAuthContext;
     }) {
         this.debugLog("📋 [RealtimeService] Registering DataDriver subscription:", subscriptionId, subscription.authContext ? "(with auth)" : "(no auth)");
-        this._subscriptions.set(subscriptionId, subscription);
+        this._subscriptions.set(subscriptionId, { ...subscription, started: 0, delivered: 0 });
     }
 
     // Add callback management methods
@@ -328,7 +382,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 databaseId: config.databaseId,
                 searchString: config.searchString,
                 searchExplain: config.searchExplain
-            }
+            },
+            started: 0,
+            delivered: 0
         });
 
         if (callback) {
@@ -348,7 +404,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             clientId: config.clientId,
             type: "single",
             path: config.path,
-            id: config.id
+            id: config.id,
+            started: 0,
+            delivered: 0
         });
 
         if (callback) {
@@ -524,7 +582,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
             // Store subscription with full request parameters and auth context for RLS
-            this._subscriptions.set(subscriptionId, {
+            const subscription: Subscription = {
                 clientId,
                 type: "collection",
                 path: request.path,
@@ -540,19 +598,30 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     searchString: request.searchString,
                     searchExplain: request.searchExplain
                 },
-                authContext
-            });
+                authContext,
+                started: 0,
+                delivered: 0
+            };
+            this._subscriptions.set(subscriptionId, subscription);
+
+            // The subscription is registered before this fetch runs, so a write
+            // arriving in that window starts a refetch of its own — with nothing
+            // ordering the two. Claim a slot first: this fetch is the oldest, so
+            // if the refetch answers first, this one no longer delivers.
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
 
             // Send initial data. Built from the request the subscription just
             // stored, so the first answer and every refetch after it cannot
             // describe different queries.
             const rows = await this.fetchCollectionWithAuth(
                 request.path,
-                this._subscriptions.get(subscriptionId)!.collectionRequest!,
+                subscription.collectionRequest!,
                 authContext
             );
 
-            this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path);
+            if (canDeliver()) {
+                this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path);
+            }
 
         } catch (error) {
             const sanitized = sanitizeErrorForClient(error, request.path);
@@ -575,13 +644,21 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
 
             // Store subscription in memory with auth context for RLS
-            this._subscriptions.set(subscriptionId, {
+            const subscription: Subscription = {
                 clientId,
                 type: "single",
                 path: request.path,
                 id: request.id,
-                authContext
-            });
+                authContext,
+                started: 0,
+                delivered: 0
+            };
+            this._subscriptions.set(subscriptionId, subscription);
+
+            // Same race as the collection case: a write landing between the
+            // registration above and this fetch starts a refetch that can answer
+            // first, and this one must not overwrite it afterwards.
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
 
             // Send initial data
             const row = await this.fetchEntityWithAuth(
@@ -590,7 +667,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 authContext
             );
 
-            this.sendSingleUpdate(clientId, subscriptionId, row || null);
+            if (canDeliver()) {
+                this.sendSingleUpdate(clientId, subscriptionId, row || null);
+            }
 
         } catch (error) {
             const sanitized = sanitizeErrorForClient(error, request.path);
@@ -773,7 +852,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedCollectionRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { clientId: string; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
+        subscription: Subscription
     ) {
         const timerKey = `ws_${subscriptionId}`;
         const existing = this.refetchTimers.get(timerKey);
@@ -781,11 +860,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         this.refetchTimers.set(timerKey, setTimeout(async () => {
             this.refetchTimers.delete(timerKey);
-            // Verify subscription still exists (client may have disconnected)
-            if (!this._subscriptions.has(subscriptionId)) return;
+            // Cheap bail before spending a query: the client may have
+            // disconnected, or re-subscribed under the same id. It is only an
+            // optimisation — `canDeliver()` after the await is what makes the
+            // delivery safe, because the same things can happen *during* it.
+            if (this._subscriptions.get(subscriptionId) !== subscription) return;
+            // Claimed here rather than when the timer was scheduled: the
+            // debounce coalesces, and no work exists to order until it fires.
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
             try {
                 const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
-                this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath);
+                if (canDeliver()) {
+                    this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath);
+                }
             } catch (error) {
                 const sanitized = sanitizeErrorForClient(error, notifyPath);
                 this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
@@ -799,7 +886,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedDriverRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext },
+        subscription: Subscription,
         callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
     ) {
         const timerKey = `drv_${subscriptionId}`;
@@ -808,10 +895,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         this.refetchTimers.set(timerKey, setTimeout(async () => {
             this.refetchTimers.delete(timerKey);
-            if (!this._subscriptions.has(subscriptionId)) return;
+            if (this._subscriptions.get(subscriptionId) !== subscription) return;
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
             try {
                 const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
-                callback(rows);
+                if (canDeliver()) callback(rows);
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}`, { error: error });
             }
@@ -976,7 +1064,7 @@ roles: activeAuth.roles },
         subscriptionId: string,
         notifyPath: string,
         id: string,
-        subscription: { clientId: string; authContext?: SubscriptionAuthContext }
+        subscription: Subscription
     ) {
         const timerKey = `wse_${subscriptionId}`;
         const existing = this.refetchTimers.get(timerKey);
@@ -984,10 +1072,13 @@ roles: activeAuth.roles },
 
         this.refetchTimers.set(timerKey, setTimeout(async () => {
             this.refetchTimers.delete(timerKey);
-            if (!this._subscriptions.has(subscriptionId)) return;
+            if (this._subscriptions.get(subscriptionId) !== subscription) return;
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
             try {
                 const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
-                this.sendSingleUpdate(subscription.clientId, subscriptionId, row || null);
+                if (canDeliver()) {
+                    this.sendSingleUpdate(subscription.clientId, subscriptionId, row || null);
+                }
             } catch (error) {
                 const sanitized = sanitizeErrorForClient(error, notifyPath);
                 this.sendError(subscription.clientId, sanitized.message, subscriptionId, sanitized.code);
@@ -1002,7 +1093,7 @@ roles: activeAuth.roles },
         subscriptionId: string,
         notifyPath: string,
         id: string,
-        subscription: { clientId: string; authContext?: SubscriptionAuthContext },
+        subscription: Subscription,
         callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
     ) {
         const timerKey = `drve_${subscriptionId}`;
@@ -1011,10 +1102,11 @@ roles: activeAuth.roles },
 
         this.refetchTimers.set(timerKey, setTimeout(async () => {
             this.refetchTimers.delete(timerKey);
-            if (!this._subscriptions.has(subscriptionId)) return;
+            if (this._subscriptions.get(subscriptionId) !== subscription) return;
+            const canDeliver = this.beginDelivery(subscriptionId, subscription);
             try {
                 const row = await this.fetchEntityWithAuth(notifyPath, id, subscription.authContext);
-                callback(row || null);
+                if (canDeliver()) callback(row || null);
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced row driver refetch for ${subscriptionId}`, { error: error });
             }
@@ -2312,8 +2404,15 @@ lastSeen: Date.now() });
     private async connectListenClient(): Promise<void> {
         if (!this.listenConnectionString) return;
 
+        let pending: PgClient | undefined;
         try {
+            // See `PgNotifyListener.connect` — same shape, same reason. Until
+            // `this.listenClient` is assigned, nothing else in this class knows
+            // the connection exists, so a throw between `connect()` and that
+            // assignment leaks a live backend and `scheduleReconnect` opens
+            // another one three seconds later.
             const client = new PgClient({ connectionString: this.listenConnectionString });
+            pending = client;
 
             client.on("error", (err) => {
                 logger.error("❌ [RealtimeService] LISTEN client error", { detail: err.message });
@@ -2381,9 +2480,14 @@ lastSeen: Date.now() });
             await client.connect();
             await client.query(`LISTEN ${PG_NOTIFY_CHANNEL}`);
             this.listenClient = client;
+            // Adopted: `destroy()` and `scheduleReconnect` close it now.
+            pending = undefined;
 
             this.debugLog(`📡 [RealtimeService] LISTEN client connected on channel "${PG_NOTIFY_CHANNEL}"`);
         } catch (err) {
+            if (pending) {
+                try { await pending.end(); } catch { /* already dead */ }
+            }
             logger.error("❌ [RealtimeService] Failed to connect LISTEN client", { error: err });
             this.scheduleReconnect();
         }

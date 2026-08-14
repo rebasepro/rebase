@@ -217,8 +217,8 @@ function canonicalKeyOrBadRequest(key: string): string {
  * The bucket's counterpart to {@link canonicalKeyOrBadRequest}, and it exists
  * for the same reason: the value routes a write, so it has to be checked where
  * it enters rather than where it is used. Applied at every entry point a bucket
- * has — this route's multipart body, the `?bucket=` query, and the TUS
- * `Upload-Metadata` header.
+ * has — this route's multipart body, the folder route's JSON body, the
+ * `?bucket=` query, and the TUS `Upload-Metadata` header.
  */
 function canonicalBucketOrBadRequest(bucket: string | undefined | null): string | undefined {
     try {
@@ -562,7 +562,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         if (resolved.getType() === "local") {
             const localController = resolved as LocalStorageController;
 
-            const absolutePath = localController.getAbsolutePath(resolvedPath, bucket);
+            const absolutePath = localController.getAbsolutePath(resolvedPath, bucket ?? "default");
 
             // Check if file exists
             try {
@@ -763,13 +763,28 @@ message: "No file to delete" });
         }
 
         const resolved = resolveController(storageId);
-        const { bucket, resolvedPath } = parseBucketAndPath(folderPath);
+        const { resolvedPath } = parseBucketAndPath(folderPath);
+
+        // The documented `bucket` body field, read for the first time.
+        //
+        // The docblock above has always said `Body: { path, bucket? }`, and the
+        // handler never looked at it: it took whatever `parseBucketAndPath`
+        // returned, which is `"default"` for every input that is not literally
+        // prefixed `default/`. So `POST /folder { path: "reports", bucket:
+        // "media" }` answered 201 and created the folder in the default bucket
+        // — the parameter was accepted, ignored, and the call reported success.
+        //
+        // `canonicalBucketOrBadRequest`'s own comment lists the entry points a
+        // bucket has — "this route's multipart body, the `?bucket=` query, and
+        // the TUS `Upload-Metadata` header". This body was the fourth, missing
+        // from the list and from the code.
+        const bucket = canonicalBucketOrBadRequest(typeof body.bucket === "string" ? body.bucket : undefined);
 
         if (!resolvedPath || resolvedPath.trim() === "") {
             throw ApiError.badRequest("Invalid folder path");
         }
 
-        await checkAuthorized(c, "write", resolvedPath, bucket, storageId);
+        await checkAuthorized(c, "write", resolvedPath, bucket ?? "default", storageId);
 
         if (resolved.getType() === "local") {
             // For local storage, create the directory
@@ -780,9 +795,12 @@ message: "No file to delete" });
             // For S3/GCS-compatible storage, create a zero-byte marker object with trailing slash
             const key = resolvedPath.endsWith("/") ? resolvedPath : resolvedPath + "/";
             const emptyFile = new File([], key, { type: "application/x-directory" });
+            // Threaded through, like every other write in this file: the marker
+            // has to land in the bucket the hook above was asked about.
             await resolved.putObject({
                 file: emptyFile,
-                key
+                key,
+                bucket
             });
         }
 

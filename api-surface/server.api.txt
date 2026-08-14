@@ -43,6 +43,7 @@ function assertAllowedOutboundUrl
 function assertCollectionConfigs
 function assertDistinctSuffixes
 function assertEmailLinkBases
+function assertWriteRequestValid
 function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }
@@ -161,7 +162,7 @@ interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storag
 interface BundleSchema { enums, relations, tables }
 interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
-interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchExplain, searchString, startAfter }
+interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConfigProblem { message, path, severity }
 interface ContractRoutesConfig { collectionRegistry, runtimeVersion, schemaVersion }

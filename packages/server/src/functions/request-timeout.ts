@@ -16,9 +16,20 @@ export function resolveFunctionsTimeoutMs(configured?: number): number {
     if (typeof configured === "number" && Number.isFinite(configured)) {
         return Math.max(0, Math.floor(configured));
     }
-    const fromEnv = Number(process.env.REBASE_FUNCTIONS_TIMEOUT_MS);
-    if (Number.isFinite(fromEnv) && fromEnv >= 0) {
-        return Math.floor(fromEnv);
+    // Blank means unset, not zero. `Number("")` and `Number(" ")` are both 0,
+    // and 0 here means "no ceiling" — so a compose file with
+    // `REBASE_FUNCTIONS_TIMEOUT_MS=${SOMETHING}` and `SOMETHING` undefined, or
+    // a `.env` line with the name and no value, silently switched off the one
+    // bound on how long code the framework did not write may hold a socket.
+    // Declaring a variable without setting it is the ordinary way to write
+    // both of those files, and the failure is invisible: nothing logs, and the
+    // deployment behaves exactly as it did before the ceiling existed.
+    const raw = process.env.REBASE_FUNCTIONS_TIMEOUT_MS?.trim();
+    if (raw) {
+        const fromEnv = Number(raw);
+        if (Number.isFinite(fromEnv) && fromEnv >= 0) {
+            return Math.floor(fromEnv);
+        }
     }
     return DEFAULT_FUNCTIONS_TIMEOUT_MS;
 }
