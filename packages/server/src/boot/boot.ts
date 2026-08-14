@@ -349,7 +349,12 @@ at: staticApp.path });
                 frontendPath: staticApp.dir,
                 basePath: staticApp.path,
                 apiBasePath: env.REBASE_BASE_PATH,
-                excludePaths: ["/health", "/livez", "/metrics", ...siblings],
+                // `/.well-known` among them: the JWKS is mounted at the root,
+                // so the "/"-rooted app's catch-all would otherwise answer a
+                // verifier's fetch with index.html — a 200 of HTML, which
+                // reads as "this issuer has no keys" rather than as a routing
+                // mistake.
+                excludePaths: ["/health", "/livez", "/metrics", "/.well-known", ...siblings],
                 spa: staticApp.spa
             });
         }

@@ -41,7 +41,9 @@ import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
-import { configureJwt, requireAdmin } from "./auth";
+import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
+import { createJwksRoutes } from "./auth/jwks-routes";
+import type { JwtSigningKeyConfig } from "./auth/jwt-keys";
 import {
     BackendStorageConfig,
     createStorageRoutes,
@@ -88,6 +90,22 @@ export interface RebaseAuthConfig {
      */
     collection?: AnyCollectionConfig;
     jwtSecret?: string;
+    /**
+     * Asymmetric keys for signing access tokens, newest first. Additive —
+     * without them tokens stay HS256, exactly as before. With them, anyone can
+     * verify a session from `/.well-known/jwks.json` without holding the key
+     * that mints one, and a key can be rotated without signing users out.
+     *
+     * ```ts
+     * auth: {
+     *   jwtSecret: process.env.JWT_SECRET,
+     *   signingKeys: [{ kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY! }]
+     * }
+     * ```
+     */
+    signingKeys?: JwtSigningKeyConfig[];
+    /** Which of {@link signingKeys} mints new tokens. Defaults to the first. */
+    activeKid?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
     requireAuth?: boolean;
@@ -898,7 +916,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 configureJwt({
                     secret: safeAuthConfig.jwtSecret,
                     accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
-                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d"
+                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d",
+                    signingKeys: safeAuthConfig.signingKeys,
+                    activeKid: safeAuthConfig.activeKid
                 });
             }
 
@@ -1117,6 +1137,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 config.app.route(`${basePath}/admin`, adminRoutes);
                 logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
+        }
+    }
+
+    // ── JWKS ─────────────────────────────────────────────────────────────
+    // At the root, not under `basePath`: `/.well-known/` is where verifiers
+    // look. Mounted whenever this backend mints its own tokens, and answering
+    // an empty key set when none are asymmetric — "this issuer publishes no
+    // public keys" is a fact a verifier can act on, where a 404 is
+    // indistinguishable from a wrong URL.
+    if (isJwtConfigured()) {
+        config.app.route("/.well-known", createJwksRoutes());
+        if (hasAsymmetricSigningKey()) {
+            logger.info("Access tokens are signed asymmetrically; public keys at /.well-known/jwks.json");
         }
     }
 

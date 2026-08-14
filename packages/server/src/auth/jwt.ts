@@ -6,11 +6,37 @@ import { logger } from "../utils/logger";
 // token is minted with and the value a request is checked against must come
 // from one function, not from two copies of one rule.
 import { canonicalStorageId } from "../storage/keys";
+import {
+    resolveSigningKeys,
+    resolveVerificationKey,
+    toJwks,
+    type JwtSigningKeyConfig,
+    type PublicJwk,
+    type ResolvedJwtKey
+} from "./jwt-keys";
 
 export interface JwtConfig {
     secret: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
+    /**
+     * Asymmetric keys for signing **access tokens**, newest first.
+     *
+     * Optional and additive: with none configured everything below behaves
+     * exactly as it did, signing HS256 with {@link JwtConfig.secret}. With one
+     * configured, access tokens are signed by {@link JwtConfig.activeKid} (or
+     * the first entry) and carry its `kid`, and every key in the list keeps
+     * verifying — which is what makes rotation a deploy rather than a mass
+     * sign-out. Tokens minted before any key existed carry no `kid` and are
+     * still verified against the secret until they expire.
+     *
+     * The secret stays required regardless: purpose-scoped tokens (download,
+     * MFA-pending, password reset) are read only by this server, and are
+     * shorter and cheaper symmetric. See `jwt-keys.ts`.
+     */
+    signingKeys?: JwtSigningKeyConfig[];
+    /** Which key signs. Defaults to the first entry of {@link JwtConfig.signingKeys}. */
+    activeKid?: string;
 }
 
 export interface AccessTokenPayload {
@@ -58,6 +84,16 @@ let jwtConfig: JwtConfig = {
 };
 
 /**
+ * The parsed signing keys, and which one mints new access tokens.
+ *
+ * Both are module state beside `jwtConfig` for the same reason it is: every
+ * signing and verifying path in the server reads them through this file, and
+ * there is exactly one JWT configuration per process.
+ */
+let signingKeys: ResolvedJwtKey[] = [];
+let activeSigningKey: ResolvedJwtKey | null = null;
+
+/**
  * Configure JWT settings - call this during initialization.
  * Validates the secret strength to prevent deployment with default/weak secrets.
  */
@@ -99,10 +135,48 @@ export function configureJwt(config: JwtConfig): void {
         );
     }
 
+    // Resolved before `jwtConfig` is replaced, so a malformed key leaves the
+    // previous configuration standing rather than half-applying a new one.
+    const resolved = config.signingKeys ? resolveSigningKeys(config.signingKeys) : [];
+    let active: ResolvedJwtKey | null = null;
+    if (resolved.length > 0) {
+        if (config.activeKid) {
+            active = resolved.find((key) => key.kid === config.activeKid) ?? null;
+            if (!active) {
+                throw new Error(
+                    `auth.activeKid is "${config.activeKid}", which is not among the configured signing keys ` +
+                    `(${resolved.map((k) => `"${k.kid}"`).join(", ")}). Signing with a key nobody published ` +
+                    "produces tokens no verifier can check."
+                );
+            }
+        } else {
+            active = resolved[0];
+        }
+    }
+
     jwtConfig = {
         ...jwtConfig,
         ...config
     };
+    signingKeys = resolved;
+    activeSigningKey = active;
+}
+
+/**
+ * The public keys, in JWKS form, for `/.well-known/jwks.json`.
+ *
+ * An empty `keys` array on a backend with no asymmetric keys configured is the
+ * correct answer rather than a 404: it says "this issuer publishes none",
+ * which a verifier can act on, where a 404 is indistinguishable from a
+ * misconfigured URL.
+ */
+export function getJwks(): { keys: PublicJwk[] } {
+    return toJwks(signingKeys);
+}
+
+/** Is this backend signing access tokens asymmetrically? */
+export function hasAsymmetricSigningKey(): boolean {
+    return activeSigningKey !== null;
 }
 
 /**
@@ -145,6 +219,17 @@ export function generateAccessToken(
         ...customClaims,
         aal
     };
+
+    // The `kid` is what lets a verifier pick the right public key out of the
+    // JWKS, and what lets the previous key keep working while tokens signed by
+    // it are still in circulation.
+    if (activeSigningKey) {
+        return jwt.sign(payload, activeSigningKey.privateKey, {
+            expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
+            algorithm: activeSigningKey.algorithm,
+            keyid: activeSigningKey.kid
+        });
+    }
 
     return jwt.sign(payload, jwtConfig.secret, {
         expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
@@ -203,10 +288,29 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     }
 
     try {
+        // Which key, and therefore which algorithm, is decided here — by the
+        // `kid` and by nothing else in the token.
+        //
+        // The alternative, passing every algorithm we support and letting
+        // `jsonwebtoken` read `alg` from the header, is the canonical JWT
+        // vulnerability: an attacker takes the RSA public key we publish at
+        // `/.well-known/jwks.json`, HMACs a payload of their choosing with it,
+        // sets `alg: HS256`, and the verifier — holding that same public key as
+        // "the secret" — agrees. Any uid, any roles. So a token naming a key we
+        // hold is verified with that key's algorithm alone, and a token naming
+        // none never reaches the asymmetric path at all.
+        const header = jwt.decode(token, { complete: true })?.header;
+        const namedKey = resolveVerificationKey(signingKeys, header?.kid);
+
         // `userId` is the pre-rename claim: tokens minted by an older backend
         // are still in circulation and must keep verifying until they expire,
-        // or a deploy signs every active session out.
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
+        // or a deploy signs every active session out. A token with a `kid` we
+        // do not recognise falls through to the secret and fails there, which
+        // is what a retired key should do.
+        const decoded = (namedKey
+            ? jwt.verify(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
+            : jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] })
+        ) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;

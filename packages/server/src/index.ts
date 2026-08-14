@@ -118,9 +118,19 @@ export {
     isOperationAllowed,
     // Constant-time compare for static secrets — drivers checking a service key
     // must not fall back to ===.
-    safeCompare
+    safeCompare,
+    // The public keys that verify this issuer's access tokens, and the route
+    // that serves them. Exported because a custom server builds its own Hono
+    // app, and would otherwise have no way to publish a JWKS.
+    getJwks,
+    hasAsymmetricSigningKey,
+    createJwksRoutes
 } from "./auth";
 export type {
+    // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.
+    JwtSigningKeyConfig,
+    JwtSigningAlgorithm,
+    PublicJwk,
     AccessTokenPayload,
     PasswordValidationResult,
     AuthHooks,
