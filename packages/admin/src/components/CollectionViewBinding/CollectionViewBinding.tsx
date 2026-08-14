@@ -1407,6 +1407,13 @@ export function EntitiesCount({
         });
 
         return () => { cancelled = true; };
+        // `filterKey` and `sortKey` ARE `filter` and `sortBy` — the memoized
+        // serializations a few lines up, and the only stable identity either
+        // has. Both arrive as freshly built objects on every render, so
+        // depending on them directly would re-run this effect each time and
+        // fire a count request per render. The keys change exactly when the
+        // values do, which is the condition this effect actually wants.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [path, filterKey, sortKey, searchString]);
 
     // Count is now displayed in the breadcrumb bar, this component only fetches and reports
