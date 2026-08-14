@@ -1161,6 +1161,7 @@ relatedTo: hop });
             logical?: LogicalCondition;
             searchString?: string;
             databaseId?: string;
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<number> {
         // Same narrowing as the listing — and, unlike the count it replaces,
@@ -1195,6 +1196,17 @@ relatedTo: hop });
                 options.logical, table, effectivePath, this.filterContext(effectivePath, table)
             );
             if (logicalCondition) allConditions.push(logicalCondition);
+        }
+
+        // A `threshold` genuinely narrows the row set on the fetch path, and
+        // this count did not apply it — so a similarity-filtered listing
+        // reported the size of the *unfiltered* set, and `hasMore` stayed true
+        // over pages that were already empty. Only the threshold matters here:
+        // the ORDER BY and the `_distance` projection change which rows come
+        // first and what rides along with them, not how many there are.
+        if (options.vectorSearch?.threshold != null) {
+            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
+            if (vectorMeta.filter) allConditions.push(vectorMeta.filter);
         }
 
         if (allConditions.length > 0) {

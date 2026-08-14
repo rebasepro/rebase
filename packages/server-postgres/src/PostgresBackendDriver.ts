@@ -1188,16 +1188,20 @@ export class PostgresBackendDriver implements DataDriver {
                                                                collection,
                                                                filter,
                                                                logical,
-                                                               searchString
+                                                               searchString,
+                                                               vectorSearch
                                                            }: FetchCollectionProps<M>): Promise<number> {
         return this.dataService.count(
             path,
             {
                 filter,
                 // Counted as well as filtered, or `meta.total` describes a
-                // different set of rows from the `data` beside it.
+                // different set of rows from the `data` beside it. The same
+                // held for a `vectorSearch` carrying a `threshold`: it narrows
+                // the fetch, so it has to narrow the count.
                 logical,
-                searchString
+                searchString,
+                vectorSearch
             }
         );
     }

@@ -1169,9 +1169,14 @@ id: parsed.id });
             collection,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set
-            // of rows from the one that was served.
+            // of rows from the one that was served. `vectorSearch` was the
+            // parameter still missing from that list: its `threshold` drops
+            // rows on the fetch path, so a similarity-filtered listing reported
+            // the size of the plain-filtered set and `hasMore` stayed true
+            // across pages that came back empty.
             logical: queryOptions.logical,
-            searchString
+            searchString,
+            vectorSearch: queryOptions.vectorSearch
         }) : 0;
     }
 
