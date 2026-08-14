@@ -315,7 +315,7 @@ export class RestApiGenerator {
                     },
                     queryOptions.include
                 )
-                : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString);
+                : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString, searchExplain);
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
@@ -1140,7 +1140,7 @@ id: parsed.id });
     /**
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string) {
+    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string, searchExplain?: boolean) {
         const entities = await driver.fetchCollection({
             path: getCollectionDataPath(collection),
             collection,
@@ -1152,8 +1152,16 @@ id: parsed.id });
             limit: queryOptions.limit,
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
-            startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
+            // `?offset=` is a row count. It used to be stringified into
+            // `startAfter`, which is a cursor *row* — so the driver was handed
+            // "20" where it expected a keyset value and the offset it does
+            // understand never arrived. Every page served page one, while the
+            // `meta` block this route returns reported the offset that was
+            // asked for and computed `hasMore` from it. The same mistake was
+            // fixed on the client; this is the server half.
+            offset: queryOptions.offset,
             searchString,
+            searchExplain,
             vectorSearch: queryOptions.vectorSearch
         });
 

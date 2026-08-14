@@ -1814,6 +1814,58 @@ accessors and gone back to `data.collection(slug)`, which is how three of these
 survived a year. When the only user of a generated artifact routes around it,
 that is the finding.
 
+### Last sweep — 2026-08-12, the generator that emits SQL
+
+The 2026-08-08 sweep classified interpolations in the files that emit
+*TypeScript*. Two surfaces were not on that list, and both were broken.
+
+| checked | result |
+|---|---|
+| `policyToPostgres` — identifiers into SQL | **BUG** — `quoteLiteral` for the value side, nothing for the identifier side. |
+| `wrapSql` — SQL into a TypeScript file | **BUG** — no escaping at all at the boundary between the two languages. |
+| `search-column.ts` | clean — every column reference is `"${...}"`, every literal goes through `quote()`. |
+| `ensure-collection-policies.ts` | clean — schema and table quoted, the two values it interpolates single-quote-escaped. |
+
+The SQL one is worth stating precisely, because "it will fail loudly" is the
+assumption that let it stand. Three outcomes, and only the first two announce
+themselves:
+
+- `"createdAt"` folds to `createdat`, `CREATE POLICY` errors, and the collection
+  keeps RLS on with no policy — deny-all. `columnName` is used verbatim and
+  `rebase schema introspect` writes it from the live database, so this is simply
+  what a camelCase table adopted from an existing project does.
+- `order`, `default`, `end` are syntax errors mid-clause.
+- `user`, `current_user`, `session_user`, `current_date` are **valid bare
+  expressions**. The policy compiles, applies, and is logged as applied, while
+  comparing against the connected role or the wall clock. Under RLS every request
+  runs as the same `rebase_user`, so the clause is a constant: it denies
+  everyone, and its negation admits everyone.
+
+That third row is the reason a name position in SQL is not a milder version of a
+name position in TypeScript. A broken identifier in generated TypeScript does not
+compile. A broken identifier in generated SQL can be a *different valid
+expression* — the language has bare keywords that evaluate.
+
+The TypeScript one is the same class read the other way: correct SQL becomes
+wrong SQL by being written into a `.ts` file. Drizzle's `sql` tag reads the
+cooked template strings, not `.raw`, so JavaScript eats the escapes first, and
+`email ~ '^admin\\.user@corp\\.com$'` reaches the database as
+`^admin.user@corp.com$` — every `\\.` now matching any character. The `.sql`
+file emitted from the same rule keeps its backslashes. Two generators, one rule,
+two different security boundaries, and the divergence is always permissive.
+
+**Add to the sweep:** the tell generalises past `${` in a template. Ask, for every
+value crossing a language boundary, *which* language's rules it is about to be
+read under. Both bugs are one value read by two languages with different opinions
+about one character.
+
+A note on the fix, which is not obvious: quote only what needs quoting. Always
+quoting is simpler and would have rewritten every policy body in every generated
+artifact and every shipped database, to reach the handful that were broken. That
+trade is worse than the bug. Policy *names* hash the rule rather than the SQL, so
+the narrow fix renames nothing and manufactures no orphans — worth checking
+before choosing, because if names had hashed the text the choice would reverse.
+
 ---
 
 ## 36. A mechanism nothing enforces
@@ -2376,3 +2428,113 @@ implemented twice, after `delete`, the filter operators and `createUser`. The
 sweep that found it is worth keeping: take the interface, list the methods both
 drivers implement, and diff the refusals each can raise. Two engines answering
 one question differently is the contract being written twice.
+
+---
+
+## 42. A second door into the same operation
+
+A capability that can be reached two ways gets its checks written on the way
+that was built first. The other way keeps working — it authenticates, it scopes,
+it writes — and is missing whichever rules live in the first door's *route*
+rather than in the thing both of them call.
+
+`assertKnownWriteFields` and `assertWriteValuesValid` were called from
+`api-generator.ts` and nowhere else. The WebSocket `SAVE` handler took the
+client's payload straight to `driver.save`, so
+`PATCH /api/data/users/1 { age: 999 }` was a 400 naming the rule and the same
+write over the socket was stored. Everything else about that path was enforced —
+auth, an RLS-scoped delegate, the driver's own column check — which is what
+makes it hard to see: the door is not open, it is missing one lock.
+
+The socket's own `requireAuth` comment had already named the problem after the
+previous divergence: *"this socket is the other enforcement point for one
+product decision, and while it computed the answer itself it computed a
+different one."* The same sentence applies to the next decision along.
+
+**Sweep:** list what a request passes through on the primary path, in order,
+and then walk every other entry point asking which of those it repeats. For
+this codebase the doors are the REST router, the two WebSocket servers, the
+in-process `rebase.data`, and the auth adapter's own writes. A check that lives
+in the route is a check only that route has.
+
+**Watch for:** where the shared rule should live. Moving these into the driver
+would have covered every door at once and changed what a `beforeSave` callback
+means — the driver validates after callbacks, the route validates before, and
+in-process writes are trusted server code the REST layer deliberately does not
+validate. So the rule went to the boundary each door owns, as one exported
+function, rather than to the funnel underneath them.
+
+**Watch for, too:** the payload that carries its own rules. `SaveProps` has a
+`collection` field and it is client-supplied — validating against *that* would
+let a caller send an empty properties map and choose to be unvalidated. The
+collection has to come from the registry, by path. There is a test for it,
+because the mistake is invisible: everything works, and nothing is enforced.
+
+---
+
+## 43. Acquired, then lost before anything could release it
+
+A resource is created, connected, and only then stored in the field that the
+rest of the class cleans up. Everything between those two moments can throw, and
+if it does, nothing knows the resource exists: `stop()` closes the field, the
+reconnect timer closes the field, and the field is still undefined.
+
+Both LISTEN clients had it. `connect()` resolved — the socket was open — and the
+`LISTEN` statement was what failed, which is the case that makes this reachable
+rather than theoretical: a revoked privilege, a transaction-mode pooler
+refusing session state, a channel the server will not take. The reconnect timer
+then opened another connection three seconds later, and the failure repeated,
+one stranded backend per attempt, until the database stopped accepting them —
+surfacing somewhere else entirely as an exhausted pool.
+
+**Sweep:** `grep -rnE "await .*\.connect\(\)|= await open\(|\.acquire\(\)"` and
+for each, ask what closes it *on the path that threw*. A `finally` answers it; a
+release at the end of the happy path does not; and a release keyed on a field
+that is assigned after the risky work is the trap — it reads like cleanup and
+covers nothing.
+
+**Watch for:** the handover. The fix is a local that holds the resource until
+the field adopts it, cleared on success so the failure path cannot close a
+connection the class now owns. Both halves matter: without the clear, a
+successful start closes its own listener.
+
+
+---
+
+## 44. Concurrent refreshes of one view, delivered in whatever order they finish
+
+A subscription's update is a *re-fetch*: something happens, the server reads the
+current state and hands the client the whole answer. As soon as more than one
+thing can start a re-fetch, two are in flight at once — and the one that started
+first can finish last. The callback replaces everything the client has, so the
+client goes back to the state before the change and stays there, silently, until
+something else touches that collection.
+
+The MongoDB realtime service had three independent starters for one
+subscription: the initial fetch at subscribe time, the change stream, and
+`notifyUpdate` after a save. The initial fetch is the reliable way in, because it
+is dispatched fire-and-forget and the change handler is registered *after* it —
+so any write in that window produces two fetches with nothing ordering them.
+
+Two neighbours fall out of the same missing check, and they are worth naming
+separately because they read as different bugs:
+
+- **Cancelled.** The subscription is gone by the time the fetch lands, and the
+  callback belongs to a client that stopped listening. A `has(id)` check before
+  the await does not answer this; only one after it does.
+- **Replaced.** `subscribeToCollection` unsubscribes before re-registering, so
+  one id can name a *different* subscription by the time an old fetch returns —
+  and the previous filter's rows are delivered to the new subscriber.
+
+**Sweep:** find every callback invoked after an await, and ask what guarantees
+it is still the newest answer *and* still wanted. A sequence number taken before
+the await and checked after it answers all three at once. Synchronous deliveries
+have to claim a slot too: a `delete` notification carries no fetch, but it is the
+newest fact about the row, so it must be able to close the door on a re-fetch
+still in flight rather than be overwritten by one.
+
+**Watch for:** a debounce read as a fix. It collapses a burst into one refetch
+and does nothing about two refetches that overlap — the Postgres realtime service
+debounces per subscription and still races, and it re-checks the subscription map
+before the await rather than after. Debouncing changes how often the race is
+reachable, not whether it is.

@@ -176,18 +176,13 @@ propertyCallbacks: undefined };
      * what every re-fetch reads — the wrapper used to stamp the field on the
      * `Subscription` object instead, and nothing has ever read that one.
      */
-    listenCollection<M extends Record<string, any>>({
-        path,
-        collection,
-        filter,
-        limit,
-        startAfter,
-        orderBy,
-        searchString,
-        order,
-        onUpdate,
-        onError
-    }: ListenCollectionProps<M>, authContext?: { uid: string; roles: string[] }): () => void {
+    listenCollection<M extends Record<string, any>>(
+        // `collection` is re-resolved from the registry on every re-fetch, and
+        // `vectorSearch` is not a thing a subscription can do — the Postgres
+        // service refuses it outright rather than run it once and never again.
+        { onUpdate, onError, collection, vectorSearch, ...query }: ListenCollectionProps<M>,
+        authContext?: { uid: string; roles: string[] }
+    ): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
         const callback = (rows: Record<string, unknown>[]) => {
@@ -201,19 +196,15 @@ propertyCallbacks: undefined };
             }
         };
 
+        // Forwarded whole rather than re-listed, for the reason `fetchCollection`
+        // gives above: the hand-written list named seven of the eleven fields
+        // `ListenCollectionProps` declares, so `logical` and `offset` were
+        // accepted at every type-checked boundary and then dropped — an
+        // `or(...)` subscription was pushed every row, and a subscription to
+        // page two was pushed page one.
         this.realtimeService.subscribeToCollection(
             subscriptionId,
-            {
-                clientId: "driver",
-                path,
-                filter,
-                orderBy,
-                order,
-                limit,
-                startAfter,
-                searchString,
-                authContext
-            },
+            { clientId: "driver", ...query, authContext },
             callback
         );
 

@@ -251,6 +251,49 @@ description: "Whether more records exist beyond this page" }
 
         const dataPath = `/data/${slug}`;
 
+        // ── GET /data/{slug}/count — How many rows match ──────────────
+        //
+        // Served for every collection since the route existed and described
+        // here for the first time. A spec is what a generated client can see,
+        // so an endpoint missing from it is an endpoint that client does not
+        // have — and this is the one a paginating UI needs to know how many
+        // pages there are.
+        //
+        // Registered before the list path so its literal segment cannot be read
+        // as an `{id}`, which is the same ordering the router uses.
+        paths[`${dataPath}/count`] = {
+            get: {
+                tags: [collection.name],
+                summary: `Count ${collection.name}`,
+                description:
+                    "The number of rows the same filters would return, without returning them. " +
+                    "Takes the filter and search parameters of the list endpoint; `limit`, `offset` " +
+                    "and `orderBy` are not part of the question and are ignored.",
+                operationId: `count${schemaName}`,
+                parameters: [
+                    ...listQueryParameters().filter(p => p.name === "searchString"),
+                    ...buildFilterParameters(collection, reservedParameterNames)
+                ],
+                responses: {
+                    200: {
+                        description: "The number of matching rows",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    required: ["count"],
+                                    properties: {
+                                        count: { type: "integer", description: "Rows matching the filters" }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    ...errorResponses(requireAuth)
+                }
+            }
+        };
+
         // ── GET /data/{slug} — List entities ──────────────────────────
         paths[dataPath] = {
             get: {

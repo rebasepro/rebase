@@ -2,7 +2,7 @@ import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, Save
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, resolveRequireAuth } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth, assertWriteRequestValid, ApiError } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
@@ -216,6 +216,14 @@ roles: verifiedUser.roles } }));
                     }
                 }
 
+                /** @see the Postgres socket — same rule, same reason. */
+                const assertWriteRequest = (path: string | undefined, values: unknown): void => {
+                    if (!path || !values || typeof values !== "object") return;
+                    const collection = driver.registry?.getCollectionByPath(path);
+                    if (!collection) return;
+                    assertWriteRequestValid(values as Record<string, unknown>, collection);
+                };
+
                 const getScopedDelegate = async (): Promise<DataDriver> => {
                     const session = clientSessions.get(clientId);
                     if (session?.user && isDriverWithAuth(driver)) {
@@ -259,6 +267,11 @@ requestId }));
                     }
                     case "SAVE": {
                         const request: SaveProps = payload;
+                        // The REST layer's write checks, at this boundary too —
+                        // the socket is a second way in, and it used to be the
+                        // unchecked one. Collection from the registry by path,
+                        // never from the client's `request.collection`.
+                        assertWriteRequest(request.path, request.values as Record<string, unknown>);
                         const delegate = await getScopedDelegate();
                         const row = await delegate.save(request);
                         ws.send(JSON.stringify({ type: "SAVE_SUCCESS",
@@ -352,6 +365,17 @@ roles: session.user.roles ?? [] } : undefined;
                         logger.error("❌ [WebSocket Server] Unknown message type", { detail: type });
                 }
             } catch (error: unknown) {
+                // A refused write keeps its message: it is the only thing that
+                // tells the caller what to send instead, and the generic branch
+                // below drops it in production.
+                if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
+                    const apiError = error as ApiError;
+                    ws.send(JSON.stringify({ type: "ERROR",
+requestId,
+payload: { error: { message: apiError.message,
+code: apiError.code } } }));
+                    return;
+                }
                 const errorMessage = process.env.NODE_ENV === "production" ? "An unexpected error occurred" : (error instanceof Error ? error.message : "An unexpected error occurred");
                 ws.send(JSON.stringify({ type: "ERROR",
 requestId,
