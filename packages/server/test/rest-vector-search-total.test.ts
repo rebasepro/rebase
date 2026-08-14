@@ -52,10 +52,15 @@ function harness(): { app: Hono; recorded: Recorded } {
     const driver = {
         key: "postgres",
         initialised: true,
-        fetchCollection: async (params: { vectorSearch?: VectorSearchParams; limit?: number; startAfter?: string }) => {
+        fetchCollection: async (params: { vectorSearch?: VectorSearchParams; limit?: number; offset?: number }) => {
             recorded.fetches.push(params);
             const matching = withinThreshold(params.vectorSearch);
-            const offset = params.startAfter ? Number(params.startAfter) : 0;
+            // `?offset=` reaches the driver as `offset`. It used to be
+            // stringified into `startAfter` — a cursor *row* — which is the bug
+            // fixed in "fix(rest): `?offset=` became a cursor value on every
+            // non-Postgres driver". Reading `startAfter` here would page off a
+            // value the route no longer sends, and every page would be page one.
+            const offset = params.offset ?? 0;
             return matching.slice(offset, params.limit ? offset + params.limit : undefined);
         },
         fetchOne: async () => undefined,
