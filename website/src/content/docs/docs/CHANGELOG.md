@@ -7,6 +7,26 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Added
+
+- **A sort is a list of keys, not one key.** `orderBy` accepts `[["category", "asc"], ["created_at", "desc"]]` wherever it accepted `["created_at", "desc"]`, over the SDK, the REST parameter (`?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]`), a WebSocket subscription, and every driver. The second key decides between rows the first calls equal.
+
+  On the fluent builder, `.orderBy()` called twice now **adds a tie-breaker instead of replacing the first key** — the previous behaviour discarded the earlier call, which made a multi-column sort unexpressible. If you were relying on the second call to win, pass the one key you want.
+
+  A bare field name with no direction reads as ascending everywhere. It used to mean DESC on Postgres and ASC on Mongo, so one call described two different queries depending on the database underneath.
+
+- **The admin panel orders by more than one column.** Shift-click a table header to add a column under the sort already there; the header shows each key's rank so a two-arrow header says which one wins. The toolbar's sort menu — now in the table view as well as list and cards — is where a key is re-ranked or removed without rebuilding the sort, and a multi-key sort survives a reload and a shared link.
+
+### Fixed
+
+- **A local-first read disagreed with the server about tied rows.** Every server-side sort ends on `id DESC`, which is what makes the ordering total; the offline overlay re-sorted with an ascending id tiebreak, so two rows sharing a sort value came back from the cache in the opposite order to the network — and `isLocallySortable` reported that page as exactly reproducible while it was not.
+
+- **The Mongo driver's sort was not a total order, and could not name the id at all.** It emitted only the keys the caller gave, so two rows sharing a value were returned in whatever order the engine pleased — free to differ between two runs of the same query, which is what makes `offset` paging repeat and skip rows. It now closes on `_id` descending, as the Postgres driver has always done. `orderBy: ["id", …]` also named a field no document carries — rows leave the driver with `_id` renamed to `id`, so `id` is the only name a caller has — and Mongo answered by ignoring the sort. It maps to `_id` now.
+
+- **Six labels in the admin's sort menu rendered as their own key names.** `sort_then_by`, `sort_move_up`, `sort_move_down`, `sort_remove_key`, `sort_ascending` and `sort_descending` were referenced by the control and declared by none of the seven locale files, and i18next answers an unknown key with the key. All seven locales carry them now, along with `save_entity_before_subcollections`, which had the same defect behind a `?? "…"` fallback that could never fire. A test now checks every literal key the panel renders against the catalogue.
+
+- **A list-view column header said "Sort by <column>" whichever state it was in**, so on a descending column it promised a sort where the click removed one — and it said it in English regardless of the panel's language. It now names the next action, the key's rank, and the shift-click that adds a column rather than replacing the sort.
+
 ## [0.14.0] - 2026-08-12
 
 ### Breaking

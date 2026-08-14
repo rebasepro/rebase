@@ -132,6 +132,17 @@ const unsubscribe = client.data.products
     );
 ```
 
+A subscription takes a multi-column sort like any other query — either
+`orderBy: [["category", "asc"], ["created_at", "desc"]]` in the params, or a
+second `.orderBy()` call, which adds a tie-breaker rather than replacing the
+first. See [Sorting](/docs/sdk/querying#sorting).
+
+The server checks the *shape* of a subscription's `orderBy` on arrival and
+refuses a malformed one with an error frame rather than subscribing. A sort it
+could not read would otherwise stream rows in no order at all while reporting
+nothing wrong — and a `collection_update` frame carries rows and nothing else,
+so a subscriber has no way to notice.
+
 ## Unsubscribing
 
 Every subscription returns an `unsubscribe` function. Call it to stop receiving updates and clean up the WebSocket listener:

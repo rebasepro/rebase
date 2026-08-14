@@ -82,6 +82,18 @@ const unsubscribe = client.data.products.listen(
 
 The server respects these filters — only matching records are included in updates. Filter, sort, limit, offset, and searchString are all supported.
 
+`orderBy` takes a multi-column sort here as anywhere else —
+`orderBy: [["category", "asc"], ["created_at", "desc"]]`, or a second
+`.orderBy()` call on the fluent builder, which adds a tie-breaker rather than
+replacing the first key.
+
+The server validates the *shape* of `orderBy` when the subscribe frame arrives
+and answers a malformed one with an error frame (`INVALID_ORDER_BY`) instead of
+subscribing. This matters more here than on the REST route: a
+`collection_update` frame carries rows and nothing else — no `total`, no
+`hasMore` — so a subscriber handed rows in no particular order has no way to
+learn that its sort was dropped.
+
 ### `listen()` Signature
 
 ```typescript no-verify

@@ -90,9 +90,26 @@ Use the `orderBy` parameter. Two formats are supported:
 ?orderBy=[{"field":"created_at","direction":"desc"},{"field":"name","direction":"asc"}]
 ```
 
+The keys apply in the order given: the second decides between rows the first
+calls equal. `direction` may be omitted and defaults to `asc`.
+
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
 | `orderBy` | string | Sort field and direction | `?orderBy=created_at:desc` |
+
+What an agent has to know before constructing one:
+
+- **A repeated `?orderBy=` is not a multi-key sort.** The last value wins, as
+  for every query parameter. Use the JSON array.
+- **The whole shape is validated.** A bare object (`?orderBy={"field":"name"}`),
+  a bare `["name"]`, a number, or a direction that is not `asc`/`desc` is a
+  **400**, not a 200 with unsorted rows. So is a field the collection does not
+  have (`UNKNOWN_ORDER_BY_FIELD`), and a to-many relation, which has no single
+  value per row to order by (`ORDER_BY_FIELD_NOT_SORTABLE`).
+- **Every sort ends on the row id descending**, whether asked for or not. That
+  is what makes the ordering total; paging with `offset` over an order that is
+  not total repeats some rows and skips others.
+- Both spellings work on nested routes too — `/api/data/authors/:id/posts`.
 
 ### Filtering (PostgREST-Style)
 

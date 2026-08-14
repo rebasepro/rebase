@@ -10,6 +10,7 @@ import {
     ChevronDownIcon,
     ChevronUpIcon,
     cls,
+    defaultBorderMixin,
     iconSize,
     IconButton,
     Popover,
@@ -114,6 +115,12 @@ position });
         applySort(keys.filter(([existing]) => existing !== key));
     }, [applySort, keys]);
 
+    /** What a click on an active key will do to it, for the tooltip and the label. */
+    const flipLabel = useCallback(
+        (direction: "asc" | "desc") => direction === "asc" ? t("sort_descending") : t("sort_ascending"),
+        [t]
+    );
+
     /** Swap a key with its neighbour, which is what changes which one decides. */
     const moveKey = useCallback((position: number, delta: -1 | 1) => {
         const target = position + delta;
@@ -128,11 +135,18 @@ position });
     }
 
     const primary = keys[0];
-    const primaryOption = primary ? options.find(option => option.key === primary[0]) : undefined;
-    const label = primaryOption
+    // The key's own name when it has no option to be titled by — a sort can
+    // outlive the column it names (a property hidden since, a `collection.sort`
+    // on something the panel does not render). Falling back to "Sort" there
+    // showed the neutral icon and the inactive label over a collection that
+    // *was* sorted, which is the one thing this control exists to report.
+    const primaryTitle = primary
+        ? options.find(option => option.key === primary[0])?.title ?? primary[0]
+        : undefined;
+    const label = primaryTitle
         ? keys.length > 1
-            ? `${t("sort_by")}: ${primaryOption.title} +${keys.length - 1}`
-            : `${t("sort_by")}: ${primaryOption.title}`
+            ? `${t("sort_by")}: ${primaryTitle} +${keys.length - 1}`
+            : `${t("sort_by")}: ${primaryTitle}`
         : t("sort");
 
     // Icon only, at every width. The arrow says which way the order runs; which
@@ -152,7 +166,7 @@ position });
             size={"small"}
             aria-label={label}
             title={label}
-            className={cls(primaryOption && "text-primary")}
+            className={cls(primaryTitle && "text-primary")}
         >
             {/* Same icon size as the filter controls it sits between: 16 in the
                 split view's narrow toolbar, 20 everywhere else. It was a flat
@@ -186,7 +200,11 @@ position });
                 </Typography>
 
                 {keys.length > 0 && (
-                    <div className="flex flex-col">
+                    // Bounded for the same reason the option list below is: the
+                    // active keys are as many as the collection has sortable
+                    // columns, and an unbounded column pushed "Clear sort" off
+                    // the bottom of the screen on a wide collection.
+                    <div className="flex flex-col max-h-[200px] overflow-y-auto">
                         {keys.map(([key, direction], position) => {
                             const option = options.find(o => o.key === key);
                             return (
@@ -202,7 +220,8 @@ position });
                                     <button
                                         type="button"
                                         onClick={() => onOptionClick(key)}
-                                        title={direction === "asc" ? t("sort_descending") : t("sort_ascending")}
+                                        title={flipLabel(direction)}
+                                        aria-label={`${option?.title ?? key} — ${t("sort_key_position", { position: position + 1 })}. ${flipLabel(direction)}`}
                                         className="flex items-center gap-2 flex-grow min-w-0 text-left cursor-pointer"
                                     >
                                         {option && (
@@ -217,49 +236,65 @@ position });
                                                 : <ArrowUpIcon size={iconSize.smallest}/>}
                                         </span>
                                     </button>
-                                    {keys.length > 1 && (
-                                        <>
-                                            <IconButton
-                                                size="smallest"
-                                                aria-label={t("sort_move_up")}
-                                                title={t("sort_move_up")}
-                                                disabled={position === 0}
-                                                onClick={() => moveKey(position, -1)}
-                                            >
-                                                <ChevronUpIcon size={iconSize.smallest}/>
-                                            </IconButton>
-                                            <IconButton
-                                                size="smallest"
-                                                aria-label={t("sort_move_down")}
-                                                title={t("sort_move_down")}
-                                                disabled={position === keys.length - 1}
-                                                onClick={() => moveKey(position, 1)}
-                                            >
-                                                <ChevronDownIcon size={iconSize.smallest}/>
-                                            </IconButton>
-                                        </>
-                                    )}
-                                    <IconButton
-                                        size="smallest"
-                                        aria-label={t("sort_remove_key")}
-                                        title={t("sort_remove_key")}
-                                        onClick={() => removeKey(key)}
-                                    >
-                                        <XIcon size={iconSize.smallest}/>
-                                    </IconButton>
+                                    {/* Ruled off from the key itself. The row
+                                        carries two arrows that mean different
+                                        things — the direction this key runs, and
+                                        which key outranks which — and side by
+                                        side at 14px they read as one control
+                                        with a stutter. The rule says where the
+                                        key ends and the controls on it begin. */}
+                                    <div className={cls(
+                                        "flex-shrink-0 flex items-center gap-0.5 ml-1 pl-1 border-l",
+                                        defaultBorderMixin
+                                    )}>
+                                        {keys.length > 1 && (
+                                            <>
+                                                <IconButton
+                                                    size="smallest"
+                                                    aria-label={t("sort_move_up")}
+                                                    title={t("sort_move_up")}
+                                                    disabled={position === 0}
+                                                    onClick={() => moveKey(position, -1)}
+                                                >
+                                                    <ChevronUpIcon size={iconSize.smallest}/>
+                                                </IconButton>
+                                                <IconButton
+                                                    size="smallest"
+                                                    aria-label={t("sort_move_down")}
+                                                    title={t("sort_move_down")}
+                                                    disabled={position === keys.length - 1}
+                                                    onClick={() => moveKey(position, 1)}
+                                                >
+                                                    <ChevronDownIcon size={iconSize.smallest}/>
+                                                </IconButton>
+                                            </>
+                                        )}
+                                        <IconButton
+                                            size="smallest"
+                                            aria-label={t("sort_remove_key")}
+                                            title={t("sort_remove_key")}
+                                            onClick={() => removeKey(key)}
+                                        >
+                                            <XIcon size={iconSize.smallest}/>
+                                        </IconButton>
+                                    </div>
                                 </div>
                             );
                         })}
                     </div>
                 )}
 
-                {inactiveOptions.length > 0 && (
+                {/* Only once there is a key to come *after*. With none, the
+                    "Sort by" heading above already names the list, and an empty
+                    caption here left a band of padding that read as a divider
+                    between two groups where there was only one. */}
+                {keys.length > 0 && inactiveOptions.length > 0 && (
                     <Typography
                         variant="caption"
                         color="secondary"
                         className="font-medium uppercase tracking-wider px-3 pt-2 pb-1"
                     >
-                        {keys.length > 0 ? t("sort_then_by") : ""}
+                        {t("sort_then_by")}
                     </Typography>
                 )}
 
@@ -276,8 +311,14 @@ position });
                             <button
                                 key={key}
                                 type="button"
-                                role="menuitemradio"
-                                aria-checked={false}
+                                // Not `menuitemradio`: a sort is a *list* of
+                                // keys, so picking one does not unpick another,
+                                // and the role announced the opposite. There is
+                                // no `role="menu"` around this either, which
+                                // left the radio orphaned as well as wrong.
+                                aria-label={keys.length > 0
+                                    ? `${t("sort_then_by")} ${title}`
+                                    : `${t("sort_by")} ${title}`}
                                 disabled={disabled}
                                 onClick={() => onOptionClick(key)}
                                 className={cls(

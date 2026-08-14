@@ -198,7 +198,8 @@ The client is not a replica of your database, and it does not pretend to be:
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
-- **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending — but against the client's copy of the rows, which may be stale.
+- **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending and breaks the remaining ties on the row id descending, exactly as the server does — but against the client's copy of the rows, which may be stale.
+- **A sort the client cannot reproduce is not applied.** Ordering text is the server's to do: PostgreSQL sorts it by the *database's* collation, which this process has never been told, and under the C collation `Banana` sorts before `apple` where a JavaScript collator says otherwise. When a sort column cannot be compared numerically the rows keep the order the server sent, and the result is marked `partial` rather than being presented as the sorted page that was asked for. Every key of a multi-column sort has to be reproducible, not just the first — a sort the local side can only agree with down to its second column is one it disagrees with.
 
 ## Recipe: an offline indicator
 

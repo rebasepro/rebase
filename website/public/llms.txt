@@ -3764,6 +3764,29 @@ GET /api/data/products?orderBy=price:desc
 GET /api/data/products?orderBy=name:asc
 ```
 
+A missing direction is `asc`. A direction that is neither `asc` nor `desc`, or a
+field the collection does not have, is a **400** — not a 200 with the rows in
+whatever order the database pleased, which is indistinguishable from a sort that
+worked.
+
+#### Several keys
+
+The shorthand carries one key. For more, pass a JSON array — the second key
+decides between rows the first calls equal:
+
+```bash
+# By category, and newest first within each category
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]
+```
+
+Both spellings reach every route that lists rows, including nested ones
+(`/api/data/authors/:id/posts`). Every sort ends on the row id descending
+whether you asked for it or not: that is what makes the ordering total, and
+paging over an order that is not total repeats and skips rows.
+
+A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
+it does for every other query parameter. Use the array.
+
 ### Pagination
 
 Use `limit` and `offset`, or `page`:
@@ -10544,6 +10567,48 @@ const { data } = await client.data.products
     .find();
 ```
 
+A direction you leave out is `"asc"` — the same thing `?orderBy=name` means over
+HTTP, whichever database is underneath.
+
+#### Sorting by more than one column
+
+A sort is a *list* of keys. The second decides between rows the first calls
+equal, the third between rows the first two do — so `orderBy` takes a list of
+`[field, direction]` pairs as readily as a single one:
+
+```typescript
+// By category, and newest first within each category.
+const { data } = await client.data.products.find({
+    orderBy: [["category", "asc"], ["created_at", "desc"]]
+});
+```
+
+The fluent builder spells the same thing by calling `.orderBy()` again. Each
+call **adds** a key under the ones before it rather than replacing them:
+
+```typescript
+const { data } = await client.data.products
+    .orderBy("category")            // primary
+    .orderBy("created_at", "desc")  // tie-breaker
+    .find();
+```
+
+Every sort ends on the row id, descending, whether you asked for it or not.
+That is what makes the ordering *total*: without it two rows sharing a value are
+returned in whatever order the database pleased, and paging over an order that
+can differ between two runs of the same query repeats some rows and skips
+others.
+
+Two things a multi-column sort cannot be combined with, both refused with a 400
+rather than answered wrongly:
+
+- **`cursor` on `iterate()`/`findAll()`.** Keyset pagination advances with one
+  comparison along one column. Order by the cursor column alone, or page by
+  `offset`.
+- **`_score`** — see [Search](/docs/backend/search). Relevance is computed per
+  query rather than stored, so there is no value on the cursor row to compare
+  the next page against.
+
 ### Aggregates
 
 `count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
@@ -11186,6 +11251,17 @@ const unsubscribe = client.data.products
     );
 ```
 
+A subscription takes a multi-column sort like any other query — either
+`orderBy: [["category", "asc"], ["created_at", "desc"]]` in the params, or a
+second `.orderBy()` call, which adds a tie-breaker rather than replacing the
+first. See [Sorting](/docs/sdk/querying#sorting).
+
+The server checks the *shape* of a subscription's `orderBy` on arrival and
+refuses a malformed one with an error frame rather than subscribing. A sort it
+could not read would otherwise stream rows in no order at all while reporting
+nothing wrong — and a `collection_update` frame carries rows and nothing else,
+so a subscriber has no way to notice.
+
 ### Unsubscribing
 
 Every subscription returns an `unsubscribe` function. Call it to stop receiving updates and clean up the WebSocket listener:
@@ -11605,7 +11681,8 @@ The client is not a replica of your database, and it does not pretend to be:
 - **`searchString` is approximated** as a case-insensitive substring scan over cached string fields. The server runs real full-text search over the collection's configured columns.
 - **`include`d relations cannot be evaluated locally** — the related rows live in collections the query never loaded. Such a query is always marked `partial` when answered from the cache.
 - **Replay is at-least-once.** A write that reaches the server but whose response is lost may be sent again. Prefer idempotent writes (`createMany` with `upsert`) where duplicates would matter.
-- **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending — but against the client's copy of the rows, which may be stale.
+- **Local reads apply Postgres semantics, not the database's data.** Filters are evaluated the way SQL would — comparisons against `NULL` are unknown, `ORDER BY` puts nulls last ascending and breaks the remaining ties on the row id descending, exactly as the server does — but against the client's copy of the rows, which may be stale.
+- **A sort the client cannot reproduce is not applied.** Ordering text is the server's to do: PostgreSQL sorts it by the *database's* collation, which this process has never been told, and under the C collation `Banana` sorts before `apple` where a JavaScript collator says otherwise. When a sort column cannot be compared numerically the rows keep the order the server sent, and the result is marked `partial` rather than being presented as the sorted page that was asked for. Every key of a multi-column sort has to be reproducible, not just the first — a sort the local side can only agree with down to its second column is one it disagrees with.
 
 ### Recipe: an offline indicator
 

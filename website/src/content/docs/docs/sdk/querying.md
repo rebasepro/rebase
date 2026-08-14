@@ -279,6 +279,48 @@ const { data } = await client.data.products
     .find();
 ```
 
+A direction you leave out is `"asc"` — the same thing `?orderBy=name` means over
+HTTP, whichever database is underneath.
+
+### Sorting by more than one column
+
+A sort is a *list* of keys. The second decides between rows the first calls
+equal, the third between rows the first two do — so `orderBy` takes a list of
+`[field, direction]` pairs as readily as a single one:
+
+```typescript
+// By category, and newest first within each category.
+const { data } = await client.data.products.find({
+    orderBy: [["category", "asc"], ["created_at", "desc"]]
+});
+```
+
+The fluent builder spells the same thing by calling `.orderBy()` again. Each
+call **adds** a key under the ones before it rather than replacing them:
+
+```typescript
+const { data } = await client.data.products
+    .orderBy("category")            // primary
+    .orderBy("created_at", "desc")  // tie-breaker
+    .find();
+```
+
+Every sort ends on the row id, descending, whether you asked for it or not.
+That is what makes the ordering *total*: without it two rows sharing a value are
+returned in whatever order the database pleased, and paging over an order that
+can differ between two runs of the same query repeats some rows and skips
+others.
+
+Two things a multi-column sort cannot be combined with, both refused with a 400
+rather than answered wrongly:
+
+- **`cursor` on `iterate()`/`findAll()`.** Keyset pagination advances with one
+  comparison along one column. Order by the cursor column alone, or page by
+  `offset`.
+- **`_score`** — see [Search](/docs/backend/search). Relevance is computed per
+  query rather than stored, so there is no value on the cursor row to compare
+  the next page against.
+
 ## Aggregates
 
 `count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without

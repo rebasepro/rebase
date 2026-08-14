@@ -24,6 +24,7 @@ import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
 import { hasDeclaredDisplay } from "@rebasepro/app";
+import { useTranslation } from "@rebasepro/app";
 import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
@@ -1318,6 +1319,11 @@ function ListHeader({
         />
     );
 
+    // No `role="columnheader"` / `aria-sort` here, tempting as they are: both
+    // are only valid inside a `row` inside a `table`/`grid`, and neither this
+    // header nor the virtualized `ListView` under it declares one. An orphaned
+    // columnheader is worse than none. The sort state and the rank ride on the
+    // header button's `aria-label` instead — see `ListHeaderLabel`.
     return (
         <div className={cls(
             "flex items-center gap-4 px-5 py-1.5 select-none border-b bg-surface-50 dark:bg-surface-900",
@@ -1371,6 +1377,8 @@ function ListHeaderLabel({
     position?: number;
     onSort?: (additive: boolean) => void;
 }) {
+    const { t } = useTranslation();
+
     const content = (
         <>
             <span className="truncate">{column.label}</span>
@@ -1393,10 +1401,26 @@ function ListHeaderLabel({
         return <span className={cls(base, tone)}>{content}</span>;
     }
 
+    // What the *next* click does, which is the only thing a user needs from a
+    // control with three states. This said "Sort by <column>" in every state,
+    // so on a descending column the tooltip promised a sort where the click
+    // removed one — and it said it in English regardless of the panel's
+    // language, alone among the toolbar's sort controls.
+    const nextAction = direction === "asc"
+        ? t("sort_descending")
+        : direction === "desc"
+            ? t("sort_remove")
+            : t("sort_ascending");
+    const rank = direction && position !== undefined
+        ? ` (${t("sort_key_position", { position: position + 1 })})`
+        : "";
+    const label = `${column.label}${rank} — ${nextAction}. ${t("sort_shift_click_hint")}`;
+
     return (
         <button
             type="button"
-            title={`Sort by ${column.label} — shift-click to add it under the current sort`}
+            title={label}
+            aria-label={label}
             onClick={(event) => onSort(event.shiftKey)}
             className={cls(base, tone, "cursor-pointer hover:text-surface-700 dark:hover:text-surface-200 transition-colors")}
         >

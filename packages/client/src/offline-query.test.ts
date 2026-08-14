@@ -158,9 +158,26 @@ describe("local query engine", () => {
             expect(sortRows([...rows], ["n", "desc"]).map((r) => r.id)).toEqual([2, 1, 3]);
         });
 
-        it("breaks ties on id so paging cannot shuffle equal rows between pages", () => {
-            const rows: Row[] = [{ id: "c", n: 1 }, { id: "a", n: 1 }, { id: "b", n: 1 }];
-            expect(sortRows(rows, ["n", "asc"]).map((r) => r.id)).toEqual(["a", "b", "c"]);
+        it("breaks ties on id descending, which is what the server orders by", () => {
+            // Not an arbitrary direction: `FetchService.buildOrderExpressions`
+            // appends `id DESC` to every sort it builds, and the keyset cursor
+            // is written to match it. Ascending here meant the overlay handed
+            // back tied rows in the opposite order to the network answer for
+            // the same query — while `isLocallySortable` reported the page as
+            // exactly reproducible.
+            const rows: Row[] = [{ id: "a", n: 1 }, { id: "c", n: 1 }, { id: "b", n: 1 }];
+            expect(sortRows(rows, ["n", "asc"]).map((r) => r.id)).toEqual(["c", "b", "a"]);
+            expect(sortRows(rows, ["n", "desc"]).map((r) => r.id)).toEqual(["c", "b", "a"]);
+        });
+
+        it("lets a later key decide before the id tiebreak does", () => {
+            const rows: Row[] = [
+                { id: 1, role: "admin", at: 2 },
+                { id: 2, role: "admin", at: 1 },
+                { id: 3, role: "user", at: 9 }
+            ];
+            expect(sortRows(rows, [["role", "asc"], ["at", "desc"]]).map((r) => r.id))
+                .toEqual([1, 2, 3]);
         });
 
         it("orders dates chronologically, not lexicographically", () => {

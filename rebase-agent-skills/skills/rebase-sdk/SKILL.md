@@ -251,6 +251,39 @@ const result = await rebase.data.posts
     .find();
 ```
 
+### Sorting by more than one column
+
+A sort is a list of keys: the second decides between rows the first calls equal.
+Both spellings mean the same query.
+
+```typescript
+// Params: a list of [field, direction] pairs.
+await rebase.data.posts.find({
+    orderBy: [['category', 'asc'], ['created_at', 'desc']],
+});
+
+// Fluent: each call ADDS a key under the ones before it.
+await rebase.data.posts
+    .orderBy('category')             // primary
+    .orderBy('created_at', 'desc')   // tie-breaker
+    .find();
+```
+
+Rules an agent needs before writing one:
+
+- A missing direction is `'asc'`, on every driver.
+- Every sort ends on the row id descending, whether asked for or not — that is
+  what makes the order total, and paging over a non-total order repeats and
+  skips rows. Do not add an id key yourself unless you want a different
+  direction or rank for it.
+- **`cursor` on `iterate()`/`findAll()` cannot be combined with a multi-key
+  sort** — it throws `RebasePaginationError` with code `cursor-order-mismatch`.
+  Keyset pagination advances with one comparison along one column. Order by the
+  cursor column alone, or page by `offset`.
+- `orderBy('_score')` cannot key a cursor either, for the same reason: relevance
+  is computed per query rather than stored.
+- A field the collection does not have is a 400, not a silently unsorted 200.
+
 ### Complex Logical Conditions
 
 Use `or`, `and`, and `cond` helpers for complex filters:
@@ -275,7 +308,7 @@ const result = await rebase.data.posts
 |--------|-------------|
 | `.where(field, op, value)` | Add a filter condition |
 | `.where(logicalCondition)` | Add complex `or`/`and`/`cond` filter |
-| `.orderBy(field, direction?)` | Sort results (`'asc'` or `'desc'`) |
+| `.orderBy(field, direction?)` | Sort results (`'asc'` or `'desc'`, default `'asc'`). Calling it again **adds a tie-breaker** — it does not replace the first key |
 | `.limit(n)` | Limit number of results |
 | `.offset(n)` | Skip first `n` results |
 | `.search(term)` | Text search — substring by default, ranked full-text if the collection opted in |

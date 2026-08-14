@@ -141,15 +141,18 @@ parentEntityIds,
         </Tooltip>
     );
 
-    // Ordering the collection is a click on a column header — which only the
-    // table has. The list and card views showed rows in whatever order the
-    // query returned with no way to change it, so they get the control in the
-    // toolbar instead.
+    // Everywhere a `sortBy` means something — which is every view but the
+    // board, whose columns are ordered by their own order key and which ignores
+    // `sortBy` entirely, so the control would appear to do nothing.
     //
-    // Not the table, where the headers already do this and say which column is
-    // sorted; and not the board, which orders its columns by its own order key
-    // and ignores `sortBy` entirely, so the control would appear to do nothing.
-    const sortButton = resolvedProperties && (viewMode === "list" || viewMode === "cards") && (
+    // Including the table, whose headers were once thought to cover it. They
+    // build a multi-key sort (shift-click) and they show its ranks, but they
+    // cannot *re-rank* it: promoting the third key above the first means
+    // clearing the sort and shift-clicking all three back in the new order.
+    // Nor can they remove a middle key without cycling it through descending
+    // first. This popover is the only place either is one click, and a table
+    // with a three-key sort needs it more than a card grid does, not less.
+    const sortButton = resolvedProperties && viewMode !== "kanban" && (
         <SortButton
             key={"sort_button"}
             tableController={tableController}

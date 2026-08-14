@@ -24,8 +24,13 @@ export function useTranslation() {
      * Also supports i18next interpolation variables, e.g.
      *   t("add_to_field", { fieldName: "Tags" })
      *   t("error_deleting", { message: err.message })
+     *   t("sort_key_position", { position: 2 })
+     *
+     * Numbers are accepted as well as strings: i18next interpolates them
+     * either way, and a signature that took only strings pushed a `String()`
+     * onto every call site with a count in it — `{{count}}`, `{{position}}`.
      */
-    const typedT = useCallback((key: string, vars?: Record<string, string>): string =>
+    const typedT = useCallback((key: string, vars?: Record<string, string | number>): string =>
         t(key, vars) as string, [t]);
 
     return useMemo(() => ({ t: typedT,

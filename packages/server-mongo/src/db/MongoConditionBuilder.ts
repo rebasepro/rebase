@@ -293,11 +293,32 @@ export class MongoConditionBuilder {
     }
 
     /**
+     * The primary key's name in a stored document.
+     *
+     * Rows leave this driver with `_id` renamed to `id` — see
+     * `MongoDataService.documentToRow` — so `id` is the only name a caller ever
+     * sees, and the one the SDK's own examples use for a tie-breaker. A sort
+     * document naming `id` names a field no document has: Mongo does not
+     * complain, it just returns them in natural order, so `.orderBy("id")` read
+     * as "no sort at all" with a 200 to go with it.
+     */
+    private static readonly ID_FIELD = "_id";
+
+    /**
      * Build MongoDB sort options from Rebase options
      *
      * A Mongo sort document is already an ordered map of field to direction, so
      * a multi-key sort is expressed directly: the keys are applied in insertion
      * order, each breaking ties on the one before it.
+     *
+     * The id closes every sort, descending, for the same reason the Postgres
+     * driver appends `id DESC`: it is what makes the ordering *total*. Without
+     * it, two rows sharing a sort value are returned in whatever order the
+     * engine pleases, and that order is free to differ between two executions of
+     * the same query — so paging by `offset` over a non-unique sort column
+     * repeats some rows and skips others. A single-column sort has always had
+     * this exposure here; a multi-key sort merely made it easier to reach, since
+     * the whole point of the later keys is that the earlier ones tie.
      *
      * @param orderBy - Field to order by, or the `[field, direction]` list
      * @param order - Sort direction, for the single-field spelling
@@ -314,7 +335,13 @@ export class MongoConditionBuilder {
         // would sort by, and letting a later duplicate overwrite it would order
         // by a direction the caller listed as less significant.
         for (const [field, direction] of keys) {
-            if (!(field in sort)) sort[field] = direction === "desc" ? -1 : 1;
+            const key = field === "id" ? MongoConditionBuilder.ID_FIELD : field;
+            if (!(key in sort)) sort[key] = direction === "desc" ? -1 : 1;
+        }
+        // Already named by the caller — at whatever direction and rank they
+        // chose — the sort is total and there is nothing left to break.
+        if (!(MongoConditionBuilder.ID_FIELD in sort)) {
+            sort[MongoConditionBuilder.ID_FIELD] = -1;
         }
         return sort;
     }

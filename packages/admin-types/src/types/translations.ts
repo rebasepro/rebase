@@ -65,6 +65,25 @@ export interface RebaseTranslations {
     /** Toolbar control that orders the collection, outside the table view */
     sort: string;
     sort_by: string;
+    /** Heading over the columns a further key can still be added from */
+    sort_then_by: string;
+    /** What the next click does to a key currently running descending */
+    sort_ascending: string;
+    /** …and to one currently running ascending */
+    sort_descending: string;
+    /** …and to one whose next click clears it, which is the third state a header cycles through */
+    sort_remove: string;
+    /** Promote a key over the one above it, which is what changes which key decides */
+    sort_move_up: string;
+    sort_move_down: string;
+    /** Drop one key of a multi-column sort, leaving the rest in place */
+    sort_remove_key: string;
+    /** A key's rank in a multi-column sort. Supports `{{position}}` interpolation, 1-based. */
+    sort_key_position: string;
+    /** How a column is added under the sort already in place, rather than replacing it */
+    sort_shift_click_hint: string;
+    /** Stands in for a subcollection list on an entity that has never been saved */
+    save_entity_before_subcollections: string;
     /** Reset all active filters */
     clear_all: string;
     no_items: string;

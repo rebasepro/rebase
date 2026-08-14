@@ -134,6 +134,29 @@ GET /api/data/products?orderBy=price:desc
 GET /api/data/products?orderBy=name:asc
 ```
 
+A missing direction is `asc`. A direction that is neither `asc` nor `desc`, or a
+field the collection does not have, is a **400** — not a 200 with the rows in
+whatever order the database pleased, which is indistinguishable from a sort that
+worked.
+
+### Several keys
+
+The shorthand carries one key. For more, pass a JSON array — the second key
+decides between rows the first calls equal:
+
+```bash
+# By category, and newest first within each category
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]
+```
+
+Both spellings reach every route that lists rows, including nested ones
+(`/api/data/authors/:id/posts`). Every sort ends on the row id descending
+whether you asked for it or not: that is what makes the ordering total, and
+paging over an order that is not total repeats and skips rows.
+
+A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
+it does for every other query parameter. Use the array.
+
 ## Pagination
 
 Use `limit` and `offset`, or `page`:

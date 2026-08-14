@@ -214,17 +214,48 @@ describe("MongoConditionBuilder", () => {
 
         it("should build ascending sort", () => {
             const result = MongoConditionBuilder.buildSort("name", "asc");
-            expect(result).toEqual({ name: 1 });
+            expect(result).toEqual({ name: 1, _id: -1 });
         });
 
         it("should build descending sort", () => {
             const result = MongoConditionBuilder.buildSort("createdAt", "desc");
-            expect(result).toEqual({ createdAt: -1 });
+            expect(result).toEqual({ createdAt: -1, _id: -1 });
         });
 
         it("should default to ascending when order not specified", () => {
             const result = MongoConditionBuilder.buildSort("name");
-            expect(result).toEqual({ name: 1 });
+            expect(result).toEqual({ name: 1, _id: -1 });
+        });
+
+        it("applies several keys in the order they were given", () => {
+            // Insertion order is Mongo's significance order, so the assertion
+            // has to be about the *sequence* of keys and not only their values.
+            const result = MongoConditionBuilder.buildSort([["role", "asc"], ["created_at", "desc"]]);
+            expect(Object.keys(result!)).toEqual(["role", "created_at", "_id"]);
+            expect(result).toEqual({ role: 1, created_at: -1, _id: -1 });
+        });
+
+        it("closes every sort on the id, so the order is total", () => {
+            // Postgres appends `id DESC` for exactly this reason. Without it two
+            // rows sharing a `role` come back in whatever order the engine
+            // pleases — and free to differ between two runs of the same query,
+            // which is what makes `offset` paging repeat and skip rows.
+            expect(MongoConditionBuilder.buildSort([["role", "asc"]])).toEqual({ role: 1, _id: -1 });
+        });
+
+        it("maps the canonical `id` onto `_id`", () => {
+            // Rows leave this driver with `_id` renamed to `id`, so `id` is the
+            // only name a caller has. Sorting by it named a field no document
+            // carries: Mongo returned natural order and said nothing.
+            expect(MongoConditionBuilder.buildSort("id", "asc")).toEqual({ _id: 1 });
+            expect(MongoConditionBuilder.buildSort([["name", "asc"], ["id", "asc"]]))
+                .toEqual({ name: 1, _id: 1 });
+        });
+
+        it("does not append a second id key when the caller already named one", () => {
+            const result = MongoConditionBuilder.buildSort([["id", "asc"], ["name", "desc"]]);
+            expect(Object.keys(result!)).toEqual(["_id", "name"]);
+            expect(result).toEqual({ _id: 1, name: -1 });
         });
     });
 

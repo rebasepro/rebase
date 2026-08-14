@@ -383,7 +383,12 @@ entityId }
                             openEntityMode={layout} />
                         : <div className="flex items-center justify-center w-full h-full p-3">
                             <Typography variant={"label"}>
-                                {t("save_entity_before_subcollections") ?? "You need to save your entity before adding additional collections"}
+                                {/* No `?? "…"` here: `t` returns the key itself
+                                    when it cannot find one, never null, so the
+                                    fallback never ran and this rendered the raw
+                                    `save_entity_before_subcollections`. The key
+                                    exists now, in all seven locales. */}
+                                {t("save_entity_before_subcollections")}
                             </Typography>
                         </div>)
                 }

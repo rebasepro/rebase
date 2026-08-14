@@ -2573,3 +2573,59 @@ and does nothing about two refetches that overlap — the Postgres realtime serv
 debounces per subscription and still races, and it re-checks the subscription map
 before the await rather than after. Debouncing changes how often the race is
 reachable, not whether it is.
+
+
+---
+
+## 45. A key the renderer answers with its own name
+
+Lookup by string is a contract nothing checks. `t("sort_then_by")` compiles
+whether or not anything declares `sort_then_by`, and i18next answers a key it
+does not know with *the key* — not an error, not empty, not the English. The
+literal string `sort_then_by` is rendered into the interface as if it were a
+translation, and it looks like a translation to every automated check that runs
+over it: the types are satisfied, the component renders, the test asserting the
+element exists passes.
+
+The multi-column sort menu shipped six of them. `sort_then_by`, `sort_move_up`,
+`sort_move_down`, `sort_remove_key`, `sort_ascending` and `sort_descending` were
+referenced by `SortButton.tsx` and declared by none of the seven locale files,
+so the popover's section heading read "sort_then_by" and every tooltip on it
+read like a variable name. Nothing failed. Every one of those keys was on a
+control added in the same change as the feature, which is the pattern: the
+strings that go missing are the *new* ones, because the old ones were added when
+somebody was thinking about the catalogue.
+
+A second shape hides the same defect behind an apology for it:
+
+```tsx
+{t("save_entity_before_subcollections") ?? "You need to save your entity first"}
+```
+
+The `??` never fires — `t` returns the key, which is truthy — so the fallback is
+dead code that reads as a safety net and is the tell that the author was not
+sure the key existed. It did not.
+
+**Sweep:** collect every literal key the source passes to the lookup and check
+it against the catalogue. This is a text scan, not a type: the whole class
+exists because the type is `string`. Ask the same of any other
+lookup-by-string — icon registries, property-config ids, slot names, feature
+flags — and specifically of the ones whose miss returns something *plausible*
+rather than throwing.
+
+**Watch for:** a fallback catalogue that hides the gap one level down. English
+seeds every other locale here, so a key added to `en.ts` alone renders in
+English rather than as an identifier — milder, invisible in an English-language
+review, and 159 instances deep by the time anybody looked. A bare zero was not
+reachable, so that half is a baseline that only shrinks
+(`packages/app/test/translation-keys-baseline.json`), on the same reasoning
+`check-untranslated.mjs` gives for its own: ambient findings make the next one
+invisible.
+
+### Last sweep — 2026-08-15, the admin's translation catalogue
+
+294 literal keys across `packages/app/src` and `packages/admin/src`, against the
+891 `en.ts` declares. Seven missing, all seven fixed: the six sort keys above and
+`save_entity_before_subcollections`. Gated by
+`packages/app/test/translation-keys.test.ts` at zero, so the next one fails on
+the way in.

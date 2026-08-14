@@ -307,6 +307,13 @@ export function matchesParams(row: Record<string, unknown>, params?: FindParams)
  * Sort in place, Postgres-style: nulls last ascending, first descending, with
  * the row id as a tiebreak so paging through an unsorted-but-equal run does
  * not shuffle rows between pages.
+ *
+ * The tiebreak runs *descending*, which is not a taste: every server-side sort
+ * ends on `id DESC` — `FetchService.buildOrderExpressions` appends it to make
+ * the ordering total, and the keyset cursor is built to match. This ran
+ * ascending, so two rows sharing a sort value came back from the local overlay
+ * in the opposite order to the server's, and {@link isLocallySortable} called
+ * that page exactly reproducible while it was not.
  */
 export function sortRows<M extends Record<string, unknown>>(rows: M[], orderBy?: OrderBySpec): M[] {
     const keys = normalizeOrderBy(orderBy);
@@ -345,9 +352,10 @@ function compareOnKey(
     return cmp * (direction === "desc" ? -1 : 1);
 }
 
+/** The last word, and the server's: `id DESC`. */
 function tiebreak(a: Record<string, unknown>, b: Record<string, unknown>): number {
     const cmp = compareValues(a.id, b.id);
-    return cmp ?? 0;
+    return cmp === undefined ? 0 : -cmp;
 }
 
 /**
