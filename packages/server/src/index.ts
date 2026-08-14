@@ -235,6 +235,23 @@ export * from "./services/webhook-service";
 export * from "./services/outbound-url-guard";
 
 // =============================================================================
+// Jobs — the durable queue. Application code both produces (`enqueue`) and
+// consumes (`tasks`, `register`), so the whole surface is public.
+// =============================================================================
+export { createJobQueue, createJobStore, defaultBackoff } from "./jobs";
+export type {
+    JobQueue,
+    JobStore,
+    JobContext,
+    JobHandler,
+    JobRecord,
+    JobStatus,
+    JobQueueClient,
+    JobQueueOptions,
+    EnqueueOptions
+} from "./jobs";
+
+// =============================================================================
 // @internal — dev-server / SPA-serving plumbing for the official app template.
 // Not part of the stable public API; see the JSDoc on each symbol.
 // =============================================================================

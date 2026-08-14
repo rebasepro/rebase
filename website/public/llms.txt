@@ -4438,6 +4438,78 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 - `appName: string` — The app name from email config.
 - `resetPasswordUrl: string` — The password reset link base URL.
 
+### Asymmetric Tokens and JWKS
+
+By default access tokens are signed with `jwtSecret` (HS256). That works, but it
+means anything that needs to *verify* a token has to hold the key that *mints*
+one — so a gateway or an edge worker checking a session can also forge one — and
+changing the secret signs every user out at once.
+
+Configure a signing key and Rebase signs access tokens asymmetrically instead,
+publishing the public half at **`/.well-known/jwks.json`** for anyone to verify
+against:
+
+```typescript no-verify
+auth: {
+    jwtSecret: process.env.JWT_SECRET,
+    signingKeys: [
+        { kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY! }
+    ]
+}
+```
+
+Or from the environment, for a single key:
+
+```bash
+JWT_PRIVATE_KEY="$(cat jwt-key.pem)"
+JWT_KEY_ID=2026-08
+```
+
+Generate a key with:
+
+```bash
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out jwt-key.pem
+```
+
+RSA keys work too and sign `RS256`; EC P-256 keys sign `ES256`. Only the private
+key is configured — the public half is derived from it, so the pair cannot be
+mismatched. `jwtSecret` stays required either way: it still signs the
+purpose-scoped tokens (download links, MFA-pending, password reset) that only
+this server ever reads.
+
+#### Rotating a key
+
+Put the new key first and keep the old one listed. New tokens are signed by the
+new key; tokens already in circulation keep verifying against the old one until
+they expire, so nobody is signed out.
+
+```typescript no-verify
+signingKeys: [
+    { kid: "2026-09", privateKey: process.env.JWT_PRIVATE_KEY_NEW! },
+    { kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY_OLD! }
+]
+```
+
+Once the longest access-token lifetime has passed, drop the old entry. Use
+`activeKid` if you want to publish a key before signing with it.
+
+#### Verifying elsewhere
+
+Tokens carry the signing key's `kid` in their header, which is how a verifier
+picks the right key out of the JWKS and how it knows to re-fetch after a
+rotation. Any standard library does this for you — for example, with `jose`:
+
+```typescript no-verify
+
+const jwks = createRemoteJWKSet(new URL("https://api.example.com/.well-known/jwks.json"));
+const { payload } = await jwtVerify(token, jwks);
+```
+
+:::note
+With no `signingKeys` configured, `/.well-known/jwks.json` answers
+`{"keys":[]}` and tokens stay HS256. Nothing changes until you add a key.
+:::
+
 ### Service Key Authentication
 
 For server-to-server communication (e.g., cron jobs, external services), configure a static service key:
@@ -6410,6 +6482,154 @@ export default job;
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
+
+## Background Jobs
+
+### Overview
+
+A job is a row in `rebase.jobs`. It is claimed by exactly one worker, retried
+with a widening delay if its handler throws, and left in the table when it
+finally gives up so somebody can look at it.
+
+There is nothing to install and nothing to run alongside Postgres. A job
+enqueued inside a transaction that rolls back was never enqueued.
+
+Use it for work that must not be lost and must not happen inside a request:
+sending mail, calling a third party, generating a file, reconciling with an
+external system.
+
+| | Runs | Survives a restart |
+|---|---|---|
+| [Cron](/docs/backend/cron-jobs) | On a schedule | Yes — the schedule is in code |
+| **Jobs** | Once, as soon as a worker is free | **Yes — the job is a row** |
+| A `setTimeout` in a callback | Once, in this process | No |
+
+### Enabling
+
+```typescript no-verify
+await initializeRebaseBackend({
+    jobs: {
+        enabled: true,
+        tasks: {
+            "send-welcome": async ({ payload }) => {
+                await sendEmail((payload as { email: string }).email);
+            }
+        }
+    }
+});
+```
+
+Off unless you ask for it: a worker polls the database forever, which is not a
+default anyone chose. It needs a driver that can run SQL — on one that cannot
+(MongoDB), the queue is unavailable and you are told at boot rather than at the
+first enqueue.
+
+### Enqueueing
+
+```typescript no-verify
+const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true, tasks } });
+
+await jobQueue?.enqueue("send-welcome", { email: "ada@example.com" });
+```
+
+#### Options
+
+```typescript no-verify
+await jobQueue?.enqueue("send-digest", { userId: "u7" }, {
+    delayMs: 60_000,               // not before a minute from now
+    maxAttempts: 5,                // default 3
+    idempotencyKey: "digest:u7"    // at most one *unfinished* job with this key
+});
+```
+
+`idempotencyKey` collapses a double-click, a retried request, and two instances
+reacting to the same event into a single job. It is scoped to unfinished work,
+so the key becomes reusable once the job completes — otherwise "the nightly
+digest for user 7" would be sendable exactly once, ever. A duplicate enqueue
+resolves to `null` rather than throwing: the work you asked for is queued, which
+is the outcome you wanted.
+
+### Failure
+
+A handler fails by throwing. There is no `return false` — a boolean would be
+silently ignored by every handler that forgot to return one, and failure has to
+be what you get by default.
+
+- **Attempts left** → back to `pending`, with `run_at` pushed out by the backoff
+  (1s, 5s, 25s … capped at an hour; override with `backoff`).
+- **Out of attempts** → `failed`, and the row *stays*. A queue that silently
+  drops what it could not deliver is indistinguishable from one with nothing to
+  do.
+
+```sql
+SELECT task, attempts, last_error, updated_at
+FROM rebase.jobs WHERE status = 'failed'
+ORDER BY updated_at DESC;
+```
+
+Failed rows are kept 30 days; successful ones 3.
+
+### What happens when a worker dies
+
+A process killed mid-job cannot release its claim, so nothing but a timeout will
+free the row. Jobs claimed for longer than `visibilityTimeoutMs` (default 5
+minutes) are reclaimed — back to `pending` if they have attempts left, otherwise
+dead-lettered with an error saying what happened.
+
+This is also why the timeout must exceed your slowest handler: past it, a second
+worker may start a job the first is still running.
+
+```typescript no-verify
+jobs: {
+    enabled: true,
+    concurrency: 5,              // jobs at once, per instance
+    pollIntervalMs: 2_000,       // when the last look found nothing
+    visibilityTimeoutMs: 300_000 // must exceed the slowest handler
+}
+```
+
+### Several instances
+
+Safe by construction. Workers claim with `SELECT … FOR UPDATE SKIP LOCKED`, so
+each job goes to exactly one of them and the others move on to the next row
+rather than queueing behind it. Nothing needs to be elected leader.
+
+During a rolling deploy an instance running older code will be handed jobs whose
+task it does not implement. Those are returned to the queue rather than failed,
+so they run as soon as an updated peer picks them up.
+
+### Durable webhooks
+
+[`WebhookDispatcher`](/docs/recipes/webhooks) queues its deliveries in memory by
+default, which means a crash or a deploy between the change and the delivery
+drops the event. Hand it the queue and each delivery becomes a row:
+
+```typescript no-verify
+
+const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
+
+const dispatcher = new WebhookDispatcher({ jobQueue });
+dispatcher.setWebhooks(myWebhooks);
+
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+```
+
+Only the webhook's **id** is stored on the job, never the webhook itself — its
+signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as
+retention keeps the row, and a webhook edited between the enqueue and the
+delivery should go out as it is now.
+
+### Shutdown
+
+`shutdown()` stops the worker claiming new jobs and waits for the ones in
+flight, so a deploy does not run the tail of a batch twice. Anything still
+running when the process goes keeps its claim and is recovered by the visibility
+timeout.
+
+### Next Steps
+
+- **[Cron Jobs](/docs/backend/cron-jobs)** — work on a schedule
+- **[Webhooks](/docs/recipes/webhooks)** — notify other systems on a change
 
 ## Custom Functions
 
