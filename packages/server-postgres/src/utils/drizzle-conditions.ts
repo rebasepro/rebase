@@ -200,12 +200,44 @@ export interface FilterCompilationOptions {
 type FilterTarget =
     | { kind: "column"; column: AnyPgColumn }
     | {
+        /** A path *inside* a json/jsonb column — `metadata->>country`. */
+        kind: "json";
+        column: AnyPgColumn;
+        /** The keys to walk, outermost first. Always at least one. */
+        path: string[];
+    }
+    | {
         kind: "relation";
         relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany;
         /** Bound here so the compile step cannot be reached without them. */
         registry: PostgresCollectionRegistry;
         sourceIdColumn: AnyPgColumn;
     };
+
+/**
+ * Split `metadata->address->>city` into its column and its path.
+ *
+ * The arrows are PostgREST's spelling and Postgres's own, so the filter reads
+ * the same as the SQL it becomes — and, more usefully, the same as what someone
+ * would have written by hand in the SQL console while working out what to ask
+ * for. A field with no arrow is not a JSON path and returns `undefined`, which
+ * leaves every existing filter on exactly the path it took before.
+ *
+ * Both arrows are accepted and mean the same thing here: the extraction is
+ * always compiled to `->>` (text) at the leaf, because that is the only form a
+ * comparison can be made against. `->` is allowed because people write it out
+ * of habit, and refusing it would be pedantry about a distinction this layer
+ * erases anyway.
+ */
+function parseJsonFieldPath(field: string): { columnKey: string; path: string[] } | undefined {
+    if (!field.includes("->")) return undefined;
+
+    const segments = field.split(/->>?/).map(s => s.trim()).filter(Boolean);
+    if (segments.length < 2) return undefined;
+
+    const [columnKey, ...path] = segments;
+    return { columnKey, path };
+}
 
 /**
  * Filter values may arrive as relation wire objects — `EntityRelation`
@@ -484,6 +516,26 @@ export class DrizzleConditionBuilder {
         const direct = columnAt(field);
         if (direct) return { kind: "column", column: direct };
 
+        // Checked after the direct lookup, so a column literally named with an
+        // arrow — which Postgres permits, if someone quoted it — still wins.
+        const jsonPath = parseJsonFieldPath(field);
+        if (jsonPath) {
+            const base = columnAt(jsonPath.columnKey);
+            if (base) {
+                const meta = getColumnMeta(base);
+                // Refused rather than compiled: `->>` on a text column is a
+                // Postgres error at execution time, which surfaces as a 500 on
+                // a request whose only fault is a typo'd column name.
+                if (meta.dataType !== "json" && meta.columnType !== "PgJsonb" && meta.columnType !== "PgJson") {
+                    throw ApiError.badRequest(
+                        `Cannot filter inside "${jsonPath.columnKey}" — it is not a json or jsonb column.`,
+                        "INVALID_FILTER_FIELD"
+                    );
+                }
+                return { kind: "json", column: base, path: jsonPath.path };
+            }
+        }
+
         if (collection) {
             const relation = resolveCollectionRelations(collection)[field];
 
@@ -630,11 +682,109 @@ export class DrizzleConditionBuilder {
         field: string,
         collectionPath: string
     ): SQL | null {
-        return target.kind === "column"
-            ? this.buildSingleFilterCondition(target.column, op, value)
-            : this.buildRelationFilterCondition(
-                target.relation, op, value, target.sourceIdColumn, target.registry, field, collectionPath
-            );
+        if (target.kind === "column") {
+            return this.buildSingleFilterCondition(target.column, op, value);
+        }
+        if (target.kind === "json") {
+            return this.buildJsonPathCondition(target.column, target.path, op, value);
+        }
+        return this.buildRelationFilterCondition(
+            target.relation, op, value, target.sourceIdColumn, target.registry, field, collectionPath
+        );
+    }
+
+    /**
+     * A comparison against a value extracted from a json/jsonb column.
+     *
+     * The path is walked with `->` and the leaf taken with `->>`, so what comes
+     * out is always **text**. That is the whole of the type story, and it is
+     * the part worth being explicit about, because the alternatives are all
+     * worse:
+     *
+     *  - text comparison alone makes `["<", 100]` compare lexically, where
+     *    `"9"` is greater than `"100"`;
+     *  - casting unconditionally makes every filter on a non-numeric value a
+     *    runtime `invalid input syntax for type numeric` — a 500 on a row whose
+     *    JSON simply holds a string.
+     *
+     * So the *filter value* decides. A number on an ordering comparison casts
+     * both sides to numeric; everything else compares as text, with booleans
+     * rendered the way `->>` renders them (`"true"` / `"false"`). A row whose
+     * JSON holds a non-numeric value at a path being compared numerically is
+     * excluded rather than fatal, which is what `IS NOT NULL`-style filtering
+     * means everywhere else in this file.
+     *
+     * The path segments are bound as parameters, never interpolated: they come
+     * from a query string, and `->>` takes a text parameter perfectly well.
+     */
+    private static buildJsonPathCondition(
+        column: AnyPgColumn,
+        path: string[],
+        op: WhereFilterOp,
+        value: unknown
+    ): SQL | null {
+        // Every segment but the last with `->` (staying in json), the last
+        // with `->>` (leaving as text).
+        let expr: SQL = sql`${column}`;
+        for (const key of path.slice(0, -1)) {
+            expr = sql`${expr} -> ${key}`;
+        }
+        const leaf = sql`${expr} ->> ${path[path.length - 1]}`;
+
+        const numericComparison = typeof value === "number" &&
+            (op === ">" || op === ">=" || op === "<" || op === "<=");
+
+        if (numericComparison) {
+            // The guard is what keeps this from being a 500: rows whose value
+            // at this path is not a number are excluded, not fatal.
+            const numeric = sql`CASE WHEN ${leaf} ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN (${leaf})::numeric END`;
+            switch (op) {
+                case ">": return sql`${numeric} > ${value}`;
+                case ">=": return sql`${numeric} >= ${value}`;
+                case "<": return sql`${numeric} < ${value}`;
+                case "<=": return sql`${numeric} <= ${value}`;
+            }
+        }
+
+        const asText = (v: unknown): string => typeof v === "boolean" ? String(v) : String(v);
+
+        switch (op) {
+            case "==":
+                return value === null || value === undefined ? sql`${leaf} IS NULL` : sql`${leaf} = ${asText(value)}`;
+            case "!=":
+                return value === null || value === undefined ? sql`${leaf} IS NOT NULL` : sql`${leaf} != ${asText(value)}`;
+            case ">": return sql`${leaf} > ${asText(value)}`;
+            case ">=": return sql`${leaf} >= ${asText(value)}`;
+            case "<": return sql`${leaf} < ${asText(value)}`;
+            case "<=": return sql`${leaf} <= ${asText(value)}`;
+            case "like": return sql`${leaf} LIKE ${asText(value)}`;
+            case "ilike": return sql`${leaf} ILIKE ${asText(value)}`;
+            case "not-like": return sql`${leaf} NOT LIKE ${asText(value)}`;
+            case "not-ilike": return sql`${leaf} NOT ILIKE ${asText(value)}`;
+            case "is-null": return sql`${leaf} IS NULL`;
+            case "is-not-null": return sql`${leaf} IS NOT NULL`;
+            case "in":
+            case "not-in": {
+                if (value === null || value === undefined) {
+                    return op === "in" ? sql`${leaf} IS NULL` : sql`${leaf} IS NOT NULL`;
+                }
+                const values = toMembershipList(value).map(asText);
+                // Same inversion guard as the column path: an empty list
+                // matches nothing, and dropping the condition would match
+                // everything.
+                if (values.length === 0) return op === "in" ? sql`FALSE` : sql`TRUE`;
+                const list = sql.join(values.map(v => sql`${v}`), sql`, `);
+                return op === "in" ? sql`${leaf} IN (${list})` : sql`${leaf} NOT IN (${list})`;
+            }
+            default:
+                // `array-contains` and friends are about the column, not a
+                // scalar inside it — `metadata @> '{"tags":["x"]}'` is the
+                // question, and it is asked of the column directly.
+                throw ApiError.badRequest(
+                    `Operator "${op}" is not supported on a JSON path. Use it on the column itself.`,
+                    "INVALID_FILTER_OPERATOR"
+                );
+        }
     }
 
     /**

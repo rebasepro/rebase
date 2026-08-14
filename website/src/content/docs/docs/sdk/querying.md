@@ -279,6 +279,49 @@ const { data } = await client.data.products
     .find();
 ```
 
+## Filtering Inside JSON
+
+A `json` or `jsonb` column can be filtered by path, using Postgres's own arrow
+syntax:
+
+```typescript no-verify
+// Orders whose metadata says the country is US
+const { data } = await client.data.orders
+    .where("metadata->>country", "==", "US")
+    .find();
+
+// Nested paths walk with -> and take the leaf with ->>
+await client.data.orders.where("metadata->address->>city", "==", "Berlin").find();
+```
+
+Over REST:
+
+```bash
+GET /api/data/orders?metadata->>country=eq.US
+```
+
+Path segments are always sent as bound parameters, never spliced into SQL.
+
+### How values compare
+
+`->>` yields **text**, so comparisons are text comparisons — except that an
+ordering operator (`>`, `>=`, `<`, `<=`) given a **number** casts to numeric:
+
+```typescript no-verify
+await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
+await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
+```
+
+Rows whose value at that path is not a number are excluded from a numeric
+comparison rather than failing the query. Booleans compare as `"true"` /
+`"false"`, which is how `->>` renders them.
+
+:::note
+`array-contains` and the other whole-column operators are not available on a
+path — they ask a question about the whole document, so use them on the column
+itself.
+:::
+
 ## Text Search
 
 ```typescript
