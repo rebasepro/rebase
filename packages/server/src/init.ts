@@ -41,7 +41,10 @@ import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
-import { configureJwt, requireAdmin } from "./auth";
+import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
+import { createJwksRoutes } from "./auth/jwks-routes";
+import type { JwtSigningKeyConfig } from "./auth/jwt-keys";
+import type { JobQueueOptions } from "./jobs/types";
 import {
     BackendStorageConfig,
     createStorageRoutes,
@@ -88,6 +91,22 @@ export interface RebaseAuthConfig {
      */
     collection?: AnyCollectionConfig;
     jwtSecret?: string;
+    /**
+     * Asymmetric keys for signing access tokens, newest first. Additive —
+     * without them tokens stay HS256, exactly as before. With them, anyone can
+     * verify a session from `/.well-known/jwks.json` without holding the key
+     * that mints one, and a key can be rotated without signing users out.
+     *
+     * ```ts
+     * auth: {
+     *   jwtSecret: process.env.JWT_SECRET,
+     *   signingKeys: [{ kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY! }]
+     * }
+     * ```
+     */
+    signingKeys?: JwtSigningKeyConfig[];
+    /** Which of {@link signingKeys} mints new tokens. Defaults to the first. */
+    activeKid?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
     requireAuth?: boolean;
@@ -431,6 +450,24 @@ export interface RebaseBackendConfig {
      */
     cronPersistence?: boolean;
     /**
+     * The durable job queue: background work that survives a restart.
+     *
+     * Off unless `enabled` is set, because a worker polls the database forever
+     * and that is not a default anyone chose. Requires a driver that can run
+     * SQL; on one that cannot, the queue is unavailable and callers are told
+     * so at boot rather than at the first enqueue.
+     *
+     * ```ts
+     * jobs: {
+     *   enabled: true,
+     *   tasks: {
+     *     "send-welcome": async ({ payload }) => { await sendEmail(payload.email); }
+     *   }
+     * }
+     * ```
+     */
+    jobs?: JobQueueOptions;
+    /**
      * Maximum request body size in bytes for API routes (default: 10MB).
      * Set to 0 to disable the global limit entirely.
      *
@@ -540,6 +577,19 @@ export interface RebaseBackendInstance {
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
     cronScheduler?: import("./cron").CronScheduler;
+    /**
+     * The durable job queue, when `jobs.enabled` is set and the driver can run
+     * SQL. Present on the instance because the *producers* live in application
+     * code — a `WebhookDispatcher` is constructed by the app, so this is what
+     * it gets handed:
+     *
+     * ```ts
+     * const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
+     * const dispatcher = new WebhookDispatcher({ jobQueue });
+     * jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload));
+     * ```
+     */
+    jobQueue?: import("./jobs").JobQueue;
 
     /**
      * Attach collection callbacks AFTER initialization.
@@ -898,7 +948,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 configureJwt({
                     secret: safeAuthConfig.jwtSecret,
                     accessExpiresIn: safeAuthConfig.accessExpiresIn || "1h",
-                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d"
+                    refreshExpiresIn: safeAuthConfig.refreshExpiresIn || "30d",
+                    signingKeys: safeAuthConfig.signingKeys,
+                    activeKid: safeAuthConfig.activeKid
                 });
             }
 
@@ -1117,6 +1169,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 config.app.route(`${basePath}/admin`, adminRoutes);
                 logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
+        }
+    }
+
+    // ── JWKS ─────────────────────────────────────────────────────────────
+    // At the root, not under `basePath`: `/.well-known/` is where verifiers
+    // look. Mounted whenever this backend mints its own tokens, and answering
+    // an empty key set when none are asymmetric — "this issuer publishes no
+    // public keys" is a fact a verifier can act on, where a 404 is
+    // indistinguishable from a wrong URL.
+    if (isJwtConfigured()) {
+        config.app.route("/.well-known", createJwksRoutes());
+        if (hasAsymmetricSigningKey()) {
+            logger.info("Access tokens are signed asymmetrically; public keys at /.well-known/jwks.json");
         }
     }
 
@@ -1854,6 +1919,30 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // 6a. Start the durable job queue.
+    //
+    // After cron on purpose: both create tables in `rebase`, and cron's
+    // bootstrap is the older and better-exercised of the two.
+    let jobQueue: import("./jobs").JobQueue | undefined;
+    if (config.jobs?.enabled) {
+        const { createJobStore, createJobQueue } = await import("./jobs");
+        const store = createJobStore(defaultDriver);
+
+        if (store) {
+            await store.ensureTable();
+            jobQueue = createJobQueue(store, config.jobs);
+            jobQueue.start();
+            logger.info("Job queue started", { tasks: Object.keys(config.jobs.tasks ?? {}).length });
+        } else {
+            // `createJobStore` already said why. What it cannot say is what the
+            // caller should expect instead, which depends on who asked.
+            logger.warn(
+                "Job queue requested but unavailable on this driver — `rebase.jobs.enqueue` will throw, " +
+                "and webhook deliveries fall back to the in-memory queue."
+            );
+        }
+    }
+
     // 6b. Mount Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
     // rebuild. Only enabled when BACKUP_DESTINATION is set.
@@ -1976,6 +2065,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const shutdown = createShutdown({
         server: config.server,
         cronScheduler,
+        jobQueue,
         realtimeServices
     });
 
@@ -2024,6 +2114,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         storageController,
         collectionRegistry,
         cronScheduler,
+        jobQueue,
         healthCheck,
         shutdown
     };

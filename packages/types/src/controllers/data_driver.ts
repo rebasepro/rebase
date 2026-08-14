@@ -540,6 +540,31 @@ export interface RestFetchService {
     ): Promise<Record<string, unknown>[]>;
 
     /**
+     * `count`/`sum`/`avg`/`min`/`max` over the rows a filter selects,
+     * optionally grouped.
+     *
+     * Optional, and the REST route answers 501 where a driver does not
+     * implement it — an aggregate is not a thing to approximate, and an empty
+     * result set would read as "nothing matched".
+     *
+     * Any implementation **must apply the same row-level authorization as a
+     * read**. An aggregate is an efficient way to learn about rows you cannot
+     * select, and `count(*)` over a table whose policies would return nothing
+     * has to be zero.
+     */
+    aggregate?(
+        collectionPath: string,
+        options: {
+            aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[];
+            groupBy?: string[];
+            filter?: FilterValues<string>;
+            logical?: LogicalCondition;
+            searchString?: string;
+            limit?: number;
+        }
+    ): Promise<Record<string, unknown>[]>;
+
+    /**
      * Fetch a single flattened entity with optional relation includes.
      */
     fetchOneForRest(

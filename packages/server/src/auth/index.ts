@@ -1,8 +1,10 @@
 // Auth module exports
 export * from "./interfaces";
 
-export { configureJwt, isJwtConfigured, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, generateDownloadToken, verifyDownloadToken } from "./jwt";
+export { configureJwt, isJwtConfigured, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, generateDownloadToken, verifyDownloadToken, getJwks, hasAsymmetricSigningKey } from "./jwt";
 export type { JwtConfig, AccessTokenPayload, DownloadTokenPayload } from "./jwt";
+export { createJwksRoutes } from "./jwks-routes";
+export type { JwtSigningKeyConfig, JwtSigningAlgorithm, PublicJwk } from "./jwt-keys";
 
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";
 // Constant-time compare for static secrets (service keys), so token checks

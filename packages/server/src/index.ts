@@ -118,9 +118,19 @@ export {
     isOperationAllowed,
     // Constant-time compare for static secrets — drivers checking a service key
     // must not fall back to ===.
-    safeCompare
+    safeCompare,
+    // The public keys that verify this issuer's access tokens, and the route
+    // that serves them. Exported because a custom server builds its own Hono
+    // app, and would otherwise have no way to publish a JWKS.
+    getJwks,
+    hasAsymmetricSigningKey,
+    createJwksRoutes
 } from "./auth";
 export type {
+    // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.
+    JwtSigningKeyConfig,
+    JwtSigningAlgorithm,
+    PublicJwk,
     AccessTokenPayload,
     PasswordValidationResult,
     AuthHooks,
@@ -223,6 +233,23 @@ export * from "./services/webhook-service";
 // its own because a webhook is not the only outbound call whose URL comes from
 // data — anything that fetches a stored address wants the same check.
 export * from "./services/outbound-url-guard";
+
+// =============================================================================
+// Jobs — the durable queue. Application code both produces (`enqueue`) and
+// consumes (`tasks`, `register`), so the whole surface is public.
+// =============================================================================
+export { createJobQueue, createJobStore, defaultBackoff } from "./jobs";
+export type {
+    JobQueue,
+    JobStore,
+    JobContext,
+    JobHandler,
+    JobRecord,
+    JobStatus,
+    JobQueueClient,
+    JobQueueOptions,
+    EnqueueOptions
+} from "./jobs";
 
 // =============================================================================
 // @internal — dev-server / SPA-serving plumbing for the official app template.

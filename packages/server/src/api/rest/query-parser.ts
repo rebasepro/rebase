@@ -156,6 +156,79 @@ function invalidOrderBy(detail: string): never {
     );
 }
 
+/** The aggregate functions `?select=` accepts. */
+const AGGREGATE_FUNCTIONS = new Set(["count", "sum", "avg", "min", "max"]);
+
+export interface ParsedAggregate {
+    fn: "count" | "sum" | "avg" | "min" | "max";
+    /** Absent only for `count()`, which counts rows rather than values. */
+    field?: string;
+    /** The key this appears under in the response. */
+    alias: string;
+}
+
+/**
+ * Parse `?select=count(),sum(total),avg(total)`.
+ *
+ * The spelling is SQL's, because whoever writes it is thinking in SQL and
+ * because any other spelling has to be learned first. `count()` with no field
+ * counts rows; every other function names a column.
+ *
+ * Aliases are derived rather than accepted: `sum(total)` returns as
+ * `sum_total`, `count()` as `count`. Letting a caller choose would mean
+ * checking their alias is not also a `groupBy` field — a rule nobody would
+ * guess, and a silently overwritten value if it went unchecked.
+ */
+export function parseAggregateSelect(raw: unknown): ParsedAggregate[] | undefined {
+    const value = getLastValue(raw);
+    if (!value) return undefined;
+
+    const entries = String(value).split(",").map(s => s.trim()).filter(Boolean);
+    if (entries.length === 0) return undefined;
+
+    return entries.map((entry) => {
+        const match = /^([a-z]+)\(\s*([A-Za-z0-9_]*)\s*\)$/i.exec(entry);
+        if (!match) {
+            throw invalidParam(
+                `Invalid \`select\` entry "${entry}". Expected \`fn(field)\`, e.g. \`sum(total)\` or \`count()\`.`,
+                "INVALID_AGGREGATE_SELECT"
+            );
+        }
+
+        const fn = match[1].toLowerCase();
+        const field = match[2] || undefined;
+
+        if (!AGGREGATE_FUNCTIONS.has(fn)) {
+            throw invalidParam(
+                `Unknown aggregate function "${fn}". Expected: ${[...AGGREGATE_FUNCTIONS].join(", ")}.`,
+                "INVALID_AGGREGATE_FUNCTION"
+            );
+        }
+        if (fn !== "count" && !field) {
+            // `sum()` has no sensible reading, and guessing one would be
+            // inventing a column on the caller's behalf.
+            throw invalidParam(
+                `\`${fn}()\` needs a field, e.g. \`${fn}(total)\`. Only \`count()\` may be empty.`,
+                "INVALID_AGGREGATE_SELECT"
+            );
+        }
+
+        return {
+            fn: fn as ParsedAggregate["fn"],
+            field,
+            alias: field ? `${fn}_${field}` : fn
+        };
+    });
+}
+
+/** Parse `?groupBy=status,country`. */
+export function parseGroupBy(raw: unknown): string[] | undefined {
+    const value = getLastValue(raw);
+    if (!value) return undefined;
+    const fields = String(value).split(",").map(s => s.trim()).filter(Boolean);
+    return fields.length > 0 ? fields : undefined;
+}
+
 /** `asc`/`desc`, in any case. Anything else is a request to sort in a way that does not exist. */
 function toDirection(raw: unknown, context: string): "asc" | "desc" {
     if (raw === undefined || raw === null) return "asc";
@@ -337,7 +410,12 @@ export function parseQueryOptions(
     // list made the documented `?where={...}` compile as a filter on a
     // nonexistent field — which used to be dropped, widening the read to the
     // whole table, and is now a 400 `UNKNOWN_FILTER_FIELD`.
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where"];
+    //
+    // `select` and `groupBy` are reserved for the same reason: on
+    // `/aggregate` they are the request, and left out of this list
+    // `?select=sum(total)` compiles into the filter as a comparison on a
+    // column named "select" — a 400 on the one endpoint that requires it.
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where", "select", "groupBy"];
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;

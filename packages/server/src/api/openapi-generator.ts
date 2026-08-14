@@ -294,6 +294,65 @@ description: "Whether more records exist beyond this page" }
             }
         };
 
+        // ── GET /data/{slug}/aggregate — count/sum/avg/min/max ────────
+        //
+        // Before the list path for the same reason `/count` is: a literal
+        // segment that a generated client would otherwise be told is an `{id}`.
+        paths[`${dataPath}/aggregate`] = {
+            get: {
+                tags: [collection.name],
+                summary: `Aggregate ${collection.name}`,
+                description:
+                    "Aggregate values over the rows the same filters would return. Takes the filter and " +
+                    "search parameters of the list endpoint. Row-level security applies to the rows " +
+                    "being aggregated, so a caller who can read nothing counts nothing.",
+                operationId: `aggregate${schemaName}`,
+                parameters: [
+                    {
+                        name: "select",
+                        in: "query",
+                        required: true,
+                        description:
+                            "Comma-separated aggregates, e.g. `count()`, `sum(total)`, `avg(total),max(total)`. " +
+                            "Results are keyed `count`, `sum_total`, `avg_total` and so on.",
+                        schema: { type: "string" },
+                        example: "count(),sum(total)"
+                    },
+                    {
+                        name: "groupBy",
+                        in: "query",
+                        required: false,
+                        description: "Comma-separated fields to group by. Each grouped field is returned alongside the aggregates.",
+                        schema: { type: "string" },
+                        example: "status"
+                    },
+                    ...listQueryParameters().filter(p => p.name === "searchString" || p.name === "limit"),
+                    ...buildFilterParameters(collection, reservedParameterNames)
+                ],
+                responses: {
+                    200: {
+                        description: "One row per group, or a single row when `groupBy` is absent",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    required: ["data"],
+                                    properties: {
+                                        data: {
+                                            type: "array",
+                                            items: { type: "object", additionalProperties: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    501: { description: "This backend's data driver does not implement aggregates" },
+                    ...errorResponses(requireAuth)
+                }
+            }
+        };
+
         // ── GET /data/{slug} — List entities ──────────────────────────
         paths[dataPath] = {
             get: {

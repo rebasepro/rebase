@@ -91,6 +91,22 @@ const rebaseEnvSchema = z.object({
     DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
     ADMIN_CONNECTION_STRING: z.string().url().optional(),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters long"),
+    /**
+     * PEM private key for signing access tokens asymmetrically, so anything
+     * holding the JWKS can verify a session without being able to mint one.
+     * Optional — without it, tokens stay HS256 and nothing changes.
+     *
+     * Accepts a PEM with real newlines, a PEM with `\n` escapes (how most
+     * secret managers and `.env` files carry a multi-line value), or base64 of
+     * the whole PEM.
+     */
+    JWT_PRIVATE_KEY: z.string().optional(),
+    /**
+     * Names {@link rebaseEnvSchema.JWT_PRIVATE_KEY} in the token header and in
+     * the JWKS. Rotation depends on the old and new keys being
+     * distinguishable, so change this whenever the key changes.
+     */
+    JWT_KEY_ID: z.string().default("default"),
     JWT_ACCESS_EXPIRES_IN: z.string().default("1h"),
     // Sliding: every rotation re-ups it, so this governs how long a session
     // survives INACTIVITY, not how long it survives. 400d is the ceiling any

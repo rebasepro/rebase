@@ -80,6 +80,7 @@ export default defineConfig({
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
+                        { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
                         { label: "Entity History", slug: "docs/backend/history" },

@@ -369,6 +369,79 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 - `appName: string` — The app name from email config.
 - `resetPasswordUrl: string` — The password reset link base URL.
 
+## Asymmetric Tokens and JWKS
+
+By default access tokens are signed with `jwtSecret` (HS256). That works, but it
+means anything that needs to *verify* a token has to hold the key that *mints*
+one — so a gateway or an edge worker checking a session can also forge one — and
+changing the secret signs every user out at once.
+
+Configure a signing key and Rebase signs access tokens asymmetrically instead,
+publishing the public half at **`/.well-known/jwks.json`** for anyone to verify
+against:
+
+```typescript no-verify
+auth: {
+    jwtSecret: process.env.JWT_SECRET,
+    signingKeys: [
+        { kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY! }
+    ]
+}
+```
+
+Or from the environment, for a single key:
+
+```bash
+JWT_PRIVATE_KEY="$(cat jwt-key.pem)"
+JWT_KEY_ID=2026-08
+```
+
+Generate a key with:
+
+```bash
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out jwt-key.pem
+```
+
+RSA keys work too and sign `RS256`; EC P-256 keys sign `ES256`. Only the private
+key is configured — the public half is derived from it, so the pair cannot be
+mismatched. `jwtSecret` stays required either way: it still signs the
+purpose-scoped tokens (download links, MFA-pending, password reset) that only
+this server ever reads.
+
+### Rotating a key
+
+Put the new key first and keep the old one listed. New tokens are signed by the
+new key; tokens already in circulation keep verifying against the old one until
+they expire, so nobody is signed out.
+
+```typescript no-verify
+signingKeys: [
+    { kid: "2026-09", privateKey: process.env.JWT_PRIVATE_KEY_NEW! },
+    { kid: "2026-08", privateKey: process.env.JWT_PRIVATE_KEY_OLD! }
+]
+```
+
+Once the longest access-token lifetime has passed, drop the old entry. Use
+`activeKid` if you want to publish a key before signing with it.
+
+### Verifying elsewhere
+
+Tokens carry the signing key's `kid` in their header, which is how a verifier
+picks the right key out of the JWKS and how it knows to re-fetch after a
+rotation. Any standard library does this for you — for example, with `jose`:
+
+```typescript no-verify
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
+const jwks = createRemoteJWKSet(new URL("https://api.example.com/.well-known/jwks.json"));
+const { payload } = await jwtVerify(token, jwks);
+```
+
+:::note
+With no `signingKeys` configured, `/.well-known/jwks.json` answers
+`{"keys":[]}` and tokens stay HS256. Nothing changes until you add a key.
+:::
+
 ## Service Key Authentication
 
 For server-to-server communication (e.g., cron jobs, external services), configure a static service key:

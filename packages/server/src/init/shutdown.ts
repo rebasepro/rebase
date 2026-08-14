@@ -5,6 +5,8 @@ import { logger } from "../utils/logger";
 interface ShutdownConfig {
     server: Server;
     cronScheduler?: { stop(): void };
+    /** Structural, for the same no-circular-imports reason as the backend below. */
+    jobQueue?: { stop(): Promise<void> };
     realtimeServices: Record<string, RealtimeProvider>;
 }
 
@@ -129,6 +131,19 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 if (config.cronScheduler) {
                     config.cronScheduler.stop();
                     logger.info("Cron scheduler stopped");
+                }
+
+                // 1b. Stop claiming jobs, and wait for the ones in flight.
+                //
+                // Before the realtime teardown and the pool close, both of
+                // which a still-running handler would be caught by. Jobs
+                // executing at this point keep their claim, so anything this
+                // misses is recovered by the visibility timeout rather than
+                // lost — but waiting here is what stops a deploy from running
+                // the tail of a batch twice.
+                if (config.jobQueue) {
+                    await config.jobQueue.stop();
+                    logger.info("Job queue stopped");
                 }
 
                 // 2. Tear down realtime services (LISTEN clients, debounce timers,

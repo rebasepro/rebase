@@ -1,5 +1,16 @@
 import { createHmac, randomUUID } from "crypto";
 import { assertAllowedOutboundUrl, BlockedUrlError } from "./outbound-url-guard";
+import { logger } from "../utils/logger";
+import type { JobQueueClient } from "../jobs/types";
+
+/**
+ * The task name a queued webhook delivery is stored under.
+ *
+ * Namespaced, and frozen: it is written into `rebase.jobs` rows that outlive
+ * the deploy that wrote them, so renaming it would strand every delivery
+ * already queued under the old name until they dead-lettered.
+ */
+export const WEBHOOK_DELIVERY_TASK = "rebase.webhook.deliver";
 
 export interface WebhookConfig {
     id: string;
@@ -48,6 +59,14 @@ export interface WebhookDispatcherOptions {
      * `dns.lookup`; injected by tests so a unit suite never asks a resolver.
      */
     lookup?: (hostname: string) => Promise<string[]>;
+    /**
+     * Where {@link WebhookDispatcher.enqueueEntityChange} puts deliveries.
+     *
+     * Without it they go to an in-memory array that a crash or a deploy
+     * empties. With it they are rows, retried with backoff by a worker that
+     * may not even be the process that queued them.
+     */
+    jobQueue?: JobQueueClient;
 }
 
 /**
@@ -128,11 +147,15 @@ export class WebhookDispatcher {
      * for a third party. It also means a receiver that is down can no longer
      * fail the customer's write.
      *
-     * The cost, stated plainly: the queue is in-process and in-memory. A crash
-     * or a deploy between the enqueue and the delivery drops the event, and a
-     * receiver may see the notification a few milliseconds before the row it
-     * describes is committed. Use {@link flush} on shutdown, and
-     * `onDelivery` to record failures.
+     * The cost, when no `jobQueue` is configured: the queue is in-process and
+     * in-memory. A crash or a deploy between the enqueue and the delivery drops
+     * the event, and a receiver may see the notification a few milliseconds
+     * before the row it describes is committed. Use {@link flush} on shutdown,
+     * and `onDelivery` to record failures.
+     *
+     * With `jobQueue` set, only the second half of that remains: the delivery
+     * becomes a row in `rebase.jobs` and survives the crash, the deploy and the
+     * pod being rescheduled.
      */
     enqueueEntityChange(
         table: string,
@@ -143,13 +166,82 @@ export class WebhookDispatcher {
     ): void {
         const jobs = this.buildDeliveries(table, event, entity, previousEntity);
         if (jobs.length === 0) return;
+
+        // The webhook is referenced by id rather than embedded. Its `secret`
+        // would otherwise be written into `rebase.jobs` in cleartext and sit
+        // there for as long as retention keeps the row — and a webhook edited
+        // between the enqueue and the delivery should go out as it is now, not
+        // as it was.
+        if (this.options.jobQueue) {
+            for (const job of jobs) {
+                void this.options.jobQueue
+                    .enqueue(WEBHOOK_DELIVERY_TASK, {
+                        webhookId: job.webhook.id,
+                        event: job.event,
+                        payload: job.payload
+                    })
+                    .catch((error) => {
+                        // The one case where the durable path is worse than the
+                        // memory one, so it does not fail silently — and the
+                        // delivery still goes out rather than being lost.
+                        logger.error("[webhooks] Could not queue a delivery; falling back to in-process", { error });
+                        this.queue.push(job);
+                        this.startDraining();
+                    });
+            }
+            return;
+        }
+
         this.queue.push(...jobs);
         this.startDraining();
     }
 
     /**
+     * Deliver one queued job, as the worker runs it.
+     *
+     * One attempt, and it throws on failure. The retries belong to the queue
+     * now: keeping both would multiply — three in-process attempts inside each
+     * of three job attempts is nine deliveries and about two minutes of holding
+     * a worker slot — and only the queue's retries survive a restart, which is
+     * the whole reason for moving.
+     */
+    async deliverQueuedJob(job: { webhookId: string; event: string; payload: Record<string, unknown> }): Promise<void> {
+        const webhook = this.webhooks.find(w => w.id === job.webhookId);
+        if (!webhook) {
+            // Deleted or disabled between the enqueue and now. Not an error:
+            // the operator's most recent instruction is that this endpoint
+            // should not be called.
+            logger.warn(`[webhooks] Dropping a queued delivery for unknown or disabled webhook "${job.webhookId}"`);
+            return;
+        }
+
+        const { result, terminal } = await this.deliver(webhook, job.event, job.payload, 1);
+        this.options.onDelivery?.(result);
+
+        if (result.success) return;
+
+        if (terminal) {
+            // A refused destination or a redirect fails identically every time.
+            // Retrying it costs three more worker slots to reach the same
+            // answer, so it is dead-lettered on the spot — with the reason,
+            // which is the part somebody will need.
+            logger.error(
+                `[webhooks] "${webhook.id}" failed permanently: ${result.responseBody.slice(0, 200)}`
+            );
+            return;
+        }
+
+        throw new Error(
+            `Webhook "${webhook.id}" responded ${result.statusCode}: ${result.responseBody.slice(0, 200)}`
+        );
+    }
+
+    /**
      * Wait for every queued delivery to finish. For graceful shutdown, and for
      * tests that need to observe what {@link enqueueEntityChange} sent.
+     *
+     * In-process deliveries only — with a `jobQueue` configured there is
+     * nothing here to wait for, because the deliveries are rows.
      */
     async flush(): Promise<void> {
         while (this.draining) {

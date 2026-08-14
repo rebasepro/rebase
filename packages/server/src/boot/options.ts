@@ -2,6 +2,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { RebaseAuthConfig } from "../init";
 import type { EmailConfig } from "../email";
 import type { RebaseBootEnv } from "./env";
+import { normalizePemFromEnv } from "../auth/jwt-keys";
 
 /**
  * Build the email configuration, or `undefined` when no SMTP host is set.
@@ -44,6 +45,12 @@ export function resolveAuthOptions(
     const auth: RebaseAuthConfig = {
         collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
+        // One key from the environment. A rotation window needs two at once,
+        // which is more than an env var wants to express — configure
+        // `auth.signingKeys` directly for that.
+        signingKeys: env.JWT_PRIVATE_KEY
+            ? [{ kid: env.JWT_KEY_ID, privateKey: normalizePemFromEnv(env.JWT_PRIVATE_KEY) }]
+            : undefined,
         accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
         serviceKey: env.REBASE_SERVICE_KEY,
