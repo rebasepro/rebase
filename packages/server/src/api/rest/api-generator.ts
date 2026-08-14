@@ -932,7 +932,8 @@ id };
                     // this one did not, so a nested `/count?or=(…)` answered
                     // with the unnarrowed total beside a narrowed list.
                     logical: queryOptions.logical,
-                    searchString
+                    searchString,
+                    vectorSearch: queryOptions.vectorSearch
                 }) : 0;
 
                 return c.json({ count: total });
@@ -980,7 +981,14 @@ id: parsed.id });
                     offset: queryOptions.offset,
                     orderBy: queryOptions.orderBy?.[0]?.field,
                     order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" as const : "asc" as const,
-                    searchString
+                    searchString,
+                    // Parsed by the same `parseQuery` the root list uses and
+                    // then dropped here, so `?vector_search=…&vector=[…]` on a
+                    // child listing was served as an ordinary page: no distance
+                    // ordering, no `_distance`, no threshold. A silent
+                    // downgrade, which reads as "the collection has no
+                    // neighbours" rather than as "this route ignored you".
+                    vectorSearch: queryOptions.vectorSearch
                 };
                 const entities = fetchService
                     ? await fetchService.fetchCollectionForRest(parsed.collectionPath, listOptions, queryOptions.include)
@@ -991,7 +999,12 @@ id: parsed.id });
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     logical: queryOptions.logical,
-                    searchString
+                    searchString,
+                    // Wired together with the fetch above on purpose: a count
+                    // that ignores the threshold the listing applied reports a
+                    // `total` larger than the set that was served, and
+                    // `hasMore` promises a page that does not exist.
+                    vectorSearch: queryOptions.vectorSearch
                 }) : entities.length;
 
                 const listCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
@@ -1169,9 +1182,12 @@ id: parsed.id });
             collection,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set
-            // of rows from the one that was served.
+            // of rows from the one that was served — which is exactly what a
+            // dropped vector `threshold` did: the listing excluded the distant
+            // rows and `meta.total` went on counting them.
             logical: queryOptions.logical,
-            searchString
+            searchString,
+            vectorSearch: queryOptions.vectorSearch
         }) : 0;
     }
 

@@ -106,6 +106,8 @@ export class DataService implements DataRepository {
             logical?: LogicalCondition;
             searchString?: string;
             databaseId?: string;
+            /** The `threshold` narrows the count; see `FetchService.count`. */
+            vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<number> {
         return this.fetchService.count<M>(collectionPath, options);
