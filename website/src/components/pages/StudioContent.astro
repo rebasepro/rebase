@@ -31,6 +31,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
   <span class="text-blue-300">securityRules</span>: [<span class="text-surface-500">/* ... */</span>],
   <span class="text-blue-300">callbacks</span>: { <span class="text-blue-300">onSave</span>: <span class="text-surface-500">/* ... */</span> }
 };`;
+import ClosingCta from "../ClosingCta.astro";
 ---
 
   <div class="flex flex-col isolate">
@@ -91,9 +92,9 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Collection Editor</h2>
             <p class="text-lg text-surface-400 mb-6">Every visual change generates clean, version-controlled TypeScript via AST transformation. What you see in the UI is what gets committed to your repo.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Visual edits write to real TypeScript files</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Full collection config: properties, callbacks, security rules</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Zod schema generation for runtime validation</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Visual edits write to real TypeScript files</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Full collection config: properties, callbacks, security rules</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Zod schema generation for runtime validation</li>
             </ul>
           </div>
           <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
@@ -453,5 +454,8 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
         </div>
       </div>
     </section>
-  </div>
+  
+    <ClosingCta title="Run your database from the panel." blurb="Scaffold a project and Studio comes with it: SQL editor, schema visualizer, RLS policy editor and logs, against your own Postgres." trackId="studio" />
+
+</div>
 

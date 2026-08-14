@@ -89,7 +89,21 @@ Omitting `storageSource` means `(default)`.
 ## Declared is not configured
 
 A source declared in `rebase.json` with nothing set for it in the environment is
-**skipped**, not fatal. Uploads routed to it answer `501 STORAGE_NOT_CONFIGURED`.
+**skipped**, not fatal. Requests routed to it answer
+`501 STORAGE_SOURCE_NOT_CONFIGURED` — distinct from the `STORAGE_NOT_CONFIGURED`
+the whole `/storage` router answers when the deployment has no storage at all,
+because "this one bucket is not wired up" and "file storage is off" have
+different fixes.
+
+A `storageId` that was never declared at all is a `400 UNKNOWN_STORAGE_SOURCE`
+naming the sources that do exist; it is a caller mistake, usually a typo.
+
+Neither case falls back to the default source. It used to, silently, and that
+was worse than an error in both directions: a write landed in a bucket nobody
+named, and a read served bytes from a bucket the `storageAuthorize` hook was
+never asked about — the hook having been asked about the source in the request.
+Because a second source exists precisely to hold the same keys, the fallback
+returned plausible bytes rather than anything that looked wrong.
 
 This matters: declaring a bucket usually happens well before anyone attaches
 storage to it. Treating that as a boot error would crash-loop the backend until

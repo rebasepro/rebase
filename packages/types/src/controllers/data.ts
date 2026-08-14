@@ -1,7 +1,7 @@
 import type { VectorSearchParams } from "./data_driver";
 import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, FilterValues, OrderBySpec } from "../types/filter-operators";
 
 /**
  * Operator-blind filter value: whatever the column holds, a list of it, or null.
@@ -160,10 +160,13 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      */
     logical?: LogicalCondition;
     /**
-     * Sort order as a `[field, direction]` tuple.
+     * Sort order as a `[field, direction]` tuple, or a list of them applied in
+     * order of significance — the second key breaks ties on the first, and so on.
+     *
      * @example orderBy: ["created_at", "desc"]
+     * @example orderBy: [["roles", "asc"], ["created_at", "desc"]]
      */
-    orderBy?: OrderByTuple<FieldPath<M> | ComputedSortField>;
+    orderBy?: OrderBySpec<FieldPath<M> | ComputedSortField>;
     /**
      * Relations to include in the response.
      *

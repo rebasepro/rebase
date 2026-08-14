@@ -4,12 +4,12 @@ import {
     FindResult,
     LogicalCondition,
     FilterCondition,
-    OrderByTuple,
+    OrderBySpec,
     WhereFilterOp,
     toCanonicalOp
 } from "@rebasepro/types";
 import { FindParams } from "./transport";
-import { resolveFindWindow } from "@rebasepro/common";
+import { normalizeOrderBy, resolveFindWindow } from "@rebasepro/common";
 
 /**
  * A local evaluator for `FindParams`, so cached rows can answer a query the
@@ -308,24 +308,41 @@ export function matchesParams(row: Record<string, unknown>, params?: FindParams)
  * the row id as a tiebreak so paging through an unsorted-but-equal run does
  * not shuffle rows between pages.
  */
-export function sortRows<M extends Record<string, unknown>>(rows: M[], orderBy?: OrderByTuple): M[] {
-    if (!orderBy) return rows;
-    const [field, direction = "asc"] = orderBy;
-    const sign = direction === "desc" ? -1 : 1;
+export function sortRows<M extends Record<string, unknown>>(rows: M[], orderBy?: OrderBySpec): M[] {
+    const keys = normalizeOrderBy(orderBy);
+    if (!keys) return rows;
     return rows.sort((a, b) => {
-        const av = a[field];
-        const bv = b[field];
-        const aNull = isNullish(toComparable(av));
-        const bNull = isNullish(toComparable(bv));
-        if (aNull || bNull) {
-            if (aNull && bNull) return tiebreak(a, b);
-            // NULLS LAST ascending, NULLS FIRST descending.
-            return (aNull ? 1 : -1) * (direction === "desc" ? -1 : 1);
+        for (const [field, direction = "asc"] of keys) {
+            const cmp = compareOnKey(a, b, field, direction);
+            // Equal on this key — and equal is not a decision, so the next key
+            // gets to make one. Returning the tiebreak here instead is what a
+            // single-key sort does at the end, and doing it per key would order
+            // by the id the moment two rows shared a role.
+            if (cmp !== 0) return cmp;
         }
-        const cmp = compareValues(av, bv);
-        if (cmp === undefined || cmp === 0) return tiebreak(a, b);
-        return cmp * sign;
+        return tiebreak(a, b);
     });
+}
+
+/** One key's verdict: negative, positive, or 0 for "these two are equal here". */
+function compareOnKey(
+    a: Record<string, unknown>,
+    b: Record<string, unknown>,
+    field: string,
+    direction: "asc" | "desc"
+): number {
+    const av = a[field];
+    const bv = b[field];
+    const aNull = isNullish(toComparable(av));
+    const bNull = isNullish(toComparable(bv));
+    if (aNull || bNull) {
+        if (aNull && bNull) return 0;
+        // NULLS LAST ascending, NULLS FIRST descending.
+        return (aNull ? 1 : -1) * (direction === "desc" ? -1 : 1);
+    }
+    const cmp = compareValues(av, bv);
+    if (cmp === undefined || cmp === 0) return 0;
+    return cmp * (direction === "desc" ? -1 : 1);
 }
 
 function tiebreak(a: Record<string, unknown>, b: Record<string, unknown>): number {
@@ -433,21 +450,22 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
  */
 export function isLocallySortable(
     rows: readonly Record<string, unknown>[],
-    orderBy?: OrderByTuple
+    orderBy?: OrderBySpec
 ): boolean {
-    if (!orderBy) return true;
-    const [field] = orderBy;
-    for (const row of rows) {
+    const keys = normalizeOrderBy(orderBy);
+    if (!keys) return true;
+    // Every key has to be decidable, not just the first: a sort the local side
+    // can only agree with down to its second column is one it disagrees with.
+    return keys.every(([field]) => rows.every((row) => {
         const value = toComparable(row[field]);
-        if (isNullish(value)) continue;
-        if (typeof value === "number" || typeof value === "boolean") continue;
-        if (typeof value === "bigint") continue;
+        if (isNullish(value)) return true;
+        if (typeof value === "number" || typeof value === "boolean") return true;
+        if (typeof value === "bigint") return true;
         // A numeric string is compared as a number, so it is safe too — this is
         // the wire's type erasure, which `compareValues` already undoes.
-        if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) continue;
+        if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) return true;
         return false;
-    }
-    return true;
+    }));
 }
 
 /** Run a full query — filter, sort, paginate — over a set of rows. */

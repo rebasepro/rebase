@@ -2,12 +2,14 @@ import {
     FindParams,
     FindResult,
     LogicalCondition,
+    OrderByTuple,
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValueFor,
     type ComputedSortField
 } from "@rebasepro/types";
+import { normalizeOrderBy } from "@rebasepro/common";
 
 /**
  * SDK Query Builder — returns flat rows (`FindResult<M>`) instead of
@@ -72,9 +74,15 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
 
     /**
      * Order the results by a specific column.
+     *
+     * Call it again to add a tie-breaker rather than replace the sort: keys
+     * apply in the order they were added, so
+     * `.orderBy("roles").orderBy("created_at", "desc")` sorts by role and
+     * shows the newest first within each one.
      */
     orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
-        this.params.orderBy = [column, direction];
+        const existing = normalizeOrderBy(this.params.orderBy) ?? [];
+        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
         return this;
     }
 

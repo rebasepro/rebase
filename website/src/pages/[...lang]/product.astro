@@ -14,8 +14,13 @@ const t = useTranslations(currentLang as keyof typeof languages);
 
 import Layout from '../../layouts/Layout.astro';
 
-const title = "Rebase — a backend for your Postgres, and the admin panel that comes with it";
-const description = "REST, a typed SDK, realtime, auth and storage over your Postgres — with access control enforced by the database. The admin panel renders from the same definition, when you want one.";
+// Routed through t() like every other page. These two were hardcoded in English,
+// so /es/product, /de/product and /fr/product shipped an English title and
+// description while the localized product.meta.* keys went unread. The keys now
+// carry this exact copy — they had drifted to "Rebase Product Ecosystem", so
+// switching to t() first would have downgraded the English.
+const title = t("product.meta.title");
+const description = t("product.meta.description");
 
 import ProductContent from '../../components/pages/ProductContent.astro';
 const breadcrumbs = [

@@ -14,10 +14,10 @@ import { existsSync } from "fs";
 import { join } from "path";
 import type { Context } from "hono";
 import type { StorageController } from "./types";
-import type { StorageRegistry } from "./storage-registry";
+import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
-import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
+import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -232,6 +232,22 @@ export class TusHandler {
         }
         const storageId = metadata.storageId || c.req.query("storageId") || undefined;
 
+        // Refuse an unknown source now, while the request is cheap. `finalize`
+        // resolves the controller again and would refuse there too, but that is
+        // after the client has uploaded every byte — and before this check the
+        // resolution silently fell back to the default source, so the hook was
+        // asked about one bucket and the object landed in another.
+        if (storageId !== undefined && this.storageRegistry && !this.storageRegistry.has(canonicalStorageId(storageId))) {
+            throw new ApiError(
+                400,
+                "UNKNOWN_STORAGE_SOURCE",
+                `Unknown storage source "${storageId}". ` +
+                `Available: ${this.storageRegistry.list().map((k) => `"${k}"`).join(", ") || "(none)"}.`,
+                undefined,
+                true
+            );
+        }
+
         // Gate before any temp file exists, so a denied upload leaves nothing
         // behind to resume.
         if (this.authorizeUpload) {
@@ -390,9 +406,18 @@ export class TusHandler {
         const storageId = upload.storageId;
         let targetController = this.storageController;
         if (this.storageRegistry) {
-            targetController = storageId
-                ? this.storageRegistry.getOrDefault(storageId)
-                : this.storageRegistry.getDefault();
+            try {
+                targetController = storageId
+                    ? this.storageRegistry.getOrDefault(storageId)
+                    : this.storageRegistry.getDefault();
+            } catch (err) {
+                // `create` already refused an unknown source, so reaching this
+                // means the registry changed under a resumable upload. Fall
+                // into the "nothing to write to" branch below rather than
+                // letting it surface as a 500 — and never into another bucket.
+                if (!(err instanceof UnknownStorageSourceError)) throw err;
+                targetController = undefined;
+            }
         }
 
         if (!targetController) {

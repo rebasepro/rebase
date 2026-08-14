@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
-import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
+import { parseQueryOptions, orderByEntriesToTuples, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
@@ -307,8 +307,7 @@ export class RestApiGenerator {
                         logical: queryOptions.logical,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
-                        orderBy: queryOptions.orderBy?.[0]?.field,
-                        order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
+                        orderBy: orderByEntriesToTuples(queryOptions.orderBy),
                         searchString,
                         searchExplain,
                         vectorSearch: queryOptions.vectorSearch
@@ -978,8 +977,7 @@ id: parsed.id });
                     logical: queryOptions.logical,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
-                    orderBy: queryOptions.orderBy?.[0]?.field,
-                    order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" as const : "asc" as const,
+                    orderBy: orderByEntriesToTuples(queryOptions.orderBy),
                     searchString
                 };
                 const entities = fetchService
@@ -1150,8 +1148,7 @@ id: parsed.id });
             // group exactly as the Postgres path did.
             logical: queryOptions.logical,
             limit: queryOptions.limit,
-            orderBy: queryOptions.orderBy?.[0]?.field,
-            order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
+            orderBy: orderByEntriesToTuples(queryOptions.orderBy),
             startAfter: queryOptions.offset ? String(queryOptions.offset) : undefined,
             searchString,
             vectorSearch: queryOptions.vectorSearch

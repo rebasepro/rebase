@@ -332,7 +332,7 @@ width: 120 }}
       >
         {entity.image ? (
           <img
-            src={entity.image}
+            src={entity.image} {...imgDims(entity.image)}
             alt=""
             className="w-[90px] h-[40px] object-cover rounded-md"
             loading="lazy"

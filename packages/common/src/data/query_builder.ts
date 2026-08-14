@@ -4,11 +4,13 @@ import {
     FindParams,
     FindResponse,
     LogicalCondition,
+    OrderByTuple,
     QueryBuilderInterface,
     WhereFilterOp,
     WhereValueFor,
     type ComputedSortField
 } from "@rebasepro/types";
+import { normalizeOrderBy } from "./sort-dialect";
 
 export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
     return { type: "or",
@@ -78,11 +80,18 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
 
     /**
      * Order the results by a specific column.
+     *
+     * Called again, this adds a tie-breaker rather than replacing the sort:
+     * keys apply in the order they were added.
+     *
      * @example
      * client.collection('users').orderBy('createdAt', 'desc').find()
+     * @example
+     * client.collection('users').orderBy('roles').orderBy('createdAt', 'desc').find()
      */
     orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
-        this.params.orderBy = [column, direction];
+        const existing = normalizeOrderBy(this.params.orderBy) ?? [];
+        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
         return this;
     }
 

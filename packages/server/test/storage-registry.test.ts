@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/g
 import {
     StorageRegistry,
     DefaultStorageRegistry,
-    DEFAULT_STORAGE_ID
+    DEFAULT_STORAGE_ID,
+    UnknownStorageSourceError
 } from "../src/storage/storage-registry";
 import { StorageController } from "../src/storage/types";
 
@@ -118,21 +119,44 @@ describe("StorageRegistry", () => {
                 expect(registry.getOrDefault(null)).toBe(defaultController);
             });
 
-            it("should fallback to default when id not found", () => {
-                const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
-
-                expect(registry.getOrDefault("non-existent")).toBe(defaultController);
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('Storage "non-existent" not found')
-                );
-
-                consoleSpy.mockRestore();
+            /**
+             * "Or default" means *when no id was given*, not *when the id is
+             * wrong*. Falling back on an unknown id hands the caller a
+             * different bucket than the one the `storageAuthorize` hook was
+             * asked about — and since a second source exists precisely to hold
+             * the same keys, it returns plausible bytes rather than an error.
+             */
+            it("refuses an id that names no registered source", () => {
+                expect(() => registry.getOrDefault("non-existent"))
+                    .toThrow(UnknownStorageSourceError);
             });
 
-            it("should throw when fallback fails (no default)", () => {
+            it("names the registered sources so the caller can see the typo", () => {
+                try {
+                    registry.getOrDefault("medai");
+                    throw new Error("expected getOrDefault to throw");
+                } catch (err) {
+                    expect(err).toBeInstanceOf(UnknownStorageSourceError);
+                    expect((err as UnknownStorageSourceError).storageId).toBe("medai");
+                    expect((err as UnknownStorageSourceError).knownKeys)
+                        .toEqual(expect.arrayContaining([DEFAULT_STORAGE_ID, "media"]));
+                }
+            });
+
+            it("treats every spelling of the default source as 'no id given'", () => {
+                // These reach the registry from `?storageId=`, where omitted,
+                // empty and the literal key all mean the same source. If they
+                // did not agree here, an empty parameter would 400.
+                for (const spelling of [undefined, null, "", "   ", DEFAULT_STORAGE_ID]) {
+                    expect(registry.getOrDefault(spelling)).toBe(defaultController);
+                }
+            });
+
+            it("should throw when there is no default to fall back to", () => {
                 const emptyRegistry = new DefaultStorageRegistry();
 
                 expect(() => emptyRegistry.getOrDefault("anything")).toThrow();
+                expect(() => emptyRegistry.getOrDefault(undefined)).toThrow();
             });
         });
 

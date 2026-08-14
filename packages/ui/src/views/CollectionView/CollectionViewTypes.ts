@@ -1,4 +1,5 @@
 import React from "react";
+import type { VirtualTableSortKey } from "../../components/VirtualTable/VirtualTableProps";
 
 /** Supported view modes */
 export type CollectionViewMode = "table" | "cards" | "kanban" | "list";
@@ -80,8 +81,9 @@ export interface CollectionDataController<T = Record<string, unknown>> {
     filterValues?: Record<string, [string, unknown]>;
     setFilterValues?: (values: Record<string, [string, unknown]> | undefined) => void;
 
-    sortBy?: [string, "asc" | "desc"];
-    setSortBy?: (sort?: [string, "asc" | "desc"]) => void;
+    /** The sort keys in order of significance; the second breaks ties on the first. */
+    sortBy?: VirtualTableSortKey[];
+    setSortBy?: (sort?: VirtualTableSortKey[]) => void;
 
     searchString?: string;
     setSearchString?: (search?: string) => void;

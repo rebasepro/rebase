@@ -9,6 +9,7 @@ import {
     FindResult,
     IterateParams,
     LogicalCondition,
+    OrderByTuple,
     RebaseData,
     RebaseSdkData,
     SDKCollectionClient,
@@ -21,6 +22,7 @@ import {
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
+import { normalizeOrderBy } from "./sort-dialect";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
 
@@ -191,8 +193,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         logical: params?.logical,
                         limit,
                         offset: driverOffset,
-                        orderBy: params?.orderBy?.[0],
-                        order: params?.orderBy?.[1],
+                        orderBy: normalizeOrderBy(params?.orderBy),
                         searchString: params?.searchString
                     },
                     params?.include
@@ -203,8 +204,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     offset: driverOffset,
                     filter,
                     logical: params?.logical,
-                    orderBy: params?.orderBy?.[0],
-                    order: params?.orderBy?.[1],
+                    orderBy: normalizeOrderBy(params?.orderBy),
                     searchString: params?.searchString
                 });
 
@@ -330,8 +330,7 @@ ids });
                     offset: driverOffset,
                     filter: params?.where,
                     logical: params?.logical,
-                    orderBy: params?.orderBy?.[0],
-                    order: params?.orderBy?.[1],
+                    orderBy: normalizeOrderBy(params?.orderBy),
                     searchString: params?.searchString,
                     searchExplain: params?.searchExplain,
                     onUpdate: (entities) => {
@@ -494,8 +493,10 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         return this;
     }
 
+    /** Called again, this adds a tie-breaker rather than replacing the sort. */
     orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
-        this.params.orderBy = [column, direction];
+        const existing = normalizeOrderBy(this.params.orderBy) ?? [];
+        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
         return this;
     }
 

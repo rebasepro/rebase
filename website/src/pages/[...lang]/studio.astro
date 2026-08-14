@@ -13,8 +13,11 @@ const t = useTranslations(currentLang as keyof typeof languages);
 
 import Layout from '../../layouts/Layout.astro';
 
-const title = "Rebase Studio — Visual Admin Panel for Postgres";
-const description = "A full-featured admin panel that generates real TypeScript code. Schema editor, SQL editor, RLS policies, Kanban boards, rich text, storage, and more.";
+// See the note in product.astro — same bug, same fix. The old hardcoded title also
+// called Studio "Visual Admin Panel for Postgres", which is the one thing it is
+// not: /admin is the panel, /studio is the workspace registered inside it.
+const title = t("studio.meta.title");
+const description = t("studio.meta.description");
 
 import StudioContent from '../../components/pages/StudioContent.astro';
 const breadcrumbs = [

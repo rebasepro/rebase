@@ -4,8 +4,8 @@
  * Translates Rebase filter conditions to MongoDB query operators.
  */
 
-import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, WhereFilterOp } from "@rebasepro/types";
-import { toFilterTuples } from "@rebasepro/common";
+import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, OrderByTuple, WhereFilterOp } from "@rebasepro/types";
+import { normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
 import { Filter, Document } from "mongodb";
 import { ApiError, logger } from "@rebasepro/server";
 
@@ -295,15 +295,27 @@ export class MongoConditionBuilder {
     /**
      * Build MongoDB sort options from Rebase options
      *
-     * @param orderBy - Field to order by
-     * @param order - Sort direction
+     * A Mongo sort document is already an ordered map of field to direction, so
+     * a multi-key sort is expressed directly: the keys are applied in insertion
+     * order, each breaking ties on the one before it.
+     *
+     * @param orderBy - Field to order by, or the `[field, direction]` list
+     * @param order - Sort direction, for the single-field spelling
      * @returns MongoDB sort object
      */
     static buildSort(
-        orderBy?: string,
+        orderBy?: string | OrderByTuple[],
         order?: "asc" | "desc"
     ): Record<string, 1 | -1> | undefined {
-        if (!orderBy) return undefined;
-        return { [orderBy]: order === "desc" ? -1 : 1 };
+        const keys = normalizeDriverOrderBy(orderBy, order);
+        if (!keys) return undefined;
+        const sort: Record<string, 1 | -1> = {};
+        // A repeated field is the first occurrence's: that is the key Mongo
+        // would sort by, and letting a later duplicate overwrite it would order
+        // by a direction the caller listed as less significant.
+        for (const [field, direction] of keys) {
+            if (!(field in sort)) sort[field] = direction === "desc" ? -1 : 1;
+        }
+        return sort;
     }
 }

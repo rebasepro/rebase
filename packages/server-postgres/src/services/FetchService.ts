@@ -1,8 +1,8 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
@@ -29,6 +29,9 @@ import { reachedDatabase } from "../utils/pg-error-utils";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
 type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
+
+/** One sort key, with the column or expression it was resolved to. */
+type ResolvedOrderKey = { field: string; direction: "asc" | "desc"; target: AnyPgColumn | SQL };
 
 /**
  * Service for handling all row read operations.
@@ -143,6 +146,48 @@ export class FetchService {
             if (rank) return rank;
         }
         return this.resolveOrderByField(table, orderBy, collection);
+    }
+
+    /**
+     * Resolve every sort key to the expression it orders by, in order of
+     * significance.
+     *
+     * A key that resolves to nothing is dropped rather than skipping the rest:
+     * `resolveOrderByField` only *returns* undefined under the lenient
+     * unknown-field mode, where dropping is the configured answer, and dropping
+     * one key of several still honours the ones that did resolve.
+     */
+    private resolveOrderKeys(
+        table: PgTable<any>,
+        keys: OrderByTuple[],
+        collection?: CollectionConfig,
+        searchString?: string
+    ): ResolvedOrderKey[] {
+        const resolved: ResolvedOrderKey[] = [];
+        for (const [field, direction] of keys) {
+            const target = this.resolveOrderTarget(table, field, collection, searchString);
+            if (target) resolved.push({ field,
+direction,
+target });
+        }
+        return resolved;
+    }
+
+    /**
+     * The full `ORDER BY`: the caller's keys, then the id.
+     *
+     * The id is always last and always descending. It is not decoration — it is
+     * what makes the ordering *total*, and a cursor over a non-total order
+     * repeats and skips rows among the ties. Every keyset comparison built by
+     * {@link buildCursorConditions} ends on the same `id DESC`, and the two have
+     * to agree: they did not, and an ascending sort paged with `id >` against an
+     * `ORDER BY … , id DESC`, so rows sharing a sort value were dropped from
+     * every page after the first.
+     */
+    private buildOrderExpressions(keys: ResolvedOrderKey[], idField: AnyPgColumn): SQL[] {
+        const expressions = keys.map(({ direction, target }) => direction === "asc" ? asc(target) : desc(target));
+        expressions.push(desc(idField));
+        return expressions as SQL[];
     }
 
     private resolveOrderByField(
@@ -442,7 +487,7 @@ export class FetchService {
         idInfo: { fieldName: string; type: "string" | "number" },
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -506,18 +551,11 @@ export class FetchService {
         }
 
         // OrderBy
-        const orderExpressions: unknown[] = [];
-        if (options.orderBy) {
-            const collection = getCollectionByPath(collectionPath, this.registry);
-            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
-            if (orderByField) {
-                orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
-            }
-        }
-        orderExpressions.push(desc(idField));
-        if (orderExpressions.length > 0) {
-            queryOpts.orderBy = orderExpressions;
-        }
+        const orderKeys = normalizeDriverOrderBy(options.orderBy, options.order);
+        const resolvedOrder = orderKeys
+            ? this.resolveOrderKeys(table, orderKeys, getCollectionByPath(collectionPath, this.registry), options.searchString)
+            : [];
+        queryOpts.orderBy = this.buildOrderExpressions(resolvedOrder, idField);
 
         // Limit
         const limitValue = options.searchString ? (options.limit || 50) : options.limit;
@@ -531,25 +569,31 @@ export class FetchService {
 
     /**
      * Extract cursor pagination conditions from startAfter options.
+     *
+     * "Every row that sorts after this one", written out as a comparison over
+     * the same keys the `ORDER BY` uses and ending on the same `id DESC`. With
+     * one key that is the familiar `k > v OR (k = v AND id < cursorId)`; with
+     * several it nests, each key's tie handing the decision to the next.
      */
     private buildCursorConditions(
         table: PgTable<any>,
         idField: AnyPgColumn,
         idInfo: { fieldName: string; type: "string" | "number" },
-        options: { orderBy?: string; order?: "desc" | "asc"; startAfter?: Record<string, unknown> },
+        options: { orderBy?: string | OrderByTuple[]; order?: "desc" | "asc"; startAfter?: Record<string, unknown> },
         collectionPath?: string
     ): SQL[] {
         if (!options.startAfter) return [];
         const cursor = options.startAfter;
+        const keys = normalizeDriverOrderBy(options.orderBy, options.order);
 
-        if (options.orderBy) {
+        if (keys) {
             // Relevance is computed per query, not stored, so there is no value
             // on the cursor row to compare a later page against — and two
             // requests with different search strings would produce scores that
             // are not on the same scale at all. Refusing is the only honest
             // answer: a dropped cursor condition silently repeats and skips
             // rows, which is precisely what paging exists to prevent.
-            if (options.orderBy === FetchService.SCORE_FIELD) {
+            if (keys.some(([field]) => field === FetchService.SCORE_FIELD)) {
                 throw ApiError.badRequest(
                     "Cursor pagination (`startAfter`) cannot be combined with `orderBy: \"_score\"`. " +
                     "Relevance is computed per query rather than stored, so it cannot key a cursor. " +
@@ -559,23 +603,25 @@ export class FetchService {
                 );
             }
             const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
-            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
-            if (orderByField) {
-                const startAfterOrderValue = (cursor.values as Record<string, unknown> | undefined)?.[options.orderBy] ?? cursor[options.orderBy];
-                const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
+            const resolved = this.resolveOrderKeys(table, keys, collection);
+            const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
 
-                if (startAfterOrderValue !== undefined && startAfterId !== undefined) {
-                    if (options.order === "asc") {
-                        return [or(
-                            gt(orderByField, startAfterOrderValue),
-                            and(eq(orderByField, startAfterOrderValue), gt(idField, startAfterId))
-                        )!];
-                    } else {
-                        return [or(
-                            lt(orderByField, startAfterOrderValue),
-                            and(eq(orderByField, startAfterOrderValue), lt(idField, startAfterId))
-                        )!];
-                    }
+            if (resolved.length > 0 && startAfterId !== undefined) {
+                const cursorValues = cursor.values as Record<string, unknown> | undefined;
+                // `in`, not `??`: a cursor row whose sort value is genuinely
+                // NULL is a row this has to be able to page past, and `??`
+                // read it as "the cursor did not carry this key" and dropped
+                // the whole condition.
+                const values = resolved.map(({ field }) => (cursorValues && field in cursorValues)
+                    ? cursorValues[field]
+                    : cursor[field]);
+                // Every key needs a value from the cursor row. A missing one
+                // cannot be guessed, and a comparison built from the keys that
+                // happen to be present is not the same comparison — so this
+                // falls through to no cursor condition, which is what a single
+                // missing sort value has always done here.
+                if (values.every((value) => value !== undefined)) {
+                    return [this.buildKeysetComparison(resolved, values, idField, startAfterId)];
                 }
             }
         } else {
@@ -588,6 +634,54 @@ export class FetchService {
         }
 
         return [];
+    }
+
+    /**
+     * "Sorts strictly after the cursor row", over `keys` and then the id.
+     *
+     * Built by recursion rather than as a row-value comparison — `(a, b) > (x, y)`
+     * would be shorter, but it is only correct when every key runs the same
+     * direction, and `roles ASC, created_at DESC` is exactly the case this
+     * exists to serve.
+     *
+     * NULLs are compared by the rule Postgres sorts them under (last ascending,
+     * first descending) rather than by `>`/`<`, which answer *unknown* against
+     * NULL and therefore match nothing. Ordering by a nullable column and paging
+     * used to drop every row whose sort value was NULL from page two onward.
+     */
+    private buildKeysetComparison(
+        keys: ResolvedOrderKey[],
+        values: unknown[],
+        idField: AnyPgColumn,
+        cursorId: unknown,
+        index = 0
+    ): SQL {
+        // Past the last key, the id settles it. It is ordered `DESC`, so "after"
+        // the cursor row means a smaller id.
+        if (index >= keys.length) return lt(idField, cursorId);
+
+        const { direction } = keys[index];
+        // A column, not an expression: the one target that is an expression is
+        // `_score`, and a cursor over relevance is refused before this is
+        // reached. Drizzle's comparison helpers are typed per operand kind, so
+        // the union has to be resolved here rather than at the call site.
+        const target = keys[index].target as AnyPgColumn;
+        const value = values[index];
+        const rest = this.buildKeysetComparison(keys, values, idField, cursorId, index + 1);
+
+        if (value === null) {
+            // The cursor row sorts among the NULLs.
+            return direction === "asc"
+                // NULLS LAST: nothing non-null is left, so only later NULLs.
+                ? and(isNull(target), rest)!
+                // NULLS FIRST: every non-null row is still ahead, plus later NULLs.
+                : or(isNotNull(target), and(isNull(target), rest))!;
+        }
+
+        return direction === "asc"
+            // NULLS LAST, so the NULLs are still ahead of a non-null cursor row.
+            ? or(gt(target, value), isNull(target), and(eq(target, value), rest))!
+            : or(lt(target, value), and(eq(target, value), rest))!;
     }
 
     /**
@@ -779,7 +873,7 @@ idColumn };
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -909,18 +1003,19 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             if (finalCondition) query = query.where(finalCondition);
         }
 
-        const orderExpressions = [];
         // Vector search overrides ORDER BY with distance (ascending = closest first)
-        if (vectorMeta) {
-            orderExpressions.push(asc(vectorMeta.orderBy));
-        } else if (options.orderBy) {
-            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
-            if (orderByField) {
-                orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
-            }
-        }
-        orderExpressions.push(desc(idField));
-        if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
+        const orderExpressions = vectorMeta
+            ? [asc(vectorMeta.orderBy), desc(idField)]
+            : this.buildOrderExpressions(
+                this.resolveOrderKeys(
+                    table,
+                    normalizeDriverOrderBy(options.orderBy, options.order) ?? [],
+                    collection,
+                    options.searchString
+                ),
+                idField
+            );
+        query = query.orderBy(...orderExpressions);
 
         if (options.startAfter) {
             const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
@@ -1098,7 +1193,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
              * logical group was pushed every row in the table.
              */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -1137,7 +1232,7 @@ relatedTo: hop });
              * that RLS allowed.
              */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;
@@ -1269,7 +1364,7 @@ relatedTo: hop });
             filter?: FilterValues<Extract<keyof M, string>>;
             /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -1546,7 +1641,7 @@ relatedTo: hop }, include
              * described different sets of rows.
              */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -1627,17 +1722,19 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             if (finalCondition) query = query.where(finalCondition);
         }
 
-        const orderExpressions = [];
-        if (vectorMeta) {
-            orderExpressions.push(asc(vectorMeta.orderBy));
-        } else if (options.orderBy) {
-            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
-            if (orderByField) {
-                orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
-            }
-        }
-        orderExpressions.push(desc(idField));
-        if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
+        // Vector search overrides ORDER BY with distance (ascending = closest first)
+        const orderExpressions = vectorMeta
+            ? [asc(vectorMeta.orderBy), desc(idField)]
+            : this.buildOrderExpressions(
+                this.resolveOrderKeys(
+                    table,
+                    normalizeDriverOrderBy(options.orderBy, options.order) ?? [],
+                    collection,
+                    options.searchString
+                ),
+                idField
+            );
+        query = query.orderBy(...orderExpressions);
 
         const limitValue = options.vectorSearch
             ? (options.limit || 10)

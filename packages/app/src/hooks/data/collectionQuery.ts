@@ -1,4 +1,4 @@
-import type { FindParams, FilterValues, LogicalCondition } from "@rebasepro/types";
+import type { FindParams, FilterValues, LogicalCondition, OrderBySpec } from "@rebasepro/types";
 
 /**
  * The one place a collection read's parameters are assembled.
@@ -24,12 +24,12 @@ export interface CollectionQueryInput<M extends Record<string, unknown>> {
     logical?: LogicalCondition;
     /**
      * Loosened from `FindParams["orderBy"]` on purpose: callers hold the sort
-     * as a plain `[string, direction]` read off user config or a URL, where the
-     * column is not statically known. Narrowing it here would push a cast onto
-     * every call site, which is the kind of friction that sends people back to
-     * hand-building the object this exists to replace.
+     * as plain `[string, direction]` pairs read off user config or a URL, where
+     * the columns are not statically known. Narrowing it here would push a cast
+     * onto every call site, which is the kind of friction that sends people back
+     * to hand-building the object this exists to replace.
      */
-    orderBy?: [string, "asc" | "desc"];
+    orderBy?: OrderBySpec;
     limit?: number;
     offset?: number;
     page?: number;

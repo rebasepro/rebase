@@ -1,5 +1,5 @@
 
-import type { Properties, Property } from "@rebasepro/types";
+import type { OrderByTuple, Properties, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
 import { CollectionSize, EntityAction, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
@@ -540,11 +540,11 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         ...(columnMode ? [] : slotKeys.relationKeys)
     ]), [titleColumn, imagePropertyKey, subtitleKey, declaredColumns, columnMode, slotKeys.relationKeys]);
 
-    /** The property the sort names, when no cell already shows it. */
-    const sortedKey = useMemo(() => {
-        const key = sortBy?.[0];
-        return key && !shownKeys.has(key) ? key : undefined;
-    }, [sortBy, shownKeys]);
+    /** The properties the sort names, minus the ones a cell already shows. */
+    const sortedKeys = useMemo(
+        () => (sortBy ?? []).map(([key]) => key as string).filter(key => !shownKeys.has(key)),
+        [sortBy, shownKeys]
+    );
 
     /** The properties the filters name, minus the ones a cell already shows. */
     const filteredKeys = useMemo(
@@ -561,23 +561,28 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
      * and clearing a sort says nothing about wanting to stop seeing the property
      * it sorted on.
      *
-     * What it does *not* do is accumulate. There is only ever one sort, so
-     * ordering by four properties in turn is changing one's mind four times, not
-     * asking for four columns — and asking for four is how the row lost its
-     * status and its date to a wall of numbers. A new sort therefore replaces
-     * the property the last one left behind, and a new set of filters replaces
-     * the set before it. At most one sort column and one set of filter columns
-     * outlive their request.
+     * What it does *not* do is accumulate. A sort names the properties it names
+     * *now*, so ordering by four properties in turn is changing one's mind four
+     * times, not asking for four columns — and asking for four is how the row
+     * lost its status and its date to a wall of numbers. A new sort therefore
+     * replaces the properties the last one left behind, and a new set of filters
+     * replaces the set before it. At most one sort's columns and one set of
+     * filter columns outlive their request.
      *
      * The list remounts per collection (it is keyed by path), so this is the
      * memory of one visit to one collection, not a preference.
      */
-    const [lastSortedKey, setLastSortedKey] = useState<string | undefined>(undefined);
+    const [lastSortedKeys, setLastSortedKeys] = useState<string[]>([]);
     const [lastFilteredKeys, setLastFilteredKeys] = useState<string[]>([]);
 
     useEffect(() => {
-        if (sortedKey) setLastSortedKey(sortedKey);
-    }, [sortedKey]);
+        if (sortedKeys.length === 0) return;
+        // Same members, same array — see the filter effect below.
+        setLastSortedKeys(previous =>
+            previous.length === sortedKeys.length && previous.every((key, i) => key === sortedKeys[i])
+                ? previous
+                : sortedKeys);
+    }, [sortedKeys]);
 
     useEffect(() => {
         if (filteredKeys.length === 0) return;
@@ -602,14 +607,14 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         // read in that order rather than from state alone, because the effects
         // above have not run yet on the render that first sees a request, and
         // waiting a frame would flash the row without its new column.
-        const active = new Set([...filteredKeys, ...(sortedKey ? [sortedKey] : [])]);
+        const active = new Set([...filteredKeys, ...sortedKeys]);
         const keys: string[] = [];
         const request = (key: string | undefined) => {
             if (!key || keys.includes(key) || shownKeys.has(key)) return;
             keys.push(key);
         };
         (filteredKeys.length > 0 ? filteredKeys : lastFilteredKeys).forEach(request);
-        request(sortedKey ?? lastSortedKey);
+        (sortedKeys.length > 0 ? sortedKeys : lastSortedKeys).forEach(request);
 
         return keys.flatMap((key, index) => {
             const property = getResolvedPropertyInPath(resolvedCollection.properties, key) as Property | undefined;
@@ -624,7 +629,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                 priority: (active.has(key) ? PRIORITY_ACTIVE_REQUEST : PRIORITY_STALE_REQUEST) - index
             }];
         });
-    }, [filteredKeys, sortedKey, lastFilteredKeys, lastSortedKey, shownKeys, resolvedCollection, sortableKeys]);
+    }, [filteredKeys, sortedKeys, lastFilteredKeys, lastSortedKeys, shownKeys, resolvedCollection, sortableKeys]);
 
     // ── Compute list-view-visible actions per entity ──
     const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
@@ -733,26 +738,51 @@ customEntityActions });
         handleSelectionChange(entity, selected);
     }, [handleSelectionChange]);
 
+    /** Where each sorted column sits in the order, so a header can show its rank. */
+    const sortIndex = useMemo(() => {
+        const index = new Map<string, { direction: "asc" | "desc"; position: number }>();
+        (sortBy ?? []).forEach(([key, direction], position) => {
+            if (!index.has(key as string)) index.set(key as string, { direction,
+position });
+        });
+        return index;
+    }, [sortBy]);
+
     /**
      * Order by a column, on the same cycle a table header runs: unordered →
-     * ascending → descending → unordered. Clicking a header here and clicking it
+     * ascending → descending → unordered, and shift-click to add the column
+     * under the sort already in place. Clicking a header here and clicking it
      * in the table view have to mean the same thing, because they are the same
      * collection under the same controller.
      */
-    const onColumnSort = useCallback((key: string) => {
+    const onColumnSort = useCallback((key: string, additive = false) => {
         if (!setSortBy) return;
-        const active = sortBy?.[0] === key ? sortBy[1] : undefined;
-        const next: [string, "asc" | "desc"] | undefined = active === "asc"
-            ? [key, "desc"]
+        const active = sortIndex.get(key)?.direction;
+        const next: "asc" | "desc" | undefined = active === "asc"
+            ? "desc"
             : active === "desc"
                 ? undefined
-                : [key, "asc"];
-        setSortBy(next);
+                : "asc";
+
+        const existing = (sortBy ?? []) as OrderByTuple[];
+        let updated: OrderByTuple[] | undefined;
+        if (!additive) {
+            updated = next ? [[key, next]] : undefined;
+        } else if (next === undefined) {
+            updated = existing.filter(([existingKey]) => existingKey !== key);
+        } else if (active === undefined) {
+            updated = [...existing, [key, next]];
+        } else {
+            updated = existing.map((entry) => entry[0] === key ? [key, next] as OrderByTuple : entry);
+        }
+        if (updated?.length === 0) updated = undefined;
+
+        setSortBy(updated as Parameters<NonNullable<typeof setSortBy>>[0]);
         // Re-ordering a partially loaded collection invalidates the pages
         // already fetched — they are no longer the rows the query answers with —
         // so pagination starts over, as it does for the table and the sort menu.
         setItemCount?.(pageSize);
-    }, [setSortBy, sortBy, setItemCount, pageSize]);
+    }, [setSortBy, sortBy, sortIndex, setItemCount, pageSize]);
 
     /**
      * Whether a sort can be offered at all next to the filter already applied.
@@ -763,11 +793,11 @@ customEntityActions });
     const sortIsAvailable = useCallback((key: string) => {
         if (!setSortBy) return false;
         if (!checkFilterCombination) return true;
-        const active = sortBy?.[0] === key ? sortBy[1] : undefined;
+        const active = sortIndex.get(key)?.direction;
         // Clearing the sort is always available: it asks nothing of the driver.
         if (active === "desc") return true;
-        return checkFilterCombination(filterValues ?? {}, [key, active === "asc" ? "desc" : "asc"]);
-    }, [setSortBy, checkFilterCombination, filterValues, sortBy]);
+        return checkFilterCombination(filterValues ?? {}, [[key, active === "asc" ? "desc" : "asc"]]);
+    }, [setSortBy, checkFilterCombination, filterValues, sortIndex]);
 
     const header = (titleColumn || visibleColumns.length > 0) && (
         <ListHeader
@@ -776,7 +806,7 @@ customEntityActions });
             selectionEnabled={selectionEnabled && !combineSelection}
             showImage={showImage}
             actionsWidth={actionsWidth}
-            sortBy={sortBy as [string, "asc" | "desc"] | undefined}
+            sortIndex={sortIndex}
             onColumnSort={onColumnSort}
             sortIsAvailable={sortIsAvailable}
         />
@@ -1264,7 +1294,7 @@ function ListHeader({
     selectionEnabled,
     showImage,
     actionsWidth,
-    sortBy,
+    sortIndex,
     onColumnSort,
     sortIsAvailable
 }: {
@@ -1273,15 +1303,18 @@ function ListHeader({
     selectionEnabled?: boolean;
     showImage: boolean;
     actionsWidth: number;
-    sortBy?: [string, "asc" | "desc"];
-    onColumnSort: (key: string) => void;
+    sortIndex: Map<string, { direction: "asc" | "desc"; position: number }>;
+    onColumnSort: (key: string, additive?: boolean) => void;
     sortIsAvailable: (key: string) => boolean;
 }) {
     const headerCell = (column: ListColumn) => (
         <ListHeaderLabel
             column={column}
-            direction={sortBy?.[0] === column.key ? sortBy[1] : undefined}
-            onSort={column.sortable && sortIsAvailable(column.key) ? () => onColumnSort(column.key) : undefined}
+            direction={sortIndex.get(column.key)?.direction}
+            position={sortIndex.size > 1 ? sortIndex.get(column.key)?.position : undefined}
+            onSort={column.sortable && sortIsAvailable(column.key)
+                ? (additive: boolean) => onColumnSort(column.key, additive)
+                : undefined}
         />
     );
 
@@ -1329,17 +1362,25 @@ function ListHeader({
 function ListHeaderLabel({
     column,
     direction,
+    position,
     onSort
 }: {
     column: ListColumn;
     direction?: "asc" | "desc";
-    onSort?: () => void;
+    /** Rank in a multi-key sort, or `undefined` when one key says it all. */
+    position?: number;
+    onSort?: (additive: boolean) => void;
 }) {
     const content = (
         <>
             <span className="truncate">{column.label}</span>
             {direction === "asc" && <ArrowUpIcon size={12} className="flex-shrink-0"/>}
             {direction === "desc" && <ArrowDownIcon size={12} className="flex-shrink-0"/>}
+            {direction && position !== undefined && (
+                <span className="flex-shrink-0 text-[9px] font-bold leading-none tabular-nums">
+                    {position + 1}
+                </span>
+            )}
         </>
     );
 
@@ -1355,8 +1396,8 @@ function ListHeaderLabel({
     return (
         <button
             type="button"
-            title={`Sort by ${column.label}`}
-            onClick={onSort}
+            title={`Sort by ${column.label} — shift-click to add it under the current sort`}
+            onClick={(event) => onSort(event.shiftKey)}
             className={cls(base, tone, "cursor-pointer hover:text-surface-700 dark:hover:text-surface-200 transition-colors")}
         >
             {content}

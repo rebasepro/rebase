@@ -51,6 +51,7 @@ const capabilities = [
     { title: "Users, roles and what they can reach", desc: "The same roles your RLS policies read, managed by people who will never open psql." },
     { title: "Import, export, bulk edit", desc: "CSV, JSON or Excel in with field mapping; one click out. Thousands of rows without a migration script." },
 ];
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -110,8 +111,7 @@ const capabilities = [
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-                    <span class="font-mono text-surface-500">01</span>
-                    <span class="mx-2 text-surface-600">·</span>The tour
+                    The tour
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                     Not a table viewer. A place to work.
@@ -139,8 +139,7 @@ const capabilities = [
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-                        <span class="font-mono text-surface-500">02</span>
-                        <span class="mx-2 text-surface-600">·</span>Day to day
+                        Day to day
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-8">
                         What the people who are not developers actually get
@@ -194,8 +193,7 @@ const capabilities = [
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-                    <span class="font-mono text-surface-500">03</span>
-                    <span class="mx-2 text-surface-600">·</span>Yours to extend
+                    Yours to extend
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                     It is a React app. Treat it like one.
@@ -260,8 +258,7 @@ const capabilities = [
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-                    <span class="font-mono text-surface-500">04</span>
-                    <span class="mx-2 text-surface-600">·</span>The cost of adding it
+                    The cost of adding it
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">A layer, not a lock-in</h2>
                 <p class="mt-5 text-lg leading-8 text-surface-400">
@@ -321,8 +318,7 @@ const capabilities = [
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-                    <span class="font-mono text-surface-500">05</span>
-                    <span class="mx-2 text-surface-600">·</span>Where it fits
+                    Where it fits
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Three layers, adopted in any order</h2>
             </div>
@@ -385,4 +381,7 @@ const capabilities = [
             </div>
         </div>
     </section>
+
+    <ClosingCta title="Add the panel when you need it." blurb="Scaffold a project, define one collection, and the back office is already there — or leave it out and nothing about the API changes." trackId="admin" />
+
 </div>

@@ -944,7 +944,11 @@ export function CrmDashboardDemo() {
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-4">
                     <div>
                         <Typography variant="h4" className="tracking-tight">
-                            {getGreeting()} 👋
+                            {/* No emoji: this demo renders inside the public rebase.pro/ui
+                                gallery, and emoji render differently on every platform,
+                                cannot be recoloured, and read as a placeholder for a design
+                                decision nobody made. The greeting carries itself. */}
+                            {getGreeting()}
                         </Typography>
                         <Typography variant="body2" color="secondary" className="mt-0.5">
                             {getFormattedDate()} — here&apos;s your crm overview.

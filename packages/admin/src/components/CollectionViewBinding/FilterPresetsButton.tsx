@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { CheckIcon, ChevronsUpDownIcon, cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
-import type { FilterValues, FilterPreset } from "@rebasepro/types";
+import type { FilterValues, FilterPreset, OrderByTuple } from "@rebasepro/types";
+import { normalizeOrderBy } from "@rebasepro/common";
 import type { EntityTableController, PropertyPath } from "@rebasepro/admin-types";
 
 export interface FilterPresetsButtonProps<M extends Record<string, unknown>> {
@@ -216,19 +217,19 @@ export function FilterPresetsButton<M extends Record<string, unknown>>({
             // otherwise find sort from remaining active presets
             if (!wasActive && preset.sort) {
                 tableController.setSortBy?.(
-                    preset.sort as [Extract<keyof M, string> | (string & {}), "asc" | "desc"]
+                    normalizeOrderBy(preset.sort) as OrderByTuple<Extract<keyof M, string> | (string & {})>[]
                 );
             } else if (wasActive) {
-                let remainingSort: [string, "asc" | "desc"] | undefined;
+                let remainingSort: OrderByTuple[] | undefined;
                 for (let i = 0; i < filterPresets.length; i++) {
                     if (i === index) continue;
                     const other = filterPresets[i] as FilterPreset<string>;
                     if (isPresetActive(other, currentFilters) && other.sort) {
-                        remainingSort = other.sort;
+                        remainingSort = normalizeOrderBy(other.sort);
                     }
                 }
                 tableController.setSortBy?.(
-                    remainingSort as [Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined
+                    remainingSort as OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined
                 );
             }
         }

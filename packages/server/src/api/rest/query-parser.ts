@@ -1,4 +1,4 @@
-import type { FilterValues, ListLimitBounds, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
+import type { FilterValues, ListLimitBounds, LogicalCondition, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { deserializeFilter, deserializeLogicalCondition, UnknownFilterOperatorError } from "@rebasepro/common";
 import { QueryOptions } from "../types";
@@ -133,6 +133,20 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
 }
 
 type OrderByEntry = { field: string; direction: "asc" | "desc" };
+
+/**
+ * The parsed entries as the driver contract spells them: `[field, direction]`
+ * tuples in order of significance.
+ *
+ * The REST layer used to hand the driver `orderBy[0].field` and drop the rest,
+ * so `?orderBy=[{"field":"roles"},{"field":"created_at","direction":"desc"}]`
+ * — a shape this parser has always accepted and validated in full — sorted by
+ * `roles` alone and returned the ties in whatever order Postgres pleased.
+ */
+export function orderByEntriesToTuples(entries?: OrderByEntry[]): OrderByTuple[] | undefined {
+    if (!entries || entries.length === 0) return undefined;
+    return entries.map(({ field, direction }) => [field, direction] as OrderByTuple);
+}
 
 function invalidOrderBy(detail: string): never {
     throw invalidParam(

@@ -11,15 +11,59 @@
  * - Properties without `storageId` fallback to "(default)"
  */
 
+import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+
 import { StorageController } from "./types";
+import { canonicalStorageId } from "./keys";
 import { logger } from "../utils/logger";
 
 /**
  * The default storage identifier used when:
  * - A single storage controller is provided (not a map)
  * - A property doesn't specify a storageId
+ *
+ * An alias rather than a second `"(default)"` literal: the same string is the
+ * registry key here, the source key a project declares in `rebase.json`, and
+ * the scope baked into a download token. Two literals that must stay equal are
+ * a divergence waiting to happen — and this one would silently unscope tokens.
  */
-export const DEFAULT_STORAGE_ID = "(default)";
+export const DEFAULT_STORAGE_ID = DEFAULT_STORAGE_SOURCE_KEY;
+
+/**
+ * A request named a storage source that is not registered.
+ *
+ * This used to be a `logger.warn` and a fallback to the default source, which
+ * is the wrong answer in a way that is hard to notice: the caller asks for
+ * `media`, the `storageAuthorize` hook is asked about `media`, and the bytes
+ * are read from — or written to — `(default)`. A hook that widens access for
+ * one named source therefore widens it for the default one, and the object the
+ * hook approved is not the object the request touched. That is the same shape
+ * as the non-canonical-key bypass: the check and the read disagree about which
+ * object is in play.
+ *
+ * The failure is silent by construction. Both sources hold the *same key*,
+ * because that is what makes a caller reach for a second source in the first
+ * place, so the fallback returns plausible bytes rather than an error.
+ *
+ * It is also reachable without an attacker: a source declared in `rebase.json`
+ * but not configured by the environment is skipped at boot and never
+ * registered, while `GET /sources` still advertises it. The client asks for a
+ * source it was told exists and silently gets a different bucket's contents.
+ *
+ * Carries `knownKeys` so the route layer can tell a typo from a source that was
+ * declared but never configured — two different answers to the caller. The
+ * registry itself does not know what was *declared*, only what was registered,
+ * so it does not make that decision.
+ */
+export class UnknownStorageSourceError extends Error {
+    constructor(public readonly storageId: string, public readonly knownKeys: string[]) {
+        super(
+            `[StorageRegistry] Storage source "${storageId}" is not registered. ` +
+            `Registered sources: ${knownKeys.length > 0 ? knownKeys.map((k) => `"${k}"`).join(", ") : "(none)"}.`
+        );
+        this.name = "UnknownStorageSourceError";
+    }
+}
 
 /**
  * Registry for managing multiple storage controllers
@@ -46,10 +90,16 @@ export interface StorageRegistry {
     get(id: string | undefined | null): StorageController | undefined;
 
     /**
-     * Get a storage controller by ID, with fallback to default
-     * @param id - Storage identifier, or undefined/null for default
-     * @returns The StorageController (falls back to default if id not found)
-     * @throws Error if neither the specified nor default storage exists
+     * Get the storage controller the caller named, or the default if they
+     * named none.
+     *
+     * "Or default" means *when no id was given* — not when the given id is
+     * unknown. See {@link UnknownStorageSourceError} for why an unknown id is
+     * refused rather than quietly redirected.
+     *
+     * @param id - Storage identifier, or undefined/null/empty for default
+     * @throws UnknownStorageSourceError if `id` names no registered source
+     * @throws Error if no default storage is registered
      */
     getOrDefault(id: string | undefined | null): StorageController;
 
@@ -130,33 +180,27 @@ export class DefaultStorageRegistry implements StorageRegistry {
     }
 
     get(id: string | undefined | null): StorageController | undefined {
-        if (id === undefined || id === null) {
-            return this.controllers.get(DEFAULT_STORAGE_ID);
-        }
-        return this.controllers.get(id);
+        // Canonicalized on the same rule as `getOrDefault`, so the two cannot
+        // disagree about which ids mean "the default source".
+        return this.controllers.get(canonicalStorageId(id));
     }
 
     getOrDefault(id: string | undefined | null): StorageController {
-        // If no ID specified, return default
-        if (id === undefined || id === null) {
+        const key = canonicalStorageId(id);
+        if (key === DEFAULT_STORAGE_ID) {
             return this.getDefault();
         }
 
-        // Try to get by ID
-        const controller = this.controllers.get(id);
+        const controller = this.controllers.get(key);
         if (controller) {
             return controller;
         }
 
-        // Fallback to default with warning
-        logger.warn(
-            `[StorageRegistry] Storage "${id}" not found, falling back to "${DEFAULT_STORAGE_ID}"`
-        );
-        return this.getDefault();
+        throw new UnknownStorageSourceError(key, this.list());
     }
 
     has(id: string): boolean {
-        return this.controllers.has(id);
+        return this.controllers.has(canonicalStorageId(id));
     }
 
     list(): string[] {

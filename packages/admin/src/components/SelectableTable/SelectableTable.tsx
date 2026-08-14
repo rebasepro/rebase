@@ -284,7 +284,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     filter={filterValues as any}
                     onFilterUpdate={setFilterValues ? onFilterUpdate : undefined}
                     sortBy={sortBy}
-                    onSortByUpdate={setSortBy as ((sortBy?: [string, "asc" | "desc"]) => void)}
+                    onSortByUpdate={setSortBy as ((sortBy?: [string, "asc" | "desc"][]) => void)}
                     hoverRow={hoverRow}
                     initialScroll={initialScroll}
                     onScroll={onScroll}

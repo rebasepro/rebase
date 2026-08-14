@@ -93,6 +93,7 @@ const headToHead = [
     { name: "Django", href: "/rebase-vs-django" },
 ];
 import { imgDims } from "../../utils/imageDimensions";
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -336,4 +337,7 @@ import { imgDims } from "../../utils/imageDimensions";
             </div>
         </div>
     </section>
+
+    <ClosingCta title="Compare it on your own database." blurb="The only honest comparison is the one you run yourself. Point Rebase at a Postgres database you already have." trackId="compare" />
+
 </div>

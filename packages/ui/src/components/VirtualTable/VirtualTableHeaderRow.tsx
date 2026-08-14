@@ -16,8 +16,8 @@ const SortableColumnHeader = ({
     isResizing,
     onFilterUpdate,
     filter,
-    sortByProperty,
-    currentSort,
+    sortIndex,
+    sortCount,
     onColumnSort,
     onClickResizeColumn,
     createFilterField,
@@ -30,9 +30,9 @@ const SortableColumnHeader = ({
     isResizing: number;
     onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
     filter: [VirtualTableWhereFilterOp, unknown] | undefined;
-    sortByProperty: string | undefined;
-    currentSort: "asc" | "desc" | undefined;
-    onColumnSort: (key: string) => void;
+    sortIndex: Map<string, { direction: "asc" | "desc"; position: number }>;
+    sortCount: number;
+    onColumnSort: (key: string, additive?: boolean) => void;
     onClickResizeColumn: (index: number) => void;
     createFilterField: ((props: import("./VirtualTableHeader").FilterFormFieldProps<unknown>) => React.ReactNode) | undefined;
     isDragging: boolean;
@@ -96,7 +96,8 @@ const SortableColumnHeader = ({
                 isResizingIndex={isResizing}
                 onFilterUpdate={onFilterUpdate}
                 filter={filter}
-                sort={sortByProperty === column.key ? currentSort : undefined}
+                sort={sortIndex.get(column.key)?.direction}
+                sortPosition={sortCount > 1 ? sortIndex.get(column.key)?.position : undefined}
                 onColumnSort={onColumnSort}
                 onClickResizeColumn={onClickResizeColumn}
                 column={column}
@@ -110,10 +111,9 @@ const SortableColumnHeader = ({
 
 export const VirtualTableHeaderRow = ({
     columns,
-    currentSort,
+    sortIndex,
     onColumnSort,
     onFilterUpdate,
-    sortByProperty,
     filter,
     onColumnResize,
     onColumnResizeEnd,
@@ -230,8 +230,8 @@ export const VirtualTableHeaderRow = ({
                                 isResizing={isResizing}
                                 onFilterUpdate={onFilterUpdate}
                                 filter={filterForThisProperty}
-                                sortByProperty={sortByProperty}
-                                currentSort={currentSort}
+                                sortIndex={sortIndex}
+                                sortCount={sortIndex.size}
                                 onColumnSort={onColumnSort}
                                 onClickResizeColumn={onClickResizeColumn}
                                 createFilterField={createFilterField}

@@ -85,6 +85,8 @@ export function BodyPartsDemo() {
                 the landing page while the render-blocking CSS was still in flight. */}
             <img
                 src={imgSrc}
+                width={1024}
+                height={1024}
                 alt={`Body ${view} view`}
                 draggable={false}
                 loading="lazy"

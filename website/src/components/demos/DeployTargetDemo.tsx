@@ -66,7 +66,7 @@ const TARGETS: Target[] = [
             { kind: "cmd", text: "rebase build" },
             { kind: "cmd", text: "npm install --omit=dev --prefix dist-bundle" },
             { kind: "note", text: "# Dockerfile" },
-            { kind: "note", text: "#   FROM rebasepro/server:0.11.0" },
+            { kind: "note", text: "#   FROM rebasepro/server:0.13.0" },
             { kind: "note", text: "#   COPY dist-bundle /bundle" },
             { kind: "cmd", text: "docker build -t registry.example.eu/acme/api:1.4.0 ." },
             { kind: "cmd", text: "docker push registry.example.eu/acme/api:1.4.0" },

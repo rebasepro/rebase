@@ -19,8 +19,11 @@ const Component = link ? 'a' : 'div';
   data-spotlight-card>
   <!-- Mouse spotlight effect -->
   <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-  <!-- Gradient border effect -->
-  <div class="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100" style="background: linear-gradient(135deg, transparent 0%, rgba(56, 189, 248, 0.1) 50%, transparent 100%); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; padding: 1px;"></div>
+  <!-- Top rule on hover. Was a masked gradient border in rgba(56,189,248) — sky-400,
+       which is not the theme's blue: primary is #0070F4 / rgb(0,112,244). At 0.1
+       alpha behind a mask-composite trick it cost a compositing layer to render a
+       hue the palette does not contain. Same affordance, one hairline, on-palette. -->
+  <span class="pointer-events-none absolute inset-x-0 top-0 h-px bg-primary origin-left scale-x-0 transition-transform duration-500 ease-out group-hover:scale-x-100" aria-hidden="true"></span>
 
   <div class="relative z-10">
     <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">

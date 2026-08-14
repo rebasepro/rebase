@@ -3,6 +3,9 @@
 import React from "react";
 import type { FilterFormFieldProps } from "./VirtualTableHeader";
 
+/** One sort key: the column, and which way it runs. */
+export type VirtualTableSortKey = [string, "asc" | "desc"];
+
 export type OnRowClickParams<T extends Record<string, unknown>> = {
     rowData: T;
     rowIndex: number;
@@ -39,7 +42,7 @@ export interface VirtualTableProps<T extends Record<string, unknown>> {
      * @param sortBy
      */
     checkFilterCombination?: (filterValues: VirtualTableFilterValues<Extract<keyof T, string>>,
-        sortBy?: [string, "asc" | "desc"]) => boolean;
+        sortBy?: VirtualTableSortKey[]) => boolean;
 
     /**
      * A callback function when scrolling the table to near the end
@@ -96,15 +99,16 @@ export interface VirtualTableProps<T extends Record<string, unknown>> {
     }) => void;
 
     /**
-     * Default sort applied to this collection
+     * Sort applied to this collection: the keys in order of significance, the
+     * second breaking ties on the first.
      */
-    sortBy?: [string, "asc" | "desc"];
+    sortBy?: VirtualTableSortKey[];
 
     /**
      * Callback used when sorting is updated
      * @param sortBy
      */
-    onSortByUpdate?: (sortBy?: [string, "asc" | "desc"]) => void;
+    onSortByUpdate?: (sortBy?: VirtualTableSortKey[]) => void;
 
     /**
      * If there is an error loading data you can pass it here, so it gets

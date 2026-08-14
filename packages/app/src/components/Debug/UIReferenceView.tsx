@@ -602,7 +602,14 @@ selected: true }, { name: "Tags" }].map(c => (
                         {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
                             <div key={v} className={cls("flex items-baseline gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
                                 <span className="w-24 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
-                                <Typography variant={v}>The quick brown fox jumps over the lazy dog</Typography>
+                                {/* `component="p"` keeps the variant's styling but not its
+                                    element. Rendering the specimen with its native tag put a
+                                    real <h1> — "The quick brown fox jumps over the lazy dog" —
+                                    plus h2-h6 into the document outline of every page that
+                                    embeds this view, including the public rebase.pro/ui gallery,
+                                    where it competed with the page's actual heading. The class
+                                    carries the type, so this renders identically. */}
+                                <Typography variant={v} component="p">The quick brown fox jumps over the lazy dog</Typography>
                             </div>
                         ))}
                     </div>

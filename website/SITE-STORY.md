@@ -109,6 +109,48 @@ grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli
 | `/compare` | Why this and not X? | comparison matrix |
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
+**The home page's beat order, and why it is that order.** Revised 2026-08-10 after
+the competitor audit in `COMPETITOR-AUDIT-2026-08-10.md`.
+
+| Beat | Section | Carries |
+|------|---------|---------|
+| — | `s-hero` | Headline, one action, and the install terminal |
+| — | `s-social-proof` | Logo wall |
+| 01 | `s-collection-power` | Claim 2 — one definition, every surface |
+| 02 | `s-backend-engine` | What that definition generates |
+| 03 | `s-security` | **Claim 1** — security lives in the database |
+| 04 | `s-modes` | Claim 3 — the panel is a separate product |
+| 05 | `s-demo-carousel` | The panel itself |
+| 06 | `s-personas` | Developer / support / agent, one scenario each |
+| 07 | `s-agent-era` | Claim 4 — agent-native |
+| 08 | `s-case-study` | Real products |
+
+Three rules are encoded in that table and should not be quietly undone:
+
+- **Security runs at 03, not 06.** It is the highest-ranked claim and it used to
+  sit sixth, behind a screen of admin-panel screenshots — the ordering the
+  backend-first rule exists to prevent. It cannot be first, because "RLS written
+  in the same file as the collection" needs the collection beat to have run. The
+  build is: the definition (01) → what it generates (02) → what enforces it (03).
+- **The hero carries a product artifact.** It used to be a WebGL gradient with
+  type on it, and the install command appeared twice — once in a small hero box
+  and again two screens later as beat 01, with the logo wall between the two
+  tellings. Those are now one thing, in the hero. Every competitor hero audited
+  carried a product artifact and ours carried decoration, which broke
+  proof-over-assertion in the one place it matters most.
+- **GitHub is not a hero action.** Payload and Strapi put star counts up front
+  because theirs are proof; ours is not one yet, and a primary hero button that
+  spends the highest-intent click on our weakest signal is a self-inflicted
+  wound. GitHub stays in the header and the footer. Revisit when the number
+  argues for us.
+
+**Beat 06 is the only place a person appears.** The page was mechanism from top to
+bottom, which left the reader to translate every claim into their own week
+unaided. Each column is one concrete scenario closing on a different deep page —
+`/backend`, `/admin`, `/ai`. It is three columns of prose divided by hairlines
+rather than three cards, because beat 05 above it is a carousel and §6 bans a card
+grid straight after another one.
+
 **The `/europe` rule: control, not location.** The tempting sovereignty pitch —
 "their servers are in Virginia" — is false. Supabase provisions in
 `eu-central-1`; Firestore has `eur3`. If the page ever implies otherwise it is

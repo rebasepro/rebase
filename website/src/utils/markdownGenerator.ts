@@ -22,15 +22,37 @@ export function generateMarkdownForPage(page: string, lang: string): string {
       .replace(/<[^>]*>/g, "");
   };
 
+  // The home page's machine-readable variant — this is what `/index.md` serves and
+  // what `llms.txt` is assembled from, so it is the version of the home page that
+  // agents and crawlers read.
+  //
+  // It used to open on a "Key Benefits" list built from `howitworks.*`: copy that
+  // exists in all four locales, renders nowhere on the visual page, and leads with
+  // "Connect your Postgres and get a complete, editable admin panel". So the human
+  // page was backend-first and the agent-facing page was panel-first, and the
+  // agent-facing one never mentioned security, the two-product split, or agents at
+  // all. It now tracks the real beats. Keep this in step with the beat sequence in
+  // `components/pages/IndexContent.astro` — nothing enforces it.
   if (page === "index" || page === "") {
     return `# ${cleanHtml(tr("index.meta.title"))}
 
 ${cleanHtml(tr("index.meta.description"))}
 
-## Key Benefits
-- **${cleanHtml(tr("howitworks.step1.title"))}**: ${cleanHtml(tr("howitworks.step1.desc"))}
-- **${cleanHtml(tr("howitworks.step2.title"))}**: ${cleanHtml(tr("howitworks.step2.desc"))}
-- **${cleanHtml(tr("howitworks.step3.title"))}**: ${cleanHtml(tr("howitworks.step3.desc"))}
+## What it is
+${cleanHtml(tr("hero.title.part1"))} ${cleanHtml(tr("hero.title.part2"))}
+
+${cleanHtml(tr("hero.subtitle"))}
+
+## What the home page leads with
+- **${cleanHtml(tr("security.title"))}**: ${cleanHtml(tr("security.desc"))}
+- **${cleanHtml(tr("engine.title"))}**: ${cleanHtml(tr("engine.subtitle"))}
+- **${cleanHtml(tr("modes.title"))}**: ${cleanHtml(tr("modes.subtitle"))}
+- **${cleanHtml(tr("agentera.card.title"))}**: ${cleanHtml(tr("agentera.card.desc"))}
+
+## Who uses it
+- **${cleanHtml(tr("personas.dev.role"))} — ${cleanHtml(tr("personas.dev.title"))}**: ${cleanHtml(tr("personas.dev.desc"))}
+- **${cleanHtml(tr("personas.ops.role"))} — ${cleanHtml(tr("personas.ops.title"))}**: ${cleanHtml(tr("personas.ops.desc"))}
+- **${cleanHtml(tr("personas.agent.role"))} — ${cleanHtml(tr("personas.agent.title"))}**: ${cleanHtml(tr("personas.agent.desc"))}
 
 ## Generated Platform Features
 Define your schema in TypeScript, and Rebase automatically generates:

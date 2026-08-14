@@ -1,4 +1,5 @@
-import type { Property } from "@rebasepro/types";
+import type { OrderByTuple, Property } from "@rebasepro/types";
+import { serializeOrderBy } from "@rebasepro/common";
 import type { AdditionalFieldDelegate, EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import {
     Entity,
@@ -1322,7 +1323,7 @@ function DefaultCollectionEmptyState({
 
 /**
  * Inflight count request deduplication map.
- * Keyed by `path|filterKey|sortByProperty|sortDir` so that concurrent
+ * Keyed by `path|filterKey|sort|search` so that concurrent
  * callers (e.g. React StrictMode double-mount) share the same promise.
  */
 const inflightCountRequests = new Map<string, Promise<number>>();
@@ -1338,7 +1339,7 @@ export function EntitiesCount({
     path: string,
     collection: AdminCollection,
     filter?: FilterValues<any>,
-    sortBy?: [string, "asc" | "desc"],
+    sortBy?: OrderByTuple[],
     /**
      * Required, not optional. The term sits in the same scope as the element
      * that mounts this and is passed to the toolbar and the empty state beside
@@ -1352,8 +1353,9 @@ export function EntitiesCount({
 
     const dataClient = useData();
 
-    const sortByProperty = sortBy ? sortBy[0] : undefined;
-    const currentSort = sortBy ? sortBy[1] : undefined;
+    // The whole sort as one string: it keys the dedup cache and drives the
+    // effect, and a `sortBy` array is a new reference on every render.
+    const sortKey = React.useMemo(() => sortBy ? serializeOrderBy(sortBy) ?? "" : "", [sortBy]);
 
     // Use refs for values that should NOT trigger re-fetches
     const dataClientRef = React.useRef(dataClient);
@@ -1375,14 +1377,16 @@ export function EntitiesCount({
 
         // filterValues is already FilterValues — pass directly
         const whereParams = filter && Object.keys(filter).length > 0 ? filter : undefined;
-        const orderByParams: [string, "asc" | "desc"] | undefined = sortByProperty && currentSort ? [String(sortByProperty), currentSort] : undefined;
+        const orderByParams = sortBy && sortBy.length > 0
+            ? sortBy.map(([field, direction]) => [String(field), direction] as OrderByTuple)
+            : undefined;
 
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
         // The search term is part of the query, so it is part of the key. The
         // cache is module-level and outlives an unmount, so a key that omits it
         // does not merely lose precision — it answers one search with a
         // different search's total.
-        const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}|${searchString ?? ""}`;
+        const cacheKey = `${path}|${filterKey}|${sortKey}|${searchString ?? ""}`;
         let countPromise = inflightCountRequests.get(cacheKey);
         if (!countPromise) {
             countPromise = accessor.count({
@@ -1403,7 +1407,7 @@ export function EntitiesCount({
         });
 
         return () => { cancelled = true; };
-    }, [path, filterKey, sortByProperty, currentSort, searchString]);
+    }, [path, filterKey, sortKey, searchString]);
 
     // Count is now displayed in the breadcrumb bar, this component only fetches and reports
     return null;

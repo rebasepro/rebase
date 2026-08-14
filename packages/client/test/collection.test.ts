@@ -388,8 +388,10 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
                 expect.objectContaining({
                     path: "posts",
                     limit: 10,
-                    orderBy: "title",
-                    order: "desc"
+                    // The subscribe frame carries the same list form the fetch
+                    // path does; a field name plus a separate `order` cannot
+                    // express a second sort key.
+                    orderBy: [["title", "desc"]]
                 }),
                 expect.any(Function),
                 onError

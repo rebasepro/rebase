@@ -157,19 +157,22 @@ describe("QueryBuilder", () => {
         it("sets default ascending order", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("createdAt");
-            expect(getParams(qb).orderBy).toEqual(["createdAt", "asc"]);
+            expect(getParams(qb).orderBy).toEqual([["createdAt", "asc"]]);
         });
 
         it("sets descending order", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("createdAt", "desc");
-            expect(getParams(qb).orderBy).toEqual(["createdAt", "desc"]);
+            expect(getParams(qb).orderBy).toEqual([["createdAt", "desc"]]);
         });
 
-        it("allows overriding orderBy with a second call", () => {
+        it("adds a tie-breaker on a second call rather than replacing the sort", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.orderBy("name", "asc").orderBy("date", "desc");
-            expect(getParams(qb).orderBy).toEqual(["date", "desc"]);
+            // This used to keep only the last call, which made a multi-column
+            // sort unexpressible through the builder. Keys now apply in the
+            // order they were added: by name, newest first within each name.
+            expect(getParams(qb).orderBy).toEqual([["name", "asc"], ["date", "desc"]]);
         });
     });
 
@@ -256,7 +259,7 @@ describe("QueryBuilder", () => {
                 age: [">=", 18],
                 status: ["==", "active"]
             });
-            expect(params.orderBy).toEqual(["name", "asc"]);
+            expect(params.orderBy).toEqual([["name", "asc"]]);
             expect(params.limit).toBe(25);
             expect(params.offset).toBe(50);
             expect(params.searchString).toBe("keyword");

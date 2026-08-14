@@ -57,7 +57,7 @@ export function generateOpenApiSpec(
             name: "orderBy",
             in: "query",
             schema: { type: "string" },
-            description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]`",
+            description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]` — several entries sort by each in turn, the second breaking ties on the first.",
             example: "created_at:desc"
         },
         {

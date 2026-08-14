@@ -4,7 +4,15 @@ import { getLangFromUrl, useTranslations } from '../i18n/ui';
 
 // `index` renders the numbered eyebrow used by the home page's beat sequence;
 // deep pages pass nothing and get a plain badge.
-const { index } = Astro.props;
+//
+// `badge` / `title` let a deep page frame the same figure for its own question.
+// SITE-STORY deleted /features for being "a near-verbatim copy of /product: same
+// hero claim, same section", and this component was reproducing that failure at
+// section level — / and /product both rendered the identical heading. The demo
+// budget allows the figure on home plus one deep page; it does not license the
+// copy to be identical, because /product answers "what do I actually get, in
+// both layers?" rather than restating the home page's claim.
+const { index, badge, title } = Astro.props;
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
@@ -42,8 +50,8 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
     {/* Header — keep centred with a soft max-width just for the text */}
     <div class="mx-auto max-w-2xl text-center px-6 mb-16 animate-on-scroll fade-in-up">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{t('power.badge')}</p>
-        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-5xl leading-tight" set:html={t('power.title')}></h2>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{badge ?? t('power.badge')}</p>
+        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-5xl leading-tight" set:html={title ?? t('power.title')}></h2>
         <p class="mt-6 text-lg text-surface-400">
             {t('power.subtitle')}
         </p>
@@ -67,7 +75,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
   <circle cx="4" cy="20" r="2" />
 </svg>
 
-            {t('power.badge')}
+            {badge ?? t('power.badge')}
         </div>
     </div>
 

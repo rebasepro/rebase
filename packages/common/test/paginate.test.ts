@@ -178,8 +178,7 @@ describe("in-process accessor pagination", () => {
         expect(seen).toEqual([1, 2, 3]);
         expect(calls).toHaveLength(2);
         expect(calls[0].offset).toBeUndefined();
-        expect(calls[0].orderBy).toBe("id");
-        expect(calls[0].order).toBe("asc");
+        expect(calls[0].orderBy).toEqual([["id", "asc"]]);
         // The second page seeks past the last row it saw.
         expect(calls[1].filter).toMatchObject({ id: [">", 2] });
         expect(calls[1].offset).toBeUndefined();

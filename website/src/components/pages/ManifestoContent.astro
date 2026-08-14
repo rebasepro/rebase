@@ -4,6 +4,7 @@ const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 import { NeatBackground } from '../../components/NeatBackground';
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="manifesto flex flex-col isolate">
@@ -213,4 +214,7 @@ import { NeatBackground } from '../../components/NeatBackground';
         </div>
       </div>
     </section>
+
+    <ClosingCta title="Own your stack." blurb="An argument is only worth as much as the software under it. Point Rebase at a database you already run." trackId="manifesto" />
+
 </div>

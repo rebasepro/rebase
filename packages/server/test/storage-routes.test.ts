@@ -326,7 +326,12 @@ describe("Storage routes — multi-backend routing (registry)", () => {
             requireAuth: false,
             sources: [
                 { key: "(default)", engine: "local", transport: "server" },
-                { key: "secondary", engine: "local", transport: "server", label: "Secondary" }
+                { key: "secondary", engine: "local", transport: "server", label: "Secondary" },
+                // Declared in `rebase.json` but absent from the registry —
+                // the shape a source takes when the environment supplies no
+                // credentials for it: boot skips it rather than crash-looping
+                // the backend, so it exists on paper and nowhere else.
+                { key: "archive", engine: "s3", transport: "server", label: "Archive" }
             ]
         }));
     });
@@ -408,16 +413,96 @@ describe("Storage routes — multi-backend routing (registry)", () => {
         expect(after.status).toBe(404);
     });
 
-    it("falls back to the default backend for an unknown storageId", async () => {
+    /**
+     * An unknown `storageId` used to fall back to the default backend, which is
+     * wrong in both directions and quiet in both: a write lands in a bucket the
+     * caller did not name, and a read serves one they were not authorized for —
+     * the `storageAuthorize` hook having been asked about the source they *did*
+     * name. A hook that widens access for one named source widened it for the
+     * default one.
+     */
+    it("refuses a write to an unknown storageId instead of redirecting it", async () => {
         const res = await upload("does-not-exist", "fallback.txt", "fell-back");
-        expect(res.ok).toBe(true);
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("UNKNOWN_STORAGE_SOURCE");
+        // The available sources are named, because the overwhelmingly likely
+        // cause is a typo.
+        expect(body.error.message).toContain("secondary");
 
-        // Unknown id falls back to default, so the file is in the default backend.
+        // The write must not have landed anywhere at all.
         const inDefault = await app.fetch(
             new Request("http://localhost/api/storage/file/default/fallback.txt")
         );
-        expect(inDefault.status).toBe(200);
-        expect(await inDefault.text()).toBe("fell-back");
+        expect(inDefault.status).toBe(404);
+    });
+
+    it("refuses a read from an unknown storageId", async () => {
+        await upload(undefined, "only-in-default.txt", "default bytes");
+
+        const res = await app.fetch(
+            new Request("http://localhost/api/storage/file/default/only-in-default.txt?storageId=does-not-exist")
+        );
+
+        expect(res.status).toBe(400);
+        expect(await res.text()).not.toContain("default bytes");
+    });
+
+    it("does not mint a download token for an unknown storageId", async () => {
+        // `/metadata` is the route that hands out the capability, so a source
+        // that does not exist must not get one minted against the default.
+        await upload(undefined, "tokened.txt", "default bytes");
+
+        const res = await app.fetch(
+            new Request("http://localhost/api/storage/metadata/default/tokened.txt?storageId=does-not-exist")
+        );
+
+        expect(res.status).toBe(400);
+    });
+
+    /**
+     * A declared-but-unconfigured source is not a caller mistake, and telling
+     * the caller it does not exist would send them debugging their own code.
+     * It is also the case that made the old fallback dangerous without an
+     * attacker: `GET /sources` advertises the source (asserted below), so a
+     * client asks for something it was told exists and silently gets a
+     * different bucket's contents.
+     *
+     * 501, matching the whole-storage stub, because it is permanent until
+     * someone configures credentials — and the client's offline queue retries
+     * 503 forever, which would pile up uploads that can never land.
+     */
+    it("answers 501 for a source that is declared but not configured", async () => {
+        const res = await upload("archive", "doc.txt", "archived");
+
+        expect(res.status).toBe(501);
+        const body = await res.json() as { error: { code: string } };
+        expect(body.error.code).toBe("STORAGE_SOURCE_NOT_CONFIGURED");
+
+        const inDefault = await app.fetch(
+            new Request("http://localhost/api/storage/file/default/doc.txt")
+        );
+        expect(inDefault.status).toBe(404);
+    });
+
+    it("advertises the declared-but-unconfigured source, which is why 501 and 400 differ", async () => {
+        const res = await app.fetch(new Request("http://localhost/api/storage/sources"));
+        const body = await res.json() as { data: Array<{ key: string }> };
+
+        expect(body.data.map((s) => s.key)).toContain("archive");
+    });
+
+    it("still treats an empty storageId as the default backend", async () => {
+        // `?storageId=` with no value is how a client spells "no preference".
+        // Refusing it would be a regression dressed up as a fix.
+        await upload(undefined, "empty-id.txt", "default bytes");
+
+        const res = await app.fetch(
+            new Request("http://localhost/api/storage/file/default/empty-id.txt?storageId=")
+        );
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("default bytes");
     });
 
     it("lists both backends via GET /sources", async () => {
@@ -497,5 +582,122 @@ describe("Storage routes — scoped download token under AuthAdapter", () => {
             new Request(`http://localhost/api/storage/file/author_pictures/logo.png?token=${token}`)
         );
         expect(res.status).toBe(403);
+    });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// A minted download token is good for one source, not for the key
+//
+// `/metadata` is where the `storageAuthorize` hook runs and where the token
+// that `/file/*` then trusts is minted. A key is unique only inside its own
+// source, so a token naming the path alone is a grant on the same key in every
+// configured source: authorize the read where the hook says yes, spend it where
+// it would have said no. (That the hook can say no is `storage-authorize`'s
+// business — the hook here allows both sources, so the only thing these tests
+// can fail on is the scoping.)
+//
+// Both halves have to be pinned, and they fail in opposite directions. A
+// missing *check* lets a token cross into another source — caught below by the
+// cross-source reads. A missing *storageId at the mint* is invisible to those,
+// because a token minted for the default source is what a default request
+// should get anyway; it shows up only when a token minted for a **named**
+// source is spent on that same source and is wrongly refused.
+// ──────────────────────────────────────────────────────────────────────
+describe("Storage routes — download tokens are scoped to a storage source", () => {
+    let app: Hono<HonoEnv>;
+    let defaultDir: string;
+    let mediaDir: string;
+
+    const KEY = "avatars/u1.png";
+
+    beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
+        defaultDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-src-default-"));
+        mediaDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-src-media-"));
+
+        const defaultController = new LocalStorageController({ basePath: defaultDir });
+        const mediaController = new LocalStorageController({ basePath: mediaDir });
+
+        // The same key in both sources, holding different bytes — which is the
+        // whole point: these are two objects that share a name.
+        await defaultController.putObject({
+            file: new File([Buffer.from("bytes from the default source")], "u1.png", { type: "image/png" }),
+            key: KEY
+        });
+        await mediaController.putObject({
+            file: new File([Buffer.from("bytes from the media source")], "u1.png", { type: "image/png" }),
+            key: KEY
+        });
+
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({
+            registry: DefaultStorageRegistry.create({
+                "(default)": defaultController,
+                media: mediaController
+            }),
+            requireAuth: true,
+            publicRead: false,
+            authAdapter: { verifyRequest: async () => ({ uid: "alice", roles: [] }) },
+            authorize: () => true
+        }));
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(defaultDir, { recursive: true, force: true });
+        await fs.promises.rm(mediaDir, { recursive: true, force: true });
+    });
+
+    /** The token `/metadata` mints for `KEY` in the given source. */
+    const mintToken = async (storageId?: string): Promise<string> => {
+        const query = storageId === undefined ? "" : `?storageId=${storageId}`;
+        const res = await app.fetch(
+            new Request(`http://localhost/api/storage/metadata/${KEY}${query}`, {
+                headers: { Authorization: "Bearer access-token" }
+            })
+        );
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { token?: string } };
+        expect(typeof body.data.token).toBe("string");
+        return body.data.token!;
+    };
+
+    const fetchFile = (token: string, storageId?: string) => app.fetch(
+        new Request(
+            `http://localhost/api/storage/file/${KEY}?token=${token}` +
+            (storageId === undefined ? "" : `&storageId=${storageId}`)
+        )
+    );
+
+    it("serves the object a named-source token was minted for", async () => {
+        // The mint-site test: if `/metadata` drops the source when signing, this
+        // token claims the default source and its own read is refused.
+        const res = await fetchFile(await mintToken("media"), "media");
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("bytes from the media source");
+    });
+
+    it("serves the object a default-source token was minted for", async () => {
+        const res = await fetchFile(await mintToken());
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("bytes from the default source");
+    });
+
+    it("refuses a default-source token spent on a named source", async () => {
+        const res = await fetchFile(await mintToken(), "media");
+
+        expect(res.status).toBe(403);
+        // The status is not the assertion that matters: a regression here hands
+        // back another source's object with a 200.
+        expect(await res.text()).not.toContain("bytes from the media source");
+    });
+
+    it("refuses a named-source token spent on the default source", async () => {
+        const res = await fetchFile(await mintToken("media"));
+
+        expect(res.status).toBe(403);
+        expect(await res.text()).not.toContain("bytes from the default source");
     });
 });

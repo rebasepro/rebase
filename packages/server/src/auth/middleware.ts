@@ -3,7 +3,7 @@ import type { AuthRepository } from "./interfaces";
 import { isAccessTokenRevoked } from "./token-revocation";
 import { hasAdministrativeRole } from "./admin-roles";
 import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
-import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken } from "./jwt";
+import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
@@ -11,10 +11,11 @@ import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
 import { extractBearerToken } from "./bearer-token";
-// A leaf module (node:path only), so this does not close an import cycle with
-// `storage/routes.ts` — which is the point: both sides of the token comparison
-// must derive a key with the same function, not with two copies of one rule.
-import { tryCanonicalStorageKey } from "../storage/keys";
+// A leaf module (node:path and `@rebasepro/types` only), so this does not close
+// an import cycle with `storage/routes.ts` — which is the point: both sides of
+// the token comparison must derive the key, and the source it belongs to, with
+// the same functions, not with two copies of one rule.
+import { canonicalStorageId, tryCanonicalStorageKey } from "../storage/keys";
 
 // Re-exported from here because this is where callers look for it; the separate
 // module exists only so `api-key-middleware` can use it without closing an
@@ -593,6 +594,50 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         };
     };
 
+    /**
+     * Decide what a valid download token entitles this request to.
+     *
+     * One function rather than a copy per token location: a Bearer token and a
+     * `?token=` are the same grant presented two ways, and the whole failure
+     * this guards against is two places disagreeing about what was granted.
+     *
+     * `"no-path"` is distinct from the two denials because the caller treats it
+     * differently — a request with no object path at all is not a denied read,
+     * it is a request this middleware has nothing to say about, and on
+     * `/metadata/*` it must still reach the downstream auth gate.
+     */
+    const evaluateGrant = (payload: DownloadTokenPayload): "grant" | "deny-path" | "deny-storage" | "no-path" => {
+        // A key is unique only within its source, so the same path in another
+        // source is another object. Checked first: it is the cheaper test, and
+        // it holds even for a path the token genuinely covers.
+        if (canonicalStorageId(c.req.query("storageId")) !== payload.storageId) return "deny-storage";
+
+        const rawPath = extractWildcard(c);
+        if (!rawPath) return "no-path";
+
+        const filePath = decodeURIComponent(rawPath);
+        const { bucket, resolvedPath } = parseBucketPath(filePath);
+        if (resolvedPath === null) return "deny-path";
+
+        return isPathMatch(`${bucket}/${resolvedPath}`, payload.path) ? "grant" : "deny-path";
+    };
+
+    /**
+     * Which half of the scope failed is named in the message. The holder of the
+     * token already knows both values, so this reveals nothing to an attacker —
+     * and without it, a client that forgets to forward `?storageId=` on the file
+     * URL reports a "path mismatch" for a path that matches perfectly.
+     */
+    const denyMismatch = (outcome: "deny-path" | "deny-storage") =>
+        c.json({
+            error: {
+                message: outcome === "deny-storage"
+                    ? "Forbidden: Scoped token storage mismatch"
+                    : "Forbidden: Scoped token path mismatch",
+                code: "FORBIDDEN"
+            }
+        }, 403);
+
     // 1. Authorization: Bearer <token>
     const bearerToken = extractBearerToken(authHeader);
     if (bearerToken !== undefined) {
@@ -600,19 +645,12 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         const payload = verifyDownloadToken(token);
 
         if (payload) {
-            const rawPath = extractWildcard(c);
-            if (rawPath) {
-                const filePath = decodeURIComponent(rawPath);
-                const { bucket, resolvedPath } = parseBucketPath(filePath);
-                const requestedFullPath = resolvedPath === null ? null : `${bucket}/${resolvedPath}`;
-
-                if (requestedFullPath !== null && isPathMatch(requestedFullPath, payload.path)) {
-                    c.set("user", { uid: "download-token", roles: ["reader"] });
-                    return next();
-                } else {
-                    return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);
-                }
+            const outcome = evaluateGrant(payload);
+            if (outcome === "grant") {
+                c.set("user", { uid: "download-token", roles: ["reader"] });
+                return next();
             }
+            if (outcome !== "no-path") return denyMismatch(outcome);
         }
 
         // If it's a file serving route, explicitly reject full access JWTs
@@ -629,19 +667,12 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         const payload = verifyDownloadToken(queryToken);
 
         if (payload) {
-            const rawPath = extractWildcard(c);
-            if (rawPath) {
-                const filePath = decodeURIComponent(rawPath);
-                const { bucket, resolvedPath } = parseBucketPath(filePath);
-                const requestedFullPath = resolvedPath === null ? null : `${bucket}/${resolvedPath}`;
-
-                if (requestedFullPath !== null && isPathMatch(requestedFullPath, payload.path)) {
-                    c.set("user", { uid: "download-token", roles: ["reader"] });
-                    return next();
-                } else {
-                    return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);
-                }
+            const outcome = evaluateGrant(payload);
+            if (outcome === "grant") {
+                c.set("user", { uid: "download-token", roles: ["reader"] });
+                return next();
             }
+            if (outcome !== "no-path") return denyMismatch(outcome);
         }
 
         // Explicitly reject query-token if it is not a valid scoped download token (e.g. if it is a full access JWT)

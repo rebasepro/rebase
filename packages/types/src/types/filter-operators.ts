@@ -45,12 +45,29 @@
  * boundary, handled by `serializeOrderBy` / `deserializeOrderBy` in
  * `@rebasepro/common`.
  *
- * Design note: the natural extension for multi-column sort is
- * `OrderByTuple[]` — not implemented yet (server consumes only the first).
- *
  * @group Models
  */
 export type OrderByTuple<Key extends string = string> = [Key, "asc" | "desc"];
+
+/**
+ * One sort key, or several applied in order of significance.
+ *
+ * ```ts
+ * orderBy: ["created_at", "desc"]                      // one key
+ * orderBy: [["roles", "asc"], ["created_at", "desc"]]  // roles, then newest first
+ * ```
+ *
+ * The two forms are told apart by whether the first element is itself an
+ * array, so a single tuple never needs wrapping and every existing caller
+ * keeps working unchanged. `normalizeOrderBy` in `@rebasepro/common` collapses
+ * both to the list form, which is what every layer below the call site speaks.
+ *
+ * Ties on the last key are broken by the row id, so a multi-key sort is a
+ * total order and pages over it neither repeat nor skip rows.
+ *
+ * @group Models
+ */
+export type OrderBySpec<Key extends string = string> = OrderByTuple<Key> | OrderByTuple<Key>[];
 
 /**
  * Canonical filter operators supported across all database backends.
@@ -161,8 +178,9 @@ export interface FilterPreset<Key extends string = string> {
 
     /**
      * Optional sort override to apply alongside the filter values.
+     * One key, or several in order of significance.
      */
-    sort?: OrderByTuple<Key>;
+    sort?: OrderBySpec<Key>;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
     generateDownloadToken,
     verifyDownloadToken
 } from "../src/auth/jwt";
+import jwt from "jsonwebtoken";
 import { Hono } from "hono";
 import { setRefreshCookie } from "../src/auth/cookie-utils";
 
@@ -419,8 +420,39 @@ accessExpiresIn: "1s" });
             const decoded = verifyDownloadToken(token);
             expect(decoded).toEqual({
                 purpose: "file-read",
-                path: "default/photos/file.jpg"
+                path: "default/photos/file.jpg",
+                storageId: "(default)"
             });
+        });
+
+        it("carries the storage source it was minted for", () => {
+            // The path alone does not identify an object: the same key exists
+            // independently in every configured source.
+            const token = generateDownloadToken("default/photos/file.jpg", 100, "media");
+            expect(verifyDownloadToken(token)!.storageId).toBe("media");
+        });
+
+        it("spells the default source one way, however it was asked for", () => {
+            // `?storageId=` omitted, empty, and `(default)` all resolve to the
+            // same controller, so all three must produce the same grant — else
+            // the check either 403s a legitimate read or gets skipped.
+            for (const asked of [undefined, null, "", "   ", "(default)"] as const) {
+                const token = generateDownloadToken("default/photos/file.jpg", 100, asked);
+                expect(verifyDownloadToken(token)!.storageId).toBe("(default)");
+            }
+        });
+
+        it("reads a token minted before the storageId claim as a default-source grant", () => {
+            // Fail-closed for the five minutes an old token can still be in
+            // flight after a deploy: it grants the default source, not all of
+            // them. Signed by hand because the current minter cannot omit the
+            // claim — which is the point of the test.
+            const legacy = jwt.sign(
+                { purpose: "file-read", path: "default/photos/file.jpg" },
+                testSecret,
+                { expiresIn: 100, algorithm: "HS256" }
+            );
+            expect(verifyDownloadToken(legacy)!.storageId).toBe("(default)");
         });
 
         it("should return null when verifying an access token as a download token", () => {

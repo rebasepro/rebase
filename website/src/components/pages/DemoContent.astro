@@ -1,6 +1,7 @@
 ---
 const { lang, t } = Astro.props;
 import InteractiveDemo from '../demos/InteractiveDemo';
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="bg-black text-white min-h-screen">
@@ -25,4 +26,7 @@ import InteractiveDemo from '../demos/InteractiveDemo';
             </div>
         </div>
     </section>
+
+    <ClosingCta title="Now run it on your own data." blurb="The demo is someone else's database. This is one command against yours." trackId="demo" />
+
 </div>

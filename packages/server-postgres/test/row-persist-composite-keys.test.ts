@@ -318,8 +318,18 @@ describe("FetchService – cursor pagination combined with filters", () => {
         // the next page of the *unfiltered* table. Ascending order compares
         // with `>`, and the id tie-breaker is what keeps rows with an equal
         // `name` from being skipped or repeated across pages.
+        //
+        // Two things this used to get wrong, both of them silent:
+        //
+        // - The tie-breaker read `"id" > $4` while the ORDER BY has always
+        //   appended `id DESC`. A comparison that runs opposite to the sort it
+        //   breaks ties for walks the ties backwards, so rows sharing a `name`
+        //   were skipped and repeated across pages.
+        // - `>` answers *unknown* against NULL, so with NULLS LAST every row
+        //   whose `name` is NULL vanished from page two onward. They sort after
+        //   the cursor row, so `"name" is null` belongs in the disjunction.
         const { sql, params } = lastWhereCondition(db);
-        expect(sql).toBe('("name" = $1 and ("name" > $2 or ("name" = $3 and "id" > $4)))');
+        expect(sql).toBe('("name" = $1 and ("name" > $2 or "name" is null or ("name" = $3 and "id" < $4)))');
         expect(params).toEqual(["Item C", "Item E", "Item E", 5]);
     });
 

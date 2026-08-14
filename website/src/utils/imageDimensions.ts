@@ -15,6 +15,15 @@
  * Generated from website/public/img — see scripts if these need refreshing.
  */
 export const IMAGE_DIMENSIONS: Record<string, [number, number]> = {
+    "/img/kanban/api_docs.png": [80, 80],
+    "/img/kanban/auth.png": [80, 80],
+    "/img/kanban/cicd.png": [80, 80],
+    "/img/kanban/dark_mode.png": [80, 80],
+    "/img/kanban/export.png": [80, 80],
+    "/img/kanban/onboarding.png": [80, 80],
+    "/img/kanban/rls.png": [80, 80],
+    "/img/kanban/search_indexing.png": [80, 80],
+    "/img/product_logo_tee.webp": [1024, 1024],
     "/img/competitors/Retool_Logo_0.svg": [87, 17],
     "/img/competitors/contentful-light.svg": [157, 32],
     "/img/competitors/directus-logo-light.svg": [64, 39],

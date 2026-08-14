@@ -162,7 +162,7 @@ price: "gte.100" } as never
             );
         });
 
-        it("parses orderBy string", async () => {
+        it("passes the sort to the driver as a list of keys", async () => {
             const driver = createMockDriver({
                 fetchCollection: jest.fn().mockResolvedValue([])
             });
@@ -170,10 +170,13 @@ price: "gte.100" } as never
 
             await at(data, "products").find({ orderBy: ["created_at", "desc"] });
 
+            // The driver contract used to be a field name plus a separate
+            // `order`, which cannot carry a second key at all. Both spellings
+            // still arrive — `normalizeDriverOrderBy` collapses them — but what
+            // is *sent* is the list form, so one sort means one shape.
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    orderBy: "created_at",
-                    order: "desc"
+                    orderBy: [["created_at", "desc"]]
                 })
             );
         });
@@ -336,8 +339,7 @@ path: "products" })
                     filter: {
                         price: [">", 100]
                     },
-                    orderBy: "createdAt",
-                    order: "desc",
+                    orderBy: [["createdAt", "desc"]],
                     limit: 5,
                     offset: 10,
                     searchString: "camera"

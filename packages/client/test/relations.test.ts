@@ -669,7 +669,7 @@ listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ orderBy: ["title", "desc"] }, jest.fn());
         const args = mockWs.listenCollection.mock.calls[0][0];
-        expect(args.orderBy).toBe("title"); expect(args.order).toBe("desc");
+        expect(args.orderBy).toEqual([["title", "desc"]]);
     });
     it("listen returns unsubscribe function", () => {
         const unsub = jest.fn();

@@ -1,5 +1,5 @@
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { FilterValues, LogicalCondition } from "@rebasepro/types";
+import { FilterValues, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
 import { PersistService } from "./PersistService";
@@ -62,7 +62,7 @@ export class DataService implements DataRepository {
             filter?: FilterValues<Extract<keyof M, string>>;
             /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -85,7 +85,7 @@ export class DataService implements DataRepository {
             filter?: FilterValues<Extract<keyof M, string>>;
             /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;
@@ -133,7 +133,7 @@ export class DataService implements DataRepository {
         relationKey: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             startAfter?: Record<string, unknown>;

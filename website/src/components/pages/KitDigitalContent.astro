@@ -130,6 +130,7 @@ const solutions = [
         sectors: t('kd.sol5.sectors'),
     },
 ];;
+import ClosingCta from "../ClosingCta.astro";
 ---
 
     <Fragment slot="head">
@@ -374,5 +375,8 @@ const solutions = [
                 <p class="text-xs text-surface-500 text-center leading-relaxed" set:html={t('kd.legal.disclaimer')} />
             </div>
         </section>
-    </div>
+    
+    <ClosingCta title="Start with one command." blurb="Self-hosted on infrastructure you choose, with no vendor account to open first." trackId="kit-digital" />
+
+</div>
 

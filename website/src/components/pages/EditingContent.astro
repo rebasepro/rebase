@@ -17,6 +17,7 @@ import "../../styles/editor.css";
 
 
 
+import ClosingCta from "../ClosingCta.astro";
 ---
 
   <div class="flex flex-col isolate">
@@ -299,9 +300,9 @@ import "../../styles/editor.css";
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Type <code class="text-primary">/</code> to do anything.</h2>
             <p class="text-lg text-surface-400 mb-6">A contextual command palette appears when you type <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">/</code> — just like Notion. Insert images, code blocks, tables, dividers, and more without lifting your fingers from the keyboard.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Fuzzy search across all available block types</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Register custom slash commands from your code</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Keyboard navigable — never leave your flow</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Fuzzy search across all available block types</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Register custom slash commands from your code</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Keyboard navigable — never leave your flow</li>
             </ul>
           </div>
           <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
@@ -323,9 +324,9 @@ import "../../styles/editor.css";
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Write Markdown. Watch it render.</h2>
             <p class="text-lg text-surface-400 mb-6">Prefer plain text? Markdown fields come with a split-pane live preview — headings, bold, lists and code render as you type, and the raw Markdown is what lands in your database.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Side-by-side editor and live preview</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Select text to format with the floating toolbar</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Stored as plain Markdown — portable by default</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Side-by-side editor and live preview</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Select text to format with the floating toolbar</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Stored as plain Markdown — portable by default</li>
             </ul>
           </div>
           <div class="rounded-2xl overflow-hidden shadow-2xl" inert aria-hidden="true">
@@ -347,9 +348,9 @@ import "../../styles/editor.css";
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Drag cards, update your database.</h2>
             <p class="text-lg text-surface-400 mb-6">Every collection with an enum or status field automatically gets a Kanban view. Drag cards between columns to update records — no code, no config. Backed by real Postgres writes.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Auto-generated from any enum or status property</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Drag-and-drop with optimistic database updates</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Filterable, sortable, and fully responsive</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Auto-generated from any enum or status property</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Drag-and-drop with optimistic database updates</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Filterable, sortable, and fully responsive</li>
             </ul>
           </div>
           <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height:260px">
@@ -371,10 +372,10 @@ import "../../styles/editor.css";
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Edit like a spreadsheet. Save like a database.</h2>
             <p class="text-lg text-surface-400 mb-6">Click any cell and start typing. Changes are persisted directly to Postgres. Sort, filter, bulk-select, and export — all from a familiar grid interface that non-technical users love.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Click-to-edit cells with type-aware inputs</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Multi-row selection and bulk actions</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Column resizing, reordering, and visibility toggles</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> CSV / JSON export with one click</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Click-to-edit cells with type-aware inputs</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Multi-row selection and bulk actions</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Column resizing, reordering, and visibility toggles</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> CSV / JSON export with one click</li>
             </ul>
           </div>
           <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
@@ -396,10 +397,10 @@ import "../../styles/editor.css";
             <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">20+ fields. Or build your own.</h2>
             <p class="text-lg text-surface-400 mb-6">Text, numbers, dates, enums, arrays, maps, references, file uploads, rich text, JSON, and more — all pre-built. Need a color picker, a rating widget, or a map selector? Build it in React and plug it in.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> 20+ built-in field types with custom rendering</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Custom field widgets via standard React components</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Conditional field logic and validation rules</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Preview panels for real-time content previews</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> 20+ built-in field types with custom rendering</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Custom field widgets via standard React components</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Conditional field logic and validation rules</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Preview panels for real-time content previews</li>
             </ul>
           </div>
           <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[450px]">
@@ -577,5 +578,8 @@ import "../../styles/editor.css";
       </div>
     </section>
 
-  </div>
+  
+    <ClosingCta title="Hand it to the people who edit." blurb="Scaffold a project, point it at your data, and your team has somewhere to work the same afternoon." trackId="editing" />
+
+</div>
 

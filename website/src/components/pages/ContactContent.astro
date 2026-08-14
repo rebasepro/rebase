@@ -8,6 +8,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 
 
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 
@@ -18,7 +19,7 @@ import { NeatBackground } from '../../components/NeatBackground';
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          We Are Open!
+          Talk to the people building it.
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
           Schedule a call with our team to discuss your project, get a demo, or just say hello.
@@ -170,6 +171,9 @@ import { NeatBackground } from '../../components/NeatBackground';
         </div>
       </div>
     </section>
-  </div>
+  
+    <ClosingCta title="Or try it before you write." blurb="Most questions answer themselves after one command against a database you already have." trackId="contact" />
+
+</div>
 
 

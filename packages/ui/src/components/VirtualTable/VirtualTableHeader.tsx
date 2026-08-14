@@ -36,9 +36,14 @@ type VirtualTableHeaderProps<M extends Record<string, unknown>> = {
     columnIndex: number;
     isResizingIndex: number;
     column: VirtualTableColumn<unknown>;
-    onColumnSort: (key: Extract<keyof M, string>) => void;
+    onColumnSort: (key: Extract<keyof M, string>, additive?: boolean) => void;
     filter?: [VirtualTableWhereFilterOp, unknown];
     sort: VirtualTableSort;
+    /**
+     * This column's zero-based rank in a multi-key sort, or `undefined` when
+     * only one column is sorted and a rank would say nothing.
+     */
+    sortPosition?: number;
     onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
     onClickResizeColumn?: (columnIndex: number, column: VirtualTableColumn) => void;
     createFilterField?: (props: FilterFormFieldProps<unknown>) => React.ReactNode;
@@ -47,12 +52,27 @@ type VirtualTableHeaderProps<M extends Record<string, unknown>> = {
     isDraggable?: boolean;
 };
 
+/**
+ * What the next click on this column's sort control will do, spelled out for
+ * the tooltip and for screen readers. An unlabelled arrow that means three
+ * different things depending on the state it is in is a control you have to
+ * click to learn.
+ */
+function sortActionTitle(sort: VirtualTableSort, sortPosition?: number): string {
+    const rank = sortPosition !== undefined ? ` (sort key ${sortPosition + 1})` : "";
+    const addKey = " — shift-click to add it under the current sort instead";
+    if (sort === "asc") return `Sorted ascending${rank}. Click to sort descending.${addKey}`;
+    if (sort === "desc") return `Sorted descending${rank}. Click to remove this sort.${addKey}`;
+    return `Click to sort ascending.${addKey}`;
+}
+
 export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<string, unknown>>>(
     function VirtualTableHeader<M extends Record<string, unknown>>({
         resizeHandleRef,
         columnIndex,
         isResizingIndex,
         sort,
+        sortPosition,
         onColumnSort,
         onFilterUpdate,
         filter,
@@ -141,14 +161,23 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                             <AdditionalHeaderWidget onHover={onHover || openFilter}/>}
 
                         {column.sortable && (sort || hovered || openFilter) &&
-                            <div className="flex-shrink-0">
+                            <div className="flex-shrink-0 flex items-center">
                                 <Badge color="secondary"
                                     invisible={!sort}>
                                     <IconButton
                                         size={"small"}
                                         className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
-                                        onClick={() => {
-                                            onColumnSort(column.key as Extract<keyof M, string>);
+                                        // Shift keeps the sort already in place
+                                        // and adds this column beneath it, which
+                                        // is how a two-key order is built from
+                                        // header clicks. Plain click still
+                                        // replaces the whole sort, so the common
+                                        // case takes no modifier and nothing a
+                                        // user knew before stops working.
+                                        title={sortActionTitle(sort, sortPosition)}
+                                        aria-label={sortActionTitle(sort, sortPosition)}
+                                        onClick={(event: React.MouseEvent) => {
+                                            onColumnSort(column.key as Extract<keyof M, string>, event.shiftKey);
                                         }}
                                     >
                                         {!sort &&
@@ -159,6 +188,18 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                             <ArrowUpIcon size={14} className="flex-shrink-0 rotate-180" />}
                                     </IconButton>
                                 </Badge>
+                                {/* The rank, shown only once there is more than
+                                    one key: two arrows with no numbers beside
+                                    them say a table is sorted by both columns
+                                    and nothing about which one decides. */}
+                                {sort && sortPosition !== undefined && (
+                                    <span
+                                        className="flex-shrink-0 -ml-0.5 mr-0.5 text-[10px] font-bold leading-none tabular-nums text-text-secondary dark:text-text-secondary-dark"
+                                        aria-hidden={true}
+                                    >
+                                        {sortPosition + 1}
+                                    </span>
+                                )}
                             </div>
                         }
                     </>

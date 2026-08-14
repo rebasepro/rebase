@@ -12,7 +12,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
-import type { StorageRegistry } from "./storage-registry";
+import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
 import { generateDownloadToken } from "../auth";
@@ -20,7 +20,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
-import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
+import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
 
 /** Shared image transform cache (LRU, 500 entries, 1 hour TTL). */
 const transformCache = new TransformCache();
@@ -360,15 +360,70 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     };
 
     /**
-     * Resolve the storage controller for a request.
-     * Looks up by `storageId` in the registry, falls back to the single
-     * controller, and finally to the registry default.
+     * Resolve the storage controller for a request, or refuse the request.
+     *
+     * A `storageId` that names no registered source used to fall back to the
+     * default one. That is silently wrong: the `storageAuthorize` hook is asked
+     * about the source the caller named while the bytes come from `(default)`,
+     * so the object the hook approved is not the object the request touched —
+     * and because the two sources hold the same key, the fallback returns
+     * plausible bytes instead of an error.
+     *
+     * The caller gets one of two answers, because they are two different
+     * problems with two different fixes:
+     *
+     * - **501** if the source *is* declared in `rebase.json` but has no
+     *   credentials in this environment. It was skipped at boot rather than
+     *   crash-looping the backend, but `GET /sources` still advertises it, so a
+     *   client asking for it is not confused — the deployment is incomplete.
+     *   501 (not 503) for the same reason the whole-storage stub uses it: this
+     *   is permanent until someone configures it, and the client's offline
+     *   queue retries 503 forever.
+     * - **400** otherwise. The id names nothing this deployment has ever heard
+     *   of, which is a caller mistake. `expected`, so one client holding a
+     *   stale source name does not write a warning per request forever.
      */
+    const declaredKeys = new Set((declaredSources ?? []).map((s) => s.key));
+
+    const refuseUnknownSource = (storageId: string, knownKeys: string[]): never => {
+        if (declaredKeys.has(storageId)) {
+            throw new ApiError(
+                501,
+                "STORAGE_SOURCE_NOT_CONFIGURED",
+                `Storage source "${storageId}" is declared but not configured on this deployment, ` +
+                "so it cannot be read from or written to. Set its credentials " +
+                `(the ${storageId} suffixed environment variables) and redeploy.`
+            );
+        }
+        throw new ApiError(
+            400,
+            "UNKNOWN_STORAGE_SOURCE",
+            `Unknown storage source "${storageId}". ` +
+            `Available: ${knownKeys.length > 0 ? knownKeys.map((k) => `"${k}"`).join(", ") : "(none)"}.`,
+            undefined,
+            true
+        );
+    };
+
     const resolveController = (storageId?: string | null): StorageController => {
         if (registry) {
-            return registry.getOrDefault(storageId);
+            try {
+                return registry.getOrDefault(storageId);
+            } catch (err) {
+                if (err instanceof UnknownStorageSourceError) {
+                    return refuseUnknownSource(err.storageId, err.knownKeys);
+                }
+                throw err;
+            }
         }
         if (controller) {
+            // Single-controller backends (no registry) have exactly one source,
+            // and it is the default one. Honouring a named `storageId` here
+            // would be the same silent redirect by another route.
+            const requested = canonicalStorageId(storageId);
+            if (requested !== DEFAULT_STORAGE_SOURCE_KEY) {
+                return refuseUnknownSource(requested, [DEFAULT_STORAGE_SOURCE_KEY]);
+            }
             return controller;
         }
         throw new Error("No storage controller or registry available");
@@ -615,8 +670,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // Public object: served token-less via a permanent URL.
                 downloadConfig.metadata.public = true;
             } else {
-                // Private object: mint a short-lived, path-scoped download token.
-                downloadConfig.metadata.token = generateDownloadToken(scopedPath, 300);
+                // Private object: mint a short-lived download token scoped to
+                // this path *and to the source it was authorized against*. The
+                // hook above was asked about one object; a key is only unique
+                // within its own source, so a token that named the path alone
+                // would spend against the same key in every other one.
+                downloadConfig.metadata.token = generateDownloadToken(scopedPath, 300, storageId);
                 downloadConfig.metadata.tokenExpiresIn = 300;
             }
         }

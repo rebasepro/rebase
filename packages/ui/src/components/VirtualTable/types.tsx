@@ -27,14 +27,14 @@ export type VirtualTableContextProps<T> = {
     headerHeight?: number,
     columns: VirtualTableColumn[];
     cellRenderer: React.ComponentType<CellRendererParams<T>>;
-    currentSort: "asc" | "desc" | undefined;
+    /** Each sorted column's direction and its rank in the sort, keyed by column. */
+    sortIndex: Map<string, { direction: "asc" | "desc"; position: number }>;
     filter?: VirtualTableFilterValues<string>;
     onRowClick?: (props: OnRowClickParams<Record<string, unknown>>) => void;
-    onColumnSort: (key: string) => void;
+    onColumnSort: (key: string, additive?: boolean) => void;
     onColumnResize: (params: OnVirtualTableColumnResizeParams) => void;
     onColumnResizeEnd: (params: OnVirtualTableColumnResizeParams) => void;
     onFilterUpdate: (column: VirtualTableColumn, filterForProperty?: [VirtualTableWhereFilterOp, unknown]) => void;
-    sortByProperty?: string;
     customView?: React.ReactNode,
     hoverRow: boolean;
     createFilterField?: (props: FilterFormFieldProps<unknown>) => React.ReactNode;

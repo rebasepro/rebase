@@ -1,4 +1,5 @@
-import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, OrderByTuple, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { normalizeDriverOrderBy } from "@rebasepro/common";
 import { FilterCombination } from "@rebasepro/admin-types";
 import { User } from "firebase/auth";
 import {
@@ -133,7 +134,7 @@ export function useFirestoreDriver({
 
     const buildQuery = useCallback(<M>(path: string,
         filter: FilterValues<Extract<keyof M, string>> | undefined,
-        orderBy: string | undefined,
+        orderBy: string | OrderByTuple[] | undefined,
         order: "desc" | "asc" | undefined,
         startAfter: unknown[] | undefined,
         limit: number | undefined,
@@ -174,8 +175,12 @@ export function useFirestoreDriver({
                 });
         }
 
-        if (orderBy && order) {
-            queryParams.push(orderByClause(orderBy, order));
+        // Firestore composes several `orderBy` constraints into a compound sort,
+        // applied in the order they are added — the same meaning the tuple list
+        // carries. It needs a matching composite index; without one Firestore
+        // refuses the query outright rather than answering it half-sorted.
+        for (const [field, direction] of normalizeDriverOrderBy(orderBy, order) ?? []) {
+            queryParams.push(orderByClause(field, direction));
         }
 
         if (startAfter) {

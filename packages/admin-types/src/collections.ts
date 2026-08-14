@@ -13,7 +13,7 @@
  * only stored next to it.
  */
 import React, { Dispatch, SetStateAction } from "react";
-import type { Entity, EntityStatus, FilterValues, Property, User } from "@rebasepro/types";
+import type { Entity, EntityStatus, FilterValues, OrderByTuple, Property, User } from "@rebasepro/types";
 
 import type { RebaseContext } from "./rebase_context";
 import type { AdminCollection, PropertyPath } from "@rebasepro/admin-types";
@@ -245,8 +245,15 @@ export type EntityTableController<M extends Record<string, unknown> = Record<str
     dataLoadingError?: Error;
     filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
     setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
-    sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"];
-    setSortBy?: (sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"]) => void;
+    /**
+     * The sort keys in order of significance, the second breaking ties on the
+     * first. A single key is a one-element list — this was a bare tuple, which
+     * could only ever express one, so `collection.sort` could not describe an
+     * order like "by role, newest first within each role" and the table had no
+     * state to hold one in.
+     */
+    sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[];
+    setSortBy?: (sortBy?: OrderByTuple<Extract<keyof M, string> | (string & {})>[]) => void;
     searchString?: string;
     setSearchString?: (searchString?: string) => void;
     clearFilter?: () => void;
@@ -261,7 +268,7 @@ export type EntityTableController<M extends Record<string, unknown> = Record<str
     paginationEnabled?: boolean;
     pageSize?: number;
     checkFilterCombination?: (filterValues: FilterValues<string>,
-        sortBy?: [string, "asc" | "desc"]) => boolean;
+        sortBy?: OrderByTuple[]) => boolean;
     popupCell?: SelectedCellProps<M>;
     setPopupCell?: (popupCell?: SelectedCellProps<M>) => void;
 

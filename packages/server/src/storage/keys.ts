@@ -32,6 +32,7 @@
  */
 
 import path from "node:path";
+import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 
 /** Longest key accepted, in UTF-16 code units. Matches the previous cap. */
 export const MAX_STORAGE_KEY_LENGTH = 1024;
@@ -124,6 +125,28 @@ export function tryCanonicalStorageKey(rawKey: string): string | null {
     } catch {
         return null;
     }
+}
+
+/**
+ * Canonicalize the storage *source* a request names (`?storageId=`), so that
+ * "the default source" has exactly one spelling.
+ *
+ * The default source can be asked for three ways — the parameter omitted, sent
+ * empty, or sent as the literal `(default)` — and all three resolve to the same
+ * controller. Without a single spelling, the value derived when a download
+ * token is minted and the value derived when it is presented can differ for the
+ * same object, which is either a spurious 403 or, if the comparison is dropped
+ * to stop those, no scoping at all.
+ *
+ * Deliberately *not* validated against the registry: this is a naming rule, not
+ * an existence check, and it must give the same answer in `auth/` (which has no
+ * registry) as in the storage routes. An id that names no source still
+ * canonicalizes to itself and simply matches only itself.
+ */
+export function canonicalStorageId(rawStorageId: string | undefined | null): string {
+    if (rawStorageId === undefined || rawStorageId === null) return DEFAULT_STORAGE_SOURCE_KEY;
+    const trimmed = rawStorageId.trim();
+    return trimmed === "" ? DEFAULT_STORAGE_SOURCE_KEY : trimmed;
 }
 
 /**

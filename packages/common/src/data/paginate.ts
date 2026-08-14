@@ -8,6 +8,7 @@ import {
     IterateParams,
     WhereFilterOp
 } from "@rebasepro/types";
+import { normalizeOrderBy } from "./sort-dialect";
 
 /**
  * The pagination engine behind `iterate()` / `findAll()`.
@@ -184,16 +185,29 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
 
     let direction: "asc" | "desc" = "asc";
     if (cursorField) {
-        const orderBy = findParams.orderBy;
-        if (orderBy && orderBy[0] !== cursorField) {
+        const orderBy = normalizeOrderBy(findParams.orderBy);
+        // A seek is one `>`/`<` on one column, so it can only follow a sort of
+        // one column. Over a multi-key sort the same comparison both repeats
+        // rows (every later key's ties) and skips them, which is the failure
+        // this error exists to prevent — name it rather than seek anyway.
+        if (orderBy && orderBy.length > 1) {
             throw new RebasePaginationError(
                 "cursor-order-mismatch",
-                `Cannot seek on "${cursorField}" while ordering "${label}" by "${orderBy[0]}": ` +
+                `Cannot seek on "${cursorField}" while ordering "${label}" by ` +
+                `${orderBy.map(([field]) => `"${field}"`).join(", ")}: ` +
+                `keyset pagination advances along a single column. ` +
+                `Order by "${cursorField}" alone, or drop the cursor and page by offset.`
+            );
+        }
+        if (orderBy && orderBy[0][0] !== cursorField) {
+            throw new RebasePaginationError(
+                "cursor-order-mismatch",
+                `Cannot seek on "${cursorField}" while ordering "${label}" by "${orderBy[0][0]}": ` +
                 `keyset pagination only advances along the column the query is sorted by. ` +
                 `Order by "${cursorField}", or drop the cursor and page by offset.`
             );
         }
-        direction = requestedDirection ?? orderBy?.[1] ?? "asc";
+        direction = requestedDirection ?? orderBy?.[0][1] ?? "asc";
         findParams.orderBy = [cursorField, direction] as FindParams<M>["orderBy"];
     }
     const seekOp: WhereFilterOp = direction === "desc" ? "<" : ">";

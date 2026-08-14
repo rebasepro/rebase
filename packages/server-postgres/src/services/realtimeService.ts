@@ -4,12 +4,12 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { buildPropertyCallbacks, getTableName } from "@rebasepro/common";
+import { buildPropertyCallbacks, getTableName, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { logger } from "@rebasepro/server";
@@ -85,7 +85,7 @@ type RealTimeListenCollectionProps = ListenCollectionProps & {
 type StoredCollectionRequest = {
     filter?: Record<string, unknown>;
     logical?: LogicalCondition;
-    orderBy?: string;
+    orderBy?: string | OrderByTuple[];
     order?: "desc" | "asc";
     limit?: number;
     offset?: number;
@@ -507,6 +507,22 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return;
             }
 
+            // The sort arrives as whatever JSON the client put in the frame, so
+            // its *shape* is checked here the way the REST ingress checks the
+            // query parameter. Unchecked, a malformed entry reads as a field
+            // name that resolves to no column, and under lenient unknown-field
+            // handling the subscription then streams rows in no order at all
+            // while reporting nothing wrong.
+            let orderBy: OrderByTuple[] | undefined;
+            try {
+                orderBy = parseOrderBySpecStrict(request.orderBy, request.order);
+            } catch (e) {
+                if (!(e instanceof OrderBySpecError)) throw e;
+                logger.warn(`[RealtimeService] Refused subscription to '${request.path}': ${e.message}`);
+                this.sendError(clientId, e.message, subscriptionId, e.code);
+                return;
+            }
+
             // Store subscription with full request parameters and auth context for RLS
             this._subscriptions.set(subscriptionId, {
                 clientId,
@@ -515,7 +531,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 collectionRequest: {
                     filter: request.filter,
                     logical: request.logical,
-                    orderBy: request.orderBy,
+                    orderBy,
                     order: request.order,
                     limit: boundedLimit,
                     offset: request.offset,

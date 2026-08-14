@@ -113,7 +113,7 @@ to both. That is a cross-bucket content leak in exactly the configuration
 `docs/storage-sources.md` promotes. It also serves stale bytes for an hour after
 an object is overwritten in place.
 
-## P1 — download tokens are not scoped to a storage source
+## P1 — download tokens are not scoped to a storage source — **FIXED**
 
 The token payload is `${bucket}/${resolvedPath}` ([routes.ts:469](../packages/server/src/storage/routes.ts:469)),
 `fileTokenAuth` matches on that path only, and `/file/*` still resolves its
@@ -121,13 +121,79 @@ controller from `?storageId`. Mint a token on a source you may read, replay it
 against a source you may not, same key. Put the source key in the token payload
 and match it.
 
-## P1 — an unknown `storageId` silently falls back to the default source
+**Fixed 2026-08-12.** `DownloadTokenPayload` carries a `storageId`;
+`/metadata/*` signs it with the source it just authorized against, and
+`fileTokenAuth` refuses a token whose source is not the one the request names
+(403 `Scoped token storage mismatch`, distinct from the path mismatch so a
+client that forgets to forward `?storageId=` is debuggable).
+
+Two details that decide whether this works:
+
+- **One spelling of the default source.** Omitted, empty and `(default)` all
+  resolve to the same controller, so all three have to produce the same grant.
+  `canonicalStorageId` in `storage/keys.ts` is that rule, shared by the minting
+  route and the middleware — the same "one canonical string, one function"
+  discipline the key canonicalizer exists for, and for the same reason: two
+  copies of this rule is the bug, not the fix. `DEFAULT_STORAGE_ID` is now an
+  alias of `DEFAULT_STORAGE_SOURCE_KEY` rather than a second `"(default)"`
+  literal.
+- **Legacy tokens read as default-source grants, not as wildcards.** A token
+  minted before the claim existed has none; `verifyDownloadToken` fills in the
+  default source. Fail-closed, and bounded by the 300s TTL — for at most that
+  long after a deploy an in-flight token for a *named* source is refused and the
+  client re-fetches `/metadata`.
+
+Guards: cross-source reads in `test/file-token-auth.test.ts` and, at route
+level, `test/storage-routes.test.ts`. Both directions are needed and they fail
+differently — a missing *check* is caught by spending a token on the wrong
+source, while a mint site that forgets to name the source is invisible to that
+(a default-scoped token is what a default request should get) and shows up only
+when a **named**-source token is spent on its own source and wrongly refused.
+
+## P1 — an unknown `storageId` silently falls back to the default source — **FIXED**
 
 `DefaultStorageRegistry.getOrDefault` logs a warning and returns the default
 controller. So the hook is asked about source `X` and the bytes come from
 `(default)`. A hook that widens access for one named source (a public-assets
 bucket, say) therefore widens it for the default one. An unknown `storageId`
 should be a 400, not a fallback.
+
+**Fixed 2026-08-12.** `getOrDefault` now means *the source you named, or the
+default if you named none* — an unknown id throws `UnknownStorageSourceError`
+instead of redirecting. The route layer turns that into one of two answers,
+because they are two different problems:
+
+- **501 `STORAGE_SOURCE_NOT_CONFIGURED`** when the source *is* declared in
+  `rebase.json` but has no credentials here. This is the case that made the old
+  fallback reachable without an attacker: boot skips such a source, but
+  `GET /sources` still advertises it, so a client asks for a source it was told
+  exists and gets a different bucket's contents. `docs/storage-sources.md`
+  already claimed this 501 — it was aspirational until now.
+- **400 `UNKNOWN_STORAGE_SOURCE`** otherwise, naming the sources that do exist.
+  Marked `expected`, so a client holding a stale name does not log a warning per
+  request forever.
+
+Three places had to agree, not one:
+
+- **TUS resolves the source twice** — `create` to tell the hook where the bytes
+  are going, `finalize` to write them — so the fallback landed the object in
+  `(default)` after the hook approved `X`. `create` now refuses an unknown
+  source before a temp file exists (failing at `finalize` would mean accepting
+  the entire upload first); `finalize` maps the error into its existing
+  "nothing to write to" branch rather than into another bucket.
+- **The single-controller path** (`controller` with no registry) honoured a
+  named `storageId` by ignoring it — the same silent redirect by another route.
+- **Empty and `(default)` must still mean the default.** `?storageId=` with no
+  value is how a client spells "no preference"; refusing it would be a
+  regression dressed as a fix. `get`/`has`/`getOrDefault` all canonicalize
+  through `canonicalStorageId` so they cannot disagree about which spellings
+  mean the default.
+
+Guards in `test/storage-registry.test.ts`, `test/storage-routes.test.ts` (400,
+501, empty-id, and *no bytes written anywhere*) and
+`test/storage-tus-storage-id.test.ts`. Verified by mutation: restoring the
+fallback fails 6, collapsing 501 into 400 fails 1, removing the TUS pre-check
+fails 1.
 
 ## P1 — a `%` in a key makes the object permanently unreadable — CONFIRMED
 
@@ -242,8 +308,8 @@ multipart.
    controller, download token and the token-matching middleware, plus the missing
    test axis (*escape the approved prefix*, not just the bucket).
 2. ~~TUS: authorize and write the same key~~ — **done**.
-3. Put `storageId` into the transform-cache key and the download-token payload;
-   400 on unknown `storageId`. Fixes the three P1 leaks.
+3. ~~Put `storageId` into the transform-cache key and the download-token
+   payload; 400 on unknown `storageId`~~ — **done**. All three P1 leaks closed.
 4. Encode/decode keys properly on both sides (the `%` 500).
 5. Then the scale work: stream + `Range` + `ETag` on `/file/*`, and decide whether
    TUS is single-replica-by-contract or moves to S3 multipart.

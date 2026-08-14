@@ -113,6 +113,33 @@ describe("TUS authorizes the storage source it writes to", () => {
         expect(await exists(path.join(assetsDir, "default", "logo.png"))).toBe(false);
     });
 
+    /**
+     * TUS resolves the source twice — once in `create`, to tell the hook where
+     * the bytes are going, and once in `finalize`, to write them. An unknown id
+     * used to fall back to the default source at the second resolution, so the
+     * hook approved a write to `unconfigured` and the object landed in
+     * `(default)`. Same shape as the key mismatch this suite was written for.
+     *
+     * Refused in `create`, before a temp file exists: the alternative is
+     * accepting the whole upload and failing at the end, which is both a worse
+     * experience and a way to fill the disk.
+     */
+    it("refuses an unknown storage source before accepting any bytes", async () => {
+        const { create } = await upload(
+            "http://localhost/api/storage/tus",
+            { key: "logo.png", storageId: "unconfigured" },
+            "hello"
+        );
+
+        expect(create.status).toBe(400);
+        const body = await create.json() as { error: { code: string } };
+        expect(body.error.code).toBe("UNKNOWN_STORAGE_SOURCE");
+
+        // Neither authorized nor written anywhere.
+        expect(seen).toEqual([]);
+        expect(await exists(path.join(defaultDir, "default", "logo.png"))).toBe(false);
+    });
+
     it("still writes an allowed upload to the default source", async () => {
         const { create, patch } = await upload(
             "http://localhost/api/storage/tus",

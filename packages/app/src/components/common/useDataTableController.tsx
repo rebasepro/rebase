@@ -7,7 +7,8 @@ import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
 import { toFindParams } from "../../hooks/data/collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
-import { Entity, EntityReference, EntityRelation, FilterValues, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
 import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
@@ -96,17 +97,21 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     });
 
     const checkFilterCombination = useCallback((filterValues: FilterValues<any>,
-        sortBy?: [string, "asc" | "desc"]) => {
+        sortBy?: OrderByTuple[]) => {
         // PostgREST/SQL can handle arbitrary filter/sort combinations natively.
         return true;
     }, []);
 
+    // The collection's default, in the list form the controller works in.
+    // `collection.sort` accepts either spelling so a one-key default stays the
+    // one-liner it always was.
     const sortInternal = useMemo(() => {
-        if (sort && fixedFilter && !checkFilterCombination(fixedFilter, sort)) {
+        const keys = normalizeOrderBy(sort as OrderBySpec | undefined);
+        if (keys && fixedFilter && !checkFilterCombination(fixedFilter, keys)) {
             console.warn("Initial sort is not compatible with the force filter. Ignoring initial sort");
             return undefined;
         }
-        return sort;
+        return keys;
     }, [sort, fixedFilter]);
 
     const {
@@ -115,7 +120,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     } = parseFilterAndSort(location.search);
 
     const [filterValues, setFilterValues] = React.useState<FilterValues<Extract<keyof M, string> | (string & {})> | undefined>(fixedFilter ?? (updateUrl ? filterUrl : undefined) ?? defaultFilter ?? undefined);
-    const [sortBy, setSortBy] = React.useState<[Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
+    const [sortBy, setSortBy] = React.useState<OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
     // Skip initial mount since useState initializers already handle URL params + collection defaults.
@@ -136,7 +141,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         if (urlSortBy && fixedFilter && !checkFilterCombination(fixedFilter, urlSortBy)) {
             console.warn("URL sort is not compatible with the force filter.");
         } else {
-            setSortBy(urlSortBy as [Extract<keyof M, string> | (string & {}), "asc" | "desc"] | undefined);
+            setSortBy(urlSortBy as OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined);
         }
 
         // Sync search string from URL
@@ -163,8 +168,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const [itemCount, setItemCount] = React.useState<number | undefined>(paginationEnabled ? initialItemCount : undefined);
 
-    const sortByProperty = sortBy ? sortBy[0] : undefined;
-    const currentSort = sortBy ? sortBy[1] : undefined;
+    // The whole sort, as one string, so the effect below re-runs when any key
+    // changes — a `sortBy` array is a new reference on every render and would
+    // re-subscribe on each one if used as a dependency directly.
+    const sortKey = sortBy ? serializeOrderBy(sortBy) : undefined;
 
     const context: RebaseContext<USER> = useRebaseContext();
 
@@ -253,7 +260,9 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         // filterValues is already FilterValues — pass directly to the accessor
         const whereParams = filterValues && Object.keys(filterValues).length > 0 ? filterValues : undefined;
-        const orderByParams: [string, "asc" | "desc"] | undefined = sortBy ? [String(sortBy[0]), sortBy[1]] : undefined;
+        const orderByParams = sortBy && sortBy.length > 0
+            ? sortBy.map(([field, direction]) => [String(field), direction] as OrderByTuple)
+            : undefined;
 
         let unsubscribe: (() => void) | undefined;
 
@@ -277,7 +286,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         }
 
         return unsubscribe;
-    }, [dataClient, path, itemCount, currentSort, sortByProperty, filterValues, searchString]);
+    }, [dataClient, path, itemCount, sortKey, filterValues, searchString]);
 
     const orderedData = useDataOrder({
         data: rawData,
@@ -336,7 +345,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
 function useUpdateUrl<M extends Record<string, any> = any>(
     filterValues: FilterValues<Extract<keyof M, string>> | undefined,
-    sortBy: [Extract<keyof M, string>, "asc" | "desc"] | undefined,
+    sortBy: OrderByTuple<Extract<keyof M, string>>[] | undefined,
     searchString: string | undefined,
     updateUrl: boolean | undefined
 ) {
@@ -371,11 +380,15 @@ function useUpdateUrl<M extends Record<string, any> = any>(
     }, [filterValues, sortBy, searchString, updateUrl]);
 }
 
-function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: [string, "asc" | "desc"] | undefined) {
+function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: OrderByTuple[] | undefined) {
     const entries: Record<string, string> = {};
-    if (sortBy) {
-        entries["__sort"] = encodeURIComponent(sortBy[0]);
-        entries["__sort_order"] = encodeURIComponent(sortBy[1]);
+    if (sortBy && sortBy.length > 0) {
+        // Comma-separated, positionally paired. A single key encodes exactly as
+        // it did before — `__sort=name&__sort_order=asc` — so links already out
+        // in the world keep working, and a reload of a two-key sort no longer
+        // silently comes back sorted by the first key alone.
+        entries["__sort"] = sortBy.map(([field]) => encodeURIComponent(field)).join(",");
+        entries["__sort_order"] = sortBy.map(([, direction]) => direction).join(",");
     }
     if (filterValues) {
         Object.entries(filterValues).forEach(([key, value]) => {
@@ -426,14 +439,23 @@ function encodeFilterAndSort(filterValues?: FilterValues<string>, sortBy?: [stri
 
 function parseFilterAndSort<M>(search: string): {
     filterValues: FilterValues<string> | undefined,
-    sortBy?: [Extract<keyof M, string>, "asc" | "desc"]
+    sortBy?: OrderByTuple<Extract<keyof M, string>>[]
 } {
     const entries = new URLSearchParams(search);
     const filterValues: FilterValues<string> = {};
-    let sortBy: [string, "asc" | "desc"] | undefined = undefined;
+    let sortBy: OrderByTuple[] | undefined = undefined;
     entries.forEach((value, key) => {
         if (key === "__sort") {
-            sortBy = [decodeURIComponent(value), entries.get("__sort_order") as "asc" | "desc"];
+            const directions = (entries.get("__sort_order") ?? "").split(",");
+            const keys = value
+                .split(",")
+                .map((field) => decodeURIComponent(field).trim())
+                .filter(Boolean)
+                // A direction missing from the URL — a hand-written link, or the
+                // one-key form of an older bookmark — is ascending, the same
+                // reading `?orderBy=name` gets everywhere else.
+                .map((field, index): OrderByTuple => [field, directions[index] === "desc" ? "desc" : "asc"]);
+            sortBy = keys.length > 0 ? keys : undefined;
         } else if (key.endsWith("_op")) {
             const field = key.replace("_op", "");
             const filterOp = decodeURIComponent(value) as WhereFilterOp;

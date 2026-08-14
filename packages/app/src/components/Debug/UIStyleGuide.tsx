@@ -34,7 +34,10 @@ export const UIStyleGuide = () => {
                     {typographyVariants.map(variant => (
                         <div key={variant} className="flex items-center gap-4 border-b border-surface-100 dark:border-surface-950 pb-4 last:border-0">
                             <span className="w-24 text-[10px] uppercase tracking-wider text-text-disabled font-mono">{variant}</span>
-                            <Typography variant={variant}>
+                            {/* component="p" keeps the variant's styling without emitting a
+                                real h1-h6 into the host page's document outline. See the
+                                matching note in UIReferenceView. */}
+                            <Typography variant={variant} component="p">
                                 The quick brown fox jumps over the lazy dog ({variant})
                             </Typography>
                         </div>

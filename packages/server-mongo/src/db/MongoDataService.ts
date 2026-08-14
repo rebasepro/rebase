@@ -6,7 +6,7 @@
  */
 
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
-import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition } from "@rebasepro/types";
+import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { ApiError } from "@rebasepro/server";
 
@@ -195,7 +195,7 @@ export class MongoDataService implements DataRepository {
             filter?: FilterValues<Extract<keyof M, string>>;
             /** An `or(...)`/`and(...)` group, AND-ed with `filter`. */
             logical?: LogicalCondition;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;
@@ -253,7 +253,7 @@ export class MongoDataService implements DataRepository {
         searchString: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;

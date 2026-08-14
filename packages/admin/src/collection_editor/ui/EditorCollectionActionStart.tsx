@@ -12,6 +12,7 @@ import { Button, SaveIcon, Tooltip, UndoIcon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
 import { mergeDeep } from "@rebasepro/utils";
+import { normalizeOrderBy } from "@rebasepro/common";
 
 export function EditorCollectionActionStart({
     path,
@@ -30,7 +31,7 @@ export function EditorCollectionActionStart({
 
     let saveDefaultFilterButton = null;
     if (!equal(getObjectOrNull(tableController.filterValues), getObjectOrNull(collection.defaultFilter)) ||
-        !equal(getObjectOrNull(tableController.sortBy), getObjectOrNull(collection.sort))) {
+        !equal(getObjectOrNull(tableController.sortBy), getObjectOrNull(normalizeOrderBy(collection.sort)))) {
         saveDefaultFilterButton = <>
             <Tooltip
                 asChild={true}
@@ -68,7 +69,7 @@ parentEntityIds,
                         if (collection?.defaultFilter)
                             tableController.setFilterValues?.(collection?.defaultFilter);
                         if (collection?.sort)
-                            tableController.setSortBy?.(collection?.sort);
+                            tableController.setSortBy?.(normalizeOrderBy(collection.sort) as Parameters<NonNullable<typeof tableController.setSortBy>>[0]);
                     }}>
                     <UndoIcon/>
                 </Button>

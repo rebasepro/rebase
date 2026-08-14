@@ -25,7 +25,7 @@ import type {
     InferEntityType,
     MongoDBCollectionConfig,
     MongoProperties,
-    OrderByTuple,
+    OrderBySpec,
     PostgresCollectionConfig,
     PostgresProperties,
     User
@@ -326,9 +326,15 @@ export type AdminCollectionOptions<
      * Default sort applied to this collection.
      * When setting this prop, entities will have a default order
      * applied in the collection.
-     * e.g. `sort: ["order", "asc"]`
+     *
+     * One key, or several applied in order of significance — the second breaks
+     * ties on the first, and so on. The row id breaks the last tie, so the
+     * order is total and paging over it neither repeats nor skips rows.
+     *
+     * @example sort: ["order", "asc"]
+     * @example sort: [["roles", "asc"], ["createdAt", "desc"]]
      */
-    readonly sort?: OrderByTuple<PropertyPath<M>>;
+    readonly sort?: OrderBySpec<PropertyPath<M>>;
 
     /**
      * You can add additional fields to the collection view by implementing

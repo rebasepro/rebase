@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { imgDims } from "../../utils/imageDimensions";
 import {
     Check,
     ChevronDown,
@@ -359,7 +360,7 @@ export default function RebaseMosaicDemo() {
                                                     <div
                                                         className="col-span-2 rounded-lg bg-neutral-950/70 border border-neutral-800/60 p-1 flex items-center justify-center relative overflow-hidden">
                                                         <img
-                                                            src={prod.imageUrl}
+                                                            src={prod.imageUrl} {...imgDims(prod.imageUrl)}
                                                             alt={prod.name}
                                                             className="h-10 w-auto object-contain drop-shadow-md rounded"
                                                         />

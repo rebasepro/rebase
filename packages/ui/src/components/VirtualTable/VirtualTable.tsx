@@ -13,6 +13,7 @@ import {
     VirtualTableColumn,
     VirtualTableFilterValues,
     VirtualTableProps,
+    VirtualTableSortKey,
     VirtualTableWhereFilterOp
 } from "./VirtualTableProps";
 
@@ -142,8 +143,18 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
         extraData
     }: VirtualTableProps<T>) {
 
-        const sortByProperty: string | undefined = sortBy ? sortBy[0] : undefined;
-        const currentSort: "asc" | "desc" | undefined = sortBy ? sortBy[1] : undefined;
+        // Where each sorted column sits in the order, so a header can show both
+        // which way it runs and how much it counts: `roles ↑1, created_at ↓2`
+        // reads as "by role, newest first within each role". Without the rank a
+        // multi-key sort shows two arrows and no way to tell which one wins.
+        const sortIndex = useMemo(() => {
+            const index = new Map<string, { direction: "asc" | "desc"; position: number }>();
+            (sortBy ?? []).forEach(([key, direction], position) => {
+                if (!index.has(key)) index.set(key, { direction,
+position });
+            });
+            return index;
+        }, [sortBy]);
 
         const [columns, setColumns] = useState(columnsProp);
 
@@ -243,16 +254,37 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             }
         }, []);
 
-        const onColumnSort = useCallback((key: string) => {
+        /**
+         * Click a header to sort by that column: ascending, descending, then
+         * off. Shift-click to keep the sort you already have and add this
+         * column under it — the same idiom spreadsheets use, and the only way
+         * to build "by role, newest first" out of two clicks.
+         *
+         * Shift cycles the column it lands on through the same three states, so
+         * a key added by mistake is removed by shift-clicking it twice more,
+         * without disturbing the keys around it.
+         */
+        const onColumnSort = useCallback((key: string, additive = false) => {
 
-            const isDesc = sortByProperty === key && currentSort === "desc";
-            const isAsc = sortByProperty === key && currentSort === "asc";
-            const newSort = isAsc ? "desc" : (isDesc ? undefined : "asc");
-            const newSortProperty: string | undefined = isDesc ? undefined : key;
+            const current = sortIndex.get(key);
+            const next: "asc" | "desc" | undefined = current === undefined
+                ? "asc"
+                : current.direction === "asc" ? "desc" : undefined;
+
+            const existing = sortBy ?? [];
+            let newSortBy: VirtualTableSortKey[] | undefined;
+            if (!additive) {
+                newSortBy = next ? [[key, next]] : undefined;
+            } else if (next === undefined) {
+                newSortBy = existing.filter(([existingKey]) => existingKey !== key);
+            } else if (current === undefined) {
+                newSortBy = [...existing, [key, next]];
+            } else {
+                newSortBy = existing.map((entry) => entry[0] === key ? [key, next] as VirtualTableSortKey : entry);
+            }
+            if (newSortBy?.length === 0) newSortBy = undefined;
 
             const filter = filterRef.current;
-
-            const newSortBy: [string, "asc" | "desc"] | undefined = newSort && newSortProperty ? [newSortProperty, newSort] : undefined;
             if (filter) {
                 if (checkFilterCombination && !checkFilterCombination(filter, newSortBy)) {
                     if (onFilterUpdate)
@@ -269,7 +301,7 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             }
 
             scrollToTop();
-        }, [checkFilterCombination, currentSort, onFilterUpdate, onResetPagination, onSortByUpdate, scrollToTop, sortByProperty]);
+        }, [checkFilterCombination, onFilterUpdate, onResetPagination, onSortByUpdate, scrollToTop, sortBy, sortIndex]);
 
         const maxScroll = Math.max((data?.length ?? 0) * rowHeight - bounds.height, 0);
 
@@ -311,14 +343,13 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             } else {
                 newFilterValue[column.key] = filterForProperty;
             }
-            const newSortBy: [string, "asc" | "desc"] | undefined = sortByProperty && currentSort ? [sortByProperty, currentSort] : undefined;
-            const isNewFilterCombinationValid = !checkFilterCombination || checkFilterCombination(newFilterValue, newSortBy);
+            const isNewFilterCombinationValid = !checkFilterCombination || checkFilterCombination(newFilterValue, sortBy);
             if (!isNewFilterCombinationValid) {
                 newFilterValue = filterForProperty ? { [column.key]: filterForProperty } as VirtualTableFilterValues<Extract<keyof T, string>> : {};
             }
 
             if (onFilterUpdate) onFilterUpdate(newFilterValue);
-        }, [checkFilterCombination, currentSort, onFilterUpdate, sortByProperty]);
+        }, [checkFilterCombination, onFilterUpdate, sortBy]);
 
         const empty = !loading && (data?.length ?? 0) === 0;
         const customView = (error && (data?.length ?? 0) === 0)
@@ -349,7 +380,6 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             headerHeight: headerHeight,
             cellRenderer,
             columns,
-            currentSort,
             onRowClick,
             customView,
             onColumnResize: onColumnResizeInternal,
@@ -357,7 +387,7 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             filter: filterRef.current,
             onColumnSort,
             onFilterUpdate: onFilterUpdateInternal,
-            sortByProperty,
+            sortIndex,
             hoverRow: hoverRow ?? false,
             createFilterField,
             rowClassName,
@@ -369,7 +399,7 @@ const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>
             } : undefined,
             draggingColumnId,
             extraData
-        }), [data, rowHeight, cellRenderer, columns, currentSort, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortByProperty, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
+        }), [data, rowHeight, cellRenderer, columns, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortIndex, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
 
         // Get sortable column keys (excluding frozen columns)
         const sortableColumnKeys = columns

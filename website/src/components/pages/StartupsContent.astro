@@ -21,6 +21,7 @@ import ClientLogos from '../../components/ClientLogos.astro';
 const zapIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>`;
 const cloudIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg>`;
 const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125v-12.75c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125m-17.25 0h17.25m-17.25 0l1.125 1.125c.15.15.313.225.487.225h14.25c.174 0 .337-.075.487-.225l1.125-1.125m-17.25 0h17.25M9 13.125h6M9 16.5h6" /></svg>`;
+import ClosingCta from "../ClosingCta.astro";
 ---
 
   <div class="flex flex-col isolate">
@@ -462,5 +463,8 @@ const spreadsheetIcon = `<svg class="h-10 w-10 mb-4 text-primary" fill="none" vi
         </div>
     </section>
 
-  </div>
+  
+    <ClosingCta title="Ship the back office this sprint." blurb="Scaffold against the Postgres you already run and hand the panel to your team — without building a single admin screen." trackId="startups" />
+
+</div>
 

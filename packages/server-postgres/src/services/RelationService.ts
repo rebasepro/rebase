@@ -1,7 +1,7 @@
 import { and, eq, inArray, notInArray, or, sql, SQL, getTableName as drizzleTableName } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -306,7 +306,7 @@ export class RelationService {
         relationKey: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             startAfter?: Record<string, unknown>;
@@ -335,7 +335,7 @@ export class RelationService {
         relation: ResolvedRelation,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             startAfter?: Record<string, unknown>;

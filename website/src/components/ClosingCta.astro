@@ -1,0 +1,85 @@
+---
+/**
+ * The closing CTA every page owes the reader.
+ *
+ * SITE-STORY §5: "Each page must answer its question, carry at least one live
+ * demo, and end with the same CTA pair: Try the demo + `pnpm dlx @rebasepro/cli
+ * init`." Twenty-four of thirty pages were ending without the command — every
+ * `rebase-vs-*` page among them, which is where a developer arrives from a
+ * search with the most intent in the whole funnel.
+ *
+ * Extracted from the hand-rolled block on /backend so the six pages that got it
+ * right and the rest converge on one implementation. Heading and blurb are props
+ * because each page closes in its own voice; the command and the demo link are
+ * not, because that is the part the contract fixes.
+ */
+import { getLangFromUrl, useTranslatedPath } from "../i18n/ui";
+
+interface Props {
+    /** Closing headline. Keep it a claim, not a label. */
+    title?: string;
+    /** One line under it. Say what happens next, concretely. */
+    blurb?: string;
+    /** Distinguishes copy events per page in analytics. */
+    trackId?: string;
+}
+
+const { title = "Point it at your database.", blurb = "Scaffold a project against a Postgres database you already run — no account, nothing to provision.", trackId = "page" } = Astro.props;
+
+const lang = getLangFromUrl(Astro.url);
+const translatePath = useTranslatedPath(lang);
+const COMMAND = "pnpm dlx @rebasepro/cli init";
+---
+
+<section class="py-24 sm:py-32">
+    <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">{title}</h2>
+        <p class="text-lg text-surface-400 mb-10">{blurb}</p>
+
+        <div class="group relative max-w-md mx-auto mb-10">
+            <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
+                 aria-hidden="true"></div>
+            <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                <div class="px-5 py-4 flex items-center justify-between">
+                    <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                        <span class="text-primary mr-3">~</span>
+                        <span class="text-white">{COMMAND}</span>
+                    </div>
+                    <button data-track-copy={`${trackId}-cta`} data-command={COMMAND}
+                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                            aria-label="Copy command" title="Copy to clipboard">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" aria-hidden="true">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+            <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
+               data-track id={`${trackId}-cta-demo`}>
+                Try the demo
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14"/>
+                    <path d="m12 5 7 7-7 7"/>
+                </svg>
+            </a>
+            <a href={translatePath("/docs")}
+               class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
+               data-track id={`${trackId}-cta-docs`}>
+                Read the docs
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14"/>
+                    <path d="m12 5 7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+</section>

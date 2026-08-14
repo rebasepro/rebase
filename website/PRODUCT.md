@@ -61,6 +61,14 @@ The docs exist to keep that developer building without leaving.
 - **Every major page carries at least one live demo**, not a card grid. A demo
   appears on the home page *and* at most one deep page — whichever page makes the
   claim it proves.
+- **The `.md` variant of a page must say what the page says.** `markdownGenerator.ts`
+  builds `/index.md`, which is what `llms.txt` is assembled from and what agents
+  and crawlers read. It drifted once and was not caught for a long time: it kept
+  building a "Key Benefits" list from `howitworks.*`, copy that rendered on no page
+  and led with the admin panel, so the human home page was backend-first while the
+  agent-facing one was panel-first and never mentioned security or agents at all.
+  Nothing enforces the correspondence — when a home-page beat changes, change the
+  generator in the same commit.
 - **`/europe` argues control, not location.** Competitors do provision in the EU;
   claiming otherwise is false and a knowledgeable reader will catch it. The true
   argument is structural: a managed backend has a second party who operates the

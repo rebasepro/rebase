@@ -2,6 +2,7 @@ import { RebaseApiError } from "../errors";
 import type { CollectionRegistryController } from "./collection_registry";
 import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
+import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
 import type { LogicalCondition } from "./data";
 
@@ -167,10 +168,25 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     limit?: number;
     offset?: number;
     startAfter?: unknown;
-    orderBy?: string;
+    /**
+     * The sort, in either of two spellings:
+     *
+     * - a field name, whose direction is the separate `order` below — the
+     *   original single-column contract, which every existing driver reads;
+     * - a list of `[field, direction]` tuples applied in order of significance,
+     *   which carries a multi-column sort and ignores `order` entirely.
+     *
+     * `normalizeDriverOrderBy` in `@rebasepro/common` collapses the pair to the
+     * list form. A driver that has not been taught the list form should read it
+     * through that helper rather than assume a string: handed an array, `String()`
+     * would produce a field name like `roles,asc` and the sort would 400 (or,
+     * with unknown-field warnings on, silently vanish).
+     */
+    orderBy?: string | OrderByTuple[];
     searchString?: string;
     /** Ask each row which declared search field matched — populates `_matches`. */
     searchExplain?: boolean;
+    /** Direction for the string form of `orderBy`. Ignored when `orderBy` is a list. */
     order?: "desc" | "asc";
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;
@@ -508,7 +524,8 @@ export interface RestFetchService {
             filter?: FilterValues<string>;
             /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
             logical?: LogicalCondition;
-            orderBy?: string;
+            /** See `FetchCollectionProps.orderBy`: a field name plus `order`, or a list of tuples. */
+            orderBy?: string | OrderByTuple[];
             order?: "desc" | "asc";
             limit?: number;
             offset?: number;

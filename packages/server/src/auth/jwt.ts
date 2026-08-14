@@ -1,6 +1,11 @@
 import jwt from "jsonwebtoken";
 import { createHash, randomBytes } from "crypto";
 import { logger } from "../utils/logger";
+// A leaf module (node:path and `@rebasepro/types` only), so this does not close
+// an import cycle. Same reason the key canonicalizer lives there: the value a
+// token is minted with and the value a request is checked against must come
+// from one function, not from two copies of one rule.
+import { canonicalStorageId } from "../storage/keys";
 
 export interface JwtConfig {
     secret: string;
@@ -336,14 +341,36 @@ export function verifyMfaPendingToken(token: string): { uid: string } | null {
 export interface DownloadTokenPayload {
     purpose: "file-read";
     path: string;
+    /**
+     * The storage source the grant is good for, canonicalized by
+     * {@link canonicalStorageId}. Always present on a decoded payload; see
+     * {@link verifyDownloadToken} for how tokens minted before this claim
+     * existed are read.
+     */
+    storageId: string;
 }
 
 /**
  * Generate a short-lived download token scoped to a specific file path or prefix
+ * *within one storage source*.
+ *
+ * Both halves of that scope are load-bearing. A key is only unique inside its
+ * own bucket, and a project with more than one source routinely holds the same
+ * key in several of them — `avatars/u1.png` in `(default)` and in `media` are
+ * different objects, quite possibly with different owners. A token that names
+ * only the path is therefore a grant on every source at once: authorize a read
+ * on the source whose `storageAuthorize` hook says yes, then spend the token
+ * against `?storageId=` pointing somewhere else.
+ *
+ * `storageId` is optional here only because omitting it *is* the default
+ * source, which is what the overwhelming majority of deployments have. A mint
+ * site that forgets to pass a named source produces a default-scoped token,
+ * which fails closed at `/file/*` rather than over-granting.
  */
 export function generateDownloadToken(
     path: string,
-    expiresInSeconds: number = 300
+    expiresInSeconds: number = 300,
+    storageId?: string | null
 ): string {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
@@ -351,7 +378,8 @@ export function generateDownloadToken(
 
     const payload: DownloadTokenPayload = {
         purpose: "file-read",
-        path
+        path,
+        storageId: canonicalStorageId(storageId)
     };
 
     return jwt.sign(payload, jwtConfig.secret, {
@@ -361,7 +389,14 @@ export function generateDownloadToken(
 }
 
 /**
- * Verify and decode a download token
+ * Verify and decode a download token.
+ *
+ * A token minted before `storageId` existed carries no such claim. It is read
+ * as a grant on the **default source** rather than on all of them: that is the
+ * fail-closed reading, and it is what such a token almost always was, since a
+ * named source has to be asked for explicitly. The cost is bounded by the
+ * five-minute TTL — for at most that long after a deploy, an in-flight token
+ * for a *named* source is refused and the client re-fetches `/metadata`.
  */
 export function verifyDownloadToken(token: string): DownloadTokenPayload | null {
     if (!jwtConfig.secret) {
@@ -373,7 +408,10 @@ export function verifyDownloadToken(token: string): DownloadTokenPayload | null 
         if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
             return {
                 purpose: "file-read",
-                path: decoded.path
+                path: decoded.path,
+                storageId: canonicalStorageId(
+                    typeof decoded.storageId === "string" ? decoded.storageId : null
+                )
             };
         }
         return null;

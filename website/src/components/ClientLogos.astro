@@ -40,6 +40,29 @@ const INTRINSIC: Record<string, [number, number]> = {
 const LOGO_IMG_CLASSES =
     "max-w-full w-auto h-auto object-contain grayscale opacity-60 hover:opacity-100 transition-all duration-500";
 
+// `product` records which of our two tools a company actually ships on.
+//
+// The wall is captioned "Rebase and FireCMS" (PRODUCT.md mandates the qualifier),
+// and the reason the qualifier is mandatory is that this list had no way to tell
+// the two apart — so the caption had to hedge over all eighteen logos. A hedge in
+// the highest-trust position on the page makes a reader discount the whole row.
+//
+// The fix is to record the distinction here and then show the Rebase set without a
+// qualifier. An entry with no `product` is unknown — not FireCMS. Only entries
+// marked "rebase" are verifiable from this repo (medicalmotion is a case study in
+// CaseStudiesCarousel.astro); marking the rest "firecms" would be a guess, and
+// guessing here puts an unverified claim on the page, which is the exact failure
+// the caption exists to prevent.
+//
+// This is deliberately NOT wired into the rendering yet, because one verified logo
+// is not a wall. To finish it: mark the remaining entries from whatever the team
+// actually knows, then filter on `logo.product === "rebase"` and drop the
+// qualifier from `social.title`. Until then the caption stays exactly as it is.
+//
+// No helper or filtered list is defined here on purpose: an unused one would be
+// exactly the dead code that put a three-year-old pitch into llms.txt.
+type LogoProduct = "rebase" | "firecms" | "unknown";
+
 const allLogos = [
     {
         key: "deardoc",
@@ -52,6 +75,8 @@ const allLogos = [
     },
     {
         key: "medicalmotion",
+        // Verified: shipped on Rebase, and carried as a case study on the home page.
+        product: "rebase" as LogoProduct,
         alt: "MedicalMotion Logo",
         href: "https://medicalmotion.com",
         src: "/img/logos/mm_logo.webp",

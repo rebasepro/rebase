@@ -12,7 +12,7 @@ import {
     WriteOptions,
     type ComputedSortField
 } from "@rebasepro/types";
-import { collectAllPages, paginateFind, resolveFindWindow } from "@rebasepro/common";
+import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
@@ -429,8 +429,11 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // handed "20" where it expected a keyset value, and the
                     // offset it does understand never arrived at all.
                     offset: window.driverOffset,
-                    orderBy: params?.orderBy?.[0],
-                    order: params?.orderBy?.[1],
+                    // The list form, so a multi-key sort reaches the socket
+                    // whole. Indexing `[0]`/`[1]` here read a tuple-of-tuples as
+                    // a field name and a direction, and a live subscription came
+                    // back in a different order from the same query fetched.
+                    orderBy: normalizeOrderBy(params?.orderBy),
                     searchString: params?.searchString,
                     searchExplain: params?.searchExplain
                 },

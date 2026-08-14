@@ -1,4 +1,5 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
+import type { OrderByTuple } from "./filter-operators";
 import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
@@ -47,7 +48,8 @@ export interface QueryFilter {
  */
 export interface FetchCollectionOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
-    orderBy?: string;
+    /** See `FetchCollectionProps.orderBy`: a field name plus `order`, or a list of tuples. */
+    orderBy?: string | OrderByTuple[];
     order?: "desc" | "asc";
     limit?: number;
     offset?: number;
@@ -62,7 +64,8 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
  */
 export interface SearchOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
-    orderBy?: string;
+    /** See `FetchCollectionProps.orderBy`: a field name plus `order`, or a list of tuples. */
+    orderBy?: string | OrderByTuple[];
     order?: "desc" | "asc";
     limit?: number;
     databaseId?: string;
@@ -237,7 +240,8 @@ export interface CollectionSubscriptionConfig {
     clientId: string;
     path: string;
     filter?: unknown;
-    orderBy?: string;
+    /** See `FetchCollectionProps.orderBy`: a field name plus `order`, or a list of tuples. */
+    orderBy?: string | OrderByTuple[];
     order?: "desc" | "asc";
     limit?: number;
     startAfter?: unknown;

@@ -439,8 +439,12 @@ title: "Mental Health B" }
             // from page two onwards.
             expect(queries[0].wheres).toHaveLength(2);
             expect(finalWhere(queries[0])).toMatchObject({
+                // `is null` and the `id <` tie-breaker: see the keyset
+                // comparison in `row-persist-composite-keys.test.ts` for why
+                // the id runs opposite to the key it breaks ties for, and why
+                // NULLs have to be named rather than compared.
                 sql: '("posts"."tag_id" = $1 and ("posts"."title" ilike $2 or "posts"."content" ilike $3) and ' +
-                    '("posts"."title" > $4 or ("posts"."title" = $5 and "posts"."id" > $6)))',
+                    '("posts"."title" > $4 or "posts"."title" is null or ("posts"."title" = $5 and "posts"."id" < $6)))',
                 params: [19, "%mental%", "%mental%", "Mental Health B", "Mental Health B", 5]
             });
             expect(queries[0].limit).toBe(10);

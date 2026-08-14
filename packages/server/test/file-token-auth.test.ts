@@ -152,6 +152,75 @@ describe("fileTokenAuth Middleware", () => {
         expect(body.error.message).toContain("Forbidden: Scoped token path mismatch");
     });
 
+    /**
+     * A token names a path *and* a storage source, because a path alone names
+     * an object in every source at once.
+     *
+     * The attack the source half stops: alice asks `/metadata` for a key in the
+     * source whose `storageAuthorize` hook says yes, then spends the minted
+     * token against `?storageId=` pointing at a source where the answer would
+     * have been no — same key, different object, different owner. Nothing about
+     * the path is wrong, which is exactly why a path-only grant let it through.
+     */
+    describe("a token is scoped to the storage source it was minted for", () => {
+        const key = "default/uploads/image.png";
+        const url = (storageId?: string, token?: string) =>
+            `http://localhost/api/storage/file/${key}?token=${token}` +
+            (storageId === undefined ? "" : `&storageId=${encodeURIComponent(storageId)}`);
+
+        it("grants a read on the source it names", async () => {
+            const token = generateDownloadToken(key, 300, "media");
+            const res = await app.fetch(new Request(url("media", token)));
+            expect(res.status).toBe(200);
+        });
+
+        it("refuses the same key in another source", async () => {
+            const token = generateDownloadToken(key, 300, "media");
+            const res = await app.fetch(new Request(url("backups", token)));
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.message).toContain("Forbidden: Scoped token storage mismatch");
+        });
+
+        it("refuses a named-source token used against the default source", async () => {
+            // The bypass is symmetric, and dropping the parameter is the
+            // cheapest way to try it.
+            const token = generateDownloadToken(key, 300, "media");
+            const res = await app.fetch(new Request(url(undefined, token)));
+            expect(res.status).toBe(403);
+        });
+
+        it("refuses a default-source token used against a named source", async () => {
+            const token = generateDownloadToken(key, 300);
+            const res = await app.fetch(new Request(url("media", token)));
+            expect(res.status).toBe(403);
+        });
+
+        it("accepts every spelling of the default source", async () => {
+            // A client that sends `storageId=(default)` explicitly, or an empty
+            // one, is asking for the same controller the omitted parameter
+            // resolves to — so it must not 403.
+            const token = generateDownloadToken(key, 300);
+            for (const spelling of [undefined, "", "(default)"]) {
+                const res = await app.fetch(new Request(url(spelling, token)));
+                expect([spelling, res.status]).toEqual([spelling, 200]);
+            }
+        });
+
+        it("scopes a Bearer-presented token the same way", async () => {
+            // Two code paths presented the same grant, and the check has to be
+            // the same in both.
+            const token = generateDownloadToken(key, 300, "media");
+            const res = await app.fetch(
+                new Request(`http://localhost/api/storage/file/${key}?storageId=backups`, {
+                    headers: { Authorization: "Bearer " + token }
+                })
+            );
+            expect(res.status).toBe(403);
+        });
+    });
+
     it("should reject full access JWT in query parameter ?token=", async () => {
         const fullAccessJwt = generateAccessToken("user-1", ["admin"]);
         const res = await app.fetch(
