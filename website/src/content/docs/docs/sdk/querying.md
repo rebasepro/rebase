@@ -279,6 +279,54 @@ const { data } = await client.data.products
     .find();
 ```
 
+## Aggregates
+
+`count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
+fetching them:
+
+```bash
+GET /api/data/orders/aggregate?select=count(),sum(total)
+```
+
+```json
+{ "data": [{ "count": 128, "sum_total": 40522 }] }
+```
+
+Group to get one row per value:
+
+```bash
+GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
+```
+
+```json
+{
+  "data": [
+    { "status": "paid",    "count": 96, "sum_total": 31200 },
+    { "status": "pending", "count": 32, "sum_total": 9322 }
+  ]
+}
+```
+
+Results are keyed by function and field — `count()` becomes `count`,
+`sum(total)` becomes `sum_total`.
+
+It takes the same filters as the list endpoint, so an aggregate can be narrowed
+the same way a listing is:
+
+```bash
+GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&created_at=gte.2026-01-01
+```
+
+:::note
+**Row-level security applies to the rows being aggregated.** An aggregate is an
+efficient way to learn about rows you cannot read, so it runs under the caller's
+own policies: someone who can select nothing counts nothing.
+:::
+
+Aggregates need a driver that implements them. On one that does not, the
+endpoint answers `501` rather than an empty result — a dashboard should not be
+told "no matches" when the truth is "not supported".
+
 ## Filtering Inside JSON
 
 A `json` or `jsonb` column can be filtered by path, using Postgres's own arrow

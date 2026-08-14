@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
-import { parseQueryOptions, orderByEntriesToTuples, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
+import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
@@ -279,6 +279,47 @@ export class RestApiGenerator {
 
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
             return c.json({ count: total });
+        });
+
+        // GET /collection/aggregate - count/sum/avg/min/max, optionally grouped
+        //
+        // Beside `/count` and before `/:id`, or "aggregate" is read as an id
+        // and the endpoint 404s for a row that was never asked for.
+        this.router.get(`${basePath}/aggregate`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
+            const queryDict = c.req.queries();
+            const queryOptions = this.parseQuery(queryDict);
+            const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+
+            const aggregates = parseAggregateSelect(queryDict.select);
+            if (!aggregates) {
+                throw ApiError.badRequest(
+                    "`select` is required, e.g. `?select=count()` or `?select=sum(total)&groupBy=status`.",
+                    "MISSING_AGGREGATE_SELECT"
+                );
+            }
+
+            const driver = this.getScopedDriver(c);
+            const fetchService = driver.restFetchService;
+            if (!fetchService?.aggregate) {
+                // Every non-Postgres driver. A 501 naming the capability rather
+                // than a 500 — and emphatically not an empty result set, which
+                // reads as "nothing matched" and is the wrong thing to believe
+                // about a dashboard.
+                throw new ApiError(501, "AGGREGATE_NOT_SUPPORTED",
+                    "Aggregates are not implemented for this backend's data driver.");
+            }
+
+            const data = await fetchService.aggregate(collection.slug, {
+                aggregates,
+                groupBy: parseGroupBy(queryDict.groupBy),
+                filter: queryOptions.where,
+                logical: queryOptions.logical,
+                searchString,
+                limit: queryOptions.limit
+            });
+
+            return c.json({ data });
         });
 
         // GET /collection - List entities

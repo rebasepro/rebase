@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
@@ -1311,6 +1311,131 @@ relatedTo: hop });
 
         const result = await query;
         return Number(result[0]?.count || 0);
+    }
+
+    /**
+     * `count`/`sum`/`avg`/`min`/`max`, optionally grouped.
+     *
+     * The gap this fills is narrow and constant: every dashboard wants "revenue
+     * by status" and "orders per day", and without it the options were a custom
+     * function holding hand-written SQL, or fetching every row and reducing in
+     * JavaScript — which is wrong at any size that matters, and silently wrong
+     * under a `limit`.
+     *
+     * It runs through the same request-scoped handle as every other read, so
+     * **RLS applies to the rows being aggregated**. That is the property worth
+     * protecting here: an aggregate is an effective way to read data you cannot
+     * select, and `count(*)` over a table whose policies would return nothing
+     * has to be zero.
+     */
+    async aggregate<M extends Record<string, unknown>>(
+        collectionPath: string,
+        options: {
+            aggregates: { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string }[];
+            groupBy?: string[];
+            filter?: FilterValues<Extract<keyof M, string>>;
+            logical?: LogicalCondition;
+            searchString?: string;
+            limit?: number;
+        }
+    ): Promise<Record<string, unknown>[]> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const columns = getTableColumns(table);
+
+        const columnFor = (field: string, forWhat: string): AnyPgColumn => {
+            const column = columns[field as keyof typeof columns] as AnyPgColumn | undefined;
+            if (!column) {
+                throw ApiError.badRequest(
+                    `Unknown field '${field}' in ${forWhat}. Valid fields: ${Object.keys(columns).sort().join(", ")}`,
+                    "UNKNOWN_AGGREGATE_FIELD"
+                );
+            }
+            return column;
+        };
+
+        const selection: Record<string, SQL> = {};
+
+        for (const aggregate of options.aggregates) {
+            if (aggregate.fn === "count" && !aggregate.field) {
+                selection[aggregate.alias] = sql`count(*)`;
+                continue;
+            }
+            const column = columnFor(aggregate.field as string, `${aggregate.fn}()`);
+            switch (aggregate.fn) {
+                case "count": selection[aggregate.alias] = sql`count(${column})`; break;
+                // Cast through numeric so what comes back is a string this
+                // method parses, rather than a float whose precision depends on
+                // the column type — `avg` over an integer column is otherwise
+                // one shape here and another there.
+                case "sum": selection[aggregate.alias] = sql`sum(${column})::numeric`; break;
+                case "avg": selection[aggregate.alias] = sql`avg(${column})::numeric`; break;
+                case "min": selection[aggregate.alias] = sql`min(${column})`; break;
+                case "max": selection[aggregate.alias] = sql`max(${column})`; break;
+            }
+        }
+
+        const groupColumns = (options.groupBy ?? []).map(field => ({
+            field,
+            column: columnFor(field, "groupBy")
+        }));
+        for (const group of groupColumns) {
+            selection[group.field] = sql`${group.column}`;
+        }
+
+        let query = this.db.select(selection).from(table).$dynamic();
+
+        const conditions: SQL[] = [];
+        if (options.searchString) {
+            const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
+                options.searchString, collection.properties, table, collection
+            );
+            // No searchable field means no row matches — the same impossible
+            // WHERE the listing uses, rather than an unfiltered aggregate.
+            if (searchConditions.length === 0) return [];
+            conditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions) as SQL);
+        }
+        if (options.filter) {
+            conditions.push(...this.buildFilterConditions(options.filter, table, collectionPath));
+        }
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(
+                options.logical, table, collectionPath, this.filterContext(collectionPath, table)
+            );
+            if (logicalCondition) conditions.push(logicalCondition);
+        }
+        if (conditions.length > 0) {
+            const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(conditions);
+            if (finalCondition) query = query.where(finalCondition);
+        }
+
+        if (groupColumns.length > 0) {
+            query = query.groupBy(...groupColumns.map(g => g.column));
+            // Bounded for the same reason a listing is: grouping by a
+            // high-cardinality column is a whole table's worth of rows in one
+            // response.
+            if (options.limit) query = query.limit(options.limit);
+        }
+
+        const rows = await query as Record<string, unknown>[];
+
+        // `count`, `sum` and `avg` arrive as strings: Postgres returns bigint
+        // and numeric that way because they do not fit a JS number in general.
+        // They do fit for every aggregate anyone puts on a dashboard, and a
+        // caller handed `"12"` where they expected `12` has to find that out
+        // for themselves. Parsed once, here.
+        const numericAliases = new Set(
+            options.aggregates.filter(a => a.fn === "count" || a.fn === "sum" || a.fn === "avg").map(a => a.alias)
+        );
+        return rows.map(row => {
+            const out: Record<string, unknown> = { ...row };
+            for (const alias of numericAliases) {
+                if (out[alias] === null || out[alias] === undefined) continue;
+                const parsed = Number(out[alias]);
+                if (!Number.isNaN(parsed)) out[alias] = parsed;
+            }
+            return out;
+        });
     }
 
     /**
