@@ -931,7 +931,8 @@ id };
                     // this one did not, so a nested `/count?or=(…)` answered
                     // with the unnarrowed total beside a narrowed list.
                     logical: queryOptions.logical,
-                    searchString
+                    searchString,
+                    vectorSearch: queryOptions.vectorSearch
                 }) : 0;
 
                 return c.json({ count: total });
@@ -978,7 +979,14 @@ id: parsed.id });
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
                     orderBy: orderByEntriesToTuples(queryOptions.orderBy),
-                    searchString
+                    searchString,
+                    // Parsed by the same `parseQuery` the root list uses and
+                    // then dropped here, so `?vector_search=…&vector=[…]` on a
+                    // child listing was served as an ordinary page: no distance
+                    // ordering, no `_distance`, no threshold. A silent
+                    // downgrade, which reads as "the collection has no
+                    // neighbours" rather than as "this route ignored you".
+                    vectorSearch: queryOptions.vectorSearch
                 };
                 const entities = fetchService
                     ? await fetchService.fetchCollectionForRest(parsed.collectionPath, listOptions, queryOptions.include)
@@ -989,7 +997,12 @@ id: parsed.id });
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
                     logical: queryOptions.logical,
-                    searchString
+                    searchString,
+                    // Wired together with the fetch above on purpose: a count
+                    // that ignores the threshold the listing applied reports a
+                    // `total` larger than the set that was served, and
+                    // `hasMore` promises a page that does not exist.
+                    vectorSearch: queryOptions.vectorSearch
                 }) : entities.length;
 
                 const listCollection = this.resolveNestedWriteCollection(parsed.collectionPath);

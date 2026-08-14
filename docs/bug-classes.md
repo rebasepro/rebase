@@ -543,6 +543,41 @@ the call sites of the *feature* — every `count()`, every route that returns
 rows — and check each one, rather than reading the implementation and assuming
 its callers agree with it.
 
+### The same route family, one parameter later — 2026-08-13
+
+`vectorSearch` was the fourth parameter to go missing on the subcollection
+routes, after `logical`, `fields` and the `offset`/`orderBy`/`include` group.
+The route parses it — it shares `parseQuery` with the root list, so the value
+is sitting in `queryOptions` — and then builds `listOptions` without it. Nothing
+downstream is at fault: `fetchCollectionForRest` resolves the nested path and
+applies the distance ordering, the `_distance` select and the threshold, exactly
+as it does for a root read, and had done so the whole time.
+
+What makes this one worth recording is **what the caller is told**. A dropped
+`limit` unbounds a read and a dropped `logical` widens one, and both of those
+still answer the question that was asked. A dropped `vectorSearch` answers a
+*different* question in the same shape: `GET /authors/1/posts?vector_search=…`
+came back 200, with rows, ordered by `id DESC`, no `_distance` field, and the
+threshold ignored. The caller reads the first row as the nearest neighbour. There
+is no signal anywhere — not a status, not a header, not a missing field they
+were looking for — that the ranking they are about to act on is arbitrary.
+
+**A downgrade needs both halves wired in the same commit.** Only the
+`threshold` narrows a count; ordering does not change how many rows there are.
+Fixing the listing alone would have left `meta.total` counting the rows the
+threshold excluded, and `hasMore` promising a page that no longer exists — so
+the count paths were threaded too, `PostgresBackendDriver.count` →
+`dataService.count` → `FetchService.count`, and the root `countRawEntities`
+with them, which had the same gap. Before the fix the two disagreed *silently
+but consistently* (both ignored it), which is the trap: a half-fix converts a
+wrong answer into two answers that contradict each other.
+
+**The alternative was a 400**, and it is the right fix whenever the downstream
+support is genuinely absent — refusing `?vector_search=` on a route that cannot
+serve it tells the caller something true. It was not needed here only because
+the nested read already supported it. Serving the request as though the
+parameter were not there is the one option that is never correct.
+
 ---
 
 ## 18. A predicate that discriminates nothing

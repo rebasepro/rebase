@@ -1256,6 +1256,13 @@ relatedTo: hop });
             logical?: LogicalCondition;
             searchString?: string;
             databaseId?: string;
+            /**
+             * Only the `threshold` half of a vector search narrows a count: the
+             * distance ordering and the `_distance` column change which rows
+             * come back first, not how many there are. Omitting it here left
+             * `meta.total` counting rows the threshold had excluded, so a
+             * request that was served three rows was told there were nine.
+             */
             vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<number> {
@@ -1296,10 +1303,16 @@ relatedTo: hop });
         // A `threshold` genuinely narrows the row set on the fetch path, and
         // this count did not apply it — so a similarity-filtered listing
         // reported the size of the *unfiltered* set, and `hasMore` stayed true
-        // over pages that were already empty. Only the threshold matters here:
+        // over pages that were already empty. Only the threshold narrows it:
         // the ORDER BY and the `_distance` projection change which rows come
         // first and what rides along with them, not how many there are.
-        if (options.vectorSearch?.threshold != null) {
+        if (options.vectorSearch) {
+            // Built for any vector search rather than only a thresholded one,
+            // because this is also where an unknown or non-vector
+            // `vector_search` property is refused with a 400. Without a
+            // threshold it contributes no filter, so the count is unchanged and
+            // what is gained is that `/count` refuses the request the listing
+            // refuses instead of answering it with a number.
             const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
             if (vectorMeta.filter) allConditions.push(vectorMeta.filter);
         }
