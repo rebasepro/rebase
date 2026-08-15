@@ -11,8 +11,9 @@ Context that drives most of these findings: **Rebase now operates a hosted
 multi-tenant service (Rebase Cloud, `app.rebase.pro`) that stores other people's
 production databases and files on Google Cloud in `europe-west1` (Belgium).** The
 three policy documents predate that service. They are Termly-style templates for
-a marketing website, last updated **May 25, 2022** (terms, cookies) and
-**April 10, 2023** (privacy).
+a marketing website, inherited from the FireCMS-era site and re-dated to
+**April 8, 2026** — the day they were adopted under the Rebase name, not the day
+anyone reviewed them. See item 7.
 
 ---
 
@@ -178,9 +179,22 @@ before consent, that is a separate compliance exposure. Worth confirming that
 
 **Files:** all three
 
-- `terms_conditions.astro` line 35: "Last updated **May 25, 2022**"
-- `cookies_policy.astro` line 19: "Last updated **May 25, 2022**"
-- `privacy_policy.astro` line 21: "Last updated **April 10, 2023**"
+- ~~`terms_conditions.astro` line 35: "Last updated **May 25, 2022**"~~
+- ~~`cookies_policy.astro` line 19: "Last updated **May 25, 2022**"~~
+- ~~`privacy_policy.astro` line 21: "Last updated **April 10, 2023**"~~
+
+  **Partially addressed 2026-08-16.** All three now read **April 8, 2026**.
+  Those dates were impossible, not merely stale: they were inherited from the
+  FireCMS-era site along with the documents themselves, and someone
+  find-and-replaced FireCMS → Rebase without touching them — so the privacy
+  notice named "Rebase, S.L." as controller and dated itself eleven months
+  before `@rebasepro/cli` was first published (2026-03-30). April 8, 2026 is
+  the day `git` records the documents being adopted onto this site under the
+  Rebase name, which is genuinely when they last changed in substance.
+
+  **This is an adoption date, not a review date, and counsel must not read it
+  as one.** Everything else in this file is still open. Whoever does the
+  rewrite re-dates all three again on publication.
 - `terms_conditions.astro` contains **36** occurrences of
   `class="statement-end-if-in-editor"` and numerous `<bdt class="question">`
   wrappers — leftover Termly template-editor markup shipped into production HTML.
