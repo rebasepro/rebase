@@ -281,3 +281,69 @@ describe("the driver result the schema hooks pass", () => {
         expect(logged()).toContain("Applied 4");
     });
 });
+
+/**
+ * `provision: false` is what a split deployment sets on every process but one.
+ *
+ * Both halves have to hold: the DDL must not run, and the process must say so.
+ * A silent decline here is the worst failure available in this file — a replica
+ * that provisions nothing looks exactly like one that provisioned everything,
+ * right up until the owner never boots and the whole deployment serves 500s
+ * with no line anywhere naming the reason.
+ */
+describe("schema provisioning ownership", () => {
+    it("runs no schema DDL, and says which process owns it", async () => {
+        fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
+        const ensure = jest.fn(async () => ({ applied: 0 }));
+
+        await ensureCollectionSchema(
+            bundle(),
+            [source({ bootstrapper: { ensureCollectionSchema: ensure } as unknown as InitializedDataSource["bootstrapper"] })],
+            env(),
+            { provision: false }
+        );
+
+        expect(ensure).not.toHaveBeenCalled();
+        expect(loggedAtDefaultLevel()).toContain("another process in this deployment owns it");
+    });
+
+    it("applies no policies, and says so at the default level", async () => {
+        fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
+        const ensure = jest.fn(async () => ({ applied: 0 }));
+
+        await ensureCollectionPolicies(
+            bundle(),
+            [source({ bootstrapper: { ensureCollectionPolicies: ensure } as unknown as InitializedDataSource["bootstrapper"] })],
+            env(),
+            { provision: false }
+        );
+
+        expect(ensure).not.toHaveBeenCalled();
+        expect(loggedAtDefaultLevel()).toContain("another process in this deployment owns them");
+    });
+
+    it("provisions when the option is absent — the default must not move", async () => {
+        fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
+        const ensure = jest.fn(async () => ({ applied: 1 }));
+
+        await ensureCollectionSchema(
+            bundle(),
+            [source({ bootstrapper: { ensureCollectionSchema: ensure } as unknown as InitializedDataSource["bootstrapper"] })],
+            env()
+        );
+
+        expect(ensure).toHaveBeenCalled();
+    });
+
+    it("still declines for REBASE_MIGRATE_ON_BOOT=none, and names that reason instead", async () => {
+        // The two opt-outs answer different questions and must not be collapsed:
+        // an operator reading "another process owns it" on a deployment that has
+        // exactly one process would go looking for a process that never existed.
+        await ensureCollectionSchema(bundle(), [source()], env({ REBASE_MIGRATE_ON_BOOT: "none" }), {
+            provision: true
+        });
+
+        expect(logged()).toContain("REBASE_MIGRATE_ON_BOOT=none");
+        expect(logged()).not.toContain("another process");
+    });
+});

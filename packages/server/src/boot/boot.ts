@@ -51,6 +51,19 @@ export interface BootedRuntime {
     shutdown: () => Promise<void>;
 }
 
+/**
+ * Whether this process is the one that provisions the database schema.
+ *
+ * Separate from `REBASE_MIGRATE_ON_BOOT` on purpose. That variable answers
+ * "does this deployment create its own schema at boot"; this answers "is this
+ * *process* the one that does it", which only becomes a question once a
+ * deployment boots the same bundle more than once.
+ */
+export interface SchemaProvisioningOptions {
+    /** Default `true`. `false` leaves every DDL statement to another process. */
+    provision?: boolean;
+}
+
 export interface BootOptions {
     /** Bundle directory. Defaults to `REBASE_BUNDLE` or `./dist-bundle`. */
     bundleDir?: string;
@@ -66,6 +79,20 @@ export interface BootOptions {
     listen?: boolean;
     /** Install SIGTERM/SIGINT handlers. Off for tests. */
     handleSignals?: boolean;
+    /**
+     * Whether this process provisions the collection schema and its RLS
+     * policies at boot. Default `true` — the behaviour every deployment has.
+     *
+     * Set `false` on a process that is one of several booting the same bundle
+     * against the same database. `CREATE … IF NOT EXISTS` reads the catalog and
+     * then writes to it non-atomically, so peers starting together do collide;
+     * exactly one owner is cheaper and more legible than N racing and retrying.
+     *
+     * Independent of `REBASE_MIGRATE_ON_BOOT`, which answers a different
+     * question — whether *this deployment* provisions its schema at boot at all,
+     * rather than which of its processes does.
+     */
+    provisionSchema?: boolean;
 }
 
 /**
@@ -212,7 +239,12 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // deliberate migration, because this runs unattended with nobody reading a
     // diff. `REBASE_MIGRATE_ON_BOOT=none` opts out entirely for a deployment
     // that manages its own schema.
-    await ensureCollectionSchema(bundle, dataSources, env);
+    // One process provisions. See `BootOptions.provisionSchema`; declining is
+    // logged by `ensureCollectionSchema` itself, because a process serving 500s
+    // on every data route because the *owner* never booted must not look
+    // identical to one that provisioned and found nothing to do.
+    const provisioning = { provision: options.provisionSchema ?? true };
+    await ensureCollectionSchema(bundle, dataSources, env, provisioning);
 
     const backend = await initializeRebaseBackend({
         server,
@@ -264,7 +296,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // purpose: `CREATE POLICY` validates the `auth.uid()` functions it references
     // exist, and those are created during auth initialization. Same
     // `REBASE_MIGRATE_ON_BOOT=none` opt-out as the table creation above.
-    await ensureCollectionPolicies(bundle, dataSources, env);
+    await ensureCollectionPolicies(bundle, dataSources, env, provisioning);
 
     // Restrict metric labels to collections that exist, now that they do.
     metrics?.setKnownCollections(
@@ -686,7 +718,8 @@ function logForeignCollections(
 export async function ensureCollectionSchema(
     bundle: LoadedBundle,
     dataSources: InitializedDataSource[],
-    env: RebaseBootEnv
+    env: RebaseBootEnv,
+    options: SchemaProvisioningOptions = {}
 ): Promise<void> {
     // `info` is for the bundle shapes with legitimately nothing to create;
     // `warn` is for a bundle that asked for collection tables and is not getting
@@ -695,6 +728,15 @@ export async function ensureCollectionSchema(
     const skip = (reason: string, level: "info" | "warn" = "info"): void => {
         logger[level](`Collection schema: skipped — ${reason}`);
     };
+
+    // Checked before the mode, because it answers a different question and a
+    // reader deserves the more specific reason: `REBASE_MIGRATE_ON_BOOT=none`
+    // says this *deployment* provisions nothing, while this says this *process*
+    // is not the one that does it.
+    if (options.provision === false) {
+        skip("this process does not provision the schema — another process in this deployment owns it.");
+        return;
+    }
 
     const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
     if (mode === "none") {
@@ -819,8 +861,19 @@ function preInitDriverResult(source: InitializedDataSource): InitializedDriver {
 export async function ensureCollectionPolicies(
     bundle: LoadedBundle,
     dataSources: InitializedDataSource[],
-    env: RebaseBootEnv
+    env: RebaseBootEnv,
+    options: SchemaProvisioningOptions = {}
 ): Promise<void> {
+    if (options.provision === false) {
+        // Said out loud, unlike this function's other early returns. A missing
+        // policy is not a missing table: the routes answer 200 with zero rows
+        // rather than 500, so nothing else in the logs will point here.
+        logger.info(
+            "Collection RLS policies: not applied by this process — another process in this deployment owns them."
+        );
+        return;
+    }
+
     const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
     if (mode === "none") return;
     if (bundle.manifest.kind !== "backend") return;

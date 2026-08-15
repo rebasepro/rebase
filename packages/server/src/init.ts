@@ -1933,8 +1933,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // 6. Mount Cron Jobs
+    //
+    // Two independent questions, and this block answers both: whether the cron
+    // *admin surface* is served (`surfaces.cron`), and whether this process is
+    // one of the ones whose timers fire (`ownership.cronScheduler`). A process
+    // that is neither does not even load the job files — importing them runs
+    // whatever the author put at module scope.
     let cronScheduler: import("./cron").CronScheduler | undefined;
-    if (config.cronsDir) {
+    if (config.cronsDir && (surfaces.cron || ownership.cronScheduler)) {
         const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
@@ -1976,7 +1982,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
         if (surfaces.cron) config.app.route(`${basePath}/cron`, cronRouter);
 
-        if (loadedCronJobs.length > 0) {
+        if (loadedCronJobs.length > 0 && !ownership.cronScheduler) {
+            // Registered but not started. The admin surface still lists the jobs
+            // and can trigger one by hand — which is the point of serving `/cron`
+            // from a process that does not schedule: a person looking at the
+            // Studio panel sees the same jobs the worker is running.
+            logger.info("Cron jobs registered but NOT scheduled in this process", {
+                count: loadedCronJobs.length,
+                reason: "this process does not own the cron scheduler"
+            });
+        } else if (loadedCronJobs.length > 0) {
             cronScheduler.start();
             logger.info("Mounted cron jobs", {
                 count: loadedCronJobs.length,
@@ -2004,8 +2019,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (store) {
             await store.ensureTable();
             jobQueue = createJobQueue(store, config.jobs);
-            jobQueue.start();
-            logger.info("Job queue started", { tasks: Object.keys(config.jobs.tasks ?? {}).length });
+            // Constructed either way, started only where this process owns the
+            // workers: `rebase.jobs.enqueue` must keep working in a process that
+            // runs none of them. Enqueueing is a write to a table; running is a
+            // poll loop, and only the second is what "owning" means here.
+            if (ownership.jobWorkers) {
+                jobQueue.start();
+                logger.info("Job queue started", { tasks: Object.keys(config.jobs.tasks ?? {}).length });
+            } else {
+                logger.info("Job queue available for enqueue, workers NOT started in this process", {
+                    tasks: Object.keys(config.jobs.tasks ?? {}).length
+                });
+            }
         } else {
             // `createJobStore` already said why. What it cannot say is what the
             // caller should expect instead, which depends on who asked.
