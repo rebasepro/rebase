@@ -223,4 +223,99 @@ enabledProviders: ["github"] }
         expect(screen.queryByTestId("additional")).not.toBeInTheDocument();
         expect(screen.queryByTestId("no-user")).not.toBeInTheDocument();
     });
+
+    /**
+     * The opt-in belongs to the screen where you pick *how* to sign in, not to
+     * the password form. Asked on the form, it reached only the people who got
+     * that far by typing an address — anyone using Google was never offered it.
+     *
+     * Which makes the tick outlive a screen change, so these check both halves:
+     * that it is offered in the right place, and that a box ticked on screen one
+     * is still read after a sign-in that happens on screen two.
+     */
+    describe("newsletter opt-in", () => {
+        const optIn = () => screen.getByText("join_newsletter").closest("label")!
+            .querySelector("button")!;
+
+        it("is offered on the provider screen, not on the credentials form", async () => {
+            render(<LoginView authController={mockAuthController} onNewsletterOptIn={jest.fn()}/>);
+
+            expect(screen.getByText("join_newsletter")).toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+            await screen.findByPlaceholderText("you@example.com");
+
+            expect(screen.queryByText("join_newsletter")).not.toBeInTheDocument();
+        });
+
+        it("is not offered at all when the host wires no callback", () => {
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByText("join_newsletter")).not.toBeInTheDocument();
+        });
+
+        it("subscribes the address that signed in, with a tick made a screen earlier", async () => {
+            const onNewsletterOptIn = jest.fn();
+            render(<LoginView authController={mockAuthController} onNewsletterOptIn={onNewsletterOptIn}/>);
+
+            fireEvent.click(optIn());
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+
+            const emailInput = await screen.findByPlaceholderText("you@example.com");
+            fireEvent.change(emailInput, { target: { value: "reader@example.com" } });
+            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+
+            await act(async () => {
+                fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
+            });
+
+            expect(onNewsletterOptIn).toHaveBeenCalledWith("reader@example.com");
+        });
+
+        it("does not subscribe when the box was left alone", async () => {
+            const onNewsletterOptIn = jest.fn();
+            render(<LoginView authController={mockAuthController} onNewsletterOptIn={onNewsletterOptIn}/>);
+
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+            fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
+            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+
+            await act(async () => {
+                fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
+            });
+
+            expect(onNewsletterOptIn).not.toHaveBeenCalled();
+        });
+
+        it("does not subscribe an address the controller rejected", async () => {
+            const onNewsletterOptIn = jest.fn();
+            mockAuthController.emailPasswordLogin = jest.fn().mockRejectedValue(new Error("bad credentials"));
+            render(<LoginView authController={mockAuthController} onNewsletterOptIn={onNewsletterOptIn}/>);
+
+            fireEvent.click(optIn());
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with email/i }));
+            fireEvent.change(await screen.findByPlaceholderText("you@example.com"), { target: { value: "reader@example.com" } });
+            fireEvent.change(await screen.findByPlaceholderText("••••••••"), { target: { value: "password123" } });
+
+            await act(async () => {
+                fireEvent.click(await screen.findByRole("button", { name: /^Sign in$/i }));
+            });
+
+            // A ticked box on a failed attempt would subscribe an address
+            // nobody proved they control.
+            expect(onNewsletterOptIn).not.toHaveBeenCalled();
+        });
+
+        it("keeps the opt-in on the form in bootstrap mode, which has no provider screen", () => {
+            render(
+                <LoginView
+                    authController={mockAuthController}
+                    needsSetup={true}
+                    onNewsletterOptIn={jest.fn()}
+                />
+            );
+
+            expect(screen.getByPlaceholderText("Jane Doe (optional)")).toBeInTheDocument();
+            expect(screen.getByText("join_newsletter")).toBeInTheDocument();
+        });
+    });
 });

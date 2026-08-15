@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect, useId, useRef, useState } from "react";
+import React, { ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 /** Google Identity Services SDK — injected by the GIS <script> tag. */
 declare global {
@@ -145,11 +145,18 @@ export interface LoginViewProps {
     defaultPassword?: string;
 
     /**
-     * When set, the email/password forms render a "Join the newsletter"
-     * opt-in checkbox. Called with the address that just authenticated —
-     * sign-in or registration — if the box was ticked. Wire it to whatever
-     * stores the subscription; failures are the callback's problem, the
-     * login flow never waits on it.
+     * When set, a "Join the newsletter" opt-in checkbox is offered. Called with
+     * the address that just authenticated — by any method — if the box was
+     * ticked. Wire it to whatever stores the subscription; failures are the
+     * callback's problem, the login flow never waits on it.
+     *
+     * The checkbox sits on the **provider screen**, beside the buttons that
+     * choose how to sign in, rather than on the credentials form. It is a
+     * decision about the visitor, not about the password: asking on the
+     * credentials form put it in front of only the people who got that far by
+     * typing an address, so anyone signing in with Google was never offered it
+     * at all. Bootstrap mode is the exception — there is no provider screen
+     * there, so the form keeps it.
      */
     onNewsletterOptIn?: (email: string) => void;
 }
@@ -225,9 +232,31 @@ export function LoginView({
     const [mode, setMode] = useState<AuthMode>("buttons");
     const [fadeIn, setFadeIn] = useState(false);
     const [viewVisible, setViewVisible] = useState(true);
-    // Lives here, not in LoginForm: the form unmounts on every login↔register
-    // switch, and losing the tick on a mode change would silently drop opt-ins.
+    // Lives here, not in LoginForm: the box is ticked on the provider screen
+    // and read after a sign-in that happens one or two screens later, so it has
+    // to outlive both. The form also unmounts on every login↔register switch.
     const [newsletterOptIn, setNewsletterOptIn] = useState(false);
+
+    // The controller as of the latest render. A provider callback resolves long
+    // after the click that started it, and the `authController` captured in that
+    // closure is the one from the render that mounted the button — which, for a
+    // controller replaced on each render, has no `user` on it yet.
+    const authControllerRef = useRef(authController);
+    authControllerRef.current = authController;
+
+    /**
+     * Subscribe the address that just authenticated, if the visitor asked for
+     * it. Every sign-in path calls this, which is the point: the checkbox sits
+     * beside the provider buttons, so it has to mean the same thing whichever
+     * one is pressed.
+     *
+     * Only ever from a resolution path — a ticked box on a *failed* attempt
+     * must not subscribe an address nobody proved they control.
+     */
+    const subscribeIfOptedIn = useCallback((email?: string | null) => {
+        if (!newsletterOptIn || !onNewsletterOptIn || !email) return;
+        onNewsletterOptIn(email);
+    }, [newsletterOptIn, onNewsletterOptIn]);
 
     const switchMode = (newMode: AuthMode) => {
         setViewVisible(false);
@@ -388,9 +417,10 @@ export function LoginView({
                             bootstrapMode={true}
                             defaultEmail={defaultEmail}
                             defaultPassword={defaultPassword}
-                            onNewsletterOptIn={onNewsletterOptIn}
+                            onSignedIn={subscribeIfOptedIn}
                             newsletterOptIn={newsletterOptIn}
                             setNewsletterOptIn={setNewsletterOptIn}
+                            showNewsletterOptIn={Boolean(onNewsletterOptIn)}
                         />
                     )}
 
@@ -419,6 +449,24 @@ export function LoginView({
                                             {topComponent}
                                         </div>
                                     )}
+                                    {/* Above the buttons, not below them: it is a
+                                        condition on the sign-in you are about to
+                                        make, and it reads as one more line of the
+                                        consent block a host puts in
+                                        `topComponent` — the demo's privacy tick
+                                        sits directly above it. */}
+                                    {onNewsletterOptIn && (
+                                        <label className="flex items-center gap-2 cursor-pointer -mt-1">
+                                            <Checkbox
+                                                checked={newsletterOptIn}
+                                                onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
+                                                size="small"
+                                            />
+                                            <Typography variant="caption" color="secondary" className="select-none">
+                                                {t("join_newsletter")}
+                                            </Typography>
+                                        </label>
+                                    )}
                                     <LoginButton
                                         disabled={disabled}
                                         text={"Sign in with email"}
@@ -430,6 +478,7 @@ export function LoginView({
                                             disabled={disabled}
                                             googleClientId={googleClientId}
                                             authController={authController}
+                                            onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
                                         />
                                     )}
                                     {hasGitHubLogin && githubClientId && (
@@ -473,9 +522,7 @@ export function LoginView({
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
                                     defaultEmail={defaultEmail}
                                     defaultPassword={defaultPassword}
-                                    onNewsletterOptIn={onNewsletterOptIn}
-                                    newsletterOptIn={newsletterOptIn}
-                                    setNewsletterOptIn={setNewsletterOptIn}
+                                    onSignedIn={subscribeIfOptedIn}
                                 />
                             )}
 
@@ -491,9 +538,7 @@ export function LoginView({
                                     switchToLogin={() => switchMode("login")}
                                     defaultEmail={defaultEmail}
                                     defaultPassword={defaultPassword}
-                                    onNewsletterOptIn={onNewsletterOptIn}
-                                    newsletterOptIn={newsletterOptIn}
-                                    setNewsletterOptIn={setNewsletterOptIn}
+                                    onSignedIn={subscribeIfOptedIn}
                                 />
                             )}
 
@@ -557,13 +602,21 @@ const GoogleIcon = () => (
 function GoogleLoginButton({
     disabled,
     googleClientId,
-    authController
+    authController,
+    onSignedIn
 }: {
     disabled?: boolean,
     googleClientId: string,
-    authController: AuthControllerExtended
+    authController: AuthControllerExtended,
+    /** Called once the controller has accepted the provider's code. */
+    onSignedIn?: () => void
 }) {
     const codeClientRef = useRef<{ requestCode(): void } | null>(null);
+    // The code client is built once and its callback closes over this render's
+    // props forever. A ref keeps the callback reaching the *current* handler
+    // rather than the one that existed when Google's script happened to load.
+    const onSignedInRef = useRef(onSignedIn);
+    onSignedInRef.current = onSignedIn;
 
     useEffect(() => {
         if (!authController.googleLogin) return;
@@ -587,6 +640,10 @@ function GoogleLoginButton({
                         code: response.code,
                         redirectUri: "postmessage"
                     });
+                    // After the await, and only on the resolution path: a
+                    // newsletter tick must not subscribe an address whose
+                    // sign-in the controller rejected.
+                    onSignedInRef.current?.();
                 } catch (err: unknown) {
                     console.error("Google login error:", err);
                 }
@@ -692,9 +749,10 @@ function LoginForm({
     switchToLogin,
     defaultEmail,
     defaultPassword,
-    onNewsletterOptIn,
+    onSignedIn,
     newsletterOptIn = false,
-    setNewsletterOptIn
+    setNewsletterOptIn,
+    showNewsletterOptIn = false
 }: {
     onClose: () => void,
     onForgotPassword?: () => void,
@@ -707,9 +765,15 @@ function LoginForm({
     switchToLogin?: () => void,
     defaultEmail?: string,
     defaultPassword?: string,
-    onNewsletterOptIn?: (email: string) => void,
+    /** The address the controller just accepted, reported after every success. */
+    onSignedIn?: (email: string) => void,
     newsletterOptIn?: boolean,
-    setNewsletterOptIn?: (checked: boolean) => void
+    setNewsletterOptIn?: (checked: boolean) => void,
+    /**
+     * Render the newsletter opt-in here. Only bootstrap mode does: everywhere
+     * else it lives on the provider screen, which bootstrap mode never shows.
+     */
+    showNewsletterOptIn?: boolean
 }) {
     const passwordRef = useRef<HTMLInputElement | null>(null);
     const { t } = useTranslation();
@@ -749,16 +813,14 @@ function LoginForm({
     // Fires only on the resolution path, i.e. after the controller accepted
     // the credentials — a ticked box on a failed attempt must not subscribe
     // an address its owner never proved they control.
-    function subscribeIfOptedIn(email: string) {
-        if (newsletterOptIn && onNewsletterOptIn) {
-            onNewsletterOptIn(email);
-        }
+    function reportSignedIn(email: string) {
+        onSignedIn?.(email);
     }
 
     function handleEnterPassword() {
         if (email && password && authController.emailPasswordLogin) {
             void Promise.resolve(authController.emailPasswordLogin(email, password))
-                .then(() => subscribeIfOptedIn(email))
+                .then(() => reportSignedIn(email))
                 .catch(() => undefined);
         }
     }
@@ -766,7 +828,7 @@ function LoginForm({
     function handleRegistration() {
         if (email && password && authController.register) {
             void Promise.resolve(authController.register(email, password, displayName))
-                .then(() => subscribeIfOptedIn(email))
+                .then(() => reportSignedIn(email))
                 .catch(() => undefined);
         }
     }
@@ -891,7 +953,10 @@ function LoginForm({
                 </div>
             )}
 
-            {onNewsletterOptIn && (
+            {/* Bootstrap mode only — see `showNewsletterOptIn`. Every other
+                route to this form came through the provider screen, which is
+                where the box now is. */}
+            {showNewsletterOptIn && (
                 <label className="flex items-center gap-2 cursor-pointer mt-1 mb-1">
                     <Checkbox
                         checked={newsletterOptIn}
