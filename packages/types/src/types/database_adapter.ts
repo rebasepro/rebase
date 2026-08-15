@@ -108,10 +108,18 @@ export interface DatabaseAdapter {
      * into a `BackendBootstrapper`: the runtime calls it through the bootstrapper
      * at boot, and a wrapper that silently omits it leaves a managed tenant
      * 500ing every data route with no create step ever having run.
+     *
+     * `driverResult` is optional because this runs BEFORE `initializeDriver`, so
+     * there may be no result to pass. The bundle path can supply a pre-init
+     * stand-in because the coordinator opened the connection itself; an app that
+     * constructed this adapter never handed the framework a connection handle,
+     * so it passes `undefined` and the adapter MUST fall back to the connection
+     * it was constructed with. An adapter that dereferences `driverResult`
+     * unconditionally works for managed tenants and breaks every self-built one.
      */
     ensureCollectionSchema?(
         collections: unknown[],
-        driverResult: InitializedDriver,
+        driverResult?: InitializedDriver,
         log?: (message: string) => void,
     ): Promise<{ applied: number }>;
 
@@ -127,7 +135,7 @@ export interface DatabaseAdapter {
      */
     ensureCollectionPolicies?(
         collections: unknown[],
-        driverResult: InitializedDriver,
+        driverResult?: InitializedDriver,
         log?: (message: string) => void,
     ): Promise<{ applied: number }>;
 
@@ -178,4 +186,25 @@ export interface DatabaseAdapterInitConfig {
      * Drivers that introspect should honour `unprotectedTables`.
      */
     baas?: { unprotectedTables?: "exclude" | "serve" };
+    /**
+     * What the runtime's boot-time table provisioning did, in this process,
+     * before this driver was initialized.
+     *
+     * A driver that checks for missing tables cannot otherwise tell "the create
+     * step ran and this table still is not here" from "no create step ran at
+     * all" — and those need opposite advice. The Postgres driver's drift warning
+     * assumed the first, told operators to redeploy with REBASE_MIGRATE_ON_BOOT
+     * unset, and pointed at driver version skew; for an app whose boot path had
+     * no provisioning step, all of that was unactionable and one investigation
+     * chased a driver that was perfectly current.
+     *
+     * Absent when the caller predates this field: treat that as "unknown" and
+     * fall back to generic guidance rather than asserting either case.
+     */
+    schemaProvisioning?: {
+        /** Whether the table-creation hook actually ran this boot. */
+        attempted: boolean;
+        /** Why it did not, when it did not — safe to print verbatim. */
+        reason?: string;
+    };
 }
