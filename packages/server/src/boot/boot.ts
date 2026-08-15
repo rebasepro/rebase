@@ -23,6 +23,7 @@ import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
 import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { resolveRole, RoleConfigurationError } from "./role";
 import {
     BundleError,
     loadBundle,
@@ -160,6 +161,17 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const env = loadBootEnv();
     const isProduction = env.NODE_ENV === "production";
 
+    // What this process is. Resolved before anything is built, because a role
+    // that cannot boot must say so at once rather than after opening a pool and
+    // half-mounting a server.
+    const runtimeRole = resolveRole(env);
+    if (runtimeRole.role !== "all") {
+        logger.info(`Runtime role: ${runtimeRole.role}`, {
+            provisionsSchema: runtimeRole.provisionSchema,
+            ...runtimeRole.ownership
+        });
+    }
+
     // ── Declarations ─────────────────────────────────────────────────────────
     const configExports = await loadBundleConfigExports(bundle);
     const dataSourceDefs: DataSourceDefinition[] | undefined = configExports.dataSources;
@@ -243,7 +255,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // logged by `ensureCollectionSchema` itself, because a process serving 500s
     // on every data route because the *owner* never booted must not look
     // identical to one that provisioned and found nothing to do.
-    const provisioning = { provision: options.provisionSchema ?? true };
+    const provisioning = { provision: options.provisionSchema ?? runtimeRole.provisionSchema };
     await ensureCollectionSchema(bundle, dataSources, env, provisioning);
 
     const backend = await initializeRebaseBackend({
@@ -253,6 +265,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
+        surfaces: runtimeRole.surfaces,
+        ownership: runtimeRole.ownership,
         bootstrappers: dataSources.map(s => s.bootstrapper),
         dataSources: dataSourceDefs,
         storage,
@@ -593,7 +607,10 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
     try {
         return await bootFromBundle(options);
     } catch (err) {
-        if (err instanceof BundleError) {
+        // Both of these are "your configuration says something that cannot
+        // work", so both get the message and the fix rather than a stack trace.
+        // The reader is looking at a container that will not start.
+        if (err instanceof BundleError || err instanceof RoleConfigurationError) {
             logger.error(err.message);
             if (err.hint) logger.error(err.hint);
         } else {
