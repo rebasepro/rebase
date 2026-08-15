@@ -6,9 +6,7 @@ export const en = {
     "Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated — your schema is the only input.",
   "hero.cta.demo": "See the live demo",
   "hero.cli.label": "No signup for the demo. Yours is one command away:",
-  // `hero.cta.github` was removed on 2026-08-10 with the hero's GitHub button.
-  // GitHub is still in the header and the footer; it is not a primary hero action
-  // while the repo's star count is the weakest number on the page.
+  "hero.cta.github": "View on GitHub",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
@@ -19,9 +17,8 @@ export const en = {
   "rlscheck.note":
     "Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes nothing, and no data ever leaves your machine.",
   "rlscheck.cta": "See all 14 checks",
-  // `demo.badge` / `demo.title` went with beat 01 on 2026-08-10, when the terminal
-  // moved into the hero. The remaining `demo.*` keys are that terminal's output
-  // lines and are still rendered there.
+  "demo.badge": "The first five minutes",
+  "demo.title": "Init. Push. Run.",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
@@ -55,29 +52,6 @@ export const en = {
   "agentera.card.desc":
     "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore all AI & Agent features",
-  // Beat 06. The page was mechanism end to end and never once showed a person
-  // doing a task, so a reader had to translate every claim into their own week
-  // unaided. Each scenario is concrete, and each closes on the demo that proves
-  // it rather than on a card.
-  "personas.badge": "Who actually uses it",
-  "personas.title": 'One backend, <span class="text-primary">three very different days.</span>',
-  "personas.subtitle":
-    "A developer, the person answering support mail, and an agent — all reaching the same tables through the same policies.",
-  "personas.dev.role": "Developer",
-  "personas.dev.title": "Add a table on Monday, ship its API on Monday.",
-  "personas.dev.desc":
-    "A collection goes into one TypeScript file and the schema is pushed. The table, the REST routes, the typed SDK accessors and the row-level security policies all land together — no migration written by hand, no endpoint wired, no client types regenerated on the side.",
-  "personas.dev.cta": "What one collection generates",
-  "personas.ops.role": "Support & ops",
-  "personas.ops.title": "Fix the wrong order without opening the repo.",
-  "personas.ops.desc":
-    "Someone filters twelve thousand orders down to the one that is wrong and edits it in place. The app sees the change immediately, because the panel is calling the same API your client calls, under the same policies — not a back door around them.",
-  "personas.ops.cta": "Tour the admin panel",
-  "personas.agent.role": "Agent",
-  "personas.agent.title": "Let an agent do the work, under the same rules.",
-  "personas.agent.desc":
-    "An agent connects over MCP with a scoped API key. It can read orders and draft new records — and its DELETE still removes nothing, because a key permission is not a policy. Postgres refuses the write, not the prompt.",
-  "personas.agent.cta": "How agents are governed",
   // This beat proves claim 3 — the panel is a separate product and the API
   // response does not move — which is what its figure actually models. The
   // English had drifted onto claim 2 ("one definition, everything generated"),
@@ -122,10 +96,20 @@ export const en = {
   "paths.admin.desc":
     "Views, fields, custom React components, roles and workflows — the full reference.",
   "paths.admin.cta": "Explore the admin panel",
-  // `howitworks.*` was removed on 2026-08-10. It rendered on no page and was
-  // reachable only through markdownGenerator, which meant the agent-facing home
-  // page led with "Connect your Postgres and get a complete, editable admin
-  // panel" long after the visual page had gone backend-first.
+  "howitworks.badge": "Time reclaimed",
+  "howitworks.title":
+    'What you\'ll <span class="text-primary">never build again.</span>',
+  "howitworks.subtitle":
+    "Every hour you used to spend on plumbing is now spent on your product.",
+  "howitworks.step1.title": "Boilerplate admin UIs",
+  "howitworks.step1.desc":
+    "No more hand-wiring table views, form layouts, or filter logic. Connect your Postgres and get a complete, editable admin panel — instantly.",
+  "howitworks.step2.title": "Hand-rolled API layers",
+  "howitworks.step2.desc":
+    "Stop writing CRUD endpoints, serializers, and validation middleware. Rebase exposes type-safe REST and WebSocket APIs from your schema — zero glue code.",
+  "howitworks.step3.title": "Brittle auth & permissions",
+  "howitworks.step3.desc":
+    "Forget custom JWT plumbing and scattered access checks. Define row-level security and role-based permissions right in your TypeScript schema — auditable, version-controlled, bulletproof.",
   "showcase.badge": "Built for real products",
   "showcase.title.part1": "Teams ship faster with",
   "showcase.title.part2": "Rebase",
@@ -250,14 +234,6 @@ export const en = {
     "Managed hosting. We run our own products on it first — early access goes out from the waitlist, oldest first.",
   "cta.lane.cloud.badge": "Not launched yet",
   "cta.lane.cloud.link": "Join the waitlist",
-  // The trust row under the closing CTA. Strapi runs MIT / SOC 2 / GDPR in this
-  // exact position; we hold no certification and must not imply one, so these four
-  // claim the axis their badges concede instead. Each is already asserted in prose
-  // elsewhere on the site — this only concentrates them at the decision point.
-  "cta.trust.mit": "MIT-licensed, end to end",
-  "cta.trust.selfhosted": "Your data never reaches us",
-  "cta.trust.processor": "No second processor",
-  "cta.trust.noaccount": "No account to create",
   "cta.button.demo": "Try the Demo",
   "cta.button.docs": "Read the Docs",
   "cta.button.github": "GitHub",
@@ -275,18 +251,7 @@ export const en = {
   "opensource.badge": "Open source",
   "opensource.title": "Your code. Your infra.<br/>Zero lock-in.",
   "opensource.desc":
-    // "no per-seat pricing" was dropped here on 2026-08-10: opensource.limits, two
-    // lines below in the same column, now makes that point precisely and with the
-    // other two caps beside it.
-    "MIT-licensed, end to end — the schema editor, the generated APIs, the typed SDK, all of it. Your data stays in your Postgres: no vendor dependency, no surprises.",
-  // The no-caps line. Checkable, and it lands against all three competitors at
-  // once: Directus caps its free tier at 25 collections / 3 seats / 5 flows and
-  // charges $499/mo for 50 collections, and Strapi Cloud meters API requests at
-  // $1.50 per additional 25k. Scoped to self-hosted on purpose — it is a statement
-  // about the product that ships, not a promise about an unlaunched Cloud. The
-  // closing clause is the honest half: no meter also means no one else's capacity.
-  "opensource.limits":
-    '<strong class="text-white font-medium">No seat count. No collection cap. No request meter.</strong> The only ceiling is the machine you run it on.',
+    "MIT-licensed, end to end — the schema editor, the generated APIs, the typed SDK, all of it. Your data stays in your Postgres: no vendor dependency, no per-seat pricing, no surprises.",
   "opensource.link1": "For developers",
   "opensource.link2": "How it compares",
   "showcase.sync.badge": "Your workflow",
