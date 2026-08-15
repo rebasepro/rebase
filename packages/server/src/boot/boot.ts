@@ -24,6 +24,7 @@ import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
 import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import { resolveRole, RoleConfigurationError } from "./role";
+import { FunctionSelectionError } from "../functions/selection";
 import {
     BundleError,
     loadBundle,
@@ -267,6 +268,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         cronsDir: bundle.cronsDir,
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,
+        functionsSelection: runtimeRole.functionsSelection,
         bootstrappers: dataSources.map(s => s.bootstrapper),
         dataSources: dataSourceDefs,
         storage,
@@ -610,7 +612,8 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
         // Both of these are "your configuration says something that cannot
         // work", so both get the message and the fix rather than a stack trace.
         // The reader is looking at a container that will not start.
-        if (err instanceof BundleError || err instanceof RoleConfigurationError) {
+        if (err instanceof BundleError || err instanceof RoleConfigurationError ||
+            err instanceof FunctionSelectionError) {
             logger.error(err.message);
             if (err.hint) logger.error(err.hint);
         } else {

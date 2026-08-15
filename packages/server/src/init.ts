@@ -477,6 +477,16 @@ export interface RebaseBackendConfig {
      * cancelled, so give outbound calls an `AbortSignal`.
      */
     functionsTimeoutMs?: number;
+    /**
+     * Serve only some of the bundle's functions.
+     *
+     * How one expensive function gets its own replica count and its own blast
+     * radius without its code moving anywhere. `bootFromBundle` fills this from
+     * `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
+     *
+     * A name that is not in the bundle fails the boot — see `selectFunctions`.
+     */
+    functionsSelection?: import("./functions/selection").FunctionSelection;
     cronsDir?: string;
     /**
      * Enable/disable database persistence for cron job execution logs.
@@ -1843,7 +1853,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const { createFunctionRoutes } = await import("./functions/function-routes");
         const { createFunctionsRequestTimeout, resolveFunctionsTimeoutMs } = await import("./functions/request-timeout");
 
-        const { functions: loadedFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+        const { functions: allFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+
+        // A subset, when this process was told to serve one. Applied after the
+        // load rather than before it so an unknown name can be reported against
+        // what the bundle actually contains — the list is the whole value of
+        // that error message.
+        const { selectFunctions } = await import("./functions/selection");
+        const loadedFunctions = selectFunctions(allFunctions, config.functionsSelection);
+        if (loadedFunctions.length !== allFunctions.length) {
+            logger.info("Serving a subset of this bundle's functions", {
+                serving: loadedFunctions.map(fn => fn.name),
+                notServing: allFunctions
+                    .filter(fn => !loadedFunctions.includes(fn))
+                    .map(fn => fn.name)
+            });
+        }
 
         // Mounted for the directory, not for the functions in it — the same
         // correction the cron router carries ninety lines down, which was never

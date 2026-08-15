@@ -89,7 +89,10 @@ type Boot = { app: Hono; stop: () => void };
 
 const started: Boot[] = [];
 
-async function boot(surfaces?: Partial<Record<RuntimeSurface, boolean>>): Promise<Hono> {
+async function boot(
+    surfaces?: Partial<Record<RuntimeSurface, boolean>>,
+    functionsSelection?: { only?: string[]; exclude?: string[] }
+): Promise<Hono> {
     const app = new Hono();
     const backend = await initializeRebaseBackend({
         app: app as never,
@@ -101,7 +104,8 @@ async function boot(surfaces?: Partial<Record<RuntimeSurface, boolean>>): Promis
         functionsDir: FUNCTIONS_DIR,
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: JWT_SECRET },
-        ...(surfaces ? { surfaces } : {})
+        ...(surfaces ? { surfaces } : {}),
+        ...(functionsSelection ? { functionsSelection } : {})
     } as never);
     const b: Boot = {
         app,
@@ -147,6 +151,19 @@ describe("runtime surfaces", () => {
         const expected = PROBES.filter(p => p.surface !== surface).map(p => p.url);
 
         expect((await mounted(app)).sort()).toEqual(expected.sort());
+    });
+
+    it("mounts only the selected functions", async () => {
+        // The fixture directory holds two loadable functions; ask for one.
+        const app = await boot(undefined, { only: ["valid-app"] });
+
+        expect((await app.request("/api/functions/valid-app/hello")).status).not.toBe(404);
+        expect((await app.request("/api/functions/valid-factory/hello")).status).toBe(404);
+
+        // The listing has to agree with what is mounted, or a caller reading it
+        // is told about a function this process will 404.
+        const listed = await (await app.request("/api/functions")).json() as { functions: { name: string }[] };
+        expect(listed.functions.map(f => f.name)).toEqual(["valid-app"]);
     });
 
     it("serves nothing but leaves the process healthy with every surface off", async () => {

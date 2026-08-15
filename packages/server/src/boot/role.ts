@@ -14,6 +14,7 @@
  * schema, are failures nothing in a boot log makes obvious.
  */
 import type { RuntimeOwnershipOptions, RuntimeSurfaceOptions } from "../init/surfaces";
+import type { FunctionSelection } from "../functions/selection";
 
 /** The four shapes a runtime process can boot in. */
 export type RebaseRuntimeRole = "all" | "api" | "functions" | "worker";
@@ -25,6 +26,10 @@ export interface ResolvedRole {
     ownership: RuntimeOwnershipOptions;
     /** Whether this process runs the boot-time schema DDL. */
     provisionSchema: boolean;
+    /** Which functions this process serves. Empty lists mean "all of them". */
+    functionsSelection: FunctionSelection;
+    /** Where `/api/functions/*` is forwarded, when this process forwards it. */
+    functionsUpstream?: string;
 }
 
 /** The environment this module reads. Narrowed so it can be called with a literal. */
@@ -54,6 +59,14 @@ export class RoleConfigurationError extends Error {
 }
 
 /**
+ * What a role *is*, as distinct from what a process configured with it ends up
+ * doing. Deliberately narrower than {@link ResolvedRole}: the function selection
+ * and the upstream URL are per-process settings that a role has no opinion
+ * about, and putting them here would invite four copies of an empty default.
+ */
+type RoleShape = Pick<ResolvedRole, "surfaces" | "ownership" | "provisionSchema">;
+
+/**
  * What each role serves and owns.
  *
  * Read as a table, deliberately. `api` keeps cron and the job workers so that
@@ -63,7 +76,7 @@ export class RoleConfigurationError extends Error {
  * at all — a function process is scaled by request load and replaced at will, so
  * giving it scheduled work would make its replica count mean something.
  */
-const ROLES: Record<RebaseRuntimeRole, Omit<ResolvedRole, "role">> = {
+const ROLES: Record<RebaseRuntimeRole, RoleShape> = {
     all: {
         surfaces: {},
         ownership: {},
@@ -159,7 +172,12 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
         role,
         surfaces: { ...base.surfaces },
         ownership,
-        provisionSchema: base.provisionSchema
+        provisionSchema: base.provisionSchema,
+        functionsSelection: {
+            only: parseNameList(env.REBASE_FUNCTIONS_ONLY),
+            exclude: parseNameList(env.REBASE_FUNCTIONS_EXCLUDE)
+        },
+        functionsUpstream: env.REBASE_FUNCTIONS_UPSTREAM?.trim() || undefined
     };
 }
 
