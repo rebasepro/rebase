@@ -417,10 +417,16 @@ at: staticApp.path });
                 server.once("error", reject);
                 server.listen(env.PORT, () => {
                     server.removeListener("error", reject);
+                    // The socket, not the request: `PORT=0` asks the OS to pick
+                    // one, and reporting the request then announces a port
+                    // nothing listens on — to the log, and to every caller of
+                    // `BootedRuntime.port`.
+                    const address = server.address();
+                    if (address && typeof address === "object") port = address.port;
                     resolve();
                 });
             });
-            logger.info(`Rebase runtime listening on port ${env.PORT}`);
+            logger.info(`Rebase runtime listening on port ${port}`);
         } else {
             port = await listenWithPortRetry(server, env.PORT, {
                 portFileDir: devRoot,
