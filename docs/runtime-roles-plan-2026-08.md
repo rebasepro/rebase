@@ -1,7 +1,27 @@
 # Runtime roles: running functions in their own process
 
-Status: **proposal** — written 2026-08-15, nothing implemented.
-Scope: `packages/server`, `packages/types`, `docker/`, `website/src/content/docs`.
+Status: **implemented** — 2026-08-15, on `claude/rebase-cloud-functions-dac59a`.
+Scope: `packages/server`, `packages/server-postgres`, `docker/`,
+`website/src/content/docs`.
+
+All seven steps in §4 landed. Two decisions changed while building, and both are
+recorded where they matter rather than only here — a plan that still describes a
+refusal the code does not have is worse than no plan:
+
+- **§3.5 refusal 2 (the channel bus) was dropped.** A role split does not create
+  the problem: only the API-serving roles have websocket clients, so what makes
+  the in-memory bus matter is the *replica count* of that process — equally true
+  of a single `all` deployment scaled to three, and not readable from a process's
+  own environment. The runtime already answers it from evidence
+  (`warnIfMemoryBusOnMultiplePods` fires on a notification actually seen from a
+  peer). The reasoning is in `packages/server/src/boot/role.ts`.
+- **§3.1's role enum lives in `packages/server`, not `packages/types`.** It is
+  read from the environment by the runtime and by nothing else; putting it in the
+  shared contract package would have implied a contract that does not exist.
+
+Everything else shipped as specified. §5 gained four traps found while building —
+the last three are all about test harnesses claiming to prove something they
+structurally cannot.
 
 This is Phase 1 of making custom functions independently deployable. It is
 deliberately the smallest change that delivers a real capability on its own:
@@ -246,6 +266,22 @@ container topology stays the default and the documented starting point.
 Ordered by dependency. Each step is independently mergeable and each ends with a
 verification that must pass before the next begins.
 
+**Where each step landed** (one commit per step, in this order):
+
+| Step | Landed in |
+| --- | --- |
+| 1 | `packages/server/src/init/surfaces.ts`, gates through `init.ts`; `test/runtime-surfaces.test.ts` |
+| 2 | `ownership` on the backend config, `provisionSchema` on `BootOptions`; `test/runtime-ownership.test.ts` |
+| 3 | `isDuplicateObjectRace` + `applyAction` in `ensure-collection-tables.ts`; `schema/drizzle-ddl.ts` for the channel stores |
+| 4 | `packages/server/src/boot/role.ts` + `REBASE_ROLE` in `boot/env.ts`; `boot/role.test.ts` |
+| 5 | `packages/server/src/functions/selection.ts`; `selection.test.ts` |
+| 6 | `packages/server/src/functions/proxy.ts`; `test/functions-proxy.test.ts` |
+| 7 | `docker/docker-compose.selfhost.yml`, `docs/deployment/split-processes.md` ×6 locales |
+
+Gates at the end: 2330 server tests, 2062 server-postgres tests, both typecheck
+projects, eslint on both packages, `verify:docs`, `check:generated`, and a
+regenerated `api-surface/server.api.txt` (nine additions, no removals).
+
 ### Step 1 — Make the surface set explicit (no behaviour change)
 
 Introduce an internal `surfaces` option on `initializeRebaseBackend`, defaulting
@@ -362,6 +398,27 @@ Every one of these has already burned this repository.
 
 7. **`backend/src` and `backend/functions` are separate trees.** A grep scoped to
    `src` misses every function and every cron. Grep the package whole.
+
+8. **`fetch` decodes a response but keeps its `Content-Encoding`.** Found while
+   building the proxy, and it cost the longest debugging cycle in this work. The
+   runtime compresses its own responses, so *every* forwarded response arrives
+   with the header set over a body undici has already gunzipped; copying it onto
+   the response handed back tells the client to decode plain bytes, and that does
+   not fail cleanly — it hangs. A `Content-Length` from the upstream is wrong for
+   the same reason.
+
+9. **`app.request()` is not a transport.** It hands the `Response` object
+   straight back, so neither of the bugs above is reachable through it, and
+   `getConnInfo` has no socket to report — which silently made the
+   `X-Forwarded-For` behaviour untestable. Two real servers on ephemeral ports
+   found both in one run. Resolve the port from `serve`'s listening callback, not
+   after a sleep: a fixed delay is a race that only loses under parallel load.
+
+10. **Fixture directories are shared state.** `functions-mount.test.ts` asserted
+    that exactly 2 subdirectories were skipped; adding one unrelated fixture
+    directory elsewhere in the suite failed it with a number that said nothing
+    about the behaviour under test. Count from the filesystem, not from a
+    literal.
 
 ---
 
