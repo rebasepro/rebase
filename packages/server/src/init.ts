@@ -20,6 +20,13 @@ import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
 import { assertCollectionConfigs } from "./collections/validate-config";
+import {
+    collectionsStoredBy,
+    logForeignCollections,
+    provisionCollectionPolicies,
+    provisionCollectionTables,
+    provisionTargetFor
+} from "./boot/provision";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
 import { createRoutedRealtimeService } from "./services/routed-realtime-service";
 import { Server } from "http";
@@ -311,6 +318,22 @@ export interface RebaseBackendConfig {
 
     /** Options that only apply when collections are derived from the database. */
     baas?: BaasOptions;
+
+    /**
+     * The pre-init handle to hand the boot-time schema hooks, when the caller
+     * has one.
+     *
+     * Those hooks run before any driver is initialized, so there is no driver
+     * result to pass — the bundle boot path can still supply a stand-in built
+     * from the connection its coordinator opened, and does, because a driver
+     * written before this was optional dereferences `driverResult.internals`
+     * unconditionally. An application that constructed its own adapter has no
+     * such handle to give (it gave the connection to the adapter instead), so it
+     * leaves this unset and the adapter falls back to its own connection.
+     *
+     * Not part of the ordinary configuration surface: set by `bootFromBundle`.
+     */
+    provisioningDriverResult?: InitializedDriver;
 
     /**
      * Declared data sources, shared with the frontend `<Rebase dataSources>`.
@@ -765,6 +788,30 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let defaultDriverResult: InitializedDriver | undefined = undefined;
 
+    // ─── Collection schema ───────────────────────────────────────────────
+    //
+    // Create any collection tables the database is missing, BEFORE any driver
+    // initializes: the driver introspects the tables during initialization, and
+    // attaches its change-capture triggers to them, so a table created after
+    // this point stays uninstrumented until the next restart.
+    //
+    // This runs here — inside the function every boot path calls — rather than
+    // in `bootFromBundle`, which is where it used to live and therefore only
+    // ever ran for managed tenants. An app shipping its own image called
+    // `initializeRebaseBackend` directly, got no tables, and served sign-in
+    // while 500ing every data route. See ./boot/provision.
+    const provisionTarget = provisionTargetFor(bootstrappers, config.database, config.provisioningDriverResult);
+    const provisionable = collectionsStoredBy(
+        activeCollections,
+        { engine: provisionTarget.engine },
+        (config.dataSources ?? []).map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
+    );
+    logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
+
+    const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
+        introspecting: introspectCollections
+    });
+
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
         const b = bootstrapper;
@@ -777,7 +824,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             collections: activeCollections,
             collectionRegistry,
             introspectCollections,
-            baas: config.baas
+            baas: config.baas,
+            // So the driver's drift check can say something true about WHY a
+            // table is missing. Its warning used to assert that "this runtime
+            // applies the collection schema at boot" and point at
+            // REBASE_MIGRATE_ON_BOOT — advice that was unactionable for every
+            // app whose boot path had no provisioning step at all.
+            schemaProvisioning: {
+                attempted: schemaOutcome.status === "applied",
+                reason: schemaOutcome.status === "skipped" ? schemaOutcome.reason : undefined
+            }
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
 
@@ -979,6 +1035,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         }
     }
+
+    // ─── RLS policies ────────────────────────────────────────────────────
+    //
+    // The companion to the table creation above, and it has to be here rather
+    // than beside it: generated policies call the `auth.*` helper functions, and
+    // `CREATE POLICY` validates those exist — they are created during auth
+    // initialization, which just finished. A table without its policies is not
+    // servable either, so skipping this half only changes the symptom from a 500
+    // to an empty result.
+    await provisionCollectionPolicies(provisionable, provisionTarget, {
+        introspecting: introspectCollections
+    });
 
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
     if (config.history) {

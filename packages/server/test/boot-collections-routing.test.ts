@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import { collectionsStoredBy } from "../src/boot/boot";
+import { collectionsStoredBy } from "../src/boot/provision";
 import type { InitializedDataSource } from "../src/boot/driver";
 
 /**

@@ -822,10 +822,16 @@ export interface BackendBootstrapper {
      * enum types, and never drop, narrow or rewrite anything. This runs
      * unattended against live customer data with nobody reading a diff, so the
      * destructive half stays a deliberate migration.
+     *
+     * `driverResult` is optional: this runs before `initializeDriver`, and only
+     * the bundle path has a pre-init stand-in to pass. An adapter built by an
+     * application already holds its own connection and MUST use it when this is
+     * `undefined` — dereferencing it unconditionally works for managed tenants
+     * and breaks every app that builds its own adapter.
      */
     ensureCollectionSchema?(
         collections: unknown[],
-        driverResult: InitializedDriver,
+        driverResult?: InitializedDriver,
         log?: (message: string) => void
     ): Promise<{ applied: number }>;
 
@@ -847,7 +853,7 @@ export interface BackendBootstrapper {
      */
     ensureCollectionPolicies?(
         collections: unknown[],
-        driverResult: InitializedDriver,
+        driverResult?: InitializedDriver,
         log?: (message: string) => void
     ): Promise<{ applied: number }>;
 

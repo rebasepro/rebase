@@ -138,6 +138,52 @@ export function resolveDriftCheckName(
 }
 
 /**
+ * Why the tables this backend serves are not in the database — the part of the
+ * drift warning that has to be true rather than merely plausible.
+ *
+ * The three answers need three different actions, and only the caller knows
+ * which one applies. This warning used to assert the first ("this runtime
+ * applies the collection schema at boot unless REBASE_MIGRATE_ON_BOOT=none")
+ * and then point at that variable and at driver-version skew. For an app whose
+ * boot path contained no provisioning step at all, every word of that was a
+ * dead end: nothing read the variable, and the driver was current. The advice
+ * cost an investigation, which is a strictly worse outcome than saying less.
+ *
+ * Exported for its own test: the surrounding check needs a live pool and a real
+ * database, and this is the part that was wrong.
+ */
+export function describeSchemaDriftCause(
+    provisioning: { attempted: boolean; reason?: string } | undefined
+): string[] {
+    // A caller too old to send the signal gets no claim either way — just where
+    // to look. Guessing is what got this wrong the first time.
+    if (provisioning === undefined) {
+        return [
+            "  This runtime could not determine whether a schema-creation step ran",
+            "  before this check (the caller predates that signal).",
+            "    • Look for a \"Collection schema:\" line above. No such line at all",
+            "      means nothing tried to create these tables in this process."
+        ];
+    }
+    if (provisioning.attempted) {
+        return [
+            "  A schema-creation step DID run this boot and these tables are still",
+            "  missing, so it did not create them — check the \"schema:\" lines above",
+            "  for what it did instead, and for DDL errors.",
+            "    • A collection routed to another engine or data source is not",
+            "      created here; that is reported separately at boot.",
+            "    • Otherwise this is a bug worth reporting, with those lines."
+        ];
+    }
+    return [
+        "  No schema-creation step ran this boot:",
+        `    ${provisioning.reason ?? "no reason was given."}`,
+        "  Resolve that reason — the drift is its consequence, not a separate",
+        "  problem, and re-running a migration tool will not change it."
+    ];
+}
+
+/**
  * Is this the local database `rebase init` scaffolds — i.e. the one case where
  * "you are connected as a superuser" is not news?
  *
@@ -200,17 +246,53 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         configureUnknownFilterFields(pgConfig.unknownFilterFields);
     }
 
+    /**
+     * The handle the schema/policy hooks issue their DDL through.
+     *
+     * Both hooks run BEFORE `initializeDriver`, so `driverResult` is a stand-in
+     * the caller may not have: the bundle path can synthesize one from the
+     * connection its coordinator opened, but an application that built this
+     * adapter itself never handed the framework a connection — it handed it to
+     * *us*, as `pgConfig.connection`. Falling back to that is what lets a
+     * self-built adapter provision at all; requiring the argument is what left
+     * those apps with no tables and a 500 on every data route.
+     *
+     * Either handle is equivalent here. The driver's `schemaAwareDb` differs
+     * only by the drizzle schema object registered on it — relevant to the query
+     * builder, not to `execute(sql.raw(...))` — and every statement these hooks
+     * emit is schema-qualified DDL, so neither depends on `search_path`.
+     */
+    const provisioningQueryable = (driverResult?: InitializedDriver) => {
+        const internals = driverResult?.internals as PostgresDriverInternals | undefined;
+        const db = internals?.db ?? (pgConfig.connection as PostgresDriverInternals["db"] | undefined);
+        if (!db) {
+            throw new Error(
+                "Cannot provision the collection schema: this Postgres adapter was created without a " +
+                "`connection`, and no initialized driver was supplied to fall back on. Pass `connection` " +
+                "to `createPostgresAdapter` (see `createPostgresDatabaseConnection`)."
+            );
+        }
+        return {
+            async query<T>(text: string): Promise<{ rows: T[] }> {
+                const result = await db.execute(sql.raw(text));
+                const rows = (result as unknown as { rows?: T[] }).rows;
+                return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+            }
+        };
+    };
+
     return {
         type: "postgres",
 
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
             // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
-            const { collections, collectionRegistry, introspectCollections, baas } = config as {
+            const { collections, collectionRegistry, introspectCollections, baas, schemaProvisioning } = config as {
                 collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
                 introspectCollections?: boolean;
                 baas?: { unprotectedTables?: "exclude" | "serve" };
+                schemaProvisioning?: { attempted: boolean; reason?: string };
             };
             // Secure by default: a table with no RLS is not served.
             const unprotectedTables = baas?.unprotectedTables ?? "exclude";
@@ -695,30 +777,29 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
                             "  (`?options=-c%20search_path%3Dpublic`).",
                             ""
                         ];
-                        // This runtime creates collection tables (and their RLS)
-                        // at boot unless REBASE_MIGRATE_ON_BOOT=none, so a drift
-                        // this late means that step was disabled, could not run,
-                        // or failed — the guidance names a path for both a managed
-                        // tenant (whose in-cluster database `pnpm db:push` cannot
-                        // reach) and a self-host. Naming only the pnpm scripts, as
-                        // this once did, told a managed operator to run a command
-                        // that structurally cannot touch their database.
+                        // What to tell the operator depends entirely on whether a
+                        // create step ran in this process, and the caller is the
+                        // only thing that knows. This warning used to assert that
+                        // it had ("this runtime applies the collection schema at
+                        // boot unless REBASE_MIGRATE_ON_BOOT=none") and send
+                        // people to that variable and to driver-version skew. For
+                        // an app whose boot path contained no provisioning step,
+                        // both were dead ends: nothing read that variable, and the
+                        // driver was current. Say which case this is instead of
+                        // guessing, and say nothing when the caller is too old to
+                        // tell us.
+                        const cause = describeSchemaDriftCause(schemaProvisioning);
                         logger.warn([
                             "",
                             "⚠️  SCHEMA DRIFT — the database is missing tables this backend serves:",
                             ...lines,
                             "",
                             ...misplacedHelp,
-                            "  This runtime applies the collection schema at boot unless",
-                            "  REBASE_MIGRATE_ON_BOOT=none. Check the \"Collection schema\" / \"policies\"",
-                            "  log lines above — this drift means that step was off, skipped, or failed.",
-                            "    • Managed cloud: redeploy with REBASE_MIGRATE_ON_BOOT unset or",
-                            "      \"ensure\"; the runtime applies the schema to the tenant DB.",
-                            "      If the log above says the driver does not implement collection-table",
-                            "      creation, THIS driver is too old to do it. A driver is installed from",
-                            "      your bundle's dependencies, not supplied by the platform image, so a",
-                            "      newer runtime will not update it: bump \"@rebasepro/server-postgres\"",
-                            "      in your project's package.json and redeploy.",
+                            ...cause,
+                            "",
+                            "  To apply this project's schema:",
+                            "    • Managed cloud: the runtime creates tables and RLS at boot. `rebase db",
+                            "      push` cannot reach a tenant's in-cluster database — redeploy instead.",
                             "    • Self-host: run `rebase db push` (dev) or `rebase db migrate` (prod)",
                             "      against DATABASE_URL.",
                             ""
@@ -862,23 +943,16 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          */
         async ensureCollectionSchema(
             collections: unknown[],
-            driverResult: InitializedDriver,
+            driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const internals = driverResult.internals as PostgresDriverInternals;
             const { ensureCollectionTables } = await import("./schema/ensure-collection-tables");
             // Runs through the drizzle handle the driver already bootstrapped
             // with, so it uses exactly the connection and privileges that were
             // proven to work. Every statement is DDL or a catalogue read with no
             // bindable values (schema names are identifiers), and the module
             // validates them before they reach a string.
-            const queryable = {
-                async query<T>(text: string): Promise<{ rows: T[] }> {
-                    const result = await internals.db.execute(sql.raw(text));
-                    const rows = (result as unknown as { rows?: T[] }).rows;
-                    return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
-                }
-            };
+            const queryable = provisioningQueryable(driverResult);
             const plan = await ensureCollectionTables(
                 queryable,
                 collections as Parameters<typeof ensureCollectionTables>[1],
@@ -917,18 +991,11 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          */
         async ensureCollectionPolicies(
             collections: unknown[],
-            driverResult: InitializedDriver,
+            driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const internals = driverResult.internals as PostgresDriverInternals;
             const { ensureCollectionPolicies } = await import("./schema/ensure-collection-policies");
-            const queryable = {
-                async query<T>(text: string): Promise<{ rows: T[] }> {
-                    const result = await internals.db.execute(sql.raw(text));
-                    const rows = (result as unknown as { rows?: T[] }).rows;
-                    return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
-                }
-            };
+            const queryable = provisioningQueryable(driverResult);
             const outcome = await ensureCollectionPolicies(
                 queryable,
                 collections as CollectionConfig[],
@@ -982,10 +1049,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             try {
                 const { dropLegacyAuthSchema } = await import("./schema/rls-bootstrap-sql");
                 await dropLegacyAuthSchema(
-                    async (text) => {
-                        const res = await internals.db.execute(sql.raw(text));
-                        return (res.rows ?? []) as Record<string, unknown>[];
-                    },
+                    async (text) => (await queryable.query<Record<string, unknown>>(text)).rows,
                     { info: (m) => logger.info(m), warn: (m) => logger.warn(m) }
                 );
             } catch (err) {

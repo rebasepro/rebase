@@ -201,23 +201,33 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     // ── Schema ───────────────────────────────────────────────────────────────
     //
-    // Create any collection tables the database is missing, before the backend
-    // starts serving. `initializeRebaseBackend` ensures AUTH tables; nothing
-    // ensured collection tables, so a runtime booted against a fresh database
-    // came up with working sign-in and a 500 on every `/api/data/*` route — the
-    // state every managed tenant would have launched in.
+    // Collection tables and their RLS policies are created by
+    // `initializeRebaseBackend`, not here. This is where that used to live, and
+    // living here was the bug: it meant managed tenants got provisioned and
+    // every app that boots by calling `initializeRebaseBackend` directly — its
+    // own image, `runtimeMode: custom` — got nothing, came up serving sign-in,
+    // and 500'd every data route. Provisioning belongs in the function both
+    // paths go through. See ../boot/provision.
     //
-    // Additive only: the driver may create missing tables, columns and enum
-    // types, and may never drop or rewrite. Destructive changes stay a
-    // deliberate migration, because this runs unattended with nobody reading a
-    // diff. `REBASE_MIGRATE_ON_BOOT=none` opts out entirely for a deployment
-    // that manages its own schema.
-    await ensureCollectionSchema(bundle, dataSources, env);
+    // What stays here is the one diagnosis that needs the bundle to make: a
+    // build that produced a config package with no collections directory looks,
+    // from inside the runtime, exactly like a project that declared nothing.
+    warnOnUnusableBundleShape(bundle);
 
     const backend = await initializeRebaseBackend({
         server,
         app,
         basePath: env.REBASE_BASE_PATH,
+        // The schema hooks run before any driver initializes, so they need a
+        // stand-in for the result they are declared to take. This path has one
+        // — the coordinator opened the connection itself — and passes it
+        // because a driver written before the argument became optional reads
+        // `driverResult.internals` unconditionally. Wrapping matters: passed
+        // bare, it type-checks through any cast and then dies inside the driver
+        // on `undefined.db`.
+        provisioningDriverResult: dataSources[0]
+            ? ({ internals: dataSources[0].connection } as unknown as InitializedDriver)
+            : undefined,
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
@@ -250,21 +260,6 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // and a running deployment is the last place that should be possible.
         schemaEditor: false
     });
-
-    // ── RLS policies ───────────────────────────────────────────────────────────
-    //
-    // Now that the backend is up — auth tables and the `auth.*` helper functions
-    // exist, the restricted user role is provisioned, and the collection tables
-    // were created above — apply the collections' row-level-security policies.
-    // Tables without them are not servable: authenticated requests run as a
-    // restricted role, so a read with no policy returns nothing (a public
-    // collection answers 401) and a write with no policy is denied. This is the
-    // second half of what `db push` does, and the half a managed tenant could
-    // not reach any other way. Ordered after `initializeRebaseBackend` on
-    // purpose: `CREATE POLICY` validates the `auth.uid()` functions it references
-    // exist, and those are created during auth initialization. Same
-    // `REBASE_MIGRATE_ON_BOOT=none` opt-out as the table creation above.
-    await ensureCollectionPolicies(bundle, dataSources, env);
 
     // Restrict metric labels to collections that exist, now that they do.
     metrics?.setKnownCollections(
@@ -610,266 +605,26 @@ export function warnOnDriverSkew(
         );
     }
 }
-
 /**
- * The collections a data source's engine is the store for.
+ * Warn about a bundle whose shape makes provisioning impossible.
  *
- * A bundle's collections directory holds *every* collection the project
- * declares, whatever engine serves it — that is the point of `dataSource`
- * routing. What it is not is a list of tables to create: handing the whole
- * directory to the primary source's bootstrapper made a Firestore collection
- * declared alongside the Postgres ones arrive as an empty Postgres table, with
- * RLS policies, while the app went on reading its documents from Firestore.
+ * `initializeRebaseBackend` provisions the collection schema for every boot
+ * path, and it decides from what actually resolved: a project with no
+ * collections reads them from the database and creates nothing. That rule is
+ * right, but from inside the runtime it cannot tell "this project declares no
+ * collections" from "this build lost them" — and the second is a broken build
+ * that silently serves an empty API.
  *
- * Excluding is deliberately conservative. A collection that names neither an
- * `engine` nor a `dataSource` belongs to whichever source is primary — the
- * "postgres" that `resolveDataSource` falls back to there is a default, not a
- * declaration, and must not exclude anything on its own. Only a collection that
- * explicitly routes to a *different* engine is dropped, so a project running two
- * sources on the same engine is unaffected.
+ * Only the bundle knows the difference, so this is the one piece of the old
+ * bundle-side provisioning worth keeping here. It warns; it never provisions.
  */
-export function collectionsStoredBy(
-    collections: CollectionConfig[],
-    primary: InitializedDataSource,
-    dataSources: InitializedDataSource[]
-): CollectionConfig[] {
-    const registry = createDataSourceRegistry(
-        dataSources.map(source => ({ key: source.key, engine: source.engine }))
-    );
-    return collections.filter(collection => {
-        // The collection's own `engine` is read first, and `resolveDataSource`
-        // is not asked to settle it: that function lets a registered definition
-        // override the collection's engine, which is the right precedence for
-        // *routing* and the wrong one here — a collection declaring
-        // `engine: "firestore"` and no `dataSource` would come back as the
-        // default source's "postgres" and be provisioned as a table.
-        const declared = collection.engine
-            ?? (collection.dataSource ? resolveDataSource(collection, registry).engine : undefined);
-        if (!declared) return true;
-        return declared === primary.engine;
-    });
-}
-
-/** Say what was routed elsewhere, so a missing table is never a silent one. */
-function logForeignCollections(
-    all: CollectionConfig[],
-    stored: CollectionConfig[],
-    primary: InitializedDataSource
-): void {
-    if (stored.length === all.length) return;
-    const foreign = all.filter(c => !stored.includes(c)).map(c => c.slug);
-    logger.info(
-        `Skipping ${foreign.length} collection(s) served by another engine, not "${primary.engine}": ${foreign.join(", ")}. ` +
-            "Their storage is not managed by this data source."
-    );
-}
-
-/**
- * Bring the database's collection tables up to date before serving.
- *
- * Delegates to whichever driver bootstrapped the default data source; a driver
- * without `ensureCollectionSchema` (a schemaless one, or an older build) skips
- * rather than failing, which is why this cannot break an existing deployment.
- *
- * Every path out of here says why, at info or louder. Guaranteeing the tables
- * exist is this function's entire job, so "it declined, and said nothing" is the
- * one outcome it must never produce: a deployment that skips comes up answering
- * sign-in and 500ing every `/api/data/*` route, and the operator's only evidence
- * is what these lines print. Silence here has already sent one investigation
- * chasing a stale runtime image that was not stale.
- *
- * Failure is fatal on purpose. Booting anyway would produce exactly the state
- * this exists to prevent — an app that answers sign-in and 500s every data
- * request — and a crash-looping pod with the DDL error in its logs is a far
- * better signal than a running one that silently cannot serve.
- */
-export async function ensureCollectionSchema(
-    bundle: LoadedBundle,
-    dataSources: InitializedDataSource[],
-    env: RebaseBootEnv
-): Promise<void> {
-    // `info` is for the bundle shapes with legitimately nothing to create;
-    // `warn` is for a bundle that asked for collection tables and is not getting
-    // them. A backend carrying a config package is the shape that expects
-    // tables, so every stop after that point is a real problem worth raising.
-    const skip = (reason: string, level: "info" | "warn" = "info"): void => {
-        logger[level](`Collection schema: skipped — ${reason}`);
-    };
-
-    const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
-    if (mode === "none") {
-        skip("REBASE_MIGRATE_ON_BOOT=none, leaving the database schema untouched.");
-        return;
-    }
-    // A bundle without a config package introspects its collections FROM the
-    // database, so there is nothing to create; a `static` bundle has no database
-    // at all. Both conditions matter: gating on `kind` alone would push a
-    // schema into an existing database that a project only meant to read.
-    if (bundle.manifest.kind !== "backend") {
-        skip(`this bundle's kind is "${bundle.manifest.kind}", which serves no database.`);
-        return;
-    }
-    if (!bundle.manifest.entry?.config) {
-        skip("this bundle declares no config package, so its collections are read from the database rather than from code.");
-        return;
-    }
-    // Reachable only when the config package exists but carries no collections
-    // directory — a build that produced a manifest the runtime cannot act on,
-    // which looks identical from the outside to a database that was never
-    // migrated. Name the path so the two are told apart from the log alone.
-    if (!bundle.collectionsDir) {
-        skip(
-            `this bundle declares a config package at "${bundle.manifest.entry.config}", but no collections directory resolved inside it. ` +
-                "Rebuild with `rebase build` and check the manifest's `entry.collections`.",
-            "warn"
-        );
-        return;
-    }
-
-    const primary = dataSources[0];
-    if (!primary) {
-        skip("no data source was initialized for this runtime.", "warn");
-        return;
-    }
-    if (!primary.bootstrapper.ensureCollectionSchema) {
-        // What is missing is the method on the ADAPTER — the only object boot
-        // ever sees — which is not the same as the driver package lacking the
-        // code. Three unrelated causes collapse into this one symptom: a
-        // schemaless driver, a driver too old to have it, and a driver that
-        // implements it on a class the adapter never forwards. Only the middle
-        // one is a version problem, so saying "the driver does not implement"
-        // and naming versions points at the wrong suspect two times in three —
-        // it sent one investigation after driver and runtime releases that were
-        // both fine while a wrapper silently dropped the method in between.
-        const skew = describeDriverSkew(primary.driverVersion, readRuntimeVersion(bundleResolutionRoots(bundle.dir)));
-        skip(
-            `the adapter from "${primary.driverPackage}" (engine "${primary.engine}") does not expose collection-table creation. ` +
-                (skew.detail ? `${skew.detail} ` : "") +
-                "The driver package may well implement it on a class the adapter does not forward, so check the adapter's shape before blaming its version. " +
-                "Collection tables will NOT be created, so every /api/data route will fail on a missing relation.\n" +
-                schemaRecoveryGuidance({ staleDriver: skew.stale }),
-            "warn"
-        );
-        return;
-    }
-
-    const loaded = await loadCollectionsFromDirectory(bundle.collectionsDir);
-    if (loaded.length === 0) {
-        skip(`no collections were loaded from "${bundle.collectionsDir}".`, "warn");
-        return;
-    }
-
-    const collections = collectionsStoredBy(loaded, primary, dataSources);
-    logForeignCollections(loaded, collections, primary);
-    if (collections.length === 0) {
-        skip(`none of the ${loaded.length} declared collection(s) are stored by the "${primary.engine}" data source.`);
-        return;
-    }
-
-    const { applied } = await primary.bootstrapper.ensureCollectionSchema(
-        collections,
-        preInitDriverResult(primary),
-        message => logger.debug(`schema: ${message}`)
-    );
-    // Only the change is news. "Collection schema is up to date" is the
-    // overwhelmingly common outcome and says nothing a developer can act on;
-    // at `debug` it is still there for anyone diagnosing a boot.
-    if (applied > 0) {
-        logger.info(`Applied ${applied} additive schema change(s) before boot.`);
-    } else {
-        logger.debug("Collection schema is up to date.");
-    }
-}
-
-/**
- * The `InitializedDriver` to hand a bootstrapper before any driver exists.
- *
- * Both schema hooks are declared to take the result of `initializeDriver`, but
- * they deliberately run *before* it: the tables have to exist before the driver
- * introspects them and registers collections. So there is no real result to
- * pass, and the field the hooks actually read is `internals` — the driver's own
- * opaque handle, which at this point is exactly the connection the coordinator
- * just opened (`{ db, pool }`, where `db` is the drizzle instance).
- *
- * Wrapping it matters: the connection passed *bare* type-checks through any cast
- * and then reads `undefined.db` inside the driver, which surfaces as a boot
- * crash — `TypeError: Cannot read properties of undefined (reading 'db')` — on
- * every project whose driver implements these hooks. The cast is narrowed to the
- * one field a pre-init result cannot honestly supply, rather than `as never`
- * blanketing the whole argument.
- */
-function preInitDriverResult(source: InitializedDataSource): InitializedDriver {
-    return { internals: source.connection } as unknown as InitializedDriver;
-}
-
-/**
- * Apply the project's RLS policies before serving — the companion to
- * {@link ensureCollectionSchema}, which creates the tables this makes servable.
- *
- * Runs after `initializeRebaseBackend`, not alongside table creation: the
- * generated policies call the `auth.*` helper functions, and `CREATE POLICY`
- * validates those exist, so this cannot run before auth is initialized. The
- * gate conditions mirror `ensureCollectionSchema` (mode, bundle shape, driver
- * support) — and because that function already ran and explained any skip on
- * this same boot, the benign gates here return quietly rather than logging the
- * same reason twice. The one thing it does say out loud is a driver that
- * created tables but cannot apply policies: that is the difference between a
- * served collection and a 401, and it must not pass in silence.
- */
-export async function ensureCollectionPolicies(
-    bundle: LoadedBundle,
-    dataSources: InitializedDataSource[],
-    env: RebaseBootEnv
-): Promise<void> {
-    const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
-    if (mode === "none") return;
+export function warnOnUnusableBundleShape(bundle: LoadedBundle): void {
     if (bundle.manifest.kind !== "backend") return;
     if (!bundle.manifest.entry?.config) return;
-    if (!bundle.collectionsDir) return;
-
-    const primary = dataSources[0];
-    if (!primary) return;
-    if (!primary.bootstrapper.ensureCollectionPolicies) {
-        // The tables may exist (ensureCollectionSchema ran) while their RLS does
-        // not. Name it: a silent skip here reads from outside the pod as "the
-        // database has no data".
-        //
-        // Whether that means denied or exposed depends on the driver, so the
-        // wording below does not promise either. On the Postgres driver the
-        // user role is granted DML schema-wide before policies are applied, so
-        // a table without RLS is open, not locked — that driver revokes the
-        // grant itself rather than relying on this message being true.
-        const skew = describeDriverSkew(primary.driverVersion, readRuntimeVersion(bundleResolutionRoots(bundle.dir)));
-        logger.warn(
-            `Collection policies: skipped — the "${primary.driverPackage}" driver (engine "${primary.engine}") ` +
-                "does not apply RLS policies at boot. " +
-                (skew.detail ? `${skew.detail} ` : "") +
-                "Collections are not row-secured until policies are applied — depending on the " +
-                "driver's grants that means reads are denied or that they are unfiltered. " +
-                "Do not serve traffic until this is resolved.\n" +
-                schemaRecoveryGuidance({ staleDriver: skew.stale })
-        );
-        return;
-    }
-
-    const loaded = await loadCollectionsFromDirectory(bundle.collectionsDir);
-    if (loaded.length === 0) return;
-
-    // Quiet here: `ensureCollectionSchema` already listed what it routed
-    // elsewhere on this same boot.
-    const collections = collectionsStoredBy(loaded, primary, dataSources);
-    if (collections.length === 0) return;
-
-    const { applied } = await primary.bootstrapper.ensureCollectionPolicies(
-        collections,
-        preInitDriverResult(primary),
-        message => logger.debug(`policies: ${message}`)
+    if (bundle.collectionsDir) return;
+    logger.warn(
+        `This bundle declares a config package at "${bundle.manifest.entry.config}", but no collections ` +
+            "directory resolved inside it, so no collections were loaded and no tables will be created. " +
+            "Rebuild with `rebase build` and check the manifest's `entry.collections`."
     );
-    // Same rule as the schema summary above: report the change, not the
-    // steady state.
-    if (applied > 0) {
-        logger.info(`Applied ${applied} RLS policy statement(s) before serving.`);
-    } else {
-        logger.debug("RLS policies are up to date.");
-    }
 }
