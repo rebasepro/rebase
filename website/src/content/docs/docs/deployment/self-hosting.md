@@ -166,6 +166,14 @@ broken down by API surface (data, auth, storage, functions) and collection, plus
 process gauges. Without a token the endpoint is readable by anyone who can reach
 the port, so set one unless it is on a private network.
 
+## Running functions in their own process
+
+Everything above is one container serving the whole project, which is the right
+shape for almost every deployment. When a custom function should stop competing
+with the data API for the event loop — or should scale, restart and fail on its
+own — the same image and the same bundle can be booted as several cooperating
+processes. See [Split processes](/docs/deployment/split-processes/).
+
 ## Upgrading
 
 ```yaml

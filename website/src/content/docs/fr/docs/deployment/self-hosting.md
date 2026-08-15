@@ -143,6 +143,15 @@ REBASE_METRICS_TOKEN=<random string>
 
 Expose les métriques Prometheus sur `/metrics` : nombre de requêtes et histogrammes de latence ventilés par surface d'API (data, auth, storage, functions) et par collection, ainsi que des jauges de processus. Sans jeton, le point de terminaison est accessible en lecture par quiconque peut atteindre le port ; vous devez donc en définir un à moins d'être sur un réseau privé.
 
+## Exécuter les fonctions dans leur propre processus
+
+Tout ce qui précède est un seul conteneur servant l'ensemble du projet, ce qui
+est la bonne forme pour presque tous les déploiements. Lorsqu'une fonction
+personnalisée doit cesser de concurrencer l'API de données sur la boucle
+d'événements — ou monter en charge, redémarrer et échouer de son côté — la même
+image et le même bundle peuvent être démarrés comme plusieurs processus
+coopérants. Voir [Processus séparés](/docs/deployment/split-processes/).
+
 ## Mise à niveau
 
 ```yaml

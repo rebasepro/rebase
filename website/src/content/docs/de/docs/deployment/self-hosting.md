@@ -143,6 +143,15 @@ REBASE_METRICS_TOKEN=<random string>
 
 Stellt Prometheus-Metriken unter `/metrics` bereit: Anzahl der Anfragen und Latenz-Histogramme, aufgeschlüsselt nach API-Oberfläche (Data, Auth, Storage, Functions) und Collection, sowie Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann. Setzen Sie daher ein Token, es sei denn, er befindet sich in einem privaten Netzwerk.
 
+## Functions in einem eigenen Prozess ausführen
+
+Alles oben ist ein Container, der das ganze Projekt bedient — die richtige Form
+für fast jedes Deployment. Wenn eine Custom Function aufhören soll, mit der
+Daten-API um den Event-Loop zu konkurrieren, oder eigenständig skalieren, neu
+starten und ausfallen soll, lassen sich dasselbe Image und dasselbe Bundle als
+mehrere zusammenarbeitende Prozesse starten. Siehe
+[Getrennte Prozesse](/docs/deployment/split-processes/).
+
 ## Aktualisieren
 
 ```yaml

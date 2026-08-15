@@ -168,6 +168,15 @@ y colección, además de indicadores de proceso (gauges). Sin un token, el endpo
 legible por cualquiera que pueda acceder al puerto, así que define uno a menos que esté
 en una red privada.
 
+## Ejecutar funciones en su propio proceso
+
+Todo lo anterior es un contenedor que sirve el proyecto entero, que es la forma
+correcta para casi cualquier despliegue. Cuando una función personalizada deba
+dejar de competir con la API de datos por el bucle de eventos —o deba escalar,
+reiniciarse y fallar por su cuenta— la misma imagen y el mismo bundle pueden
+arrancarse como varios procesos que cooperan. Consulta
+[Procesos divididos](/docs/deployment/split-processes/).
+
 ## Actualización
 
 ```yaml

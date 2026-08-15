@@ -143,6 +143,15 @@ REBASE_METRICS_TOKEN=<random string>
 
 Espone le metriche Prometheus su `/metrics`: conteggi delle richieste e istogrammi di latenza suddivisi per superficie API (data, auth, storage, funzioni) e collection, oltre agli indicatori (gauge) del processo. Senza un token l'endpoint è leggibile da chiunque possa raggiungere la porta, quindi impostane uno a meno che non si trovi su una rete privata.
 
+## Eseguire le funzioni in un processo dedicato
+
+Tutto quanto sopra è un solo container che serve l'intero progetto, la forma
+giusta per quasi ogni deployment. Quando una funzione personalizzata deve
+smettere di competere con l'API dei dati per l'event loop — o deve scalare,
+riavviarsi e fallire per conto proprio — la stessa immagine e lo stesso bundle
+possono essere avviati come più processi che cooperano. Vedi
+[Processi separati](/docs/deployment/split-processes/).
+
 ## Aggiornamento
 
 ```yaml

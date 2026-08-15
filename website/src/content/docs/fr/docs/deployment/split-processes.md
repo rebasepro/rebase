@@ -1,0 +1,212 @@
+---
+title: Répartir sur plusieurs processus
+sidebar_label: Processus séparés
+description: "Exécutez un bundle sous forme de plusieurs processus coopérants — une API, une couche de fonctions, un worker — depuis la même image de runtime publiée, afin qu'une fonction personnalisée lourde cesse de concurrencer l'API de données."
+---
+
+## Vue d'ensemble
+
+Un déploiement Rebase est normalement un seul processus qui sert tout : l'API de
+données, l'authentification, le stockage, vos fonctions personnalisées, le cron
+et la file de tâches. C'est la bonne forme pour presque tous les déploiements, et
+elle reste celle par défaut.
+
+Quand ce n'est plus le cas — une fonction personnalisée qui bloque la boucle
+d'événements, ou une couche de fonctions qui devrait monter en charge ou
+redémarrer indépendamment de l'API — vous pouvez démarrer **la même image et le
+même bundle** plusieurs fois et faire en sorte que chaque processus serve une
+partie différente du projet. Il n'y a rien de nouveau à construire et rien que le
+client doive savoir : les URL ne changent pas.
+
+Une variable d'environnement décide de ce qu'est un processus :
+
+```bash
+REBASE_ROLE=api        # data, auth, admin, storage, meta — everything but functions
+REBASE_ROLE=functions  # custom functions only
+REBASE_ROLE=worker     # no HTTP surface: cron and the job queue
+REBASE_ROLE=all        # the default: everything, one process
+```
+
+## Ce que sert chaque rôle
+
+| | `all` | `api` | `functions` | `worker` |
+| --- | :---: | :---: | :---: | :---: |
+| `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
+| `/api/admin`, `/api/logs`, l'éditeur de schéma | ✅ | ✅ | — | — |
+| `/api/functions/*` | ✅ | transmet (voir plus bas) | ✅ | — |
+| `/api/cron` (la surface d'administration) | ✅ | ✅ | — | — |
+| `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Crée le schéma au démarrage | ✅ | ✅ | — | — |
+| Exécute le planificateur cron | ✅ | ✅ | — | ✅ |
+| Exécute les workers de la file de tâches | ✅ | ✅ | — | ✅ |
+
+Le health et les métriques sont présents sur tous les rôles, sans exception. Un
+processus qu'un orchestrateur ne peut pas sonder est un processus qu'il ne peut
+pas déployer.
+
+## Docker Compose
+
+Deux services depuis une image, un bundle et une base de données :
+
+```yaml
+services:
+  api:
+    image: rebasepro/server:latest
+    environment:
+      REBASE_ROLE: api
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
+      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - ./dist-bundle:/bundle
+    ports:
+      - "8080:8080"
+
+  functions:
+    image: rebasepro/server:latest
+    environment:
+      REBASE_ROLE: functions
+      REBASE_MIGRATE_ON_BOOT: none
+      TRUSTED_PROXY_HOPS: 1
+      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - ./dist-bundle:/bundle
+```
+
+```bash
+docker compose up --scale functions=3
+```
+
+Les deux processus ont besoin du même `DATABASE_URL`, du même `JWT_SECRET` et de
+la même `REBASE_SERVICE_KEY` : ils forment un seul déploiement, et un jeton émis
+par l'un doit être accepté par l'autre.
+
+## Conserver les mêmes URL
+
+`REBASE_FUNCTIONS_UPSTREAM` indique au processus `api` de transmettre
+`/api/functions/*` au processus de fonctions au lieu de le servir. Les clients,
+les SDK générés et les clés d'API voient exactement la surface qu'ils voyaient
+avant la répartition : aucun code applicatif ne change, et il n'est pas
+nécessaire de mettre en place un reverse proxy pour l'essayer.
+
+Un déploiement de production peut préférer router ce chemin au niveau de son
+ingress ; dans ce cas, laissez `REBASE_FUNCTIONS_UPSTREAM` non définie — le
+processus `api` répondra alors 404 sur ces chemins et le proxy en amont décidera
+de leur destination.
+
+### Sauts de proxy
+
+Lorsque l'API transmet, elle ajoute l'adresse de l'appelant à `X-Forwarded-For`.
+Cela place le processus de fonctions derrière **un saut de proxy de plus** que
+l'API, et il faut le lui indiquer :
+
+```bash
+# api behind one ingress            → TRUSTED_PROXY_HOPS=1
+# functions behind that ingress AND the api → TRUSTED_PROXY_HOPS=2
+```
+
+`TRUSTED_PROXY_HOPS` est le nombre de reverse proxies réellement présents devant
+un processus. Chacun ajoute à `X-Forwarded-For` l'adresse qu'il a vue, si bien
+que le vrai client est la N-ième entrée en partant de la droite ; tout ce qui se
+trouve plus à gauche est fourni par le client et ignoré — c'est ce qui empêche un
+appelant de falsifier l'en-tête pour changer de clé de limitation. La valeur par
+défaut est `0` : aucun proxy n'est de confiance.
+
+Si vous vous trompez ici, rien ne casse visiblement : les limiteurs du processus
+de fonctions rattachent chaque requête à l'adresse du conteneur de l'API, donc
+tous vos appelants partagent un même seau, et l'IP enregistrée sur chaque
+événement d'authentification est toujours la même.
+
+## Un seul processus possède le schéma
+
+Un seul processus d'un déploiement réparti crée les tables et applique les
+politiques RLS au démarrage : c'est celui en `api` (ou en `all`). Tous les autres
+doivent définir :
+
+```bash
+REBASE_MIGRATE_ON_BOOT=none
+```
+
+C'est **obligatoire**, pas un conseil : un processus `functions` ou `worker`
+laissé sur la valeur par défaut refuse de démarrer, et le dit. `CREATE … IF NOT
+EXISTS` lit le catalogue puis y écrit en deux étapes distinctes, donc des
+processus qui démarrent ensemble entrent bel et bien en collision — et un
+déploiement où plusieurs d'entre eux se disputent la création du même schéma
+n'est pas un déploiement conçu par quelqu'un.
+
+## Servir une fonction par processus
+
+Un processus peut servir un sous-ensemble nommé : c'est ainsi qu'une fonction
+coûteuse obtient son propre nombre de réplicas sans que son code bouge.
+
+```bash
+REBASE_FUNCTIONS_ONLY=send-invoice
+REBASE_FUNCTIONS_EXCLUDE=debug-tools
+```
+
+Les noms sont les noms de fichiers sans l'extension — le même nom sous lequel la
+fonction est montée. Un nom absent du bundle **fait échouer le démarrage**, et
+l'erreur énumère les noms présents. Un processus configuré pour une fonction
+existe pour cette fonction : une faute de frappe qui servirait silencieusement
+rien serait le pire résultat possible.
+
+## Cron et tâches de fond
+
+Les deux sont déjà sûrs sur plusieurs processus : le planificateur cron
+revendique chaque paire `(job, slot)` dans la base, et la file de tâches
+revendique ses lignes avec `FOR UPDATE SKIP LOCKED`. C'est pourquoi `api`
+continue d'exécuter les deux par défaut, et une répartition en deux services est
+complète sans troisième conteneur.
+
+Ajoutez un processus `worker` si vous voulez sortir le travail planifié du chemin
+des requêtes, et désactivez-le sur l'API :
+
+```yaml
+  api:
+    environment:
+      REBASE_CRON_SCHEDULER: "false"
+      REBASE_JOB_WORKERS: "false"
+
+  worker:
+    environment:
+      REBASE_ROLE: worker
+      REBASE_MIGRATE_ON_BOOT: none
+```
+
+Un processus `functions` n'exécute jamais ni l'un ni l'autre. Il monte en charge
+selon le trafic et peut être remplacé à tout moment ; lui confier du travail
+planifié donnerait à son nombre de réplicas un sens qu'il ne doit pas avoir.
+
+Notez que `rebase.jobs.enqueue` continue de fonctionner partout, y compris sur un
+processus qui n'exécute aucun worker : mettre en file est une écriture, exécuter
+est une boucle de scrutation, et seule la seconde est ce qu'un rôle désactive.
+
+## Ce que la répartition n'apporte pas
+
+**Des limites de débit partagées.** Le stockage du limiteur est par processus par
+défaut, donc N processus multiplient par N le budget de chaque appelant. Passez
+un `rateLimit.store` partagé dans la configuration de votre backend si la limite
+doit valoir pour l'ensemble du déploiement.
+
+**Des canaux inter-instances.** Le broadcast et la présence utilisent par défaut
+un bus en mémoire, qui ne franchit pas les processus. C'est une question de
+*nombre de réplicas* plutôt que de répartition — c'est tout aussi vrai d'un
+déploiement à rôle unique mis à l'échelle sur trois — alors définissez
+`REALTIME_CHANNEL_BUS=postgres` (ou `realtime.bus` dans la configuration) dès que
+plus d'un processus sert des websockets.
+
+**La mise à l'échelle à zéro.** Rien ici ne réduit un processus à néant ni n'en
+démarre un à la demande. C'est une capacité de la plateforme, pas du runtime.
+
+## Mise à jour
+
+Inchangée : chaque processus exécute la même image publiée, donc une mise à jour
+est le même changement de tag sur chacun d'eux. Mettez `api` à jour en dernier si
+vous voulez que le provisionnement du schéma se fasse d'abord contre la nouvelle
+version — même si en pratique l'ordre n'a pas d'importance, car l'étape de schéma
+est additive et idempotente.

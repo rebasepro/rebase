@@ -167,6 +167,7 @@ export default defineConfig({
                     items: [
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
+                        { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "AWS", slug: "docs/deployment/aws" },
                         { label: "Google Cloud", slug: "docs/deployment/gcp" },
                         { label: "Azure", slug: "docs/deployment/azure" },
