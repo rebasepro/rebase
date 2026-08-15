@@ -111,7 +111,55 @@ const bootEnvExtension = z.object({
     REBASE_COMPRESSION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     REBASE_HISTORY: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     /** Comma-separated origins allowed to make credentialed cross-origin calls. */
-    CORS_ORIGINS: z.string().optional()
+    CORS_ORIGINS: z.string().optional(),
+
+    // ── Split deployments ────────────────────────────────────────────────────
+    /**
+     * Which part of the project this process serves.
+     *
+     * `all` — everything, in one process. The default, and what every existing
+     * deployment gets by setting nothing.
+     *
+     * The other three exist so one image and one bundle can be booted several
+     * times over, each serving a different part: `api` (data, auth, admin,
+     * storage, meta), `functions` (custom functions only), `worker` (no HTTP
+     * surface at all — cron and the job queue).
+     *
+     * See `resolveRole` in `boot/role.ts` for exactly what each one mounts and
+     * owns, and for the combinations that refuse to boot.
+     */
+    REBASE_ROLE: z.enum(["all", "api", "functions", "worker", ""]).default("all")
+        .transform(v => (v === "" ? "all" as const : v)),
+    /**
+     * Override whether this process runs the cron scheduler's timers.
+     *
+     * Separate from the role because "which URLs answer" and "which timers fire"
+     * are independent questions: a three-way split wants cron off the `api`
+     * process, a two-way split wants it on. Unset follows the role.
+     */
+    REBASE_CRON_SCHEDULER: z.enum(["true", "false", ""]).optional()
+        .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
+    /** Override whether this process runs job-queue workers. Unset follows the role. */
+    REBASE_JOB_WORKERS: z.enum(["true", "false", ""]).optional()
+        .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
+    /**
+     * Comma-separated function names this process serves. Unset means all.
+     *
+     * `functions` role only. A name that is not in the bundle is a boot failure,
+     * not a warning — the deployment exists to serve that function, and a typo
+     * that silently serves nothing is the failure this must not have.
+     */
+    REBASE_FUNCTIONS_ONLY: z.string().optional(),
+    /** Comma-separated function names to skip. Applied after `_ONLY`. */
+    REBASE_FUNCTIONS_EXCLUDE: z.string().optional(),
+    /**
+     * Base URL of the process serving `/api/functions/*`.
+     *
+     * `api` role only. Set it and this process forwards those requests there
+     * instead of mounting them, so a split deployment presents the identical URL
+     * surface and nobody has to run a reverse proxy to try one.
+     */
+    REBASE_FUNCTIONS_UPSTREAM: z.string().optional()
 });
 
 export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;

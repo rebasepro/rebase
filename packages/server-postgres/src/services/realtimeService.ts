@@ -1470,7 +1470,7 @@ roles: activeAuth.roles },
         logger.warn(
             "⚠️ [ChannelBus] Channels are in use with the in-memory bus, but notifications from another " +
             "instance have been seen — this deployment runs more than one process. Broadcast and presence " +
-            "reach only the clients connected to this one. Set `realtime.bus` (or REBASE_REALTIME_BUS=postgres) " +
+            "reach only the clients connected to this one. Set `realtime.bus` (or REALTIME_CHANNEL_BUS=postgres) " +
             "to make channels cross-instance."
         );
     }

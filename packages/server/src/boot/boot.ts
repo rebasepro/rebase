@@ -23,6 +23,8 @@ import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
 import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
+import { resolveRole, RoleConfigurationError } from "./role";
+import { FunctionSelectionError } from "../functions/selection";
 import {
     BundleError,
     loadBundle,
@@ -51,6 +53,19 @@ export interface BootedRuntime {
     shutdown: () => Promise<void>;
 }
 
+/**
+ * Whether this process is the one that provisions the database schema.
+ *
+ * Separate from `REBASE_MIGRATE_ON_BOOT` on purpose. That variable answers
+ * "does this deployment create its own schema at boot"; this answers "is this
+ * *process* the one that does it", which only becomes a question once a
+ * deployment boots the same bundle more than once.
+ */
+export interface SchemaProvisioningOptions {
+    /** Default `true`. `false` leaves every DDL statement to another process. */
+    provision?: boolean;
+}
+
 export interface BootOptions {
     /** Bundle directory. Defaults to `REBASE_BUNDLE` or `./dist-bundle`. */
     bundleDir?: string;
@@ -66,6 +81,20 @@ export interface BootOptions {
     listen?: boolean;
     /** Install SIGTERM/SIGINT handlers. Off for tests. */
     handleSignals?: boolean;
+    /**
+     * Whether this process provisions the collection schema and its RLS
+     * policies at boot. Default `true` — the behaviour every deployment has.
+     *
+     * Set `false` on a process that is one of several booting the same bundle
+     * against the same database. `CREATE … IF NOT EXISTS` reads the catalog and
+     * then writes to it non-atomically, so peers starting together do collide;
+     * exactly one owner is cheaper and more legible than N racing and retrying.
+     *
+     * Independent of `REBASE_MIGRATE_ON_BOOT`, which answers a different
+     * question — whether *this deployment* provisions its schema at boot at all,
+     * rather than which of its processes does.
+     */
+    provisionSchema?: boolean;
 }
 
 /**
@@ -132,6 +161,17 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     const env = loadBootEnv();
     const isProduction = env.NODE_ENV === "production";
+
+    // What this process is. Resolved before anything is built, because a role
+    // that cannot boot must say so at once rather than after opening a pool and
+    // half-mounting a server.
+    const runtimeRole = resolveRole(env);
+    if (runtimeRole.role !== "all") {
+        logger.info(`Runtime role: ${runtimeRole.role}`, {
+            provisionsSchema: runtimeRole.provisionSchema,
+            ...runtimeRole.ownership
+        });
+    }
 
     // ── Declarations ─────────────────────────────────────────────────────────
     const configExports = await loadBundleConfigExports(bundle);
@@ -231,6 +271,14 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
+        // One process provisions. `bootFromBundle` no longer does this itself —
+        // it moved into `initializeRebaseBackend` so every boot path gets it —
+        // so the role's answer travels as an option rather than as a call here.
+        provisionSchema: options.provisionSchema ?? runtimeRole.provisionSchema,
+        surfaces: runtimeRole.surfaces,
+        ownership: runtimeRole.ownership,
+        functionsSelection: runtimeRole.functionsSelection,
+        functionsUpstream: runtimeRole.functionsUpstream,
         bootstrappers: dataSources.map(s => s.bootstrapper),
         dataSources: dataSourceDefs,
         storage,
@@ -363,10 +411,16 @@ at: staticApp.path });
                 server.once("error", reject);
                 server.listen(env.PORT, () => {
                     server.removeListener("error", reject);
+                    // The socket, not the request: `PORT=0` asks the OS to pick
+                    // one, and reporting the request then announces a port
+                    // nothing listens on — to the log, and to every caller of
+                    // `BootedRuntime.port`.
+                    const address = server.address();
+                    if (address && typeof address === "object") port = address.port;
                     resolve();
                 });
             });
-            logger.info(`Rebase runtime listening on port ${env.PORT}`);
+            logger.info(`Rebase runtime listening on port ${port}`);
         } else {
             port = await listenWithPortRetry(server, env.PORT, {
                 portFileDir: devRoot,
@@ -556,7 +610,11 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
     try {
         return await bootFromBundle(options);
     } catch (err) {
-        if (err instanceof BundleError) {
+        // Both of these are "your configuration says something that cannot
+        // work", so both get the message and the fix rather than a stack trace.
+        // The reader is looking at a container that will not start.
+        if (err instanceof BundleError || err instanceof RoleConfigurationError ||
+            err instanceof FunctionSelectionError) {
             logger.error(err.message);
             if (err.hint) logger.error(err.hint);
         } else {

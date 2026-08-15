@@ -88,6 +88,22 @@ function describeAdapter(target: ProvisionTarget): string {
 }
 
 /** `REBASE_MIGRATE_ON_BOOT=none` opts a deployment out of both phases. */
+/**
+ * How one call to a provisioning function is run.
+ *
+ * `provision` is a different question from `REBASE_MIGRATE_ON_BOOT`, and both
+ * are checked. That variable says whether this *deployment* provisions its own
+ * schema at boot; `provision` says whether this *process* is the one that does
+ * it — which only becomes a question once a deployment boots the same bundle
+ * more than once (see `REBASE_ROLE`).
+ */
+export interface ProvisionRunOptions {
+    introspecting?: boolean;
+    env?: { REBASE_MIGRATE_ON_BOOT?: string };
+    /** Default `true`. `false` leaves every DDL statement to another process. */
+    provision?: boolean;
+}
+
 export function provisioningDisabled(env: { REBASE_MIGRATE_ON_BOOT?: string } = process.env): boolean {
     return (env.REBASE_MIGRATE_ON_BOOT || "ensure") === "none";
 }
@@ -117,7 +133,7 @@ export function provisioningDisabled(env: { REBASE_MIGRATE_ON_BOOT?: string } = 
 export async function provisionCollectionTables(
     collections: CollectionConfig[],
     target: ProvisionTarget,
-    options: { introspecting?: boolean; env?: { REBASE_MIGRATE_ON_BOOT?: string } } = {}
+    options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
     const skip = (reason: string, level: "info" | "warn" = "info"): ProvisionOutcome => {
         logger[level](`Collection schema: skipped — ${reason}`);
@@ -125,6 +141,13 @@ export async function provisionCollectionTables(
 reason };
     };
 
+    // Checked before the mode, because it answers a different question and the
+    // reader deserves the more specific reason: `REBASE_MIGRATE_ON_BOOT=none`
+    // says this deployment provisions nothing, while this says this process is
+    // not the one that does it.
+    if (options.provision === false) {
+        return skip("this process does not provision the schema — another process in this deployment owns it.");
+    }
     if (provisioningDisabled(options.env ?? process.env)) {
         return skip("REBASE_MIGRATE_ON_BOOT=none, leaving the database schema untouched.");
     }
@@ -190,8 +213,17 @@ applied };
 export async function provisionCollectionPolicies(
     collections: CollectionConfig[],
     target: ProvisionTarget,
-    options: { introspecting?: boolean; env?: { REBASE_MIGRATE_ON_BOOT?: string } } = {}
+    options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
+    if (options.provision === false) {
+        // Said out loud, unlike this function's other early returns. A missing
+        // policy is not a missing table: routes answer 200 with zero rows rather
+        // than 500, so nothing else in the logs will point here.
+        logger.info(
+            "Collection RLS policies: not applied by this process — another process in this deployment owns them."
+        );
+        return { status: "skipped", reason: "another process provisions" };
+    }
     if (provisioningDisabled(options.env ?? process.env)) {
         return { status: "skipped", reason: "REBASE_MIGRATE_ON_BOOT=none" };
     }

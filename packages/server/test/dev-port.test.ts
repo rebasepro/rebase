@@ -109,6 +109,24 @@ describe("listenWithPortRetry", () => {
         expect(parseInt(fs.readFileSync(portFile(), "utf-8").trim(), 10)).toBe(actual.port);
     });
 
+    it("reports the ephemeral port the OS chose when asked for 0", async () => {
+        // `PORT=0` is the ordinary way to say "any free port", and it is the one
+        // request that is never granted literally. Resolving with the request
+        // announced `http://localhost:0`, wrote `0` into the port file and into
+        // `.rebase/state.json`, and pointed the CLI banner, MCP discovery and any
+        // health check at a port nothing listens on.
+        const server = track(createServer());
+
+        const reported = await listenWithPortRetry(server, 0, { portFileDir: dir });
+
+        const actual = server.address();
+        if (actual === null || typeof actual === "string") throw new Error("not listening on a TCP port");
+
+        expect(reported).toBe(actual.port);
+        expect(reported).toBeGreaterThan(0);
+        expect(parseInt(fs.readFileSync(portFile(), "utf-8").trim(), 10)).toBe(actual.port);
+    });
+
     it("treats a legacy single-number port file as affinity", async () => {
         // Files written before the format carried the requested port. There is no
         // way to know what was asked for then, so the old behaviour is kept.

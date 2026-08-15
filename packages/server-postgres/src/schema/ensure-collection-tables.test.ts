@@ -250,3 +250,102 @@ describe("applying the plan", () => {
         expect(plan.actions).toEqual([]);
     });
 });
+
+/**
+ * Two instances booting into the same fresh database.
+ *
+ * These inject the error at the statement level rather than driving two real
+ * boots, and that is deliberate: the end state after a real race is usually
+ * correct anyway — one instance always finishes — so a test that only asserts
+ * the end state passes against the broken code as well as the fixed code. The
+ * defect was never "the table is missing"; it was that the throw abandoned
+ * every remaining action, so the loser skipped work it had not attempted yet.
+ */
+describe("a simultaneous boot", () => {
+    /** A driver error shaped the way node-postgres reports one, through drizzle. */
+    function pgError(code: string, extra: Record<string, unknown> = {}): Error {
+        const inner = Object.assign(new Error(`pg error ${code}`), { code, ...extra });
+        // Drizzle wraps the driver error; nothing useful is ever on the top level.
+        return Object.assign(new Error("Failed query"), { cause: inner });
+    }
+
+    /** Records every statement, and fails the first match of `failOn` once. */
+    function racingClient(
+        failOn: RegExp,
+        error: Error,
+        options: { forever?: boolean } = {}
+    ): { client: Queryable; executed: string[] } {
+        const executed: string[] = [];
+        let thrown = false;
+        return {
+            executed,
+            client: {
+                async query<T>(sql: string): Promise<{ rows: T[] }> {
+                    executed.push(sql);
+                    if (failOn.test(sql) && (options.forever || !thrown)) {
+                        thrown = true;
+                        throw error;
+                    }
+                    return { rows: [] as T[] };
+                }
+            }
+        };
+    }
+
+    it("carries on to the remaining actions when it loses a CREATE TABLE race", async () => {
+        // 42P07 duplicate_table: a peer created it between our catalog read and
+        // our write. The table exists; everything after it still has to run.
+        const { client, executed } = racingClient(/^CREATE TABLE/, pgError("42P07"), { forever: true });
+
+        const plan = await ensureCollectionTables(client, [posts]);
+
+        expect(plan.actions.length).toBeGreaterThan(0);
+        // The proof: statements that come *after* the losing one were attempted.
+        expect(executed.some(s => s.startsWith("ALTER TABLE"))).toBe(true);
+    });
+
+    it("treats a catalog unique violation as the object already existing", async () => {
+        // The one measured in practice: `CREATE TYPE` has no IF NOT EXISTS, so
+        // the loser gets 23505 on pg_type's own index.
+        const { client, executed } = racingClient(
+            /^CREATE TYPE/,
+            pgError("23505", { constraint: "pg_type_typname_nsp_index" }),
+            { forever: true }
+        );
+
+        await ensureCollectionTables(client, [posts]);
+
+        expect(executed.some(s => s.startsWith("CREATE TABLE"))).toBe(true);
+    });
+
+    it("retries a deadlock and then succeeds", async () => {
+        // 40P01: two boots taking catalog locks in step. Unlike a duplicate, the
+        // statement did nothing at all, so it must actually be run again.
+        const { client, executed } = racingClient(/^CREATE TABLE/, pgError("40P01"));
+
+        await ensureCollectionTables(client, [posts]);
+
+        expect(executed.filter(s => s.startsWith("CREATE TABLE")).length).toBeGreaterThan(1);
+    });
+
+    it("still fails loudly on a unique violation from the customer's own data", async () => {
+        // A named constraint, not a `pg_` catalog index — this is a real problem
+        // with real rows and must not be swallowed as "someone beat me to it".
+        // It is still retried first, because 23505 is in the retryable set and
+        // this shape cannot be told from a race until the constraint name is
+        // read; what matters is that it ends in a throw rather than a shrug.
+        const { client } = racingClient(
+            /^CREATE TABLE/,
+            pgError("23505", { constraint: "posts_slug_key" }),
+            { forever: true }
+        );
+
+        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
+    });
+
+    it("still fails loudly on a permission error", async () => {
+        const { client } = racingClient(/^CREATE TABLE/, pgError("42501"), { forever: true });
+
+        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
+    });
+});

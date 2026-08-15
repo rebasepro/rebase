@@ -47,6 +47,14 @@ import { initializeStorage, assertStorageAccessControlConfigured } from "./init/
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
+import {
+    ALL_RUNTIME_SURFACES,
+    disabledSurfaces,
+    resolveOwnership,
+    resolveSurfaces,
+    type RuntimeOwnershipOptions,
+    type RuntimeSurfaceOptions
+} from "./init/surfaces";
 import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { configureJwt, hasAsymmetricSigningKey, isJwtConfigured, requireAdmin } from "./auth";
 import { createJwksRoutes } from "./auth/jwks-routes";
@@ -453,6 +461,43 @@ export interface RebaseBackendConfig {
      */
     history?: HistoryConfig;
     enableSwagger?: boolean;
+    /**
+     * Which HTTP surfaces this process mounts. Every one, unless named.
+     *
+     * The point of naming a subset is to run the same bundle as several
+     * cooperating processes — one answering `/api/data`, another `/api/functions`
+     * — so a custom function that pins the event loop does not do it in the
+     * process serving the data API. `bootFromBundle` derives this from
+     * `REBASE_ROLE`; passing it directly is for tests and for embedders.
+     *
+     * Omitting it, or naming only some surfaces, leaves the rest mounted. That
+     * default is deliberate: a surface added in a later version is served by
+     * every existing deployment without anyone editing a list.
+     */
+    /**
+     * Whether this process provisions the collection schema and its RLS
+     * policies at boot. Default `true` — what every deployment does today.
+     *
+     * `false` on every process but one in a split deployment: `CREATE … IF NOT
+     * EXISTS` reads the catalog and then writes to it, so N processes racing to
+     * provision the same schema is a state nobody designed. `bootFromBundle`
+     * derives it from `REBASE_ROLE`.
+     */
+    provisionSchema?: boolean;
+    surfaces?: RuntimeSurfaceOptions;
+    /**
+     * Which background singletons this process runs. All of them, unless named.
+     *
+     * Separate from {@link surfaces} because "which URLs answer" and "which
+     * timers fire" are independent: a process can serve the cron *admin* surface
+     * without being the one that fires the jobs, and vice versa.
+     *
+     * Neither is a correctness control — the cron scheduler claims each
+     * `(job, slot)` pair and the job store claims rows `FOR UPDATE SKIP LOCKED`,
+     * so running several of each is already safe. It is about not handing
+     * scheduled work to a process whose replica count is a scaling decision.
+     */
+    ownership?: RuntimeOwnershipOptions;
     functionsDir?: string;
     /**
      * Per-request ceiling for `/api/functions/*`, in milliseconds.
@@ -465,6 +510,24 @@ export interface RebaseBackendConfig {
      * cancelled, so give outbound calls an `AbortSignal`.
      */
     functionsTimeoutMs?: number;
+    /**
+     * Serve only some of the bundle's functions.
+     *
+     * How one expensive function gets its own replica count and its own blast
+     * radius without its code moving anywhere. `bootFromBundle` fills this from
+     * `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
+     *
+     * A name that is not in the bundle fails the boot — see `selectFunctions`.
+     */
+    functionsSelection?: import("./functions/selection").FunctionSelection;
+    /**
+     * Forward `/api/functions/*` to another process instead of serving it here.
+     *
+     * Only consulted when the `functions` surface is off — a process that serves
+     * them has nothing to forward. `bootFromBundle` fills this from
+     * `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
+     */
+    functionsUpstream?: string;
     cronsDir?: string;
     /**
      * Enable/disable database persistence for cron job execution logs.
@@ -716,6 +779,24 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const basePath = config.basePath || "/api";
     const isProduction = process.env.NODE_ENV === "production";
 
+    // What this process serves, and what it owns. Both default to everything,
+    // so a caller that passes neither boots the process this server has always
+    // booted. Resolved here, before anything mounts, so every gate below reads
+    // one already-decided answer rather than re-deriving it from optionals.
+    const surfaces = resolveSurfaces(config.surfaces);
+    const ownership = resolveOwnership(config.ownership);
+    const offSurfaces = disabledSurfaces(surfaces);
+    if (offSurfaces.length > 0) {
+        // Said once, at info: a request answering 404 because this process was
+        // never meant to serve it is indistinguishable, from the client side,
+        // from a broken deployment. This line is the only thing that tells the
+        // difference, so it must not be at debug.
+        logger.info("Partial runtime surface — some routes are not served by this process", {
+            serving: ALL_RUNTIME_SURFACES.filter(surface => surfaces[surface]),
+            notServing: offSurfaces
+        });
+    }
+
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
 
@@ -809,7 +890,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
 
     const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
-        introspecting: introspectCollections
+        introspecting: introspectCollections,
+        provision: config.provisionSchema ?? true
     });
 
     // 1. Initialize all drivers
@@ -1045,7 +1127,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // servable either, so skipping this half only changes the symptom from a 500
     // to an empty result.
     await provisionCollectionPolicies(provisionable, provisionTarget, {
-        introspecting: introspectCollections
+        introspecting: introspectCollections,
+        provision: config.provisionSchema ?? true
     });
 
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
@@ -1111,11 +1194,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const apiKeyPreAuth = apiKeyStore
         ? createApiKeyPreAuth({ store: apiKeyStore, driver: defaultDriver })
         : undefined;
-    if (apiKeyPreAuth) {
+    if (apiKeyPreAuth && surfaces.admin) {
         config.app.use(`${basePath}/admin/*`, apiKeyPreAuth);
     }
 
-    if (apiKeyStore) {
+    if (apiKeyStore && surfaces.admin) {
         // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
@@ -1223,7 +1306,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // ── Mount auth & admin routes via the adapter ────────────────────
-        if (authAdapter && authAdapter.createAuthRoutes) {
+        if (authAdapter && authAdapter.createAuthRoutes && surfaces.auth) {
             const authRoutes = authAdapter.createAuthRoutes();
             if (authRoutes) {
                 config.app.route(`${basePath}/auth`, authRoutes);
@@ -1231,7 +1314,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         }
 
-        if (authAdapter && authAdapter.createAdminRoutes) {
+        if (authAdapter && authAdapter.createAdminRoutes && surfaces.admin) {
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) {
                 config.app.route(`${basePath}/admin`, adminRoutes);
@@ -1246,7 +1329,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // an empty key set when none are asymmetric — "this issuer publishes no
     // public keys" is a fact a verifier can act on, where a 404 is
     // indistinguishable from a wrong URL.
-    if (isJwtConfigured()) {
+    // Gated with the auth surface: a process that does not issue tokens has no
+    // key set to publish, and serving an empty one from a functions-only
+    // replica would tell a verifier the issuer has no public keys.
+    if (isJwtConfigured() && surfaces.auth) {
         config.app.route("/.well-known", createJwksRoutes());
         if (hasAsymmetricSigningKey()) {
             logger.info("Access tokens are signed asymmetrically; public keys at /.well-known/jwks.json");
@@ -1382,7 +1468,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
-    {
+    if (surfaces.admin) {
         // Gate a *fresh* router, then mount the routes into it. Hono collects
         // matching handlers in registration order, so a `use("/*")` appended to
         // an already-populated router runs after the handler it was meant to
@@ -1515,7 +1601,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }));
 
         storageRouter.route("/", storageRoutes);
-        config.app.route(`${basePath}/storage`, storageRouter);
+        // Only the HTTP surface is optional. The controller, the registry and
+        // the access-control boot guard above are not: a process that serves no
+        // storage routes still hands `rebase.storage` to every function it runs.
+        if (surfaces.storage) config.app.route(`${basePath}/storage`, storageRouter);
     } else {
         // No storage backend: say so, instead of 404ing as if the route were a
         // typo. A bare 404 reads as "wrong URL" and sends people debugging
@@ -1534,8 +1623,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 code: "STORAGE_NOT_CONFIGURED"
             }
         }, 501));
-        config.app.route(`${basePath}/storage`, storageStub);
-        logger.info("Storage not configured — /storage returns 501 STORAGE_NOT_CONFIGURED");
+        if (surfaces.storage) {
+            config.app.route(`${basePath}/storage`, storageStub);
+            logger.info("Storage not configured — /storage returns 501 STORAGE_NOT_CONFIGURED");
+        }
     }
 
     // Only the server-mediated collections get a backend surface. Collections
@@ -1670,11 +1761,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         );
         dataRouter.route("/", restGenerator.generateRoutes());
 
-        config.app.route(`${basePath}/data`, dataRouter);
+        // As with storage: the registry, the generator and the driver wiring are
+        // built either way, because the singleton's data plane and every custom
+        // function read through them. Only the HTTP mount is conditional.
+        if (surfaces.data) config.app.route(`${basePath}/data`, dataRouter);
     }
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
-    await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth));
+    // Follows the data surface: the document describes the collection routes, so
+    // a process that does not serve them would publish a spec for URLs it 404s.
+    if (surfaces.data) {
+        await mountOpenApiDocs(config.app, basePath, config.enableSwagger, serverCollections, resolveRequireAuth(config.auth));
+    }
 
     // ─── Server-side singleton ────────────────────────────────────────────
     // Build the RebaseClient for control-plane APIs (auth, admin, storage,
@@ -1833,12 +1931,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     // 5. Mount Custom Functions
-    if (config.functionsDir) {
+    //
+    // Gated on the surface before the loader runs, not after: importing a
+    // project's function modules has side effects the author chose (a client
+    // constructed at module scope, a connection opened), and a process that will
+    // never serve them should not be paying for or triggering any of it.
+    if (config.functionsDir && surfaces.functions) {
         const { loadFunctionsWithDiagnostics } = await import("./functions/function-loader");
         const { createFunctionRoutes } = await import("./functions/function-routes");
         const { createFunctionsRequestTimeout, resolveFunctionsTimeoutMs } = await import("./functions/request-timeout");
 
-        const { functions: loadedFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+        const { functions: allFunctions, problems } = await loadFunctionsWithDiagnostics(config.functionsDir);
+
+        // A subset, when this process was told to serve one. Applied after the
+        // load rather than before it so an unknown name can be reported against
+        // what the bundle actually contains — the list is the whole value of
+        // that error message.
+        const { selectFunctions } = await import("./functions/selection");
+        const loadedFunctions = selectFunctions(allFunctions, config.functionsSelection);
+        if (loadedFunctions.length !== allFunctions.length) {
+            logger.info("Serving a subset of this bundle's functions", {
+                serving: loadedFunctions.map(fn => fn.name),
+                notServing: allFunctions
+                    .filter(fn => !loadedFunctions.includes(fn))
+                    .map(fn => fn.name)
+            });
+        }
 
         // Mounted for the directory, not for the functions in it — the same
         // correction the cron router carries ninety lines down, which was never
@@ -1927,9 +2045,33 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // 5a. Or forward them, when another process serves them.
+    //
+    // Mutually exclusive with mounting: a process either serves these routes or
+    // hands them on, and a deployment that configured both would have the local
+    // copy silently win. The `surfaces.functions` check is what makes that
+    // impossible rather than merely unlikely.
+    if (config.functionsUpstream && !surfaces.functions) {
+        const { createFunctionsProxy } = await import("./functions/proxy");
+        config.app.route(`${basePath}/functions`, createFunctionsProxy({
+            upstream: config.functionsUpstream,
+            basePath: `${basePath}/functions`
+        }));
+        logger.info("Forwarding custom functions to another process", {
+            path: `${basePath}/functions`,
+            upstream: config.functionsUpstream
+        });
+    }
+
     // 6. Mount Cron Jobs
+    //
+    // Two independent questions, and this block answers both: whether the cron
+    // *admin surface* is served (`surfaces.cron`), and whether this process is
+    // one of the ones whose timers fire (`ownership.cronScheduler`). A process
+    // that is neither does not even load the job files — importing them runs
+    // whatever the author put at module scope.
     let cronScheduler: import("./cron").CronScheduler | undefined;
-    if (config.cronsDir) {
+    if (config.cronsDir && (surfaces.cron || ownership.cronScheduler)) {
         const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
@@ -1969,9 +2111,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         applyAdminGate(cronRouter, "Cron");
 
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
-        config.app.route(`${basePath}/cron`, cronRouter);
+        if (surfaces.cron) config.app.route(`${basePath}/cron`, cronRouter);
 
-        if (loadedCronJobs.length > 0) {
+        if (loadedCronJobs.length > 0 && !ownership.cronScheduler) {
+            // Registered but not started. The admin surface still lists the jobs
+            // and can trigger one by hand — which is the point of serving `/cron`
+            // from a process that does not schedule: a person looking at the
+            // Studio panel sees the same jobs the worker is running.
+            logger.info("Cron jobs registered but NOT scheduled in this process", {
+                count: loadedCronJobs.length,
+                reason: "this process does not own the cron scheduler"
+            });
+        } else if (loadedCronJobs.length > 0) {
             cronScheduler.start();
             logger.info("Mounted cron jobs", {
                 count: loadedCronJobs.length,
@@ -1999,8 +2150,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (store) {
             await store.ensureTable();
             jobQueue = createJobQueue(store, config.jobs);
-            jobQueue.start();
-            logger.info("Job queue started", { tasks: Object.keys(config.jobs.tasks ?? {}).length });
+            // Constructed either way, started only where this process owns the
+            // workers: `rebase.jobs.enqueue` must keep working in a process that
+            // runs none of them. Enqueueing is a write to a table; running is a
+            // poll loop, and only the second is what "owning" means here.
+            if (ownership.jobWorkers) {
+                jobQueue.start();
+                logger.info("Job queue started", { tasks: Object.keys(config.jobs.tasks ?? {}).length });
+            } else {
+                logger.info("Job queue available for enqueue, workers NOT started in this process", {
+                    tasks: Object.keys(config.jobs.tasks ?? {}).length
+                });
+            }
         } else {
             // `createJobStore` already said why. What it cannot say is what the
             // caller should expect instead, which depends on who asked.
@@ -2014,7 +2175,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 6b. Mount Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
     // rebuild. Only enabled when BACKUP_DESTINATION is set.
-    {
+    if (surfaces.admin) {
         const { createBackupRoutes, parseBackupDestination } = await import("./backup");
         const backupRouter = new Hono<HonoEnv>();
 
@@ -2034,7 +2195,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // 6c. Mount Logs routes (for the Studio Logs Explorer). Request logs expose
     // paths, status codes and correlation IDs, so they are admin-only — the same
     // posture as the cron and backup admin routes above.
-    {
+    if (surfaces.admin) {
         const { default: logsRoutes } = await import("./api/logs-routes");
         const logsRouter = new Hono<HonoEnv>();
 
@@ -2053,7 +2214,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Mounted here rather than by the bundle runtime so a project with a
     // hand-written entrypoint gets it too: ejecting should cost you the stock
     // runtime, not the API surface.
-    {
+    if (surfaces.meta) {
         const { createContractRoutes } = await import("./api/contract-routes");
         const contractRouter = new Hono<HonoEnv>();
 

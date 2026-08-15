@@ -29,6 +29,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { revokeInternalTableSql } from "@rebasepro/common";
+import { drizzleDdlBootstrapper } from "../schema/drizzle-ddl";
 
 /** A tracked client, as any instance sees it. */
 export interface PresenceRow {
@@ -45,17 +46,34 @@ export class ChannelPresenceStore {
         private readonly instanceId: string
     ) {}
 
-    /** Create the roster table. Idempotent. */
+    /**
+     * Create the roster table. Idempotent, and safe to run on every instance at
+     * once.
+     *
+     * Written as separate contained steps rather than one straight sequence for
+     * a reason that only bites with more than one replica, which is exactly the
+     * deployment shape this table exists to serve: `CREATE … IF NOT EXISTS`
+     * reads the catalog and then writes to it non-atomically, so peers booting
+     * together collide, and the loser used to abandon everything after it —
+     * including the trailing `REVOKE`. That revoke is the only thing keeping the
+     * roster off the end-user role, so losing a boot race silently left the
+     * whole channel roster readable by every signed-in user.
+     *
+     * `tablesReady` is now set from a probe of what exists, not from having been
+     * the instance that created it.
+     */
     async ensureTables(): Promise<void> {
         if (this.tablesReady) return;
 
-        await this.db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
+        const ddl = drizzleDdlBootstrapper(this.db, "channel-presence");
+
+        await ddl.ensureObject("rebase schema", "CREATE SCHEMA IF NOT EXISTS rebase");
 
         // Keyed by (channel, client_id): a client id is globally unique, so the
         // instance is a column rather than part of the identity — a client that
         // reconnects onto another replica replaces its own row instead of
         // appearing twice in the roster.
-        await this.db.execute(sql`
+        await ddl.ensureObject("channel_presence table", `
             CREATE TABLE IF NOT EXISTS rebase.channel_presence (
                 channel TEXT NOT NULL,
                 client_id TEXT NOT NULL,
@@ -67,7 +85,7 @@ export class ChannelPresenceStore {
         `);
 
         // The sweep's access path; the roster read rides the primary key.
-        await this.db.execute(sql`
+        await ddl.ensureObject("channel_presence last_seen index", `
             CREATE INDEX IF NOT EXISTS idx_channel_presence_last_seen
             ON rebase.channel_presence (last_seen)
         `);
@@ -82,9 +100,15 @@ export class ChannelPresenceStore {
         // see `docs/channel-authorization.md` for what it does *not*
         // yet decide. Revoke the schema-wide grant the driver handed out
         // before this table existed.
-        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_presence")));
-
-        this.tablesReady = true;
+        //
+        // Driven off the probe, not off who won the create: the privilege has to
+        // come off whether this instance created the table or found it.
+        if (await ddl.isReadable("rebase.channel_presence")) {
+            await ddl.step("channel_presence revoke", () =>
+                this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_presence")))
+            );
+            this.tablesReady = true;
+        }
     }
 
     /** Record (or refresh) a client's presence. */

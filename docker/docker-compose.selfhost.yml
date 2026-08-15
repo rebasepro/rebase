@@ -105,5 +105,75 @@ services:
     ports:
       - "${PORT:-8080}:8080"
 
+  # ── Running functions in their own process ─────────────────────────────────
+  #
+  # Everything above is one container serving the whole project, which is the
+  # right shape for almost every deployment. Uncomment the two services below —
+  # and set REBASE_ROLE + REBASE_FUNCTIONS_UPSTREAM on `api` — when a custom
+  # function should stop competing with the data API for the event loop, or
+  # should scale, restart and fail on its own.
+  #
+  # Same image, same bundle, same database. Only the environment differs.
+  #
+  #   docker compose up --scale functions=3
+  #
+  # On `api`, add:
+  #     REBASE_ROLE: api
+  #     REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
+  #
+  # `api` then forwards /api/functions/* rather than serving it, so clients and
+  # generated SDKs see exactly the URL surface they saw before the split.
+  #
+  # functions:
+  #   image: rebasepro/server:${REBASE_VERSION:-latest}
+  #   restart: unless-stopped
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     REBASE_ROLE: functions
+  #     # Required. One process provisions the schema, and that is `api`.
+  #     # Booting without this is refused rather than raced.
+  #     REBASE_MIGRATE_ON_BOOT: none
+  #     # The api process appends the caller's address to X-Forwarded-For, so
+  #     # this process sits behind one more proxy hop than the api does. Without
+  #     # it, every forwarded request looks like it came from the api container
+  #     # and all callers share a single rate-limit bucket.
+  #     TRUSTED_PROXY_HOPS: 1
+  #     DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+  #     CORS_ORIGINS: ${CORS_ORIGINS}
+  #     PORT: 8080
+  #     # Serve one function per replica set, when one of them is the expensive
+  #     # one. A name that is not in the bundle refuses to boot.
+  #     # REBASE_FUNCTIONS_ONLY: send-invoice
+  #   volumes:
+  #     - ../dist-bundle:/bundle
+  #
+  # A third process, for taking cron and the job queue off the request path
+  # entirely. Optional: `api` runs both by default, and both are already safe to
+  # run in several processes at once — cron claims each (job, slot) pair and the
+  # job queue claims rows FOR UPDATE SKIP LOCKED. Add `REBASE_CRON_SCHEDULER:
+  # "false"` and `REBASE_JOB_WORKERS: "false"` to the api service if you want
+  # this one to be the only place scheduled work runs.
+  #
+  # worker:
+  #   image: rebasepro/server:${REBASE_VERSION:-latest}
+  #   restart: unless-stopped
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   environment:
+  #     REBASE_ROLE: worker
+  #     REBASE_MIGRATE_ON_BOOT: none
+  #     DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+  #     JWT_SECRET: ${JWT_SECRET}
+  #     REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+  #     CORS_ORIGINS: ${CORS_ORIGINS}
+  #     PORT: 8080
+  #   volumes:
+  #     - ../dist-bundle:/bundle
+
 volumes:
   db-data:

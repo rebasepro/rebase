@@ -272,7 +272,22 @@ export type { ShutdownHandlerOptions } from "./init/shutdown";
 // used to hand-write in `backend/src/index.ts`.
 // =============================================================================
 export { bootFromBundle, runFromBundle } from "./boot/boot";
-export type { BootedRuntime, BootOptions } from "./boot/boot";
+export type { BootedRuntime, BootOptions, SchemaProvisioningOptions } from "./boot/boot";
+
+// Concurrent-DDL classification, exported for the drivers.
+//
+// `CREATE … IF NOT EXISTS` reads the catalog and then writes to it, so instances
+// booting together do collide — measured at 8 losses in 10 with five peers. A
+// driver applying a schema plan needs the same classification the server's own
+// bootstraps use, and a second copy of the SQLSTATE list in each driver is
+// exactly how the two drift.
+export {
+    createDdlBootstrapper,
+    isConcurrentDdlRace,
+    isDuplicateObjectRace,
+    CONCURRENT_DDL_SQLSTATES
+} from "./boot/ddl-bootstrap";
+export type { DdlBootstrapper, SqlExec } from "./boot/ddl-bootstrap";
 export {
     BundleError,
     loadBundle,

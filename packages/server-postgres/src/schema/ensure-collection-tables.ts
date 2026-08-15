@@ -27,7 +27,7 @@
  */
 import { type CollectionConfig, type Property, isPostgresCollectionConfig } from "@rebasepro/types";
 import { getTableName, relationalCollections } from "@rebasepro/common";
-import { logger } from "@rebasepro/server";
+import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
 import {
     assertSearchIsPostgresOnly,
     buildSearchColumnSpec,
@@ -800,8 +800,11 @@ export async function ensureCollectionTables(
 
     for (const action of plan.actions) {
         try {
-            await client.query(action.sql);
-            log?.(`${action.kind}: ${action.target}`);
+            if (await applyAction(client, action)) {
+                log?.(`${action.kind}: ${action.target}`);
+            } else {
+                log?.(`${action.kind}: ${action.target} (already created by a peer)`);
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             // A foreign key is the only action that can fail on the customer's
@@ -824,4 +827,63 @@ export async function ensureCollectionTables(
         }
     }
     return { ...plan, failures };
+}
+
+/** Attempts per action, including the first. Matches the server's bootstraps. */
+const DDL_ATTEMPTS = 4;
+
+/**
+ * Run one planned statement, surviving a simultaneous boot.
+ *
+ * Every statement in a plan is written to be idempotent, and that is not the
+ * same as being safe to run concurrently: `CREATE … IF NOT EXISTS` reads the
+ * catalog and then writes to it as two steps, so peers starting together both
+ * see "absent" and the loser gets a duplicate key on a *catalog* index. Measured
+ * against Postgres 18: five instances, 8 of 10 calls lost. `CREATE TYPE` is
+ * worse, because Postgres has no `IF NOT EXISTS` for it at all.
+ *
+ * What made that fatal here rather than merely noisy is the loop this sits in.
+ * A losing statement threw, and the throw abandoned **every remaining action in
+ * the plan** — so a replica that lost one race came up missing tables it never
+ * attempted, and the boot log blamed the one statement that failed.
+ *
+ * @returns `true` if this process applied the statement, `false` if a peer had
+ *   already created the object. The distinction is only for the log; both mean
+ *   the object is now there.
+ * @throws the original error for anything that is not a race — a syntax error, a
+ *   permission failure, a unique constraint the customer's own rows violate.
+ */
+async function applyAction(
+    client: Queryable,
+    action: EnsureAction
+): Promise<boolean> {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await client.query(action.sql);
+            return true;
+        } catch (err) {
+            // Already there. Not "retry" — the end state this statement wanted
+            // is the end state the database is in, so carry on to the next
+            // action rather than spending three more attempts proving it.
+            if (isDuplicateObjectRace(err)) {
+                logger.debug(
+                    `[schema] ${action.kind} ${action.target}: already created by another instance`
+                );
+                return false;
+            }
+            // Retryable but not yet satisfied — a deadlock between two boots
+            // taking catalog locks in step. The statement did nothing; run it
+            // again after a jittered pause so peers that collided once do not
+            // collide again in lockstep.
+            if (isConcurrentDdlRace(err) && attempt < DDL_ATTEMPTS) {
+                logger.debug(
+                    `[schema] ${action.kind} ${action.target}: lost a race with another instance ` +
+                    `(attempt ${attempt}/${DDL_ATTEMPTS}) — retrying`
+                );
+                await new Promise(resolve => setTimeout(resolve, 40 * attempt * (1 + Math.random())));
+                continue;
+            }
+            throw err;
+        }
+    }
 }

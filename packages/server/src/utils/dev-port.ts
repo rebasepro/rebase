@@ -12,6 +12,7 @@
  * This module is dev-only and should never run in production.
  */
 import type { Server } from "http";
+import type { AddressInfo } from "net";
 import path from "path";
 import fs from "fs";
 
@@ -63,7 +64,8 @@ export function listenWithPortRetry(
             server.once("error", onError);
             server.listen(startPort, host, () => {
                 server.removeListener("error", onError);
-                resolve(startPort);
+                // Same reason as the dev path below: `startPort` may be `0`.
+                resolve(boundPort(server) ?? startPort);
             });
         });
     }
@@ -142,6 +144,20 @@ export function listenWithPortRetry(
             const onListening = () => {
                 cleanup();
 
+                // Ask the socket, do not assume the request was granted.
+                //
+                // `port` here is what we *asked* for, and for one legitimate
+                // value that is not what we got: `0` means "any free port", so
+                // the OS picks one and the request itself is never a real
+                // address. Resolving with the request announced
+                // `http://localhost:0`, wrote `0` into the port file and into
+                // `.rebase/state.json`, and every consumer of those — the CLI's
+                // banner, MCP discovery, a health check — then pointed at a port
+                // nothing listens on. This is the same class as the retry bug
+                // documented above (announcing a port we are not on); the fix is
+                // the same in both: the socket is the only thing that knows.
+                const bound = boundPort(server) ?? port;
+
                 // Write the port file so the CLI can pick it up
                 if (portFileDir) {
                     try {
@@ -149,17 +165,17 @@ export function listenWithPortRetry(
                         // Bound port first so `parseInt` still yields it, then the
                         // port that was requested — that is what makes the affinity
                         // above conditional rather than absolute.
-                        fs.writeFileSync(portFile, `${port} ${startPort}`, "utf-8");
+                        fs.writeFileSync(portFile, `${bound} ${startPort}`, "utf-8");
                     } catch {
                         // Non-fatal — the CLI will fall back to parsing stdout
                     }
 
                     // Write .rebase/state.json so external scripts can discover
                     // the running server port, URL, etc.
-                    writeStateFile(portFileDir, port, options?.serviceKey);
+                    writeStateFile(portFileDir, bound, options?.serviceKey);
                 }
 
-                resolve(port);
+                resolve(bound);
             };
 
             const onError = (err: NodeJS.ErrnoException) => {
@@ -248,4 +264,17 @@ function writeStateFile(projectRoot: string, port: number, serviceKey?: string):
     } catch {
         // Non-fatal
     }
+}
+
+/**
+ * The port a server is actually listening on, or `undefined` if it cannot say.
+ *
+ * `Server.address()` returns a string for a UNIX socket and `null` before the
+ * socket is bound, so neither is a port and both fall back to the caller's own
+ * answer rather than being coerced into a number.
+ */
+function boundPort(server: Server): number | undefined {
+    const address = server.address();
+    if (!address || typeof address === "string") return undefined;
+    return (address as AddressInfo).port;
 }
