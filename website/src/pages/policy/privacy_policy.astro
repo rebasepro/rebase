@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import '../../styles/legal.css';
 
 const title = "Rebase Privacy Policy";
 const description = "Learn how Rebase handles your data and protects your privacy.";
@@ -13,16 +14,12 @@ const breadcrumbs = [
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
 
 
-    <div class="mx-auto max-w-7xl">
-        <div><strong><span
-                style="font-size: 26px;"><span>PRIVACY NOTICE</span></span></strong>
-        </div>
-        <div><br></div>
-        <div><span><strong><span>Last updated April 10, 2023</span></strong></span>
-        </div>
-        <div><br></div>
-        <div><br></div>
-        <div><br></div>
+    <div class="px-6 pb-24 pt-14 sm:px-8 md:pb-32 md:pt-20">
+        <article class="legal-doc">
+            <header class="legal-doc__header">
+                <h1 class="legal-doc__title">PRIVACY NOTICE</h1>
+                <p class="legal-doc__meta">Last updated April 10, 2023</p>
+            </header>
         <div><span>This privacy notice for Rebase, S.L. ("<strong>Company</strong>," "<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>"</span><span>), describes how and why we might collect, store, use, and/or share ("<strong>process</strong>") your information when you use our services ("<strong>Services</strong>"), such as when you:</span>
         </div>
         <ul>
@@ -40,91 +37,92 @@ const breadcrumbs = [
             </div>
             <div><br></div>
             <div><br></div>
-            <div><strong><span>SUMMARY OF KEY POINTS</span></strong></div>
+            <h2 id="summary">SUMMARY OF KEY POINTS</h2>
             <div><br></div>
-            <div><span><strong><em>This summary provides key points from our privacy notice, but you can find out more details about any of these topics by clicking the link following each key point or by using our table of contents below to find the section you are looking for. You can also click&nbsp;</em></strong></span><a><span><strong><em>here</em></strong></span></a><span><strong><em>&nbsp;to go directly to our table of contents.</em></strong></span>
+            <div><span><strong><em>This summary provides key points from our privacy notice, but you can find out more details about any of these topics by clicking the link following each key point or by using our table of contents below to find the section you are looking for. You can also click&nbsp;</em></strong></span><a href="#toc"><span><strong><em>here</em></strong></span></a><span><strong><em>&nbsp;to go directly to our table of contents.</em></strong></span>
             </div>
             <div><br></div>
-            <div><span><strong>What personal information do we process?</strong> When you visit, use, or navigate our Services, we may process personal information depending on how you interact with Rebase and the Services, the choices you make, and the products and features you use. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+            <div><span><strong>What personal information do we process?</strong> When you visit, use, or navigate our Services, we may process personal information depending on how you interact with Rebase and the Services, the choices you make, and the products and features you use. Click&nbsp;</span><a href="#infocollect"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
             <div>
-                <span><strong>Do we process any sensitive personal information?</strong> We may process sensitive personal information when necessary with your consent or as otherwise permitted by applicable law. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+                <span><strong>Do we process any sensitive personal information?</strong> We may process sensitive personal information when necessary with your consent or as otherwise permitted by applicable law. Click&nbsp;</span><a href="#infocollect"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
             <div>
                 <span><strong>Do we receive any information from third parties?</strong> We do not receive any information from third parties.</span>
             </div>
             <div><br></div>
-            <div><span><strong>How do we process your information?</strong> We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. We process your information only when we have a valid legal reason to do so. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+            <div><span><strong>How do we process your information?</strong> We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent. We process your information only when we have a valid legal reason to do so. Click&nbsp;</span><a href="#infouse"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
-            <div><span><strong>In what situations and with which parties do we share personal information?</strong> We may share information in specific situations and with specific third parties. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+            <div><span><strong>In what situations and with which parties do we share personal information?</strong> We may share information in specific situations and with specific third parties. Click&nbsp;</span><a href="#whoshare"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
-            <div><span><strong>How do we keep your information safe?</strong> We have organizational and technical processes and procedures in place to protect your personal information. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other unauthorized third parties will not be able to defeat our security and improperly collect, access, steal, or modify your information. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+            <div><span><strong>How do we keep your information safe?</strong> We have organizational and technical processes and procedures in place to protect your personal information. However, no electronic transmission over the internet or information storage technology can be guaranteed to be 100% secure, so we cannot promise or guarantee that hackers, cybercriminals, or other unauthorized third parties will not be able to defeat our security and improperly collect, access, steal, or modify your information. Click&nbsp;</span><a href="#infosafe"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
-            <div><span><strong>What are your rights?</strong> Depending on where you are located geographically, the applicable privacy law may mean you have certain rights regarding your personal information. Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to learn more.</span>
+            <div><span><strong>What are your rights?</strong> Depending on where you are located geographically, the applicable privacy law may mean you have certain rights regarding your personal information. Click&nbsp;</span><a href="#privacyrights"><span>here</span></a><span>&nbsp;to learn more.</span>
             </div>
             <div><br></div>
             <div><span><strong>How do I exercise my rights?</strong> The easiest way to exercise your rights is by contacting us. We will consider and act upon any request in accordance with applicable data protection laws.</span>
             </div>
             <div><br></div>
-            <div><span>Want to learn more about what Rebase does with any information we collect? Click&nbsp;</span><a><span>here</span></a><span>&nbsp;to review the notice in full.</span>
+            <div><span>Want to learn more about what Rebase does with any information we collect? Click&nbsp;</span><a href="#toc"><span>here</span></a><span>&nbsp;to review the notice in full.</span>
             </div>
             <div><br></div>
             <div><br></div>
-            <div><span><strong><span>TABLE OF CONTENTS</span></strong></span></div>
-            <div><br></div>
-            <div><span><a><span>1. WHAT INFORMATION DO WE COLLECT?</span></a></span>
+            <h2 id="toc">TABLE OF CONTENTS</h2>
+            <nav class="legal-doc__toc" aria-label="Sections of this privacy notice">
+            <div><span><a href="#infocollect"><span>1. WHAT INFORMATION DO WE COLLECT?</span></a></span>
             </div>
             <div>
-                <span><a><span>2. HOW DO WE PROCESS YOUR INFORMATION?</span></a></span>
+                <span><a href="#infouse"><span>2. HOW DO WE PROCESS YOUR INFORMATION?</span></a></span>
             </div>
-            <div><span><a><span>3. <span>WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR PERSONAL INFORMATION?</span></span></a></span>
+            <div><span><a href="#legalbases"><span>3. <span>WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR PERSONAL INFORMATION?</span></span></a></span>
             </div>
-            <div><span><a>4. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?</a></span>
+            <div><span><a href="#whoshare">4. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?</a></span>
             </div>
-            <div><span><a><span>5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</span></a></span>
-            </div>
-            <div>
-                <span><a><span>6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?</span></a></span>
+            <div><span><a href="#cookies"><span>5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</span></a></span>
             </div>
             <div>
-                <span><a><span>7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?</span></a></span>
-            </div>
-            <div><span><a><span>8. HOW LONG DO WE KEEP YOUR INFORMATION?</span></a></span>
-            </div>
-            <div><span><a><span>9. HOW DO WE KEEP YOUR INFORMATION SAFE?</span></a></span>
+                <span><a href="#sociallogins"><span>6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?</span></a></span>
             </div>
             <div>
-                <span><a><span>10. DO WE COLLECT INFORMATION FROM MINORS?</span></a></span>
+                <span><a href="#intltransfers"><span>7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?</span></a></span>
             </div>
-            <div><span><a>11. WHAT ARE YOUR PRIVACY RIGHTS?</a></span></div>
-            <div>
-                <span><a><span>12. CONTROLS FOR DO-NOT-TRACK FEATURES</span></a></span>
+            <div><span><a href="#inforetain"><span>8. HOW LONG DO WE KEEP YOUR INFORMATION?</span></a></span>
             </div>
-            <div><span><a><span>13. DO CALIFORNIA RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?</span></a></span>
+            <div><span><a href="#infosafe"><span>9. HOW DO WE KEEP YOUR INFORMATION SAFE?</span></a></span>
             </div>
             <div>
-                <span><a><span>14. DO WE MAKE UPDATES TO THIS NOTICE?</span></a></span>
+                <span><a href="#infominors"><span>10. DO WE COLLECT INFORMATION FROM MINORS?</span></a></span>
+            </div>
+            <div><span><a href="#privacyrights">11. WHAT ARE YOUR PRIVACY RIGHTS?</a></span></div>
+            <div>
+                <span><a href="#DNT"><span>12. CONTROLS FOR DO-NOT-TRACK FEATURES</span></a></span>
+            </div>
+            <div><span><a href="#caresidents"><span>13. DO CALIFORNIA RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?</span></a></span>
+            </div>
+            <div>
+                <span><a href="#policyupdates"><span>14. DO WE MAKE UPDATES TO THIS NOTICE?</span></a></span>
             </div>
             <div><a href="#contact"><span>15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</span></a>
             </div>
             <div><a href="#request"><span>16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?</span></a>
             </div>
+            </nav>
             <div><br></div>
             <div>
-                <span><strong><span>1. WHAT INFORMATION DO WE COLLECT?</span></strong></span>
+                <h2 id="infocollect">1. WHAT INFORMATION DO WE COLLECT?</h2>
             </div>
             <div><br></div>
             <div>
-                <span><strong>Personal information you disclose to us</strong></span>
+                <h3>Personal information you disclose to us</h3>
             </div>
             <div>
                 <div><br></div>
-                <div>
+                <div class="legal-doc__short">
                     <span><strong><em>In Short:</em></strong></span><span><strong><em>&nbsp;</em></strong><em>We collect personal information that you provide to us.</em></span>
                 </div>
             </div>
@@ -169,11 +167,11 @@ const breadcrumbs = [
             <div><span>All personal information that you provide to us must be true, complete, and accurate, and you must notify us of any changes to such personal information.</span>
             </div>
             <div><br></div>
-            <div><span><strong>Information automatically collected</strong></span>
+            <div><h3>Information automatically collected</h3>
             </div>
             <div>
                 <div><br></div>
-                <div>
+                <div class="legal-doc__short">
                     <span><strong><em>In Short:</em></strong></span><span><strong><em>&nbsp;</em></strong><em>Some information — such as your Internet Protocol (IP) address and/or browser and device characteristics — is collected automatically when you visit our Services.</em></span>
                 </div>
             </div>
@@ -193,11 +191,11 @@ const breadcrumbs = [
                 <div>
 
                     <div>
-                        <span><strong><span>2. HOW DO WE PROCESS YOUR INFORMATION?</span></strong></span>
+                        <h2 id="infouse">2. HOW DO WE PROCESS YOUR INFORMATION?</h2>
                     </div>
                     <div>
                         <div><br></div>
-                        <div><span><strong><em>In Short:&nbsp;</em></strong><em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent.</em></span>
+                        <div class="legal-doc__short"><span><strong><em>In Short:&nbsp;</em></strong><em>We process your information to provide, improve, and administer our Services, communicate with you, for security and fraud prevention, and to comply with law. We may also process your information for other purposes with your consent.</em></span>
                         </div>
                     </div>
                     <div><br></div>
@@ -247,7 +245,7 @@ const breadcrumbs = [
                                                             <br>
                                                         </div>
                                                         <div>
-                                                            <strong><span>3. WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR INFORMATION?</span></strong>
+                                                            <h2 id="legalbases">3. WHAT LEGAL BASES DO WE RELY ON TO PROCESS YOUR INFORMATION?</h2>
                                                         </div>
                                                         <div>
                                                             <br>
@@ -259,7 +257,7 @@ const breadcrumbs = [
                                                             <br>
                                                         </div>
                                                         <div>
-                                                            <em><span><strong><u>If you are located in the EU or UK, this section applies to you.</u></strong></span></em>
+                                                            <h3>If you are located in the EU or UK, this section applies to you.</h3>
                                                         </div>
                                                         <div>
                                                             <br>
@@ -313,7 +311,7 @@ const breadcrumbs = [
                                                                                 <br>
                                                                             </div>
                                                                             <div>
-                                                                                <span><strong><u><em>If you are located in Canada, this section applies to you.</em></u></strong></span>
+                                                                                <h3>If you are located in Canada, this section applies to you.</h3>
                                                                             </div>
                                                                             <div>
                                                                                 <br>
@@ -398,12 +396,12 @@ const breadcrumbs = [
                                                                                 <br>
                                                                             </div>
                                                                             <div>
-                                                                                <span><strong><span>4. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?</span></strong></span>
+                                                                                <h2 id="whoshare">4. WHEN AND WITH WHOM DO WE SHARE YOUR PERSONAL INFORMATION?</h2>
                                                                             </div>
                                                                             <div>
                                                                                 <br>
                                                                             </div>
-                                                                            <div>
+                                                                            <div class="legal-doc__short">
                                                                                 <span><strong><em>In Short:</em></strong><em>&nbsp;We may share information in specific situations described in this section and/or with the following third parties.</em></span>
                                                                             </div>
                                                                             <div>
@@ -432,12 +430,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</span></strong></span>
+                                                                                                    <h2 id="cookies">5. DO WE USE COOKIES AND OTHER TRACKING TECHNOLOGIES?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:</em></strong><em>&nbsp;We may use cookies and other tracking technologies to collect and store your information.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -450,12 +448,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?</span></strong></span>
+                                                                                                    <h2 id="sociallogins">6. HOW DO WE HANDLE YOUR SOCIAL LOGINS?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:&nbsp;</em></strong><em>If you choose to register or log in to our services using a social media account, we may have access to certain information about you.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -474,14 +472,14 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?</span></strong></span>
+                                                                                                    <h2 id="intltransfers">7. IS YOUR INFORMATION TRANSFERRED INTERNATIONALLY?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
 
 
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:&nbsp;</em></strong><em>We may transfer, store, and process your information in countries other than your own.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -501,12 +499,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>8. HOW LONG DO WE KEEP YOUR INFORMATION?</span></strong></span>
+                                                                                                    <h2 id="inforetain">8. HOW LONG DO WE KEEP YOUR INFORMATION?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:&nbsp;</em></strong><em>We keep your information for as long as necessary to fulfill the purposes outlined in this privacy notice unless otherwise required by law.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -525,12 +523,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>9. HOW DO WE KEEP YOUR INFORMATION SAFE?</span></strong></span>
+                                                                                                    <h2 id="infosafe">9. HOW DO WE KEEP YOUR INFORMATION SAFE?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:&nbsp;</em></strong><em>We aim to protect your personal information through a system of organizational and technical security measures.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -543,12 +541,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>10. DO WE COLLECT INFORMATION FROM MINORS?</span></strong></span>
+                                                                                                    <h2 id="infominors">10. DO WE COLLECT INFORMATION FROM MINORS?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:</em></strong><em>&nbsp;We do not knowingly collect data from or market to children under 18 years of age.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -561,12 +559,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>11. WHAT ARE YOUR PRIVACY RIGHTS?</span></strong></span>
+                                                                                                    <h2 id="privacyrights">11. WHAT ARE YOUR PRIVACY RIGHTS?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:</em></strong><em>&nbsp;In some regions, such as the European Economic Area (EEA), United Kingdom (UK), and Canada, you have rights that allow you greater access to and control over your personal information.&nbsp;You may review, change, or terminate your account at any time. </em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -604,7 +602,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><u>Withdrawing your consent:</u></strong> If we are relying on your consent to process your personal information, which may be express and/or implied consent depending on the applicable law, you have the right to withdraw your consent at any time. You can withdraw your consent at any time by contacting us by using the contact details provided in the section "</span><a
+                                                                                                    <span id="withdrawconsent"><strong><u>Withdrawing your consent:</u></strong> If we are relying on your consent to process your personal information, which may be express and/or implied consent depending on the applicable law, you have the right to withdraw your consent at any time. You can withdraw your consent at any time by contacting us by using the contact details provided in the section "</span><a
                                                                                                         href="#contact"><span>HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</span></a><span>" below or updating your preferences.</span>
                                                                                                 </div>
                                                                                                 <div>
@@ -624,7 +622,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong>Account Information</strong></span>
+                                                                                                    <h3>Account Information</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -654,7 +652,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>12. CONTROLS FOR DO-NOT-TRACK FEATURES</span></strong></span>
+                                                                                                    <h2 id="DNT">12. CONTROLS FOR DO-NOT-TRACK FEATURES</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -666,12 +664,12 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>13. DO CALIFORNIA RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?</span></strong></span>
+                                                                                                    <h2 id="caresidents">13. DO CALIFORNIA RESIDENTS HAVE SPECIFIC PRIVACY RIGHTS?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <div>
+                                                                                                <div class="legal-doc__short">
                                                                                                     <span><strong><em>In Short:&nbsp;</em></strong><em>Yes, if you are a resident of California, you are granted specific rights regarding access to your personal information.</em></span>
                                                                                                 </div>
                                                                                                 <div>
@@ -690,7 +688,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong>CCPA Privacy Notice</strong></span>
+                                                                                                    <h3>CCPA Privacy Notice</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <div>
@@ -725,7 +723,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong>What categories of personal information do we collect?</strong></span>
+                                                                                                    <h3>What categories of personal information do we collect?</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -736,31 +734,31 @@ const breadcrumbs = [
                                                                                                 <div>
                                                                                                     <br>
                                                                                                 </div>
-                                                                                                <table style="width: 100%;">
+                                                                                                <div class="legal-doc__table-wrap"><table>
                                                                                                     <tbody>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <span><strong>Category</strong></span>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-top: 1px solid black; border-right: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <span><strong>Examples</strong></span>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; border-right: 1px solid black; border-top: 1px solid black; text-align: center;">
+                                                                                                        <td>
                                                                                                             <span><strong>Collected</strong></span>
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>A. Identifiers</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-top: 1px solid black; border-right: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Contact details, such as real name, alias, postal address, telephone or mobile contact number, unique personal identifier, online identifier, Internet Protocol address, email address, and account name</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; vertical-align: middle; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -773,17 +771,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>B. Personal information categories listed in the California Customer Records statute</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Name, contact information, education, employment, employment history, and financial information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -796,17 +794,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>C. Protected classification characteristics under California or federal law</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Gender and date of birth</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -819,17 +817,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>D. Commercial information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Transaction information, purchase history, financial details, and payment information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -842,17 +840,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>E. Biometric information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Fingerprints and voiceprints</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -865,17 +863,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>F. Internet or other similar network activity</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Browsing history, search history, online behavior, interest data, and interactions with our and other websites, applications, systems, and advertisements</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -888,17 +886,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>G. Geolocation data</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Device location</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -911,17 +909,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>H. Audio, electronic, visual, thermal, olfactory, or similar information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Images and audio, video or call recordings created in connection with our business activities</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -934,17 +932,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="width: 33.8274%; border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>I. Professional or employment-related information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 51.4385%; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Business contact details in order to provide you our services at a business level or job title, work history, and professional qualifications if you apply for a job with us</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="width: 14.9084%; text-align: center; border-right: 1px solid black; border-top: 1px solid black;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -957,17 +955,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="border-left: 1px solid black; border-right: 1px solid black; border-top: 1px solid black; width: 33.8274%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>J. Education Information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="border-right: 1px solid black; border-top: 1px solid black; width: 51.4385%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Student records and directory information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="text-align: center; border-right: 1px solid black; border-top: 1px solid black; width: 14.9084%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -980,17 +978,17 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     <tr>
-                                                                                                        <td style="border-width: 1px; border-color: black; border-style: solid; width: 33.8274%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>K. Inferences drawn from other personal information</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="border-bottom: 1px solid black; border-top: 1px solid black; border-right: 1px solid black; width: 51.4385%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <span>Inferences drawn from any of the collected personal information listed above to create a profile or summary about, for example, an individual’s preferences and characteristics</span>
                                                                                                             </div>
                                                                                                         </td>
-                                                                                                        <td style="text-align: center; border-right: 1px solid black; border-bottom: 1px solid black; border-top: 1px solid black; width: 14.9084%;">
+                                                                                                        <td>
                                                                                                             <div>
                                                                                                                 <br>
                                                                                                             </div>
@@ -1003,7 +1001,7 @@ const breadcrumbs = [
                                                                                                         </td>
                                                                                                     </tr>
                                                                                                     </tbody>
-                                                                                                </table>
+                                                                                                </table></div>
 
                                                                                                 <div>
                                                                                                     <br>
@@ -1029,7 +1027,7 @@ const breadcrumbs = [
                                                                                                     </li>
                                                                                                 </ul>
                                                                                                 <div>
-                                                                                                    <span><strong>How do we use and share your personal information?</strong></span>
+                                                                                                    <h3>How do we use and share your personal information?</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1053,7 +1051,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong>Will your information be shared with anyone else?</strong></span>
+                                                                                                    <h3>Will your information be shared with anyone else?</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1092,7 +1090,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong>Your rights with respect to your personal data</strong></span>
+                                                                                                    <h3>Your rights with respect to your personal data</h3>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1229,7 +1227,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>14. DO WE MAKE UPDATES TO THIS NOTICE?</span></strong></span>
+                                                                                                    <h2 id="policyupdates">14. DO WE MAKE UPDATES TO THIS NOTICE?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1247,7 +1245,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</span></strong></span>
+                                                                                                    <h2 id="contact">15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1259,7 +1257,7 @@ const breadcrumbs = [
                                                                                                     <br>
                                                                                                 </div>
                                                                                                 <div>
-                                                                                                    <span><strong><span>16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?</span></strong></span>
+                                                                                                    <h2 id="request">16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?</h2>
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <br>
@@ -1267,17 +1265,6 @@ const breadcrumbs = [
                                                                                                 <div>
                                                                                                     <span>Based on the applicable laws of your country, you may have the right to request access to the personal information we collect from you, change that information, or delete it in some circumstances. To request to review, update, or delete your personal information, please submit a request via email to hello@rebase.pro&nbsp;</span><span>.</span>
                                                                                                 </div>
-                                                                                                <style> ul {
-                                                                                                    list-style-type: square;
-                                                                                                }
-
-                                                                                                ul > li > ul {
-                                                                                                    list-style-type: circle;
-                                                                                                }
-
-                                                                                                ul > li > ul > li > ul {
-                                                                                                    list-style-type: square;
-                                                                                                } </style>
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
@@ -1300,7 +1287,6 @@ const breadcrumbs = [
                 </div>
             </div>
         </div>
+        </article>
     </div>
-
-
 </Layout>

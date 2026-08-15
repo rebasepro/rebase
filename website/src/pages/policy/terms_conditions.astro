@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import '../../styles/legal.css';
 
 const title = "Rebase Terms of Service";
 const description = "Terms and conditions for using Rebase services.";
@@ -12,7 +13,8 @@ const breadcrumbs = [
 
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
 
-    <div class="mx-auto max-w-7xl p-8">
+    <div class="px-6 pb-24 pt-14 sm:px-8 md:pb-32 md:pt-20">
+        <article class="legal-doc">
         <div align="center" style="text-align: left; line-height: 1;">
             <div align="center" class="MsoNormal" style="text-align: left; line-height: 150%;">
                 <div align="center" class="MsoNormal" style="text-align:center;line-height:150%;"><a name="_2cipo4yr3w5d"></a>
@@ -845,21 +847,9 @@ Calibri;mso-themecolor:text1;mso-themetint:166;">In order to resolve a complaint
             <div class="MsoNormal" data-custom-class="body_text" style="line-height: 1.5;"><span style="font-size: 15px;"><strong><span><span style="font-size: 15px;"><strong><span><bdt class="block-component"></bdt></span></strong></span></span></strong></span></div><strong>
             <div class="MsoNormal" data-custom-class="body_text" style="line-height: 1.5;"><span style="font-size: 15px; line-height: 115%; "><bdt class="block-container question question-in-editor" data-id="fdc2b5b8-c95f-244b-23a7-287f82541348" data-type="question"><strong>hello@rebase.pro</strong></bdt></span></div>
         </strong></strong></strong></strong></div><strong><strong>
-        <style>
-            ul {
-                list-style-type: square;
-            }
-
-            ul > li > ul {
-                list-style-type: circle;
-            }
-
-            ul > li > ul > li > ul {
-                list-style-type: square;
-            }
-        </style>
     </strong></strong></div><strong><strong>
 
 
-</strong></strong></div>
+</strong></strong></article>
+    </div>
 </Layout>
