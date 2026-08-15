@@ -97,7 +97,7 @@ function mockService(autofill: () => any, available = true) {
             return Promise.resolve({ ok: true,
 status: 200,
 json: async () => ({ available,
-model: "gemini-3.6-flash" }) });
+model: "gemini-3.7-flash" }) });
         }
         if (String(url).endsWith("/autofill")) return Promise.resolve(autofill());
         return Promise.resolve({ ok: true,

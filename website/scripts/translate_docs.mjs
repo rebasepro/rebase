@@ -10,8 +10,8 @@ if (!apiKey) {
     process.exit(1);
 }
 const genAI = new GoogleGenerativeAI(apiKey);
-// Using gemini-3.6-flash as it's fast and excellent for translation tasks
-const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+// Using gemini-3.7-flash as it's fast and excellent for translation tasks
+const model = genAI.getGenerativeModel({ model: 'gemini-3.7-flash' });
 
 const TARGET_LANGUAGES = ['es', 'de', 'fr', 'it', 'pt'];
 const CONTENT_DIR = path.resolve('./src/content/docs');
