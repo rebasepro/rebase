@@ -454,9 +454,27 @@ export function LoginView({
                                         make, and it reads as one more line of the
                                         consent block a host puts in
                                         `topComponent` — the demo's privacy tick
-                                        sits directly above it. */}
+                                        sits directly above it.
+
+                                        Which is why it pulls back most of the
+                                        column's `gap-3`: at the full gap the two
+                                        ticks sat 24px apart and read as two
+                                        unrelated questions rather than one
+                                        consent block. The offset is against this
+                                        column's own gap, not against whatever
+                                        margins the host's `topComponent` happens
+                                        to carry, so it lands the same way under
+                                        any of them — but only when there is
+                                        something above to hug. With no header
+                                        and no `topComponent` this row is the
+                                        column's first child, and pulling back a
+                                        gap that is not there would crowd it into
+                                        the logo. */}
                                     {onNewsletterOptIn && (
-                                        <label className="flex items-center gap-2 cursor-pointer -mt-1">
+                                        <label className={cls(
+                                            "flex items-center gap-2 cursor-pointer",
+                                            (topComponent || title || subtitle) && "-mt-3"
+                                        )}>
                                             <Checkbox
                                                 checked={newsletterOptIn}
                                                 onCheckedChange={(checked) => setNewsletterOptIn(checked === true)}
