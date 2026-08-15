@@ -301,33 +301,36 @@ describe("offline evaluator vs the server, on identical data", () => {
     });
 
     /**
-     * **KNOWN: ties in an ORDER BY have no deterministic tiebreaker.**
+     * Ties in an ORDER BY resolve the same way on both sides.
      *
-     * Sorting on `qty`, where two rows share the value 10, the two sides return
-     * the same values in the same order and disagree only on which of the tied
-     * rows comes first. Neither is wrong: an `ORDER BY qty` with no further key
-     * leaves the order of equal rows undefined, and Postgres is free to return
-     * them in whatever order the plan produced.
+     * This was recorded as KNOWN-divergent: sorting on `qty`, where two rows
+     * share the value 10, the two sides returned the same values in the same
+     * order and disagreed on which of the tied rows came first. Neither was
+     * wrong — `ORDER BY qty` with no further key leaves equal rows undefined —
+     * but pagination is built on it, and `LIMIT 2 OFFSET 2` over an undefined
+     * order can skip a row and repeat another with nothing to notice it.
      *
-     * It matters anyway, because pagination is built on it. `LIMIT 2 OFFSET 2`
-     * over an undefined order can skip a row and repeat another between two
-     * requests, with no error and no way for the client to notice. The standard
-     * fix is for the server to append the primary key to every ORDER BY; that
-     * changes generated SQL and index expectations, so it is recorded here
-     * rather than done in passing.
+     * The fix the old note called for has since landed: every sort ends on the
+     * primary key, on both sides. So the assertion is inverted rather than
+     * deleted. A characterization test kept asserting the OLD behaviour is worse
+     * than none — it goes red the moment the bug is fixed, and reads as a
+     * regression in whatever change happened to be in flight at the time.
      */
-    it("KNOWN: tied sort keys order differently, though the values match", async () => {
+    it("orders tied sort keys identically, because every sort ends on the id", async () => {
         const server = await serverOrder({ orderBy: "qty", order: "asc" });
         const local = localOrder({ orderBy: ["qty", "asc"] });
-        expect(server).not.toEqual(local);
 
-        // The divergence is confined to the tie: the sequence of *values* is
-        // identical, so this is an ordering ambiguity and not a sorting bug.
+        expect(server).toEqual(local);
+
+        // Still the right values in the right order, not merely two lists that
+        // happen to match — the tie is broken, not the sort. Checked as
+        // "ascending, nulls last" rather than against a JS `.sort()`, which
+        // compares `null` with `NaN` and would place it second.
         const qtyOf = (id: string) => ROWS.find(r => r.id === id)!.qty;
-        expect(server.map(qtyOf)).toEqual(local.map(qtyOf));
+        const values = server.map(qtyOf);
+        const present = values.filter((v): v is number => v !== null && v !== undefined);
 
-        // …and the rows that differ are exactly the tied pair.
-        const differing = server.filter((id, i) => id !== local[i]);
-        expect(new Set(differing.map(qtyOf))).toEqual(new Set([10]));
+        expect(present).toEqual([...present].sort((a, b) => a - b));
+        expect(values.slice(present.length).every(v => v === null || v === undefined)).toBe(true);
     });
 });
