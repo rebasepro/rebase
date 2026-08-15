@@ -142,6 +142,45 @@ describe("ChannelHistoryStore — gating", () => {
         await store.ensureTables();
         expect(db.execute).not.toHaveBeenCalled();
     });
+
+    /**
+     * Two instances booting into the same database.
+     *
+     * These tables carry every retained broadcast and sit outside RLS, so the
+     * two `REVOKE`s at the end of `ensureTables` are the only thing keeping them
+     * off the end-user role. They used to be the tail of one straight sequence:
+     * lose the `CREATE TABLE` race — which a peer starting at the same moment
+     * causes, measured at 8 losses in 10 with five instances — and the throw
+     * skipped them, leaving the history of every channel readable by any
+     * signed-in user, with the failure attributed to a create that was harmless.
+     */
+    it("still revokes after losing a create race with another instance", async () => {
+        const statements: string[] = [];
+        const db = {
+            execute: jest.fn(async (query: unknown) => {
+                const text = sqlTextOf(query) || String((query as { sql?: string })?.sql ?? "");
+                statements.push(text);
+                if (/CREATE TABLE IF NOT EXISTS rebase\.channel_messages/.test(text)) {
+                    throw Object.assign(new Error("Failed query"), {
+                        cause: Object.assign(new Error("duplicate table"), { code: "42P07" })
+                    });
+                }
+                return { rows: [], rowCount: 0 };
+            })
+        } as unknown as NodePgDatabase<Record<string, unknown>>;
+
+        const store = new ChannelHistoryStore(db, [{ match: "doc:*", limit: 10 }]);
+        await store.ensureTables();
+
+        // First: the race actually happened. Without this the test passes for
+        // the wrong reason if the statement text ever changes shape — nothing
+        // throws, and "the revokes ran" proves nothing.
+        expect(statements.some(s => /CREATE TABLE IF NOT EXISTS rebase\.channel_messages/.test(s))).toBe(true);
+
+        // The point of the test: the statements *after* the losing one ran.
+        expect(statements.some(s => /REVOKE/i.test(s) && s.includes("channel_messages"))).toBe(true);
+        expect(statements.some(s => /REVOKE/i.test(s) && s.includes("channel_cursors"))).toBe(true);
+    });
 });
 
 describe("RealtimeService — retained channels", () => {

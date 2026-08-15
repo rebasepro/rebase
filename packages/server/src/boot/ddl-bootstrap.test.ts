@@ -1,5 +1,12 @@
 import { describe, it, expect, jest, afterEach } from "@jest/globals";
-import { createDdlBootstrapper, isConcurrentDdlRace, hasInCauseChain, DDL_ATTEMPTS, type SqlExec } from "./ddl-bootstrap";
+import {
+    createDdlBootstrapper,
+    isConcurrentDdlRace,
+    isDuplicateObjectRace,
+    hasInCauseChain,
+    DDL_ATTEMPTS,
+    type SqlExec
+} from "./ddl-bootstrap";
 import { logger } from "../utils/logger";
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -177,5 +184,52 @@ describe("createDdlBootstrapper", () => {
             );
             await expect(missing.isReadable("rebase.api_keys")).resolves.toBe(false);
         });
+    });
+});
+
+/**
+ * The narrow classifier: "someone beat me to it" versus "this genuinely failed".
+ *
+ * `isConcurrentDdlRace` answers "should I try again", and a caller that only
+ * retries can afford to be generous. `isDuplicateObjectRace` answers "may I
+ * carry on as though this had worked", which is a claim about the end state —
+ * and the caller that asks it is a loop applying a schema plan, where a
+ * generous answer swallows the one `23505` that matters: a unique constraint
+ * the customer's existing rows already violate.
+ */
+describe("isDuplicateObjectRace", () => {
+    const wrapped = (code: string, extra: Record<string, unknown> = {}) =>
+        new Error("Failed query: …", { cause: Object.assign(new Error(code), { code, ...extra }) });
+
+    it.each(["42P06", "42P07", "42710"])("accepts %s — the object is unambiguously there", (code) => {
+        expect(isDuplicateObjectRace(wrapped(code))).toBe(true);
+    });
+
+    it("accepts a 23505 on a pg_catalog index — a lost CREATE TYPE race", () => {
+        expect(isDuplicateObjectRace(wrapped("23505", { constraint: "pg_type_typname_nsp_index" }))).toBe(true);
+    });
+
+    it("accepts a 23505 whose catalog index is only named in the detail text", () => {
+        expect(isDuplicateObjectRace(wrapped("23505", {
+            detail: 'Key (typname, typnamespace)=(posts_status, 2200) already exists in pg_type_typname_nsp_index.'
+        }))).toBe(true);
+    });
+
+    it("REFUSES a 23505 on the customer's own constraint", () => {
+        // The whole reason this function is separate from isConcurrentDdlRace.
+        // Treating this as a race would let a schema step that genuinely cannot
+        // be applied report success.
+        expect(isDuplicateObjectRace(wrapped("23505", { constraint: "posts_slug_key" }))).toBe(false);
+    });
+
+    it("REFUSES a deadlock, which the broad check retries", () => {
+        // 40P01 means the statement did nothing at all. Skipping it would leave
+        // the object uncreated while the caller believed a peer had made it.
+        expect(isDuplicateObjectRace(wrapped("40P01"))).toBe(false);
+        expect(isConcurrentDdlRace(wrapped("40P01"))).toBe(true);
+    });
+
+    it("refuses an unrelated failure", () => {
+        expect(isDuplicateObjectRace(wrapped("42501"))).toBe(false);
     });
 });

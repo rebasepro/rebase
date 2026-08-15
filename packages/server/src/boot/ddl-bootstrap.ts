@@ -74,6 +74,48 @@ export function isConcurrentDdlRace(err: unknown): boolean {
     );
 }
 
+/**
+ * SQLSTATEs that mean, unambiguously, *the object is already there*.
+ *
+ * A subset of {@link CONCURRENT_DDL_SQLSTATES} and a stricter question. The
+ * broad set answers "should this be retried"; this one answers "is it safe to
+ * carry on as though the statement had succeeded", which is a claim about the
+ * end state rather than about the attempt. Deadlock is not in it — a deadlocked
+ * statement did nothing and must be retried, not skipped.
+ */
+const DUPLICATE_OBJECT_SQLSTATES = new Set([
+    "42P06", // duplicate_schema
+    "42P07", // duplicate_table
+    "42710" // duplicate_object — a type, an index, a constraint
+]);
+
+/**
+ * Did this statement fail *because a peer already created the same object*?
+ *
+ * The narrow companion to {@link isConcurrentDdlRace}, for the one caller that
+ * needs to tell "someone beat me to it" from "this genuinely failed": a loop
+ * applying a schema plan, where treating every `23505` as a harmless race would
+ * silently swallow the one that matters — a unique constraint that cannot be
+ * added because the customer's existing rows violate it.
+ *
+ * `23505` is therefore only accepted when it names a `pg_catalog` index. That is
+ * what a lost `CREATE TYPE`/`CREATE TABLE` race raises (`pg_type_typname_nsp_index`
+ * is the one seen in practice); a unique violation on user data names the user's
+ * own constraint and is left to the caller.
+ */
+export function isDuplicateObjectRace(err: unknown): boolean {
+    return hasInCauseChain(err, (e) => {
+        if (typeof e.code !== "string") return false;
+        if (DUPLICATE_OBJECT_SQLSTATES.has(e.code)) return true;
+        if (e.code !== "23505") return false;
+        // node-postgres puts the violated index in `constraint`; some paths only
+        // carry it in the detail text, so check both rather than miss the race.
+        const constraint = typeof e.constraint === "string" ? e.constraint : "";
+        const detail = typeof e.detail === "string" ? e.detail : "";
+        return constraint.startsWith("pg_") || /\bpg_[a-z_]+_index\b/.test(detail);
+    });
+}
+
 export interface DdlBootstrapper {
     /**
      * Run one idempotent statement — `CREATE … IF NOT EXISTS`, `ALTER TABLE …

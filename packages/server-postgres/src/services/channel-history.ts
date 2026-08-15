@@ -35,6 +35,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { revokeInternalTableSql } from "@rebasepro/common";
+import { drizzleDdlBootstrapper } from "../schema/drizzle-ddl";
 
 /** How many messages a replay returns when the caller does not say. */
 const DEFAULT_REPLAY_LIMIT = 200;
@@ -167,12 +168,19 @@ export class ChannelHistoryStore {
     async ensureTables(): Promise<void> {
         if (!this.enabled || this.tablesReady) return;
 
-        await this.db.execute(sql`CREATE SCHEMA IF NOT EXISTS rebase`);
+        // Contained, retrying steps rather than one straight sequence — see the
+        // note on `ChannelPresenceStore.ensureTables`. The failure mode here is
+        // the same and the stakes are the same: the two `REVOKE`s at the end are
+        // what keep retained broadcasts off the end-user role, and a lost create
+        // race used to skip them.
+        const ddl = drizzleDdlBootstrapper(this.db, "channel-history");
+
+        await ddl.ensureObject("rebase schema", "CREATE SCHEMA IF NOT EXISTS rebase");
 
         // The primary key is exactly the replay query's access path
         // (`channel = $1 AND seq > $2 ORDER BY seq`), so it needs no further
         // index of its own.
-        await this.db.execute(sql`
+        await ddl.ensureObject("channel_messages table", `
             CREATE TABLE IF NOT EXISTS rebase.channel_messages (
                 channel TEXT NOT NULL,
                 seq BIGINT NOT NULL,
@@ -185,14 +193,14 @@ export class ChannelHistoryStore {
         `);
 
         // Only for the TTL arm of pruning; the limit arm rides the primary key.
-        await this.db.execute(sql`
+        await ddl.ensureObject("channel_messages created_at index", `
             CREATE INDEX IF NOT EXISTS idx_channel_messages_created
             ON rebase.channel_messages (created_at)
         `);
 
         // Never pruned — see the note at the top of this file. One row per
         // channel that has ever retained a message.
-        await this.db.execute(sql`
+        await ddl.ensureObject("channel_cursors table", `
             CREATE TABLE IF NOT EXISTS rebase.channel_cursors (
                 channel TEXT PRIMARY KEY,
                 last_seq BIGINT NOT NULL
@@ -209,8 +217,32 @@ export class ChannelHistoryStore {
         // `docs/channel-authorization.md`. The driver's schema-wide
         // grant reaches these (created here, after it ran), so take the
         // privilege back.
-        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_messages")));
-        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_cursors")));
+        //
+        // Driven off a probe of what exists rather than off who won each create.
+        const [messagesReady, cursorsReady] = await Promise.all([
+            ddl.isReadable("rebase.channel_messages"),
+            ddl.isReadable("rebase.channel_cursors")
+        ]);
+        if (messagesReady) {
+            await ddl.step("channel_messages revoke", () =>
+                this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_messages")))
+            );
+        }
+        if (cursorsReady) {
+            await ddl.step("channel_cursors revoke", () =>
+                this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_cursors")))
+            );
+        }
+
+        if (!messagesReady || !cursorsReady) {
+            // Left un-ready on purpose so the next call retries. Announcing
+            // "ready" here is what would turn a half-created schema into replays
+            // that answer empty forever.
+            logger.warn(
+                "[ChannelHistory] Retained-channel tables are not both present; history is not ready yet."
+            );
+            return;
+        }
 
         this.tablesReady = true;
         logger.info(`✅ [ChannelHistory] Retained channels ready (${this.rules.length} rule(s)).`);
