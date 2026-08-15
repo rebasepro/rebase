@@ -1,0 +1,442 @@
+/* ── Legal documents (/policy/*) ───────────────────────────────────────────
+ *
+ * The three files under `src/pages/policy` are Termly exports: a few thousand
+ * lines of `<div><span><strong>` with every piece of document semantics thrown
+ * away on the way out of the editor. They shipped with no styling at all, so
+ * they rendered as one undifferentiated 200-character-per-line wall — a section
+ * heading and a paragraph were the same size, the only difference being weight.
+ *
+ * The words in these documents are binding and are not ours to edit (see
+ * `LEGAL-TODO.md`, which lists what counsel still owes them). Only the
+ * presentation is in scope here, so all of it lives in CSS plus a set of
+ * structural hooks added to the markup — never a copy change.
+ *
+ * Two hook conventions are supported, because the exports disagree:
+ *   - `data-custom-class="heading_1|heading_2|body_text|link|title|subtitle"`,
+ *     which the cookie policy and terms kept from Termly, and
+ *   - real `<h1>`/`<h2>`/`<h3>` elements, which the privacy notice was given
+ *     because its export lost the `data-custom-class` attributes entirely.
+ * Both resolve to the same type tier, so a document can be upgraded from the
+ * first convention to the second without the styling shifting under it.
+ *
+ * Rhythm note: Termly separates paragraphs with `<div><br></div>` rather than
+ * margins. Those spacers are load-bearing here — one blank line at the body
+ * line-height — so paragraph spacing is deliberately NOT restated as margin.
+ * Only headings, lists and tables carry their own vertical space, and headings
+ * take more space above than below.
+ * ------------------------------------------------------------------------- */
+
+
+.legal-doc {
+    /* ~72 characters at the body size, the comfortable end of the 65–75ch
+       band. Legal prose is the longest continuous reading on the site. */
+    --legal-measure: 38rem;
+    --legal-rule: color-mix(in srgb, var(--color-surface-300) 14%, transparent);
+
+    max-width: var(--legal-measure);
+    margin-inline: auto;
+    color: var(--color-surface-300);
+    font-size: 1.0625rem;
+    line-height: 1.75;
+    text-align: left;
+    overflow-wrap: break-word;
+}
+
+/* Termly's exports are littered with `align="center"` and
+   `text-align: justify` on individual blocks. Neither survives contact with
+   a 38rem column: justification opens rivers at this measure, and the
+   centred blocks were centring left-aligned prose to no effect anyway. */
+.legal-doc [align],
+.legal-doc [style*="text-align"] {
+    text-align: left !important;
+}
+
+/* Absolute type sizes from a fixed-width editor: 15px, 19px, 11pt, 14.6667px
+   and 12px, sprinkled across a couple of hundred spans with no relationship to
+   each other or to this page. They are the reason the terms ran at 78
+   characters a line while the privacy notice ran at 63. `!important` is the
+   only thing that outranks an inline style, and these are inherited-away
+   rather than overwritten so the tiers set above still land — the headings and
+   the masthead each declare their own size on the element itself. */
+.legal-doc [style*="font-size"] {
+    font-size: inherit !important;
+}
+
+/* Same story for hardcoded leading. */
+.legal-doc [style*="line-height"] {
+    line-height: inherit !important;
+}
+
+/* ── Document header ─────────────────────────────────────────────── */
+
+.legal-doc__header {
+    margin-bottom: 3.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--legal-rule);
+}
+
+.legal-doc__title {
+    margin: 0;
+    color: var(--color-surface-50);
+    font-size: 2.25rem;
+    line-height: 1.1;
+    /* All three documents title themselves in caps ("PRIVACY NOTICE", "COOKIE
+       POLICY", "TERMS AND CONDITIONS"). The display tracking token is cut for
+       mixed-case headlines and closes caps up until the words run together, so
+       caps take a hair of positive tracking instead. */
+    letter-spacing: 0.005em;
+}
+
+.legal-doc__meta {
+    margin: 0.875rem 0 0;
+    color: var(--color-surface-500);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+/* The two exports that kept their `data-custom-class` hooks carry the title and
+   date inline in the soup instead of in a header element, several `<span>`s
+   deep and wearing an inline `font-size`. Promoting them to blocks here builds
+   the same masthead without surgery on the nesting. Both sit inside a
+   `<strong>`, so the weight has to be restated rather than inherited. */
+.legal-doc [data-custom-class="title"] {
+    display: block;
+    margin: 0;
+    color: var(--color-surface-50);
+    font-family: var(--font-headers);
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: 0.005em;
+}
+
+.legal-doc [data-custom-class="subtitle"] {
+    display: block;
+    margin: 0.875rem 0 3.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--legal-rule);
+    color: var(--color-surface-500);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+/* The terms export carries a second, empty `subtitle` holding nothing but a
+   `<br>`. Left alone it draws the masthead rule a second time, with a blank
+   band between the two. */
+.legal-doc [data-custom-class="subtitle"]:has(> br:only-child) {
+    display: none;
+}
+
+/* Both the title and the date sit inside a `<strong>`, which the lead-in rule
+   further down would otherwise recolour and re-weight. The masthead sets its
+   own tone. */
+.legal-doc [data-custom-class="title"] :is(strong, b),
+.legal-doc [data-custom-class="subtitle"] :is(strong, b) {
+    color: inherit;
+    font-weight: inherit;
+}
+
+/* …and no blank line between the two halves of the masthead. */
+.legal-doc div:has(> br:only-child):has(+ div [data-custom-class="subtitle"]),
+.legal-doc div:has([data-custom-class="title"]) + div:has(> br:only-child) {
+    display: none;
+}
+
+/* ── Headings ────────────────────────────────────────────────────── */
+
+/* A numbered top-level section. The sticky site header is 60px, so anchor
+   jumps need to clear it plus a little breathing room. */
+.legal-doc h2,
+.legal-doc [data-custom-class="heading_1"] {
+    display: block;
+    margin: 4rem 0 1.25rem;
+    color: var(--color-surface-50);
+    font-family: var(--font-headers);
+    font-size: 1.375rem;
+    font-weight: 600;
+    line-height: 1.3;
+    /* Section headings are uppercase too — see the note on the title. */
+    letter-spacing: normal;
+    scroll-margin-top: 6rem;
+}
+
+/* A named sub-section inside one of those. */
+.legal-doc h3,
+.legal-doc [data-custom-class="heading_2"] {
+    display: block;
+    margin: 2.75rem 0 1rem;
+    color: var(--color-surface-100);
+    font-family: var(--font-headers);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: var(--tracking-heading);
+    scroll-margin-top: 6rem;
+}
+
+/* The heading text sometimes arrives already wrapped in `<strong>`, `<em>`
+   or `<u>`. The tier above sets the weight; the wrappers must not add an
+   underline that reads as a link, or a second weight step on top. */
+.legal-doc h2 :is(strong, b, em, i, u),
+.legal-doc h3 :is(strong, b, em, i, u),
+.legal-doc [data-custom-class="heading_1"] :is(strong, b, em, i, u),
+.legal-doc [data-custom-class="heading_2"] :is(strong, b, em, i, u) {
+    font-weight: inherit;
+    font-style: inherit;
+    text-decoration: none;
+}
+
+/* The export puts one or two `<div><br></div>` spacers on each side of a
+   heading, on top of whatever margin the heading carries. Those blank lines
+   are the right rhythm between paragraphs and the wrong one around a
+   heading — they made the gap depend on how many the editor happened to
+   emit. Next to a heading they come out, so the space above and below is
+   the heading's own and is the same at every one of them.
+
+   Each heading appears in one of two shapes — bare, or alone inside a wrapper
+   div — and the export sometimes stacks two spacers, so all four combinations
+   have to be named. The stacked pair is matched as `+ div +` rather than by
+   testing the middle div, because `:has()` cannot nest: a selector list that
+   contains one invalid complex selector drops the ENTIRE rule, which is how
+   this started out silently doing nothing. The looser form is safe here —
+   across all three documents there is no heading whose second-previous sibling
+   is a spacer and whose first-previous sibling is not. */
+/* — a spacer directly before a heading … */
+.legal-doc div:has(> br:only-child):has(+ :is(h2, h3)),
+.legal-doc div:has(> br:only-child):has(+ :is([data-custom-class="heading_1"], [data-custom-class="heading_2"])),
+.legal-doc div:has(> br:only-child):has(+ div > :is(h2, h3):only-child),
+.legal-doc div:has(> br:only-child):has(+ div > span [data-custom-class="heading_1"]),
+.legal-doc div:has(> br:only-child):has(+ div > span [data-custom-class="heading_2"]),
+/* — the outer one of a stacked pair … */
+.legal-doc div:has(> br:only-child):has(+ div + :is(h2, h3)),
+.legal-doc div:has(> br:only-child):has(+ div + :is([data-custom-class="heading_1"], [data-custom-class="heading_2"])),
+.legal-doc div:has(> br:only-child):has(+ div + div > :is(h2, h3):only-child),
+.legal-doc div:has(> br:only-child):has(+ div + div > span [data-custom-class="heading_1"]),
+.legal-doc div:has(> br:only-child):has(+ div + div > span [data-custom-class="heading_2"]),
+/* — and one directly after. */
+.legal-doc :is(h2, h3) + div:has(> br:only-child),
+.legal-doc :is([data-custom-class="heading_1"], [data-custom-class="heading_2"]) + div:has(> br:only-child),
+.legal-doc div:has(> :is(h2, h3):only-child) + div:has(> br:only-child),
+.legal-doc div:has(> span [data-custom-class="heading_1"]) + div:has(> br:only-child),
+.legal-doc div:has(> span [data-custom-class="heading_2"]) + div:has(> br:only-child) {
+    display: none;
+}
+
+/* ── Body copy ───────────────────────────────────────────────────── */
+
+.legal-doc [data-custom-class="body_text"] {
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+/* Inline lead-ins ("Payment Data.", "Withdrawing your consent:") are the
+   document's third level of structure and its most frequent one. They sit
+   inside the paragraph they introduce, so they get colour rather than size.
+   Semibold is the ceiling for this site — never `bold`. */
+.legal-doc :is(strong, b) {
+    color: var(--color-surface-50);
+    font-weight: 600;
+}
+
+/* Termly underlines a handful of lead-ins. On a page where links are also
+   underlined, that is a false affordance; the colour above already carries
+   the emphasis. */
+.legal-doc u {
+    text-decoration: none;
+}
+
+/* ── Links ───────────────────────────────────────────────────────── */
+
+.legal-doc a[href],
+.legal-doc [data-custom-class="link"] {
+    color: var(--color-primary-light);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--color-primary-light) 45%, transparent);
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    transition: color 150ms ease, text-decoration-color 150ms ease;
+}
+
+.legal-doc a[href]:hover {
+    color: #ffffff;
+    text-decoration-color: currentColor;
+}
+
+/* An `<a>` with no `href` is not a link and must not look like one. The
+   exports contain a few; they are inert text until someone gives them a
+   target. */
+.legal-doc a:not([href]) {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* ── Table of contents ───────────────────────────────────────────── */
+
+.legal-doc__toc {
+    margin: 0;
+    padding: 1.25rem 1.75rem;
+    border: 1px solid var(--legal-rule);
+    border-radius: 0.75rem;
+    background: var(--color-surface-900);
+    scroll-margin-top: 6rem;
+}
+
+.legal-doc__toc > div {
+    line-height: 1.5;
+}
+
+/* The entries are one-line divs in the export, each link buried in a span.
+   Padding on the link (inline-block, so it stays inside that span) carries
+   the row rhythm and takes the pointer target past the 24px minimum,
+   without spacing the list out into something that reads as prose. */
+.legal-doc__toc a[href] {
+    display: inline-block;
+    padding: 0.3125rem 0;
+    color: var(--color-surface-300);
+    font-size: 0.9375rem;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+}
+
+.legal-doc__toc a[href]:hover,
+.legal-doc__toc a[href]:focus-visible {
+    color: var(--color-primary-light);
+    text-decoration-color: currentColor;
+}
+
+/* ── "In Short" summaries ────────────────────────────────────────── */
+
+/* Every section opens with Termly's own one-sentence summary. It is the
+   single most useful thing in the document for a reader who is scanning,
+   and in the raw export it was italic body copy, indistinguishable from a
+   quotation. A 1px rule and an inset make it an aside without turning it
+   into a card. */
+.legal-doc__short {
+    margin: 0 0 0.5rem;
+    padding: 0.125rem 0 0.125rem 1.25rem;
+    border-left: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+    color: var(--color-surface-400);
+}
+
+.legal-doc__short :is(strong, b) {
+    color: var(--color-surface-200);
+}
+
+/* ── Lists ───────────────────────────────────────────────────────── */
+
+/* Tailwind's preflight strips list styling, and the export emits one `<ul>`
+   per bullet — 45 of them in the privacy notice — so a five-item list is
+   five sibling lists. Collapsing the gap between adjacent lists is what
+   makes them read as one. */
+.legal-doc ul,
+.legal-doc ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    list-style-position: outside;
+}
+
+.legal-doc ul {
+    list-style-type: disc;
+}
+
+.legal-doc ol {
+    list-style-type: decimal;
+}
+
+.legal-doc :is(ul, ol) + :is(ul, ol) {
+    margin-top: -0.75rem;
+}
+
+.legal-doc li {
+    margin: 0.375rem 0;
+    padding-left: 0.25rem;
+}
+
+.legal-doc li::marker {
+    color: var(--color-surface-500);
+}
+
+/* ── Tables ──────────────────────────────────────────────────────── */
+
+/* The CCPA category table shipped with `border: 1px solid black` inline on
+   every cell — on a black page, twelve rows of data with no visible
+   structure at all. The inline rules are stripped in the markup (an inline
+   style outranks every layer) and rebuilt here from the surface ramp. */
+.legal-doc__table-wrap {
+    margin: 1.75rem 0;
+    overflow-x: auto;
+    border: 1px solid var(--legal-rule);
+    border-radius: 0.75rem;
+}
+
+.legal-doc__table-wrap > table {
+    width: 100%;
+    /* `table-layout: fixed` is what stops a table from sizing itself to its
+       widest unbreakable content and pushing the whole page sideways — the
+       cookie tables carry raw cookie names that do exactly that. Below the
+       min-width the wrapper scrolls instead. */
+    table-layout: fixed;
+    min-width: 30rem;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.legal-doc__table-wrap :is(td, th) {
+    overflow-wrap: break-word;
+}
+
+.legal-doc__table-wrap :is(td, th) {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--legal-rule);
+    text-align: left;
+    vertical-align: top;
+}
+
+.legal-doc__table-wrap tr:last-child :is(td, th) {
+    border-bottom: 0;
+}
+
+/* Termly emits the header row as ordinary `<td>`s carrying `<strong>`. */
+.legal-doc__table-wrap tr:first-child :is(td, th) {
+    background: var(--color-surface-900);
+    color: var(--color-surface-100);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* The YES/NO column is the answer the reader came for. */
+.legal-doc__table-wrap :is(td, th):last-child {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Small screens ───────────────────────────────────────────────── */
+
+@media (max-width: 40rem) {
+    .legal-doc {
+        font-size: 1rem;
+    }
+
+    .legal-doc__title {
+        font-size: 1.75rem;
+    }
+
+    .legal-doc h2,
+    .legal-doc [data-custom-class="heading_1"] {
+        margin-top: 3rem;
+        font-size: 1.25rem;
+    }
+
+    .legal-doc__toc {
+        padding: 1.25rem 1.25rem;
+    }
+
+    .legal-doc__short {
+        padding-left: 1rem;
+    }
+}

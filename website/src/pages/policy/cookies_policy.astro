@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import '../../styles/legal.css';
 
 const title = "Rebase Cookie Policy";
 const description = "Cookie Policy for Rebase - The Open Source Headless CMS.";
@@ -11,7 +12,8 @@ const breadcrumbs = [
 ---
 
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <div class="p-8 mx-auto max-w-7xl">
+    <div class="px-6 pb-24 pt-14 sm:px-8 md:pb-32 md:pt-20">
+        <article class="legal-doc">
         <div><strong><span style="font-size: 26px;"><span data-custom-class="title">COOKIE POLICY</span></span></strong>
         </div>
         <div><br></div>
@@ -85,7 +87,7 @@ const breadcrumbs = [
             <div><span data-custom-class="body_text">
                 <section data-custom-class="body_text"
                                                               style="width: 100%; border: 1px solid #232323; margin: 0 0 10px; border-radius: 3px;"><div
-                    style="padding: 8px 13px; border-bottom: 1px solid #232323;"><table><tbody><tr
+                    style="padding: 8px 13px; border-bottom: 1px solid #232323;"><div class="legal-doc__table-wrap"><table><tbody><tr
                     style=" font-size: 12px; line-height: 1.67; margin: 0 0 8px; vertical-align: top;"><td
                     style="text-align: right; color: #D1D1D1; min-width: 80px;">Name:</td><td
                     style="display: inline-block; margin-left: 5px;"><span
@@ -115,10 +117,10 @@ const breadcrumbs = [
                     style=" font-size: 12px; line-height: 1.67; margin: 0 0 8px; vertical-align: top;"><td
                     style="text-align: right; color: #D1D1D1; min-width: 80px;">Expires in:</td><td
                     style="display: inline-block; margin-left: 5px;"><span
-                    style="color: #8b93a7; word-break: break-all;">1 year 11 months 29 days</span></td></tr></tbody></table></div></section><section
+                    style="color: #8b93a7; word-break: break-all;">1 year 11 months 29 days</span></td></tr></tbody></table></div></div></section><section
                     data-custom-class="body_text"
                     style="width: 100%; border: 1px solid #232323; margin: 0 0 10px; border-radius: 3px;"><div
-                    style="padding: 8px 13px; border-bottom: 1px solid #232323;"><table><tbody><tr
+                    style="padding: 8px 13px; border-bottom: 1px solid #232323;"><div class="legal-doc__table-wrap"><table><tbody><tr
                     style=" font-size: 12px; line-height: 1.67; margin: 0 0 8px; vertical-align: top;"><td
                     style="text-align: right; color: #D1D1D1; min-width: 80px;">Name:</td><td
                     style="display: inline-block; margin-left: 5px;"><span
@@ -148,7 +150,7 @@ const breadcrumbs = [
                     style=" font-size: 12px; line-height: 1.67; margin: 0 0 8px; vertical-align: top;"><td
                     style="text-align: right; color: #D1D1D1; min-width: 80px;">Expires in:</td><td
                     style="display: inline-block; margin-left: 5px;"><span
-                    style="color: #8b93a7; word-break: break-all;">1 year 11 months 29 days</span></td></tr></tbody></table></div></section></span>
+                    style="color: #8b93a7; word-break: break-all;">1 year 11 months 29 days</span></td></tr></tbody></table></div></div></section></span>
             </div>
         </div>
         <div style="line-height: 1.5;"><br></div>
@@ -205,18 +207,6 @@ const breadcrumbs = [
         <div style="line-height: 1.5;"><br></div>
         <div style="line-height: 1.5;"><span><span><span><span data-custom-class="body_text">If you have any questions about our use of cookies or other technologies, please email us at <bdt
                 class="question">hello@rebase.pro</bdt></span></span></span></span></div>
-        <style>
-            ul {
-                list-style-type: square;
-            }
-
-            ul > li > ul {
-                list-style-type: circle;
-            }
-
-            ul > li > ul > li > ul {
-                list-style-type: square;
-            }
-        </style>
+        </article>
     </div>
 </Layout>
