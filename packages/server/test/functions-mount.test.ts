@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import fs from "node:fs";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 
@@ -103,9 +104,15 @@ describe("the functions router is mounted for the directory, not for the functio
 
         const body = await res.json() as { functions: unknown[]; skipped?: number; note?: string };
         expect(body.functions).toEqual([]);
-        // `test/fixtures` holds two subdirectories, which the loader now
-        // reports rather than silently dropping.
-        expect(body.skipped).toBe(2);
+        // Every subdirectory of `test/fixtures` is reported rather than silently
+        // dropped. Counted from the directory rather than written as a literal:
+        // it was `2`, and adding one unrelated fixture directory elsewhere in the
+        // suite failed this test with a number that said nothing about the
+        // behaviour it is guarding.
+        const subdirectories = fs.readdirSync(EMPTY_FUNCTIONS_DIR, { withFileTypes: true })
+            .filter(entry => entry.isDirectory() && !entry.name.startsWith(".")).length;
+        expect(subdirectories).toBeGreaterThan(0);
+        expect(body.skipped).toBe(subdirectories);
         expect(body.note).toMatch(/see the server log/);
 
         expect(warn.mock.calls.flat().join(" ")).toMatch(/no functions loaded/);

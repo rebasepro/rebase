@@ -269,6 +269,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,
         functionsSelection: runtimeRole.functionsSelection,
+        functionsUpstream: runtimeRole.functionsUpstream,
         bootstrappers: dataSources.map(s => s.bootstrapper),
         dataSources: dataSourceDefs,
         storage,

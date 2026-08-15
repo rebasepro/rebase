@@ -487,6 +487,14 @@ export interface RebaseBackendConfig {
      * A name that is not in the bundle fails the boot — see `selectFunctions`.
      */
     functionsSelection?: import("./functions/selection").FunctionSelection;
+    /**
+     * Forward `/api/functions/*` to another process instead of serving it here.
+     *
+     * Only consulted when the `functions` surface is off — a process that serves
+     * them has nothing to forward. `bootFromBundle` fills this from
+     * `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
+     */
+    functionsUpstream?: string;
     cronsDir?: string;
     /**
      * Enable/disable database persistence for cron job execution logs.
@@ -1955,6 +1963,24 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     : "The directory holds no .ts/.js function files.")
             );
         }
+    }
+
+    // 5a. Or forward them, when another process serves them.
+    //
+    // Mutually exclusive with mounting: a process either serves these routes or
+    // hands them on, and a deployment that configured both would have the local
+    // copy silently win. The `surfaces.functions` check is what makes that
+    // impossible rather than merely unlikely.
+    if (config.functionsUpstream && !surfaces.functions) {
+        const { createFunctionsProxy } = await import("./functions/proxy");
+        config.app.route(`${basePath}/functions`, createFunctionsProxy({
+            upstream: config.functionsUpstream,
+            basePath: `${basePath}/functions`
+        }));
+        logger.info("Forwarding custom functions to another process", {
+            path: `${basePath}/functions`,
+            upstream: config.functionsUpstream
+        });
     }
 
     // 6. Mount Cron Jobs
