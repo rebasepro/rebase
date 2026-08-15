@@ -386,3 +386,43 @@ describe("serving one named function", () => {
         expect(listed.functions).toEqual([]);
     }, 180_000);
 });
+
+// Placed last on purpose: the suites above assert against an *unprovisioned*
+// database, and a default-role process provisions on boot. Ordering is part of
+// the fixture here, not an accident.
+describe("a deployment that sets no role at all", () => {
+    /**
+     * The shape every existing deployment is in, and the one Rebase Cloud's
+     * managed runtime boots: `buildManagedContainer` sets `REBASE_BUNDLE`,
+     * `NODE_ENV` and `PORT` and nothing else, so a tenant pod resolves
+     * `REBASE_ROLE=all`.
+     *
+     * This is the compatibility assertion for the whole feature. If it ever
+     * fails, every managed tenant and every self-hosted single container is
+     * serving something different from what it served before the split existed.
+     */
+    let single: Process;
+
+    beforeAll(async () => {
+        single = await start({});
+    }, 180_000);
+
+    it("serves every surface from one process", async () => {
+        expect((await fetch(`${single.origin}/api/data/notes`)).status).toBe(200);
+        expect((await fetch(`${single.origin}/api/functions/echo/hello`)).status).toBe(200);
+        expect((await fetch(`${single.origin}/api/meta/schema-version`)).status).toBe(200);
+        expect((await fetch(`${single.origin}/health`)).status).toBe(200);
+    });
+
+    it("provisions its own schema, as it always did", async () => {
+        expect(await tableExists("split_notes")).toBe(true);
+    });
+
+    it("says nothing about roles in its log", async () => {
+        // The role line is logged only when the role is not `all`. A default
+        // deployment whose logs changed would be a change in behaviour that
+        // nobody asked for, and the first sign of one is usually a new line.
+        expect(single.output()).not.toMatch(/Runtime role/);
+        expect(single.output()).not.toMatch(/Partial runtime surface/);
+    });
+});

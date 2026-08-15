@@ -422,6 +422,43 @@ Every one of these has already burned this repository.
 
 ---
 
+## 5a. Rebase Cloud
+
+Nothing here changes what the managed tier does today, and that is the property
+that matters most, because the fleet is rolled onto new runtime images without
+anyone rebuilding a bundle.
+
+**Why it is safe.** `buildManagedContainer` (saas `backend/src/managed/deployment.ts`)
+sets `REBASE_BUNDLE`, `NODE_ENV` and `PORT` and nothing else, so a tenant pod
+resolves `REBASE_ROLE=all` — byte-identical to the process it booted before.
+Everything added here is additive environment reading; the bundle format is
+untouched and `RUNTIME_CONTRACT_VERSION` does **not** move. A bundle built
+against an older runtime boots on a new image exactly as it did.
+
+That claim is pinned by a test rather than asserted: the last suite in
+`split-roles-e2e.test.ts` boots the runtime with no role set and requires every
+surface, the schema provisioning, and even the absence of a new log line.
+
+**Two things to get right whenever cloud does adopt roles** (phase 3, not now):
+
+1. **Pin `REBASE_ROLE` on the platform side.** It is read from the environment,
+   and a tenant's own env secret is applied via `envFrom` — which Kubernetes
+   lets the container's `env` list override, but only for names that list
+   actually contains. A customer who sets `REBASE_ROLE=worker` in their project's
+   variables today would get a pod that serves no HTTP at all and reads as "my
+   API 404s everything". Adding `{ name: "REBASE_ROLE", value: "all" }` to
+   `platformEnv` closes it in one line, and should land *before* any tenant is
+   told the variable exists.
+2. **A `functions` or `worker` pod must carry `REBASE_MIGRATE_ON_BOOT=none`.**
+   Without it the process refuses to boot — deliberately, see §3.5 — which on
+   Kubernetes is a crash loop rather than a message anyone reads. The refusal is
+   correct; the orchestrator has to set the variable, not discover it.
+
+**What cloud gains, when it wants it.** Per-function Deployments are now a
+manifest change rather than a runtime change: same image, same bundle, a
+different `REBASE_ROLE` and an ingress rule. `k8s/external-backend.ts` and
+`cloudrun/service.ts` in saas are already written and still uncalled.
+
 ## 6. Out of scope
 
 Named explicitly so the boundary is not argued later.
