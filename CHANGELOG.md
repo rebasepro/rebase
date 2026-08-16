@@ -2,7 +2,41 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-16
+
 ### Added
+
+- **Access tokens can be signed asymmetrically, and the public keys are published.** A shared secret cannot do the one thing verification most needs to be: cheap to delegate. Handing a gateway, an edge worker or a neighbouring service the means to *check* a session also hands it the means to *mint* one, so in practice the check moves back to the server that owns the secret — and because rotating that secret invalidates every token at once, it is never rotated.
+
+  `auth.signingKeys` takes PEM private keys. Access tokens are signed by the active one, carry its `kid`, and verify against the matching public half, which is served unauthenticated at `/.well-known/jwks.json` — the URL every verifier already looks for.
+
+  Additive by construction: without keys nothing changes, tokens stay HS256, and the JWKS answers an empty key set rather than a 404, because "this issuer publishes no public keys" is a fact a verifier can act on where a 404 is indistinguishable from a wrong URL. Turning it on signs nobody out, and neither does rotation — list the new key first, keep the old one until the tokens it signed expire, then drop it. Only private keys are configured, so a mismatched pair cannot be expressed; malformed keys, a duplicate `kid`, an algorithm the key cannot sign and an EC curve other than P-256 all fail at boot rather than at the first login.
+
+  `JWT_SECRET` stays required regardless: download, MFA-pending and password-reset tokens are read only by the server that minted them.
+
+- **A durable job queue, and webhook deliveries that survive a restart.** `webhook-service.ts` said it plainly in its own docblock — the queue was in-process and in-memory, so a crash or a deploy between the enqueue and the delivery dropped the event. Nothing recorded that the event had existed, which makes the failure mode silence: the receiver simply never hears about a row that was definitely written.
+
+  A job is now a row in `rebase.jobs`. Workers claim with `SELECT … FOR UPDATE SKIP LOCKED`, so each job goes to exactly one worker and N instances divide the work with nothing elected leader. `rebase.jobs.enqueue(task, payload)` is the public door; `jobs: { enabled: true, tasks: { … } }` registers the handlers.
+
+  The decisions worth knowing: `attempts` increments on *claim*, not on failure, so a job that kills the process cannot retry forever, once per restart. A worker that dies cannot release its own claim, so jobs held past `visibilityTimeoutMs` return to `pending` or dead-letter with an error that says which. An unknown task is returned to the queue rather than failed, because during a rolling deploy the old instance is handed jobs belonging to the new one. Failed jobs are kept for 30 days — a queue that silently drops what it could not deliver looks exactly like one with nothing to do. `idempotencyKey` is unique over *unfinished* work only, or "the nightly digest for user 7" would be sendable once, ever.
+
+- **Aggregates: `count`, `sum`, `avg`, `min`, `max`, optionally grouped.** The query API could return rows and a total and nothing else, so every dashboard question — revenue by status, orders per day — meant hand-written SQL in a custom function, or fetching the rows and reducing them in the client. The second is wrong at any size that matters and *silently* wrong under a `limit`: the numbers look plausible and describe the first page.
+
+  `GET /data/:slug/aggregate?select=count(),sum(total)&groupBy=status`, taking the same filters, `or`/`and` groups and `searchString` as the listing beside it.
+
+  **RLS applies to the rows being aggregated** — an aggregate is an efficient way to learn about rows you cannot select, so it runs through the request-scoped driver like every other read, and a caller whose policies return nothing counts nothing. Aliases are derived rather than accepted (`sum(total)` is `sum_total`), because a caller-chosen alias would have to be checked against the `groupBy` fields. `count`/`sum`/`avg` are parsed to numbers here, since Postgres returns bigint and numeric as strings. A driver without aggregate support answers 501, not an empty list: "no matches" is the wrong thing for a dashboard to conclude from "not supported".
+
+- **Filter inside a jsonb column by path.** Rebase has had jsonb columns for as long as it has had columns and no way to ask a question about what is in one — a filter could compare the whole document and nothing else, so "orders whose metadata says the country is US" meant a custom function or reading the table into the application.
+
+  `metadata->>country` and `metadata->address->>city` now compile to the extraction they look like. The syntax is Postgres's own and PostgREST's, so the filter reads the same as the SQL it becomes.
+
+  The path is bound, never interpolated — it arrives from a query string, and `->>` takes a text parameter perfectly well. The filter *value* picks the comparison, because both obvious readings are wrong on their own: comparing as text puts `"9"` above `"100"`, while casting unconditionally turns any row holding a string into `invalid input syntax for type numeric` — a 500 caused by one row's data on a request that is not wrong. An ordering operator given a number casts, guarded so non-numeric rows are excluded rather than fatal; everything else compares as text. A path into a column that is not json is a 400 rather than SQL Postgres rejects at execution time.
+
+- **One bundle can run as several cooperating processes.** `REBASE_ROLE=api|functions|worker|all` decides what a runtime process serves and what it owns, so a custom function that pins the event loop can be given its own replica count, restarts and blast radius without its code moving anywhere. Same image, same bundle, same database — only the environment differs.
+
+  `all` is the default and is byte-identical to the process this server has always booted, so no existing deployment changes. `REBASE_FUNCTIONS_UPSTREAM` lets the `api` role forward `/api/functions/*` to the functions process, so a split deployment presents the identical URL surface and no client, SDK or API key notices. `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow a process to named functions; a name the bundle does not contain fails the boot and the error lists the names it does have.
+
+  Two combinations refuse to start rather than misbehave quietly: a non-`api` role left on the default `REBASE_MIGRATE_ON_BOOT` (several processes would race to provision one schema), and a variable set on a process that does not read it (it would do nothing at all, leaving a deployment that looks configured and is not). See [Split processes](/docs/deployment/split-processes/) for the compose topology, and for what splitting does *not* give you — shared rate limits, cross-instance channels and scale-to-zero are each called out.
 
 - **A sort is a list of keys, not one key.** `orderBy` accepts `[["category", "asc"], ["created_at", "desc"]]` wherever it accepted `["created_at", "desc"]`, over the SDK, the REST parameter (`?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]`), a WebSocket subscription, and every driver. The second key decides between rows the first calls equal.
 
@@ -12,7 +46,54 @@
 
 - **The admin panel orders by more than one column.** Shift-click a table header to add a column under the sort already there; the header shows each key's rank so a two-arrow header says which one wins. The toolbar's sort menu — now in the table view as well as list and cards — is where a key is re-ranked or removed without rebuilding the sort, and a multi-key sort survives a reload and a shared link.
 
+### Changed
+
+- **Collection tables are created on every boot path, not only the managed one.** `ensureCollectionSchema` and `ensureCollectionPolicies` were called from exactly one place — the managed bundle boot. An app shipping its own image boots by calling `initializeRebaseBackend` directly, never entered that path, and so had its collection tables created by nothing. It came up serving sign-in — auth bootstraps its own tables, which is what made this read as a data bug rather than a boot bug — and 500'd every `/api/data` route, with a green deploy and a healthy `/health`. Found on a tenant that had been in that state for weeks.
+
+  Provisioning now lives in `initializeRebaseBackend`, the one function both paths go through. **If you run a custom image against a database whose tables you manage yourself, set `REBASE_MIGRATE_ON_BOOT=none`** — the additive ensure will otherwise create anything the collections declare and the database lacks. It never drops, narrows or rewrites.
+
+- **A write over the WebSocket now meets the same validation as a write over HTTP.** `assertKnownWriteFields` and `assertWriteValuesValid` were called from the REST generator and nowhere else, so the socket `SAVE` handler took the client's payload straight to `driver.save`:
+
+  ```
+  PATCH /api/data/users/1  { age: 999 }             → 400, naming the rule
+  ws SAVE { path: "users", values: { age: 999 } }   → written
+  ```
+
+  Everything else on the socket path was enforced — it authenticates, it scopes the delegate so RLS binds, and the driver still refuses a column the table does not have. What it skipped is the collection's own `validation` block: `min`, `max`, `matches`, `required`, and the unknown-field check behind `strictWrites`. A realtime write that has been storing values your rules reject will now be refused.
+
 ### Fixed
+
+- **A policy compiler that quoted values and no identifiers.** `policyToPostgres` quoted the value side of every comparison and the identifier side of nothing, so a column whose name Postgres does not read back unchanged reached `CREATE POLICY` as a bare word — and there are three ways that goes. `"createdAt"` folds to `createdat`, the statement errors, and the collection keeps RLS on with no policy, which denies every row; `columnName` is used verbatim and `rebase schema introspect` populates it from the live database, so this is what any camelCase table adopted from an existing project did. `order`, `default` and `end` are syntax errors mid-clause. Worst, `user`, `current_user`, `session_user` and `current_date` are *valid bare expressions*, so the policy compiled, applied, and was logged as applied — while comparing against the connected role or the wall clock instead of the column.
+
+- **A backslash in a policy clause was eaten before Postgres saw it.** The Drizzle generator writes each compiled clause into a `.ts` file inside `` sql`…` `` with no escaping, and Drizzle's `sql` tag reads the *cooked* template strings rather than `.raw` — so JavaScript consumed the escapes first. A rule written ``using: "email ~ '^admin\\.user@corp\\.com$'"`` reached the database as `^admin.user@corp.com$`, where each `\.` matches any character. The DDL generator writes the same rule into a `.sql` file, where a backslash is just a backslash, so the two generators produced different policies from one rule — and the difference was always in the permissive direction. `\d`, `\s` and `\w` went the same way.
+
+- **A vector search on a subcollection route was served as a plain listing.** The subcollection routes parse `?vector_search=`/`?vector=` through the same `parseQuery` the root list uses and then built their options without it, so `GET /authors/1/posts?vector_search=embedding&vector=[…]` came back 200 with rows ordered by `id DESC`, no `_distance`, and the threshold ignored — a silent downgrade the caller reads as "these are the nearest neighbours".
+
+- **A vector-search threshold narrowed the rows but not the count.** `countRawEntities` forwarded `filter`, `logical` and `searchString` to `driver.count` and dropped `vectorSearch`. A `threshold` is a WHERE clause, not a hint, so a similarity-filtered listing was served narrowed rows beside the count of the *unfiltered* set — three rows with `meta.total: 25` — and paging forward then handed back empty pages while `hasMore` stayed true, until the offset walked past the inflated total. The standalone `/count` route answered the same inflated number.
+
+- **`?offset=` became a cursor value on every non-Postgres driver.** Two paths serve `GET /api/data/<collection>`: `restFetchService` when the driver has one, and `fetchRawCollection` for everything else — mongo, firebase, anything a developer registers. The second passed `String(offset)` as `startAfter`, which is a cursor *row*, and never passed `offset` at all. The caller got page one every time, with a `meta` block reporting the offset it had asked for.
+
+- **A subscription is a query, and two of its fields never arrived.** `logical` and `offset` were accepted at every type-checked boundary and then dropped, because `CollectionSubscriptionConfig` did not declare them — the client sends both, the type has no slot for either, and the subscription re-fetches a different query than the one that was asked for. An `or(...)` subscription ran with the group gone and was pushed every row the caller's policies allow, rather than the rows it asked for.
+
+- **A subscription's re-fetches raced, and the loser was delivered last.** Every update a subscription delivers is a full re-fetch, and several things start one for the same subscription without coordinating: the initial fetch at subscribe time, the change stream or `NOTIFY`, and the debounced refetch after a mutation. A fetch that started earlier could finish later, and the delivery replaces the subscriber's whole list — so the subscriber went back to the state before the change and stayed there, silently, until something else touched the collection. Fixed on both the Postgres and the MongoDB paths.
+
+- **A LISTEN connection that failed after connecting was never closed.** Both LISTEN clients build a client, connect it, issue `LISTEN`, and only then assign the field the rest of the class cleans up. Anything before that assignment can throw, and when it did nothing knew the connection existed — `stop()` closed the field, the reconnect timer closed the field, and the field was still undefined. A persistent failure (a revoked LISTEN privilege, a pooler that refuses session state) leaked a backend every three seconds.
+
+- **A declared-but-empty `REBASE_FUNCTIONS_TIMEOUT_MS` read as "no timeout".** `Number("")` is `0`, and zero is meaningful on this setting — it disables the ceiling on purpose. Both ways of producing an empty value are ordinary: a compose file with `REBASE_FUNCTIONS_TIMEOUT_MS=${SOMETHING}` and no `SOMETHING` in the environment, and a `.env` line carrying the name and no value. Neither reads like a configuration change, nothing logged, and what it switched off is the only bound on how long code the framework did not write can hold a socket.
+
+- **`PORT=0` announced `http://localhost:0`.** The listen helper resolved with the port it *asked for* rather than the one it bound, so the ordinary "any free port" request wrote `0` into the boot banner, the dev port file and `.rebase/state.json` — pointing the CLI, MCP discovery and any health check at a port nothing listens on.
+
+- **Simultaneous boots abandoned their schema plan.** `CREATE … IF NOT EXISTS` reads the catalog and then writes to it as two steps, so instances starting together do collide — measured at 8 losses in 10 with five peers. The losing statement threw, and the throw abandoned every remaining action in the plan, so a replica that lost one race came up missing tables it had never attempted, with the boot log blaming the one statement that was harmless. The channel-presence and channel-history bootstraps had the same shape with a `REVOKE` as their tail: losing a create race there left the presence roster and every retained broadcast readable by any signed-in user.
+
+- **A double-clicked signup answered 500 instead of "email already registered".** `POST /auth/register` reads before it inserts, and both engines back that check with a unique index, so no deployment ever ends up with two accounts on one address. What was missing is what the loser is told: neither `createUser` mapped its driver's duplicate-key error, so the second request raised a bare `23505` or `E11000`, reached the central handler as an unclassified failure, and came back as a sanitized 500.
+
+- **Enabling MFA on a Mongo backend answered a sanitized 500.** The auth router mounts the MFA routes for every backend, so `POST /auth/mfa/enroll` is live on MongoDB and landed in the repository's stubs — six of which threw a bare `Error`, which the central handler classifies as unhandled. The person turning on two-factor authentication was told "Internal Server Error" while the actual reason sat in the server log, and the operator got a support ticket about a fault that does not exist.
+
+- **`POST /storage/folder` documented a `bucket` field and never read it.** The handler read `path` and `storageId` and derived the bucket from the path prefix, so `POST /storage/folder { path: "reports", bucket: "media" }` answered 201 and created the folder in the default bucket — the parameter accepted, ignored, and the call reported as success.
+
+- **The newsletter opt-in was offered only to people who typed a password.** It sat on the credentials form, under the password field — the screen you reach *after* choosing email — so a visitor who signed in with Google was never shown the checkbox at all. It moves to the provider screen, beside the buttons that choose how to sign in and directly under the consent block a host passes as `topComponent`; the two ticks are now spaced as one block of conditions rather than two unrelated asks.
+
+- **The OpenAPI spec never mentioned the count endpoint.** `GET /data/{slug}/count` is registered for every collection and appeared in no generated document — the word "count" was not in the generator at all. The spec is what a client generator can see, so an endpoint missing from it is an endpoint that client does not have, and this is the one a paginating UI needs to know how many pages there are.
 
 - **A local-first read disagreed with the server about tied rows.** Every server-side sort ends on `id DESC`, which is what makes the ordering total; the offline overlay re-sorted with an ascending id tiebreak, so two rows sharing a sort value came back from the cache in the opposite order to the network — and `isLocallySortable` reported that page as exactly reproducible while it was not.
 
