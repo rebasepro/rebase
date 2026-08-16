@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { useAuthController, useStorageSource } from "@rebasepro/app";
@@ -13,6 +13,7 @@ import {
     fieldBackgroundHoverMixin,
     fieldBackgroundMixin,
     IconButton,
+    lazyChunk,
     Skeleton,
     XIcon
 } from "@rebasepro/ui";
@@ -22,7 +23,7 @@ import { randomString } from "@rebasepro/utils";
 
 // Lazy-load ProseMirror editor + markdown parser/serializer (~300KB)
 // Only fetched when a markdown field is actually rendered.
-const RichTextEditor = lazy(() => import("../../editor").then(m => ({ default: m.RichTextEditor })));
+const RichTextEditor = lazyChunk(() => import("../../editor").then(m => ({ default: m.RichTextEditor })));
 const loadMarkdownUtils = () => import("../../editor/markdown");
 let _markdownUtils: Awaited<ReturnType<typeof loadMarkdownUtils>> | null = null;
 const getMarkdownUtils = async () => {

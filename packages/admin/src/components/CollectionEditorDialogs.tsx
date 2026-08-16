@@ -1,15 +1,16 @@
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
+import { lazyChunk } from "@rebasepro/ui";
 import { useCollectionEditorDialogsState } from "../collection_editor/CollectionEditorDialogsContext";
 
 // Dynamic imports targeting the separate collection_editor_ui entry point.
 // This ensures the heavy editor UI lands in its own chunk and is only fetched
 // when a dialog is actually opened.
-const CollectionEditorDialog = lazy(() =>
+const CollectionEditorDialog = lazyChunk(() =>
     import("../collection_editor/ui/collection_editor/CollectionEditorDialog")
         .then(m => ({ default: m.CollectionEditorDialog }))
 );
 
-const PropertyFormDialog = lazy(() =>
+const PropertyFormDialog = lazyChunk(() =>
     import("../collection_editor/ui/collection_editor/PropertyEditView")
         .then(m => ({ default: m.PropertyFormDialog }))
 );

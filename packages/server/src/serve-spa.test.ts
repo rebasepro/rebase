@@ -57,8 +57,8 @@ function mount(apps: MountedApp[]): Hono {
     return app;
 }
 
-async function get(app: Hono, url: string): Promise<{ status: number; body: string }> {
-    const res = await app.request(`http://localhost${url}`);
+async function get(app: Hono, url: string, headers?: Record<string, string>): Promise<{ status: number; body: string }> {
+    const res = await app.request(`http://localhost${url}`, headers ? { headers } : undefined);
     return { status: res.status,
 body: await res.text() };
 }
@@ -174,6 +174,42 @@ describe("serveSPA edge cases", () => {
         expect((await get(app, "/admin/deep/link")).body).toBe("ADMIN_INDEX");
         expect((await get(app, "/health")).body).toBe('{"status":"ok"}');
         expect((await get(app, "/api/things")).body).toBe('{"ok":true}');
+    });
+
+    // A deploy replaces the hashed asset files, so a tab opened before it asks
+    // for chunks that are gone. Answering those with index.html is a 200 of
+    // HTML under a .js URL: the browser refuses it as a module and reports
+    // "Failed to fetch dynamically imported module", which names the chunk and
+    // reads as a broken build rather than a stale tab.
+    it.each([
+        ["/assets/RouterCollectionsStudioView-old-hash.js", "a chunk from a previous build"],
+        ["/admin/assets/index-old-hash.js", "a chunk under a sub-app"],
+        ["/assets/index-old.css", "a stylesheet"],
+        ["/assets/index-old.js.map", "a sourcemap"],
+        ["/fonts/inter.woff2", "a font"]
+    ])("404s %s rather than serving the index — it is %s", async (missing) => {
+        const { status, body } = await get(twoApps(), missing);
+        expect(status).toBe(404);
+        expect(body).not.toContain("INDEX");
+    });
+
+    it("404s a missing asset the browser labels, whatever its extension", async () => {
+        // Sec-Fetch-Dest is the browser telling us what it will do with the
+        // response. It will not render HTML as a script.
+        const { status } = await get(twoApps(), "/assets/chunk-with-no-extension", { "sec-fetch-dest": "script" });
+        expect(status).toBe(404);
+    });
+
+    it("still serves the app for a navigation, and for ids that look like filenames", async () => {
+        const app = twoApps();
+        expect((await get(app, "/c/users/ada@example.com", { "sec-fetch-dest": "document" })).body).toBe("SITE_INDEX");
+        // An entity id can be any dotted string; only build extensions 404.
+        expect((await get(app, "/c/posts/v1.2.3-draft")).body).toBe("SITE_INDEX");
+        expect((await get(app, "/admin/c/users/ada@example.com")).body).toBe("ADMIN_INDEX");
+    });
+
+    it("keeps serving assets that do exist", async () => {
+        expect((await get(twoApps(), "/assets/x.js")).body).toBe("SITE_ASSET");
     });
 
     it("disables itself, without throwing, when the directory is missing", async () => {

@@ -2629,3 +2629,57 @@ invisible.
 `save_entity_before_subcollections`. Gated by
 `packages/app/test/translation-keys.test.ts` at zero, so the next one fails on
 the way in.
+
+---
+
+## 46. State the test suite can only reach by staging it
+
+Every suite here starts a server, loads a page, and drives it. That is one
+moment in the life of a deployment: the moment when the running code, the files
+on disk and the tab in the browser are the same build. Some failures only exist
+when they are *not*.
+
+The stale tab is the plain example. A built SPA names its chunks by content hash
+and a deploy replaces the whole `assets/` directory, so a tab opened before the
+deploy still holds the previous entry chunk. It keeps working — until the user
+opens the first view it had not already fetched, and the import asks for a hash
+the server no longer has. The user gets a dead pane reading "Failed to fetch
+dynamically imported module: .../RouterCollectionsStudioView-<hash>.js", which
+names a filename and reads like a broken build, so it is reported as one.
+
+Nothing in a normal suite can produce it. Playwright loads one build and never
+replaces it underneath the page; the CI job builds and serves the same tree. The
+state is not rare in production — it is what *every* user with an open tab is in,
+for as long as they keep it open after a deploy — and it is unreachable by
+construction in test. It is the "aged" row of §1 wearing a different hat: the
+thing under test was made by one version and is being used by another.
+
+The server made it worse in the way this class usually does. `serveSPA` answered
+every unmatched path with `index.html`, missing `/assets/*.js` included, so the
+browser got a 200 of HTML where it asked for a module. The one response that
+would have named the problem — a 404 — was the one response the server could not
+give.
+
+**Sweep:** for anything the code assumes is *the same* across a request, name
+what happens when it is not. Chunk hashes across a deploy. A client SDK older
+than the API it calls. A schema written by a previous release (§1). A cached
+`index.html` in front of an origin that has moved on. A WebSocket that outlives
+the process it connected to. Ask, in each case, what the user sees — and whether
+the answer is a sentence they can act on or a filename.
+
+**Watch for:** the version-skew test that stages nothing and asserts anyway.
+`e2e/tests/stale-tab-after-deploy.spec.ts` fulfils the chunk request with
+`index.html` — the exact response the old server gave — and then asserts the
+interception fired at all, because a route pattern that never matched leaves a
+green test that proves nothing.
+
+### Last sweep — 2026-08-16, chunk loading across a deploy
+
+Every `lazy()` in `packages/admin`, `packages/studio` and `packages/app` — 19
+call sites, the last of which resolves every user-supplied custom view — now
+goes through `lazyChunk`, which retries once and then fails with
+an error `ErrorBoundary` renders as "New version available" plus a reload, rather
+than the browser's wording. `serveSPA` 404s a missing build artifact instead of
+serving the index. Both covered: `packages/ui/test/lazy-chunk.test.tsx`,
+`packages/server/src/serve-spa.test.ts` and the staged-deploy e2e above, which
+fails on a mutation that removes either half.

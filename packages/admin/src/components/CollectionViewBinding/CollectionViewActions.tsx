@@ -1,16 +1,16 @@
 
 
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
 
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
-import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
+import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
 import { ErrorBoundary, Link2Icon, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
-const ImportCollectionAction = lazy(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));
-const ExportCollectionAction = lazy(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
+const ImportCollectionAction = lazyChunk(() => import("../../data_import/import").then(m => ({ default: m.ImportCollectionAction })));
+const ExportCollectionAction = lazyChunk(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 import { useAdminContext } from "../../hooks/useAdminContext";

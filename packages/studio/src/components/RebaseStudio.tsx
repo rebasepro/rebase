@@ -1,21 +1,21 @@
-import React, { lazy, Suspense, useLayoutEffect, useMemo } from "react";
+import React, { Suspense, useLayoutEffect, useMemo } from "react";
 import { useRebaseRegistryDispatch } from "@rebasepro/app";
 import type { RebaseStudioConfig, AppView } from "@rebasepro/admin-types";
-import { CircularProgressCenter } from "@rebasepro/ui";
+import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 // Lazy-loaded studio tools — each fetched only when its route is visited.
 // This keeps Monaco, @xyflow/react, dagre, pgsql-ast-parser etc. out of the initial bundle.
-const SQLEditor = lazy(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
-const JSEditor = lazy(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
-const RLSEditor = lazy(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
-const StorageView = lazy(() => import("./StorageView/StorageView").then(m => ({ default: m.StorageView })));
-const CronJobsView = lazy(() => import("./CronJobs/CronJobsView").then(m => ({ default: m.CronJobsView })));
-const SchemaVisualizer = lazy(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
-const BranchesView = lazy(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
-const BackupsView = lazy(() => import("./Backups/BackupsView").then(m => ({ default: m.BackupsView })));
-const ApiExplorer = lazy(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
-const LogsExplorer = lazy(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
-const ApiKeysView = lazy(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
+const SQLEditor = lazyChunk(() => import("./SQLEditor/SQLEditor").then(m => ({ default: m.SQLEditor })));
+const JSEditor = lazyChunk(() => import("./JSEditor/JSEditor").then(m => ({ default: m.JSEditor })));
+const RLSEditor = lazyChunk(() => import("./RLSEditor/RLSEditor").then(m => ({ default: m.RLSEditor })));
+const StorageView = lazyChunk(() => import("./StorageView/StorageView").then(m => ({ default: m.StorageView })));
+const CronJobsView = lazyChunk(() => import("./CronJobs/CronJobsView").then(m => ({ default: m.CronJobsView })));
+const SchemaVisualizer = lazyChunk(() => import("./SchemaVisualizer/SchemaVisualizer").then(m => ({ default: m.SchemaVisualizer })));
+const BranchesView = lazyChunk(() => import("./Branches/BranchesView").then(m => ({ default: m.BranchesView })));
+const BackupsView = lazyChunk(() => import("./Backups/BackupsView").then(m => ({ default: m.BackupsView })));
+const ApiExplorer = lazyChunk(() => import("./ApiExplorer/ApiExplorer").then(m => ({ default: m.ApiExplorer })));
+const LogsExplorer = lazyChunk(() => import("./LogsExplorer/LogsExplorer").then(m => ({ default: m.LogsExplorer })));
+const ApiKeysView = lazyChunk(() => import("./ApiKeys/ApiKeysView").then(m => ({ default: m.ApiKeysView })));
 
 import { StudioHomePage } from "./StudioHomePage";
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useCallback, useContext, lazy, Suspense } from "react";
+import React, { useMemo, useRef, useEffect, useCallback, useContext, Suspense } from "react";
 import {
     useRebaseRegistry,
     useRebaseContext,
@@ -16,7 +16,7 @@ import {
     RebaseDataContext
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
-import { CircularProgressCenter } from "@rebasepro/ui";
+import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection } from "@rebasepro/admin-types";
 import type { CollectionRegistryController } from "@rebasepro/types";
@@ -41,7 +41,7 @@ import { ConfigControllerProvider } from "../collection_editor/ConfigControllerP
 import { useCollectionsConfigController } from "../collection_editor/useCollectionsConfigController";
 
 // Lazy-load the schema view — only fetched when studio schema tool is active
-const CollectionsStudioView = lazy(() =>
+const CollectionsStudioView = lazyChunk(() =>
     import("../collection_editor/ui/collection_editor/RouterCollectionsStudioView")
         .then(m => ({ default: m.RouterCollectionsStudioView }))
 );

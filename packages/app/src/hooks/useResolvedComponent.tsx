@@ -1,4 +1,5 @@
-import React, { lazy, useMemo } from "react";
+import React, { useMemo } from "react";
+import { lazyChunk } from "@rebasepro/ui";
 import type { ComponentRef, LazyComponentRef } from "@rebasepro/types";
 import { isLazyComponentRef } from "@rebasepro/types";
 
@@ -70,7 +71,9 @@ function getOrCreateLazy<P>(
     if (cached) return cached as React.ComponentType<P>;
 
     // SAFETY: React.lazy returns LazyExoticComponent which is structurally compatible with ComponentType<P>
-    const LazyComponent = lazy(loader) as React.ComponentType<P>;
+    // `lazyChunk`, not `lazy`: a custom view is a chunk like any other, and a
+    // tab left open across a deploy cannot fetch it either.
+    const LazyComponent = lazyChunk(loader) as React.ComponentType<P>;
     lazyCache.set(key, LazyComponent);
     return LazyComponent;
 }

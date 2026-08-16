@@ -6,6 +6,16 @@ import { iconSize } from "../icons/Icon";
 import { Typography } from "./Typography";
 import { Button } from "./Button";
 import { cls } from "../util";
+import { isChunkLoadError } from "../util/lazy_chunk";
+
+/**
+ * The one error a user can fix themselves. A deploy replaces the hashed chunk
+ * files, so a tab opened before it cannot load any lazy view it has not already
+ * fetched — with the browser's raw message ("Failed to fetch dynamically
+ * imported module: …") this reads as a broken build rather than a stale tab.
+ */
+const CHUNK_ERROR_DESCRIPTION =
+    "This app was updated while the tab was open, so part of it could not be loaded. Reload to continue.";
 
 /**
  * Checks whether the error message relates to missing permissions or
@@ -86,15 +96,29 @@ showDetails: false });
     }
 
     private renderInline() {
+        const isStaleChunk = isChunkLoadError(this.state.error);
         return (
-            <div className="flex flex-col m-2">
+            <div className="flex flex-col m-2 items-start">
                 <div className="flex items-center m-2">
-                    <AlertCircleIcon className={"text-red-500 dark:text-red-400"} size={iconSize.small}/>
-                    <div className="ml-4">Error</div>
+                    {isStaleChunk
+                        ? <RefreshCwIcon className={"text-text-secondary dark:text-text-secondary-dark"}
+                                         size={iconSize.small}/>
+                        : <AlertCircleIcon className={"text-red-500 dark:text-red-400"} size={iconSize.small}/>}
+                    <div className="ml-4">{isStaleChunk ? "New version available" : "Error"}</div>
                 </div>
                 <Typography variant={"caption"}>
-                    {this.state.error?.message ?? "See the error in the console"}
+                    {isStaleChunk
+                        ? CHUNK_ERROR_DESCRIPTION
+                        : this.state.error?.message ?? "See the error in the console"}
                 </Typography>
+                {isStaleChunk && <Button variant="outlined"
+                                         color="neutral"
+                                         size="small"
+                                         className="mt-3 ml-2"
+                                         onClick={this.handleReload}>
+                    <RefreshCwIcon size={16}/>
+                    Reload
+                </Button>}
             </div>
         );
     }
@@ -102,14 +126,20 @@ showDetails: false });
     private renderFullPage() {
         const { error, showDetails } = this.state;
         const isPermission = isPermissionError(error);
+        // Neither a fault nor a denial: the app is fine, this tab is behind it.
+        const isStaleChunk = !isPermission && isChunkLoadError(error);
 
-        const Icon = isPermission ? ShieldAlertIcon : AlertCircleIcon;
+        const Icon = isPermission ? ShieldAlertIcon : isStaleChunk ? RefreshCwIcon : AlertCircleIcon;
         const title = isPermission
             ? "Access denied"
-            : "Something went wrong";
+            : isStaleChunk
+                ? "New version available"
+                : "Something went wrong";
         const description = isPermission
             ? "You don't have permission to access this resource. Please check your account permissions or contact your administrator."
-            : "An unexpected error occurred. You can try reloading the page or going back.";
+            : isStaleChunk
+                ? CHUNK_ERROR_DESCRIPTION
+                : "An unexpected error occurred. You can try reloading the page or going back.";
 
         return (
             <div className={cls(
@@ -121,13 +151,17 @@ showDetails: false });
                         "flex items-center justify-center w-14 h-14 rounded-xl mb-6",
                         isPermission
                             ? "bg-amber-100 dark:bg-amber-900/30"
-                            : "bg-red-100 dark:bg-red-900/30"
+                            : isStaleChunk
+                                ? "bg-surface-100 dark:bg-surface-800"
+                                : "bg-red-100 dark:bg-red-900/30"
                     )}>
                         <Icon
                             size={28}
                             className={isPermission
                                 ? "text-amber-600 dark:text-amber-400"
-                                : "text-red-500 dark:text-red-400"}
+                                : isStaleChunk
+                                    ? "text-text-secondary dark:text-text-secondary-dark"
+                                    : "text-red-500 dark:text-red-400"}
                         />
                     </div>
 
@@ -142,7 +176,10 @@ showDetails: false });
                     </Typography>
 
                     <div className="flex gap-3">
-                        <Button
+                        {/* React caches a `lazy()` rejection: re-mounting the
+                            children re-throws without re-running the import, so
+                            "Try again" cannot recover a missing chunk. */}
+                        {!isStaleChunk && <Button
                             variant="outlined"
                             color="neutral"
                             size="medium"
@@ -150,7 +187,7 @@ showDetails: false });
                         >
                             <ArrowLeftIcon size={16}/>
                             Try again
-                        </Button>
+                        </Button>}
                         <Button
                             variant="filled"
                             color="primary"
@@ -162,7 +199,9 @@ showDetails: false });
                         </Button>
                     </div>
 
-                    {error?.message && (
+                    {/* For a stale chunk the message *is* the description
+                        above; repeating it under a disclosure adds nothing. */}
+                    {!isStaleChunk && error?.message && (
                         <div className="mt-8 w-full">
                             <button
                                 onClick={this.toggleDetails}

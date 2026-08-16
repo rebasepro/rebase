@@ -1,7 +1,7 @@
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { Entity } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
-import React, { lazy, Suspense, useEffect } from "react";
+import React, { Suspense, useEffect } from "react";
 import {
     CircularProgressCenter,
     cls,
@@ -9,6 +9,7 @@ import {
     ErrorBoundary,
     IconButton,
     iconSize,
+    lazyChunk,
     Tab,
     Tabs,
     XIcon
@@ -16,7 +17,7 @@ import {
 import { useTranslation } from "@rebasepro/app";
 import { JsonPreviewBinding } from "./JsonPreviewBinding";
 
-const EntityHistoryView = lazy(() => import("./history").then(m => ({ default: m.EntityHistoryView })));
+const EntityHistoryView = lazyChunk(() => import("./history").then(m => ({ default: m.EntityHistoryView })));
 
 export type InspectorTab = "json" | "history";
 

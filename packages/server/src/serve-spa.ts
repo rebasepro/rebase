@@ -85,6 +85,46 @@ function isUnderPath(requestPath: string, prefix: string): boolean {
 }
 
 /**
+ * Extensions a build emits, never a client-side route.
+ *
+ * An allowlist rather than "does the last segment contain a dot": entity routes
+ * carry ids, and an id is often an email or a dotted slug, so a generic
+ * extension test answers `/c/users/ada@example.com` with a 404.
+ */
+const ASSET_EXTENSIONS = new Set([
+    "js", "mjs", "cjs", "css", "map", "wasm",
+    "png", "jpg", "jpeg", "gif", "svg", "webp", "avif", "ico", "bmp",
+    "woff", "woff2", "ttf", "otf", "eot",
+    "mp3", "mp4", "webm", "ogg", "wav"
+]);
+
+/**
+ * Is this request for a build artifact rather than a client-side route?
+ *
+ * It matters because of what the fallback would otherwise do. A tab opened
+ * before a deploy still holds the previous entry chunk, so the first lazy view
+ * it opens fetches a content hash that no longer exists; answering that with
+ * index.html hands the browser HTML where it asked for a module, and the error
+ * it reports ("Failed to fetch dynamically imported module: …") names the chunk
+ * and nothing else — it reads as a broken build, not as a stale tab, and a 404
+ * would have said so. Serving HTML for a missing asset also poisons any cache
+ * sitting in front of the origin with an HTML body under a .js URL.
+ *
+ * `Sec-Fetch-Dest` catches the extensionless cases browsers still label for us;
+ * a missing header (curl, a health probe, an old browser) falls back to the
+ * extension, and so keeps answering navigations with the app.
+ */
+function isAssetRequest(requestPath: string, destination: string | undefined): boolean {
+    if (destination && destination !== "document" && destination !== "iframe" && destination !== "frame") {
+        return true;
+    }
+    const lastSegment = requestPath.slice(requestPath.lastIndexOf("/") + 1);
+    const dot = lastSegment.lastIndexOf(".");
+    if (dot <= 0) return false;
+    return ASSET_EXTENSIONS.has(lastSegment.slice(dot + 1).toLowerCase());
+}
+
+/**
  * Serve a Single Page Application from an Hono app.
  *
  * @internal Not part of the stable public API. Exported only because the
@@ -157,6 +197,13 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         // Skip excluded paths (API, health checks, sibling apps).
         if (allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
             return next();
+        }
+
+        // The static middleware above already declined it, so a request that
+        // asks for a build artifact is asking for one this build does not have.
+        // 404 is both the honest answer and the legible one.
+        if (isAssetRequest(c.req.path, c.req.header("sec-fetch-dest"))) {
+            return c.text("Not found", 404);
         }
 
         const indexPath = path.join(frontendPath, indexFile);

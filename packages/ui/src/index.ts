@@ -18,6 +18,7 @@ export * from "./icons";
 // =============================================================================
 export * from "./styles";
 export { cls } from "./util/cls";
+export { lazyChunk, loadChunk, isChunkLoadError } from "./util/lazy_chunk";
 export { CHIP_COLORS, CHIP_HUES, CHIP_SEED_KEYS, getColorSchemeForKey, getColorSchemeForSeed } from "./util/chip_colors";
 export type { ChipHue, ChipTone } from "./util/chip_colors";
 
