@@ -141,7 +141,12 @@ async function signIn(baseURL: string, attempts = 3) {
                 } else {
                     // The demo login pre-fills credentials behind a privacy
                     // checkbox, which gates the button — hence check, then click.
-                    await page.getByRole("checkbox").check();
+                    // The privacy checkbox, which is what gates the sign-in button.
+                    // `getByRole("checkbox")` was unambiguous until the newsletter opt-in moved
+                    // onto this screen — it now resolves to two elements and Playwright's strict
+                    // mode refuses. Privacy comes from the host's `topComponent`, which renders
+                    // above the newsletter row, so it is the first one.
+                    await page.getByRole("checkbox").first().check();
                     await withEmail.click();
 
                     const submit = page.locator("button", { hasText: /^Sign in$/i }).first();

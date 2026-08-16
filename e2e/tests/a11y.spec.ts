@@ -52,7 +52,12 @@ for (const { name, viewport } of WIDTHS) {
             test("the login screen names every field and control", async ({ page }) => {
                 await page.goto("/");
 
-                await page.getByRole("checkbox").check();
+                // The privacy checkbox, which is what gates the sign-in button.
+                // `getByRole("checkbox")` was unambiguous until the newsletter opt-in moved
+                // onto this screen — it now resolves to two elements and Playwright's strict
+                // mode refuses. Privacy comes from the host's `topComponent`, which renders
+                // above the newsletter row, so it is the first one.
+                await page.getByRole("checkbox").first().check();
                 await page.getByRole("button", { name: /Sign in with email/i }).click();
 
                 // The form is up once the password field exists.
