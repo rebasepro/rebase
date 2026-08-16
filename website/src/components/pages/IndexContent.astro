@@ -941,10 +941,21 @@ const faqColumns = [
                                 <span class="text-2xs font-mono font-medium text-surface-500">self-host</span>
                                 <div class="w-12"></div>
                             </div>
+                            <!-- The self-host path is the CLI, not a clone of this repository:
+                                 `init` scaffolds a project, `build` emits the bundle, and compose
+                                 boots the same published runtime image Rebase Cloud runs. Nobody
+                                 has to fork us to own their infrastructure. Commands and ports
+                                 track packages/cli/templates/template/ — `build` is the scaffold's
+                                 own script, and the runtime publishes API and admin together on
+                                 3001 from one container. -->
                             <div class="px-5 py-5 font-mono text-sm sm:text-sm space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
                                 <div class="flex items-center gap-3 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                     <span class="text-primary font-semibold">~</span>
-                                    <span class="text-white">git clone github.com/rebasepro/rebase</span>
+                                    <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-primary font-semibold">~</span>
+                                    <span class="text-white">pnpm run build</span>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <span class="text-primary font-semibold">~</span>
@@ -952,7 +963,7 @@ const faqColumns = [
                                 </div>
                                 <div class="text-surface-400 text-xs ml-6">✔ Postgres ready on :5432</div>
                                 <div class="text-emerald-400/90 text-xs ml-6 flex items-center gap-2">
-                                    ✔ Backend live on :3000
+                                    ✔ API + admin live on :3001
                                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20 text-emerald-400 text-3xs">
                                         <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                         running
