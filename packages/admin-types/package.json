@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/admin-types",
   "type": "module",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Rebase admin-panel type definitions — the React-flavoured half of the type surface",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
