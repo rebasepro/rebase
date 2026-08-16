@@ -439,20 +439,39 @@ That claim is pinned by a test rather than asserted: the last suite in
 `split-roles-e2e.test.ts` boots the runtime with no role set and requires every
 surface, the schema provisioning, and even the absence of a new log line.
 
-**Two things to get right whenever cloud does adopt roles** (phase 3, not now):
+**Both cloud-side gaps are now closed** (saas `9390731`), because leaving them
+open would have meant a customer variable reshaping their own pod:
 
-1. **Pin `REBASE_ROLE` on the platform side.** It is read from the environment,
-   and a tenant's own env secret is applied via `envFrom` — which Kubernetes
-   lets the container's `env` list override, but only for names that list
-   actually contains. A customer who sets `REBASE_ROLE=worker` in their project's
-   variables today would get a pod that serves no HTTP at all and reads as "my
-   API 404s everything". Adding `{ name: "REBASE_ROLE", value: "all" }` to
-   `platformEnv` closes it in one line, and should land *before* any tenant is
-   told the variable exists.
-2. **A `functions` or `worker` pod must carry `REBASE_MIGRATE_ON_BOOT=none`.**
-   Without it the process refuses to boot — deliberately, see §3.5 — which on
-   Kubernetes is a crash loop rather than a message anyone reads. The refusal is
-   correct; the orchestrator has to set the variable, not discover it.
+1. **The topology is pinned on the platform side.** `pinnedRuntimeEnv(role)` in
+   saas `backend/src/managed/deployment.ts` supplies `REBASE_ROLE` plus the four
+   functions/ownership variables, appended after `platformEnv` so they shadow the
+   tenant's `envFrom` secret. Pinned *empty* rather than to a value, except the
+   role — the runtime reads `""` as unset, so each entry neutralises whatever the
+   tenant set and then lets the role's own default apply. Without it,
+   `REBASE_ROLE=worker` in a customer's project variables gave a pod serving no
+   HTTP at all — and `/health` answers on every role, so readiness passed, the
+   rollout succeeded, and every request 404'd. `REBASE_FUNCTIONS_ONLY` was worse
+   in a different way: it is a boot *refusal* off a `functions` role, so a crash
+   loop.
+2. **`REBASE_MIGRATE_ON_BOOT=none` is decided by the role, not remembered.**
+   `pinnedRuntimeEnv` emits it for any non-provisioning role, so the orchestrator
+   cannot produce a `functions` or `worker` pod that refuses to boot by
+   forgetting a variable. It is deliberately *not* pinned on `all`/`api`: some
+   projects set `none` because they manage their own schema, and overriding that
+   would silently start rewriting schemas at boot.
+
+Cloud Run pins from the same list rather than restating it — the two paths build
+different manifests around one runtime, and a name added to one and forgotten in
+the other is a gap visible only on whichever tier a customer is on.
+
+Existing tenants pick this up at their next deploy or the next fleet rollout,
+whichever comes first: `provisionManagedRuntimeVersion` restates the whole pod
+template rather than patching the image.
+
+**Still required before the managed tier can run any of this**: a runtime image
+carrying 0.14 has to be built and published, and a `runtime_releases` row added.
+Both are prod actions — see [[dockerhub-token-secret-missing]] for the state of
+the registry.
 
 **What cloud gains, when it wants it.** Per-function Deployments are now a
 manifest change rather than a runtime change: same image, same bundle, a
