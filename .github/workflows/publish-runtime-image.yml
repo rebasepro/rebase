@@ -1,0 +1,109 @@
+# Build and push the runtime image for a version that is already released.
+#
+# ## Why this exists separately from `publish.yml`
+#
+# A stable release does four one-way things in order: publish to npm, push a
+# version-bump commit, push a tag, then build and push `rebasepro/server:<v>`.
+# The Docker Hub login sits *between* the third and the fourth, so a bad
+# credential leaves a release half-finished — npm and git carrying a version
+# whose scaffolded `docker-compose.yml` pulls an image that does not exist.
+#
+# That is exactly what happened to 0.13.0, and again to 0.14.1 when the Docker
+# Hub token expired: `Check release credentials` passed because the secret was
+# present, and the login then failed because a present secret is not a valid one.
+#
+# Re-running `publish.yml` is not the repair. It would compute the *next* patch
+# and publish a new version to npm to fix a missing image for the current one —
+# so the only way to get an image for 0.14.1 would be to release 0.14.2.
+#
+# This job builds the image for a version that already exists, from the tag that
+# already exists, and does nothing else. It publishes nothing to npm, bumps no
+# version, and creates no tag.
+name: Publish runtime image
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version to build the image for, e.g. 0.14.1"
+        required: true
+      ref:
+        description: "Git ref to build from. Defaults to v<version>."
+        required: false
+      move_latest:
+        description: "Also move the `latest` tag to this image"
+        type: boolean
+        default: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: runtime-image-${{ inputs.version }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Resolve the ref
+        id: ref
+        run: echo "ref=${{ inputs.ref || format('v{0}', inputs.version) }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout the released commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          fetch-depth: 0
+
+      # The image must be built from what was released, not from whatever main
+      # has become since. A tag that does not exist is a typo in the input, and
+      # failing here costs nothing; failing after a push does not.
+      - name: The ref must carry the version being built
+        run: |
+          PKG=$(node -p "require('./packages/server/package.json').version")
+          if [ "$PKG" != "${{ inputs.version }}" ]; then
+            echo "::error::${{ steps.ref.outputs.ref }} carries @rebasepro/server $PKG, not ${{ inputs.version }}."
+            echo "The image would be tagged with a version its own contents do not claim."
+            exit 1
+          fi
+          echo "$PKG at ${{ steps.ref.outputs.ref }} — matches."
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Before the build, not after: a build is several minutes of work that a
+      # bad credential throws away, and this is the failure being repaired.
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push the runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          # Both architectures, as the release does: a self-hoster on Apple
+          # silicon otherwise gets qemu emulation, which is slow enough on first
+          # boot to read as a hang.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            rebasepro/server:${{ inputs.version }}
+            ${{ inputs.move_latest && format('rebasepro/server:latest') || '' }}
+
+      # Publishing is not the same as being pullable. Ask the registry from
+      # outside, with no credentials, the way a self-hoster's daemon will.
+      - name: Verify the image is pullable
+        run: node scripts/check-runtime-image.mjs --live --version "${{ inputs.version }}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Runtime image published"
+            echo ""
+            echo "- \`rebasepro/server:${{ inputs.version }}\`"
+            [ "${{ inputs.move_latest }}" = "true" ] && echo "- \`rebasepro/server:latest\` moved to it"
+            echo "- built from \`${{ steps.ref.outputs.ref }}\`"
+            echo ""
+            echo "Nothing was published to npm and no version was bumped."
+          } >> "$GITHUB_STEP_SUMMARY"
