@@ -26,7 +26,7 @@ import {
     type NestedPathHop
 } from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
-import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage } from "../utils/pg-error-utils";
+import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
 
 /**
@@ -511,11 +511,32 @@ export class PersistService {
             // reported to callers as a bad request. Classes 22 (data exception)
             // and 23 (integrity constraint violation) are the caller's data;
             // everything else — a dropped connection, a missing column, a
-            // permission problem — is ours, and stays a 500.
+            // *privilege* problem — is ours, and stays a 500.
             if (/^2[23]/.test(code)) {
                 return code === "23505"
                     ? ApiError.conflict(message, `PG_${code}`)
                     : ApiError.badRequest(message, `PG_${code}`);
+            }
+            // With one exception inside class 42: a row-level-security policy
+            // refusing the caller is not a fault at all, it is access control
+            // working. It fell through to the 500 below, so the client could not
+            // tell "you may not do this" from "the server is broken" — and a
+            // 500's message is sanitized on the way out, so the reason was lost
+            // too. `expected`, because a caller attempting what their policies
+            // forbid is routine and should not page anyone; that is the same
+            // treatment `unauthenticated()` gets one status code down.
+            // `WRITE_DENIED`, the same code `explainZeroRowWrite` returns for an
+            // UPDATE or DELETE that RLS refused. Those already answered 403; only
+            // INSERT reached here, because a failed `WITH CHECK` raises 42501 while
+            // a refused UPDATE simply matches no rows. Two spellings of one denial
+            // should not be two status codes.
+            //
+            // Left at the default log level rather than `expected`: `ApiError`'s
+            // own documentation puts "a permission the database refused" in the
+            // stays-at-warn column, and the status code is the defect here. The
+            // log level is a separate decision that already has an answer.
+            if (isRowLevelSecurityDenial(error)) {
+                return ApiError.forbidden(message, "WRITE_DENIED");
             }
             return new Error(message);
         }

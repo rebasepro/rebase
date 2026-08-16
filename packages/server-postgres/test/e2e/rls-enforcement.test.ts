@@ -274,13 +274,37 @@ describe("Unified RLS enforcement (E2E)", () => {
 
     it("DENIES a user write that violates the policy (WITH CHECK: forging another owner)", async () => {
         const a = await userDriver("user-a");
+        // 403 WRITE_DENIED, the same answer the UPDATE, DELETE and UNLINK
+        // refusals below give. It asserted only `toBeTruthy()` for a long time,
+        // and that is how this shipped as a 500: a refused INSERT raises 42501
+        // (a failed WITH CHECK) where a refused UPDATE simply matches no rows,
+        // so the INSERT went down the unclassified path and came back as
+        // "Internal Server Error" with its reason sanitized away. A test that
+        // accepts any error cannot tell a denial from a fault.
         await expect(a.save({
             path: "tasks", collection: tasksCollection,
             values: { id: "t-forged", title: "spoof", owner_id: "user-b" }
-        } as never)).rejects.toBeTruthy();
+        } as never)).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
 
         // Nothing was written.
         expect(await rawCount("tasks", "WHERE id = 't-forged'")).toBe(0);
+    });
+
+    it("tells the caller a policy refused the row, not that the server broke", async () => {
+        // The message survives to the client only because the status is 4xx — a
+        // 500's message is sanitized on the way out, which is what made this
+        // undiagnosable from the outside.
+        const a = await userDriver("user-a");
+        const err = await a.save({
+            path: "tasks", collection: tasksCollection,
+            values: { id: "t-forged-2", title: "spoof", owner_id: "user-b" }
+        } as never).catch((e: unknown) => e as Error);
+
+        expect(err).toBeInstanceOf(Error);
+        expect(err.message).toMatch(/row-level security policy/i);
+        // Not the other 42501: this is not a credentials problem, and saying so
+        // would send the reader to check a GRANT that is fine.
+        expect(err.message).not.toMatch(/database credentials/i);
     });
 
     it("DENIES a user from updating another tenant's row (USING makes it invisible)", async () => {

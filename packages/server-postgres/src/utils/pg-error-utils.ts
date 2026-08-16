@@ -179,6 +179,38 @@ export function isRoleSwitchingPermissionError(error: unknown): boolean {
 }
 
 /**
+ * Was this `42501` the *caller* being refused by a policy, rather than the
+ * server lacking a privilege?
+ *
+ * Both arrive as `insufficient_privilege`, and they are opposite kinds of
+ * problem. A row-level-security refusal is a working access-control system
+ * doing its job: the caller asked for something their policies do not permit,
+ * which is a 403 and nobody's bug. A missing `GRANT` is the deployment being
+ * wrong — the connection role cannot touch the table at all, no policy is
+ * involved, and nothing the caller changes about the request will help.
+ *
+ * Postgres distinguishes them in the message, so this does too:
+ *
+ *     new row violates row-level security policy for table "notes"  → the caller
+ *     permission denied for table notes                             → the server
+ *
+ * Only writes reach this. A read that RLS excludes is not an error — the rows
+ * are filtered and the caller gets an empty page — so the erroring case is
+ * specifically an `INSERT`/`UPDATE` whose row fails a policy's `WITH CHECK`.
+ *
+ * Matched on the message because that is the only thing carrying the
+ * distinction; the SQLSTATE is identical either way. Narrow by design: anything
+ * not naming row-level security stays the server's problem, since reporting a
+ * genuine privilege misconfiguration as "forbidden" would send an operator
+ * hunting for a policy bug that does not exist.
+ */
+export function isRowLevelSecurityDenial(error: unknown): boolean {
+    const pgError = extractPgError(error);
+    if (!pgError || pgError.code !== "42501") return false;
+    return pgError.message.toLowerCase().includes("row-level security policy");
+}
+
+/**
  * Translate a raw PostgreSQL error into a user-friendly message.
  *
  * @param pgError  - The extracted PostgreSQL error (from {@link extractPgError})
@@ -249,10 +281,23 @@ export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string
                 code
             };
         case "42501": // insufficient_privilege
-            return {
-                message: `Permission denied on "${tableRef}". Check your database credentials and RLS policies.${suffix}`,
-                code
-            };
+            // Two unrelated failures share this SQLSTATE, and the old message
+            // named both causes because it could not tell them apart — which
+            // meant it was half wrong whichever one had happened, and sent the
+            // reader to check the other. Postgres says which in its own message.
+            return pgMessage.toLowerCase().includes("row-level security policy")
+                ? {
+                    // The caller. Their policies do not permit this row; the
+                    // deployment is working exactly as configured.
+                    message: `Not permitted to write this row in "${tableRef}": it does not satisfy the row-level security policy.${suffix}`,
+                    code
+                }
+                : {
+                    // The deployment. No policy is involved — the connecting
+                    // role cannot touch the table at all.
+                    message: `Permission denied on "${tableRef}": the database role this server connects as lacks privileges on it.${suffix}`,
+                    code
+                };
         case "28000": // invalid_authorization_specification
             return {
                 message: `Authorization failed for "${context}". Check your database credentials.${suffix}`,
