@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError, classifyConnectFailure, reachedDatabase } from "../src/utils/pg-error-utils";
+import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError, isRowLevelSecurityDenial, classifyConnectFailure, reachedDatabase } from "../src/utils/pg-error-utils";
 import { logger } from "@rebasepro/server";
 // Imported from the module rather than the package barrel: the barrel is
 // mocked below, so `ApiError` would come back undefined through it.
@@ -165,7 +165,12 @@ describe("pg-error-utils", () => {
             const result = pgErrorToFriendlyMessage(pgError as any, "clients");
             expect(result.code).toBe("42501");
             expect(result.message).toContain("Permission denied");
-            expect(result.message).toContain("RLS policies");
+            // This one is a missing GRANT, so it must NOT mention RLS. The
+            // message used to name both causes because it could not tell them
+            // apart, and this assertion pinned that: it required a privilege
+            // misconfiguration to point the reader at their policies.
+            expect(result.message).toContain("role this server connects as");
+            expect(result.message).not.toContain("RLS policies");
         });
 
         it("includes hint when present", () => {
@@ -363,6 +368,83 @@ describe("pg-error-utils", () => {
         it("is false for non-errors", () => {
             expect(reachedDatabase(undefined)).toBe(false);
             expect(reachedDatabase("boom")).toBe(false);
+        });
+    });
+
+    /**
+     * Two opposite problems share SQLSTATE 42501, and only the message tells
+     * them apart: a policy refusing the caller (their request, a 403) and the
+     * connecting role lacking a GRANT (the deployment, a 500). Calling the
+     * second one "forbidden" would send an operator hunting for a policy bug
+     * that does not exist, so the check is deliberately narrow.
+     */
+    describe("isRowLevelSecurityDenial", () => {
+        const pg = (message: string, code = "42501") =>
+            Object.assign(new Error(message), { code });
+
+        it("recognises a failed WITH CHECK on insert — what a denied write raises", () => {
+            expect(isRowLevelSecurityDenial(
+                pg('new row violates row-level security policy for table "notes"')
+            )).toBe(true);
+        });
+
+        it("recognises the USING variant an update raises", () => {
+            expect(isRowLevelSecurityDenial(
+                pg('new row violates row-level security policy (USING expression) for table "notes"')
+            )).toBe(true);
+        });
+
+        it("finds it through the Drizzle wrapper", () => {
+            // Nothing useful is ever on the top-level error.
+            const wrapped = new Error("Failed query: insert into notes …");
+            (wrapped as { cause?: unknown }).cause =
+                pg('new row violates row-level security policy for table "notes"');
+            expect(isRowLevelSecurityDenial(wrapped)).toBe(true);
+        });
+
+        it("REFUSES a missing GRANT — that is the server's problem, not the caller's", () => {
+            expect(isRowLevelSecurityDenial(pg("permission denied for table notes"))).toBe(false);
+            expect(isRowLevelSecurityDenial(pg("permission denied for relation notes"))).toBe(false);
+            expect(isRowLevelSecurityDenial(pg("permission denied for schema public"))).toBe(false);
+        });
+
+        it("REFUSES the role-switching failure, which has its own handling", () => {
+            expect(isRowLevelSecurityDenial(pg('permission denied to set role "demo"'))).toBe(false);
+        });
+
+        it("refuses anything that is not 42501", () => {
+            expect(isRowLevelSecurityDenial(
+                pg('new row violates row-level security policy for table "notes"', "23505")
+            )).toBe(false);
+            expect(isRowLevelSecurityDenial(undefined)).toBe(false);
+            expect(isRowLevelSecurityDenial("not an error")).toBe(false);
+        });
+    });
+
+    describe("the 42501 message says WHICH of the two happened", () => {
+        it("blames the policy, not the credentials, for an RLS refusal", () => {
+            const { message } = pgErrorToFriendlyMessage(
+                Object.assign(new Error('new row violates row-level security policy for table "notes"'), {
+                    code: "42501", table: "notes"
+                }) as never,
+                "notes"
+            );
+            expect(message).toMatch(/row-level security policy/i);
+            // The old message named both causes because it could not tell them
+            // apart, so it was half wrong either way and sent the reader to
+            // check the wrong one.
+            expect(message).not.toMatch(/database credentials/i);
+        });
+
+        it("blames the connecting role, not a policy, for a missing GRANT", () => {
+            const { message } = pgErrorToFriendlyMessage(
+                Object.assign(new Error("permission denied for table notes"), {
+                    code: "42501", table: "notes"
+                }) as never,
+                "notes"
+            );
+            expect(message).toMatch(/role this server connects as/i);
+            expect(message).not.toMatch(/row-level security/i);
         });
     });
 
