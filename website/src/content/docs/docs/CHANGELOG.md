@@ -1,10 +1,19 @@
 ---
 slug: docs/changelog
 title: Changelog
+description: Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 ---
 # Changelog
 
 ## [Unreleased]
+
+### Fixed
+
+- **A write refused by a row-level-security policy answered 500, not 403.** The client could not tell "you may not do this" from "the server is broken" — and a 500's message is sanitized on the way out, so the reason went with it. An operator got paged for access control working correctly.
+
+  Only `INSERT` was affected, and for a mechanical reason: a refused `UPDATE` or `DELETE` simply matches no rows, which was already classified as `403 WRITE_DENIED`, while a refused `INSERT` raises `42501` from a failed `WITH CHECK` and fell through to the unclassified path. All four spellings of the denial now answer the same status and the same code.
+
+  `42501` carries two opposite problems and only the message separates them, so the driver now does too: a policy refusing the caller is a 403, while the connecting role lacking a `GRANT` stays a 500 — telling an operator "forbidden" for a missing privilege would send them hunting for a policy bug that does not exist. The message used to name both causes because it could not tell them apart; it now names whichever happened.
 
 ## [0.14.1] - 2026-08-16
 
