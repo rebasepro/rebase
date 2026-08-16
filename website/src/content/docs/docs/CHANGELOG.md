@@ -7,7 +7,7 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
-## [0.15.0] - 2026-08-16
+## [0.14.1] - 2026-08-16
 
 ### Added
 
