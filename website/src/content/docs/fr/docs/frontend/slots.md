@@ -58,7 +58,7 @@ const myPlugin: RebasePlugin = {
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Cartes supplémentaires sur la page d'accueil |
 | `home.children.start` | `PluginGenericProps` | Contenu au début de la page d'accueil |
 | `home.children.end` | `PluginGenericProps` | Contenu à la fin de la page d'accueil |
-| `home.card.insight` | `HomeCardInsightSlotProps` | Widget d'insight compact à l'intérieur d'une carte de collection de la page d'accueil |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Widget compact à l'intérieur d'une carte de collection de la page d'accueil |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Actions sur les cartes de collection de la page d'accueil |
 
 #### Navigation
@@ -79,7 +79,7 @@ const myPlugin: RebasePlugin = {
 | `collection.error` | `CollectionErrorProps` | Affichage de l'état d'erreur d'une collection |
 | `collection.toolbar` | `CollectionToolbarProps` | Widgets supplémentaires dans la rangée de la barre d'outils de la collection |
 | `collection.empty-state` | `CollectionEmptyStateProps` | État vide personnalisé lorsque la collection n'a pas de données |
-| `collection.insights` | `CollectionInsightsSlotProps` | Widgets d'insight au-dessus du tableau de la collection |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets au-dessus du tableau de la collection |
 | `collection.filter-panel` | `CollectionFilterPanelProps` | Barre latérale de filtres personnalisée à côté du tableau. **Pas encore rendu** — déclaré, mais rien dans l'admin ne le rend aujourd'hui. |
 
 #### Entité / Formulaire

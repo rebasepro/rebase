@@ -76,7 +76,7 @@ export function NavigationCardBinding({
         context
     });
 
-    const pluginCardInsights = useSlot("home.card.insight", {
+    const pluginCardWidgets = useSlot("home.card.widget", {
         slug: slug,
         collection: collection!,
         context
@@ -92,7 +92,7 @@ export function NavigationCardBinding({
         name={name}
         description={description}
         actions={actions}
-        additionalContent={pluginCardInsights.length > 0 ? <>{pluginCardInsights}</> : undefined}
+        additionalContent={pluginCardWidgets.length > 0 ? <>{pluginCardWidgets}</> : undefined}
         onClick={() => {
             onClick?.();
             navigate(url);

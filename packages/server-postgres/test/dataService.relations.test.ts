@@ -517,8 +517,12 @@ customerId: 1 }
             // nothing: only what reached ORDER BY does. The id tiebreaker
             // trails the requested key so the order is total, and keyset
             // pagination has a unique cursor to advance on.
+            // The NULL placement is written out rather than inherited from
+            // Postgres's default, which is what it already was: `DESC` means
+            // `NULLS FIRST`. It is stated because the keyset comparison behind
+            // cursor paging encodes the same placement.
             const orderBy = (chain.orderBy as jest.Mock).mock.calls[0].map(compiled);
-            expect(orderBy).toEqual(["total desc", "id desc"]);
+            expect(orderBy).toEqual(["total DESC NULLS FIRST", "id desc"]);
         });
     });
 

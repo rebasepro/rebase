@@ -4,7 +4,8 @@ import {
     ALL_WHERE_FILTER_OPS,
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
-    ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany
+    ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
+    encodeRelationAggregateSort, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
     fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
@@ -100,6 +101,23 @@ const targetOf = (relation: ResolvedRelation): CollectionConfig | undefined => {
     } catch {
         return undefined;
     }
+};
+
+/**
+ * The SQL each aggregate sort function compiles to.
+ *
+ * A lookup rather than interpolation, and `sql.raw` applied to five constants
+ * written out here rather than to anything derived from a request. The key is
+ * already validated by `parseRelationAggregateSort` — this is the second lock
+ * on the same door, so that a future caller reaching the builder directly
+ * cannot put a string from the wire where a function name goes.
+ */
+const AGGREGATE_SQL: Record<RelationAggregateFn, SQL> = {
+    min: sql.raw("min"),
+    max: sql.raw("max"),
+    count: sql.raw("count"),
+    sum: sql.raw("sum"),
+    avg: sql.raw("avg")
 };
 
 /** Column types `ILIKE '%…%'` is defined on. */
@@ -212,6 +230,27 @@ type FilterTarget =
         /** Bound here so the compile step cannot be reached without them. */
         registry: PostgresCollectionRegistry;
         sourceIdColumn: AnyPgColumn;
+    }
+    | {
+        /**
+         * A *column of the related row* — `applications.status`. Same `EXISTS`
+         * as `relation`, with the predicate moved off the target's id and onto
+         * one of its columns.
+         */
+        kind: "relation-field";
+        /**
+         * `via` is not among them: it is refused at resolution, and leaving it
+         * in the type would let a later edit reach the compile step with a
+         * relation there is no correlation for.
+         */
+        relation: ResolvedBelongsTo | ResolvedForeignKeyOnTarget | ResolvedManyToMany;
+        registry: PostgresCollectionRegistry;
+        /** The column on *this* table the subquery correlates back to. */
+        sourceIdColumn: AnyPgColumn;
+        /** The table the predicate is asked of, already resolved. */
+        targetTable: PgTable<any>;
+        /** The column on {@link targetTable} the predicate compares. */
+        targetColumn: AnyPgColumn;
     };
 
 /**
@@ -229,6 +268,25 @@ type FilterTarget =
  * of habit, and refusing it would be pedantry about a distinction this layer
  * erases anyway.
  */
+/**
+ * Split `applications.status` into the relation and the column it addresses.
+ *
+ * One dot, and only the first one: a relation name cannot contain a dot, and
+ * everything after it is handed to the target as a single column key. A second
+ * dot would be a second hop — `talents.applications.job.title` — which is a
+ * different feature (it needs a chain of subqueries, and a chain has to decide
+ * what "some" means at every level), so it is refused rather than silently read
+ * as a column named `job.title` that no table has.
+ *
+ * Returns `undefined` for a field with no dot, which leaves every existing
+ * filter on exactly the path it took before.
+ */
+function parseRelationFieldPath(field: string): { relationKey: string; fieldKey: string } | undefined {
+    const dot = field.indexOf(".");
+    if (dot <= 0 || dot === field.length - 1) return undefined;
+    return { relationKey: field.slice(0, dot), fieldKey: field.slice(dot + 1) };
+}
+
 function parseJsonFieldPath(field: string): { columnKey: string; path: string[] } | undefined {
     if (!field.includes("->")) return undefined;
 
@@ -567,6 +625,17 @@ export class DrizzleConditionBuilder {
                 }
                 return { kind: "relation", relation, registry, sourceIdColumn: correlationColumn };
             }
+
+            // `applications.status` — a column of the related row rather than
+            // its id. Resolved last of the relation shapes, so a relation
+            // literally named with a dot still wins above.
+            const relationField = parseRelationFieldPath(field);
+            if (relationField && registry && sourceIdColumn) {
+                const target = this.resolveRelationFieldTarget(
+                    table, relationField, collection, registry, sourceIdColumn, field, collectionPath
+                );
+                if (target) return target;
+            }
         }
 
         // No collection in hand — the shapes an owning relation's key takes by
@@ -607,6 +676,106 @@ export class DrizzleConditionBuilder {
             "UNKNOWN_FILTER_FIELD",
             { field, collection: collectionPath, ...(validFields.length > 0 && { validFields }) }
         );
+    }
+
+    /**
+     * `applications.status` — the relation, and the column of the target it
+     * addresses.
+     *
+     * `undefined` when the first segment names no relation: the field simply is
+     * not a relation path, and resolution carries on to the guesses and then to
+     * the unknown-field answer, which is where a typo belongs. A segment that
+     * *does* name a relation is a different matter — the author plainly meant
+     * this shape — so everything after that point throws rather than returning,
+     * naming what went wrong. Falling through would report "unknown filter
+     * field 'applications.status'" and list the columns of the wrong table.
+     *
+     * `via` is refused for the reason it is absent from
+     * `filterableRelationKinds`: its join path is authored source → target with
+     * no stated inverse, so there is nothing to correlate a subquery back to.
+     */
+    private static resolveRelationFieldTarget(
+        table: PgTable<any>,
+        path: { relationKey: string; fieldKey: string },
+        collection: CollectionConfig,
+        registry: PostgresCollectionRegistry,
+        sourceIdColumn: AnyPgColumn,
+        field: string,
+        collectionPath: string
+    ): FilterTarget | undefined {
+        const relation = resolveCollectionRelations(collection)[path.relationKey];
+        if (!relation) return undefined;
+
+        if (relation.kind === "via") {
+            throw ApiError.badRequest(
+                `Cannot filter by '${field}' on collection '${collectionPath}': '${path.relationKey}' is a ` +
+                "`via` relation, whose join path is authored one way only, so there is nothing to correlate " +
+                "a subquery back to.",
+                "UNSUPPORTED_RELATION_FILTER",
+                { field, collection: collectionPath, relation: path.relationKey, kind: relation.kind }
+            );
+        }
+
+        const targetCollection = targetOf(relation);
+        const targetTable = targetCollection && registry.getTable(getTableName(targetCollection));
+        if (!targetCollection || !targetTable) {
+            throw new Error(
+                `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
+                `so '${field}' has nothing to filter against.`
+            );
+        }
+
+        const targetColumn = relationColumn(targetTable, targetCollection, path.fieldKey)
+            ?? (path.fieldKey in targetTable
+                ? targetTable[path.fieldKey as keyof typeof targetTable] as AnyPgColumn
+                : undefined);
+        if (!targetColumn) {
+            let validFields: string[] = [];
+            try {
+                validFields = Object.keys(getTableColumns(targetTable)).sort();
+            } catch {
+                // Same tolerance as the column path: a table stand-in without
+                // Drizzle's column symbols still gets the error, just no list.
+            }
+            throw ApiError.badRequest(
+                `Unknown field '${path.fieldKey}' on '${targetCollection.slug}', the target of relation ` +
+                `'${path.relationKey}' on collection '${collectionPath}'` +
+                (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
+                "UNKNOWN_FILTER_FIELD",
+                {
+                    field,
+                    collection: collectionPath,
+                    relation: path.relationKey,
+                    targetCollection: targetCollection.slug,
+                    ...(validFields.length > 0 && { validFields })
+                }
+            );
+        }
+
+        // The column on *this* table the subquery correlates back to. Only
+        // `hasMany`/`hasOne` can name a different one; `belongsTo` correlates
+        // from its own foreign key, and a many-to-many from the primary key the
+        // junction was built against.
+        const correlationColumn = relation.kind === "belongsTo"
+            ? relationColumn(table, collection, relation.localKey)
+            : hasForeignKeyOnTarget(relation) && relation.sourceKey
+                ? relationColumn(table, collection, relation.sourceKey)
+                : sourceIdColumn;
+        if (!correlationColumn) {
+            throw new Error(
+                `Relation '${relation.relationName}' on '${collectionPath}' names a key that is not a column ` +
+                `there, so '${field}' has nothing to correlate against.`
+            );
+        }
+
+        return {
+            kind: "relation-field",
+            relation,
+            registry,
+            sourceIdColumn: correlationColumn,
+            targetTable,
+            targetColumn
+        };
     }
 
     /**
@@ -687,6 +856,9 @@ export class DrizzleConditionBuilder {
         }
         if (target.kind === "json") {
             return this.buildJsonPathCondition(target.column, target.path, op, value);
+        }
+        if (target.kind === "relation-field") {
+            return this.buildRelationFieldCondition(target, op, value, field, collectionPath);
         }
         return this.buildRelationFilterCondition(
             target.relation, op, value, target.sourceIdColumn, target.registry, field, collectionPath
@@ -989,6 +1161,427 @@ export class DrizzleConditionBuilder {
                     { field, collection: collectionPath, operator: op }
                 );
         }
+    }
+
+    /**
+     * A filter on a *column of the related row* — `applications.status`.
+     *
+     * The same `EXISTS` {@link buildRelationFilterCondition} builds, with the
+     * predicate moved off the target's id and onto one of its columns:
+     *
+     *     EXISTS (SELECT 1 FROM talent_applications AS t
+     *             WHERE t.talent_id = talents.id
+     *               AND t.status IN ('applied', 'reviewing', 'interview'))
+     *
+     * which is the shape every "who is waiting" queue is written in. Without
+     * it the only way to ask is to fetch every row and filter in the browser,
+     * and a filter the client applies after paging is not a filter — the page
+     * was already chosen without it.
+     *
+     * A many-to-many needs one more table than the id filter does. That one
+     * stops at the junction, because the junction already holds the value it
+     * compares; a column of the target is a table further out, so the subquery
+     * joins the target to the junction and correlates from the junction. The
+     * join is inside `EXISTS`, so it cannot multiply the outer rows the way a
+     * top-level join through a junction would.
+     *
+     * `belongsTo` is included even though its foreign key is a column here:
+     * `author.name` is a column of another table either way, and refusing the
+     * one relation kind that reads most naturally would be a rule about
+     * implementation rather than about meaning.
+     *
+     * Under RLS the subquery runs as the reader, so it sees the target rows
+     * that reader's policies allow and no others. On the positive direction
+     * that is exactly right. On the negative — `!=`, `not-in`, and any
+     * `NOT EXISTS` — "no related row satisfies this" and "no related row this
+     * reader can see satisfies this" are the same sentence, so a target table
+     * with row-level security and no `SELECT` policy for `rebase_user` makes
+     * every row look unmatched and the negative filter over-reports. Nothing is
+     * leaked: the outer table's own policies still decide which rows exist. The
+     * cause is a missing policy on the target rather than anything here, and it
+     * is the same caveat the id-filter path carries.
+     */
+    static buildRelationFieldCondition(
+        target: Extract<FilterTarget, { kind: "relation-field" }>,
+        op: WhereFilterOp,
+        value: unknown,
+        field: string,
+        collectionPath: string
+    ): SQL {
+        const alias = "__rel_field";
+        const { relation, targetTable, targetColumn } = target;
+        const ref = sql`${sql.identifier(alias)}.${sql.identifier(targetColumn.name)}`;
+
+        const { predicate, negate } = this.buildRelationColumnPredicate(
+            ref, targetColumn, op, value, field, collectionPath
+        );
+
+        // Everything inside the subquery is referenced by identifier against a
+        // local alias — see `buildRelationScopeCondition` for why a Drizzle
+        // column object cannot be used there. Only `sourceIdColumn` stays a
+        // column object, which is what binds it to the *outer* row.
+        let from: SQL;
+        let correlation: SQL;
+
+        if (relation.kind === "manyToMany") {
+            const { table: junctionName, sourceColumn, targetColumn: junctionTargetColumn } = relation.through;
+            const junctionTable = target.registry.getTable(junctionName);
+            if (!junctionTable) {
+                throw new Error(`Junction table not found: ${junctionName}`);
+            }
+            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetCol = junctionTable[junctionTargetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            if (!sourceCol || !targetCol) {
+                throw new Error(
+                    `Junction columns '${sourceColumn}'/'${junctionTargetColumn}' not found in '${junctionName}'`
+                );
+            }
+            const targetKey = this.primaryKeyColumn(targetTable);
+            if (!targetKey) {
+                throw new Error(
+                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `so '${field}' has nothing to join the junction against.`
+                );
+            }
+            const junctionAlias = "__rel_field_junction";
+            from = sql`${targetTable} AS ${sql.identifier(alias)} INNER JOIN ${junctionTable} AS ${sql.identifier(junctionAlias)} ON ${sql.identifier(junctionAlias)}.${sql.identifier(targetCol.name)} = ${sql.identifier(alias)}.${sql.identifier(targetKey.name)}`;
+            correlation = sql`${sql.identifier(junctionAlias)}.${sql.identifier(sourceCol.name)} = ${target.sourceIdColumn}`;
+        } else if (relation.kind === "belongsTo") {
+            const targetKey = this.primaryKeyColumn(targetTable);
+            if (!targetKey) {
+                throw new Error(
+                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `so '${field}' has nothing to correlate against.`
+                );
+            }
+            from = sql`${targetTable} AS ${sql.identifier(alias)}`;
+            correlation = sql`${sql.identifier(alias)}.${sql.identifier(targetKey.name)} = ${target.sourceIdColumn}`;
+        } else {
+            const foreignKey = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
+            if (!foreignKey) {
+                throw new Error(
+                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
+                    `relation '${relation.relationName}'.`
+                );
+            }
+            from = sql`${targetTable} AS ${sql.identifier(alias)}`;
+            correlation = sql`${sql.identifier(alias)}.${sql.identifier(foreignKey.name)} = ${target.sourceIdColumn}`;
+        }
+
+        const where = predicate ? sql`${correlation} AND ${predicate}` : correlation;
+        const exists = sql`EXISTS (SELECT 1 FROM ${from} WHERE ${where})`;
+        return negate ? sql`NOT ${exists}` : exists;
+    }
+
+    /**
+     * The inner predicate of a relation *column* filter, and whether the
+     * `EXISTS` wrapping it is negated.
+     *
+     * The negation rule is the one {@link buildRelationFilterPredicate} states
+     * and holds for exactly the same reason, one column over. A negative
+     * operator is `NOT EXISTS` of the **positive** predicate, never `EXISTS` of
+     * a negated one: `EXISTS (… AND status != 'hired')` asks "does some
+     * application differ from hired", which is true of nearly every candidate
+     * with more than one application and answers nothing anybody asked.
+     * `NOT EXISTS (… AND status = 'hired')` asks "is there no hired
+     * application", which is what unticking a value means — and it makes `==`
+     * and `!=` partition the rows, the way a filter implies they do.
+     *
+     * `is-null` and `is-not-null` are the exception, and deliberately not a
+     * complementary pair here. On a column they compile to `EXISTS (… AND col
+     * IS NULL)` and `EXISTS (… AND col IS NOT NULL)` — "has a related row whose
+     * column is unset" and "has one where it is set" — which is the plain
+     * reading of `applications.status is-not-null` and the useful one. They are
+     * both true of a candidate with two applications, one of each. Making
+     * `is-not-null` the negation instead would make it "no application has an
+     * unset status", which is true of a candidate with no applications at all
+     * and so answers a queue with the very rows the queue exists to exclude.
+     *
+     * Unlike the id path, every operator is available: the compared value is an
+     * ordinary column, so `>=` on a date and `ilike` on a name mean here what
+     * they mean anywhere else. Only an operator that does not exist is refused,
+     * and it throws rather than returning `null` — a dropped condition widens
+     * the read, which is the whole reason this file fails closed.
+     */
+    private static buildRelationColumnPredicate(
+        ref: SQL,
+        column: AnyPgColumn,
+        op: WhereFilterOp,
+        value: unknown,
+        field: string,
+        collectionPath: string
+    ): { predicate?: SQL; negate: boolean } {
+        value = unwrapRelationFilterValue(value);
+        const isNullish = value === null || value === undefined;
+
+        const equals = () => sql`${ref} = ${value}`;
+        const inList = (): SQL => {
+            const values = toMembershipList(value);
+            // An empty list matches nothing, and `NOT EXISTS (… AND FALSE)`
+            // gives `not-in []` — which excludes nothing — for free. Dropping
+            // the condition instead would match everything.
+            return values.length === 0
+                ? sql`FALSE`
+                : sql`${ref} IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`;
+        };
+        const isNull = () => sql`${ref} IS NULL`;
+        const contains = (): SQL => {
+            const meta = getColumnMeta(column);
+            const isNativeArray = meta.dataType === "array" || meta.columnType === "PgArray";
+            if (op === "array-contains-any") {
+                if (Array.isArray(value) && value.length === 0) return sql`FALSE`;
+                if (Array.isArray(value) && value.length > 0) {
+                    return isNativeArray
+                        ? sql`${ref} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`
+                        : sql`${ref} ?| array[${sql.join(value.map(v => sql`${String(v)}`), sql`, `)}]`;
+                }
+            }
+            return isNativeArray
+                ? sql`${ref} @> ARRAY[${value}]`
+                : sql`${ref} @> ${JSON.stringify([value])}`;
+        };
+
+        switch (op) {
+            case "==":
+                return { predicate: isNullish ? isNull() : equals(), negate: false };
+            case "!=":
+                return { predicate: isNullish ? isNull() : equals(), negate: true };
+            case ">":
+                return { predicate: sql`${ref} > ${value}`, negate: false };
+            case ">=":
+                return { predicate: sql`${ref} >= ${value}`, negate: false };
+            case "<":
+                return { predicate: sql`${ref} < ${value}`, negate: false };
+            case "<=":
+                return { predicate: sql`${ref} <= ${value}`, negate: false };
+            case "in":
+                return { predicate: isNullish ? isNull() : inList(), negate: false };
+            case "not-in":
+                return { predicate: isNullish ? isNull() : inList(), negate: true };
+            case "like":
+                return { predicate: sql`${ref} LIKE ${String(value)}`, negate: false };
+            case "not-like":
+                return { predicate: sql`${ref} LIKE ${String(value)}`, negate: true };
+            case "ilike":
+            case "not-ilike": {
+                // `ILIKE` is only defined on the text family. Asking it of a
+                // date or an integer is a Postgres error at execution time — a
+                // 500 on a request whose only fault is an operator the admin
+                // offered for the wrong column.
+                if (!supportsILike(column)) {
+                    throw ApiError.badRequest(
+                        `Operator '${op}' cannot be applied to '${field}' on collection '${collectionPath}': ` +
+                        `'${column.name}' is ${column.getSQLType?.() ?? "not a text column"}, and case-insensitive ` +
+                        "matching is only defined on text.",
+                        "UNSUPPORTED_RELATION_FILTER_OPERATOR",
+                        { field, collection: collectionPath, operator: op }
+                    );
+                }
+                return { predicate: sql`${ref} ILIKE ${String(value)}`, negate: op === "not-ilike" };
+            }
+            case "is-null":
+                return { predicate: isNull(), negate: false };
+            case "is-not-null":
+                return { predicate: sql`${ref} IS NOT NULL`, negate: false };
+            case "array-contains":
+            case "array-contains-any":
+                return { predicate: contains(), negate: false };
+            default:
+                throw ApiError.badRequest(
+                    `Unknown filter operator '${op}'. Valid operators: ${ALL_WHERE_FILTER_OPS.join(", ")}.`,
+                    "UNKNOWN_FILTER_OPERATOR",
+                    { operator: op, validOperators: ALL_WHERE_FILTER_OPS }
+                );
+        }
+    }
+
+    /**
+     * An aggregate over the rows a relation reaches, as a scalar expression —
+     * what `orderBy: [{ relation: "applications", field: "created_at", agg:
+     * "min" }, "asc"]` compiles to.
+     *
+     *     (SELECT min(t.created_at) FROM talent_applications AS t
+     *      WHERE t.talent_id = talents.id)
+     *
+     * A correlated scalar subquery rather than a `LEFT JOIN LATERAL`: the join
+     * would have to be threaded into a query the relational query builder
+     * assembles, while a scalar expression drops straight into `ORDER BY` and
+     * into the keyset comparison behind cursor paging — which has to be the
+     * *same* expression, or paging and ordering disagree and rows are skipped.
+     *
+     * `correlateTo` is what the subquery is pinned against. Left out, it is the
+     * outer row's key column and the expression is correlated in the ordinary
+     * way. Given a literal — the cursor row's id — the subquery stops being
+     * correlated at all, so Postgres evaluates it once for the whole statement
+     * rather than per row. That is how a cursor pages over an aggregate it has
+     * no stored value for: the value is recomputed from the id it does have.
+     *
+     * Over zero related rows `count` is 0 and every other function is NULL,
+     * which is what puts "nobody waiting" at a defined end of the order rather
+     * than wherever a missing value would land. See `buildOrderExpressions` for
+     * where that end is pinned.
+     *
+     * Under RLS the subquery runs as the reader, so a related row the reader
+     * cannot see does not contribute — an aggregate is over the rows that
+     * reader can see, which is the only total it could honestly report.
+     */
+    static buildRelationAggregateExpression(
+        spec: RelationAggregateSort,
+        table: PgTable<any>,
+        collection: CollectionConfig,
+        registry: PostgresCollectionRegistry,
+        sourceIdColumn: AnyPgColumn,
+        collectionPath: string,
+        correlateTo?: unknown
+    ): SQL {
+        const relation = resolveCollectionRelations(collection)[spec.relation];
+        if (!relation) {
+            throw ApiError.badRequest(
+                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on collection '${collectionPath}': ` +
+                `'${spec.relation}' is not a relation there.`,
+                "UNKNOWN_ORDER_BY_FIELD",
+                { field: encodeRelationAggregateSort(spec), collection: collectionPath, relation: spec.relation }
+            );
+        }
+        if (relation.kind === "via") {
+            throw ApiError.badRequest(
+                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on collection '${collectionPath}': ` +
+                "`via` relations are authored one way only, so there is nothing to correlate a subquery back to.",
+                "ORDER_BY_FIELD_NOT_SORTABLE",
+                { field: encodeRelationAggregateSort(spec), collection: collectionPath, kind: relation.kind }
+            );
+        }
+
+        const targetCollection = targetOf(relation);
+        const targetTable = targetCollection && registry.getTable(getTableName(targetCollection));
+        if (!targetCollection || !targetTable) {
+            throw new Error(
+                `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
+                "so there is nothing to aggregate."
+            );
+        }
+
+        const alias = "__rel_agg";
+        // `count` with no field counts the related rows themselves. Every other
+        // function needs something to aggregate, and a key that named no column
+        // never got this far — `parseRelationAggregateSort` refuses it.
+        let aggregand: SQL = sql`*`;
+        if (spec.field) {
+            const column = relationColumn(targetTable, targetCollection, spec.field)
+                ?? (spec.field in targetTable
+                    ? targetTable[spec.field as keyof typeof targetTable] as AnyPgColumn
+                    : undefined);
+            if (!column) {
+                let validFields: string[] = [];
+                try {
+                    validFields = Object.keys(getTableColumns(targetTable)).sort();
+                } catch {
+                    // A table stand-in without Drizzle's column symbols.
+                }
+                throw ApiError.badRequest(
+                    `Unknown field '${spec.field}' on '${targetCollection.slug}', the target of relation ` +
+                    `'${spec.relation}' on collection '${collectionPath}'` +
+                    (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
+                    "UNKNOWN_ORDER_BY_FIELD",
+                    {
+                        field: encodeRelationAggregateSort(spec),
+                        collection: collectionPath,
+                        relation: spec.relation,
+                        targetCollection: targetCollection.slug,
+                        ...(validFields.length > 0 && { validFields })
+                    }
+                );
+            }
+            aggregand = sql`${sql.identifier(alias)}.${sql.identifier(column.name)}`;
+        } else if (spec.agg !== "count") {
+            throw ApiError.badRequest(
+                `'${spec.agg}' needs a field to aggregate — only 'count' means something on its own.`,
+                "ORDER_BY_FIELD_NOT_SORTABLE",
+                { field: encodeRelationAggregateSort(spec), collection: collectionPath }
+            );
+        }
+
+        // The literal pins the subquery to one row; the column object binds it
+        // to the outer row, because a Drizzle column renders qualified with its
+        // own table. See `buildRelationScopeCondition`.
+        const source: SQL = correlateTo === undefined ? sql`${sourceIdColumn}` : sql`${correlateTo}`;
+
+        let from: SQL;
+        let correlation: SQL;
+
+        if (relation.kind === "manyToMany") {
+            const { table: junctionName, sourceColumn, targetColumn } = relation.through;
+            const junctionTable = registry.getTable(junctionName);
+            if (!junctionTable) {
+                throw new Error(`Junction table not found: ${junctionName}`);
+            }
+            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            if (!sourceCol || !targetCol) {
+                throw new Error(
+                    `Junction columns '${sourceColumn}'/'${targetColumn}' not found in '${junctionName}'`
+                );
+            }
+            const targetKey = this.primaryKeyColumn(targetTable);
+            if (!targetKey) {
+                throw new Error(
+                    `No primary key or "id" column in the target table of relation '${relation.relationName}'.`
+                );
+            }
+            const junctionAlias = "__rel_agg_junction";
+            from = sql`${targetTable} AS ${sql.identifier(alias)} INNER JOIN ${junctionTable} AS ${sql.identifier(junctionAlias)} ON ${sql.identifier(junctionAlias)}.${sql.identifier(targetCol.name)} = ${sql.identifier(alias)}.${sql.identifier(targetKey.name)}`;
+            correlation = sql`${sql.identifier(junctionAlias)}.${sql.identifier(sourceCol.name)} = ${source}`;
+        } else if (relation.kind === "belongsTo") {
+            const targetKey = this.primaryKeyColumn(targetTable);
+            const localKey = relationColumn(table, collection, relation.localKey);
+            if (!targetKey || !localKey) {
+                throw new Error(
+                    `Relation '${relation.relationName}' on '${collectionPath}' names a key that is not a column, ` +
+                    "so there is nothing to aggregate against."
+                );
+            }
+            from = sql`${targetTable} AS ${sql.identifier(alias)}`;
+            // A to-one reaches one row, so the aggregate is that row's value.
+            // Pinning by a literal cursor id means looking the key up on the
+            // cursor row rather than reading it off the outer one.
+            const owner: SQL = correlateTo === undefined
+                ? sql`${localKey}`
+                : sql`(SELECT ${sql.identifier(localKey.name)} FROM ${table} WHERE ${sourceIdColumn} = ${correlateTo})`;
+            correlation = sql`${sql.identifier(alias)}.${sql.identifier(targetKey.name)} = ${owner}`;
+        } else {
+            const foreignKey = relationColumn(targetTable, targetCollection, relation.foreignKeyOnTarget);
+            if (!foreignKey) {
+                throw new Error(
+                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
+                    `relation '${relation.relationName}'.`
+                );
+            }
+            // `sourceKey` names a column other than the primary key when the
+            // link joins on one; correlating on the id anyway aggregates over
+            // nothing and every row sorts as though it had no related rows.
+            const sourceKeyColumn = relation.sourceKey
+                ? relationColumn(table, collection, relation.sourceKey)
+                : sourceIdColumn;
+            if (!sourceKeyColumn) {
+                throw new Error(
+                    `\`sourceKey: "${relation.sourceKey}"\` on relation '${relation.relationName}' is not a ` +
+                    `column on '${collectionPath}'.`
+                );
+            }
+            const pinned: SQL = correlateTo === undefined
+                ? sql`${sourceKeyColumn}`
+                : relation.sourceKey
+                    ? sql`(SELECT ${sql.identifier(sourceKeyColumn.name)} FROM ${table} WHERE ${sourceIdColumn} = ${correlateTo})`
+                    : sql`${correlateTo}`;
+            from = sql`${targetTable} AS ${sql.identifier(alias)}`;
+            correlation = sql`${sql.identifier(alias)}.${sql.identifier(foreignKey.name)} = ${pinned}`;
+        }
+
+        // The function name is not interpolated from input: it comes off a
+        // five-member union the parser validated, and is written out here so
+        // nothing string-shaped reaches the statement.
+        const aggregate = AGGREGATE_SQL[spec.agg];
+        return sql`(SELECT ${aggregate}(${aggregand}) FROM ${from} WHERE ${correlation})`;
     }
 
     /** The column a table's rows are keyed by: its primary key, else `id`. */

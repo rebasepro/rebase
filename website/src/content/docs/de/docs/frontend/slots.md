@@ -58,7 +58,7 @@ const myPlugin: RebasePlugin = {
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Zusätzliche Karten auf der Startseite |
 | `home.children.start` | `PluginGenericProps` | Inhalt am Anfang der Startseite |
 | `home.children.end` | `PluginGenericProps` | Inhalt am Ende der Startseite |
-| `home.card.insight` | `HomeCardInsightSlotProps` | Kompaktes Insight-Widget in einer Collection-Karte der Startseite |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Kompaktes Widget in einer Collection-Karte der Startseite |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Aktionen auf Collection-Karten der Startseite |
 
 #### Navigation
@@ -79,7 +79,7 @@ const myPlugin: RebasePlugin = {
 | `collection.error` | `CollectionErrorProps` | Anzeige des Fehlerzustands einer Collection |
 | `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets in der Toolbar-Zeile der Collection |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand, wenn die Collection keine Daten hat |
-| `collection.insights` | `CollectionInsightsSlotProps` | Insight-Widgets über der Collection-Tabelle |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets über der Collection-Tabelle |
 | `collection.filter-panel` | `CollectionFilterPanelProps` | Benutzerdefinierte Filter-Sidebar neben der Tabelle. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
 
 #### Entität / Formular

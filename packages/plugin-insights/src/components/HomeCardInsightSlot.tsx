@@ -4,7 +4,7 @@ import { InsightWidget } from "./InsightWidget";
 
 /**
  * Renders compact insight widgets inline within a home page collection card.
- * Injected via the `home.card.insight` slot.
+ * Injected via the `home.card.widget` slot.
  *
  * Uses a horizontal flex layout so multiple cards sit side by side.
  */

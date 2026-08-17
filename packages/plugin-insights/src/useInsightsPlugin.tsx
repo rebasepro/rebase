@@ -11,8 +11,8 @@ import { CollectionInsightsInline } from "./components/CollectionInsightsInline"
  *
  * This plugin injects scorecard widgets into key UI locations:
  * - **Home page header**: KPI overview via `home.children.start` slot
- * - **Collection list view**: Scorecards inline (below title, above list) via `collection.insights` slot
- * - **Home page cards**: Compact scorecard metrics auto-extracted from collection insights via `home.card.insight` slot
+ * - **Collection list view**: Scorecards inline (below title, above list) via `collection.widgets` slot
+ * - **Home page cards**: Compact scorecard metrics auto-extracted from collection insights via `home.card.widget` slot
  *
  * Collection-level insights (`collections.<slug>`) are the single source of truth:
  * scorecards render in the collection list view and are automatically extracted
@@ -63,8 +63,8 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
 
         // ── Per-collection insights ───────────────────────────────────────
         // A single `collections.<slug>` definition serves two slots:
-        // 1. collection.insights  → inline scorecards in the list view
-        // 2. home.card.insight    → compact scorecards on the home card
+        // 1. collection.widgets   → inline scorecards in the list view
+        // 2. home.card.widget     → compact scorecards on the home card
         if (insights.collections) {
             for (const [slug, defs] of Object.entries(insights.collections)) {
                 if (defs.length === 0) continue;
@@ -72,7 +72,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
 
                 // 1. Inline in collection list view
                 slots.push({
-                    slot: "collection.insights" as const,
+                    slot: "collection.widgets" as const,
                     Component: (props: Record<string, unknown>) => {
                         const path = props.path as string;
                         const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
@@ -98,7 +98,7 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
 
                 // 2. Auto-extract scorecards for home page card
                 slots.push({
-                    slot: "home.card.insight" as const,
+                    slot: "home.card.widget" as const,
                     Component: (props: Record<string, unknown>) => {
                         const cardSlug = props.slug as string;
                         if (cardSlug !== slug) return null;

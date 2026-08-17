@@ -552,7 +552,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             onNewClick
         });
 
-        const pluginInsights = useSlot("collection.insights", {
+        const pluginWidgets = useSlot("collection.widgets", {
             path,
             parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
 parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
@@ -1201,7 +1201,7 @@ parentEntityIds,
                             </Typography>
                         </div>
                     </div>
-                    {pluginInsights.length > 0 && (
+                    {pluginWidgets.length > 0 && (
                         <div
                             className={cls(
                                 "grid transition-[grid-template-rows] duration-150 ease-out",
@@ -1209,7 +1209,7 @@ parentEntityIds,
                             )}
                         >
                             <div className="overflow-hidden flex-shrink-0">
-                                {pluginInsights}
+                                {pluginWidgets}
                             </div>
                         </div>
                     )}

@@ -67,7 +67,143 @@ export type OrderByTuple<Key extends string = string> = [Key, "asc" | "desc"];
  *
  * @group Models
  */
-export type OrderBySpec<Key extends string = string> = OrderByTuple<Key> | OrderByTuple<Key>[];
+export type OrderBySpec<Key extends string = string> =
+    | OrderBySortTuple<Key>
+    | OrderBySortTuple<Key>[];
+
+/**
+ * A sort key: a field name, or an aggregate over a to-many relation.
+ *
+ * @group Models
+ */
+export type SortKey<Key extends string = string> = Key | RelationAggregateSort;
+
+/**
+ * `[sortKey, direction]` — the authoring form of {@link OrderByTuple}, which
+ * additionally accepts a {@link RelationAggregateSort} object.
+ *
+ * The object never reaches a driver: `normalizeOrderBy` in `@rebasepro/common`
+ * encodes it to its string spelling on the way down, and everything below that
+ * point speaks plain `OrderByTuple`. See {@link RelationAggregateSort} for why
+ * the wire form is a string.
+ *
+ * @group Models
+ */
+export type OrderBySortTuple<Key extends string = string> = [SortKey<Key>, "asc" | "desc"];
+
+/**
+ * The aggregate functions a relation sort can apply.
+ *
+ * Five, and no `array_agg`/`string_agg`: an aggregate used as a sort key has to
+ * produce something with an order, and these are the ones that do.
+ *
+ * @group Models
+ */
+export type RelationAggregateFn = "min" | "max" | "count" | "sum" | "avg";
+
+/**
+ * Order rows by an aggregate over the rows a to-many relation reaches —
+ * "candidates, oldest waiting first", "clients, busiest first".
+ *
+ * ```ts
+ * // The date of each candidate's earliest open application.
+ * orderBy: [[{ relation: "applications", field: "created_at", agg: "min" }, "asc"]]
+ *
+ * // How many applications each candidate has.
+ * orderBy: [[{ relation: "applications", agg: "count" }, "desc"]]
+ * ```
+ *
+ * This is the half of a queue that cannot be worked around client-side. A
+ * *filter* over a relation can be approximated by denormalising a flag onto the
+ * row; an *ordering* cannot be approximated at all once the result set is
+ * paged, because the client only ever holds one page and the page was chosen by
+ * the wrong order.
+ *
+ * Rows the relation reaches nothing from sort last ascending and first
+ * descending — the placement Postgres gives a `NULL`, stated rather than
+ * inherited, because the keyset comparison behind cursor paging has to agree
+ * with it exactly. Ties are broken by the row id, so the order is total and
+ * paging over it neither repeats nor skips.
+ *
+ * Compiled by the driver into a correlated subquery, so it is subject to the
+ * reader's own row-level security on the target table: a related row the reader
+ * cannot see does not contribute to the aggregate. Offered only where
+ * {@link DataSourceCapabilities.relationAggregateSorts} says the driver can
+ * compile it.
+ *
+ * @group Models
+ */
+export interface RelationAggregateSort {
+    /** The to-many relation to aggregate over, by its name on this collection. */
+    relation: string;
+
+    /** The aggregate to apply. */
+    agg: RelationAggregateFn;
+
+    /**
+     * The column of the *target* to aggregate. Required by every function
+     * except `count`, which counts the related rows themselves when it is
+     * omitted — and counts the rows whose column is non-null when it is not.
+     */
+    field?: string;
+}
+
+/** The wire spelling of a {@link RelationAggregateSort}: `min(applications.created_at)`. */
+const RELATION_AGGREGATE_SORT_PATTERN = /^(min|max|count|sum|avg)\(([^().]+)(?:\.([^()]+))?\)$/;
+
+/**
+ * A {@link RelationAggregateSort} as a single string — `min(applications.created_at)`,
+ * `count(applications)`.
+ *
+ * The wire form is a string because every layer below the call site already is
+ * one: `OrderByTuple` is `[string, direction]`, the REST parameter is
+ * `?orderBy=key:direction`, the driver contract takes `orderBy?: string |
+ * OrderByTuple[]`, and a cursor names its keys by string. `_score` established
+ * the same pattern — a sort key that is not a column, spelled as one — and this
+ * reuses it rather than widening five signatures to carry an object that would
+ * be flattened at the end anyway.
+ *
+ * SQL's own spelling, so the key reads as what it compiles to. Neither `:` nor
+ * `,` appears in it, which is what keeps it safe in the colon-delimited wire
+ * shorthand.
+ *
+ * @group Models
+ */
+export function encodeRelationAggregateSort(sort: RelationAggregateSort): string {
+    return `${sort.agg}(${sort.relation}${sort.field ? `.${sort.field}` : ""})`;
+}
+
+/**
+ * Read the string spelling back, or `undefined` if it is not one.
+ *
+ * `undefined` rather than a throw: this is asked of *every* sort key to find
+ * out which kind it is, and an ordinary column name is not an error.
+ *
+ * @group Models
+ */
+export function parseRelationAggregateSort(key: string): RelationAggregateSort | undefined {
+    const match = RELATION_AGGREGATE_SORT_PATTERN.exec(key);
+    if (!match) return undefined;
+    const [, agg, relation, field] = match;
+    // `min()` and friends have nothing to aggregate without a column, and a
+    // key that parses to a half-built sort would resolve to no expression and
+    // be dropped — leaving the rows unsorted while the caller believes
+    // otherwise. `count` is the one function that means something on its own.
+    if (!field && agg !== "count") return undefined;
+    return { agg: agg as RelationAggregateFn, relation, ...(field && { field }) };
+}
+
+/** Is this sort key the object form rather than a field name? */
+export function isRelationAggregateSort(key: unknown): key is RelationAggregateSort {
+    return typeof key === "object" && key !== null &&
+        typeof (key as RelationAggregateSort).relation === "string" &&
+        typeof (key as RelationAggregateSort).agg === "string";
+}
+
+/** A sort key in the single-string form every layer below the call site speaks. */
+export function sortKeyToString(key: SortKey): string {
+    return isRelationAggregateSort(key) ? encodeRelationAggregateSort(key) : key;
+}
 
 /**
  * Canonical filter operators supported across all database backends.
@@ -125,16 +261,29 @@ export type FilterValues<Key extends string> =
 
 /**
  * The field names a query may address on a row type: every column, plus a
- * dotted path reaching inside one.
+ * dotted path reaching inside one — or *through a relation* to a column of the
+ * related row.
  *
- * Only the **root** of a dotted path is checked. `"meta.tag"` requires a `meta`
- * column and says nothing about what is under it, because what is under it is a
- * `map`/jsonb value whose shape the row type does not describe — and rejecting
- * paths we cannot verify would make jsonb columns unqueryable.
+ * A dotted path is not checked at all, in either direction. That is a
+ * deliberate loosening, and it is worth being exact about what it costs. The
+ * root used to be checked: `"meta.tag"` required a `meta` column. It cannot
+ * stay checked, because the other thing a dotted path now means is
+ * `"applications.status"` — and `applications` is a *relation*, which comes
+ * from the collection's `relations` and is not a column of `M` at all. There is
+ * nothing in a generated row type that could validate one. `FindParams.include`
+ * is `string[]` for exactly this reason and says so.
+ *
+ * So the guarantee moves rather than disappears: an unresolvable path is a 400
+ * from the driver, not a silently dropped condition. See
+ * `UnknownFilterFieldsMode` in `@rebasepro/server-postgres` — dropping a filter
+ * key *widens* the read to every row, which is why that resolution fails
+ * closed. A typo'd relation path is refused at runtime with the target
+ * collection's real column list in the message.
+ *
+ * Undotted keys are unaffected and still checked against `keyof M`.
  *
  * When `M` is left at its default `Record<string, unknown>`, `keyof M` is
- * `string` and a template literal over `string` is itself assignable to
- * `string`, so this collapses to `string` and every query stays permissive.
+ * `string` and this collapses to `string`, so every query stays permissive.
  * That is what keeps an untyped `createRebaseClient()` behaving exactly as it
  * did before the row type was threaded through.
  *
@@ -142,7 +291,7 @@ export type FilterValues<Key extends string> =
  */
 export type FieldPath<M extends Record<string, unknown> = Record<string, unknown>> =
     | Extract<keyof M, string>
-    | `${Extract<keyof M, string>}.${string}`;
+    | `${string}.${string}`;
 
 /**
  * Relaxed filter type that also accepts pre-serialized PostgREST strings.

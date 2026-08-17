@@ -17,8 +17,8 @@ This plugin injects data-driven scorecard widgets into the Rebase admin UI. You 
 Widgets appear in three locations automatically:
 
 - **Home page header** — KPI overview cards via the `home.children.start` slot
-- **Collection list view** — Inline scorecards below the title, above the data list via `collection.insights`
-- **Home page cards** — Compact metrics auto-extracted from collection insights via `home.card.insight`
+- **Collection list view** — Inline scorecards below the title, above the data list via `collection.widgets`
+- **Home page cards** — Compact metrics auto-extracted from collection insights via `home.card.widget`
 
 Collection-level insights are the single source of truth: define once under `collections.<slug>`, and they render both in the collection view and on the home card.
 

@@ -18,8 +18,8 @@ export interface SlotRegistry {
     "home.cards": PluginHomePageAdditionalCardsProps;
     "home.children.start": PluginGenericProps;
     "home.children.end": PluginGenericProps;
-    /** Compact insight widget rendered inline in a home page collection card. */
-    "home.card.insight": HomeCardInsightSlotProps;
+    /** Compact widget rendered inline in a home page collection card. */
+    "home.card.widget": HomeCardWidgetSlotProps;
     "home.collection.actions": PluginHomePageActionsProps;
 
     // ── Navigation / Drawer ───────────────────────────────────────────
@@ -38,8 +38,8 @@ export interface SlotRegistry {
     "collection.toolbar": CollectionToolbarProps;
     /** Custom empty-state component when a collection has no data. */
     "collection.empty-state": CollectionEmptyStateProps;
-    /** Insight widgets rendered above the collection table. */
-    "collection.insights": CollectionInsightsSlotProps;
+    /** Widgets rendered above the collection table. */
+    "collection.widgets": CollectionWidgetsSlotProps;
 
     // ── Entity / Form ─────────────────────────────────────────────────
     "form.actions": PluginFormActionProps;
@@ -108,6 +108,28 @@ export const UNRENDERED_SLOTS = [
 ] as const satisfies readonly (keyof SlotRegistry)[];
 
 export type SlotName = keyof SlotRegistry;
+
+/**
+ * Slot names that were shipped under an older spelling, and what they are now.
+ *
+ * A slot name is a public identifier: a plugin registers a component against a
+ * string, and the registry matches on string equality. Rename one and every
+ * plugin still on the old name goes on compiling, goes on registering, and
+ * renders nothing — the exact failure {@link UNRENDERED_SLOTS} exists to stop
+ * being silent. So a rename does not remove the old name, it retires it: the
+ * contribution is rewritten to the current name on the way in and the author is
+ * told once, at the console, which name to move to.
+ *
+ * These entries are load-bearing until a major release drops them. Adding a new
+ * name to {@link SlotRegistry} does not belong here — only a name that was
+ * published and then changed.
+ */
+export const RENAMED_SLOTS: Readonly<Record<string, SlotName>> = {
+    // "insights" named one plugin's use of the slot rather than the slot
+    // itself, which is any widget strip above the table / on the home card.
+    "collection.insights": "collection.widgets",
+    "home.card.insight": "home.card.widget"
+};
 
 /**
  * A single UI component contribution to a named slot.
@@ -311,11 +333,11 @@ export interface ShellToolbarProps {
 }
 
 /**
- * Props for `collection.insights` slot.
- * Insight widgets rendered above the collection table.
+ * Props for `collection.widgets` slot.
+ * Widgets rendered above the collection table.
  * @group Plugins
  */
-export interface CollectionInsightsSlotProps {
+export interface CollectionWidgetsSlotProps {
     path: string;
     collection: AdminCollection;
     parentCollectionSlugs: string[];
@@ -323,11 +345,11 @@ export interface CollectionInsightsSlotProps {
 }
 
 /**
- * Props for `home.card.insight` slot.
- * Compact insight rendered inline in a home page collection card.
+ * Props for `home.card.widget` slot.
+ * Compact widget rendered inline in a home page collection card.
  * @group Plugins
  */
-export interface HomeCardInsightSlotProps {
+export interface HomeCardWidgetSlotProps {
     slug: string;
     collection: AdminCollection;
     context: RebaseContext;
