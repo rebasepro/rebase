@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/ui",
   "type": "module",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Rebase design system — React components and design tokens built on Radix UI, Tailwind CSS and lucide-react",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"

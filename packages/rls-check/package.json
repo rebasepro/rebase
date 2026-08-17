@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/rls-check",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Audit Row-Level Security on any PostgreSQL database — finds tables served without RLS, permissive tautologies, unqualified columns in policy subqueries, RLS-bypassing views and unprotected junction tables. Read-only.",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",

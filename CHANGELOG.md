@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-17
+
 ### Added
 
 - **A filter can reach through a relation to a column of the related row.** `where: { "applications.status": ["in", ["applied", "reviewing"]] }` — "has a related row whose column satisfies this", which is the form every queue screen is written in and which previously could not be said at all. Relation filters compared the related row's *id* and nothing else, so the only way to ask the question was to fetch every row and filter in the browser: a filter the client applies after paging is not a filter, because the page was already chosen without it.
