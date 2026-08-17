@@ -1,10 +1,36 @@
-import { describe, expect, it, afterEach } from "@jest/globals";
+import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
 import { ALL_RUNTIME_SURFACES, type RuntimeSurface } from "../src/init/surfaces";
+
+/**
+ * The function and cron loaders take an injectable `ModuleImporter` precisely so
+ * tests never depend on a native ESM `import()` inside jest's vm — see
+ * `test/helpers/require-importer.ts`, which every other loader test injects.
+ * This suite cannot: it boots through `initializeRebaseBackend`, which owns the
+ * loader calls and passes no importer, so it was the one place still reaching
+ * for the real thing. Mocking the seam's default is how the boot path gets the
+ * same determinism.
+ *
+ * Not a hypothetical. On CI (`verify / checks`, 2026-08-16) every function file
+ * failed to load with `TypeError: Cannot read properties of undefined (reading
+ * 'identifier')` — jest's dynamic-import callback invoked with no referencing
+ * module — so `/api/functions/valid-app/hello` 404ed and eight of these eleven
+ * tests went red while the loader itself was working perfectly. It reproduces
+ * on demand by dropping `--experimental-vm-modules`, and it does *not* reproduce
+ * on any local Node (22.22.3, 22.23.2, 24.5.0, 25.3.0), which is the tell: the
+ * failure is in the vm's import machinery under load, not in what these tests
+ * are pinning. The loader logic, the duck-typing and the mounts below are all
+ * still the real ones — only the import mechanism is deterministic.
+ */
+jest.mock("../src/utils/dynamic-import", () => ({
+    ...(jest.requireActual("../src/utils/dynamic-import") as Record<string, unknown>),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deterministic CJS load, as in the helper's own docblock
+    nativeDynamicImport: (url: string) => require("./helpers/require-importer").requireImporter(url)
+}));
 
 /**
  * Which surfaces a process mounts.

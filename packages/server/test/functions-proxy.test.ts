@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll, beforeAll } from "@jest/globals";
+import { describe, expect, it, afterAll, beforeAll, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import type { AddressInfo } from "node:net";
@@ -23,6 +23,21 @@ import { generateAccessToken } from "../src/auth/jwt";
  * streaming and the duplex requirement are all properties of the transport, and
  * a double would assert this file's idea of them instead of undici's.
  */
+
+/**
+ * Same seam, same reason as `runtime-surfaces.test.ts`: this suite boots the
+ * functions process against a real fixture directory, so it depends on a file
+ * actually importing inside jest's vm — the one thing that cannot be relied on
+ * here. It has not gone red yet; `runtime-surfaces` did, on the identical
+ * dependency, and the two cron assertions deleted in `runtime-ownership.test.ts`
+ * went before it. Injecting the deterministic importer is what stops this suite
+ * being the next one.
+ */
+jest.mock("../src/utils/dynamic-import", () => ({
+    ...(jest.requireActual("../src/utils/dynamic-import") as Record<string, unknown>),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deterministic CJS load, as in the helper's own docblock
+    nativeDynamicImport: (url: string) => require("./helpers/require-importer").requireImporter(url)
+}));
 
 const FUNCTIONS_DIR = path.join(__dirname, "fixtures", "functions-proxy");
 const JWT_SECRET = "functions-proxy-test-secret-1234567890";
