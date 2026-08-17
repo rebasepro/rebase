@@ -3,6 +3,7 @@ import type { EntityLinkBuilder } from "../types/entity_link_builder";
 import type { Locale } from "../types/locales";
 import type { EntityAction } from "../types/entity_actions";
 import type { EntityCustomView } from "../types/entity_views";
+import type { CollectionCustomView } from "../types/collection_views";
 import type { RebasePlugin } from "../types/plugins";
 import type { PropertyConfig } from "../types/property_config";
 import type { SlotContribution } from "../types/slots";
@@ -33,6 +34,14 @@ export type CustomizationController = {
      * You can also define a entity view from the UI.
      */
     entityViews?: EntityCustomView[];
+
+    /**
+     * List of additional ways to render a collection's rows. You can use the
+     * key to reference the view in the `admin.customViews` prop of a
+     * collection, which is also what makes it selectable from the collection
+     * editor.
+     */
+    collectionViews?: CollectionCustomView[];
 
     /**
      * List of actions that can be performed on entities.

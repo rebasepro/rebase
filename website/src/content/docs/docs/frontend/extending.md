@@ -25,6 +25,7 @@ This guide helps you pick the right mechanism for your use case, then links to t
 | Add a computed column to a table | `additionalFields` | collection | [Additional Columns](/docs/frontend/additional-columns) |
 | Add a custom field widget for a property type | `propertyConfigs` | property type | [Custom Fields](/docs/frontend/custom-fields) |
 | Add a entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
+| Render one collection's rows a different way | `admin.customViews` | collection | [below](#customviews) |
 | Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
 | Ship several extensions as one installable unit | `plugins` | app | [Plugins](/docs/plugins) |
@@ -116,6 +117,62 @@ Toolbar-level React components that receive `CollectionActionsProps` (selected e
 **Relationship with `collection.actions` slot:** Both are additive — `Actions` components render first in the toolbar, then slot contributions from `collection.actions`. They do not replace each other.
 
 → [Entity Actions — Collection Actions](/docs/frontend/entity-actions#collection-actions)
+
+### Custom view modes {#customviews}
+
+**Scope:** collection (adds a view mode).
+
+A map, a calendar, a gallery, a timeline — another rendering of *the same rows*,
+offered in the collection's view switcher beside List, Table, Cards and Board.
+
+```ts
+// collection config
+admin: {
+    customViews: [
+        { key: "map", name: "Map", icon: "Map", Builder: MapView }
+    ],
+    enabledViews: ["table", "map"],
+    defaultViewMode: "map"
+}
+```
+
+Or register the component once and name it by key, which is also what makes it
+selectable from the collection editor:
+
+```tsx
+<RebaseAdmin
+    collections={collections}
+    collectionViews={[{ key: "map", name: "Map", icon: "Map", Builder: MapView }]}
+/>
+```
+
+```ts
+admin: { customViews: ["map"] }
+```
+
+`Builder` receives the live `tableController`, so the view inherits the
+collection's filters, the search box, sorting, pagination, permission checks
+and the entity side panel — that is the whole reason to declare one instead of
+building an `AppView`:
+
+```tsx
+function MapView({ tableController, onEntityClick }: CollectionCustomViewParams) {
+    return <MapCanvas
+        markers={tableController.data.map(e => e.values.location)}
+        onMarkerClick={i => onEntityClick?.(tableController.data[i])}
+    />;
+}
+```
+
+Choosing the view updates `?__view=`, survives a reload, and persists per user.
+Declaring one is enough to offer it — `enabledViews` only needs setting when you
+want to *take built-ins away*. With a single entry the switcher is hidden.
+
+**This is not a way to build a view spanning several collections.** A view mode
+is another rendering of one collection's query. If your component ignores
+`tableController` and fetches four tables of its own, it wants to be an
+[`AppView`](/docs/frontend#custom-views) — the toolbar above it, with its search
+box and its record count, would be describing a query it does not render.
 
 ### `formView` {#formview}
 

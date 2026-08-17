@@ -66,6 +66,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         onAnalyticsEvent,
         propertyConfigs,
         entityViews,
+        collectionViews,
         entityActions,
 
         effectiveRoleController,
@@ -349,10 +350,11 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         plugins,
         resolvedSlots,
         entityViews: entityViews ?? [],
+        collectionViews: collectionViews ?? [],
         entityActions: entityActions ?? [],
         propertyConfigs: propertyConfigs ?? {},
         components: componentsProp
-    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, componentsProp]);
+    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, collectionViews, entityActions, propertyConfigs, componentsProp]);
 
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent

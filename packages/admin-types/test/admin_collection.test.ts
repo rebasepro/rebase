@@ -35,7 +35,7 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         expect([...ADMIN_COLLECTION_KEYS]).toEqual(sorted);
     });
 
-    it("covers the 41 fields the split moved off the collection", () => {
+    it("covers the 42 fields the split moved off the collection", () => {
         // A bare count, as a tripwire. If this number changes, either a field was
         // added to the admin block (add it above too) or one was moved back out to
         // the contract — and the second is a decision, not a refactor.
@@ -44,7 +44,9 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         // 41 since `hideFromEntityViews` split the drawer's answer from the
         // parent tab strip's; it is on the core list and sorted, so the count is
         // the only thing that was outstanding.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(41);
+        // 42 since `customViews` opened the view switcher to app-supplied
+        // renderings of a collection's rows.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(42);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {

@@ -8,6 +8,7 @@ import {
     getCollectionDataPath
 } from "@rebasepro/types";
 import {
+    CollectionCustomViewParams,
     CollectionSize,
     EntityTableController,
     PartialCollectionConfig,
@@ -23,7 +24,7 @@ import { getEntityChildViews } from "@rebasepro/common";
 import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { mergeEntityActions } from "../../util/entity_actions";
-import { resolveEntityAction } from "../../util/resolutions";
+import { resolveCollectionViews, resolveEntityAction } from "../../util/resolutions";
 import { getPropertyInPath } from "../../util/property_utils";
 import { ReferencePreview } from "../../preview";
 import {
@@ -74,7 +75,7 @@ import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { useSelectionController } from "./useSelectionController";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
-import { isViewMode, OpenEntityMode, resolveOpenEntityMode, VIEW_MODE_PARAM } from "../../util/view_mode";
+import { isViewMode, OpenEntityMode, resolveOpenEntityMode, VIEW_MODE_PARAM, VIEW_MODES } from "../../util/view_mode";
 import { mergeDeep } from "@rebasepro/utils";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useAdminContext } from "../../hooks/useAdminContext";
@@ -83,7 +84,7 @@ import { useSidePanel } from "../../hooks/useSidePanel";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useChildViewSource } from "../../hooks/useChildViewSource";
 import { useSelectionDialog } from "../../hooks/useSelectionDialog";
-import { saveEntityWithCallbacks } from "@rebasepro/app";
+import { resolveComponentRef, saveEntityWithCallbacks } from "@rebasepro/app";
 
 const EMPTY_ARRAY: never[] = [];
 
@@ -250,21 +251,47 @@ const CollectionViewBindingInner = React.memo(
 
         const [popOverOpen, setPopOverOpen] = useState(false);
 
+        // Custom view modes this collection can render: the ones declared
+        // inline plus the ones it names by key from the app-level registry.
+        // Anything unresolvable is dropped here, once, so every consumer below
+        // — the switcher, `enabledViews`, the URL and saved-config checks —
+        // agrees on what exists.
+        const resolvedCustomViews = useMemo(
+            () => resolveCollectionViews(collection.customViews, customizationController.collectionViews),
+            [collection.customViews, customizationController]
+        );
+
+        const customViewKeys = useMemo(
+            () => resolvedCustomViews.map((v) => v.key),
+            [resolvedCustomViews]
+        );
+
         // View mode priority: URL > saved user config > collection.defaultViewMode
-        const defaultViewMode = collection.defaultViewMode ?? "list";
+        const defaultViewMode = isViewMode(collection.defaultViewMode, customViewKeys)
+            ? collection.defaultViewMode
+            // Covers a `defaultViewMode` naming a custom view that has since
+            // been removed from config; without this the collection would open
+            // on a mode nothing renders.
+            : "list";
         const [searchParams, setSearchParams] = useSearchParams();
 
         // Read view from React Router's searchParams (reactive on back/forward)
         const urlView = useMemo((): ViewMode | null => {
             const v = searchParams.get(VIEW_MODE_PARAM);
-            return isViewMode(v) ? v : null;
-        }, [searchParams]);
+            return isViewMode(v, customViewKeys) ? v : null;
+        }, [searchParams, customViewKeys]);
 
-        // Get saved view from local persistence
+        // Get saved view from local persistence.
+        //
+        // Validated rather than cast: what is stored is whatever the user last
+        // picked, and a custom view removed from config since then would come
+        // back as a mode nothing renders — a blank panel with a working
+        // toolbar above it. An unrecognised value reads as "nothing saved",
+        // which falls through to the collection default.
         const getSavedView = useCallback((): ViewMode | null => {
             const saved = userConfigPersistence?.getCollectionConfig<M>(path)?.defaultViewMode;
-            return (saved as ViewMode) ?? null;
-        }, [userConfigPersistence, path]);
+            return isViewMode(saved, customViewKeys) ? saved : null;
+        }, [userConfigPersistence, path, customViewKeys]);
 
         const [viewMode, setViewModeState] = useState<ViewMode>(() => {
             // Priority: URL > saved config > collection default
@@ -274,9 +301,15 @@ const CollectionViewBindingInner = React.memo(
             return defaultViewMode;
         });
 
+        const activeCustomView = useMemo(
+            () => resolvedCustomViews.find((v) => v.key === viewMode),
+            [resolvedCustomViews, viewMode]
+        );
+
         const openEntityMode = resolveOpenEntityMode({
             collection,
-            viewMode
+            viewMode,
+            customView: activeCustomView
         });
 
         // Sync URL with current view on init (if view came from saved config)
@@ -334,6 +367,12 @@ const CollectionViewBindingInner = React.memo(
 
         // Table view size state - controls row height
         const [tableSize, setTableSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
+
+        // Size for custom views that opted in with `sizeable`. One piece of
+        // state for all of them: only the active view reads it, and switching
+        // between two sizeable custom views keeping the same density is the
+        // less surprising behaviour.
+        const [customViewSize, setCustomViewSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
 
         const selectionController = useSelectionController<M>();
         const usedSelectionController = collection.selectionController ?? selectionController;
@@ -587,19 +626,26 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         }, [collection.kanban?.columnProperty, resolvedCollection.properties]);
 
         // Compute the effective enabled views:
-        // - Start from collection.enabledViews (defaults to all three)
+        // - Start from collection.enabledViews (defaults to every built-in
+        //   plus every custom view the collection declared)
+        // - Drop anything that resolves to nothing renderable
         // - Filter out kanban if no enum properties exist
         const hasEnumProperty = useMemo(() => {
             return Object.values(resolvedCollection.properties).some((p: Property) => p.type === "string" && "enum" in p && p.enum);
         }, [resolvedCollection.properties]);
 
         const enabledViews: ViewMode[] = useMemo(() => {
-            const configured = collection.enabledViews ?? ["list", "table", "cards", "kanban"];
+            // Declaring a custom view is enough to offer it — a collection
+            // should not have to restate the built-ins in `enabledViews` just
+            // to add one. Setting `enabledViews` explicitly still wins.
+            const configured = collection.enabledViews
+                ?? [...VIEW_MODES, ...customViewKeys];
+            const renderable = configured.filter(v => isViewMode(v, customViewKeys));
             if (!hasEnumProperty) {
-                return configured.filter(v => v !== "kanban");
+                return renderable.filter(v => v !== "kanban");
             }
-            return configured;
-        }, [collection.enabledViews, hasEnumProperty]);
+            return renderable;
+        }, [collection.enabledViews, hasEnumProperty, customViewKeys]);
 
         // Compute available enum properties for kanban column selection
         const kanbanPropertyOptions: KanbanPropertyOption[] = useMemo(() => {
@@ -938,8 +984,9 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
                 viewMode={viewMode}
                 onViewModeChange={onViewModeChange}
                 enabledViews={enabledViews}
-                size={viewMode === "list" ? listSize : viewMode === "table" ? tableSize : viewMode === "cards" ? cardSize : undefined}
-                onSizeChanged={viewMode === "list" ? onListSizeChanged : viewMode === "table" ? onTableSizeChanged : viewMode === "cards" ? setCardSize : undefined}
+                customViews={resolvedCustomViews}
+                size={activeCustomView ? (activeCustomView.sizeable ? customViewSize : undefined) : viewMode === "list" ? listSize : viewMode === "table" ? tableSize : viewMode === "cards" ? cardSize : undefined}
+                onSizeChanged={activeCustomView ? (activeCustomView.sizeable ? setCustomViewSize : undefined) : viewMode === "list" ? onListSizeChanged : viewMode === "table" ? onTableSizeChanged : viewMode === "cards" ? setCardSize : undefined}
                 open={viewModePopoverOpen}
                 onOpenChange={setViewModePopoverOpen}
                 kanbanPropertyOptions={kanbanPropertyOptions}
@@ -1014,7 +1061,37 @@ parentEntityIds,
                     </ResolvedCollectionActions>
                 }
             />
-        ); const innerView = viewMode === "kanban" ? (
+        );
+
+        // A custom view wins over the built-in chain, but only after the
+        // built-in keys have been ruled out — `resolveCollectionViews` refuses
+        // a view keyed "table", so this cannot shadow one.
+        const CustomViewBuilder = activeCustomView
+            ? resolveComponentRef<CollectionCustomViewParams<M>>(activeCustomView.Builder)
+            : undefined;
+
+        const innerView = CustomViewBuilder ? (
+            <ErrorBoundary>
+                <CustomViewBuilder
+                    key={`custom-view-${activeCustomView!.key}-${path}`}
+                    collection={collection}
+                    tableController={tableController}
+                    path={path}
+                    parentCollectionSlugs={parentCollectionSlugs}
+                    parentEntityIds={parentEntityIds}
+                    onEntityClick={onEntityClick}
+                    onNewClick={canCreateEntities ? onNewClick : undefined}
+                    canCreate={canCreateEntities}
+                    selectionController={usedSelectionController}
+                    selectionEnabled={selectionEnabled}
+                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
+                    deletedEntities={deletedEntities}
+                    emptyComponent={emptyComponent}
+                    size={activeCustomView!.sizeable ? customViewSize : undefined}
+                    viewMode={viewMode}
+                />
+            </ErrorBoundary>
+        ) : viewMode === "kanban" ? (
             <CollectionBoardViewBinding
                 key={`kanban-view-${path}-${selectedKanbanProperty}`}
                 collection={collection}

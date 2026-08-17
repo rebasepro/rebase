@@ -246,7 +246,8 @@ const productsCollection: PostgresCollectionConfig = {
         icon: "Package",
         group: "E-Commerce",
         defaultViewMode: "cards",
-        enabledViews: ["table", "cards"],
+        enabledViews: ["table", "cards", "gallery"],
+        customViews: ["gallery"],
         // Everything here is optional — without it the form still derives a
         // two-column layout from the property types. This is what taking hold
         // of that looks like when the derived grouping is not the one you want.

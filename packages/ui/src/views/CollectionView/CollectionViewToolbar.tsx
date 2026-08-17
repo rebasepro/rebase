@@ -20,6 +20,12 @@ export type CollectionViewToolbarProps = {
     viewMode: CollectionViewMode;
     onViewModeChange?: (mode: CollectionViewMode) => void;
     enabledViews?: CollectionViewMode[];
+    /**
+     * Custom view modes, supplying the label and icon for their switcher
+     * entries. Without these an `enabledViews` key outside the four built-ins
+     * has no label and no icon to draw.
+     */
+    customViews?: { key: string, name: string, icon?: React.ReactNode }[];
     size?: CollectionViewSize;
     onSizeChange?: (size: CollectionViewSize) => void;
     searchString?: string;
@@ -33,14 +39,14 @@ export type CollectionViewToolbarProps = {
     onKanbanPropertyChange?: (property: string) => void;
 };
 
-const VIEW_MODE_ICONS: Record<CollectionViewMode, React.ReactNode> = {
+const VIEW_MODE_ICONS: Record<string, React.ReactNode> = {
     list: <LayoutList size={iconSize.small} />,
     table: <Table2 size={iconSize.small} />,
     cards: <LayoutGrid size={iconSize.small} />,
     kanban: <Kanban size={iconSize.small} />,
 };
 
-const VIEW_MODE_LABELS: Record<CollectionViewMode, string> = {
+const VIEW_MODE_LABELS: Record<string, string> = {
     list: "List",
     table: "Table",
     cards: "Cards",
@@ -67,6 +73,7 @@ export function CollectionViewToolbar({
     viewMode,
     onViewModeChange,
     enabledViews = ["list", "table", "cards", "kanban"],
+    customViews,
     size = "m",
     onSizeChange,
     searchString,
@@ -81,11 +88,17 @@ export function CollectionViewToolbar({
 }: CollectionViewToolbarProps) {
     const [popoverOpen, setPopoverOpen] = useState(false);
 
-    const viewOptions: ToggleButtonOption<CollectionViewMode>[] = enabledViews.map((mode) => ({
-        value: mode,
-        label: VIEW_MODE_LABELS[mode],
-        icon: VIEW_MODE_ICONS[mode],
-    }));
+    // A key outside the four built-ins takes its label and icon from the
+    // custom view that declared it; without one it falls back to the key
+    // itself and the list glyph, so an entry is never blank.
+    const viewOptions: ToggleButtonOption<CollectionViewMode>[] = enabledViews.map((mode) => {
+        const custom = customViews?.find((entry) => entry.key === mode);
+        return {
+            value: mode,
+            label: VIEW_MODE_LABELS[mode] ?? custom?.name ?? mode,
+            icon: VIEW_MODE_ICONS[mode] ?? custom?.icon ?? <LayoutList size={iconSize.small} />,
+        };
+    });
 
     const handleViewModeChange = useCallback(
         (mode: CollectionViewMode) => {

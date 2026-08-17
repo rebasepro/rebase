@@ -1,6 +1,7 @@
 import { HistoryIcon } from "@rebasepro/ui";
 import React from "react";
-import type { CustomizationController, EntityAction, EntityCustomView } from "@rebasepro/admin-types";
+import type { CollectionCustomView, CustomizationController, EntityAction, EntityCustomView } from "@rebasepro/admin-types";
+import { VIEW_MODES } from "./view_mode";
 
 /**
  * Built-in entity views that are resolved by token name.
@@ -27,6 +28,34 @@ export function resolveEntityView(
     } else {
         return entityView;
     }
+}
+
+/**
+ * Resolve a collection's `admin.customViews` into the views it can actually
+ * render, dropping every entry that names a key nothing registered.
+ *
+ * Dropping is deliberate: an unresolvable key must not become a switcher entry
+ * that renders a blank panel. It falls out of `enabledViews` too, so a user
+ * whose saved view mode was removed lands on a built-in.
+ */
+export function resolveCollectionViews(
+    customViews: (string | CollectionCustomView<any>)[] | undefined,
+    contextCollectionViews?: CollectionCustomView<any>[]
+): CollectionCustomView<any>[] {
+    if (!customViews) return [];
+    const resolved: CollectionCustomView<any>[] = [];
+    const seen = new Set<string>();
+    for (const entry of customViews) {
+        const view = typeof entry === "string"
+            ? contextCollectionViews?.find((candidate) => candidate.key === entry)
+            : entry;
+        // A custom view keyed "table" would shadow a built-in in the switcher
+        // and be unreachable in the render chain, which checks built-ins first.
+        if (!view || VIEW_MODES.includes(view.key) || seen.has(view.key)) continue;
+        seen.add(view.key);
+        resolved.push(view);
+    }
+    return resolved;
 }
 
 export function resolveEntityAction<M extends Record<string, unknown>>(

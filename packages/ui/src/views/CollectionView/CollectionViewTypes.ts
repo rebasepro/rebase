@@ -1,8 +1,13 @@
 import React from "react";
 import type { VirtualTableSortKey } from "../../components/VirtualTable/VirtualTableProps";
 
-/** Supported view modes */
-export type CollectionViewMode = "table" | "cards" | "kanban" | "list";
+/**
+ * Supported view modes.
+ *
+ * Any other string is a key into the `customViews` prop. The `(string & {})`
+ * arm keeps the four built-ins in autocomplete while admitting those keys.
+ */
+export type CollectionViewMode = "table" | "cards" | "kanban" | "list" | (string & {});
 
 /** Supported collection sizes */
 export type CollectionViewSize = "xs" | "s" | "m" | "l" | "xl";
@@ -137,3 +142,40 @@ export interface KanbanPropertyOption {
     key: string;
     label: string;
 }
+
+/**
+ * What a custom view's component receives — the same set the built-in table,
+ * card, list and kanban views are given, so a custom view starts at parity
+ * with them and inherits the toolbar's search, the empty state and selection.
+ */
+export interface CollectionCustomViewProps<T = Record<string, unknown>> {
+    dataController: CollectionDataController<T>;
+    properties: Record<string, CollectionPropertyConfig>;
+    propertiesOrder?: string[];
+    idProperty?: string;
+    titleProperty?: string;
+    onRowClick?: (row: T) => void;
+    onRowCreate?: (defaults?: Record<string, unknown>) => void;
+    canCreate?: boolean;
+    cellRenderer?: CellRendererOverride<T>;
+    selectionEnabled?: boolean;
+    selectionController?: CollectionSelectionController<T>;
+    highlightedItems?: T[];
+    emptyComponent?: React.ReactNode;
+    size?: CollectionViewSize;
+}
+
+/**
+ * A custom view registration. Either the component on its own, or the
+ * component with the label and icon its switcher entry should carry.
+ *
+ * Without a `name` the switcher falls back to the key, which is legible but
+ * rarely what you want on screen.
+ */
+export type CollectionCustomViewEntry<T = Record<string, unknown>> =
+    | React.ComponentType<CollectionCustomViewProps<T>>
+    | {
+        name?: string;
+        icon?: React.ReactNode;
+        Component: React.ComponentType<CollectionCustomViewProps<T>>;
+    };

@@ -432,6 +432,12 @@ export interface SerializableCollectionConfig {
     defaultEntityAction?: "view" | "edit";
     defaultViewMode?: ViewMode;
     enabledViews?: ViewMode[];
+    /**
+     * Keys only. A custom view declared inline carries a `Builder` function,
+     * which does not survive a round trip through a config file — the editor
+     * can reference app-registered views, not author new ones.
+     */
+    customViews?: string[];
     kanban?: KanbanConfig<Record<string, unknown>>;
     defaultSize?: CollectionSize;
     sideDialogWidth?: number | string;

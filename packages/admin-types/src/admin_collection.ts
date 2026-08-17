@@ -43,6 +43,7 @@ import type {
     ViewMode
 } from "./collections";
 import type { EntityCustomView, FormViewConfig } from "./types/entity_views";
+import type { CollectionCustomView } from "./types/collection_views";
 import type { EntityDisplay } from "./types/entity_display";
 import type { FormLayoutConfig } from "./types/form_layout";
 import type { EntityAction } from "./types/entity_actions";
@@ -450,21 +451,51 @@ export type AdminCollectionOptions<
 
     /**
      * Default view mode for displaying this collection.
-     * - "table": Display entities in a table with inline editing (default)
+     * - "list": Display entities as a list (default)
+     * - "table": Display entities in a table with inline editing
      * - "cards": Display entities as a grid of cards with thumbnails
      * - "kanban": Display entities in a Kanban board grouped by a property
-     * Defaults to "table".
+     * - any `key` from {@link customViews}
+     * Defaults to "list".
      */
     defaultViewMode?: ViewMode;
 
     /**
      * Which view modes are available for this collection.
-     * Possible values: "table", "cards", "kanban".
-     * Defaults to all three: ["table", "cards", "kanban"].
+     * Possible values: "list", "table", "cards", "kanban", and any `key` from
+     * {@link customViews}.
+     * Defaults to all four built-ins plus every declared custom view.
      * Note: "kanban" will only be available if the collection has at least
      * one string property with `enum` defined, regardless of this setting.
+     * With a single entry the view switcher is hidden.
      */
     enabledViews?: ViewMode[];
+
+    /**
+     * Additional ways to render this collection's rows, offered in the view
+     * switcher beside list / table / cards / kanban.
+     *
+     * Can be an array of `CollectionCustomView` or a string naming the `key` of
+     * one registered globally on `<RebaseAdmin collectionViews={…}>`. The
+     * string form is what lets a React-free config package reference React UI,
+     * and it is what the collection editor stores.
+     *
+     * A custom view is another rendering of the *same query* — it is handed the
+     * live table controller and inherits filters, search and the entity side
+     * panel. Use an `AppView` instead for a workflow spanning collections.
+     *
+     * @example
+     * ```ts
+     * admin: {
+     *     customViews: [
+     *         { key: "map", name: "Map", icon: "Map", Builder: MapView }
+     *     ],
+     *     enabledViews: ["table", "map"],
+     *     defaultViewMode: "map"
+     * }
+     * ```
+     */
+    customViews?: (string | CollectionCustomView<Record<string, unknown>>)[];
 
     /**
      * Configuration for Kanban board view mode.

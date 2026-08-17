@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 
 import type { CollectionConfigsBuilder, AppViewsBuilder } from "../types/builders";
 import type { EntityCustomView } from "../types/entity_views";
+import type { CollectionCustomView } from "../types/collection_views";
 import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
 import type { AdminCollection } from "@rebasepro/admin-types";
@@ -34,6 +35,14 @@ export interface RebaseAdminConfig<EC extends AdminCollection = AdminCollection>
 
     homePage?: ReactNode;
     entityViews?: EntityCustomView[];
+
+    /**
+     * Custom collection view modes available to every collection by `key`.
+     * A collection opts into one by naming that key in `admin.customViews`,
+     * the same way `entityViews` works.
+     */
+    collectionViews?: CollectionCustomView[];
+
     entityActions?: EntityAction[];
 
     /**

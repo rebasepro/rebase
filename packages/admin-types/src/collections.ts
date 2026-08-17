@@ -53,9 +53,15 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
  * - "table": Table with inline editing
  * - "cards": Grid of visual cards with thumbnails
  * - "kanban": Board view grouped by a property
+ *
+ * Any other string is the `key` of a custom view declared in
+ * `admin.customViews` or registered on `<RebaseAdmin collectionViews={…}>`.
+ * The `(string & {})` arm is what keeps the four built-ins in autocomplete
+ * while still admitting those keys.
+ *
  * @group Collections
  */
-export type ViewMode = "list" | "table" | "cards" | "kanban";
+export type ViewMode = "list" | "table" | "cards" | "kanban" | (string & {});
 
 /**
  * Parameter passed to the `Actions` prop in the collection configuration.

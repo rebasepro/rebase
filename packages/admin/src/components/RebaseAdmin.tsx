@@ -10,7 +10,7 @@ import type { RebaseAdminConfig } from "@rebasepro/admin-types";
  * is auto-wired as a native feature (slots, provider, Studio view) without
  * needing any external plugin.
  */
-export function RebaseAdmin({ collections, views, homePage, entityViews, entityActions, collectionEditor, navigationGroupMappings, basePath }: RebaseAdminConfig) {
+export function RebaseAdmin({ collections, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath }: RebaseAdminConfig) {
     const dispatch = useRebaseRegistryDispatch();
 
     useLayoutEffect(() => {
@@ -18,12 +18,13 @@ export function RebaseAdmin({ collections, views, homePage, entityViews, entityA
 views,
 homePage,
 entityViews,
+collectionViews,
 entityActions,
 collectionEditor,
 navigationGroupMappings,
 basePath });
         return () => dispatch.unregisterAdmin();
-    }, [dispatch, collections, views, homePage, entityViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
+    }, [dispatch, collections, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
 
     return null;
 }

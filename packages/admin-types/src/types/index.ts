@@ -1,5 +1,6 @@
 export * from "./breadcrumbs";
 export * from "./builders";
+export * from "./collection_views";
 export * from "./component_overrides";
 export * from "./entity_actions";
 export * from "./entity_link_builder";
