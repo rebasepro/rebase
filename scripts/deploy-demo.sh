@@ -76,6 +76,12 @@ fi
 info "Deploying to Cloud Run service '${SERVICE}' in ${REGION}..."
 echo ""
 
+# ALLOW_REGISTRATION is not optional here. `--set-env-vars` replaces the whole
+# env block on every deploy, and the server defaults the flag to false when it
+# is absent — which left the demo advertising "Sign in with Google" while
+# refusing to create the account behind it (403 REGISTRATION_DISABLED). Visitors
+# land on `defaultRole: viewer`, so an open demo is the intent.
+
 gcloud run deploy "$SERVICE" \
   --image="$IMAGE" \
   --region="$REGION" \
@@ -86,7 +92,7 @@ gcloud run deploy "$SERVICE" \
   --cpu=1 \
   --min-instances=1 \
   --max-instances=3 \
-  --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true,ALLOW_LOCALHOST_IN_PRODUCTION=true,REBASE_CRON_ALWAYS_ON=1" \
+  --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true,ALLOW_LOCALHOST_IN_PRODUCTION=true,REBASE_CRON_ALWAYS_ON=1,ALLOW_REGISTRATION=true" \
   --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ADMIN_CONNECTION_STRING=ADMIN_CONNECTION_STRING:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
 
 echo ""

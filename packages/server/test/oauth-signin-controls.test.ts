@@ -195,6 +195,20 @@ describe("POST /auth/<provider> — registration policy", () => {
         expect(repo.createUser).not.toHaveBeenCalled();
     });
 
+    it("says why, in terms of the button the visitor actually pressed", async () => {
+        // Nobody pressed "create an account" here — a bare "Registration is
+        // disabled" leaves them re-pressing a Google button that will never
+        // work. The message is rendered verbatim by the login screen.
+        const app = createApp({ allowRegistration: false });
+        repo.listUsersPaginated.mockResolvedValue({ users: [], total: 4, limit: 1, offset: 0 });
+
+        const res = await signIn(app);
+
+        const message = ((await res.json()) as { error: { message: string } }).error.message;
+        expect(message).toContain("No account exists");
+        expect(message).toContain("new sign-ups are disabled");
+    });
+
     it("admits the very first user on an empty database and promotes them to admin", async () => {
         const app = createApp({ allowRegistration: false });
         repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });

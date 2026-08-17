@@ -318,4 +318,73 @@ enabledProviders: ["github"] }
             expect(screen.getByText("join_newsletter")).toBeInTheDocument();
         });
     });
+
+    describe("provider sign-in failures", () => {
+        /** Stands in for Google's script, handing back the popup callback. */
+        function installGoogleScript(): { fire: (response: { code?: string; error?: string }) => void } {
+            let callback: ((response: { code?: string; error?: string }) => void) | undefined;
+            (window as any).google = {
+                accounts: {
+                    oauth2: {
+                        initCodeClient: (config: any) => {
+                            callback = config.callback;
+                            return { requestCode: jest.fn() };
+                        }
+                    }
+                }
+            };
+            return { fire: (response) => act(() => { callback?.(response); }) };
+        }
+
+        afterEach(() => {
+            delete (window as any).google;
+        });
+
+        function renderWithGoogle() {
+            mockAuthController.capabilities = {
+                ...mockAuthController.capabilities,
+                enabledProviders: ["google"]
+            };
+            return render(
+                <LoginView authController={mockAuthController} googleClientId="client-id.apps.googleusercontent.com"/>
+            );
+        }
+
+        it("shows the backend's reason on the provider screen when a sign-in is refused", () => {
+            // What the demo returned: the popup closes and the visitor is back
+            // on an unchanged login screen, so this message is the only place
+            // the refusal is visible.
+            mockAuthController.authProviderError = new Error("No account exists for this google identity, and new sign-ups are disabled on this backend.");
+            renderWithGoogle();
+
+            expect(screen.getByText(/new sign-ups are disabled/i)).toBeInTheDocument();
+        });
+
+        it("does not show a stale failure once the user is signed in", () => {
+            mockAuthController.authProviderError = new Error("Registration is disabled");
+            mockAuthController.user = { uid: "1" };
+            renderWithGoogle();
+
+            expect(screen.queryByText(/Registration is disabled/i)).not.toBeInTheDocument();
+        });
+
+        it("reports a Google popup error the controller never sees", () => {
+            const google = installGoogleScript();
+            renderWithGoogle();
+
+            google.fire({ error: "invalid_client" });
+
+            expect(screen.getByText(/invalid_client/)).toBeInTheDocument();
+            expect(mockAuthController.googleLogin).not.toHaveBeenCalled();
+        });
+
+        it("stays quiet when the visitor closes the popup", () => {
+            const google = installGoogleScript();
+            renderWithGoogle();
+
+            google.fire({ error: "popup_closed" });
+
+            expect(screen.queryByText(/popup_closed/)).not.toBeInTheDocument();
+        });
+    });
 });

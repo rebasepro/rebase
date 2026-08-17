@@ -200,6 +200,22 @@ function warnAboutHalfConfiguredOAuth(
 }
 
 /**
+ * Whether a provider's error code means "the visitor backed out" rather than
+ * "the sign-in failed". Closing the popup is an answer, not a fault, and
+ * showing it in red reads as a broken login.
+ */
+function isUserCancellation(code: string | undefined): boolean {
+    if (!code) return false;
+    return [
+        "access_denied",
+        "popup_closed",
+        "popup_closed_by_user",
+        "user_cancel",
+        "immediate_failed"
+    ].includes(code);
+}
+
+/**
  * Generic login view component that works with any AuthControllerExtended.
  * Feature-detects capabilities to show/hide login methods.
  * @group Core
@@ -232,6 +248,12 @@ export function LoginView({
     const [mode, setMode] = useState<AuthMode>("buttons");
     const [fadeIn, setFadeIn] = useState(false);
     const [viewVisible, setViewVisible] = useState(true);
+    // Failures that never reach the auth controller: a provider that answers the
+    // popup with an error, a redirect whose `state` does not match, a Google
+    // script that never loaded. The controller records everything it is *given*
+    // in `authProviderError`, so it cannot speak for the half of the flow that
+    // happens before the code reaches it.
+    const [providerError, setProviderError] = useState<string | null>(null);
     // Lives here, not in LoginForm: the box is ticked on the provider screen
     // and read after a sign-in that happens one or two screens later, so it has
     // to outlive both. The form also unmounts on every login↔register switch.
@@ -259,6 +281,9 @@ export function LoginView({
     }, [newsletterOptIn, onNewsletterOptIn]);
 
     const switchMode = (newMode: AuthMode) => {
+        // A message about the last Google attempt has nothing to say about the
+        // email form the visitor just opened.
+        setProviderError(null);
         setViewVisible(false);
         setTimeout(() => {
             setMode(newMode);
@@ -321,14 +346,21 @@ export function LoginView({
 
         if (result.status === "error") {
             console.error(`OAuth sign-in failed: ${result.error}`);
+            if (!isUserCancellation(result.error)) {
+                setProviderError(`Sign-in failed: ${result.error}`);
+            }
             return;
         }
         if (result.status === "mismatch") {
             console.error("Ignoring an OAuth code that does not match a sign-in this browser started.");
+            setProviderError("This sign-in could not be verified as one you started in this browser. Please try again.");
             return;
         }
 
         if (authController.oauthLogin) {
+            // The rejection is recorded in `authProviderError`, which the screen
+            // renders — the catch is here so a shown error does not also surface
+            // as an unhandled rejection.
             authController.oauthLogin(result.provider, {
                 code: result.code,
                 redirectUri: result.redirectUri,
@@ -353,6 +385,16 @@ export function LoginView({
     } else {
         logoComponent = <RebaseLogo/>;
     }
+
+    // The controller's own record of the last rejected sign-in, ignored once a
+    // user is present — a stale failure must not sit over a screen that has
+    // since succeeded. `LoginForm` renders the same value for the email path.
+    const controllerError = authController.authProviderError && !authController.user
+        ? (authController.authProviderError instanceof Error
+            ? authController.authProviderError.message
+            : String(authController.authProviderError))
+        : null;
+    const buttonsErrorMessage = providerError ?? controllerError;
 
     let notAllowedMessage: string | undefined;
     if (notAllowedError) {
@@ -430,6 +472,15 @@ export function LoginView({
                             {/* Provider buttons screen */}
                             {mode === "buttons" && (
                                 <div className="w-full flex flex-col gap-3 mt-2">
+                                    {/* Every provider button fails here, and this
+                                        screen used to render nothing for it: a
+                                        refused Google sign-in closed the popup
+                                        and returned the visitor to an unchanged
+                                        login screen, with the reason only in the
+                                        browser console. */}
+                                    {buttonsErrorMessage && (
+                                        <ErrorView error={buttonsErrorMessage}/>
+                                    )}
                                     {(title || subtitle) && (
                                         <div className="text-center mb-2">
                                             {title && (
@@ -497,6 +548,7 @@ export function LoginView({
                                             googleClientId={googleClientId}
                                             authController={authController}
                                             onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
+                                            onError={setProviderError}
                                         />
                                     )}
                                     {hasGitHubLogin && githubClientId && (
@@ -621,13 +673,20 @@ function GoogleLoginButton({
     disabled,
     googleClientId,
     authController,
-    onSignedIn
+    onSignedIn,
+    onError
 }: {
     disabled?: boolean,
     googleClientId: string,
     authController: AuthControllerExtended,
     /** Called once the controller has accepted the provider's code. */
-    onSignedIn?: () => void
+    onSignedIn?: () => void,
+    /**
+     * Reports a failure the auth controller never saw — Google answering the
+     * popup with an error, or its script never having loaded. A rejected
+     * `googleLogin` is not reported here: the controller already records it.
+     */
+    onError?: (message: string | null) => void
 }) {
     const codeClientRef = useRef<{ requestCode(): void } | null>(null);
     // The code client is built once and its callback closes over this render's
@@ -635,6 +694,8 @@ function GoogleLoginButton({
     // rather than the one that existed when Google's script happened to load.
     const onSignedInRef = useRef(onSignedIn);
     onSignedInRef.current = onSignedIn;
+    const onErrorRef = useRef(onError);
+    onErrorRef.current = onError;
 
     useEffect(() => {
         if (!authController.googleLogin) return;
@@ -649,8 +710,16 @@ function GoogleLoginButton({
             callback: async (response: { code?: string; error?: string }) => {
                 if (response.error || !response.code) {
                     console.error("Google login error:", response.error);
+                    if (!isUserCancellation(response.error)) {
+                        onErrorRef.current?.(
+                            response.error
+                                ? `Google sign-in failed: ${response.error}`
+                                : "Google sign-in failed. Please try again."
+                        );
+                    }
                     return;
                 }
+                onErrorRef.current?.(null);
                 try {
                     // Send the authorization code to the backend.
                     // redirectUri "postmessage" is required when using popup ux_mode.
@@ -672,8 +741,10 @@ function GoogleLoginButton({
     const handleClick = () => {
         if (!codeClientRef.current) {
             console.error("Google Sign-In not loaded");
+            onErrorRef.current?.("Google Sign-In could not be loaded. Check your connection or any script blockers, then try again.");
             return;
         }
+        onErrorRef.current?.(null);
         codeClientRef.current.requestCode();
     };
 

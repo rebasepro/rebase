@@ -607,15 +607,23 @@ displayName: user.displayName });
                         // registration, and used to be the one account-creating
                         // path that consulted no policy at all — kill switch
                         // included, first-user-becomes-admin included.
+                        //
+                        // The bare "Registration is disabled" that POST
+                        // /auth/register returns is a non-sequitur here: nobody
+                        // pressed a Create-account button, they pressed Sign in
+                        // with Google and there is no account behind that
+                        // identity. Say both halves, since the visitor can see
+                        // neither.
+                        const noSignupsMessage = `No account exists for this ${provider.id} identity, and new sign-ups are disabled on this backend. Ask an administrator to create your account.`;
                         if (config.disableSelfRegistration) {
-                            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                            throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                         }
                         let bootstrapRegistration = false;
                         if (!isRegistrationAllowed()) {
                             const { total } = await authRepo.listUsersPaginated({ limit: 1 });
                             bootstrapRegistration = total === 0;
                             if (!bootstrapRegistration) {
-                                throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                                throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                             }
                         }
 
@@ -650,7 +658,7 @@ displayName: user.displayName });
                             // Two sign-ups raced through the empty-table check;
                             // same undo as POST /auth/register.
                             await authRepo.deleteUser(user.id);
-                            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                            throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                         }
 
                         if (isFirstUser) {
