@@ -208,7 +208,13 @@ export function useLogTail(filters: LogTailFilters, limit = 200): LogTail {
     // A filter change replaces the window wholesale. Clearing here rather than in
     // the connection effect means a reconnect (or a tab coming back) keeps what
     // is on screen until the new snapshot lands.
-    const filterKey = `${level} ${source} ${search}`;
+    //
+    // Joined on NUL, written as the escape: the search box takes free text, so any
+    // printable separator is a character a user can type, and two filters that
+    // differ only either side of it would collide into one key and skip the clear.
+    // As a raw byte it would make the whole file binary to grep, which reads as an
+    // empty search result rather than as an error.
+    const filterKey = `${level}\u0000${source}\u0000${search}`;
     // `EMPTY` rather than a fresh `[]` so the run on mount, when there is nothing
     // to clear, is not a state change and does not cost a render.
     useEffect(() => {
