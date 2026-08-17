@@ -90,5 +90,10 @@ export function configureMiddlewares(
     // Record requests into the in-memory ring buffer that backs the Studio's
     // Logs Explorer. This is a separate sink from `requestLogger` above, which
     // writes to stdout — both observe every request, neither duplicates the other.
-    app.use(`${basePath}/*`, logMiddleware());
+    //
+    // The tail is excluded from its own sink. It is one long-lived request whose
+    // recorded duration would be the time until the client disconnected, and it
+    // is already subscribed by the time this line runs — so the first thing every
+    // reader would see is itself connecting.
+    app.use(`${basePath}/*`, logMiddleware({ ignorePaths: [`${basePath}/logs/stream`] }));
 }

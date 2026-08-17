@@ -32,6 +32,16 @@ export function responseCompression(): MiddlewareHandler {
             return;
         }
 
+        // Server-sent events are never compressed. gzip emits on block
+        // boundaries, not on write boundaries, so a compressed event stream
+        // delivers nothing until enough events have accumulated to fill one —
+        // which is the entire property the stream exists to provide. Hono's
+        // `compress` happens to skip these already, via the `Transfer-Encoding`
+        // that `streamSSE` sets; this does not depend on that.
+        if (c.res.headers.get("Content-Type")?.startsWith("text/event-stream")) {
+            return;
+        }
+
         // The response is already built, so `compress` only needs to inspect and
         // re-wrap it — hence the no-op continuation.
         await gzip(c, async () => { /* already resolved */ });

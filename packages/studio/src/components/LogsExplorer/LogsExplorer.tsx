@@ -1,15 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
-import { useApiBase, useApiConfig } from "@rebasepro/app";
-
-interface LogEntry {
-    id: string;
-    timestamp: string;
-    level: "debug" | "info" | "warn" | "error";
-    source: "api" | "auth" | "storage" | "realtime" | "system";
-    message: string;
-    metadata?: Record<string, unknown>;
-}
+import { idNum, useLogTail } from "./useLogTail";
+import type { LogTransport } from "./useLogTail";
 
 const LEVEL_COLORS: Record<string, string> = {
     debug: "text-surface-500",
@@ -26,129 +18,70 @@ const SOURCE_COLORS: Record<string, string> = {
     system: "text-surface-600 dark:text-surface-400"
 };
 
-// Ids are `log_<n>` with a monotonic counter, so numeric comparison tells
-// old entries from new ones across polls.
-const idNum = (entry: LogEntry): number => Number(entry.id.slice("log_".length));
+const TRANSPORT_LABELS: Record<LogTransport, string> = {
+    connecting: "Connecting",
+    live: "Live",
+    polling: "Polling"
+};
 
-// The window is contiguous and ordered, so identical ends mean identical content.
-const sameLogs = (a: LogEntry[], b: LogEntry[]): boolean =>
-    a.length === b.length &&
-    a[0]?.id === b[0]?.id &&
-    a[a.length - 1]?.id === b[b.length - 1]?.id;
+const TRANSPORT_DOTS: Record<LogTransport, string> = {
+    connecting: "bg-amber-500",
+    live: "bg-green-500",
+    polling: "bg-surface-400"
+};
+
+const TRANSPORT_TITLES: Record<LogTransport, string> = {
+    connecting: "Reconnecting to the log stream.",
+    live: "Streaming — entries appear as the server writes them.",
+    polling: "This server has no log stream; falling back to a refresh every 3 seconds."
+};
 
 // How close to the bottom edge still counts as "at the bottom".
 const STICK_THRESHOLD = 40;
 
 export function LogsExplorer() {
-    const [logs, setLogs] = useState<LogEntry[]>([]);
     const [level, setLevel] = useState<string>("all");
     const [source, setSource] = useState<string>("all");
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
     const [autoScroll, setAutoScroll] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     // Entries that arrived while the user was scrolled away from the bottom.
     const [newCount, setNewCount] = useState(0);
     const [atBottom, setAtBottom] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
     // Whether the view is stuck to the bottom right now. A ref, not state:
-    // the scroll handler and the fetch loop both read it synchronously.
+    // the scroll handler and the entry-counting effect both read it synchronously.
     const stickRef = useRef(true);
     const lastMaxIdRef = useRef<number | null>(null);
-    const apiConfig = useApiConfig();
-    const apiBase = useApiBase();
 
-    // Debounce the search box so typing doesn't refetch per keystroke.
+    // Debounce the search box so typing doesn't reopen the stream per keystroke.
     useEffect(() => {
         const t = setTimeout(() => setSearch(searchInput), 300);
         return () => clearTimeout(t);
     }, [searchInput]);
 
-    const fetchLogs = useCallback(async () => {
-        if (!apiConfig?.apiUrl) {
-            setError("No API URL configured — cannot load logs.");
-            return;
-        }
-        try {
-            const params = new URLSearchParams();
-            if (level && level !== "all") params.set("level", level);
-            if (source && source !== "all") params.set("source", source);
-            if (search) params.set("search", search);
-            params.set("limit", "200");
+    const { logs, error, transport, dropped } = useLogTail({ level,
+        source,
+        search });
 
-            // Logs are admin-only, so the request must carry the auth token. The
-            // URL is absolute: a relative one would resolve against the frontend
-            // origin, which serves index.html rather than the API.
-            const headers: Record<string, string> = {};
-            const token = apiConfig.getAuthToken ? await apiConfig.getAuthToken() : null;
-            if (token) headers["Authorization"] = `Bearer ${token}`;
-
-            const resp = await fetch(`${apiBase}/logs?${params}`, { headers });
-            if (!resp.ok) {
-                setError(resp.status === 401 || resp.status === 403
-                    ? "Not authorised to read logs — an admin role is required."
-                    : `Could not load logs (HTTP ${resp.status}).`);
-                return;
-            }
-            const data: { entries?: LogEntry[] } = await resp.json();
-            // The API returns newest-first; the view tails like a terminal, so
-            // flip to chronological order (newest at the bottom).
-            const entries = (data.entries || []).slice().reverse();
-
-            const prevMax = lastMaxIdRef.current;
-            if (prevMax != null && !stickRef.current) {
-                const fresh = entries.filter(e => idNum(e) > prevMax).length;
-                if (fresh > 0) setNewCount(c => c + fresh);
-            }
-            if (entries.length > 0) lastMaxIdRef.current = idNum(entries[entries.length - 1]);
-
-            // Unchanged window → keep the previous array so React leaves the
-            // DOM alone (hover states and text selection survive the poll).
-            setLogs(prev => sameLogs(prev, entries) ? prev : entries);
-            setError(null);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not load logs.");
-        }
-    }, [level, source, search, apiConfig, apiBase]);
-
-    // A filter change replaces the window wholesale — "new entries since last
-    // poll" stops meaning anything, so the counter starts over.
+    // A filter change replaces the window wholesale — "new since you looked
+    // away" stops meaning anything, so the counter starts over.
     useEffect(() => {
-        lastMaxIdRef.current = null;
         setNewCount(0);
     }, [level, source, search]);
 
+    // Count what arrived while the user was reading further up. Driven off the
+    // rendered window rather than off the transport, so it means the same thing
+    // whether the entries were streamed or polled.
     useEffect(() => {
-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
-        let cancelled = false;
-
-        fetchLogs();
-
-        const scheduleNext = () => {
-            if (cancelled) return;
-            timeoutId = setTimeout(async () => {
-                if (document.visibilityState === "visible") {
-                    await fetchLogs();
-                }
-                scheduleNext();
-            }, 3000);
-        };
-
-        scheduleNext();
-
-        const handleVisibility = () => {
-            if (document.visibilityState === "visible") {
-                fetchLogs();
-            }
-        };
-        document.addEventListener("visibilitychange", handleVisibility);
-
-        return () => {
-            cancelled = true;
-            if (timeoutId) clearTimeout(timeoutId);
-            document.removeEventListener("visibilitychange", handleVisibility);
-        };
-    }, [fetchLogs]);
+        const max = logs.length > 0 ? idNum(logs[logs.length - 1]) : null;
+        const prevMax = lastMaxIdRef.current;
+        if (prevMax != null && !stickRef.current) {
+            const fresh = logs.filter(e => idNum(e) > prevMax).length;
+            if (fresh > 0) setNewCount(c => c + fresh);
+        }
+        lastMaxIdRef.current = max;
+    }, [logs]);
 
     const scrollToBottom = useCallback(() => {
         const el = containerRef.current;
@@ -236,14 +169,26 @@ export function LogsExplorer() {
                         Auto-scroll
                     </Label>
                 </div>
-                <div className="ml-auto pl-4">
+                {/* Whether the tail is actually attached. A log view with
+                    nothing in it is ambiguous — quiet server, or a stream that
+                    dropped — and this is the difference. */}
+                <div className="ml-auto pl-4 flex items-center gap-3">
+                    <div className="flex items-center gap-1.5" title={TRANSPORT_TITLES[transport]}>
+                        <span
+                            aria-hidden
+                            className={cls("w-1.5 h-1.5 rounded-full shrink-0", TRANSPORT_DOTS[transport])}
+                        />
+                        <Typography variant="caption" color="secondary">
+                            {TRANSPORT_LABELS[transport]}
+                        </Typography>
+                    </div>
                     <Typography variant="caption" color="secondary">
                         {logs.length} entries
                     </Typography>
                 </div>
             </div>
 
-            {/* A failing poll must stay visible even while stale logs are on
+            {/* A broken tail must stay visible even while stale logs are on
                 screen — otherwise the view quietly freezes. */}
             {error && logs.length > 0 && (
                 <div className={cls(
@@ -252,6 +197,21 @@ export function LogsExplorer() {
                 )}>
                     <Typography variant="caption" className="text-amber-700 dark:text-amber-400">
                         {error}
+                    </Typography>
+                </div>
+            )}
+
+            {/* The server bounds what it holds per connection, so a burst big
+                enough leaves a hole in what is on screen. Say so: a tail that
+                silently skips entries is worse than one that admits it. */}
+            {dropped > 0 && (
+                <div className={cls(
+                    "px-4 py-1.5 border-b bg-amber-50 dark:bg-amber-950/20 shrink-0",
+                    defaultBorderMixin
+                )}>
+                    <Typography variant="caption" className="text-amber-700 dark:text-amber-400">
+                        {dropped} {dropped === 1 ? "entry was" : "entries were"} dropped — the log is
+                        arriving faster than this view can read it. Narrow the filter to keep up.
                     </Typography>
                 </div>
             )}

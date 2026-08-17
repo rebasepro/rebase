@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every relation in a project whose collections import each other was reported as broken, by the two commands that load collections from source.** `rebase generate-sdk` and `rebase build` read `config/collections` through jiti, which transpiles ES modules to CommonJS. A CommonJS cycle hands the module entered *second* the namespace object — `{ __esModule: true, default: … }` — and never replaces it with a live binding, so a `target: () => otherCollection` thunk returned the namespace rather than the collection. Resolution saw an object with no `slug` and refused it.
+
+  The measured cost, on a 63-collection project introspected from an existing database: 58 relations rejected, one warning each, and a generated SDK in which **every relation field and every derived foreign-key column was silently missing**. `customerId` and `customer` were simply absent from the row type. Nothing failed — the command exited 0 and wrote a file that looked complete, which is the failure mode you find out about from the compiler months later.
+
+  The value was never lost. The thunk is lazy, so by the time it runs the exporting module has finished and the collection is sitting one level down in `default`. Resolution now takes it — and only when the inner value is itself a collection, because a `default` that is not one is a genuinely wrong thunk and has to keep reaching the error.
+
+  What made this hard to place is that the warning blamed the author — *"make sure the target is `() => otherCollection` and not evaluated at module load"* — for something the rejected code already did. Cycles between collection files are not an authoring mistake to be designed out: two collections that point at each other **must** import each other, and the lazy thunk is this framework's own answer to that. Native ESM resolves those thunks correctly, which is why the same collections load, relate and serve perfectly under the dev server while the CLI called them broken.
+
+  A thunk that returns a promise — `target: () => import("./other")`, one keystroke away and the mistake the namespace shape resembles — now says so, rather than reporting "not a collection".
+
 ## [0.14.1] - 2026-08-16
 
 ### Added

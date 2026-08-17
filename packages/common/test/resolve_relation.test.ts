@@ -133,6 +133,38 @@ describe("resolveRelation — import cycles", () => {
         expect(() => resolveRelation({ kind: "belongsTo", target: (() => undefined) as never }, posts, "promoted_job"))
             .toThrow(/'promoted_job' on 'posts'.*resolved to `undefined`.*import cycle/s);
     });
+
+    it("takes the collection out of a module namespace, rather than rejecting it", () => {
+        // What a loader that transpiles ESM to CJS — jiti, which `generate-sdk`
+        // and `rebase build` load collections with — hands the module entered
+        // second in a cycle: the namespace object, never replaced with a live
+        // binding. The thunk is lazy, so by the time it runs `default` holds the
+        // finished collection. Native ESM resolves the same thunk to `tags`.
+        const namespace = { __esModule: true, default: tags } as never;
+
+        const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
+        expect(r).toMatchObject({ kind: "belongsTo", targetSlug: "tags", localKey: "tag_id" });
+    });
+
+    it("still rejects a namespace whose default is not a collection", () => {
+        // Unwrapping is only right because there is one reading of it. A
+        // `default` that is not a collection is a genuinely wrong thunk, and has
+        // to keep reaching the error.
+        const namespace = { __esModule: true, default: { notACollection: true } } as never;
+
+        expect(() => resolveRelation({ kind: "belongsTo", target: () => namespace }, posts, "tag"))
+            .toThrow(/'tag' on 'posts'.*not a collection/s);
+    });
+
+    it("names the mistake when the thunk returns a promise", () => {
+        // `target: () => import("./tags")` — one keystroke from the namespace
+        // shape, and the case where "return the binding" is the actual fix
+        // rather than a restatement of what the code already does.
+        const target = (() => Promise.resolve(tags)) as never;
+
+        expect(() => resolveRelation({ kind: "belongsTo", target }, posts, "tag"))
+            .toThrow(/returned a promise.*target: \(\) => otherCollection/s);
+    });
 });
 
 describe("resolveCollectionRelations — the two sources", () => {
