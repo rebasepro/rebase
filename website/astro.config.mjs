@@ -94,6 +94,7 @@ export default defineConfig({
                     items: [
                         { label: "Frontend Setup", slug: "docs/frontend" },
                         { label: "Extending Rebase", slug: "docs/frontend/extending" },
+                        { label: "Styling Custom UI", slug: "docs/frontend/styling" },
                         { label: "Component Overrides (Swizzling)", slug: "docs/frontend/component-overrides" },
                         { label: "Authentication & Login", slug: "docs/frontend/authentication" },
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },

@@ -28,6 +28,15 @@ This guide helps you pick the right mechanism for your use case, then links to t
 | Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
 | Ship several extensions as one installable unit | `plugins` | app | [Plugins](/docs/plugins) |
+| Style the thing I just built | `@rebasepro/ui` + theme tokens | any | [Styling Custom UI](/docs/frontend/styling) |
+
+:::tip[Whatever you pick, build it from the kit]
+Every mechanism below hands you a React component and says nothing about what to
+fill it with. Use `@rebasepro/ui` components and the theme's colour tokens rather
+than hand-written CSS — a custom view is still an admin view, and a hardcoded
+colour is invisible in one of the two themes. See
+[Styling Custom UI](/docs/frontend/styling).
+:::
 
 ## Mechanisms in Detail
 
