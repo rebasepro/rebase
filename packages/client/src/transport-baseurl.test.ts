@@ -30,8 +30,8 @@ describe("transport baseUrl resolution", () => {
     });
 
     it("follows the page, so a second hostname on the same app just works", () => {
-        setWindow("https://dadaki.apps.rebase.pro");
-        expect(createTransport({}).baseUrl).toBe("https://dadaki.apps.rebase.pro");
+        setWindow("https://dadaki.rebase.website");
+        expect(createTransport({}).baseUrl).toBe("https://dadaki.rebase.website");
         setWindow("https://dadaki.com");
         expect(createTransport({}).baseUrl).toBe("https://dadaki.com");
     });

@@ -281,12 +281,12 @@ Today: one `Ingress` and one `Certificate` per tenant namespace. Two problems, o
 a hard ceiling:
 
 - **Let's Encrypt issues at most 50 certificates per registered domain per week.** Every
-  `*.apps.rebase.pro` tenant takes one. **We cannot onboard more than ~50 tenants a
+  `*.rebase.website` tenant takes one. **We cannot onboard more than ~50 tenants a
   week**, and that is unrelated to cost.
 - nginx reloads its config on every tenant Ingress change — O(n) reloads, and no place to
   make a routing decision.
 
-Fix: **one wildcard certificate for `*.apps.rebase.pro`** (DNS-01 via Cloud DNS) behind a
+Fix: **one wildcard certificate for `*.rebase.website`** (DNS-01 via Cloud DNS) behind a
 single Ingress pointing at a router. Custom domains keep per-domain certs — low volume,
 and unavoidable. The router resolves `Host` → destination from a table the control plane
 maintains, where a destination is one of: in-cluster Service, Cloud Run URL, GCS prefix,
@@ -429,9 +429,9 @@ All three are ours, which makes this the cheapest possible time to do it.
 
 | Tenant | Host | Today | Proposed |
 |---|---|---|---|
-| `1a78e932…` | **dadaki.com** + dadaki.apps.rebase.pro | managed runtime `rebasepro/server` 1.6.0, 2 vCPU/2 GiB app, 6 DB pods | **Pro** — dedicated Postgres, 1 instance, no pooler, on-demand. Real customer domain; schedule the Postgres restart. |
-| `ee6ebb2c…` | presupuestos.apps.rebase.pro | Kaniko image, 100m/256Mi app (below every tier — worth understanding why), 6 DB pods | **Static** if it does not use its database — verify first. Otherwise **Hobby**. |
-| `089c40a0…` | rebase-growth.apps.rebase.pro | Kaniko image, 2 vCPU/2 GiB app, 6 DB pods | **Hobby** — a nightly cron job with a lead table. Prime scale-to-zero candidate. |
+| `1a78e932…` | **dadaki.com** + dadaki.rebase.website | managed runtime `rebasepro/server` 1.6.0, 2 vCPU/2 GiB app, 6 DB pods | **Pro** — dedicated Postgres, 1 instance, no pooler, on-demand. Real customer domain; schedule the Postgres restart. |
+| `ee6ebb2c…` | presupuestos.rebase.website | Kaniko image, 100m/256Mi app (below every tier — worth understanding why), 6 DB pods | **Static** if it does not use its database — verify first. Otherwise **Hobby**. |
+| `089c40a0…` | rebase-growth.rebase.website | Kaniko image, 2 vCPU/2 GiB app, 6 DB pods | **Hobby** — a nightly cron job with a lead table. Prime scale-to-zero candidate. |
 
 Order: Wave 0 patches all three in place (safe, no data movement). Wave 3 moves
 `presupuestos` and `rebase-growth` onto the shared pool with a `pg_dump`/`pg_restore`
@@ -612,8 +612,9 @@ Assign plans, seed the new Stripe prices (`npm run seed:prices`), stand up
 > it is not an alternative to it, and it takes months.
 
 The Let's Encrypt limit (§4.4) is not a cost item and does not wait for any of
-the above. It needs one DNS change — delegate `apps.rebase.pro` to a Cloud DNS
-zone — then the `letsencrypt-dns01` issuer, the wildcard certificate, the
+the above. It needs one DNS change — delegate `rebase.website` to a Cloud DNS
+zone (a whole-zone delegation, per the update above) — then the
+`letsencrypt-dns01` issuer, the wildcard certificate, the
 ingress-nginx `--default-ssl-certificate` flag, and only then
 `REBASE_WILDCARD_TLS=true`. The order is enforced in
 `k8s/wildcard-tls.ts`; doing it out of order serves every tenant a self-signed

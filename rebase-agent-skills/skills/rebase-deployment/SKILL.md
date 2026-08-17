@@ -48,7 +48,7 @@ rebase cloud deploy --message "add search to posts"
 
 ### What a Cloud Deployment Serves
 
-`rebase cloud deploy` ships **one container** per project, served at `https://<project>.apps.rebase.pro`. That container runs your backend, which handles:
+`rebase cloud deploy` ships **one container** per project, served at `https://<project>.rebase.website`. That container runs your backend, which handles:
 
 - **`/api/*`** — the data API, auth, realtime, storage
 - **everything else** — your built `frontend/` as a static SPA (via `serveSPA()`, see below)
