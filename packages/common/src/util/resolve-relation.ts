@@ -46,7 +46,14 @@ export function resolveRelation(
 
     const shared: Pick<ResolvedRelation, "relationName" | "target" | "targetSlug" | "onUpdate" | "onDelete" | "overrides" | "validation"> = {
         relationName,
-        target,
+        // Normalised, not the thunk as written. Resolution reads the target once
+        // and every later consumer calls it again — the driver building a join,
+        // the DDL and policy generators, the admin's relation fields — so
+        // handing back the raw thunk would give all of them the module namespace
+        // `callTarget` just looked past, and the fix would hold only for the
+        // fields resolution happens to read here. Still lazy: same call at the
+        // same moment, one unwrap on the way out.
+        target: () => unwrapModuleNamespace(target()) as CollectionConfig,
         targetSlug: targetCollection.slug,
         onUpdate: relation.onUpdate,
         onDelete: relation.onDelete,

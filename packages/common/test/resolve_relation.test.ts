@@ -146,6 +146,23 @@ describe("resolveRelation — import cycles", () => {
         expect(r).toMatchObject({ kind: "belongsTo", targetSlug: "tags", localKey: "tag_id" });
     });
 
+    it("hands the unwrapped collection to every later caller of `target`", () => {
+        // The fields resolution reads are not the only ones that matter: the
+        // driver, the DDL and policy generators and the admin's relation fields
+        // all call `target()` again, long after this. Passing the thunk through
+        // as written would fix `targetSlug` and leave all of them holding the
+        // namespace.
+        const namespace = { __esModule: true, default: tags } as never;
+
+        const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
+        expect(r.target()).toBe(tags);
+    });
+
+    it("leaves an ordinary target thunk returning exactly what it returned", () => {
+        const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => tags }, posts);
+        expect(r.target()).toBe(tags);
+    });
+
     it("still rejects a namespace whose default is not a collection", () => {
         // Unwrapping is only right because there is one reading of it. A
         // `default` that is not a collection is a genuinely wrong thunk, and has
