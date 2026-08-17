@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "@jest/globals";
+import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
@@ -25,6 +25,21 @@ import { resolveOwnership } from "../src/init/surfaces";
  *    enqueue, the split would silently drop background work at the point where
  *    it is most likely to be used.
  */
+
+/**
+ * The importer seam, for the reason spelled out in `runtime-surfaces.test.ts`:
+ * booting through `initializeRebaseBackend` means the cron loader runs with no
+ * injectable importer, and a native dynamic `import()` inside jest's vm is the
+ * one thing that cannot be relied on here. This file paid for that already —
+ * the two cron assertions below were deleted in 55cf62efe for loading zero jobs
+ * on the runner while the same fixture loaded elsewhere in the same run. They
+ * are back because the dependency is gone, not because the runner changed.
+ */
+jest.mock("../src/utils/dynamic-import", () => ({
+    ...(jest.requireActual("../src/utils/dynamic-import") as Record<string, unknown>),
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- deterministic CJS load, as in the helper's own docblock
+    nativeDynamicImport: (url: string) => require("./helpers/require-importer").requireImporter(url)
+}));
 
 const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
 
@@ -114,22 +129,23 @@ describe("resolveOwnership", () => {
 });
 
 describe("runtime ownership", () => {
-    // The two cron assertions that were here — "schedules by default" and
-    // "registers but starts no timer when disowned" — are gone on purpose.
-    //
-    // Both depended on `test/fixtures/crons` actually importing inside jest, and
-    // in CI it does not: they failed with zero jobs loaded while the same
-    // fixture loaded for other suites in the same run. An in-process harness
-    // cannot reliably observe file loading here, and a test that fails on the
-    // runner rather than on the code blocks releases without ever having found
-    // a defect.
-    //
-    // Nothing is uncovered by removing them. The decision itself is pinned by
-    // `resolveOwnership` above and by `boot/role.test.ts`, both pure. The
-    // BEHAVIOUR — a process that does not own the scheduler runs no timers — is
-    // pinned by `split-roles-e2e.test.ts`, which spawns real `rebase-server`
-    // processes against a real Postgres and is far stronger evidence than a
-    // `nextRunAt` read through a fake bootstrapper.
+    it("schedules cron jobs by default", async () => {
+        const { backend } = await boot();
+
+        const scheduler = (backend as { cronScheduler?: { listJobs: () => unknown[] } }).cronScheduler;
+        expect(scheduler?.listJobs().length).toBeGreaterThan(0);
+        expect(hasPendingTimer(backend)).toBe(true);
+    });
+
+    it("registers cron jobs but starts no timer when it does not own the scheduler", async () => {
+        const { backend } = await boot({ cronScheduler: false });
+
+        // Registered, so the admin surface still lists them...
+        const scheduler = (backend as { cronScheduler?: { listJobs: () => unknown[] } }).cronScheduler;
+        expect(scheduler?.listJobs().length).toBeGreaterThan(0);
+        // ...but nothing is going to fire.
+        expect(hasPendingTimer(backend)).toBe(false);
+    });
 
     it("keeps the job queue enqueueable when it does not own the workers", async () => {
         const { backend, sql } = await boot({ jobWorkers: false });
@@ -145,3 +161,16 @@ describe("runtime ownership", () => {
         expect(sql.some(statement => /insert into/i.test(statement))).toBe(true);
     });
 });
+
+/**
+ * Whether the scheduler is holding a timer.
+ *
+ * Read off the scheduler's own job records rather than by counting Node
+ * handles: `jest --forceExit` and other suites' timers make a process-wide
+ * count meaningless, and the question here is specifically about this
+ * scheduler.
+ */
+function hasPendingTimer(backend: Backend): boolean {
+    const scheduler = (backend as { cronScheduler?: { listJobs: () => Array<{ nextRunAt?: unknown }> } }).cronScheduler;
+    return (scheduler?.listJobs() ?? []).some(job => Boolean(job.nextRunAt));
+}
