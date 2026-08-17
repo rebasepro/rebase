@@ -1,10 +1,42 @@
 ---
 slug: docs/changelog
 title: Changelog
+description: Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 ---
 # Changelog
 
 ## [Unreleased]
+
+### Fixed
+
+- **Every relation in a project whose collections import each other was reported as broken, by the two commands that load collections from source.** `rebase generate-sdk` and `rebase build` read `config/collections` through jiti, which transpiles ES modules to CommonJS. A CommonJS cycle hands the module entered *second* the namespace object — `{ __esModule: true, default: … }` — and never replaces it with a live binding, so a `target: () => otherCollection` thunk returned the namespace rather than the collection. Resolution saw an object with no `slug` and refused it.
+
+  The measured cost, on a 63-collection project introspected from an existing database: 58 relations rejected, one warning each, and a generated SDK in which **every relation field and every derived foreign-key column was silently missing**. `customerId` and `customer` were simply absent from the row type. Nothing failed — the command exited 0 and wrote a file that looked complete, which is the failure mode you find out about from the compiler months later.
+
+  The value was never lost. The thunk is lazy, so by the time it runs the exporting module has finished and the collection is sitting one level down in `default`. Resolution now takes it — and only when the inner value is itself a collection, because a `default` that is not one is a genuinely wrong thunk and has to keep reaching the error.
+
+  `ResolvedRelation.target` is normalised rather than passed through as written, which is the half that decides whether this is a fix or a patch over one symptom. Resolution reads the target once, to derive `targetSlug` and a join table; the forty-odd callers that matter read it *later* — `PostgresBackendDriver` building a join, the Drizzle and DDL generators, `RelationWriteService`, the doctor, the admin's relation fields and table cells. Handing those the thunk as authored would have left every one of them holding the namespace, so the generated SDK would have come out right while the server that serves it stayed broken. Measured on the same project: 134 resolved relations, 0 still answering with a namespace.
+
+  What made this hard to place is that the warning blamed the author — *"make sure the target is `() => otherCollection` and not evaluated at module load"* — for something the rejected code already did. Cycles between collection files are not an authoring mistake to be designed out: two collections that point at each other **must** import each other, and the lazy thunk is this framework's own answer to that. Native ESM resolves those thunks correctly, which is why the same collections load, relate and serve perfectly under the dev server while the CLI called them broken.
+
+  A thunk that returns a promise — `target: () => import("./other")`, one keystroke away and the mistake the namespace shape resembles — now says so, rather than reporting "not a collection".
+- **A write refused by a row-level-security policy answered 500, not 403.** The client could not tell "you may not do this" from "the server is broken" — and a 500's message is sanitized on the way out, so the reason went with it. An operator got paged for access control working correctly.
+
+  Only `INSERT` was affected, and for a mechanical reason: a refused `UPDATE` or `DELETE` simply matches no rows, which was already classified as `403 WRITE_DENIED`, while a refused `INSERT` raises `42501` from a failed `WITH CHECK` and fell through to the unclassified path. All four spellings of the denial now answer the same status and the same code.
+
+  `42501` carries two opposite problems and only the message separates them, so the driver now does too: a policy refusing the caller is a 403, while the connecting role lacking a `GRANT` stays a 500 — telling an operator "forbidden" for a missing privilege would send them hunting for a policy bug that does not exist. The message used to name both causes because it could not tell them apart; it now names whichever happened.
+
+### Changed
+
+- **The admin panel's Logs view streams, instead of polling every three seconds.** The old view re-fetched the whole window on a timer, which was wrong in three ways at once: an entry could sit up to three seconds before appearing, each client cost a request every three seconds to be told nothing had happened, and — because that request passed through the same middleware that fills the log buffer — the view's own polling became the loudest thing in its own output. On a quiet server it was also what evicted real entries out of the ring.
+
+  `GET /api/logs/stream` is server-sent events, admin-only like the query beside it. The backlog and the live entries arrive on **one** connection: a client that fetched its history separately would race its own subscription, and entries logged between the two calls would belong to neither. Appends are batched over a 250ms window rather than sent per line, because a busy server logs faster than a browser can render and one frame per entry would cost a re-render per request served — worse than the poll it replaces, precisely when the logs are worth watching.
+
+  The view says which it is doing. "Live" and "Polling" are not cosmetic: an empty log is ambiguous — quiet server, or a tail that died — and the studio and the server are versioned separately, so a frontend that knows this route will meet servers that do not. A 404 there is an older backend, not an error, and it degrades to the three-second poll rather than showing an empty view.
+
+  A connection holds a bounded number of entries between flushes, so a burst past roughly eight thousand a second leaves a gap — and says so, with a count, rather than presenting a tail with a hole in it as complete.
+
+  Fixed in the same work: a client that disconnected *during* the opening write — a fast navigation, or a reconnect storm against a restarting server — leaked its subscriber and a repeating timer, per attempt, for the life of the process. A listener added to an already-aborted `AbortSignal` is never called, so the handler had no way to learn the reader had gone.
 
 ## [0.14.1] - 2026-08-16
 
