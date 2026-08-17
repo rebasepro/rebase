@@ -501,6 +501,14 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.previewProperties) result.previewProperties = collection.previewProperties;
     if (collection.listProperties) result.listProperties = collection.listProperties;
     if (collection.enabledViews) result.enabledViews = collection.enabledViews;
+    // Inline views are dropped rather than mangled: their `Builder` cannot be
+    // serialized, and writing back a half of one would delete it from the
+    // running config. Keys survive, so a collection edited in the panel keeps
+    // whichever registered views it named.
+    if (collection.customViews) {
+        const keys = collection.customViews.filter((v): v is string => typeof v === "string");
+        if (keys.length > 0) result.customViews = keys;
+    }
     if (collection.disableDefaultActions) result.disableDefaultActions = collection.disableDefaultActions;
     if (collection.securityRules) result.securityRules = collection.securityRules;
     if (isRelationalCollectionConfig(collection) && collection.disableDefaultPolicies !== undefined) {

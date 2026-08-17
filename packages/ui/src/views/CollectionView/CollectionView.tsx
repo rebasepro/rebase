@@ -12,6 +12,7 @@ import type {
     CollectionPropertyConfig,
     CollectionDataController,
     CellRendererOverride,
+    CollectionCustomViewEntry,
     CollectionSelectionController,
     KanbanPropertyOption
 } from "./CollectionViewTypes";
@@ -134,6 +135,27 @@ export interface CollectionViewProps<T = Record<string, unknown>> {
     /** Custom empty state component */
     emptyComponent?: React.ReactNode;
 
+    /**
+     * Additional ways to render these rows, keyed by view mode. A key here can
+     * be named by `viewMode`, `defaultViewMode` and `enabledViews`, and gets
+     * its own entry in the view switcher.
+     *
+     * A custom view is another rendering of the *same* `dataController`, so it
+     * inherits the toolbar's search, the loading state and selection. A
+     * component that fetches its own data does not want to be a view mode —
+     * the toolbar above it would be describing a query it does not render.
+     *
+     * @example
+     * ```tsx
+     * <CollectionView
+     *     customViews={{ map: { name: "Map", Component: MapView } }}
+     *     enabledViews={["table", "map"]}
+     *     defaultViewMode="map"
+     * />
+     * ```
+     */
+    customViews?: Record<string, CollectionCustomViewEntry<T>>;
+
     // ── Toolbar ───────────────────────────────────────────────────────
 
     /** Actions rendered at the start (left) of the toolbar */
@@ -215,6 +237,7 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
     onMultipleDelete,
     cellRenderer,
     emptyComponent,
+    customViews,
     toolbarActionsStart,
     toolbarActionsEnd,
     hideToolbar,
@@ -298,7 +321,39 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
         emptyComponent,
     };
 
+    // Resolved once so both the switcher and the render path agree. A custom
+    // view keyed as a built-in is ignored rather than allowed to shadow it —
+    // the switch below checks the built-ins first, so honouring such a key
+    // here would put the switcher and the canvas out of step.
+    const customViewEntries = useMemo(() => {
+        if (!customViews) return [];
+        return Object.entries(customViews)
+            .filter(([key]) => !DEFAULT_ENABLED_VIEWS.includes(key))
+            .map(([key, entry]) => {
+                const isBare = typeof entry === "function";
+                return {
+                    key,
+                    name: isBare ? key : (entry.name ?? key),
+                    icon: isBare ? undefined : entry.icon,
+                    Component: isBare ? entry : entry.Component
+                };
+            });
+    }, [customViews]);
+
     function renderView() {
+        const custom = customViewEntries.find((entry) => entry.key === viewMode);
+        if (custom) {
+            const { Component } = custom;
+            return (
+                <Component
+                    {...sharedProps}
+                    onRowCreate={canCreate ? onRowCreate : undefined}
+                    canCreate={canCreate}
+                    size={size}
+                />
+            );
+        }
+
         switch (viewMode) {
             case "table":
                 return (
@@ -372,6 +427,7 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
                     viewMode={viewMode}
                     onViewModeChange={enabledViews.length > 1 ? onViewModeChange : undefined}
                     enabledViews={enabledViews}
+                    customViews={customViewEntries}
                     size={size}
                     onSizeChange={onSizeChange}
                     searchString={dataController.searchString}

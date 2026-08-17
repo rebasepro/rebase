@@ -374,9 +374,14 @@ describe("FetchService – cursor pagination combined with filters", () => {
 
         // The ORDER BY must agree with the comparison, and always end on the
         // id — an ordering that is not total makes the cursor ambiguous.
+        //
+        // The NULL placement is spelled out rather than left to Postgres's
+        // default. It is the same query — `DESC` already means `NULLS FIRST` —
+        // but `buildKeysetComparison` encodes that placement too, and the two
+        // have to agree for paging over a nullable key to be exact.
         const orderExpressions = (db.orderBy as jest.Mock).mock.calls[0];
         expect(orderExpressions.map(e => renderCondition(e).sql)).toEqual([
-            '"name" desc',
+            '"name" DESC NULLS FIRST',
             '"id" desc'
         ]);
     });

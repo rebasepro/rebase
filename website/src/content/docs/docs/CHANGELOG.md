@@ -7,6 +7,40 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Added
+
+- **A filter can reach through a relation to a column of the related row.** `where: { "applications.status": ["in", ["applied", "reviewing"]] }` — "has a related row whose column satisfies this", which is the form every queue screen is written in and which previously could not be said at all. Relation filters compared the related row's *id* and nothing else, so the only way to ask the question was to fetch every row and filter in the browser: a filter the client applies after paging is not a filter, because the page was already chosen without it.
+
+  Compiled to the correlated `EXISTS` the question already was, with the predicate moved off the target's id and onto one of its columns. A many-to-many reaches one table further than the id filter does — that one stops at the junction, which already holds the value it compares — so its subquery joins the target to the junction *inside* the `EXISTS`, where it cannot multiply the outer rows. `belongsTo` is included: `author.name` is a column of another table either way.
+
+  Every operator works, because the compared value is an ordinary column: `>=` on a date and `ilike` on a name mean here what they mean anywhere else. The negative operators keep the rule the id filter already had, for the same reason — `!=` is `NOT EXISTS` of the **positive** predicate, never `EXISTS` of a negated one. `EXISTS (… AND status != 'hired')` asks "does some application differ from hired", which is true of nearly every candidate with more than one application and answers nothing anybody asked; `NOT EXISTS (… AND status = 'hired')` asks "is there no hired application", and makes `==` and `!=` partition the rows the way a filter implies they do.
+
+  `is-null` and `is-not-null` are deliberately not a complementary pair on a relation column. They mean "has a related row whose column is unset" and "has one where it is set" — both true of a candidate with two applications, one of each. Making the second the negation of the first would make it "no application has an unset status", which is true of a candidate with no applications at all: the very rows a queue exists to exclude.
+
+  A relation that does not exist, or a column the target does not have, is a 400 naming the *target's* real columns — never a dropped condition, which would widen the read to every row.
+
+- **A sort key can be an aggregate over a to-many relation.** `orderBy: [[{ relation: "applications", field: "created_at", agg: "min" }, "asc"]]` — candidates, longest-waiting first. `count` alone answers the other half of the queue family: clients, busiest first. `min`, `max`, `count`, `sum`, `avg`.
+
+  This is the half that could not be worked around. A relation filter can be approximated by denormalising a flag onto the row — a trigger, a backfill, and a promise to keep it correct on every write to the related table. An *ordering* cannot be approximated at all once the result set is paged, because the client only ever holds one page and the page was chosen by the wrong order. It is why a project ends up with a 600-line custom view beside the collection it is about: not because the rendering needed customising, but because the query could not be expressed.
+
+  Compiled to a correlated scalar subquery in `ORDER BY` rather than a `LEFT JOIN LATERAL`, because the same expression has to serve the keyset comparison behind cursor paging — and if the two are not the same expression, paging and ordering disagree and rows are skipped. Cursor paging works: there is no aggregate stored on the cursor row to compare against, so the driver recomputes the cursor row's value in SQL from the id it does have, as a subquery pinned to that id. Pinned rather than correlated, so Postgres evaluates it once for the statement rather than per row.
+
+  Rows the relation reaches nothing from land at a defined end — `NULLS LAST` ascending, `NULLS FIRST` descending. That was already Postgres's default and is now written out in the `ORDER BY`, because `buildKeysetComparison` encodes the same placement and an invariant two functions depend on should be stated in both rather than assumed in one. `count` of nothing is `0`, not null, so those rows sort as zero. The id stays the last key, so the order is total and paging over it neither repeats nor skips.
+
+  The object form is the authoring surface; on the wire the key is a single string, `min(applications.created_at)`. `OrderByTuple` is `[string, direction]`, the REST parameter is `?orderBy=key:direction`, the driver contract takes `orderBy?: string | OrderByTuple[]`, and a cursor names its keys by string — `_score` established the same pattern, and this reuses it rather than widening five signatures to carry an object that would be flattened at the end anyway. `normalizeOrderBy` is where the two spellings collapse into one.
+
+  Both features are declared as capabilities — `supportsRelationFieldFilters` and `relationAggregateSorts` — and both default to **false** for an unclaimed driver. Firestore and MongoDB declare neither. A wrongly assumed filter capability widens a read to every row; a wrongly assumed sort capability answers 200 with rows in whatever order the database pleased, which reads as a sorted list.
+
+  The offline overlay refuses both rather than answering them wrongly. A dotted filter key resolves to `undefined` on every cached row, which would exclude all of them — a 200 with an empty list, indistinguishable from "nothing matched". An aggregate is not a field on the row either, so every cached row reads `undefined` for it, which the sortability check would have read as a column of nulls and called reproducible before handing back rows in id order.
+
+### Changed
+
+- **The `collection.insights` slot is now `collection.widgets`, and `home.card.insight` is `home.card.widget`.** The old names described one plugin's use of the slot rather than the slot, which is any widget strip above the table or on a home card. The prop types follow: `CollectionInsightsSlotProps` → `CollectionWidgetsSlotProps`, `HomeCardInsightSlotProps` → `HomeCardWidgetSlotProps`.
+
+  A contribution registered under an old name is **redirected to the new one and still renders**, with a one-time console warning naming the replacement. Slot names are matched by string equality, so a plain rename would have left every plugin still on the old name compiling, registering, and rendering nothing — the same silent nothing `UNRENDERED_SLOTS` exists to warn about. The old names are retired, not removed, and will go in a future major version.
+
+- **`AdditionalFieldDelegate` says that it is display-only.** `value()` is async and receives the whole `RebaseContext`, so it *can* read another collection and its result is cached per record — which makes it read like a computed column when it is not. It runs in the browser, once per row, after the page has already been fetched and ordered, so its result can never take part in choosing which rows came back or in what order. The doc comment now says so, and points at the two things that can: an aggregate sort or a relation filter for a value derived from a relation, and a real column for anything else.
+
 ### Fixed
 
 - **Every relation in a project whose collections import each other was reported as broken, by the two commands that load collections from source.** `rebase generate-sdk` and `rebase build` read `config/collections` through jiti, which transpiles ES modules to CommonJS. A CommonJS cycle hands the module entered *second* the namespace object — `{ __esModule: true, default: … }` — and never replaces it with a live binding, so a `target: () => otherCollection` thunk returned the namespace rather than the collection. Resolution saw an object with no `slug` and refused it.

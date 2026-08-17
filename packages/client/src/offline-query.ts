@@ -6,7 +6,8 @@ import {
     FilterCondition,
     OrderBySpec,
     WhereFilterOp,
-    toCanonicalOp
+    toCanonicalOp,
+    parseRelationAggregateSort
 } from "@rebasepro/types";
 import { FindParams } from "./transport";
 import { normalizeOrderBy, resolveFindWindow } from "@rebasepro/common";
@@ -435,7 +436,32 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     if (params.vectorSearch) return false;
     if (whereOrders(params.where)) return false;
     if (logicalOrders(params.logical)) return false;
+    // A dotted key reaches through a relation — `applications.status` asks
+    // about rows in another table. `matchesWhere` reads `row[field]` flat, so
+    // the key resolves to `undefined` on every cached row and the condition
+    // excludes all of them: a 200 with an empty list, indistinguishable from
+    // "nothing matched". The cache holds one collection; it cannot answer a
+    // question about a second, so it must not claim to.
+    if (whereReachesThroughRelation(params.where)) return false;
+    if (logicalReachesThroughRelation(params.logical)) return false;
     return true;
+}
+
+/** Does any filter key reach outside this row — `applications.status`? */
+function whereReachesThroughRelation(where: FilterValues<string> | undefined): boolean {
+    return where ? Object.keys(where).some((field) => field.includes(".")) : false;
+}
+
+/** The same question, through an `and(...)`/`or(...)` tree. */
+function logicalReachesThroughRelation(
+    condition: LogicalCondition | FilterCondition | undefined,
+    depth = 0
+): boolean {
+    if (!condition || depth > 32) return false;
+    if ("type" in condition) {
+        return (condition.conditions ?? []).some((c) => logicalReachesThroughRelation(c, depth + 1));
+    }
+    return typeof condition.column === "string" && condition.column.includes(".");
 }
 
 /**
@@ -462,6 +488,12 @@ export function isLocallySortable(
 ): boolean {
     const keys = normalizeOrderBy(orderBy);
     if (!keys) return true;
+    // An aggregate over a relation is computed by the database and is not a
+    // field on the row, so every cached row reads `undefined` for it. That
+    // looks exactly like a column of nulls to the loop below, which would call
+    // the order reproducible and then hand back rows in id order — a queue
+    // sorted by nothing at all, presented as the server's answer.
+    if (keys.some(([field]) => parseRelationAggregateSort(field))) return false;
     // Every key has to be decidable, not just the first: a sort the local side
     // can only agree with down to its second column is one it disagrees with.
     return keys.every(([field]) => rows.every((row) => {

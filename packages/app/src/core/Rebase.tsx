@@ -6,7 +6,7 @@ import type { ComponentOverrideMap } from "@rebasepro/admin-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
 import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/admin-types";
+import { RebaseContext, RENAMED_SLOTS, UNRENDERED_SLOTS } from "@rebasepro/admin-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";
@@ -66,6 +66,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         onAnalyticsEvent,
         propertyConfigs,
         entityViews,
+        collectionViews,
         entityActions,
 
         effectiveRoleController,
@@ -84,11 +85,32 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         }
     }
 
-    // Merge direct slots with plugin slots
+    // Merge direct slots with plugin slots, rewriting any retired slot name to
+    // the one it was renamed to. `useSlot` matches on string equality, so a
+    // contribution left on the old name would register cleanly and render
+    // nothing — the same silent nothing `UNRENDERED_SLOTS` warns about below.
     const resolvedSlots: SlotContribution[] = useMemo(() => [
         ...directSlots,
         ...((plugins ?? []).flatMap((p) => p.slots ?? []))
-    ], [directSlots, plugins]);
+    ].map((contribution) => {
+        const current = RENAMED_SLOTS[contribution.slot];
+        return current ? { ...contribution, slot: current } : contribution;
+    }), [directSlots, plugins]);
+
+    // Warn once per retired name actually in use. This reads the *pre-rewrite*
+    // names off the inputs rather than `resolvedSlots`, which no longer has
+    // them — the rewrite above is what makes the plugin keep working, and this
+    // is what tells its author to stop relying on it.
+    useEffect(() => {
+        const registered = [...directSlots, ...((plugins ?? []).flatMap((p) => p.slots ?? []))];
+        for (const legacy of new Set(registered.map(s => s.slot).filter(slot => slot in RENAMED_SLOTS))) {
+            console.warn(
+                `[Rebase] The "${legacy}" slot has been renamed to "${RENAMED_SLOTS[legacy]}". ` +
+                "The contribution was redirected and still renders, but the old name will be " +
+                "removed in a future major version."
+            );
+        }
+    }, [directSlots, plugins]);
 
     // Seven of the twenty-nine declared slots are rendered nowhere. They have
     // props interfaces and rows in the public slot reference, so registering
@@ -349,10 +371,11 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         plugins,
         resolvedSlots,
         entityViews: entityViews ?? [],
+        collectionViews: collectionViews ?? [],
         entityActions: entityActions ?? [],
         propertyConfigs: propertyConfigs ?? {},
         components: componentsProp
-    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, entityActions, propertyConfigs, componentsProp]);
+    }), [dateTimeFormat, locale, entityLinkBuilder, plugins, resolvedSlots, entityViews, collectionViews, entityActions, propertyConfigs, componentsProp]);
 
     const analyticsController = useMemo(() => ({
         onAnalyticsEvent

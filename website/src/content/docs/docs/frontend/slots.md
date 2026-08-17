@@ -58,7 +58,7 @@ const myPlugin: RebasePlugin = {
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Additional cards on the home page |
 | `home.children.start` | `PluginGenericProps` | Content at the start of the home page |
 | `home.children.end` | `PluginGenericProps` | Content at the end of the home page |
-| `home.card.insight` | `HomeCardInsightSlotProps` | Compact insight widget inside a home page collection card |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Compact widget inside a home page collection card |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Actions on home page collection cards |
 
 #### Navigation
@@ -79,7 +79,7 @@ const myPlugin: RebasePlugin = {
 | `collection.error` | `CollectionErrorProps` | Error state display for a collection |
 | `collection.toolbar` | `CollectionToolbarProps` | Extra widgets inside the collection toolbar row |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Custom empty-state when collection has no data |
-| `collection.insights` | `CollectionInsightsSlotProps` | Insight widgets above the collection table |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets above the collection table |
 | `collection.filter-panel` | `CollectionFilterPanelProps` | Custom filter sidebar alongside the table. **Not yet rendered** — declared, but nothing in the admin renders it today. |
 
 #### Entity / Form

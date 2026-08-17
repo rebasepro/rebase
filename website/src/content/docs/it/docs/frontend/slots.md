@@ -58,7 +58,7 @@ const myPlugin: RebasePlugin = {
 | `home.cards` | `PluginHomePageAdditionalCardsProps` | Card aggiuntive nella home page |
 | `home.children.start` | `PluginGenericProps` | Contenuto all'inizio della home page |
 | `home.children.end` | `PluginGenericProps` | Contenuto alla fine della home page |
-| `home.card.insight` | `HomeCardInsightSlotProps` | Widget di insight compatto all'interno di una card di collezione della home page |
+| `home.card.widget` | `HomeCardWidgetSlotProps` | Widget compatto all'interno di una card di collezione della home page |
 | `home.collection.actions` | `PluginHomePageActionsProps` | Azioni sulle card di collezione della home page |
 
 #### Navigazione
@@ -79,7 +79,7 @@ const myPlugin: RebasePlugin = {
 | `collection.error` | `CollectionErrorProps` | Visualizzazione dello stato di errore di una collezione |
 | `collection.toolbar` | `CollectionToolbarProps` | Widget extra all'interno della riga della toolbar della collezione |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Stato vuoto personalizzato quando la collezione non ha dati |
-| `collection.insights` | `CollectionInsightsSlotProps` | Widget di insight sopra la tabella della collezione |
+| `collection.widgets` | `CollectionWidgetsSlotProps` | Widget sopra la tabella della collezione |
 | `collection.filter-panel` | `CollectionFilterPanelProps` | Barra laterale dei filtri personalizzata accanto alla tabella. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
 
 #### Entità / Modulo

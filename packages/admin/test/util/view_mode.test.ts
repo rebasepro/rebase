@@ -140,3 +140,71 @@ describe("resolveOpenEntityMode", () => {
         expect(resolveOpenEntityMode({})).toBe(DEFAULT_OPEN_ENTITY_MODE);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Custom view modes
+//
+// A custom view is named by a key that no built-in list knows about, so every
+// gate between the URL and the render chain has to be handed the collection's
+// keys. The cases below are the ones that were silently falling back to a
+// built-in before: each of them 200s either way, which is why they are pinned.
+// ---------------------------------------------------------------------------
+describe("custom view modes", () => {
+    const CUSTOM = ["map", "calendar"];
+
+    it("accepts a custom key only when the collection declares it", () => {
+        expect(isViewMode("map", CUSTOM)).toBe(true);
+        expect(isViewMode("map")).toBe(false);
+        expect(isViewMode("timeline", CUSTOM)).toBe(false);
+    });
+
+    it("reads a custom key from the URL", () => {
+        expect(getViewModeFromSearch(`?${VIEW_MODE_PARAM}=map`, CUSTOM)).toBe("map");
+        // Without the keys there is no way to tell "map" from a typo.
+        expect(getViewModeFromSearch(`?${VIEW_MODE_PARAM}=map`)).toBeNull();
+    });
+
+    it("carries a custom key across a navigation", () => {
+        // `withViewMode` has no collection in hand, so it must not validate:
+        // dropping the param here is what reset the view on every row click.
+        expect(withViewMode("/c/places", `?${VIEW_MODE_PARAM}=map`))
+            .toBe(`/c/places?${VIEW_MODE_PARAM}=map`);
+    });
+
+    it("resolves a custom view from the URL, saved config and the default", () => {
+        expect(resolveViewMode({ search: `?${VIEW_MODE_PARAM}=map`, customKeys: CUSTOM })).toBe("map");
+        expect(resolveViewMode({ search: "", savedViewMode: "map", customKeys: CUSTOM })).toBe("map");
+        expect(resolveViewMode({
+            collection: { defaultViewMode: "map" },
+            search: "",
+            customKeys: CUSTOM
+        })).toBe("map");
+    });
+
+    it("falls back to a working view when the custom one is gone", () => {
+        // The user picked "map", it was persisted, and the view has since been
+        // removed from config. Every source has to fail closed, or the
+        // collection opens on a mode nothing renders: a blank panel under a
+        // working toolbar.
+        expect(resolveViewMode({ search: `?${VIEW_MODE_PARAM}=map` })).toBe(DEFAULT_VIEW_MODE);
+        expect(resolveViewMode({ search: "", savedViewMode: "map" })).toBe(DEFAULT_VIEW_MODE);
+        expect(resolveViewMode({ collection: { defaultViewMode: "map" }, search: "" }))
+            .toBe(DEFAULT_VIEW_MODE);
+    });
+
+    it("opens records over a custom view rather than beside them", () => {
+        // A map or a calendar owns its canvas; "split" would halve it.
+        expect(resolveOpenEntityMode({ viewMode: "map", customView: { key: "map" } as never }))
+            .toBe("side_panel");
+        expect(resolveOpenEntityMode({
+            viewMode: "map",
+            customView: { key: "map", openEntityMode: "full_screen" } as never
+        })).toBe("full_screen");
+        // An explicit collection setting still wins over the view's preference.
+        expect(resolveOpenEntityMode({
+            collection: { openEntityMode: "dialog" },
+            viewMode: "map",
+            customView: { key: "map", openEntityMode: "full_screen" } as never
+        })).toBe("dialog");
+    });
+});

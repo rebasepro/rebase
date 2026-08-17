@@ -6,7 +6,7 @@ import { InsightWidget } from "./InsightWidget";
  * Renders scorecard insight widgets inline within a collection's list view,
  * positioned below the title and above the main data list.
  *
- * Injected via the `collection.insights` slot.
+ * Injected via the `collection.widgets` slot.
  */
 export function CollectionInsightsInline({
     insights,

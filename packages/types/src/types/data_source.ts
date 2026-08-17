@@ -81,6 +81,40 @@ export interface DataSourceCapabilities {
      */
     filterableRelationKinds?: readonly string[];
 
+    /**
+     * Can a filter address a *column of the related row* — `applications.status`
+     * — rather than only the related row's id?
+     *
+     * A separate capability from {@link filterableRelationKinds} because it is
+     * a separate subquery: the id filter stops at the junction, one of these
+     * reaches the target table and compares one of its columns. A driver can
+     * do the first and not the second.
+     *
+     * Optional and defaulting to **false**, for the reason the relation kinds
+     * default narrow: an unclaimed capability that the admin assumes is there
+     * produces a control whose query the driver answers by dropping the key —
+     * and a dropped filter key widens the read to every row.
+     *
+     * Meaningless without {@link supportsRelations}; a driver with no relations
+     * has nothing to reach through.
+     */
+    supportsRelationFieldFilters?: boolean;
+
+    /**
+     * Can a sort key be an aggregate over a to-many relation — "oldest waiting
+     * first", "busiest first"?
+     *
+     * Compiled as a correlated scalar subquery in `ORDER BY`, which a document
+     * store cannot express at all. Optional and defaulting to **false**.
+     *
+     * A wrongly claimed sort capability fails differently from a wrongly
+     * claimed filter one, and worse in one respect: a driver that cannot
+     * resolve the key drops the `ORDER BY` and answers 200 with rows in
+     * whatever order the database pleased, which reads as a sorted list. Paging
+     * over that repeats and skips rows.
+     */
+    relationAggregateSorts?: boolean;
+
     // ── Admin capability flags ───────────────────────────────────────
     /** Does this source support SQL admin operations (SQL editor, EXPLAIN, etc.)? */
     supportsSQLAdmin: boolean;
@@ -213,6 +247,8 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     // `via` is absent: its join path is authored source → target with no
     // stated inverse, so the driver has nothing to reverse into a filter.
     filterableRelationKinds: ["belongsTo", "manyToMany", "hasMany", "hasOne"],
+    supportsRelationFieldFilters: true,
+    relationAggregateSorts: true,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: true
@@ -233,8 +269,11 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     // family, so the UI must never offer it.
     filterOperators: ALL_WHERE_FILTER_OPS.filter(op =>
         op !== "like" && op !== "ilike" && op !== "not-like" && op !== "not-ilike"),
-    // No relations at all — a document store links by reference.
+    // No relations at all — a document store links by reference. Nothing to
+    // reach through, so neither of the two relation-reaching features either.
     filterableRelationKinds: [],
+    supportsRelationFieldFilters: false,
+    relationAggregateSorts: false,
     supportsSQLAdmin: false,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: false
@@ -253,6 +292,8 @@ export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
     supportsVectors: false,
     filterOperators: ALL_WHERE_FILTER_OPS,
     filterableRelationKinds: [],
+    supportsRelationFieldFilters: false,
+    relationAggregateSorts: false,
     supportsSQLAdmin: false,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true
@@ -279,6 +320,12 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     // whether a query is sent that an unknown driver may answer by dropping
     // the condition — which returns every row rather than none.
     filterableRelationKinds: DEFAULT_FILTERABLE_RELATION_KINDS,
+    // Narrow for the same reason, and more sharply. An unknown driver that is
+    // assumed to compile these answers by dropping the key: the filter widens
+    // the read to every row, and the sort comes back unordered while looking
+    // sorted. Both have to be claimed.
+    supportsRelationFieldFilters: false,
+    relationAggregateSorts: false,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true

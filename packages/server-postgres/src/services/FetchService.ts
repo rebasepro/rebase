@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -30,8 +30,21 @@ import { reachedDatabase } from "../utils/pg-error-utils";
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
 type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
 
-/** One sort key, with the column or expression it was resolved to. */
-type ResolvedOrderKey = { field: string; direction: "asc" | "desc"; target: AnyPgColumn | SQL };
+/**
+ * One sort key, with the column or expression it was resolved to.
+ *
+ * `cursorTarget` is the same expression pinned to the cursor row instead of the
+ * outer one, and is set only for a key that has no stored value to compare a
+ * later page against — an aggregate over a relation. Where it is present the
+ * keyset comparison recomputes the cursor row's value in SQL rather than
+ * reading it off the cursor; see {@link FetchService.buildKeysetComparison}.
+ */
+type ResolvedOrderKey = {
+    field: string;
+    direction: "asc" | "desc";
+    target: AnyPgColumn | SQL;
+    cursorTarget?: SQL;
+};
 
 /**
  * Service for handling all row read operations.
@@ -149,6 +162,52 @@ export class FetchService {
     }
 
     /**
+     * The aggregate a sort key names, as an expression, or `undefined` if the
+     * key is not one.
+     *
+     * `cursorId` builds the same expression pinned to the cursor row — see
+     * {@link DrizzleConditionBuilder.buildRelationAggregateExpression}.
+     *
+     * A key that *parses* as an aggregate but names no relation, or a column
+     * the target does not have, throws rather than falling through to the
+     * column path. Falling through would report `min(applications.created_at)`
+     * as an unknown column and list the columns of the wrong table.
+     */
+    private resolveAggregateOrderTarget(
+        table: PgTable<any>,
+        orderBy: string,
+        collection: CollectionConfig | undefined,
+        collectionPath: string | undefined,
+        cursorId?: unknown
+    ): SQL | undefined {
+        const spec = parseRelationAggregateSort(orderBy);
+        if (!spec) return undefined;
+        if (!collection || !collectionPath) {
+            throw ApiError.badRequest(
+                `Cannot sort by '${orderBy}': an aggregate sort needs the collection it is written against, ` +
+                "and this query carries none.",
+                "ORDER_BY_FIELD_NOT_SORTABLE",
+                { field: orderBy }
+            );
+        }
+        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const idColumn = primaryKeys.length === 1
+            ? table[primaryKeys[0].fieldName as keyof typeof table] as AnyPgColumn
+            : undefined;
+        if (!idColumn) {
+            throw ApiError.badRequest(
+                `Cannot sort by '${orderBy}' on collection '${collectionPath}': the subquery correlates on a ` +
+                "single key column, and this collection has none or has a composite one.",
+                "ORDER_BY_FIELD_NOT_SORTABLE",
+                { field: orderBy, collection: collectionPath }
+            );
+        }
+        return DrizzleConditionBuilder.buildRelationAggregateExpression(
+            spec, table, collection, this.registry, idColumn, collectionPath, cursorId
+        );
+    }
+
+    /**
      * Resolve every sort key to the expression it orders by, in order of
      * significance.
      *
@@ -161,10 +220,31 @@ export class FetchService {
         table: PgTable<any>,
         keys: OrderByTuple[],
         collection?: CollectionConfig,
-        searchString?: string
+        searchString?: string,
+        collectionPath?: string,
+        cursorId?: unknown
     ): ResolvedOrderKey[] {
         const resolved: ResolvedOrderKey[] = [];
         for (const [field, direction] of keys) {
+            // Checked before the column path: an aggregate key is not a column
+            // name and would otherwise be reported as a typo'd one.
+            const aggregate = this.resolveAggregateOrderTarget(table, field, collection, collectionPath);
+            if (aggregate) {
+                resolved.push({
+                    field,
+                    direction,
+                    target: aggregate,
+                    // Built only when a cursor is in play: it is a second
+                    // subquery, and a listing with no `startAfter` has nothing
+                    // to compare against.
+                    ...(cursorId !== undefined && {
+                        cursorTarget: this.resolveAggregateOrderTarget(
+                            table, field, collection, collectionPath, cursorId
+                        )
+                    })
+                });
+                continue;
+            }
             const target = this.resolveOrderTarget(table, field, collection, searchString);
             if (target) resolved.push({ field,
 direction,
@@ -183,9 +263,20 @@ target });
      * to agree: they did not, and an ascending sort paged with `id >` against an
      * `ORDER BY … , id DESC`, so rows sharing a sort value were dropped from
      * every page after the first.
+     *
+     * Where the NULLs go is written out rather than inherited. Postgres already
+     * defaults to `NULLS LAST` ascending and `NULLS FIRST` descending, so this
+     * changes no query — but {@link buildKeysetComparison} encodes that exact
+     * placement, and an invariant two functions depend on should be stated in
+     * both rather than assumed in one. It matters most for the keys that are
+     * *always* nullable: an aggregate over a relation is NULL for every row the
+     * relation reaches nothing from, which is precisely the "nobody waiting"
+     * end of a queue.
      */
     private buildOrderExpressions(keys: ResolvedOrderKey[], idField: AnyPgColumn): SQL[] {
-        const expressions = keys.map(({ direction, target }) => direction === "asc" ? asc(target) : desc(target));
+        const expressions = keys.map(({ direction, target }) => direction === "asc"
+            ? sql`${target} ASC NULLS LAST`
+            : sql`${target} DESC NULLS FIRST`);
         expressions.push(desc(idField));
         return expressions as SQL[];
     }
@@ -603,8 +694,14 @@ target });
                 );
             }
             const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
-            const resolved = this.resolveOrderKeys(table, keys, collection);
             const startAfterId = cursor.id ?? cursor[idInfo.fieldName];
+            const resolved = this.resolveOrderKeys(
+                table, keys, collection, undefined, collectionPath,
+                // A null id addresses no row, so pinning a subquery to it would
+                // aggregate over nothing and read as "the cursor row has no
+                // related rows" rather than as the absent cursor it is.
+                startAfterId ?? undefined
+            );
 
             if (resolved.length > 0 && startAfterId !== undefined) {
                 const cursorValues = cursor.values as Record<string, unknown> | undefined;
@@ -612,15 +709,19 @@ target });
                 // NULL is a row this has to be able to page past, and `??`
                 // read it as "the cursor did not carry this key" and dropped
                 // the whole condition.
-                const values = resolved.map(({ field }) => (cursorValues && field in cursorValues)
-                    ? cursorValues[field]
-                    : cursor[field]);
+                const values = resolved.map(({ field, cursorTarget }) => cursorTarget
+                    // An aggregate is not stored on the row, so the cursor
+                    // never carried it and never could. Its value is recomputed
+                    // from the cursor id instead, in SQL, by `cursorTarget` —
+                    // there is nothing for this list to supply.
+                    ? null
+                    : (cursorValues && field in cursorValues) ? cursorValues[field] : cursor[field]);
                 // Every key needs a value from the cursor row. A missing one
                 // cannot be guessed, and a comparison built from the keys that
                 // happen to be present is not the same comparison — so this
                 // falls through to no cursor condition, which is what a single
                 // missing sort value has always done here.
-                if (values.every((value) => value !== undefined)) {
+                if (values.every((value, i) => resolved[i].cursorTarget || value !== undefined)) {
                     return [this.buildKeysetComparison(resolved, values, idField, startAfterId)];
                 }
             }
@@ -660,14 +761,53 @@ target });
         // the cursor row means a smaller id.
         if (index >= keys.length) return lt(idField, cursorId);
 
-        const { direction } = keys[index];
-        // A column, not an expression: the one target that is an expression is
-        // `_score`, and a cursor over relevance is refused before this is
-        // reached. Drizzle's comparison helpers are typed per operand kind, so
-        // the union has to be resolved here rather than at the call site.
+        const { direction, cursorTarget } = keys[index];
+        // A column or an expression. `_score` is an expression too, but a
+        // cursor over relevance is refused before this is reached; an aggregate
+        // over a relation is the one that gets here. Drizzle's comparison
+        // helpers are typed per operand kind, so the union has to be resolved
+        // here rather than at the call site.
         const target = keys[index].target as AnyPgColumn;
         const value = values[index];
         const rest = this.buildKeysetComparison(keys, values, idField, cursorId, index + 1);
+
+        // No stored value to compare against — the cursor row's is recomputed
+        // by an expression instead, and whether it is NULL is a question only
+        // SQL can answer. So both branches of the null test below have to exist
+        // in the statement rather than being chosen here.
+        //
+        // `cursorTarget` references only the cursor id, never the outer row, so
+        // Postgres evaluates it once for the whole statement rather than per
+        // row — repeating it across the branches costs nothing.
+        if (cursorTarget) {
+            return direction === "asc"
+                // NULLS LAST. A cursor row among the NULLs has only later NULLs
+                // after it; otherwise everything greater, then the NULLs, then
+                // the ties.
+                ? or(
+                    and(isNull(cursorTarget), isNull(target), rest),
+                    and(
+                        isNotNull(cursorTarget),
+                        or(
+                            sql`${target} > ${cursorTarget}`,
+                            isNull(target),
+                            and(sql`${target} = ${cursorTarget}`, rest)
+                        )
+                    )
+                )!
+                // NULLS FIRST. A cursor row among the NULLs still has every
+                // non-null row after it.
+                : or(
+                    and(isNull(cursorTarget), or(isNotNull(target), and(isNull(target), rest))),
+                    and(
+                        isNotNull(cursorTarget),
+                        or(
+                            sql`${target} < ${cursorTarget}`,
+                            and(sql`${target} = ${cursorTarget}`, rest)
+                        )
+                    )
+                )!;
+        }
 
         if (value === null) {
             // The cursor row sorts among the NULLs.

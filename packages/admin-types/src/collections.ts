@@ -53,9 +53,15 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
  * - "table": Table with inline editing
  * - "cards": Grid of visual cards with thumbnails
  * - "kanban": Board view grouped by a property
+ *
+ * Any other string is the `key` of a custom view declared in
+ * `admin.customViews` or registered on `<RebaseAdmin collectionViews={…}>`.
+ * The `(string & {})` arm is what keeps the four built-ins in autocomplete
+ * while still admitting those keys.
+ *
  * @group Collections
  */
-export type ViewMode = "list" | "table" | "cards" | "kanban";
+export type ViewMode = "list" | "table" | "cards" | "kanban" | (string & {});
 
 /**
  * Parameter passed to the `Actions` prop in the collection configuration.
@@ -164,6 +170,27 @@ export type AdditionalFieldDelegateProps<M extends Record<string, unknown> = Rec
 
 /**
  * Use this interface for adding additional fields to entity collection views and forms.
+ *
+ * **Computed for display only. The server never sees it.**
+ *
+ * `value` is async and receives the whole {@link RebaseContext}, so it *can*
+ * read another collection, and its result is cached per record. That makes it
+ * read like a computed column, and it is not one: it runs in the browser, once
+ * per row, **after** the page has already been fetched and ordered. There is no
+ * point at which its result could take part in choosing which rows came back or
+ * in what order. So a derived value can be shown, and can never be filtered,
+ * sorted or paged on — no matter what it is derived from.
+ *
+ * To filter or sort on a derived value it has to exist in the database. Two
+ * ways, in order of preference:
+ *
+ *  - if the value is an aggregate over a relation, ask for it in the query
+ *    instead — `where: { "applications.status": ["in", [...]] }` and
+ *    `orderBy: [[{ relation: "applications", field: "created_at", agg: "min" }, "asc"]]`
+ *    are both compiled by the driver, which means they run before paging;
+ *  - otherwise denormalise it onto the row — a generated column, or a
+ *    trigger-maintained one — and it becomes an ordinary property.
+ *
  * @group Models
  */
 export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>,

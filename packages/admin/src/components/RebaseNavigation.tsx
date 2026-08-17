@@ -18,7 +18,7 @@ import {
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
-import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection } from "@rebasepro/admin-types";
+import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection } from "@rebasepro/admin-types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/admin-types";
 
@@ -260,7 +260,10 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const enrichedCustomizationController = useMemo(() => {
         const cmsEntityViews = (registry.cmsConfig?.entityViews ?? []) as EntityCustomView[];
         const cmsEntityActions = (registry.cmsConfig?.entityActions ?? []) as EntityAction[];
-        if (cmsEntityViews.length === 0 && cmsEntityActions.length === 0) {
+        // Collection view modes ride the same channel, for the same reason:
+        // `admin.customViews: ["map"]` has to find the component somewhere.
+        const cmsCollectionViews = (registry.cmsConfig?.collectionViews ?? []) as CollectionCustomView[];
+        if (cmsEntityViews.length === 0 && cmsEntityActions.length === 0 && cmsCollectionViews.length === 0) {
             return parentCustomizationController;
         }
         return {
@@ -272,9 +275,13 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             entityActions: [
                 ...(parentCustomizationController.entityActions ?? []),
                 ...cmsEntityActions.filter(a => !(parentCustomizationController.entityActions ?? []).some(ea => ea.key === a.key))
+            ],
+            collectionViews: [
+                ...(parentCustomizationController.collectionViews ?? []),
+                ...cmsCollectionViews.filter(v => !(parentCustomizationController.collectionViews ?? []).some(cv => cv.key === v.key))
             ]
         };
-    }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
+    }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions, registry.cmsConfig?.collectionViews]);
 
     // ── Inner content with all context providers ──────────────────────
     // Re-provide RebaseDataContext with the routed data so that every admin

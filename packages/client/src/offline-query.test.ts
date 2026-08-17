@@ -326,6 +326,31 @@ describe("local query engine", () => {
             expect(isExactlyEvaluable({ where: { a: [["==", 1], ["<", "m"]] } } as never)).toBe(false);
             expect(isExactlyEvaluable({ where: { a: [["==", 1], ["!=", 2]] } } as never)).toBe(true);
         });
+
+        /**
+         * A dotted key reaches through a relation — `applications.status` asks
+         * about rows in another table. `matchesWhere` reads `row[field]` flat,
+         * so the key resolves to `undefined` on every cached row and the
+         * condition excludes all of them: a 200 with an empty list, which is
+         * indistinguishable from "nothing matched". The cache holds one
+         * collection and cannot answer a question about a second.
+         */
+        it("refuses a filter that reaches through a relation", () => {
+            expect(isExactlyEvaluable({
+                where: { "applications.status": ["in", ["applied"]] }
+            } as never)).toBe(false);
+            // The undotted sibling is unaffected.
+            expect(isExactlyEvaluable({ where: { status: ["in", ["applied"]] } } as never)).toBe(true);
+        });
+
+        it("finds a relation path inside an and/or group too", () => {
+            expect(isExactlyEvaluable({
+                logical: { type: "or", conditions: [
+                    { column: "a", operator: "==", value: 1 },
+                    { column: "applications.status", operator: "==", value: "applied" }
+                ] }
+            } as never)).toBe(false);
+        });
     });
 
     describe("isLocallySortable", () => {
@@ -359,6 +384,32 @@ describe("local query engine", () => {
 
         it("is vacuously true with no sort", () => {
             expect(isLocallySortable([{ id: 1, name: "a" }], undefined)).toBe(true);
+        });
+
+        /**
+         * An aggregate over a relation is computed by the database and is not a
+         * field on the row, so every cached row reads `undefined` for it. To
+         * the null rule above that looks exactly like a column of nulls — which
+         * it would call reproducible, and then hand back rows in id order: a
+         * queue sorted by nothing at all, presented as the server's answer.
+         */
+        it("refuses an aggregate sort, in either spelling", () => {
+            const rows = [{ id: 1, name: "a" }, { id: 2, name: "b" }];
+            expect(isLocallySortable(rows, ["min(applications.created_at)", "asc"])).toBe(false);
+            expect(isLocallySortable(rows, ["count(applications)", "desc"])).toBe(false);
+            expect(isLocallySortable(
+                rows,
+                [{ relation: "applications", field: "created_at", agg: "min" }, "asc"]
+            )).toBe(false);
+        });
+
+        it("refuses a multi-key sort whose second key is an aggregate", () => {
+            // A sort the local side can only agree with down to its second
+            // column is one it disagrees with.
+            expect(isLocallySortable(
+                [{ id: 1, n: 1 }, { id: 2, n: 2 }],
+                [["n", "asc"], ["count(applications)", "desc"]]
+            )).toBe(false);
         });
     });
 

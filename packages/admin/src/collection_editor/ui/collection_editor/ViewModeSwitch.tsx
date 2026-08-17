@@ -1,4 +1,4 @@
-import { ViewMode } from "@rebasepro/admin-types";
+import { CollectionCustomView, ViewMode } from "@rebasepro/admin-types";
 import {
     cls,
     KanbanIcon,
@@ -8,6 +8,7 @@ import {
     ToggleButtonGroup,
     Typography
 } from "@rebasepro/ui";
+import { getIcon, useCustomizationController } from "@rebasepro/app";
 
 export function ViewModeSwitch({
     value,
@@ -18,6 +19,14 @@ export function ViewModeSwitch({
     onChange: (value: ViewMode) => void;
     className?: string;
 }) {
+
+    const customizationController = useCustomizationController();
+
+    // Only app-registered views are offerable here. A view declared inline on
+    // a collection carries a `Builder` function, which the editor cannot write
+    // back into a config file — registering it on `<RebaseAdmin>` and naming
+    // the key is what makes it editable, the same bargain `entityViews` makes.
+    const registeredViews: CollectionCustomView[] = customizationController.collectionViews ?? [];
 
     return <div className={cls(className)}>
         <Typography variant={"label"} color={"secondary"} className={"ml-3.5"}>Default collection view</Typography>
@@ -45,7 +54,12 @@ export function ViewModeSwitch({
                         value: "kanban",
                         label: "Kanban",
                         icon: <KanbanIcon/>
-                    }
+                    },
+                    ...registeredViews.map((view) => ({
+                        value: view.key,
+                        label: view.name,
+                        icon: getIcon(view.icon) ?? <ListIcon/>
+                    }))
                 ]}
             />
         </div>

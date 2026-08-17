@@ -1,6 +1,6 @@
 import React from "react";
 import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
-import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/admin-types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/admin-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -282,6 +282,12 @@ export type RebaseProps<USER extends User, DB = unknown> = {
      * Entity Views
      */
     entityViews?: EntityCustomView[];
+
+    /**
+     * Custom collection view modes, available to every collection by `key`.
+     * A collection opts into one by naming that key in `admin.customViews`.
+     */
+    collectionViews?: CollectionCustomView[];
 
     /**
      * Entity Actions

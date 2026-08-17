@@ -196,3 +196,72 @@ describe("sort-dialect — multi-key", () => {
         });
     });
 });
+
+/**
+ * An aggregate sort key stops being an object here.
+ *
+ * `normalizeOrderBy` is the one place that already collapses the two *shapes*
+ * of a sort — one tuple, or a list of them — so it is where the two *spellings*
+ * of a key collapse too. Above it a key may be either; below it, every key is a
+ * string, which is what `OrderByTuple`, the REST parameter, the driver contract
+ * and the cursor all already were.
+ */
+describe("sort-dialect — aggregate sort keys", () => {
+
+    const oldest = { relation: "applications", field: "created_at", agg: "min" } as const;
+
+    describe("normalizeOrderBy", () => {
+        it("encodes an aggregate key to its string spelling", () => {
+            expect(normalizeOrderBy([oldest, "asc"])).toEqual([["min(applications.created_at)", "asc"]]);
+        });
+
+        it("still tells the single-tuple form from the list form", () => {
+            // An aggregate key is an object, not an array, so the "is the first
+            // element an array" test that distinguishes the two still holds.
+            expect(normalizeOrderBy([[oldest, "asc"], ["name", "desc"]]))
+                .toEqual([["min(applications.created_at)", "asc"], ["name", "desc"]]);
+        });
+
+        it("leaves an ordinary field name alone", () => {
+            expect(normalizeOrderBy(["created_at", "desc"])).toEqual([["created_at", "desc"]]);
+        });
+
+        it("encodes a bare count", () => {
+            expect(normalizeOrderBy([{ relation: "applications", agg: "count" }, "desc"]))
+                .toEqual([["count(applications)", "desc"]]);
+        });
+    });
+
+    describe("serializeOrderBy", () => {
+        it("keeps the colon shorthand, because the key carries no colon", () => {
+            expect(serializeOrderBy([oldest, "asc"])).toBe("min(applications.created_at):asc");
+        });
+
+        it("survives the round trip to the wire and back", () => {
+            expect(deserializeOrderByList(serializeOrderBy([oldest, "asc"])))
+                .toEqual([["min(applications.created_at)", "asc"]]);
+        });
+
+        it("survives it as one key of several", () => {
+            expect(deserializeOrderByList(serializeOrderBy([[oldest, "asc"], ["name", "desc"]])))
+                .toEqual([["min(applications.created_at)", "asc"], ["name", "desc"]]);
+        });
+    });
+
+    describe("parseOrderBySpecStrict", () => {
+        it("encodes the object spelling from an untyped caller", () => {
+            // A subscribe frame or a driver call from plain JavaScript never
+            // went through `normalizeOrderBy`. Refusing the shape a typed
+            // caller writes would be a distinction nothing else makes.
+            expect(parseOrderBySpecStrict([oldest, "asc"]))
+                .toEqual([["min(applications.created_at)", "asc"]]);
+            expect(parseOrderBySpecStrict([[oldest, "asc"], ["name", "desc"]]))
+                .toEqual([["min(applications.created_at)", "asc"], ["name", "desc"]]);
+        });
+
+        it("still refuses an entry that is neither a field name nor an aggregate", () => {
+            expect(() => parseOrderBySpecStrict([[{ nonsense: true }, "asc"]]))
+                .toThrow(OrderBySpecError);
+        });
+    });
+});

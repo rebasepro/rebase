@@ -1,4 +1,5 @@
-import type { OrderBySpec, OrderByTuple } from "@rebasepro/types";
+import type { OrderBySortTuple, OrderBySpec, OrderByTuple } from "@rebasepro/types";
+import { isRelationAggregateSort, sortKeyToString } from "@rebasepro/types";
 
 /**
  * Sort-order wire codec.
@@ -20,16 +21,27 @@ import type { OrderBySpec, OrderByTuple } from "@rebasepro/types";
  * the same value; the two are told apart by whether the first element is
  * itself an array, which no field name ever is.
  *
+ * This is also where a {@link RelationAggregateSort} object stops being an
+ * object. Above this function a sort key may be either spelling; below it,
+ * every key is a string — which is what `OrderByTuple`, the REST parameter, the
+ * driver contract and the cursor all already were. Doing it here means the one
+ * place that already collapses the two *shapes* of a sort also collapses the
+ * two *spellings* of a key, rather than every consumer learning about both.
+ *
  * @returns The keys in order of significance, or `undefined` for no sort. An
  *   empty list also returns `undefined` — "sort by nothing" is no sort, and
  *   letting `[]` through would have every layer below re-deciding what it meant.
  */
 export function normalizeOrderBy(orderBy?: OrderBySpec): OrderByTuple[] | undefined {
     if (!orderBy || orderBy.length === 0) return undefined;
+    // An aggregate key is an object, so the first element being an array still
+    // tells the list form from the single-tuple one — no field name is an
+    // array, and neither is an aggregate key.
     const list = Array.isArray(orderBy[0])
-        ? orderBy as OrderByTuple[]
-        : [orderBy as OrderByTuple];
-    return list.length > 0 ? list : undefined;
+        ? orderBy as OrderBySortTuple[]
+        : [orderBy as OrderBySortTuple];
+    if (list.length === 0) return undefined;
+    return list.map(([key, direction]) => [sortKeyToString(key), direction] as OrderByTuple);
 }
 
 /**
@@ -99,21 +111,30 @@ export function parseOrderBySpecStrict(raw: unknown, order?: "asc" | "desc"): Or
         throw new OrderBySpecError(`${typeof raw} is not a field name or a list of sort keys`);
     }
 
-    // The single-tuple spelling, `["created_at", "desc"]`.
-    if (typeof raw[0] === "string") return [toStrictTuple(raw, 0)];
+    // The single-tuple spelling, `["created_at", "desc"]` — or the same shape
+    // with an aggregate key in place of the field name.
+    if (typeof raw[0] === "string" || isRelationAggregateSort(raw[0])) return [toStrictTuple(raw, 0)];
 
     return raw.map(toStrictTuple);
 }
 
 function toStrictTuple(raw: unknown, index: number): OrderByTuple {
-    if (!Array.isArray(raw) || typeof raw[0] !== "string" || raw[0].trim() === "") {
+    if (!Array.isArray(raw)) {
+        throw new OrderBySpecError(`entry ${index} has no field name`);
+    }
+    // The object spelling of an aggregate key, from an untyped caller that did
+    // not go through `normalizeOrderBy`. Encoded rather than refused: it is a
+    // sort this understands, and rejecting the shape a typed caller writes
+    // would be a distinction between the two spellings that nothing else makes.
+    const key = isRelationAggregateSort(raw[0]) ? sortKeyToString(raw[0]) : raw[0];
+    if (typeof key !== "string" || key.trim() === "") {
         throw new OrderBySpecError(`entry ${index} has no field name`);
     }
     const direction = raw[1];
     if (direction !== undefined && direction !== "asc" && direction !== "desc") {
         throw new OrderBySpecError(`entry ${index} has direction '${String(direction)}'`);
     }
-    return [raw[0], direction ?? "asc"];
+    return [key, direction ?? "asc"];
 }
 
 /**
@@ -143,6 +164,9 @@ export function serializeOrderBy(orderBy?: OrderBySpec | string): string | undef
     if (!orderBy) return undefined;
     // Runtime tolerance: pass through a pre-serialized wire string unchanged.
     if (typeof orderBy === "string") return orderBy;
+    // `normalizeOrderBy` has already encoded any aggregate key to its string
+    // spelling, which is why the shorthand below can assume a string: neither
+    // `min(applications.created_at)` nor `count(applications)` contains a `:`.
     const list = normalizeOrderBy(orderBy);
     if (!list) return undefined;
     if (list.length === 1) return `${list[0][0]}:${list[0][1]}`;

@@ -4,9 +4,15 @@
 import {
     resolveEntityView,
     resolveEntityAction,
+    resolveCollectionViews,
     resolvedSelectedEntityView
 } from "../../src/util/resolutions";
-import type { EntityCustomView, EntityAction, CustomizationController } from "@rebasepro/admin-types";
+import type {
+    EntityCustomView,
+    EntityAction,
+    CollectionCustomView,
+    CustomizationController
+} from "@rebasepro/admin-types";
 
 // ---------------------------------------------------------------------------
 // resolveEntityView
@@ -157,5 +163,54 @@ describe("resolvedSelectedEntityView", () => {
         expect(result.resolvedEntityViews).toHaveLength(2);
         expect(result.selectedEntityView?.key).toBe("form");
         expect(result.selectedSecondaryForm?.key).toBe("form");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// resolveCollectionViews
+//
+// This runs once per collection and everything downstream reads its output —
+// the view switcher, `enabledViews`, and the checks on the URL param and the
+// saved user config. Anything it lets through is a mode the render chain has
+// to be able to draw.
+// ---------------------------------------------------------------------------
+describe("resolveCollectionViews", () => {
+    const MapView: CollectionCustomView = { key: "map", name: "Map", Builder: () => null };
+    const CalendarView: CollectionCustomView = { key: "calendar", name: "Calendar", Builder: () => null };
+
+    it("returns nothing when the collection declares nothing", () => {
+        expect(resolveCollectionViews(undefined)).toEqual([]);
+        expect(resolveCollectionViews([])).toEqual([]);
+    });
+
+    it("keeps an inline view as it is", () => {
+        expect(resolveCollectionViews([MapView])).toEqual([MapView]);
+    });
+
+    it("resolves a view named by key from the app registry", () => {
+        expect(resolveCollectionViews(["map"], [MapView, CalendarView])).toEqual([MapView]);
+    });
+
+    it("drops a key nothing registered", () => {
+        // Rather than becoming a switcher entry that renders a blank panel.
+        expect(resolveCollectionViews(["map"], [CalendarView])).toEqual([]);
+        expect(resolveCollectionViews(["map"])).toEqual([]);
+    });
+
+    it("refuses a view keyed as a built-in", () => {
+        // The render chain checks the built-ins first, so a view keyed "table"
+        // would sit in the switcher and never draw.
+        const shadow = { key: "table", name: "Not the table", Builder: () => null };
+        expect(resolveCollectionViews([shadow])).toEqual([]);
+    });
+
+    it("keeps the first of two views sharing a key", () => {
+        const other = { key: "map", name: "Other map", Builder: () => null };
+        expect(resolveCollectionViews([MapView, other])).toEqual([MapView]);
+    });
+
+    it("preserves declaration order", () => {
+        expect(resolveCollectionViews(["calendar", "map"], [MapView, CalendarView])
+            .map(v => v.key)).toEqual(["calendar", "map"]);
     });
 });

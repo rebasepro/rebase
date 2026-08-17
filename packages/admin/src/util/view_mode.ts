@@ -1,11 +1,12 @@
 
-import type { ViewMode, AdminCollection } from "@rebasepro/admin-types";
+import type { ViewMode, AdminCollection, CollectionCustomView } from "@rebasepro/admin-types";
 
 /**
  * Query param that carries the active collection view mode across navigations.
  */
 export const VIEW_MODE_PARAM = "__view";
 
+/** The view modes every collection has, before custom views are added. */
 export const VIEW_MODES: ViewMode[] = ["list", "table", "cards", "kanban"];
 
 export const DEFAULT_VIEW_MODE: ViewMode = "list";
@@ -14,20 +15,34 @@ export type OpenEntityMode = "side_panel" | "full_screen" | "split" | "dialog";
 
 export const DEFAULT_OPEN_ENTITY_MODE: OpenEntityMode = "split";
 
-export function isViewMode(value: string | null | undefined): value is ViewMode {
-    return Boolean(value) && VIEW_MODES.includes(value as ViewMode);
+/**
+ * Whether `value` names a view mode this collection can actually render.
+ *
+ * `customKeys` are the keys of the collection's resolved custom views. They
+ * have to be passed in rather than looked up: a custom view is registered per
+ * collection, so there is no global set to check against, and validating
+ * against the built-ins alone is what would send `?__view=map` to the table.
+ *
+ * Omitting them checks the built-ins only, which is the right answer for
+ * callers that have no collection in hand.
+ */
+export function isViewMode(value: string | null | undefined, customKeys?: readonly string[]): value is ViewMode {
+    if (!value) return false;
+    return VIEW_MODES.includes(value as ViewMode) || Boolean(customKeys?.includes(value));
 }
 
 /**
- * Read the active view mode from a query string, if it holds a valid one.
+ * Read the active view mode from a query string, if it holds one this
+ * collection can render.
  *
  * @param search a query string (e.g. `location.search`). Falls back to the
  *        current browser location when omitted.
+ * @param customKeys keys of the collection's custom views, if any.
  */
-export function getViewModeFromSearch(search?: string): ViewMode | null {
+export function getViewModeFromSearch(search?: string, customKeys?: readonly string[]): ViewMode | null {
     const source = search ?? (typeof window !== "undefined" ? window.location.search : "");
     const value = new URLSearchParams(source).get(VIEW_MODE_PARAM);
-    return isViewMode(value) ? value : null;
+    return isViewMode(value, customKeys) ? value : null;
 }
 
 /**
@@ -42,7 +57,14 @@ export function getViewModeFromSearch(search?: string): ViewMode | null {
  *        current browser location.
  */
 export function withViewMode(url: string, search?: string): string {
-    const viewMode = getViewModeFromSearch(search);
+    // Carries whatever the param holds rather than validating it. These call
+    // sites are navigations — they have no collection in hand, so they cannot
+    // know whether `map` is one of *this* collection's custom views. Checking
+    // against the built-ins here would drop every custom view on the first
+    // record click. The binding validates on read, which is where the answer
+    // is knowable.
+    const source = search ?? (typeof window !== "undefined" ? window.location.search : "");
+    const viewMode = new URLSearchParams(source).get(VIEW_MODE_PARAM);
     if (!viewMode) return url;
 
     // Preserve any hash — the param belongs to the query, which precedes it.
@@ -101,16 +123,24 @@ export function withListState(url: string, search?: string): string {
 export function resolveViewMode({
     collection,
     search,
-    savedViewMode
+    savedViewMode,
+    customKeys
 }: {
     collection?: Pick<AdminCollection<any>, "defaultViewMode">;
     search?: string;
     savedViewMode?: ViewMode | null;
+    /** Keys of the collection's resolved custom views. */
+    customKeys?: readonly string[];
 }): ViewMode {
-    const fromUrl = getViewModeFromSearch(search);
+    const fromUrl = getViewModeFromSearch(search, customKeys);
     if (fromUrl) return fromUrl;
-    if (isViewMode(savedViewMode)) return savedViewMode;
-    return collection?.defaultViewMode ?? DEFAULT_VIEW_MODE;
+    if (isViewMode(savedViewMode, customKeys)) return savedViewMode;
+    // A `defaultViewMode` naming a custom view that is no longer registered
+    // would leave the collection on a mode nothing renders, so it gets the
+    // same check the other two sources get.
+    const configured = collection?.defaultViewMode;
+    if (isViewMode(configured, customKeys)) return configured;
+    return DEFAULT_VIEW_MODE;
 }
 
 /**
@@ -127,12 +157,19 @@ export function resolveViewMode({
  */
 export function resolveOpenEntityMode({
     collection,
-    viewMode
+    viewMode,
+    customView
 }: {
     collection?: Pick<AdminCollection<any>, "openEntityMode">;
     viewMode?: ViewMode;
+    /** The resolved custom view, when `viewMode` names one. */
+    customView?: Pick<CollectionCustomView, "openEntityMode">;
 }): OpenEntityMode {
     if (collection?.openEntityMode) return collection.openEntityMode;
+    // A custom view gets to say, because only it knows whether it owns its
+    // surface. Falls to the board's answer: a map or a calendar keeps its
+    // canvas and shows the record over it, where "split" would halve it.
+    if (customView) return customView.openEntityMode ?? "side_panel";
     if (viewMode === "kanban") return "side_panel";
     if (viewMode === "table" || viewMode === "cards") return "full_screen";
     return DEFAULT_OPEN_ENTITY_MODE;
