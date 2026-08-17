@@ -82,6 +82,16 @@ export function Chip({
 
     if (hasScheme) {
         if (outlined) {
+            // An outlined chip has no fill, so it needs the ink meant for the
+            // PAGE, not the ink meant for the fill it just dropped. Those are
+            // different colours for most hues — a bright `solid` chip carries
+            // dark ink, which on a near-black page would be invisible.
+            if (!error && usedColorScheme) {
+                const outlineInk = dark
+                    ? usedColorScheme.darkOutlineText ?? usedColorScheme.darkText
+                    : usedColorScheme.outlineText;
+                if (outlineInk) textColor = outlineInk;
+            }
             bgColor = getRgba(textColor, dark ? 0.1 : 0.06);
             border = `1px solid ${getRgba(textColor, dark ? 0.2 : 0.14)}`;
         } else if (error) {

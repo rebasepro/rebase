@@ -7,6 +7,98 @@ export type ChipColorScheme = {
     darkColor?: string;
     /** Text color override for dark mode */
     darkText?: string;
+    /**
+     * Ink for the `outlined` variant, which has no fill of its own.
+     *
+     * `text`/`darkText` are the ink ON the chip's own background. An outlined
+     * chip drops that background and sits on the PAGE, so the same value is
+     * being asked to be legible against two different surfaces at once — and
+     * for most hues it cannot be. Splitting the roles is what lets the filled
+     * ink follow its fill (often dark ink on a bright chip) without dragging
+     * the outlined variant down with it.
+     */
+    outlineText?: string;
+    /** Outlined-variant ink in dark mode. */
+    darkOutlineText?: string;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Contrast
+   ────────────────────────────────────────────────────────────────────────────
+
+   Chip ink is DERIVED, not hand-picked. It used to be written down per tone —
+   `"#fff"` on every `solid` background, the hue's `pale` on every `deep` one —
+   and an audit of all 120 hue/tone/mode pairs found **63 of them below WCAG AA**.
+   The worst was white on `teal.solid` at **1.76:1**, which is not a near miss;
+   it is unreadable. The palette is an Airtable-style one whose mid stops are
+   bright enough to need dark ink, and hardcoding light ink ignored that.
+
+   So the ink is measured against the background it will actually sit on, and
+   pushed toward black or white only as far as it must go to clear the floor.
+   Starting from the hue's own dark/light tints rather than from flat `#000`
+   and `#fff` keeps the family looking like a family: `blue.solid` gets a very
+   dark navy, not black.
+
+   Deriving it also means a new hue cannot be added below AA — there is no
+   per-tone ink to forget to check. */
+
+/** WCAG floor, plus a little margin so rounding cannot drop a pair below 4.5. */
+const CONTRAST_TARGET = 4.6;
+
+/** Page backgrounds the outlined variant sits on: `bg-white` and `surface-950`. */
+const PAGE_LIGHT = "#ffffff";
+const PAGE_DARK = "#0a0a0a";
+
+function toRgb(hex: string): [number, number, number] {
+    let h = hex.replace("#", "");
+    if (h.length === 3) h = h.split("").map(c => c + c).join("");
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function toHex(rgb: number[]): string {
+    return "#" + rgb.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
+}
+
+function relativeLuminance(hex: string): number {
+    const [r, g, b] = toRgb(hex).map(v => {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function contrastRatio(a: string, b: string): number {
+    const x = relativeLuminance(a);
+    const y = relativeLuminance(b);
+    const [hi, lo] = x > y ? [x, y] : [y, x];
+    return (hi + 0.05) / (lo + 0.05);
+}
+
+function mixHex(from: string, to: string, t: number): string {
+    const A = toRgb(from);
+    const B = toRgb(to);
+    return toHex([0, 1, 2].map(i => A[i] + (B[i] - A[i]) * t));
+}
+
+/**
+ * Walk a tinted ink toward black or white until it clears the floor on `bg`.
+ *
+ * Stops at the first passing step rather than going all the way, so the ink
+ * keeps as much of its hue as legibility allows.
+ */
+function push(base: string, toward: string, bg: string): string {
+    for (let t = 0; t <= 1.0001; t += 0.02) {
+        const candidate = mixHex(base, toward, t);
+        if (contrastRatio(candidate, bg) >= CONTRAST_TARGET) return candidate;
+    }
+    return toward;
+}
+
+/** The ink for a chip filled with `bg`: whichever direction has more headroom. */
+function inkOn(stops: HueStops, bg: string): string {
+    const dark = push(stops.text, "#000000", bg);
+    const light = push(stops.onDeep ?? stops.pale, "#ffffff", bg);
+    return contrastRatio(dark, bg) >= contrastRatio(light, bg) ? dark : light;
 }
 
 /**
@@ -61,18 +153,40 @@ const HUE_STOPS: Record<ChipHue, HueStops> = {
     emerald: { pale: "#d1fae5", mid: "#6ee7b7", solid: "#10b981", deep: "#059669", text: "#064e3b" }
 };
 
+/**
+ * One tone of one hue.
+ *
+ * Backgrounds are the palette's, unchanged — the stops were not the problem and
+ * moving them would have restyled every chip in the product. Only the ink moved,
+ * and it moved to wherever the measurement says it has to be.
+ */
 function tone(stops: HueStops, chipTone: ChipTone): ChipColorScheme {
-    const onDeep = stops.onDeep ?? stops.pale;
+    // The outlined variant is a property of the HUE, not of the tone: it has no
+    // fill, so every tone of a hue sits on the same page background and wants
+    // the same ink.
+    const outline = {
+        outlineText: push(stops.text, "#000000", PAGE_LIGHT),
+        darkOutlineText: push(stops.onDeep ?? stops.pale, "#ffffff", PAGE_DARK)
+    };
+
+    const filled = (light: string, dark: string): ChipColorScheme => ({
+        color: light,
+        text: inkOn(stops, light),
+        darkColor: dark,
+        darkText: inkOn(stops, dark),
+        ...outline
+    });
+
     switch (chipTone) {
         case "Light":
-            return { color: stops.mid, text: stops.text, darkColor: stops.solid, darkText: "#fff" };
+            return filled(stops.mid, stops.solid);
         case "Dark":
-            return { color: stops.solid, text: "#fff", darkColor: stops.solid, darkText: "#fff" };
+            return filled(stops.solid, stops.solid);
         case "Darker":
-            return { color: stops.deep, text: onDeep, darkColor: stops.deep, darkText: onDeep };
+            return filled(stops.deep, stops.deep);
         case "Lighter":
         default:
-            return { color: stops.pale, text: stops.text, darkColor: stops.deep, darkText: onDeep };
+            return filled(stops.pale, stops.deep);
     }
 }
 
