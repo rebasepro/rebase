@@ -1,0 +1,32 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "rebase.serviceAccountName" . }}
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{/* No Role and no RoleBinding, deliberately. Nothing in this release talks to
+     the Kubernetes API, so the account exists only to be a stable identity for
+     image pull secrets and pod-level policy. Every pod sets
+     automountServiceAccountToken: false on top — a token in a pod running a
+     customer's own functions is a credential with no reason to be there. */}}
+automountServiceAccountToken: false
+{{- end }}
+{{- if .Values.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "rebase.fullname" . }}-api
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+{{- end }}

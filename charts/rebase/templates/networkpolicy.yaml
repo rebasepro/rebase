@@ -1,0 +1,83 @@
+{{- if .Values.networkPolicy.enabled }}
+{{/*
+Who may reach what, once the units are separate.
+
+Splitting the runtime creates a question that did not exist with one pod: the
+functions unit and the worker are now addressable inside the cluster, and
+nothing about them wants to be. The functions tier runs a customer's own code
+and is reachable on a Service; without a policy, anything else in the cluster
+can call it directly and skip whatever the ingress was doing in front.
+
+Off by default because a cluster with no policy-capable CNI accepts these
+objects and enforces nothing — a security control that may silently not be
+running should be switched on deliberately, not inherited.
+*/}}
+{{- $root := . -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rebase.fullname" . }}-api
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" $root "component" "api") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    {{/* The ingress controller is the only thing that should reach the API from
+         outside this release. Left as an empty `from` — every source — would be
+         a policy object that reads as protection and grants what it had before. */}}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: {{ .Values.service.port }}
+          protocol: TCP
+{{- if and .Values.split .Values.functions.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rebase.fullname" . }}-functions
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" $root "component" "functions") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        {{/* And the api, which forwards /api/functions/* when a deployment uses
+             the proxy path instead of an ingress rule. */}}
+        - podSelector:
+            matchLabels:
+              {{- include "rebase.selectorLabels" (dict "root" $root "component" "api") | nindent 14 }}
+      ports:
+        - port: {{ .Values.service.port }}
+          protocol: TCP
+{{- end }}
+{{- if and .Values.split .Values.worker.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "rebase.fullname" . }}-worker
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" $root "component" "worker") | nindent 6 }}
+  {{/* No ingress rules at all: the worker serves no surface anyone should call.
+       An empty `ingress` with the type declared denies everything, which is
+       different from omitting the type — that would allow everything. */}}
+  policyTypes: [Ingress]
+  ingress: []
+{{- end }}
+{{- end }}

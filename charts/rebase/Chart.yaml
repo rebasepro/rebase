@@ -1,0 +1,26 @@
+apiVersion: v2
+name: rebase
+description: >-
+  Rebase on Kubernetes. One image, one bundle, booted as one process or as
+  several cooperating ones — an API, a functions tier, a worker, and any number
+  of static apps — behind a single host.
+type: application
+
+# The chart's own version. Moves when the templates change.
+version: 0.1.0
+
+# The default runtime image tag. A deployment pins its own with
+# `image.tag`; this is what `helm install` uses when nobody says otherwise.
+appVersion: "0.15.0"
+
+keywords:
+  - baas
+  - postgres
+  - backend
+  - rebase
+home: https://rebase.pro
+sources:
+  - https://github.com/rebase-pro/rebase
+maintainers:
+  - name: Rebase
+    url: https://rebase.pro

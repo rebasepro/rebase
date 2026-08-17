@@ -1,0 +1,63 @@
+{{/*
+One Service per unit that answers HTTP.
+
+The worker gets none: it mounts no surfaces at all, so a Service would be an
+object with endpoints nothing can usefully call. Naming it anyway is how a
+routing mistake later finds something to resolve to and returns 404s instead of
+failing loudly.
+*/}}
+{{- $root := . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rebase.fullname" . }}-api
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "rebase.selectorLabels" (dict "root" $root "component" "api") | nindent 4 }}
+{{- if and .Values.split .Values.functions.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rebase.fullname" . }}-functions
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: functions
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "rebase.selectorLabels" (dict "root" $root "component" "functions") | nindent 4 }}
+{{- end }}
+{{- range .Values.staticApps }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rebase.fullname" $root }}-{{ .name }}
+  labels:
+    {{- include "rebase.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ .name }}
+spec:
+  type: {{ $root.Values.service.type }}
+  ports:
+    - port: {{ $root.Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "rebase.selectorLabels" (dict "root" $root "component" .name) | nindent 4 }}
+{{- end }}

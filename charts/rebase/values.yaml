@@ -1,0 +1,218 @@
+# Rebase on Kubernetes.
+#
+# The default here is deliberately the same shape as
+# `docker/docker-compose.selfhost.yml`: ONE process serving everything. Every
+# split below is opt-in, and turning one on is the only change — same image,
+# same bundle, same database.
+#
+# Minimum viable install:
+#
+#   helm install rebase ./charts/rebase \
+#     --set config.databaseUrl='postgres://…' \
+#     --set config.jwtSecret='…' \
+#     --set config.serviceKey='…' \
+#     --set ingress.host=api.example.com
+#
+# The chart REFUSES to render a topology that would be silently wrong — more
+# than one process counting rate limits privately, or two processes both
+# provisioning the schema. See `templates/_validate.tpl`; every message names
+# the value to change.
+
+image:
+  repository: rebasepro/server
+  # Defaults to .Chart.appVersion. Pin it for a real deployment.
+  tag: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# ─── Your project ──────────────────────────────────────────────────────────
+#
+# The runtime is the image; your project is the bundle (`rebase build` →
+# ./dist-bundle). Two ways to get it into the pod:
+#
+#   mode: image  — you built an image FROM rebasepro/server with the bundle
+#                  baked in (COPY dist-bundle /bundle). Set image.repository to
+#                  yours. Nothing else to configure; this is the sturdiest.
+#   mode: url    — the stock image, with an init container fetching a tarball
+#                  at every pod start. Good for a control plane; needs the URL
+#                  to stay reachable for the life of the deployment.
+bundle:
+  mode: image
+  path: /bundle
+  url: ""
+  # Optional bearer token for a private bundle URL. Prefer existingSecret.
+  token: ""
+
+# ─── Required configuration ────────────────────────────────────────────────
+#
+# Set these, or point existingSecret at a Secret that already carries the same
+# keys and set nothing here. A chart-managed Secret is the easy path; an
+# existing one is the right path when something else owns your secrets.
+config:
+  databaseUrl: ""
+  jwtSecret: ""
+  serviceKey: ""
+  # Origins your frontend is served from. Required in production; "*" is
+  # refused by the runtime because the API sends credentials.
+  corsOrigins: ""
+  # Extra environment for every unit. Topology variables set here are ignored:
+  # the chart owns them, and a value that cannot apply is worse than no value.
+  env: {}
+
+existingSecret: ""
+
+# ─── Topology ──────────────────────────────────────────────────────────────
+#
+# `split: false` runs one Deployment serving everything — REBASE_ROLE unset,
+# exactly today's process. Setting it true splits the surfaces across the units
+# enabled below, and the chart then wires the roles, the schema ownership, the
+# proxy hop count and the shared rate-limit store for you.
+split: false
+
+api:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Custom functions in their own process. Only meaningful when split is true.
+functions:
+  enabled: false
+  replicas: 1
+  # Serve only these functions in this unit. Empty = all of them. A name that
+  # is not in the bundle refuses to boot, which is deliberate.
+  only: []
+  exclude: []
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "2", memory: 2Gi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Cron and the durable job queue, off the request path. Both are already safe
+# to run in several processes at once — cron claims each (job, slot) pair and
+# the queue claims rows FOR UPDATE SKIP LOCKED — so this is about isolation,
+# not correctness.
+worker:
+  enabled: false
+  replicas: 1
+  # Split scheduling from execution by running this unit twice with opposite
+  # values. Null leaves the role's own default (both on).
+  cronScheduler: null
+  jobWorkers: null
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ─── Static apps ───────────────────────────────────────────────────────────
+#
+# Your admin panel and any front end, each its own Deployment of the same image
+# booting a `kind: static` bundle. A static unit needs no database and no JWT —
+# the runtime short-circuits before it reads either — so these pods carry no
+# secrets at all.
+#
+# Served under `path` on the SAME host as the API, which is what keeps cookie
+# auth and CORS exactly as they are. Assets must have been BUILT for that path.
+#
+# staticApps:
+#   - name: admin
+#     path: /admin
+#     image:
+#       repository: my-registry/my-admin
+#       tag: "1.4.0"
+#     replicas: 1
+staticApps: []
+
+# ─── Schema ────────────────────────────────────────────────────────────────
+#
+# Exactly one thing provisions the schema. With this enabled it is a Job that
+# runs before the pods roll, and every unit — the api included — boots with
+# REBASE_MIGRATE_ON_BOOT=none. That is the cleanest split available: nothing on
+# the request path owns DDL.
+#
+# Disable it and the api provisions at boot instead, which is the single-process
+# default and is what an unsplit deployment already does.
+migrationJob:
+  enabled: true
+  # `ensure` creates the auth tables and anything missing. `push` will also
+  # apply collection schema changes — destructive, so it is not the default.
+  mode: ensure
+  backoffLimit: 3
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+
+# ─── Shared state ──────────────────────────────────────────────────────────
+#
+# What has to be true before more than one process is correct. The chart checks
+# these against the topology and refuses rather than warning, because every one
+# of them fails silently: nothing errors, things merely stop being enforced or
+# stop being delivered.
+sharedState:
+  # Rate-limit counts in Postgres instead of each process's memory. Forced on
+  # by the chart whenever more than one process serves HTTP.
+  rateLimitStore: auto   # auto | sql | memory
+  # Realtime broadcast and presence across instances. The runtime's default bus
+  # is in-memory and does not cross processes; a project that uses broadcast or
+  # presence must set `realtime: { bus: { type: "postgres" } }` in its config,
+  # which the chart cannot do for it. Setting this true asserts you have.
+  channelBusConfigured: false
+
+# ─── Networking ────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  host: ""
+  # Extra hosts answering the same paths.
+  extraHosts: []
+  annotations: {}
+  tls:
+    enabled: true
+    # Leave empty to let cert-manager name it, or point at an existing Secret.
+    secretName: ""
+    clusterIssuer: letsencrypt-prod
+  # nginx defaults this to 1m and answers anything larger with its own HTML 413,
+  # before the request reaches the runtime — where a useful JSON error lives.
+  # Deliberately above the runtime's own REBASE_MAX_BODY_SIZE.
+  maxBodySize: 12m
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# Deny everything to the units that should never be reachable from outside the
+# release. Off by default because a cluster with no CNI policy support silently
+# ignores these, and a security control that might not be running should be
+# switched on deliberately.
+networkPolicy:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+podAnnotations: {}
+podLabels: {}

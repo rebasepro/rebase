@@ -1,0 +1,88 @@
+{{- if .Values.migrationJob.enabled }}
+{{/*
+Schema provisioning as a Job, so nothing on the request path owns DDL.
+
+The runtime already refuses to boot a non-provisioning role that would also
+provision — N processes racing `CREATE … IF NOT EXISTS` is a state nobody
+designed, and the driver surviving that race does not make it a design. With
+one process that refusal is enough. With four it becomes a rule an operator has
+to remember on three of them, and forgetting it is a crash loop whose reason is
+in a log nobody is watching.
+
+So the chart takes the decision away: this Job provisions, and every unit —
+including the api — boots with REBASE_MIGRATE_ON_BOOT=none. Exactly one owner,
+and it is not serving traffic while it works.
+
+## Why a hook and not just a Job
+
+`pre-install,pre-upgrade` runs it to completion before the Deployments roll, so
+pods never come up against a schema that has not been migrated yet. The weight
+is `-5` so it lands before anything else the chart may grow later.
+
+`hook-delete-policy` keeps a FAILED job: its logs are the only record of why an
+upgrade stopped, and deleting it on failure is deleting the evidence while
+someone is still reading the error.
+*/}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "rebase.fullname" . }}-migrate
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrationJob.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "rebase.selectorLabels" (dict "root" . "component" "migrate") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "rebase.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+        {{- include "rebase.bundleVolumes" . | nindent 8 }}
+      containers:
+        - name: migrate
+          image: {{ include "rebase.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{/* The `worker` role mounts no HTTP surface, which is what makes it
+               the right shape for a process that should provision and exit
+               rather than start answering requests while it does. The schema
+               work itself is driven by REBASE_MIGRATE_ON_BOOT below, which the
+               role would otherwise force to "none" — so it is set explicitly
+               after, and this is the one place in the chart where a unit
+               provisions without being the api. */}}
+          env:
+            {{- include "rebase.commonEnv" . | nindent 12 }}
+            - name: REBASE_ROLE
+              value: "worker"
+            - name: REBASE_MIGRATE_ON_BOOT
+              value: {{ .Values.migrationJob.mode | quote }}
+            - name: REBASE_CRON_SCHEDULER
+              value: "false"
+            - name: REBASE_JOB_WORKERS
+              value: "false"
+            {{/* Provision and stop. Without it this becomes a pod that
+                 successfully migrated and then sat there holding an open pool —
+                 which to a Job is a migration that never finished, and to a
+                 `helm upgrade` waiting on this hook is an upgrade that hangs. */}}
+            - name: REBASE_PROVISION_ONLY
+              value: "true"
+          volumeMounts:
+            {{- include "rebase.bundleVolumeMounts" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrationJob.resources | nindent 12 }}
+{{- end }}

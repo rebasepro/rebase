@@ -1,0 +1,133 @@
+{{- include "rebase.validate" . -}}
+{{/*
+Every backend unit, from one template.
+
+The units differ in exactly three things — their role, their replica count and
+their resources — so they are rendered from one list rather than one template
+each. Three near-identical templates is how the api grows a field the worker
+never gets, and the difference shows up as a pod that behaves subtly unlike its
+siblings months later.
+
+`all` is the unsplit default: one Deployment, no REBASE_ROLE, byte-identical to
+what the compose file runs.
+*/}}
+{{- $units := list -}}
+{{- if .Values.split -}}
+  {{- $units = append $units (dict "name" "api" "role" "api" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity) -}}
+  {{- if .Values.functions.enabled -}}
+    {{- $units = append $units (dict "name" "functions" "role" "functions" "replicas" .Values.functions.replicas "resources" .Values.functions.resources "nodeSelector" .Values.functions.nodeSelector "tolerations" .Values.functions.tolerations "affinity" .Values.functions.affinity) -}}
+  {{- end -}}
+  {{- if .Values.worker.enabled -}}
+    {{- $units = append $units (dict "name" "worker" "role" "worker" "replicas" .Values.worker.replicas "resources" .Values.worker.resources "nodeSelector" .Values.worker.nodeSelector "tolerations" .Values.worker.tolerations "affinity" .Values.worker.affinity) -}}
+  {{- end -}}
+{{- else -}}
+  {{- $units = append $units (dict "name" "api" "role" "all" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity) -}}
+{{- end -}}
+
+{{- $root := . -}}
+{{- range $unit := $units }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rebase.fullname" $root }}-{{ $unit.name }}
+  labels:
+    {{- include "rebase.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $unit.name }}
+spec:
+  replicas: {{ $unit.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" $root "component" $unit.name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rebase.selectorLabels" (dict "root" $root "component" $unit.name) | nindent 8 }}
+        {{- with $root.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{/* Roll the pods when the Secret's contents change. Kubernetes does
+             not restart a Deployment because a Secret it reads through envFrom
+             or secretKeyRef changed — only the pod template is compared — so a
+             rotated credential would sit unused until something else happened
+             to trigger a rollout. */}}
+        checksum/config: {{ include (print $root.Template.BasePath "/secret.yaml") $root | sha256sum }}
+        {{- with $root.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "rebase.serviceAccountName" $root }}
+      {{/* Nothing here talks to the Kubernetes API. A mounted token is a
+           credential sitting in a pod that runs a customer's own code. */}}
+      automountServiceAccountToken: false
+      {{- with $root.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      {{- with $unit.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $unit.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $unit.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        {{- include "rebase.bundleVolumes" $root | nindent 8 }}
+      containers:
+        - name: rebase
+          image: {{ include "rebase.image" $root }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          {{- if ne $unit.role "worker" }}
+          ports:
+            - name: http
+              containerPort: {{ $root.Values.service.port }}
+              protocol: TCP
+          {{- end }}
+          env:
+            {{- include "rebase.commonEnv" $root | nindent 12 }}
+            {{- include "rebase.roleEnv" (dict "root" $root "role" $unit.role) | nindent 12 }}
+          volumeMounts:
+            {{- include "rebase.bundleVolumeMounts" $root | nindent 12 }}
+          {{/* /health answers on EVERY role, including a worker that serves no
+               other HTTP at all. That is what makes it usable as a probe here,
+               and also why a probe passing proves only that the process is
+               alive — not that it serves anything. */}}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $root.Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $root.Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          {{/* A bundle install plus a schema check can take longer than a
+               liveness probe's patience on a cold database. The startup probe
+               is what stops that from being an endless restart loop that never
+               reaches a first successful boot. */}}
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ $root.Values.service.port }}
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            {{- toYaml $unit.resources | nindent 12 }}
+{{- end }}

@@ -1,0 +1,94 @@
+{{- if .Values.ingress.enabled }}
+{{/*
+One host, several backends, chosen by path.
+
+This is what makes the units independently deployable without becoming
+independently addressable. `/admin` is a different Deployment from `/api/data`,
+and a browser cannot tell: same origin, same cookies, same CORS, one
+certificate. Splitting by hostname instead would have made every unit a
+cross-origin call and turned an internal topology decision into a change in the
+product's public surface.
+
+**Path order is not a matter of taste here.** ingress-nginx sorts `Prefix`
+paths by descending length, so `/api/functions` wins over `/api` regardless of
+the order below — but that is a property of one controller, not of the Ingress
+API. They are emitted longest-first anyway so the intent survives a controller
+that honours document order.
+*/}}
+{{- $root := . -}}
+{{- $fullName := include "rebase.fullname" . -}}
+{{- $port := .Values.service.port -}}
+{{- $hosts := prepend .Values.ingress.extraHosts .Values.ingress.host -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "rebase.labels" . | nindent 4 }}
+  annotations:
+    {{/* nginx defaults proxy-body-size to 1m and answers anything larger with
+         its own HTML 413 — before the request ever reaches the runtime, whose
+         own limit answers JSON naming the size and the code. Set deliberately
+         ABOVE the runtime's so the limit anyone actually hits is the one with a
+         useful error behind it. */}}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ .Values.ingress.maxBodySize | quote }}
+    {{- if and .Values.ingress.tls.enabled .Values.ingress.tls.clusterIssuer (not .Values.ingress.tls.secretName) }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        {{- range $hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ default (printf "%s-tls" $fullName) .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    {{- range $host := $hosts }}
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          {{/* Longest first. Static apps before the API's own prefixes only
+               matters if one of them claims something under /api, which the
+               validation refuses outright. */}}
+          {{- range $app := $root.Values.staticApps }}
+          - path: {{ $app.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-{{ $app.name }}
+                port:
+                  number: {{ $port }}
+          {{- end }}
+          {{- if and $root.Values.split $root.Values.functions.enabled }}
+          {{/* The client SDK already builds exactly this path, so routing it to
+               a different Deployment needs no change on any caller — the split
+               is invisible from outside the cluster. This is also why the
+               api-side proxy (REBASE_FUNCTIONS_UPSTREAM) is left off here: with
+               an ingress in front there is no reason to pay a second hop, and
+               the proxy path has a Content-Encoding trap the direct route
+               simply does not have. */}}
+          - path: /api/functions
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-functions
+                port:
+                  number: {{ $port }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}-api
+                port:
+                  number: {{ $port }}
+    {{- end }}
+{{- end }}

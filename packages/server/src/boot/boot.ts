@@ -405,7 +405,13 @@ at: staticApp.path });
 
     // ── Listen ───────────────────────────────────────────────────────────────
     let port = env.PORT;
-    if (options.listen !== false) {
+    // A provisioning run has already done its work by the time it gets here:
+    // schema DDL happens during boot, above. What is left is to NOT start
+    // serving. Deciding it at the socket rather than earlier is what keeps this
+    // honest — the process that migrates is byte-identical to the one that
+    // serves, right up to the point where one of them binds a port.
+    const provisionOnly = options.listen === false || resolveProvisionOnly(process.env);
+    if (!provisionOnly) {
         if (isProduction) {
             await new Promise<void>((resolve, reject) => {
                 server.once("error", reject);
@@ -439,6 +445,30 @@ at: staticApp.path });
         );
         if (!isProduction) cleanupDevPortFile(devRoot);
     };
+
+    // A provisioning run reports what it did and stops. Without this it is a
+    // process that migrated successfully and then sat there holding an open
+    // pool — which to a Kubernetes Job is a migration that never finished, and
+    // to a `helm upgrade` waiting on a pre-upgrade hook is an upgrade that
+    // hangs until the backoff limit reports a failure for work that succeeded.
+    //
+    // Only when the environment asked for it: `listen: false` is also how the
+    // test suite boots a runtime it wants to drive in-process, and exiting
+    // under that would take the test runner with it.
+    if (resolveProvisionOnly(process.env) && options.listen !== false) {
+        logger.info("Schema provisioning complete — exiting without serving (REBASE_PROVISION_ONLY).");
+        await closeConnections();
+        return {
+            app,
+            server,
+            backend,
+            bundle,
+            env,
+            port,
+            dataSources,
+            shutdown: async () => { /* already closed */ }
+        };
+    }
 
     if (options.handleSignals !== false) {
         installShutdownHandlers(backend, { onCleanup: closeConnections });
@@ -606,9 +636,36 @@ async function bootStaticApp(
  * answer is "set DATABASE_URL". Anything else keeps its stack, because it is a
  * bug and the trace is the point.
  */
+/**
+ * Whether this process should provision the schema and stop, rather than serve.
+ *
+ * The shape a migration Job wants: same image, same bundle, same boot — and no
+ * socket. Nothing else changes, which is the point. A separate migration image
+ * would be a second artifact to build, publish and keep in step with the
+ * runtime, and the failure mode of it drifting is a schema applied by a version
+ * that is not the one about to run against it.
+ *
+ * A blank value is *unset*: `REBASE_PROVISION_ONLY=${SOMETHING}` with SOMETHING
+ * undefined is the ordinary way to write a compose file or a Helm template, and
+ * reading it as true would turn an ordinary deployment into one that migrates
+ * and then refuses to serve.
+ */
+export function resolveProvisionOnly(env: NodeJS.ProcessEnv = process.env): boolean {
+    const raw = (env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase();
+    return raw === "1" || raw === "true";
+}
+
 export async function runFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
     try {
-        return await bootFromBundle(options);
+        const booted = await bootFromBundle(options);
+        // Exit explicitly rather than letting the event loop drain. A bundle is
+        // free to leave a handle open — a driver's keepalive, a library's
+        // timer — and a Job that hangs on one of those is indistinguishable
+        // from a migration that never finished.
+        if (resolveProvisionOnly(process.env) && options.listen !== false) {
+            process.exit(0);
+        }
+        return booted;
     } catch (err) {
         // Both of these are "your configuration says something that cannot
         // work", so both get the message and the fix rather than a stack trace.

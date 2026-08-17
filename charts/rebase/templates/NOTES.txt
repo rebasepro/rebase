@@ -1,0 +1,54 @@
+Rebase is installed as release {{ .Release.Name }}.
+
+{{ if .Values.split -}}
+Topology: SPLIT
+  api        × {{ .Values.api.replicas }}   — data, auth, storage, admin{{ if not .Values.functions.enabled }}, functions{{ end }}
+{{- if .Values.functions.enabled }}
+  functions  × {{ .Values.functions.replicas }}   — /api/functions/*{{ with .Values.functions.only }} (only: {{ join ", " . }}){{ end }}
+{{- end }}
+{{- if .Values.worker.enabled }}
+  worker     × {{ .Values.worker.replicas }}   — cron and the job queue, no HTTP
+{{- end }}
+{{- else -}}
+Topology: SINGLE — one process serving everything, the same shape as
+docker-compose.selfhost.yml. Set `split=true` to separate the units.
+{{- end }}
+{{- range .Values.staticApps }}
+  {{ .name }}  — static, served at {{ .path }}
+{{- end }}
+
+Rate-limit counts: {{ include "rebase.rateLimitStore" . }}
+{{- if eq (include "rebase.rateLimitStore" .) "sql" }} (shared across processes, in rebase.rate_limit_hits)
+{{- else }} (this process's memory — correct for a single process, and only for a single process)
+{{- end }}
+
+Schema: {{ if .Values.migrationJob.enabled }}owned by the pre-upgrade Job ({{ .Values.migrationJob.mode }}); every pod boots with REBASE_MIGRATE_ON_BOOT=none{{ else }}provisioned by the api at boot ({{ .Values.migrationJob.mode }}){{ end }}
+
+{{ if .Values.ingress.enabled -}}
+Reachable at:
+  https://{{ .Values.ingress.host }}
+{{- range .Values.staticApps }}
+  https://{{ $.Values.ingress.host }}{{ .path }}
+{{- end }}
+{{- else -}}
+No ingress. Port-forward to try it:
+  kubectl port-forward svc/{{ include "rebase.fullname" . }}-api {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- end }}
+
+{{ if and (gt (int .Values.api.replicas) 1) (not .Values.sharedState.channelBusConfigured) -}}
+NOTE: {{ .Values.api.replicas }} API replicas, and sharedState.channelBusConfigured is false.
+The runtime's default channel bus is in-memory, so realtime BROADCAST and
+PRESENCE do not cross processes — a subscriber on one pod will not see a
+message published on another. Ordinary collection subscriptions are unaffected
+(those go through Postgres CDC). If your project uses broadcast or presence,
+set `realtime: { bus: { type: "postgres" } }` in its config and rebuild the
+bundle; the chart cannot do that for you, because it lives in your code.
+{{- end }}
+
+{{ if not .Values.config.corsOrigins -}}
+{{- if .Values.ingress.host -}}
+CORS_ORIGINS was derived as https://{{ .Values.ingress.host }}. Set
+config.corsOrigins explicitly if your frontend is served from anywhere else, or
+requests from it will be refused by the browser rather than by the server.
+{{- end }}
+{{- end }}

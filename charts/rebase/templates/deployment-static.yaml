@@ -1,0 +1,90 @@
+{{/*
+Static apps — the admin panel, a marketing site, any front end.
+
+Each is the runtime image booting a `kind: static` bundle. That path
+short-circuits before the runtime reads DATABASE_URL or JWT_SECRET, so these
+pods are given **no secrets at all**: not as a hardening measure applied
+afterwards, but because a folder of assets genuinely needs neither, and the one
+thing that could stop it being served is demanding them.
+
+They are also why the admin is not special. `type: static` is the same
+declaration a customer's own front end makes, and nothing here knows which is
+which — the alternative is an admin-shaped hole in the deployment model that
+every other app has to be explained against.
+
+Served under a path on the SAME host as the API. Same-origin is what keeps
+cookie auth and CORS exactly as they are; the price is that the assets must have
+been BUILT for that path, which the runtime checks and refuses rather than
+serving an index.html whose script tags point at the root.
+*/}}
+{{- $root := . -}}
+{{- range $app := .Values.staticApps }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "rebase.fullname" $root }}-{{ $app.name }}
+  labels:
+    {{- include "rebase.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $app.name }}
+spec:
+  replicas: {{ default 1 $app.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rebase.selectorLabels" (dict "root" $root "component" $app.name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rebase.selectorLabels" (dict "root" $root "component" $app.name) | nindent 8 }}
+        {{- with $root.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $root.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "rebase.serviceAccountName" $root }}
+      automountServiceAccountToken: false
+      {{- with $root.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $root.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: rebase-static
+          image: {{ printf "%s:%s" $app.image.repository (default $root.Chart.AppVersion $app.image.tag) }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $root.Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ $root.Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ $root.Values.service.port | quote }}
+            - name: NODE_ENV
+              value: production
+            - name: REBASE_BUNDLE
+              value: {{ default $root.Values.bundle.path $app.bundlePath | quote }}
+            {{- range $key, $value := (default dict $app.env) }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $root.Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $root.Values.service.port }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml (default (dict "requests" (dict "cpu" "20m" "memory" "64Mi") "limits" (dict "cpu" "500m" "memory" "256Mi")) $app.resources) | nindent 12 }}
+{{- end }}
