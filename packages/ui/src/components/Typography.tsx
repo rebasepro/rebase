@@ -31,7 +31,11 @@ const typographyVariants = {
     body2: "p",
     inherit: "p",
     caption: "p",
-    button: "span"
+    button: "span",
+    lead: "p",
+    micro: "span",
+    mono: "span",
+    stat: "span"
 };
 
 const colorToClasses = {
@@ -57,7 +61,11 @@ const gutterBottomClasses = {
     inherit: "mb-3",
     caption: "mb-2",
     button: "mb-2",
-    label: "mb-2"
+    label: "mb-2",
+    lead: "mb-4",
+    micro: "mb-1",
+    mono: "mb-2",
+    stat: "mb-1"
 };
 
 const variantToClasses = {
@@ -74,7 +82,11 @@ const variantToClasses = {
     label: "typography-label",
     inherit: "typography-inherit",
     caption: "typography-caption",
-    button: "typography-button"
+    button: "typography-button",
+    lead: "typography-lead",
+    micro: "typography-micro",
+    mono: "typography-mono",
+    stat: "typography-stat"
 };
 
 export function Typography<C extends React.ElementType = "span">(

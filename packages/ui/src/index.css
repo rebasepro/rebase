@@ -36,26 +36,40 @@ html.dark {
    size goes up. Seven consecutive levels of semibold was a Rubik-era setting,
    and holding 600 all the way down to text-sm made every heading shout equally
    — a heading stops being a headline somewhere, and the scale should say where.
-   600 is display-scale only; the small end carries 500.
+
+   The ladder now spans three weights rather than two. 600 everywhere at the top
+   meant a page title and the section heading inside it were the same voice at
+   two sizes, so a screen had no clear first thing to read. 700 is the *display*
+   tier only — h1 and h2, page titles and stat numbers — and nothing in the UI
+   chrome (nav, labels, buttons, table headers) goes above 600.
+
+   This costs nothing on the wire: both faces are loaded as VARIABLE fonts
+   (@fontsource-variable/inter, @fontsource-variable/instrument-sans), so the
+   whole weight axis is already in the file that ships. The earlier "never above
+   600" rule was written when static weights meant every step was another
+   download; that constraint no longer exists.
 
    With a single face carrying both headings and body, weight and tracking are
    the only things separating a heading from the copy around it — so the tiers
    have to actually differ, rather than all sitting at 600. */
 
 .typography-h1 {
-    @apply text-4xl font-headers font-semibold tracking-display;
+    @apply text-4xl font-headers font-bold tracking-display;
 }
 
 .typography-h2 {
-    @apply text-3xl font-headers font-semibold tracking-display;
+    @apply text-3xl font-headers font-bold tracking-display;
 }
 
 .typography-h3 {
     @apply text-2xl font-headers font-semibold tracking-title;
 }
 
+/* Semibold, not medium: h4 is the section heading inside a page, and at 20px
+   medium sits close enough to body copy that a long page reads as one
+   undifferentiated column. */
 .typography-h4 {
-    @apply text-xl font-headers font-medium tracking-title;
+    @apply text-xl font-headers font-semibold tracking-title;
 }
 
 .typography-h5 {
@@ -96,6 +110,44 @@ html.dark {
 
 .typography-button {
     @apply text-sm font-semibold tracking-wide;
+}
+
+/* ---------------------------------------------------------------------------
+ * Three tiers the product kept improvising because the system had no name for
+ * them. Each existed as hand-written utilities in several places before it
+ * existed here, which is the definition of a missing token.
+ * ------------------------------------------------------------------------- */
+
+/* The sentence under a page title. `body2` (12px) was standing in for it, which
+   made the one line explaining what a page is FOR smaller than the page's own
+   table rows. A lead is read once, deliberately, and it gets room to be read. */
+.typography-lead {
+    @apply text-base leading-relaxed;
+}
+
+/* The micro-label above a value: SCANNED, KEPT, TOOK, WHEN. Uppercase and
+   tracked so it reads as a field name rather than as copy, and small enough
+   that it never competes with the value it names.
+
+   This is the one product tier below `text-xs`. It earns the exception by never
+   carrying a sentence — it is always one or two words naming the thing directly
+   underneath it, and at 11px uppercase with this tracking it stays legible
+   where 11px prose would not. */
+.typography-micro {
+    @apply text-2xs font-medium uppercase tracking-[0.08em];
+}
+
+/* A measured value: a count, a duration, a timestamp, an id, a size.
+   `tabular-nums` is the point — proportional digits make a column of numbers
+   ragged and a live-updating counter jitter as its glyphs change width. */
+.typography-mono {
+    @apply font-mono tabular-nums;
+}
+
+/* The headline number on a stat tile. Display weight, display tracking, and
+   tabular figures so a row of tiles shares a baseline grid. */
+.typography-stat {
+    @apply text-3xl font-headers font-bold tracking-display tabular-nums;
 }
 
 :focus-visible {

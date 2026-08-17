@@ -53,7 +53,53 @@ export const fieldBackgroundInvisibleMixin = "bg-surface-accent-200/0 dark:bg-wh
 export const fieldBackgroundDisabledMixin = "bg-surface-accent-200/50 dark:bg-white/[0.03]";
 export const fieldBackgroundHoverMixin = "hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09]";
 export const defaultBorderMixin = "border-surface-200 dark:border-surface-700/60 ";
+
+// ---------------------------------------------------------------------------
+// Surfaces: two kinds, and the difference is what the border is for.
+//
+// A **floating** surface — a menu, a dialog, a popover — sits OVER the page. It
+// has to be legible against whatever happens to be underneath it, so its edge
+// is definite: solid `surface-700`. That is `paperMixin`.
+//
+// A **page** surface — a card in the document flow — sits ON the page, and the
+// page is already `surface-950`/`surface-900`. A solid edge there reads as a
+// box drawn around content rather than as the content having a surface, which
+// is why every serious caller was overriding it: 53 `<Card>` sites in the SaaS
+// console alone re-declared this border at `/60`, the same value
+// `defaultBorderMixin` above has always used. The component was wrong and the
+// callers were right, so the component now says what they meant.
+// ---------------------------------------------------------------------------
 export const paperMixin = "bg-white rounded-lg dark:bg-surface-900 border border-surface-200 dark:border-surface-700";
-export const cardMixin = "bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700";
+export const cardMixin = "bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60";
+
+/**
+ * An inset well: code, a query, a log tail, a connection string.
+ *
+ * It must read as *recessed into* the surface holding it, which means darker
+ * than that surface in dark mode — `surface-950` under a `surface-900` card.
+ * The obvious-looking `surface-800` is a trap: `#111111` is LIGHTER than the
+ * `#0a0a0a` card around it, so the well appears to float above the thing it is
+ * set into. Pair with `font-mono`; this mixin carries the surface only.
+ */
+export const codeSurfaceMixin = "bg-surface-100 dark:bg-surface-950 rounded-md";
+
+/**
+ * The accent, used as TEXT.
+ *
+ * `--color-primary` (#0070F4) is tuned to be a fill — white text on it, it on
+ * white. Read as text on our dark surfaces it lands at **4.36:1 on a
+ * `surface-900` card** (measured), which is below AA for body-sized text, and
+ * every accent link in the product sits on exactly that surface. On the page's
+ * `surface-950` it only reaches 4.62:1, so the margin was never real.
+ *
+ * `--color-primary-light` is the same hue lifted 0.15 in OKLCH lightness and
+ * measures **7.34:1** on the same card. It is indistinguishable as "the blue"
+ * and comfortably legible, so dark mode swaps to it for text.
+ *
+ * Use this for links, accent labels and any accent-coloured type. It is NOT for
+ * fills — a filled button keeps `bg-primary`, where the contrast question runs
+ * the other way and #0070F4 is already correct.
+ */
+export const accentTextMixin = "text-primary dark:text-primary-light";
 export const cardClickableMixin = "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150";
 export const cardSelectedMixin = "bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75";

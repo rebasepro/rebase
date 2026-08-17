@@ -30,11 +30,14 @@
     --tracking-title: -0.018em;   /* 20-24px — section titles */
     --tracking-heading: -0.01em;  /* <= 18px — labels; still a heading, not a headline */
 
-    /* Sub-`xs` type. MARKETING ONLY — product UI must not go below `text-xs`
-       (12px). These exist because the marketing site had ~450 hand-written
-       `text-[10px]` / `text-[11px]` classes: the tier was real, it just wasn't
-       in the system, so every page improvised it. Naming it stops the drift
-       without pretending 10px is acceptable for an admin panel. */
+    /* Sub-`xs` type. These exist because the marketing site had ~450
+       hand-written `text-[10px]` / `text-[11px]` classes: the tier was real, it
+       just wasn't in the system, so every page improvised it.
+
+       In product UI there is exactly ONE sanctioned use — `typography-micro`,
+       the uppercase field label above a value — and it earns the exception by
+       never carrying a sentence. Everything a person actually *reads* stays at
+       `text-xs` (12px) or above. `--text-3xs` remains marketing-only. */
     --text-2xs: 11px;
     --text-2xs--line-height: 1.45;
     --text-3xs: 10px;

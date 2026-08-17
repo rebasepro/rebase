@@ -599,7 +599,7 @@ selected: true }, { name: "Tags" }].map(c => (
                         All variants from <code className="font-mono text-xs">Typography</code>. Colors: primary (default), secondary, disabled, error.
                     </Typography>
                     <div className="flex flex-col gap-3">
-                        {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
+                        {(["h1", "h2", "h3", "h4", "h5", "h6", "lead", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
                             <div key={v} className={cls("flex items-baseline gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
                                 <span className="w-24 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
                                 {/* `component="p"` keeps the variant's styling but not its
@@ -617,6 +617,45 @@ selected: true }, { name: "Tags" }].map(c => (
                         {(["primary", "secondary", "disabled", "error"] as const).map(c => (
                             <Typography key={c} color={c}>color=&quot;{c}&quot;</Typography>
                         ))}
+                    </div>
+
+                    {/* The data tiers are shown with real content rather than the
+                        pangram above: `micro` is always one or two words naming the
+                        value beneath it, and `mono` is always a measurement. A
+                        specimen reading "The quick brown fox" would demonstrate the
+                        size and misrepresent the purpose. */}
+                    <div className={cls("mt-8 pt-6 border-t", defaultBorderMixin)}>
+                        <Typography variant="subtitle2" className="block mb-1">Data tiers</Typography>
+                        <Typography variant="body2" color="secondary" className="block mb-5 max-w-[65ch]">
+                            For values that are looked up rather than read: a field name, a measurement,
+                            a headline figure. <code className="font-mono text-xs">mono</code> and{" "}
+                            <code className="font-mono text-xs">stat</code> both carry{" "}
+                            <code className="font-mono text-xs">tabular-nums</code>, so a column of them
+                            keeps its decimal points aligned and a live counter does not jitter as its
+                            digits change width.
+                        </Typography>
+
+                        <div className="flex flex-wrap items-start gap-x-12 gap-y-5">
+                            {([
+                                ["Region", "europe-west1"],
+                                ["Took", "32.2s"],
+                                ["Last run", "16/08/2026, 05:30:32"]
+                            ] as const).map(([label, value]) => (
+                                <div key={label}>
+                                    <Typography variant="micro" component="div" color="secondary" className="block">
+                                        {label}
+                                    </Typography>
+                                    <Typography variant="mono" component="div" className="block mt-1 text-sm">
+                                        {value}
+                                    </Typography>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-6">
+                            <span className="text-xs text-surface-400 font-mono">stat</span>
+                            <Typography variant="stat" component="div" className="block mt-1">1,284</Typography>
+                        </div>
                     </div>
                 </SectionBlock>
 
