@@ -60,6 +60,10 @@ export { createRateLimiter, defaultAuthLimiter, strictAuthLimiter, createDataRat
 export type { DataRateLimitConfig } from "./rate-limiter";
 export { MemoryRateLimitStore } from "./rate-limit-store";
 export type { RateLimitStore, RateLimitDecision } from "./rate-limit-store";
+export { createSqlRateLimitStore } from "./sql-rate-limit-store";
+export type { SqlRateLimitStoreOptions } from "./sql-rate-limit-store";
+export { resolveRateLimitStoreKind, RateLimitStoreConfigurationError } from "./resolve-rate-limit-store";
+export type { RateLimitStoreKind, RateLimitStoreEnv } from "./resolve-rate-limit-store";
 
 // API Keys
 export { createApiKeyStore, createApiKeyRoutes, isApiKeyToken, validateApiKey, httpMethodToOperation, isOperationAllowed } from "./api-keys";

@@ -80,6 +80,7 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     "api_keys",
     "cron_logs",
     "cron_claims",
+    "rate_limit_hits",
     "idempotency_keys",
     "entity_history",
     "branches",

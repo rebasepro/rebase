@@ -73,6 +73,8 @@ import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuar
 import { createRequireAuth } from "./auth/middleware";
 import { createDataRateLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
+import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
+import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
 import { createRebaseClient } from "@rebasepro/client";
 
@@ -1212,13 +1214,25 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // the budget is per caller, not per router — private stores would silently
     // multiply every caller's allowance. An operator-provided store is
     // respected as-is.
+    //
+    // Across *processes* the same argument applies and the default cannot make
+    // it: a process cannot read its own replica count, so `memory` stays the
+    // default and a deployment that knows it has peers asks for `sql`. The
+    // refusal for an unrecognised value is in `resolveRateLimitStoreKind` — this
+    // setting fails silently in every other direction, so the moment it is read
+    // is the only moment it can be caught.
+    const rateLimitWindowMs = config.rateLimit?.windowMs ?? 15 * 60 * 1000;
+    const rateLimitStore = config.rateLimit?.store ?? (
+        resolveRateLimitStoreKind(process.env) === "sql"
+            // `undefined` when the driver has no SQL admin — it warns and we
+            // fall back, rather than refusing to serve on a Mongo deployment
+            // that asked for something Mongo cannot give.
+            ? createSqlRateLimitStore(defaultDriver) ?? new MemoryRateLimitStore(rateLimitWindowMs)
+            : new MemoryRateLimitStore(rateLimitWindowMs)
+    );
     const rateLimitConfig: DataRateLimitConfig | undefined =
         config.rateLimit?.enabled !== false
-            ? {
-                ...config.rateLimit,
-                store: config.rateLimit?.store
-                    ?? new MemoryRateLimitStore(config.rateLimit?.windowMs ?? 15 * 60 * 1000)
-            }
+            ? { ...config.rateLimit, store: rateLimitStore }
             : undefined;
 
     // 3. Initialize Storage
