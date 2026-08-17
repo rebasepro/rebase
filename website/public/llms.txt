@@ -618,13 +618,19 @@ function Widget() {
 
 ## Upgrading an existing app
 
-This release removes the `auth` schema, renames packages, changes what `id`
-means, drops CJS, moves the admin panel to react-router 8, and — most
-importantly — **fixes three ways access could be granted that you did not ask
-for**: a security rule that was silently permissive, and two on the realtime
-socket. Read the first three sections before anything else. Section 0 is the one
-that changes SQL you may have written by hand; sections 1 and 2 alter who can
-read your data, and none of them announces itself.
+This guide covers two hops, in the order you have to make them.
+
+**Part 1 (sections 0–10) is 0.12 → 0.13.** It removes the `auth` schema, renames
+packages, changes what `id` means, drops CJS, moves the admin panel to
+react-router 8, and — most importantly — **fixes three ways access could be
+granted that you did not ask for**: a security rule that was silently permissive,
+and two on the realtime socket. Read the first three sections before anything
+else. Section 0 is the one that changes SQL you may have written by hand;
+sections 1 and 2 alter who can read your data, and none of them announces itself.
+
+**Part 2 (sections 11–13) is 0.13 → 0.14.** Every wire key is camelCase, and
+anonymous sign-in is opt-in. If you are already on 0.13, skip straight to
+[section 11](#11-the-api-is-camelcase-throughout--author_id-is-now-authorid).
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
@@ -1154,6 +1160,124 @@ restores the old behaviour.
 
 ---
 
+## Part 2 — 0.13 to 0.14
+
+Sections 0–10 above are the 0.12 → 0.13 hop. The three below are 0.13 → 0.14. If
+you are already on 0.13, start here.
+
+Two of them are breaking. The first stops code compiling, which is the good case;
+the second changes who can obtain an account, and announces itself only as a 403
+your users hit and you do not.
+
+---
+
+### 11. The API is camelCase throughout — `author_id` is now `authorId`
+
+#### What changed
+
+A field's wire name is its property key, and `columnName` renames only the
+*column*. That rule did not change — but two of the four sources of keys never
+had a property key to use, and both fell back to the column name:
+
+- a **foreign key derived from a relation** had no property of its own, so
+  `belongsTo` on `author` served the `author_id` column under its own name;
+- **introspection** wrote the raw column name as the property key.
+
+So `GET /api/data/users` answered `displayName` while `GET /api/data/posts`
+beside it answered `author_id`, and nothing visible from outside said which a
+field would land in. Both now derive a camelCase key.
+
+```diff
+- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
++ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
++ ?where={"authorId":["==",3]}
+```
+
+**The database does not change.** Columns stay snake_case, `\d posts` still shows
+`author_id`, no migration runs, and `rebase doctor` reports no drift.
+
+#### What you have to do
+
+**Re-run `rebase generate-sdk`.** `row.author_id` stops compiling and
+`row.authorId` starts — the compiler names every call site for you. This is the
+half you do not have to search for.
+
+**Then find the half the compiler cannot see.** Hand-written `where` and
+`orderBy` keys, raw `fetch` consumers, and anything reading a row by key:
+
+```bash
+grep -rn "_id\"\|_id'\|\._id\b" src/ config/
+grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
+```
+
+A filter key that no longer resolves is a **400 with `UNKNOWN_FILTER_FIELD`**,
+and the error lists the valid names. It fails closed on purpose — a dropped
+condition widens a result set, which is the one failure you do not want to be
+silent. A row read by the old key, though, is just `undefined`, and nothing
+raises.
+
+#### If your project was introspected rather than authored
+
+This is the largest single change for you. `rebase schema introspect` no longer
+echoes column names on the wire: a `customer_id` column is generated as a
+`customerId` property carrying `columnName: "customer_id"`, and is served,
+filtered and sorted as `customerId`. **Re-running introspection is what produces
+the new collections.** The column, the constraints and the policies are
+untouched.
+
+> A property key *you* wrote is still your key, whatever its shape. Nothing
+> camel-cases a name someone already chose — only the two sources that never had
+> a name to use. There is no dual-key emission and no compatibility flag, because
+> serving both spellings would leave both conventions in place permanently, which
+> was the defect.
+
+---
+
+### 12. Anonymous sign-in is opt-in
+
+#### What changed
+
+`POST /auth/anonymous` answers **403** until you set `auth.allowAnonymous: true`.
+
+Anonymous sign-in is registration that never asked: it inserts a `users` row and
+assigns `defaultRole` exactly as `POST /auth/register` does. But both anonymous
+routes were mounted unconditionally and consulted none of the registration gates,
+so a backend that had closed the door still handed out permanent accounts —
+`POST /auth/anonymous` for the row and the session, then `POST /auth/anonymous/link`
+to put credentials on it, the second authenticated only by the token the first
+had just issued.
+
+#### What you have to do
+
+If you use anonymous sessions — guest carts, trials, unauthenticated drafts —
+opt in explicitly:
+
+```diff ts
+ auth: {
++    allowAnonymous: true
+ }
+```
+
+If you do not, there is nothing to do, and the 403 is the point.
+
+**Check which one you are before you deploy.** The symptom of guessing wrong is
+sign-in failing for users who never had credentials to re-enter:
+
+```bash
+grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
+```
+
+---
+
+### 13. `@rebasepro/client-postgres` is gone
+
+Remove it from `package.json`. If you imported from it, the SDK reaches Postgres
+through the ordinary client — there is no separate package to install.
+
+---
+
 ### Upgrade checklist
 
 ```
@@ -1175,6 +1299,16 @@ restores the old behaviour.
 [ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
 [ ] SELECT ... FROM pg_policies again — confirm every intended change landed
 [ ] exercise the app signed OUT, in a private window — watch the websocket too
+
+--- 0.13 → 0.14 (part 2) ---
+[ ] re-run rebase generate-sdk, then build — the compiler finds row.author_id
+[ ] grep for snake_case where/orderBy keys; a stale one is a 400, not a warning
+[ ] grep for raw fetch consumers reading row.<something>_id — these read
+    undefined and raise nothing
+[ ] if the project was introspected, re-run rebase schema introspect
+[ ] decide anonymous sign-in: set auth.allowAnonymous: true, or confirm you
+    never used it (grep for signInAnonymously)
+[ ] drop @rebasepro/client-postgres from package.json
 ```
 
 `rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
@@ -14814,6 +14948,148 @@ Unchanged: every process runs the same published image, so an upgrade is the sam
 tag change on each of them. Roll the `api` last if you want the schema
 provisioning to happen against the new version first — though in practice the
 order does not matter, because the schema step is additive and idempotent.
+
+## Kubernetes
+
+### Overview
+
+The chart in `charts/rebase` is the Kubernetes peer of the Docker Compose
+self-hosting setup. Same idea, same image, same bundle: **the runtime is the
+image, your project is the bundle, and upgrading Rebase is a tag change.**
+
+```bash
+helm install rebase ./charts/rebase \
+  --set config.databaseUrl='postgres://user:pass@host:5432/db' \
+  --set config.jwtSecret="$(openssl rand -hex 32)" \
+  --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set ingress.host=api.example.com \
+  --set image.repository=my-registry/my-app
+```
+
+The chart deploys the **runtime only**. It does not deploy Postgres — use
+CloudNativePG, a managed database, or your own StatefulSet, and point
+`config.databaseUrl` at it. A chart that also owned your database would own your
+backups and your failover, which is a much larger promise than "run the app".
+
+> **Maturity.** The chart is rendered and linted against Helm v4, and every
+> refusal listed below is covered by a test. It has **not yet been exercised
+> against a live cluster**, and `bundle.mode=url` in particular cannot be run
+> end to end until the runtime image is published to a public registry. Treat it
+> as a well-tested starting point rather than a production-proven default, and
+> read [Self-Hosting](/docs/deployment/self-hosting) for the path that is.
+
+### Getting your project into the pod
+
+| `bundle.mode` | How | When |
+|---|---|---|
+| `image` (default) | Build `FROM rebasepro/server` with `COPY dist-bundle /bundle`, then set `image.repository` | Almost always. One artifact, immutable, no runtime dependency on a URL staying up |
+| `url` | Stock image; the runtime downloads a tarball at every pod start | A control plane that ships bundles out of band |
+
+### One process, or several
+
+The default is a single Deployment serving everything — the same shape the
+Compose file runs. Splitting is one value:
+
+```yaml
+split: true
+functions:
+  enabled: true
+  replicas: 3
+worker:
+  enabled: true
+```
+
+That gives you an `api` tier, a `functions` tier and a `worker`, all from the
+same image and the same bundle. See [Split Processes](/docs/deployment/split-processes)
+for what each role does and why you would separate them.
+
+What the chart adds over doing it by hand is that it **derives the settings whose
+failure mode is silence**, from the values you already gave it:
+
+- `REBASE_ROLE` per unit
+- `REBASE_MIGRATE_ON_BOOT=none` everywhere, because the migration Job owns the schema
+- `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` on the api once a worker exists
+- `TRUSTED_PROXY_HOPS` on the functions unit
+- `REBASE_RATE_LIMIT_STORE=sql` as soon as a second process serves HTTP
+
+A wrong `REBASE_ROLE` serves no HTTP while `/health` still answers, so readiness
+passes and every request 404s. A missing `REBASE_MIGRATE_ON_BOOT` is a crash loop
+whose reason sits in a log nobody is watching. The chart writes all of them, and
+`config.env` cannot override them.
+
+#### Splitting cron from job execution
+
+Two workers with opposite ownership — no new role, and no code:
+
+```yaml
+worker:
+  enabled: true
+  cronScheduler: true
+  jobWorkers: false
+```
+
+### The admin panel, and any other front end
+
+A static app is the same runtime image booting a `kind: static` bundle. That path
+short-circuits before the runtime reads `DATABASE_URL` or `JWT_SECRET`, so these
+pods carry **no secrets at all**.
+
+```yaml
+staticApps:
+  - name: admin
+    path: /admin
+    image:
+      repository: my-registry/my-admin
+      tag: "1.4.0"
+```
+
+The ingress routes `/admin` to it and `/` to the API, on the **same host**. That
+is deliberate: same origin means cookie auth and CORS are exactly what they were,
+and the split stays an internal topology decision rather than a change to your
+product's public surface. The price is that the assets must be *built* for that
+path, which the runtime checks at boot.
+
+Deploying the admin is then an image tag bump on one Deployment. The backend does
+not restart.
+
+### Schema
+
+`migrationJob.enabled` (the default) runs a `pre-install,pre-upgrade` Job that
+provisions and exits, and every pod boots with `REBASE_MIGRATE_ON_BOOT=none`.
+Nothing on the request path owns DDL, which is the cleanest available answer to
+"exactly one process provisions the schema" — it stops being a rule anyone has to
+remember.
+
+`mode: ensure` creates what is missing. `mode: push` also applies collection
+schema changes and **is destructive**; it is not the default.
+
+### What the chart refuses to render
+
+Each of these is a configuration that produces no error at runtime — the
+deployment comes up and something quietly stops being true. `helm install` fails
+instead, naming the value to change:
+
+- more than one HTTP process with `sharedState.rateLimitStore=memory`
+- `functions.enabled` or `worker.enabled` while `split=false`
+- two static apps claiming one path, or one claiming a path under `/api`
+- `bundle.mode=image` while `image.repository` is still the stock runtime image
+- `ingress.enabled` with no host, or `bundle.mode=url` with no URL
+- an unrecognised `migrationJob.mode` or `sharedState.rateLimitStore`
+
+### What the chart cannot do for you
+
+**Realtime broadcast and presence across replicas.** The runtime's default
+channel bus is in-memory, so with more than one API replica a subscriber on one
+pod will not see a broadcast published on another. The fix lives in your
+project's config, not in the chart:
+
+```ts
+realtime: { bus: { type: "postgres" } }
+```
+
+Set `sharedState.channelBusConfigured: true` to assert that you have — the chart
+uses it only to decide whether to warn. Ordinary collection subscriptions are
+unaffected; those travel through Postgres CDC.
 
 ## Deploying Rebase on AWS
 

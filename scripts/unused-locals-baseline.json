@@ -49,7 +49,6 @@
   "packages/admin/src/components/CollectionViewBinding/SplitListView.tsx::showDetail": 1,
   "packages/admin/src/components/CollectionViewBinding/SplitListView.tsx::size": 1,
   "packages/admin/src/components/CollectionViewBinding/useBoardDataController.tsx::currentCollection": 1,
-  "packages/admin/src/components/CollectionViewBinding/ViewModeToggle.tsx::enabledViews": 1,
   "packages/admin/src/components/DefaultAppBar.tsx::adminModeController": 1,
   "packages/admin/src/components/DefaultDrawer.tsx::isFloating": 1,
   "packages/admin/src/components/DeleteEntityDialog.tsx::authController": 1,
