@@ -2,6 +2,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { fullName, joinParts, money, relatedRecord } from "../display";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: unknown): string | number | undefined => {
@@ -179,6 +180,17 @@ const ordersCollection: PostgresCollectionConfig = {
             type: "date",
             autoValue: "on_update",
             admin: { readOnly: true, hideFromCollection: true }
+        },
+        __order: {
+            // Not "Order" as on tickets: on a collection *of* orders, beside
+            // `order_number` and `order_date`, that name reads as the record.
+            name: "Board position",
+            type: "string",
+            admin: {
+                disabled: true,
+                hideFromCollection: true
+            },
+            description: "Fractional index maintained by the Kanban board"
         }
     },
     // Headless relation: no property for "order_items", only used for subcollection tab
@@ -186,10 +198,13 @@ const ordersCollection: PostgresCollectionConfig = {
         {
             kind: "hasMany",
             relationName: "order_items",
-            target: () => orderItemsCollection,
-            overrides: {
-                admin: { hideFromNavigation: false }
-            }
+            target: () => orderItemsCollection
+            // No `hideFromNavigation: false` override here any more. It existed
+            // because that one flag used to govern both the drawer and a parent's
+            // tab strip, so a line-items table could not be kept out of the drawer
+            // without also losing the tab it belongs on. `hideFromEntityViews`
+            // splits the two, and order_items now says only what it means:
+            // not a destination, still a tab.
         }
     ],
     callbacks: {
@@ -222,6 +237,31 @@ const ordersCollection: PostgresCollectionConfig = {
         enabledViews: ["table", "kanban"],
         kanban: {
             columnProperty: "status"
+        },
+        // Lexicographic sort keys, so a card dragged between board columns keeps
+        // its position. Without it the board runs read-only and says so in a
+        // banner across the top of every column.
+        orderProperty: "__order",
+        // An order is the one record here that is *about* someone else, and the
+        // derived roles could not say so: the board card read
+        // "ORD-2026-0101 / fdbf3f73-b2cb-4558-…" — the row's own uuid, which is
+        // what the card falls back to when no subtitle resolves.
+        //
+        // Both arms of the API are in use below. A path keeps the property's own
+        // rendering, which is why `status`, `order_date` and `payment_status` are
+        // named rather than computed — the chip keeps its colour, the date keeps
+        // its format. A resolver is for the two values that are not on the row in
+        // a readable form: the customer's name, which lives on the related
+        // record, and the total, which is a bare number until it is money.
+        display: {
+            title: "order_number",
+            subtitle: ({ entity }) => joinParts(
+                fullName(relatedRecord(entity.values.customer)),
+                money(entity.values.total, entity.values.currency)
+            ),
+            status: "status",
+            date: "order_date",
+            tags: "payment_status"
         },
         // The state of an order is what you check first and change least, so it
         // goes to the rail; the rest reads top to bottom as the order's life —

@@ -4,6 +4,7 @@ import authorsCollection from "./authors";
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { relatedRecords } from "../display";
 
 const postsCollection: PostgresCollectionConfig = {
     name: "Blog posts",
@@ -172,6 +173,24 @@ const postsCollection: PostgresCollectionConfig = {
         group: "Content",
         defaultViewMode: "cards",
         enabledViews: ["table", "cards", "kanban"],
+        // `publish_date` rather than the derived `updated_at`: a post card is
+        // read to see when the post goes out, not when someone last touched the
+        // row. The date slot formats relatively and reads the sign, so a
+        // scheduled post says "in 3d" instead of "just now".
+        //
+        // The tags are the post's actual tags — a many-to-many that arrives
+        // expanded on the same read as the row, so mapping it to names costs no
+        // extra request.
+        display: {
+            title: "title",
+            subtitle: "excerpt",
+            image: "hero_image",
+            status: "status",
+            date: "publish_date",
+            tags: ({ entity }) => relatedRecords(entity.values.tags)
+                .map(tag => String(tag.name ?? ""))
+                .filter(Boolean)
+        },
         // Everything about *publishing* the post to the rail; the column is then
         // the post itself, ending in the body it exists for.
         form: {

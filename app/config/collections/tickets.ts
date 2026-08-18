@@ -1,5 +1,6 @@
 import customersCollection from "./customers";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { fullName, joinParts, relatedRecord } from "../display";
 
 const ticketsCollection: PostgresCollectionConfig = {
     name: "Tickets",
@@ -210,7 +211,20 @@ const ticketsCollection: PostgresCollectionConfig = {
             columnProperty: "status"
         },
         orderProperty: "__order",
-        display: { title: "subject" },
+        // The board is this collection's default view, and a triage card has to
+        // answer "whose problem, how urgent" without being opened. `subject` was
+        // already declared — the ranking would otherwise have taken
+        // `ticket_number`, which is the one string on the row that says nothing.
+        display: {
+            title: "subject",
+            subtitle: ({ entity }) => joinParts(
+                entity.values.ticket_number,
+                fullName(relatedRecord(entity.values.customer))
+            ),
+            status: "status",
+            date: "created_at",
+            tags: "priority"
+        },
         propertiesOrder: [
             "ticket_number",
             "subject",

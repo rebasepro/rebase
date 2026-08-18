@@ -415,12 +415,28 @@ export async function runSeed() {
             imageUrls: p.images || (p.main_image ? [p.main_image] : [])
         }));
 
+        const NUM_ORDERS = 180;
         const authorIds = Array.from({ length: NUM_AUTHORS }, (_, i) => generateUUID("author", i));
         const tagIds = Array.from({ length: NUM_TAGS }, (_, i) => generateUUID("tag", i));
         const postIds = Array.from({ length: POST_COUNT }, (_, i) => generateUUID("post", i));
         const customerIds = Array.from({ length: 40 }, (_, i) => generateUUID("customer", i));
         const productIds = Array.from({ length: demoProducts.length }, (_, i) => generateUUID("product", i));
-        const orderIds = Array.from({ length: 80 }, (_, i) => generateUUID("order", i));
+        // Foreign keys below are written camelCase (`orderId`, `customerId`,
+        // `authorId`, `productId`), which is the key the generated Drizzle table
+        // carries — `fieldKeyForColumn` derives the wire name for a FK that has
+        // no declared property, and `order_id` is only what Postgres stores. The
+        // junction table `posts_tags` keeps `post_id`/`tag_id`, because those are
+        // its own columns rather than derived keys. A key Drizzle does not know
+        // is dropped from the INSERT rather than refused, so getting this wrong
+        // writes NULLs and reports success.
+        //
+        // Sized from NUM_ORDERS, not from a literal. These were 80 while the
+        // generator below made 180 orders, so every order past the eightieth got
+        // `orderIds[i - 1] === undefined`: the order itself fell back to the
+        // column default and its line items were written with a NULL order_id.
+        // 235 of 436 line items were orphaned that way, which is what made the
+        // "Order Items" tab read "So empty…" on most of the demo's orders.
+        const orderIds = Array.from({ length: NUM_ORDERS }, (_, i) => generateUUID("order", i));
         const ticketIds = Array.from({ length: 60 }, (_, i) => generateUUID("ticket", i));
 
         console.log("🧹 Clearing existing data...");
@@ -532,7 +548,7 @@ value: section });
                 created_at: randomDate(180, 10),
                 updated_at: randomDate(30, 0),
                 // Posts are written by the author whose specialism matches the theme.
-                author_id: authorIds[theme.authorIndex]
+                authorId: authorIds[theme.authorIndex]
             });
 
             // Tags follow the theme rather than being drawn at random.
@@ -643,7 +659,7 @@ tag_id: tagIds[t] });
         interface LocaleCopy { name: string; description: string }
         const productTranslations: Record<string, Partial<Record<ProductLocale, LocaleCopy>>> =
             loadJson(path.join(APP_ROOT, "backend/src/demo-product-translations.json"));
-        const productLocalesValues: { id: string; product_id: string; locale: ProductLocale; name: string; description: string }[] = [];
+        const productLocalesValues: { id: string; productId: string; locale: ProductLocale; name: string; description: string }[] = [];
         const untranslated: string[] = [];
         allProducts.forEach((p, i) => {
             const pid = productIds[i];
@@ -658,7 +674,7 @@ tag_id: tagIds[t] });
                 }
                 productLocalesValues.push({
                     id: generateUUID("locale", productLocalesValues.length),
-                    product_id: pid,
+                    productId: pid,
                     locale: locale,
                     name: translated.name,
                     description: translated.description
@@ -676,7 +692,6 @@ tag_id: tagIds[t] });
         // Spread over 90 days by `recentBiasedDate`, so only ~half of these
         // land in the 30-day window the dashboard reports on. 80 orders left
         // the per-status counts there in the low single digits.
-        const NUM_ORDERS = 180;
         console.log(`🛒 Generating ${NUM_ORDERS} orders with line items...`);
         type OrderStatus = (typeof ordersStatus.enumValues)[number];
         type PaymentStatus = (typeof ordersPayment_status.enumValues)[number];
@@ -686,7 +701,7 @@ tag_id: tagIds[t] });
         const currencies: Currency[] = ["USD", "USD", "USD", "EUR", "GBP", "CAD"];
         const carriers = ["UPS", "FedEx", "USPS", "DHL"];
         const orderValues = [];
-        const allOrderItems: { id: string; order_id: string; product_id: string; product_name: string; sku: string; quantity: string; unit_price: string; line_total: string }[] = [];
+        const allOrderItems: { id: string; orderId: string; productId: string; product_name: string; sku: string; quantity: string; unit_price: string; line_total: string }[] = [];
 
         for (let i = 1; i <= NUM_ORDERS; i++) {
             const status = pick([...orderStatuses]);
@@ -710,8 +725,8 @@ tag_id: tagIds[t] });
                 subtotal += lineTotal;
                 allOrderItems.push({
                     id: generateUUID("orderitem", allOrderItems.length),
-                    order_id: orderIds[i - 1],
-                    product_id: productIds[pIdx],
+                    orderId: orderIds[i - 1],
+                    productId: productIds[pIdx],
                     product_name: prod.name,
                     sku: prod.sku,
                     quantity: String(qty),
@@ -734,7 +749,7 @@ tag_id: tagIds[t] });
             orderValues.push({
                 id: orderIds[i - 1],
                 order_number: `ORD-${currentYear()}-${String(i).padStart(4, "0")}`,
-                customer_id: customerIds[custId - 1],
+                customerId: customerIds[custId - 1],
                 status,
                 payment_status: payStatus,
                 subtotal: subtotal.toFixed(2),
@@ -1031,7 +1046,7 @@ priority: "high" }
                 status,
                 priority: template.priority,
                 category: template.category,
-                customer_id: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
+                customerId: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
                 assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
                 __order: orderKey(i),
                 created_at: createdAt,

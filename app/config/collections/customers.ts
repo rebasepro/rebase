@@ -3,6 +3,7 @@
 // fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { fullName, joinParts, money } from "../display";
 
 const customersCollection: PostgresCollectionConfig = {
     name: "Customers",
@@ -118,6 +119,32 @@ const customersCollection: PostgresCollectionConfig = {
         icon: "Users",
         group: "E-Commerce",
         defaultEntityAction: "view",
+        // A person is called by their whole name, and this collection keeps the
+        // two halves in separate columns — so the derived title, which can only
+        // ever name one property, called every customer by their first name
+        // alone. That is the case `display` resolvers exist for.
+        display: {
+            title: ({ entity }) => fullName(entity.values),
+            subtitle: ({ entity }) => joinParts(entity.values.company, entity.values.email),
+            image: "avatar",
+            date: "created_at",
+            // Two derived stats, said once: whether they are worth attention and
+            // how much they have spent. Both are read-only columns maintained by
+            // the order callbacks, which is why neither is worth a form field.
+            tags: ({ entity }) => [
+                entity.values.is_vip ? "VIP" : undefined,
+                money(entity.values.lifetime_value)
+            ].filter((tag): tag is string => Boolean(tag))
+        },
+        // What a customer looks like when *another* record points at it — the
+        // Customer cell on an order, the picker. Without it the card repeated
+        // itself: "Robert Lopez" over "Lopez", because the second line falls to
+        // the next ranked property and that is the surname.
+        previewProperties: ["company", "email"],
+        // Two keys, in order of significance: the VIPs first, and inside each
+        // group the biggest spenders first. The row id breaks the last tie, so
+        // paging over this order neither repeats nor skips a customer.
+        sort: [["is_vip", "desc"], ["lifetime_value", "desc"]],
         // The three derived stats are read-only and rarely the reason you opened
         // the record, so they sit in the rail rather than between the person's
         // phone number and their address.

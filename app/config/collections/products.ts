@@ -2,6 +2,7 @@ import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
 import { LOCALE_ENUM } from "../locales";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { joinParts, money } from "../display";
 
 const productsCollection: PostgresCollectionConfig = {
     name: "Products",
@@ -248,6 +249,24 @@ const productsCollection: PostgresCollectionConfig = {
         defaultViewMode: "cards",
         enabledViews: ["table", "cards", "gallery"],
         customViews: ["gallery"],
+        // The card grid is this collection's default view, so what a card says
+        // is what the collection says. `image` names the array and the renderer
+        // takes the first frame; `status` and `category` are named so they keep
+        // their enum colours rather than arriving as bare strings.
+        display: {
+            title: "name",
+            subtitle: ({ entity }) => joinParts(
+                entity.values.brand,
+                money(entity.values.price),
+                entity.values.stock_quantity === 0
+                    ? "Out of stock"
+                    : `${entity.values.stock_quantity} in stock`
+            ),
+            image: "images",
+            status: "status",
+            date: "updated_at",
+            tags: "category"
+        },
         // Everything here is optional — without it the form still derives a
         // two-column layout from the property types. This is what taking hold
         // of that looks like when the derived grouping is not the one you want.

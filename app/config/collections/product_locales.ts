@@ -49,7 +49,19 @@ const productLocalesCollection: PostgresCollectionConfig = {
     admin: {
         icon: "Translate",
         group: "E-Commerce",
-        hideFromNavigation: true
+        // Not a drawer destination, but very much a tab on the product it
+        // translates — the two halves are separate flags now, so this says only
+        // the first one.
+        hideFromNavigation: true,
+        // Every row here is called "Name", because that is what the translated
+        // field is called. What tells two of them apart is the locale, so the
+        // locale leads.
+        display: {
+            title: ({ entity }) => [entity.values.locale, entity.values.name]
+                .filter(Boolean).join(" — ") || undefined,
+            subtitle: "description",
+            status: "locale"
+        }
     }
 };
 

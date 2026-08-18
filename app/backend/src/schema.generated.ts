@@ -5,19 +5,19 @@ import { relations as drizzleRelations, sql } from 'drizzle-orm';
 
 export const rebaseSchema = pgSchema("rebase");
 
-export const exercisesDifficulty = pgEnum("exercises_difficulty", ['beginner', 'intermediate', 'advanced']);
-export const exercisesCategory = pgEnum("exercises_category", ['strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics']);
-export const exercisesStatus = pgEnum("exercises_status", ['draft', 'published', 'archived']);
-export const ordersStatus = pgEnum("orders_status", ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded']);
-export const ordersPayment_status = pgEnum("orders_payment_status", ['unpaid', 'paid', 'partially_refunded', 'refunded']);
-export const ordersCurrency = pgEnum("orders_currency", ['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
-export const postsStatus = pgEnum("posts_status", ['draft', 'needs_review', 'published', 'archived']);
-export const productLocalesLocale = pgEnum("product_locales_locale", ['en', 'es', 'fr', 'de', 'it']);
-export const productsCategory = pgEnum("products_category", ['electronics', 'clothing', 'home_garden', 'sports', 'books', 'food_beverage', 'health_beauty', 'toys']);
-export const productsStatus = pgEnum("products_status", ['draft', 'active', 'archived']);
-export const ticketsStatus = pgEnum("tickets_status", ['open', 'in_progress', 'waiting', 'resolved', 'closed']);
-export const ticketsPriority = pgEnum("tickets_priority", ['low', 'medium', 'high', 'urgent']);
-export const ticketsCategory = pgEnum("tickets_category", ['bug', 'feature_request', 'question', 'billing', 'account', 'other']);
+export const exercisesDifficulty = pgEnum("exercises_difficulty", ["beginner", "intermediate", "advanced"]);
+export const exercisesCategory = pgEnum("exercises_category", ["strength", "cardio", "flexibility", "balance", "plyometrics", "calisthenics"]);
+export const exercisesStatus = pgEnum("exercises_status", ["draft", "published", "archived"]);
+export const ordersStatus = pgEnum("orders_status", ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "refunded"]);
+export const ordersPayment_status = pgEnum("orders_payment_status", ["unpaid", "paid", "partially_refunded", "refunded"]);
+export const ordersCurrency = pgEnum("orders_currency", ["USD", "EUR", "GBP", "CAD", "AUD"]);
+export const postsStatus = pgEnum("posts_status", ["draft", "needs_review", "published", "archived"]);
+export const productLocalesLocale = pgEnum("product_locales_locale", ["en", "es", "fr", "de", "it"]);
+export const productsCategory = pgEnum("products_category", ["electronics", "clothing", "home_garden", "sports", "books", "food_beverage", "health_beauty", "toys"]);
+export const productsStatus = pgEnum("products_status", ["draft", "active", "archived"]);
+export const ticketsStatus = pgEnum("tickets_status", ["open", "in_progress", "waiting", "resolved", "closed"]);
+export const ticketsPriority = pgEnum("tickets_priority", ["low", "medium", "high", "urgent"]);
+export const ticketsCategory = pgEnum("tickets_category", ["bug", "feature_request", "question", "billing", "account", "other"]);
 
 export const authors = pgTable("authors", {
     id: uuid("id").primaryKey().defaultRandom(),
@@ -100,8 +100,8 @@ export const exercises = pgTable("exercises", {
 
 export const orderItems = pgTable("order_items", {
     id: uuid("id").primaryKey().defaultRandom(),
-    order_id: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
-    product_id: uuid("product_id").references(() => products.id, { onDelete: "restrict" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "restrict" }),
     product_name: text("product_name"),
     sku: text("sku"),
     quantity: numeric("quantity").notNull(),
@@ -121,7 +121,7 @@ export const orderItems = pgTable("order_items", {
 export const orders = pgTable("orders", {
     id: uuid("id").primaryKey().defaultRandom(),
     order_number: text("order_number").unique().notNull(),
-    customer_id: uuid("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
     status: ordersStatus("status").notNull(),
     payment_status: ordersPayment_status("payment_status").notNull(),
     subtotal: numeric("subtotal"),
@@ -137,7 +137,8 @@ export const orders = pgTable("orders", {
     shipped_date: timestamp("shipped_date", { withTimezone: true, mode: 'string' }),
     delivered_date: timestamp("delivered_date", { withTimezone: true, mode: 'string' }),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    __order: text("order")
 }, (table) => ([
     pgPolicy("orders_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("orders_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
@@ -160,7 +161,7 @@ export const posts = pgTable("posts", {
     publish_date: timestamp("publish_date", { withTimezone: true, mode: 'string' }),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    author_id: uuid("author_id").references(() => authors.id, { onDelete: "set null" }),
+    authorId: uuid("author_id").references(() => authors.id, { onDelete: "set null" }),
     search_vector: customType({ dataType() { return 'tsvector'; } })("search_vector").generatedAlwaysAs(sql`setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("excerpt", '')), 'C') || setweight(to_tsvector('english', public.rebase_search_text(coalesce("content", '{}'::jsonb))), 'D')`)
 }, (table) => ([
     pgPolicy("posts_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
@@ -190,7 +191,7 @@ export const postsTags = pgTable("posts_tags", {
 
 export const productLocales = pgTable("product_locales", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
-    product_id: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
     locale: productLocalesLocale("locale").notNull(),
     name: text("name"),
     description: text("description")
@@ -260,7 +261,7 @@ export const tickets = pgTable("tickets", {
     status: ticketsStatus("status").notNull(),
     priority: ticketsPriority("priority").notNull(),
     category: ticketsCategory("category"),
-    customer_id: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
     assigned_to: text("assigned_to"),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
@@ -290,7 +291,7 @@ export const users = rebaseSchema.table("users", {
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
 }, (table) => ([
-    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR ((id)::text = rebase.uid()) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("users_read_policy", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (id = rebase.uid()::uuid) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("users_write_policy_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("users_write_policy_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("users_write_policy_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
@@ -305,40 +306,40 @@ export const users = rebaseSchema.table("users", {
 ])).enableRLS();
 
 export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({
-    "posts": many(posts, { relationName: "posts_author_id" })
+    "posts": many(posts, { relationName: "posts_authorId" })
 }));
 
 export const customersRelations = drizzleRelations(customers, ({ one, many }) => ({
-    "orders": many(orders, { relationName: "orders_customer_id" })
+    "orders": many(orders, { relationName: "orders_customerId" })
 }));
 
 export const orderItemsRelations = drizzleRelations(orderItems, ({ one, many }) => ({
     "order": one(orders, {
-        fields: [orderItems.order_id],
+        fields: [orderItems.orderId],
         references: [orders.id],
-        relationName: "order_items_order_id"
+        relationName: "order_items_orderId"
     }),
     "product": one(products, {
-        fields: [orderItems.product_id],
+        fields: [orderItems.productId],
         references: [products.id],
-        relationName: "order_items_product_id"
+        relationName: "order_items_productId"
     })
 }));
 
 export const ordersRelations = drizzleRelations(orders, ({ one, many }) => ({
-    "order_items": many(orderItems, { relationName: "order_items_order_id" }),
+    "order_items": many(orderItems, { relationName: "order_items_orderId" }),
     "customer": one(customers, {
-        fields: [orders.customer_id],
+        fields: [orders.customerId],
         references: [customers.id],
-        relationName: "orders_customer_id"
+        relationName: "orders_customerId"
     })
 }));
 
 export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({
     "author": one(authors, {
-        fields: [posts.author_id],
+        fields: [posts.authorId],
         references: [authors.id],
-        relationName: "posts_author_id"
+        relationName: "posts_authorId"
     }),
     "tags": many(postsTags, { relationName: "tags" })
 }));
@@ -358,14 +359,14 @@ export const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) =>
 
 export const productLocalesRelations = drizzleRelations(productLocales, ({ one, many }) => ({
     "product": one(products, {
-        fields: [productLocales.product_id],
+        fields: [productLocales.productId],
         references: [products.id],
-        relationName: "product_locales_product_id"
+        relationName: "product_locales_productId"
     })
 }));
 
 export const productsRelations = drizzleRelations(products, ({ one, many }) => ({
-    "product_locales": many(productLocales, { relationName: "product_locales_product_id" })
+    "product_locales": many(productLocales, { relationName: "product_locales_productId" })
 }));
 
 export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
@@ -374,9 +375,9 @@ export const tagsRelations = drizzleRelations(tags, ({ one, many }) => ({
 
 export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
     "customer": one(customers, {
-        fields: [tickets.customer_id],
+        fields: [tickets.customerId],
         references: [customers.id],
-        relationName: "tickets_customer_id"
+        relationName: "tickets_customerId"
     })
 }));
 

@@ -6,6 +6,7 @@ import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { joinParts, money, relatedRecord } from "../display";
 
 interface ProductValues extends Record<string, unknown> {
     name: string;
@@ -118,7 +119,26 @@ const orderItemsCollection: PostgresCollectionConfig = {
     admin: {
         icon: "ReceiptText",
         group: "E-Commerce",
+        // Not a destination in the drawer — nobody opens the demo to browse line
+        // items. It stays on its parent order's tab strip, which is a separate
+        // flag now (`hideFromEntityViews`, left unset) rather than something the
+        // parent relation had to override back on.
         hideFromNavigation: true,
+        // `product_name` is the name captured at the time of the order, which is
+        // the one a line item should be read by — the live product may have been
+        // renamed since. The thumbnail comes off the related product, which is
+        // included on the same read.
+        display: {
+            title: "product_name",
+            subtitle: ({ entity }) => joinParts(
+                entity.values.sku,
+                `${entity.values.quantity ?? 0} × ${money(entity.values.unit_price) ?? "—"}`
+            ),
+            image: ({ entity }) => {
+                const images = relatedRecord(entity.values.product)?.images;
+                return Array.isArray(images) && images.length ? String(images[0]) : undefined;
+            }
+        },
         form: {
             sections: [
                 { key: "item", properties: ["order", "product", "product_name", "sku"] },

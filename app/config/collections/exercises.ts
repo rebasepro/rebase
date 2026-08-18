@@ -326,7 +326,23 @@ const exercisesCollection: PostgresCollectionConfig = {
         group: "Fitness",
         defaultViewMode: "table",
         enabledViews: ["table", "cards"],
-        display: { title: "name" },
+        // `body_parts` is an array of enum values, so naming it as the tags path
+        // (rather than computing the labels) is what keeps each chip its own
+        // colour — the stated advantage of the path arm over a resolver.
+        display: {
+            title: "name",
+            subtitle: ({ entity }) => {
+                const equipment = Array.isArray(entity.values.equipment) ? entity.values.equipment : [];
+                const reps = entity.values.default_sets && entity.values.default_reps
+                    ? `${entity.values.default_sets}×${entity.values.default_reps}`
+                    : undefined;
+                return [equipment.length ? equipment.join(", ") : "Bodyweight", reps]
+                    .filter(Boolean).join(" · ");
+            },
+            image: "images",
+            status: "difficulty",
+            tags: "body_parts"
+        },
         // The widest collection in the demo, and the one that most needed this:
         // nineteen properties in one run is a list, not a form.
         form: {

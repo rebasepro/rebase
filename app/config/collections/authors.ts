@@ -4,6 +4,7 @@
 // fallow-ignore-next-line circular-dependency
 import postsCollection from "./posts";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { joinParts } from "../display";
 
 const authorsCollection: PostgresCollectionConfig = {
     name: "Authors",
@@ -90,6 +91,14 @@ const authorsCollection: PostgresCollectionConfig = {
     admin: {
         icon: "User",
         group: "Content",
+        // An author is the target of every post's `author` relation, so this
+        // block is what labels the chip on 200 post rows, not just this
+        // collection's own cards.
+        display: {
+            title: "name",
+            subtitle: ({ entity }) => joinParts(entity.values.email, entity.values.twitter),
+            image: "picture"
+        },
         form: {
             sections: [
                 { key: "author", properties: ["picture", "name", "email", "bio"] },
@@ -112,10 +121,10 @@ const authorsCollection: PostgresCollectionConfig = {
             "userId"
         ],
         defaultFilter: undefined,
-        sort: [
-            "email",
-            "asc"
-        ]
+        // By name. Sorting a list of people by their email address orders them
+        // by whatever their address happens to start with, which is neither the
+        // order they are listed under nor one a reader can scan.
+        sort: ["name", "asc"]
     }
 };
 

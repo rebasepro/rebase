@@ -34,7 +34,12 @@ const tagsCollection: PostgresCollectionConfig = {
     admin: {
         icon: "Tag",
         group: "Content",
-        hideFromNavigation: true
+        // A tag is only ever reached through a post, so it is not a drawer
+        // destination — but it is also not worth a tab on the post it labels,
+        // which is the half `hideFromEntityViews` says separately.
+        hideFromNavigation: true,
+        hideFromEntityViews: true,
+        display: { title: "name" }
     }
 };
 

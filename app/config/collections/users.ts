@@ -150,7 +150,16 @@ span: 4 }
         // and `propertiesOrder` starting `["id", "email", …]` makes the
         // derivation take the email address — so every record was titled by
         // the address with the person's name sitting in the next field.
-        display: { title: "displayName" },
+        //
+        // No `image` role: `photoURL` is redacted to null by the `afterRead`
+        // callback above, so pointing the thumbnail at it would name a column
+        // that is empty by the time the panel sees it.
+        display: {
+            title: "displayName",
+            subtitle: "email",
+            date: "createdAt",
+            tags: "roles"
+        },
         listProperties: ["displayName", "email", "roles", "createdAt"],
         propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
     }
