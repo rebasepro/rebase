@@ -36,10 +36,21 @@ export function FormRail({
             // `w-76` (304px), between the old 288 and a full `w-80`. The rail
             // holds real controls — a status select, a date picker — plus a
             // record block whose id is a 36-character UUID, so 288 left the
-            // select tighter than the identical select in the column. 320 took
-            // more than it gave back: past about 300px the extra goes to the
-            // gap beside a chip, not to anything that needed it.
-            "flex flex-col gap-6 shrink-0 w-76 border-l overflow-y-auto",
+            // select tighter than the identical select in the column.
+            //
+            // 304 is the floor rather than the answer everywhere. It was chosen
+            // against the *narrow* end, where 320 took more than it gave back —
+            // past about 300px the extra went to the gap beside a chip. That
+            // stops being true once the form is genuinely wide: `@7xl/form`
+            // (1280px of form) is the same signal the column widens on, and by
+            // then 32px is coming out of gutters, not out of the column.
+            //
+            // Container, not viewport, for the reason the whole rail is
+            // measured rather than breakpointed: a side panel inside a large
+            // window is not a wide form. Both surfaces that render a rail —
+            // `EntityForm` and `EntityViewBinding` — name their form element
+            // `@container/form`, so a panel that never gets that wide keeps 304.
+            "flex flex-col gap-6 shrink-0 w-76 @7xl/form:w-84 border-l overflow-y-auto",
             "px-5 py-6 bg-surface-50 dark:bg-surface-900",
             defaultBorderMixin
         )}>

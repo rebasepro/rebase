@@ -4,6 +4,14 @@
 
 ### Added
 
+- **A relation picker can create the row it is looking for.** The list ends in an *Add …* action that opens the target collection's form in the side panel, over the form you are already filling in; saving it closes the panel and leaves the new row selected, with no second trip through the picker. Until now a relation could only point at something that already existed, so a company that was not in the list meant abandoning the form, going to that collection, creating the row and starting again — and on a record being created, everything typed so far was lost.
+
+  A search that matched nothing is the name you were looking for, so it seeds the new row: typing `EDU.MX` into the picker and choosing *Add "EDU.MX"* opens the form with that already in the title field. Only when the collection's title lands on a plain string property — putting free text into an enum or a relation would be worse than not prefilling — and the action itself appears only when the user could actually insert into the target, the same permission the selection dialog's own *Add* button checks.
+
+  The create form does **not** take the URL. It is a detour inside the form you are in, and a record that does not exist yet has no address to restore; pushing one made closing it a *pathname* change, which is exactly what the unsaved-changes blocker watches — so a successful save raced the panel clearing its own dirty flag and often answered with "There are unsaved changes", with the URL stranded on the target collection.
+
+  The dialog widget already worked this way — except for the URL, which it took too. Its *Add* button is fixed with it, so both create-in-place paths now leave the address bar where the form is.
+
 - **A unit of a split deployment can be released on its own.** `functions.image.tag` in the Helm chart (and the `api` / `worker` equivalents, or `bundleUrl` under `bundle.mode: url`) holds one unit at a build of its own, so a fix to a custom function no longer restarts the API. Empty by default: every unit renders one image and one bundle, which is still the shape to prefer. Pinning only the tag inherits the repository, because the common case is one project and one image with one unit held back.
 
   Two units on different builds are two sets of collections against **one** database, and only one unit provisions it. So the rule, stated in the values file and in the docs: **the unit that owns the schema rolls first, and a unit may lag but must never lead.** A unit running ahead queries columns that do not exist yet and relies on RLS policies nobody applied — the first is a SQL error on one route, the second is an empty result with a 200. A unit running behind is the ordinary state of any rollout in progress. The migration Job renders the release-wide image, so it always leads the pinned units by construction.
@@ -23,6 +31,8 @@
   A driver older than the runtime has neither hook — the image supplies `@rebasepro/server` while the driver comes from the bundle — and that is treated as "this driver does not record a version" rather than as a boot failure. The check starts working when the project's driver is next updated.
 
 ### Changed
+
+- **The form's metadata rail widens a little where there is room for it.** 304px to 336px past `@7xl` of *form* width — the same container signal the content column already widens on, so a side panel inside a large window keeps the narrow rail rather than taking a viewport breakpoint's word for it. 304 was picked against the narrow end, where the extra 32px went to the gap beside a chip; on a full-screen form it comes out of the gutters instead, and the status select and date picker in there are the same controls as in the column.
 
 - **Realtime is a runtime surface now, and the roles that serve no websockets no longer pay for it.** It was neither a surface nor role-aware, so every role ran it — including `functions` and `worker`, whose entire claim is that they touch nothing. Both mounted a websocket server no client could reach, both held a dedicated `LISTEN` connection outside the pool for the life of the process, and both installed the change-capture machinery at boot: a schema, a trigger function, and a `DROP`/`CREATE TRIGGER` pair per collection table.
 

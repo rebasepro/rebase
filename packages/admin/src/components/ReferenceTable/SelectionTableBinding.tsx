@@ -225,7 +225,16 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         sidePanelController.open({
             path: path,
             collection,
-            updateUrl: true,
+            // No URL, for the reason `RelationSelector` does the same: this
+            // panel is a step inside the selection dialog, which is itself a
+            // step inside whatever form opened it. `useUnsavedChangesDialog`
+            // blocks on a *pathname* change, and this panel's path is a
+            // different collection from the one being edited — so closing it
+            // raced the panel clearing its own dirty flag and answered a
+            // successful save with "There are unsaved changes", leaving the URL
+            // on the target collection. A record that does not exist yet has no
+            // address worth restoring anyway.
+            updateUrl: false,
             onUpdate: ({ entity }) => {
                 setEntitiesDisplayedFirst([entity, ...entitiesDisplayedFirst]);
                 onEntityClick(entity);

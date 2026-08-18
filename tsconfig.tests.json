@@ -122,6 +122,11 @@
     // exist to stop. The rest of `packages/admin/test` carries pre-existing
     // errors (fixtures declaring properties with no `name`), and clearing those
     // is what would earn the directory its own line here.
+    // Same reasoning, one directory over: the relation picker's create-in-place
+    // path is asserted through the props it hands the side panel, and a prop
+    // name that drifts is exactly what the test would stop reporting.
+    "packages/admin/test/components/relation-selector-create.test.tsx",
+    "packages/admin/test/components/selection-dialog-create.test.tsx",
     "packages/admin/test/data_export/fetch_export_data.test.ts",
     "packages/admin/test/data_import/csv.test.ts",
     "packages/admin/test/data_import/prototype_pollution.test.ts",
