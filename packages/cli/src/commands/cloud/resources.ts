@@ -853,3 +853,151 @@ status: acct.status ?? null }
         reportError(e, "Failed to load billing");
     }
 }
+
+/* ─── resources: what this project is given ─────────────────────── */
+
+/** The dials, and the flag that sets each. */
+const DIAL_FLAGS = {
+    "--cpu": "cpu",
+    "--memory": "memory",
+    "--db-mode": "databaseMode",
+    "--db-instances": "databaseInstances",
+    "--db-cpu": "databaseCpu",
+    "--db-memory": "databaseMemory"
+} as const;
+
+/**
+ * `rebase cloud resources` — show what a project is given, and change it.
+ *
+ * ## Why nothing is validated here
+ *
+ * The rules are the *target cluster's*, not the CLI's: GKE Autopilot bills a
+ * 250m/512Mi floor and rewrites anything outside a 1:1–6.5:1 memory:CPU band,
+ * while a Hetzner or EKS node has neither constraint. A CLI that carried those
+ * numbers would be wrong for two of the three providers the moment it shipped,
+ * and would drift from the control plane the first time either changed.
+ *
+ * So the control plane validates and this reports what it said. The same
+ * boundary refuses a raw PATCH and a console save, which is the property worth
+ * having — a check in a client only covers the clients that run it.
+ */
+export async function resourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+
+    const project = (await client.data.collection("projects").findById(projectId)) as
+        | Record<string, unknown>
+        | undefined;
+    if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
+
+    if (action !== "set") {
+        emit(
+            () => {
+                console.log("");
+                console.log(`  ${chalk.bold(String(project!.name ?? ""))} ${chalk.gray(`[${String(project!.subdomain ?? "")}]`)}`);
+                console.log("");
+                keyValues([
+                    ["Plan", String(project!.plan ?? "legacy (no plan)")],
+                    ["App CPU", dialLine(project!.cpu)],
+                    ["App memory", dialLine(project!.memory)],
+                    ["App replicas", String(project!.replicaCount ?? 1)],
+                    ["Database", dialLine(project!.databaseMode)],
+                    ["Database instances", dialLine(project!.databaseInstances)],
+                    ["Database CPU", dialLine(project!.databaseCpu)],
+                    ["Database memory", dialLine(project!.databaseMemory)]
+                ]);
+                console.log("");
+                noteBlank();
+                note("Empty means the plan's default. Change one with:");
+                note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
+                console.log("");
+            },
+            () => ({
+                plan: project!.plan ?? null,
+                cpu: project!.cpu ?? null,
+                memory: project!.memory ?? null,
+                replicaCount: project!.replicaCount ?? 1,
+                databaseMode: project!.databaseMode ?? null,
+                databaseInstances: project!.databaseInstances ?? null,
+                databaseCpu: project!.databaseCpu ?? null,
+                databaseMemory: project!.databaseMemory ?? null
+            })
+        );
+        return;
+    }
+
+    const built = buildDialPatch(rawArgs);
+    if (built.error) fail(built.error, undefined, "bad_request");
+    const patch = built.patch;
+
+    try {
+        await client.data.collection("projects").update(projectId, patch);
+    } catch (error: unknown) {
+        // The control plane's refusals are written to be read by whoever chose
+        // the number — a ratio named, a field named — so they are surfaced
+        // verbatim rather than replaced with a generic failure.
+        reportError(error, "Could not change resources");
+        return;
+    }
+
+    emit(
+        () => {
+            success("Resources updated.");
+            noteBlank();
+            for (const [field, value] of Object.entries(patch)) {
+                note(`  ${field} → ${String(value)}`);
+            }
+            noteBlank();
+            note("Applied on the next deploy, or by the hourly reconcile — whichever is first.");
+            note("A change that restarts the database waits for a maintenance window.");
+        },
+        () => ({ updated: patch })
+    );
+}
+
+/** A dial's value, or a marker that the plan decides it. */
+function dialLine(value: unknown): string {
+    if (value === null || value === undefined || value === "") return chalk.gray("plan default");
+    return String(value);
+}
+
+/**
+ * Turn `--cpu 500m --db-instances 2` into the patch to send.
+ *
+ * Pure, and exported, so the flag handling is testable without a control plane —
+ * the same shape `buildSettingsPatch` uses. Returns an error string rather than
+ * throwing, because the caller owns how a refusal is printed in JSON mode.
+ */
+export function buildDialPatch(rawArgs: string[]): { patch: Record<string, unknown>; error?: string } {
+    const patch: Record<string, unknown> = {};
+
+    for (const [flag, field] of Object.entries(DIAL_FLAGS)) {
+        const idx = rawArgs.indexOf(flag);
+        if (idx === -1) continue;
+        const value = rawArgs[idx + 1];
+        // A flag followed by another flag is a missing value, not an empty one.
+        // Silently sending "" would clear the dial — the opposite of what
+        // someone who fumbled a flag meant.
+        if (value === undefined || value.startsWith("--")) {
+            return { patch: {}, error: `${flag} needs a value.` };
+        }
+        if (field === "databaseInstances") {
+            const n = Number(value);
+            if (!Number.isInteger(n)) {
+                return { patch: {}, error: `${flag} takes a whole number of instances, not "${value}".` };
+            }
+            // Sent as a number, not a string. The control plane's guard decides
+            // whether anything CHANGED by comparing against the stored value, and
+            // "2" against 2 differs — which would report a change on every save
+            // and, before self-serve is on, refuse every save.
+            patch[field] = n;
+        } else {
+            patch[field] = value;
+        }
+    }
+
+    if (Object.keys(patch).length === 0) {
+        return { patch: {}, error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}.` };
+    }
+    return { patch };
+}
