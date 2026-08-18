@@ -97,6 +97,11 @@ export interface RebaseTranslations {
     remove: string;
     copy_id: string;
     add_specific: string;
+    /**
+     * Offer to create the row a search did not find, with the search text as
+     * its name — e.g. `Add "Acme Corp"`.
+     */
+    add_named: string;
     select_specific: string;
     select_from: string;
     done: string;

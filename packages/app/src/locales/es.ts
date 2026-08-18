@@ -89,6 +89,7 @@ export const es: RebaseTranslations = {
     initialize_kanban_order: "Inicializar el orden para Kanban",
     copy_id: "Copiar ID",
     add_specific: "Añadir {{name}}",
+    add_named: "Añadir \"{{name}}\"",
     select_specific: "Seleccionar {{name}}",
     select_from: "Seleccionar de {{name}}",
     done: "Hecho",

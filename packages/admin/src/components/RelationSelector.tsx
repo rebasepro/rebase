@@ -14,6 +14,7 @@ import {
     focusedDisabled,
     IconButton,
     iconSize,
+    PlusIcon,
     PopoverPrimitive,
     SearchIcon,
     Separator,
@@ -26,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
-import { useData, useRelationSelector } from "@rebasepro/app";
+import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 
@@ -105,6 +106,14 @@ export interface RelationSelectorProps {
      */
     emptyCollectionText?: string;
     loadingText?: string;
+    /**
+     * Whether the open list offers to create a row in the target collection.
+     * Defaults to `true`. The offer is shown only when the user could actually
+     * insert into that collection — the same permission check the selection
+     * dialog's "Add" button makes — so turning this off is for the cases where
+     * creating is possible but not wanted, like a filter.
+     */
+    allowCreate?: boolean;
 }
 
 export const RelationSelector = React.forwardRef<
@@ -130,14 +139,18 @@ export const RelationSelector = React.forwardRef<
             noResultsText = "No matches.",
             emptyText = "Select…",
             emptyCollectionText,
-            loadingText = "Loading..."
+            loadingText = "Loading...",
+            allowCreate = true
         },
         ref
     ) => {
 
         const collection = relation.target();
+        const dataPath = getCollectionDataPath(collection);
         const dataClient = useData();
         const sidePanelController = useSidePanel();
+        const { canCreate } = usePermissions();
+        const { t } = useTranslation();
         const contextPortalContainer = usePortalContainer();
         const multiple = multipleOverride ?? relationCardinality(relation) === "many";
 
@@ -167,7 +180,7 @@ export const RelationSelector = React.forwardRef<
             loadMore,
             entityToRelationItem
         } = useRelationSelector({
-            path: getCollectionDataPath(collection),
+            path: dataPath,
             collection,
             fixedFilter,
             pageSize,
@@ -393,6 +406,13 @@ relation } as RelationItem;
             else onValueChange?.(selected[0]?.relation);
         }, [onValueChange, multiple]);
 
+        // The picker can hand its selection over long after the render that
+        // built the callback — a row created in the side panel arrives whenever
+        // the person saves it — so the emitter is read from a ref rather than
+        // captured.
+        const emitValueChangeRef = useRef(emitValueChange);
+        emitValueChangeRef.current = emitValueChange;
+
         // Helper: compute the "IDs fingerprint" for a set of RelationItems
         // so we can mark it in localSelectionIdsRef and skip re-resolution.
         const computeSelectionFingerprint = useCallback((items: RelationItem[]): string => {
@@ -482,6 +502,73 @@ relation } as RelationItem;
             isPopoverOpenRef.current = false;
             pinnedIdsRef.current = null;
         }, []);
+
+        // Pointing at a row that does not exist yet.
+        //
+        // Until now the only way out of that was to abandon the form, go to the
+        // other collection, create the row, come back and start again — and on
+        // a new record that meant losing everything typed so far. The side
+        // panel already stacks (the selection dialog creates from inside itself
+        // this way), so the picker can open a create form over the form it
+        // belongs to and select what comes back.
+        const canCreateTarget = allowCreate && canCreate(collection, dataPath);
+
+        // A search that matched nothing is the name the person was looking for,
+        // so it seeds the new row. Only when the title lands on a plain string
+        // property: putting free text into an enum, a relation or a computed
+        // property would be worse than not prefilling at all.
+        const buildDefaultValues = useCallback((searchText: string): Record<string, unknown> | undefined => {
+            const trimmed = searchText.trim();
+            if (!trimmed) return undefined;
+            const titleKey = getTitlePropertyKey(collection);
+            if (!titleKey || titleKey.includes(".")) return undefined;
+            const titleProperty = collection.properties?.[titleKey];
+            // A property builder is a function, and it decides its own value.
+            if (!titleProperty || typeof titleProperty === "function") return undefined;
+            if (titleProperty.type !== "string" || titleProperty.enum) return undefined;
+            return { [titleKey]: trimmed };
+        }, [collection]);
+
+        const handleCreateNew = useCallback(() => {
+            const defaultValues = buildDefaultValues(searchString);
+            closePopover();
+            sidePanelController.open({
+                path: dataPath,
+                collection,
+                // No URL. This panel is a detour inside the form you are
+                // filling in, not somewhere you navigated to, and its address
+                // would restore nothing anyway — a record that does not exist
+                // yet has none.
+                //
+                // Pushing one made closing it a *pathname* change, which is
+                // exactly what the unsaved-changes blocker watches
+                // (`useUnsavedChangesDialog`). So saving the new row raced the
+                // panel clearing its own dirty flag, and often enough lost:
+                // "There are unsaved changes" over a record that had just been
+                // saved, with the URL stranded on the target collection. Worst
+                // of all in the case this feature exists for — the outer form
+                // has content in it, which is the whole reason not to leave.
+                updateUrl: false,
+                // Saving is the whole point of the detour; the panel goes away
+                // and the picker is left holding the row it made.
+                closeOnSave: true,
+                defaultValues,
+                onUpdate: ({ entity }) => {
+                    if (!entity) return;
+                    const item = entityToRelationItemRef.current(entity, new EntityRelation(entity.id, dataPath));
+                    const current = selectedItemsRef.current;
+                    const newSelected = multiple
+                        ? [...current.filter(i => String(i.id) !== String(item.id)), item]
+                        : [item];
+                    setSelectedItems(newSelected);
+                    // Same bookkeeping `onItemClick` does: mark the fingerprint
+                    // so the resolution effect does not re-fetch the row we
+                    // already hold when the form echoes the value back.
+                    localSelectionIdsRef.current = newSelected.map(i => String(i.id)).sort().join(",");
+                    emitValueChangeRef.current(newSelected);
+                }
+            });
+        }, [buildDefaultValues, searchString, closePopover, sidePanelController, dataPath, collection, multiple]);
 
         // Text, not `EmptyValue`. That component draws a small grey rounded bar
         // with no text in it, which is the same shape the `Skeleton` component
@@ -787,6 +874,31 @@ relation } as RelationItem;
                                         )}
                                     </CommandPrimitive.Group>
                                 </CommandPrimitive.List>
+                                {canCreateTarget && <>
+                                    <Separator orientation="horizontal" className="my-0"/>
+                                    {/* Outside the scrolling list on purpose: it
+                                        is most wanted exactly when the list is
+                                        long and nothing in it matched. */}
+                                    <button
+                                        type="button"
+                                        data-relation-selector-create
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }}
+                                        onClick={handleCreateNew}
+                                        className={cls(
+                                            "w-full flex flex-row items-center gap-2 px-4 py-3 text-sm text-left",
+                                            "text-primary hover:bg-surface-accent-50 dark:hover:bg-surface-800"
+                                        )}>
+                                        <PlusIcon size={iconSize.smallest}/>
+                                        <span className="truncate">
+                                            {searchString.trim()
+                                                ? t("add_named", { name: searchString.trim() })
+                                                : t("add_specific", { name: collection.singularName ?? collection.name })}
+                                        </span>
+                                    </button>
+                                </>}
                             </CommandPrimitive>
                         </PopoverPrimitive.Content>
                     </PopoverPrimitive.Portal>
