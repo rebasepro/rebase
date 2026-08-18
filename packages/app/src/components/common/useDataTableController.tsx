@@ -123,16 +123,30 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [sortBy, setSortBy] = React.useState<OrderByTuple<Extract<keyof M, string> | (string & {})>[] | undefined>((updateUrl ? sortUrl : undefined) ?? sortInternal);
 
     // Sync filter/sort state from URL on browser navigation (back/forward).
-    // Skip initial mount since useState initializers already handle URL params + collection defaults.
-    const initialSearchRef = React.useRef<string | null>(location.search);
+    //
+    // Only ever on an actual *change* of the URL, which is not the same as "not
+    // the first run". `useUpdateUrl` writes with `window.history.replaceState`,
+    // which react-router does not observe, so the `location` read here keeps
+    // reporting the search string this view was mounted with — normally the
+    // empty one — no matter what the address bar says. The guard used to be a
+    // one-shot ref that skipped the first run and armed itself for every run
+    // after; the *second* run then parsed that unchanged, empty search and
+    // called `setSortBy(undefined)`, throwing away the collection's `sort`
+    // before anything had asked for a different one. Re-running is easy to
+    // trigger — this effect depends on `fixedFilter`, a prop most callers pass
+    // as a fresh object literal.
+    //
+    // The visible symptom was a collection that ignored its own default sort: it
+    // subscribed correctly, then immediately re-subscribed with no `orderBy` at
+    // all, and the second answer replaced the first.
+    const lastSyncedSearchRef = React.useRef<string>(location.search);
     useEffect(() => {
         if (!updateUrl) return;
-        // Skip the initial mount - useState already set the correct values
-        if (initialSearchRef.current !== null && initialSearchRef.current === location.search) {
-            initialSearchRef.current = null;
-            return;
-        }
-        initialSearchRef.current = null;
+        // Unchanged URL — including the initial mount, where the state
+        // initialisers have already applied the URL params and the collection
+        // defaults — carries nothing to sync.
+        if (lastSyncedSearchRef.current === location.search) return;
+        lastSyncedSearchRef.current = location.search;
 
         const { filterValues: urlFilterValues, sortBy: urlSortBy } = parseFilterAndSort(location.search);
         if (!fixedFilter) {
