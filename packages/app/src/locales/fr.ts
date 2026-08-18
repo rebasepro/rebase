@@ -38,6 +38,7 @@ export const fr: RebaseTranslations = {
     find_entity_by_id: "Rechercher l'entité par ID",
     filter: "Filtrer",
     filters: "Filtres",
+    records_in_view: "Enregistrements dans cette vue",
     clear_filter: "Effacer le filtre",
     clear_filter_sort: "Effacer le filtre/tri",
     clear_sort: "Effacer le tri",

@@ -77,7 +77,6 @@ import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
 import { isViewMode, OpenEntityMode, resolveOpenEntityMode, VIEW_MODE_PARAM, VIEW_MODES } from "../../util/view_mode";
 import { mergeDeep } from "@rebasepro/utils";
-import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
@@ -173,7 +172,6 @@ const CollectionViewBindingInner = React.memo(
         const context = useAdminContext();
         const collectionRegistry = useCollectionRegistryController();
         const urlController = useUrlController();
-        const breadcrumbs = useBreadcrumbsController();
         const path = pathProp ?? getCollectionDataPath(collectionProp);
         const dataClient = useData();
         const sidePanelController = useSidePanel();
@@ -876,14 +874,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
 
         }, [updateLastDeleteTimestamp, usedSelectionController]);
 
-        // Update breadcrumb count when count changes
-        const updateCountRef = React.useRef(breadcrumbs.updateCount);
-        updateCountRef.current = breadcrumbs.updateCount;
-        useEffect(() => {
-            updateCountRef.current(path, docsCount);
-        }, [docsCount, path]);
-
-        // EntitiesCount fetches count and updates breadcrumb - no visual rendering needed here
+        // EntitiesCount fetches the count and reports it — the toolbar renders it
         const countFetcher = <EntitiesCount
             path={path}
             collection={collection}
@@ -1039,6 +1030,7 @@ parentEntityIds,
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
                     viewMode={viewMode}
+                    entitiesCount={docsCount}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
                 actions={
@@ -1493,7 +1485,7 @@ export function EntitiesCount({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [path, filterKey, sortKey, searchString]);
 
-    // Count is now displayed in the breadcrumb bar, this component only fetches and reports
+    // The toolbar renders the count; this component only fetches and reports it
     return null;
 }
 

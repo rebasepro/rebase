@@ -38,6 +38,7 @@ export const hi: RebaseTranslations = {
     find_entity_by_id: "ID द्वारा इकाई खोजें",
     filter: "फ़िल्टर",
     filters: "फ़िल्टर",
+    records_in_view: "इस दृश्य में रिकॉर्ड",
     clear_filter: "फ़िल्टर साफ़ करें",
     clear_filter_sort: "फ़िल्टर/सॉर्ट साफ़ करें",
     clear_sort: "सॉर्ट साफ़ करें",

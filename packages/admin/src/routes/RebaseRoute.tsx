@@ -41,32 +41,24 @@ export function RebaseRoute() {
     });
 
     useEffect(() => {
-        const lastEntry = navigationEntries[navigationEntries.length - 1];
-        const isViewingCollection = lastEntry?.type === "collection";
-
         breadcrumbs.set({
-            breadcrumbs: navigationEntries.map((entry, index) => {
-                const isLastEntry = index === navigationEntries.length - 1;
+            breadcrumbs: navigationEntries.map((entry) => {
 
                 if (entry.type === "entity") {
                     return ({
                         title: String(entry.entityId),
                         url: urlController.buildUrlCollectionPath(entry.path)
-                        // count: undefined (not applicable for entities)
                     });
                 } else if (entry.type === "custom_view") {
                     return ({
                         title: String(entry.view.name ?? entry.view.key),
                         url: urlController.buildUrlCollectionPath(entry.path)
-                        // count: undefined (not applicable for custom views)
                     });
                 } else if (entry.type === "collection") {
-                    const showCount = isLastEntry && isViewingCollection;
                     return ({
                         title: entry.collection.name,
                         url: urlController.buildUrlCollectionPath(entry.path),
-                        id: entry.path,
-                        ...(showCount ? { count: null } : {})
+                        id: entry.path
                     });
                 } else {
                     throw new Error("Unexpected navigation entry type");

@@ -418,6 +418,8 @@ export interface RebaseTranslations {
     create_user: string;
 
     filters: string;
+    /** Tooltip on the record count in the collection toolbar */
+    records_in_view: string;
     multiple_entities: string;
     unsaved_changes: string;
     so_empty: string;

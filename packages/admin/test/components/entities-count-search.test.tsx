@@ -5,7 +5,7 @@ import { render, waitFor } from "@testing-library/react";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
- * The row count shown in the breadcrumb, while a search is active.
+ * The row count shown in the collection toolbar, while a search is active.
  *
  * `EntitiesCount` was handed `filter` and `sortBy` and nothing else, though
  * `tableController.searchString` sits in the same scope as the element that

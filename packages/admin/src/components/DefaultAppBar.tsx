@@ -194,16 +194,6 @@ export const DefaultAppBar = function DefaultAppBar({
                                     <Typography variant={"body2"}>
                                         {breadcrumb.title}
                                     </Typography>
-                                    {/* Show count badge for collection breadcrumbs: undefined = not applicable, null = loading, number = count */}
-                                    {breadcrumb.count !== undefined && (
-                                        breadcrumb.count !== null ? (
-                                            <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-800 px-1 py-0 rounded">
-                                                {breadcrumb.count}
-                                            </span>
-                                        ) : (
-                                            <Skeleton className="w-8 h-4 rounded-md"/>
-                                        )
-                                    )}
                                 </div>
                             </Link>
                         </React.Fragment>;

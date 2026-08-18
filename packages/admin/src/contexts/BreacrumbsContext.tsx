@@ -4,8 +4,6 @@ import type { BreadcrumbEntry, BreadcrumbsController } from "@rebasepro/admin-ty
 const DEFAULT_BREADCRUMBS_CONTROLLER: BreadcrumbsController = {
     breadcrumbs: [],
     set: () => {
-    },
-    updateCount: () => {
     }
 };
 
@@ -23,17 +21,10 @@ export const BreadcrumbsProvider: React.FC<BreadcrumbsProviderProps> = ({ childr
         breadcrumbs: BreadcrumbEntry[];
     }) => {
         setBreadcrumbs(prev => {
-            const next = props.breadcrumbs.map(newEntry => {
-                const prevEntry = newEntry.id ? prev.find(p => p.id === newEntry.id) : undefined;
-                if (prevEntry && newEntry.count === null && typeof prevEntry.count === "number") {
-                    return { ...newEntry,
-count: prevEntry.count };
-                }
-                return newEntry;
-            });
+            const next = props.breadcrumbs;
             // Bail out if nothing changed — return same reference to skip re-render
             if (prev.length === next.length && prev.every((p, i) =>
-                p.title === next[i].title && p.url === next[i].url && p.id === next[i].id && p.count === next[i].count
+                p.title === next[i].title && p.url === next[i].url && p.id === next[i].id
             )) {
                 return prev;
             }
@@ -41,18 +32,10 @@ count: prevEntry.count };
         });
     }, []);
 
-    const updateCount = useCallback((id: string, count: number | null | undefined) => {
-        setBreadcrumbs(prev => prev.map(entry =>
-            entry.id === id ? { ...entry,
-count } : entry
-        ));
-    }, []);
-
     const value = useMemo(() => ({
         breadcrumbs,
-        set,
-        updateCount
-    }), [breadcrumbs, set, updateCount]);
+        set
+    }), [breadcrumbs, set]);
 
     return (
         <BreadcrumbContext.Provider value={value}>

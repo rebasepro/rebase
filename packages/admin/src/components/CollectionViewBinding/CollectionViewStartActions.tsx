@@ -4,7 +4,7 @@ import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection, ViewMode } from "@rebasepro/admin-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
-import { Badge, Button, cls, FilterIcon, IconButton, Tooltip, XIcon } from "@rebasepro/ui";
+import { Badge, Button, cls, FilterIcon, IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
 import { FilterPresetsButton } from "./FilterPresetsButton";
@@ -24,6 +24,14 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
     collectionEntitiesCount?: number;
+    /**
+     * Number of records the current filters and search resolve to, rendered at
+     * the end of this group.
+     * - `undefined`: not applicable
+     * - `null`: still counting
+     * - number: the count
+     */
+    entitiesCount?: number | null;
     /**
      * Resolved properties from the collection for the filters dialog
      */
@@ -45,6 +53,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     selectionController,
     tableController,
     collectionEntitiesCount,
+    entitiesCount,
     resolvedProperties,
     viewMode,
     compact,
@@ -174,6 +183,26 @@ parentEntityIds,
         />
     ) : null;
 
+    // The count closes the group the filter, sort and preset controls open: it
+    // is what they resolve to. It used to live in the breadcrumb trail, which
+    // the app bar owns — and a collection rendered without an app bar has no
+    // breadcrumbs, so the number simply disappeared.
+    //
+    // Hidden on the same layouts the trail was (`hidden lg:block` there) and in
+    // the split view, where this toolbar is a few hundred pixels wide and
+    // scrolls: a passive readout is the first thing that should give up its
+    // room to the controls.
+    const countBadge = !iconOnlyToolbar && entitiesCount !== undefined ? (
+        <Tooltip title={t("records_in_view")} key={"entities_count"}>
+            {entitiesCount === null
+                ? <Skeleton className={"w-8 h-4 rounded-md mx-1"}/>
+                : <span
+                    className={"mx-1 text-xs text-surface-accent-600 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded tabular-nums"}>
+                    {entitiesCount.toLocaleString()}
+                </span>}
+        </Tooltip>
+    ) : null;
+
     const actions: React.ReactNode[] = [
         backButton,
         filtersButton,
@@ -183,7 +212,8 @@ parentEntityIds,
             tableController={tableController}
             compact={iconOnlyToolbar}
             enabled={!collection.fixedFilter}/>,
-        filterPresetsButton
+        filterPresetsButton,
+        countBadge
     ];
 
     const pluginActionsStart = useSlot("collection.actions.start", actionProps);
