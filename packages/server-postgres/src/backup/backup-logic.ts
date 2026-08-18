@@ -60,3 +60,34 @@ export async function pruneWith(
         }
     }
 }
+
+/**
+ * Remove a dump artifact abandoned by a failed tool run.
+ *
+ * `pg_dump` creates its `--file=` target before it finishes connecting, so any
+ * failure — a URL libpq rejects, a dropped connection, a full disk — leaves a
+ * 0-byte file behind. That corpse is not inert: `rebase db backups list` used
+ * to show it as an ordinary entry, and `selectBackupsToPrune` ranks by
+ * timestamp alone, so it occupies a protected `keepMinimum` slot and can push
+ * a real backup out of retention.
+ *
+ * Best-effort on purpose: the caller is already throwing, and a failed unlink
+ * must not replace the real diagnosis with an ENOENT/EPERM from the cleanup.
+ *
+ * Lives here rather than in `backup-service.ts` for the reason at the top of
+ * this file — that module's top-level `execa` import makes it unloadable under
+ * jest, so anything placed there cannot be unit-tested.
+ *
+ * `remove` deletes one file and throws if it cannot; `exists` reports presence.
+ */
+export function discardPartialDumpWith(
+    exists: (file: string) => boolean,
+    remove: (file: string) => void,
+    file: string
+): void {
+    try {
+        if (exists(file)) remove(file);
+    } catch {
+        // Ignored: see above.
+    }
+}

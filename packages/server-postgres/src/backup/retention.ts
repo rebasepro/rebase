@@ -12,6 +12,17 @@ export interface BackupObject {
      * timestamp encoded in the key by `buildBackupFilename`.
      */
     createdAt?: Date;
+    /**
+     * Size on disk, when the lister knows it (local destinations always do).
+     *
+     * Reported so an empty artifact cannot masquerade as a backup in
+     * `rebase db backups list`. Deliberately NOT consulted by
+     * {@link selectBackupsToPrune}: retention decides by age, and a rule that
+     * silently skipped small files would make a genuinely tiny dump immortal.
+     * Visibility is the fix here; the artifacts themselves are now removed at
+     * the point of failure by `discardPartialDump`.
+     */
+    sizeBytes?: number;
 }
 
 export interface RetentionOptions {

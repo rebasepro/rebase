@@ -25,6 +25,7 @@ import {
     applyGlobals,
     BackupToolError,
     createDump,
+    discardPartialDump,
     ensureDatabaseExists,
     listBackups,
     preflight,
@@ -285,18 +286,21 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             process.exit(1);
         }
 
-        // Create the target database when requested.
-        if (args["--create-db"]) {
-            if (!targetDb) {
-                outError(chalk.red("  ✗ --create-db requires a resolvable target database name (use --target-db)."));
-                process.exit(1);
-            }
-            const created = await ensureDatabaseExists(baseConnection, targetDb);
-            print(chalk.gray(created ? `  ✓ Created database "${targetDb}".` : `  • Database "${targetDb}" already exists.`));
+        // `--create-db` needs a name before anything else can be decided.
+        if (args["--create-db"] && !targetDb) {
+            outError(chalk.red("  ✗ --create-db requires a resolvable target database name (use --target-db)."));
+            process.exit(1);
         }
 
         // Destructive-action gate. Restores overwrite data; never run without
         // an explicit yes (interactive confirmation or --yes).
+        //
+        // Ahead of `--create-db`, not after it. Creating the database first
+        // meant an aborted run had already changed the cluster, while printing
+        // "No changes were made" — and it left an empty database behind that a
+        // second, confirmed run then reported as "already exists". The gate is
+        // now the first thing that can stop the command, so its own message is
+        // true whichever way the answer goes.
         if (!args["--yes"]) {
             outWarn(chalk.yellow(
                 `  ⚠️  This will restore into "${targetDb ?? "the target database"}" and may overwrite existing data.`
@@ -306,6 +310,12 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
                 print(chalk.gray("  Aborted. No changes were made."));
                 process.exit(1);
             }
+        }
+
+        // Create the target database when requested.
+        if (args["--create-db"]) {
+            const created = await ensureDatabaseExists(baseConnection, targetDb!);
+            print(chalk.gray(created ? `  ✓ Created database "${targetDb}".` : `  • Database "${targetDb}" already exists.`));
         }
 
         // Recreate cluster roles before restoring so GRANT/RLS statements in
@@ -377,7 +387,23 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
             for (const b of backups) {
                 const when = b.createdAt ? b.createdAt.toISOString() : "unknown date";
                 const name = dest.kind === "local" ? path.basename(b.key) : b.key;
-                print(`  ${chalk.green("●")} ${chalk.bold(name)} ${chalk.gray(`— ${when}`)}`);
+                // An empty file is called out rather than listed as a peer of
+                // the real ones. Older failures could leave a 0-byte dump here
+                // (fixed at the source now), and retention protects the newest
+                // by date whatever they contain — so a corpse left in place can
+                // hold a `keepMinimum` slot against a backup that matters.
+                const empty = b.sizeBytes === 0;
+                const size = b.sizeBytes === undefined ? "" : ` — ${formatBytes(b.sizeBytes)}`;
+                if (empty) {
+                    print(`  ${chalk.red("○")} ${chalk.bold(name)} ${chalk.gray(`— ${when}`)}${chalk.red(" — EMPTY, not restorable")}`);
+                } else {
+                    print(`  ${chalk.green("●")} ${chalk.bold(name)} ${chalk.gray(`— ${when}${size}`)}`);
+                }
+            }
+            if (backups.some(b => b.sizeBytes === 0)) {
+                print("");
+                print(chalk.yellow("  ⚠  Empty files above are leftovers from a failed backup. Delete them:"));
+                print(chalk.gray("     they count as recent backups for retention but restore nothing."));
             }
         }
         print("");
@@ -387,13 +413,24 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
     }
 }
 
-/** Verify a freshly written dump; abort the command if it looks corrupt. */
+/**
+ * Verify a freshly written dump; abort the command if it looks corrupt.
+ *
+ * Discards the artifact on the way out. Refusing to *report* success was never
+ * enough on its own: the file stayed on disk, `rebase db backups list` showed
+ * it as an ordinary entry, and retention — which ranks by timestamp and never
+ * looks at size — would protect it as one of the `keepMinimum` newest while
+ * pruning a real backup underneath it. The roles sidecar goes too; the two are
+ * uploaded and pruned as a pair, so half a pair is not a backup either.
+ */
 async function assertDumpValid(localFile: string): Promise<void> {
     const check = await validateDump(localFile);
     if (!check.ok) {
+        discardPartialDump(globalsFileForDump(localFile));
+        discardPartialDump(localFile);
         throw new BackupToolError(
-            `The backup failed validation and was not trusted: ${check.reason}`,
-            "The dump may be corrupt or truncated. Investigate before relying on it."
+            `The backup failed validation and was discarded: ${check.reason}`,
+            "The dump was corrupt or truncated, so nothing was kept. Investigate before relying on this destination."
         );
     }
 }

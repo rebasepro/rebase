@@ -1263,7 +1263,20 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // first on macOS, so on a machine that already runs Postgres on
                 // loopback the two addresses can reach two different servers.
                 // An address cannot be ambiguous the way a name can.
-                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
+                //
+                // `%3D`, not a literal `=`, inside the `options` value. libpq
+                // splits a URI query parameter on the FIRST `=` and rejects any
+                // further one outright:
+                //   extra key/value separator "=" in URI query parameter: "options"
+                // That is every libpq caller — `pg_dump`/`pg_restore` behind
+                // `rebase db backup|restore`, and a plain `psql "$DATABASE_URL"`
+                // copied out of this very file. It is not a version quirk; 15
+                // through 18 all refuse it. node-postgres parses URLs itself and
+                // accepts the literal form, which is why `rebase dev` and
+                // `rebase db push` worked and this shipped broken for so long.
+                // `pinSearchPath` (the --database-url branch above) has always
+                // emitted the encoded form; this line is what disagreed.
+                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
             );
 
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping

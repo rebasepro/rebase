@@ -1,4 +1,4 @@
-import { applyGlobalsWith, pruneWith } from "../src/backup/backup-logic";
+import { applyGlobalsWith, discardPartialDumpWith, pruneWith } from "../src/backup/backup-logic";
 
 describe("applyGlobalsWith (tolerant globals replay)", () => {
     const globals = [
@@ -83,5 +83,49 @@ describe("pruneWith (dump + roles-sidecar co-deletion)", () => {
         await expect(
             pruneWith(["rebase-app-20260101T000000Z.dump"], deleteObject)
         ).rejects.toThrow("permission denied");
+    });
+});
+
+describe("discardPartialDumpWith (failed-run cleanup)", () => {
+    /*
+     * pg_dump creates its `--file=` target before it finishes connecting, so a
+     * failure leaves a 0-byte file behind. Nothing removed it, and it was not
+     * inert: `rebase db backups list` showed it as an ordinary backup, and
+     * `selectBackupsToPrune` ranks by timestamp alone — so the corpse held one
+     * of the protected `keepMinimum` slots while a real backup aged out under
+     * it. Found by running `rebase db backup` against a scaffold whose
+     * generated DATABASE_URL libpq refused to parse.
+     */
+    it("removes an artifact that exists", () => {
+        const removed: string[] = [];
+        discardPartialDumpWith(() => true, (f) => removed.push(f), "/tmp/x.dump");
+        expect(removed).toEqual(["/tmp/x.dump"]);
+    });
+
+    it("does not attempt to remove what is not there", () => {
+        const removed: string[] = [];
+        discardPartialDumpWith(() => false, (f) => removed.push(f), "/tmp/x.dump");
+        expect(removed).toEqual([]);
+    });
+
+    it("swallows a failed unlink so it cannot mask the real error", () => {
+        /*
+         * Every caller is already throwing the diagnosis the user needs — a
+         * rejected connection string, an RLS failure. An EPERM from the cleanup
+         * replacing that would trade a useful message for a useless one.
+         */
+        expect(() => discardPartialDumpWith(
+            () => true,
+            () => { throw new Error("EPERM"); },
+            "/tmp/x.dump"
+        )).not.toThrow();
+    });
+
+    it("swallows a failed existence check too", () => {
+        expect(() => discardPartialDumpWith(
+            () => { throw new Error("EACCES"); },
+            () => {},
+            "/tmp/x.dump"
+        )).not.toThrow();
     });
 });

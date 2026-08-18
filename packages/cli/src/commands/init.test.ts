@@ -848,6 +848,48 @@ describe(".env.example", () => {
         expect(dbMatch![1]).not.toContain("@localhost:");
     });
 
+    it("configureEnvFile percent-encodes the `=` inside the options parameter", async () => {
+        /*
+         * libpq splits a URI query parameter on the FIRST `=` and rejects any
+         * further one:
+         *   extra key/value separator "=" in URI query parameter: "options"
+         * So `?options=-c%20search_path=public` — what this file used to write —
+         * is unusable by every libpq caller: `pg_dump`/`pg_restore` behind
+         * `rebase db backup|restore`, and a plain `psql "$DATABASE_URL"` copied
+         * out of the generated .env. Not a version quirk: 15 through 18 all
+         * refuse it.
+         *
+         * It shipped because node-postgres parses URLs itself and accepts the
+         * literal form, so `rebase dev` and `rebase db push` were fine and
+         * nothing else exercised the URL. `pinSearchPath` — the --database-url
+         * branch, covered below — has always encoded it; only this branch did
+         * not, and no test compared them.
+         */
+        const targetDir = await simulateInit("env-db-options-encoding-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const url = envContent.match(/^DATABASE_URL=(.*)$/m)![1];
+
+        expect(url).toContain("search_path%3Dpublic");
+        expect(url).not.toContain("search_path=public");
+
+        /*
+         * Assert the property rather than the spelling: at most one literal `=`
+         * per query parameter is precisely libpq's rule, so this keeps holding
+         * if the parameters are ever reordered or another one is added.
+         */
+        const query = url.slice(url.indexOf("?") + 1);
+        for (const param of query.split("&")) {
+            expect(param.split("=").length).toBe(2);
+        }
+
+        // And the pin still survives decoding — encoding it must not have
+        // changed what Postgres is actually told.
+        const options = new URL(url).searchParams.get("options");
+        expect(options).toBe("-c search_path=public");
+    });
+
     it("configureEnvFile agrees with the compose port mapping it rewrote", async () => {
         // The generated URL and the published port are two halves of one
         // decision; if they disagree the container is running and unreachable.
