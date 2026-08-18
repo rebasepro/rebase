@@ -266,13 +266,15 @@ jobs:
             echo ""
             echo "This release would publish to npm and push a tag, then fail at the Docker Hub"
             echo "login — leaving a version whose scaffolded docker-compose.yml pulls"
-            echo "rebasepro/server:<version>, an image that would not exist. Stopping first."
+            echo "rebasepro/server:<version>, an image that would not exist, and whose Kubernetes"
+            echo "guide names a chart nobody pushed. Stopping first."
             echo ""
             echo "Set them once, then re-run:"
             echo "  gh secret set DOCKERHUB_USERNAME -R ${{ github.repository }}"
             echo "  gh secret set DOCKERHUB_TOKEN    -R ${{ github.repository }}"
             echo ""
-            echo "The token needs Read & Write on the rebasepro/server repository."
+            echo "The token needs Read & Write on rebasepro/server, and on the rebasepro"
+            echo "namespace for the OCI chart."
             exit 1
           fi
 
