@@ -19,6 +19,14 @@ import { wrapDatabaseAdapter } from "../src/init";
  * enumerates the optional surface, so the next capability added to the adapter
  * protocol has to be added to `CAPABILITIES` — and the moment it is, both
  * wrappers are held to it.
+ *
+ * It happened again with the schema-stamp hooks, one layer further out: both
+ * wrappers here were updated, and `createPostgresAdapter` — a THIRD wrapper,
+ * in the driver package, rebuilding the same object field by field — was not.
+ * The stamp was therefore never written by any real deployment, and because a
+ * check that never runs looks exactly like a check that passes, only the e2e
+ * noticed. `packages/server-postgres/test/adapter-forwarding.test.ts` is the
+ * sibling of this file, added for that reason.
  */
 const CAPABILITIES = [
     "initializeRealtime",
@@ -27,6 +35,8 @@ const CAPABILITIES = [
     "initializeWebsockets",
     "ensureCollectionSchema",
     "ensureCollectionPolicies",
+    "readCollectionsSchemaVersion",
+    "stampCollectionsSchemaVersion",
     "getAdmin",
     "mountRoutes"
 ] as const;

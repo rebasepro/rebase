@@ -1782,9 +1782,17 @@ roles: activeAuth.roles },
      * inert, no schema is created, and broadcast keeps its original
      * fire-and-forget path.
      */
-    async configureChannelHistory(rules: ChannelRetentionRule[] | undefined): Promise<void> {
+    async configureChannelHistory(
+        rules: ChannelRetentionRule[] | undefined,
+        options?: { provision?: boolean }
+    ): Promise<void> {
+        // The store is built in every process, whether or not this one creates
+        // the tables: retaining a message is what a process does when it
+        // *publishes* to a retained channel, and a function handler publishes as
+        // readily as a websocket client does. Only the DDL is owned.
         this.channelHistory = new ChannelHistoryStore(this.db, rules ?? []);
         if (!this.channelHistory.enabled) return;
+        if (options?.provision === false) return;
         await this.channelHistory.ensureTables();
     }
 

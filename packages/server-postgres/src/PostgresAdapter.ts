@@ -61,6 +61,20 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
                 bootstrapper.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
 
+        // Same forwarding rule, third instance. Dropping these is not a type
+        // error and not a runtime error: the stamp is simply never written and
+        // never read, so a split deployment loses the only thing that would tell
+        // it a unit is serving against a schema it was not built for — and a
+        // check that is off looks exactly like a check that passed. This one was
+        // in fact dropped on the first attempt, and the e2e caught it.
+        readCollectionsSchemaVersion: bootstrapper.readCollectionsSchemaVersion
+            ? (driverResult) => bootstrapper.readCollectionsSchemaVersion!(driverResult)
+            : undefined,
+
+        stampCollectionsSchemaVersion: bootstrapper.stampCollectionsSchemaVersion
+            ? (version, driverResult) => bootstrapper.stampCollectionsSchemaVersion!(version, driverResult)
+            : undefined,
+
         getAdmin(driverResult) {
             if (bootstrapper.getAdmin) {
                 return bootstrapper.getAdmin(driverResult);

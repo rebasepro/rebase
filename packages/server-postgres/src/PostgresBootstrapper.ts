@@ -238,6 +238,16 @@ export function isScaffoldedLocalDatabase(connectionString: string | undefined):
  * });
  * ```
  */
+/**
+ * Where the collections schema stamp lives.
+ *
+ * The runtime's own internal schema, always — unlike the auth stamp, which
+ * follows the users collection. `rebase` and `auth` sit outside
+ * `introspectionSchema` by construction, so nothing here is ever served as a
+ * collection.
+ */
+const SCHEMA_META_SCHEMA = "rebase";
+
 export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): BackendBootstrapper {
     // Applied at construction rather than threaded through every read: the
     // condition builder's static methods are reached from call sites that
@@ -262,6 +272,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
      * builder, not to `execute(sql.raw(...))` — and every statement these hooks
      * emit is schema-qualified DDL, so neither depends on `search_path`.
      */
+    /**
+     * The drizzle handle itself, for the statements that want parameters.
+     *
+     * `provisioningQueryable` below hands back a `query(text)` shim because the
+     * DDL it serves is built as text. The schema stamp writes a *value*, so it
+     * wants the parameterised form — building that string by hand would be one
+     * more place a quoted literal has to be got right for no benefit.
+     */
+    const provisioningDb = (driverResult?: InitializedDriver) => {
+        const internals = driverResult?.internals as PostgresDriverInternals | undefined;
+        return internals?.db ?? (pgConfig.connection as PostgresDriverInternals["db"] | undefined);
+    };
+
     const provisioningQueryable = (driverResult?: InitializedDriver) => {
         const internals = driverResult?.internals as PostgresDriverInternals | undefined;
         const db = internals?.db ?? (pgConfig.connection as PostgresDriverInternals["db"] | undefined);
@@ -287,13 +310,20 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
             // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
-            const { collections, collectionRegistry, introspectCollections, baas, schemaProvisioning } = config as {
+            const { collections, collectionRegistry, introspectCollections, baas, schemaProvisioning, realtime } = config as {
                 collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
                 introspectCollections?: boolean;
                 baas?: { unprotectedTables?: "exclude" | "serve" };
                 schemaProvisioning?: { attempted: boolean; reason?: string };
+                realtime?: { subscribe: boolean; provision: boolean };
             };
+            // Absent means a caller that predates the field, and every one of
+            // those is a single process that both serves websockets and owns the
+            // schema. Defaulting to false here would silently disable realtime
+            // for them — the failure this whole area is prone to.
+            const realtimeSubscribes = realtime?.subscribe ?? true;
+            const realtimeProvisions = realtime?.provision ?? true;
             // Secure by default: a table with no RLS is not served.
             const unprotectedTables = baas?.unprotectedTables ?? "exclude";
 
@@ -570,7 +600,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // and leaves broadcast on its original fire-and-forget path, so
             // presence-only apps pay nothing for it.
             try {
-                await realtimeService.configureChannelHistory(pgConfig.realtime?.channels);
+                await realtimeService.configureChannelHistory(
+                    pgConfig.realtime?.channels,
+                    { provision: realtimeProvisions }
+                );
             } catch (err) {
                 logger.warn("⚠️ Could not initialize channel history tables — retained channels will not replay", { error: err });
             }
@@ -622,7 +655,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             // `auto` tries CDC but treats "can't" as a normal outcome (info log);
             // explicit trigger/wal was asked for, so a failure is worth a warning.
-            const wantsCdc = cdcMode !== "off";
+            // A process that consumes nothing needs no capture *started*, and a
+            // process that does not own the schema installs no triggers. They
+            // come apart: the `api` in a split with an external migration Job
+            // subscribes without provisioning, and both answers are correct.
+            const wantsCdc = cdcMode !== "off" && (realtimeSubscribes || realtimeProvisions);
             const explicitCdc = cdcMode === "trigger" || cdcMode === "wal";
             let cdcEnabled = false;
             let provisionCdcForTables: PostgresDriverInternals["provisionCdcForTables"];
@@ -664,17 +701,29 @@ table: link.table });
                     // Provisioning throws only when the connection can't create the
                     // trigger function (insufficient privilege); enableCdc throws when
                     // the LISTEN connection can't be established. Either → fall back.
-                    await provisionTriggerCdc(cdcRunSql, cdcTables);
-                    await realtimeService.enableCdc(directUrl);
+                    if (realtimeProvisions) await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
                     cdcEnabled = true;
                     // Boot steps that create their own tables (auth) run after
                     // this one and use it to instrument what they just created.
-                    provisionCdcForTables = async (tables) => {
-                        await provisionTriggerCdc(cdcRunSql, tables);
-                    };
+                    // Left undefined where this process installs nothing, so a
+                    // later boot step cannot re-enter the DDL path by the side
+                    // door — the callers already treat it as optional, because a
+                    // driver without CDC never sets it either.
+                    if (realtimeProvisions) {
+                        provisionCdcForTables = async (tables) => {
+                            await provisionTriggerCdc(cdcRunSql, tables);
+                        };
+                    }
+                    // Say which half ran. "All writes now emit realtime events"
+                    // is a claim about the database and stays true for a process
+                    // that only installed the triggers; what changes is whether
+                    // *this* process is listening, and an operator reading one
+                    // pod's log should not have to infer that from its role.
                     logger.info(
                         `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
-                        `All writes now emit realtime events regardless of origin.`
+                        `All writes now emit realtime events regardless of origin.` +
+                        (realtimeSubscribes ? "" : " This process installs the capture but does not consume it.")
                     );
                 } catch (err) {
                     if (explicitCdc) {
@@ -691,7 +740,7 @@ table: link.table });
 
             // Legacy cross-instance realtime (app-level). Skipped when CDC is
             // active because CDC already spans instances.
-            if (!cdcEnabled && directUrl) {
+            if (!cdcEnabled && directUrl && realtimeSubscribes) {
                 try {
                     await realtimeService.startListening(directUrl);
                 } catch (err) {
@@ -1060,6 +1109,27 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             }
 
             return { applied: outcome.policiesApplied };
+        },
+
+        /**
+         * Read what the last provisioning boot recorded, or `null`.
+         *
+         * The meta schema is `rebase` rather than the auth stamp's — see
+         * `schema/collections-schema-version.ts` for why the two can differ.
+         */
+        async readCollectionsSchemaVersion(driverResult?: InitializedDriver): Promise<string | null> {
+            const db = provisioningDb(driverResult);
+            if (!db) return null;
+            const { readCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
+            return readCollectionsSchemaVersion(db as never, SCHEMA_META_SCHEMA);
+        },
+
+        /** Record what this process just applied. Only the provisioning process calls this. */
+        async stampCollectionsSchemaVersion(version: string, driverResult?: InitializedDriver): Promise<void> {
+            const db = provisioningDb(driverResult);
+            if (!db) return;
+            const { stampCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
+            await stampCollectionsSchemaVersion(db as never, SCHEMA_META_SCHEMA, version);
         },
 
         getAdmin(driverResult: InitializedDriver): DatabaseAdmin | undefined {

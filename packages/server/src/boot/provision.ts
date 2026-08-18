@@ -60,7 +60,13 @@ export interface ProvisionTarget {
     engine: string;
     driverVersion?: string;
     runtimeVersion?: string;
-    bootstrapper: Pick<BackendBootstrapper, "ensureCollectionSchema" | "ensureCollectionPolicies">;
+    bootstrapper: Pick<
+        BackendBootstrapper,
+        | "ensureCollectionSchema"
+        | "ensureCollectionPolicies"
+        | "readCollectionsSchemaVersion"
+        | "stampCollectionsSchemaVersion"
+    >;
     /**
      * The handle the hooks read (`internals.db`), or `undefined` to let the
      * adapter fall back to the connection it was constructed with.

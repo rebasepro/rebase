@@ -858,6 +858,40 @@ export interface BackendBootstrapper {
     ): Promise<{ applied: number }>;
 
     /**
+     * Read the collections schema version this database was last provisioned
+     * from, or `null` when nothing has ever stamped it.
+     *
+     * The companion to {@link stampCollectionsSchemaVersion}: one process writes
+     * what it applied, every other process compares itself to it. This is what
+     * lets a split deployment — several processes over one database, only one of
+     * which provisions — notice that a unit is serving against a schema it was
+     * not built for. That failure is otherwise silent in both directions: a
+     * column that does not exist is a SQL error on one route, and a policy that
+     * was never applied is a 200 with no rows.
+     *
+     * `null` is not an error and MUST NOT be treated as one — every database
+     * provisioned before the stamp existed reads this way, and so does every
+     * fresh one until its first provisioning boot finishes.
+     */
+    readCollectionsSchemaVersion?(
+        driverResult?: InitializedDriver
+    ): Promise<string | null>;
+
+    /**
+     * Record the collections schema version this process just applied.
+     *
+     * Called only by the process that provisions, and only after both
+     * {@link ensureCollectionSchema} and {@link ensureCollectionPolicies} have
+     * run — a stamp written before the policies would claim a schema that is
+     * only half in place, and the half that is missing is the one that fails
+     * without an error.
+     */
+    stampCollectionsSchemaVersion?(
+        version: string,
+        driverResult?: InitializedDriver
+    ): Promise<void>;
+
+    /**
      * Initialize WebSocket server for realtime operations.
      */
     initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> | void;

@@ -33,6 +33,13 @@
  * - `cron` — `${basePath}/cron`, the cron *admin* surface. Whether jobs actually
  *   fire is {@link RuntimeOwnership.cronScheduler}, not this.
  * - `meta` — `${basePath}/meta`, the contract endpoint a generated SDK reads.
+ * - `realtime` — the websocket server, and with it this process's appetite for
+ *   change events: whether it opens a `LISTEN` connection and consumes CDC at
+ *   all. Not a Hono route like the others — the websocket server is attached to
+ *   the HTTP server rather than mounted on a path — but it is the same
+ *   question, asked of the same process, and leaving it out is what let a
+ *   `worker` pod hold a dedicated database connection to deliver events to
+ *   nobody.
  */
 export type RuntimeSurface =
     | "auth"
@@ -41,7 +48,8 @@ export type RuntimeSurface =
     | "admin"
     | "functions"
     | "cron"
-    | "meta";
+    | "meta"
+    | "realtime";
 
 /** Every surface, in a stable order. */
 export const ALL_RUNTIME_SURFACES: readonly RuntimeSurface[] = [
@@ -51,7 +59,8 @@ export const ALL_RUNTIME_SURFACES: readonly RuntimeSurface[] = [
     "admin",
     "functions",
     "cron",
-    "meta"
+    "meta",
+    "realtime"
 ] as const;
 
 /** A fully-resolved answer for every surface. */

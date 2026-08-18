@@ -36,6 +36,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | `/api/functions/*` | ✅ | transmet (voir plus bas) | ✅ | — |
 | `/api/cron` (la surface d'administration) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Sert les websockets, consomme les événements de changement | ✅ | ✅ | — | — |
 | Crée le schéma au démarrage | ✅ | ✅ | — | — |
 | Exécute le planificateur cron | ✅ | ✅ | — | ✅ |
 | Exécute les workers de la file de tâches | ✅ | ✅ | — | ✅ |
@@ -43,6 +44,16 @@ REBASE_ROLE=all        # the default: everything, one process
 Le health et les métriques sont présents sur tous les rôles, sans exception. Un
 processus qu'un orchestrateur ne peut pas sonder est un processus qu'il ne peut
 pas déployer.
+
+Le temps réel figure dans la liste parce qu'il coûte quelque chose que quelqu'un
+s'en serve ou non : un processus qui consomme les événements de changement garde
+une connexion `LISTEN` hors du pool pendant toute sa durée de vie, et installe
+les triggers de capture au démarrage. Seul un processus qui sert des websockets a
+quelqu'un à qui livrer — les deux rôles qui n'en servent aucun ne font donc ni
+l'un ni l'autre. **Les écritures faites par ces processus sont toujours
+entendues** : la capture repose sur des triggers de base de données, un
+changement est donc publié par la base et non par le processus qui l'a fait. Une
+fonction qui écrit une ligne réveille toujours tous les abonnés de l'`api`.
 
 ## Docker Compose
 
@@ -189,9 +200,11 @@ est une boucle de scrutation, et seule la seconde est ce qu'un rôle désactive.
 ## Ce que la répartition n'apporte pas
 
 **Des limites de débit partagées.** Le stockage du limiteur est par processus par
-défaut, donc N processus multiplient par N le budget de chaque appelant. Passez
-un `rateLimit.store` partagé dans la configuration de votre backend si la limite
-doit valoir pour l'ensemble du déploiement.
+défaut, donc N processus multiplient par N le budget de chaque appelant. Mettez
+`REBASE_RATE_LIMIT_STORE=sql` sur chaque processus qui sert du HTTP : le comptage
+se fait dans Postgres, donc la limite est la limite quel que soit le nombre de
+réplicas. (Le chart Helm le règle pour vous et refuse de rendre une topologie
+multi-processus qui le laisse sur `memory`.)
 
 **Des canaux inter-instances.** Le broadcast et la présence utilisent par défaut
 un bus en mémoire, qui ne franchit pas les processus. C'est une question de
@@ -202,6 +215,68 @@ plus d'un processus sert des websockets.
 
 **La mise à l'échelle à zéro.** Rien ici ne réduit un processus à néant ni n'en
 démarre un à la demande. C'est une capacité de la plateforme, pas du runtime.
+
+## Publier une unité pour elle-même
+
+Tout ce qui précède répartit *où* le travail s'exécute. Le tout se publie
+toujours comme une seule build : une image, un bundle, déployés ensemble. C'est
+la valeur par défaut correcte, et la plupart des déploiements devraient s'y
+tenir.
+
+Une unité peut aussi être tenue sur une build à elle — un correctif de fonction
+qui ne redémarre pas l'API :
+
+```yaml
+# values.yaml
+split: true
+functions:
+  enabled: true
+  image:
+    tag: "0.16.0"     # cette unité seulement ; le reste garde le tag du release
+```
+
+En général seul le tag vaut la peine d'être épinglé : le dépôt est hérité, donc
+c'est un projet et une image dont une unité a bougé. `bundleUrl` fait la même
+chose avec `bundle.mode: url`.
+
+### La règle
+
+Deux unités sur des builds différentes, ce sont deux jeux de collections face à
+**une seule** base de données, et une seule unité la provisionne. Donc :
+
+> **L'unité qui possède le schéma se déploie en premier. Une unité peut être en
+> retard ; elle ne doit jamais être en avance.**
+
+C'est le Job de migration, ou l'`api` quand le Job est désactivé. Une unité *en
+avance* sur le schéma interroge des colonnes qui n'existent pas encore et repose
+sur des politiques RLS que personne n'a appliquées — la première est une erreur
+SQL sur une route, la seconde un résultat vide avec un 200. Une unité *en retard*
+est l'état ordinaire de tout déploiement en cours.
+
+### Ce qui le vérifie
+
+Le processus qui provisionne enregistre dans la base la version de schéma qu'il a
+appliquée. Tout autre processus calcule la sienne à partir des collections
+chargées et compare. En cas de désaccord, il le dit et nomme les deux :
+
+```
+⚠️ [schema] The database was last provisioned from a different set of collections
+   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+```
+
+Il avertit et sert, car pendant un déploiement ce désaccord est *correct* : les
+unités pas encore déployées sont censées être en retard. Mettez
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (ou `sharedState.requireSchemaMatch` dans le
+chart) pour refuser le démarrage à la place, sur un déploiement qui préfère ne
+pas servir plutôt que servir faux.
+
+Les deux côtés de cette comparaison sont **calculés**, jamais lus dans un
+manifeste. Une version qu'une build affirme sur elle-même ne prouve pas que la
+base est d'accord.
+
+Rien ne vérifie le *sens* — une version de schéma est un hachage : elle peut dire
+que les deux diffèrent, jamais laquelle est en avance. C'est pourquoi l'ordre de
+déploiement est une règle que vous suivez, pas une que le runtime peut imposer.
 
 ## Mise à jour
 

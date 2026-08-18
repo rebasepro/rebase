@@ -140,6 +140,34 @@ export interface DatabaseAdapter {
     ): Promise<{ applied: number }>;
 
     /**
+     * Read the collections schema version this database was last provisioned
+     * from, or `null` when nothing has ever stamped it.
+     *
+     * `null` is not an error and MUST NOT be treated as one — every database
+     * provisioned before the stamp existed reads this way, and so does every
+     * fresh one until its first provisioning boot finishes.
+     *
+     * Same forwarding requirement as the two hooks above: a wrapper that omits
+     * it turns the check off, and a check that is off looks exactly like a check
+     * that passed.
+     */
+    readCollectionsSchemaVersion?(
+        driverResult?: InitializedDriver,
+    ): Promise<string | null>;
+
+    /**
+     * Record the collections schema version this process just applied.
+     *
+     * Called only by the process that provisions, and only after the tables AND
+     * the policies are in place — a stamp written earlier would claim a schema
+     * that a half-finished boot never finished creating.
+     */
+    stampCollectionsSchemaVersion?(
+        version: string,
+        driverResult?: InitializedDriver,
+    ): Promise<void>;
+
+    /**
      * Return admin capabilities for this database (SQL editor, schema browser, branching).
      */
     getAdmin?(driverResult: InitializedDriver): DatabaseAdmin | undefined;
@@ -206,5 +234,34 @@ export interface DatabaseAdapterInitConfig {
         attempted: boolean;
         /** Why it did not, when it did not — safe to print verbatim. */
         reason?: string;
+    };
+    /**
+     * What this process wants from the realtime subsystem.
+     *
+     * Both halves used to be assumed true, and both were wrong for a split
+     * deployment. A `functions` or `worker` process has no websocket clients, so
+     * consuming change events buys it a dedicated `LISTEN` connection to deliver
+     * to nobody; and it is explicitly not the process that owns schema DDL, so
+     * installing capture triggers from it contradicts the one-owner rule the
+     * runtime otherwise refuses to boot without.
+     *
+     * Absent means both — every caller that predates this field is a
+     * single-process deployment, where both are true.
+     */
+    realtime?: {
+        /**
+         * Consume change events: open the `LISTEN` connection, start CDC or the
+         * app-level fallback. False for a process that serves no websockets.
+         *
+         * Writes made by a non-consuming process are still published: capture is
+         * database triggers, so the publisher is the database.
+         */
+        subscribe: boolean;
+        /**
+         * Install what capture needs — the trigger function, the per-table
+         * triggers, any channel-history tables. This is DDL, and it follows the
+         * same single-owner rule as every other boot-time schema change.
+         */
+        provision: boolean;
     };
 }

@@ -35,12 +35,23 @@ REBASE_ROLE=all        # the default: everything, one process
 | `/api/functions/*` | ✅ | reenvía (ver abajo) | ✅ | — |
 | `/api/cron` (la superficie de administración) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Sirve websockets, consume eventos de cambio | ✅ | ✅ | — | — |
 | Crea el esquema al arrancar | ✅ | ✅ | — | — |
 | Ejecuta el planificador de cron | ✅ | ✅ | — | ✅ |
 | Ejecuta los workers de la cola de trabajos | ✅ | ✅ | — | ✅ |
 
 Las métricas y el health están en todos los roles sin excepción. Un proceso que
 un orquestador no puede sondear es un proceso que no puede desplegar.
+
+El realtime está en la lista porque cuesta algo lo use alguien o no: un proceso
+que consume eventos de cambio mantiene abierta una conexión `LISTEN` fuera del
+pool mientras viva, e instala los triggers de captura al arrancar. Solo un
+proceso que sirve websockets tiene a quién entregar, así que los dos roles que no
+sirven ninguno no hacen ni lo uno ni lo otro. **Las escrituras hechas por esos
+procesos se siguen oyendo**: la captura son triggers de base de datos, de modo
+que un cambio lo publica la base de datos y no el proceso que lo hizo. Una
+función que escribe una fila sigue despertando a todos los suscriptores del
+`api`.
 
 ## Docker Compose
 
@@ -185,8 +196,10 @@ es un bucle de sondeo, y solo lo segundo es lo que desactiva un rol.
 
 **Límites de tasa compartidos.** El almacén del limitador es por proceso por
 defecto, así que N procesos multiplican por N la asignación de cada llamante.
-Pasa un `rateLimit.store` compartido en la configuración de tu backend si el
-límite debe mantenerse en todo el despliegue.
+Pon `REBASE_RATE_LIMIT_STORE=sql` en cada proceso que sirva HTTP: cuenta en
+Postgres, así que el límite es el límite haya las réplicas que haya. (El chart de
+Helm lo pone por ti y se niega a renderizar una topología de varios procesos que
+lo deje en `memory`.)
 
 **Canales entre instancias.** El broadcast y la presencia usan un bus en memoria
 por defecto, que no cruza procesos. Esto es una cuestión de *número de réplicas*
@@ -196,6 +209,67 @@ configuración) siempre que más de un proceso sirva websockets.
 
 **Escalar a cero.** Nada de esto reduce un proceso a nada ni lo levanta bajo
 demanda. Eso es una capacidad de la plataforma, no del runtime.
+
+## Publicar una unidad por su cuenta
+
+Todo lo anterior reparte *dónde* corre el trabajo. Todo ello se sigue publicando
+como una sola build: una imagen, un bundle, desplegados juntos. Ese es el valor
+por defecto correcto, y la mayoría de los despliegues deberían quedarse ahí.
+
+Una unidad también puede quedarse en una build propia — un arreglo en una función
+que no reinicia la API:
+
+```yaml
+# values.yaml
+split: true
+functions:
+  enabled: true
+  image:
+    tag: "0.16.0"     # solo esta unidad; el resto sigue en el tag del release
+```
+
+Normalmente solo merece la pena fijar el tag: el repositorio se hereda, así que
+es un proyecto y una imagen con una unidad movida. `bundleUrl` hace lo mismo
+cuando `bundle.mode: url`.
+
+### La regla
+
+Dos unidades en builds distintas son dos conjuntos de colecciones contra **una**
+base de datos, y solo una unidad la aprovisiona. Por tanto:
+
+> **La unidad dueña del esquema se despliega primero. Una unidad puede ir por
+> detrás; nunca por delante.**
+
+Es el Job de migración, o la `api` cuando el Job está apagado. Una unidad que va
+*por delante* del esquema consulta columnas que aún no existen y depende de
+políticas RLS que nadie aplicó — lo primero es un error SQL en una ruta, lo
+segundo un resultado vacío con un 200. Una unidad que va *por detrás* es el
+estado normal de cualquier despliegue en curso.
+
+### Qué lo comprueba
+
+El proceso que aprovisiona registra en la base de datos la versión de esquema que
+aplicó. Cualquier otro proceso calcula la suya a partir de las colecciones que
+cargó y compara. Ante una discrepancia lo dice, nombrando ambas:
+
+```
+⚠️ [schema] The database was last provisioned from a different set of collections
+   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+```
+
+Avisa y sirve, porque durante un despliegue esa discrepancia es *correcta*: las
+unidades que aún no se han desplegado deben ir por detrás. Pon
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (o `sharedState.requireSchemaMatch` en el
+chart) para que rechace el arranque, en un despliegue que prefiere no servir a
+servir mal.
+
+Ambos lados de esa comparación se **calculan**, nunca se leen de un manifiesto.
+Una versión que una build afirma sobre sí misma no prueba que la base de datos
+esté de acuerdo.
+
+Nada comprueba la *dirección* — una versión de esquema es un hash, puede decir
+que las dos difieren pero nunca cuál va por delante. Por eso el orden del
+despliegue es una regla que sigues, no una que el runtime pueda imponer.
 
 ## Actualizar
 

@@ -36,12 +36,24 @@ REBASE_ROLE=all        # the default: everything, one process
 | `/api/functions/*` | ✅ | leitet weiter (siehe unten) | ✅ | — |
 | `/api/cron` (die Admin-Oberfläche) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Bedient WebSockets, konsumiert Änderungsereignisse | ✅ | ✅ | — | — |
 | Legt beim Start das Schema an | ✅ | ✅ | — | — |
 | Führt den Cron-Scheduler aus | ✅ | ✅ | — | ✅ |
 | Führt die Job-Queue-Worker aus | ✅ | ✅ | — | ✅ |
 
 Health und Metriken gibt es ausnahmslos auf jeder Rolle. Ein Prozess, den ein
 Orchestrator nicht prüfen kann, ist ein Prozess, den er nicht ausrollen kann.
+
+Realtime steht auf der Liste, weil es etwas kostet, ob es jemand nutzt oder
+nicht: Ein Prozess, der Änderungsereignisse konsumiert, hält für seine gesamte
+Laufzeit eine `LISTEN`-Verbindung außerhalb des Pools offen und legt beim Start
+die Capture-Trigger an. Nur ein Prozess, der WebSockets bedient, hat überhaupt
+jemanden, an den er ausliefern kann — die beiden Rollen, die keine bedienen, tun
+also weder das eine noch das andere. **Schreibvorgänge dieser Prozesse werden
+trotzdem gehört**: Die Erfassung läuft über Datenbank-Trigger, eine Änderung wird
+also von der Datenbank veröffentlicht und nicht von dem Prozess, der sie
+vorgenommen hat. Eine Funktion, die eine Zeile schreibt, weckt weiterhin jeden
+Abonnenten auf der `api`.
 
 ## Docker Compose
 
@@ -186,10 +198,13 @@ ist eine Polling-Schleife, und nur Letzteres schaltet eine Rolle ab.
 
 ## Was die Aufteilung nicht bringt
 
-**Geteilte Rate Limits.** Der Speicher des Rate Limiters ist standardmäßig
-prozesslokal, N Prozesse vervielfachen das Kontingent jedes Aufrufers also um N.
-Übergib einen gemeinsamen `rateLimit.store` in der Backend-Konfiguration, wenn
-das Limit für das gesamte Deployment gelten soll.
+**Geteilte Rate Limits, sofern du danach fragst.** Der Speicher ist
+standardmäßig prozesslokal, N Prozesse vervielfachen das Kontingent jedes
+Aufrufers also um N — und kein Log sagt das. Setze auf jedem Prozess, der HTTP
+bedient, `REBASE_RATE_LIMIT_STORE=sql`: Dann wird in Postgres gezählt und das
+Limit bleibt das Limit, egal wie viele Repliken laufen. (Das Helm-Chart setzt es
+für dich und weigert sich, eine Topologie mit mehreren Prozessen zu rendern, die
+auf `memory` steht.)
 
 **Instanzübergreifende Channels.** Broadcast und Presence nutzen standardmäßig
 einen In-Memory-Bus, der Prozessgrenzen nicht überschreitet. Das ist eher eine
@@ -201,6 +216,68 @@ sobald mehr als ein Prozess WebSockets bedient.
 **Scale-to-Zero.** Nichts davon fährt einen Prozess auf null herunter oder
 startet einen bei Bedarf. Das ist eine Fähigkeit der Plattform, nicht der
 Runtime.
+
+## Eine Einheit für sich ausliefern
+
+Alles bisher teilt auf, *wo* die Arbeit läuft. Ausgeliefert wird sie weiterhin
+als ein Build: ein Image, ein Bundle, gemeinsam ausgerollt. Das ist die richtige
+Voreinstellung, und die meisten Deployments sollten dabei bleiben.
+
+Eine Einheit kann aber auch auf einem eigenen Build gehalten werden — ein Fix an
+einer Funktion, der die API nicht neu startet:
+
+```yaml
+# values.yaml
+split: true
+functions:
+  enabled: true
+  image:
+    tag: "0.16.0"     # nur diese Einheit; der Rest bleibt auf dem Release-Tag
+```
+
+Meist lohnt nur das Tag: das Repository wird geerbt, es bleibt also ein Projekt
+und ein Image, bei dem eine Einheit bewegt wurde. `bundleUrl` tut dasselbe, wenn
+`bundle.mode: url` gesetzt ist.
+
+### Die Regel
+
+Zwei Einheiten auf verschiedenen Builds sind zwei Sätze von Collections gegen
+**eine** Datenbank, und nur eine Einheit provisioniert sie. Also:
+
+> **Die Einheit, der das Schema gehört, wird zuerst ausgerollt. Eine Einheit darf
+> hinterherhinken; vorauslaufen darf sie nie.**
+
+Das ist der Migrations-Job oder die `api`, wenn der Job aus ist. Eine Einheit, die
+dem Schema *vorausläuft*, fragt Spalten ab, die es noch nicht gibt, und verlässt
+sich auf RLS-Policies, die niemand angewendet hat — das erste ist ein SQL-Fehler
+auf einer Route, das zweite ein leeres Ergebnis mit einer 200. Eine Einheit, die
+*hinterherhinkt*, ist der Normalzustand jedes laufenden Rollouts.
+
+### Was das prüft
+
+Der Prozess, der provisioniert, schreibt die angewendete Schemaversion in die
+Datenbank. Jeder andere Prozess berechnet seine eigene aus den geladenen
+Collections und vergleicht. Bei Abweichung sagt er es und nennt beide:
+
+```
+⚠️ [schema] The database was last provisioned from a different set of collections
+   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+```
+
+Er warnt und bedient weiter, denn während eines Rollouts ist diese Abweichung
+*korrekt* — die noch nicht ausgerollten Einheiten sollen hinterherhinken. Mit
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (oder `sharedState.requireSchemaMatch` im
+Chart) verweigert er stattdessen den Start, für ein Deployment, das lieber gar
+nicht bedient als falsch.
+
+Beide Seiten dieses Vergleichs werden **berechnet**, nie aus einem Manifest
+gelesen. Eine Version, die ein Build über sich selbst behauptet, ist kein Beleg
+dafür, dass die Datenbank ihm zustimmt.
+
+Die *Richtung* prüft nichts — eine Schemaversion ist ein Hash, sie kann sagen,
+dass die beiden nicht übereinstimmen, aber nie, welche voraus ist. Deshalb ist
+die Rollout-Reihenfolge eine Regel, der du folgst, und keine, die die Runtime
+erzwingen kann.
 
 ## Aktualisieren
 

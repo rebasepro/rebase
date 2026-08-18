@@ -100,14 +100,38 @@ function stubDriver() {
     } as never;
 }
 
+/**
+ * What the last boot told the driver, and whether it attached websockets.
+ *
+ * `realtime` is the one surface with no URL to probe — the websocket server is
+ * attached to the HTTP server rather than mounted on a path — so this is where
+ * it is observed instead. Both halves matter: a process that mounts no
+ * websocket server but still asks the driver to consume change events has only
+ * moved the cost, not removed it.
+ */
+let lastInit: Record<string, unknown> | undefined;
+let websocketsAttached = false;
+
 const bootstrapper: BackendBootstrapper = {
     type: "fake",
     isDefault: true,
-    async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver(), collections: [], internals: {} } as unknown as InitializedDriver;
+    async initializeDriver(config: unknown): Promise<InitializedDriver> {
+        lastInit = config as Record<string, unknown>;
+        // A realtime provider has to exist for the websocket attachment to be
+        // reachable at all — the boot skips it when the driver offers none, so
+        // without this the assertion below would pass for the wrong reason.
+        return {
+            driver: stubDriver(),
+            collections: [],
+            internals: {},
+            realtimeProvider: {}
+        } as unknown as InitializedDriver;
     },
     async initializeAuth() {
         return { userService: {}, authRepository: {} };
+    },
+    async initializeWebsockets() {
+        websocketsAttached = true;
     }
 } as unknown as BackendBootstrapper;
 
@@ -153,7 +177,21 @@ async function mounted(app: Hono): Promise<string[]> {
 
 afterEach(() => {
     while (started.length) started.pop()!.stop();
+    lastInit = undefined;
+    websocketsAttached = false;
 });
+
+/**
+ * Surfaces with no URL, and why.
+ *
+ * The probe table below is the coverage guard for everything else, and it can
+ * only guard what a request can reach. A surface listed here has to be asserted
+ * some other way, and the test that follows checks that it really has no probe —
+ * otherwise this list becomes the place a surface goes to stop being tested.
+ */
+const NON_HTTP_SURFACES: Partial<Record<RuntimeSurface, string>> = {
+    realtime: "the websocket server attaches to the HTTP server, not to a path"
+};
 
 describe("runtime surfaces", () => {
     it("mounts every probe when no surfaces are named — the default must not move", async () => {
@@ -167,16 +205,49 @@ describe("runtime surfaces", () => {
         // at all and the suite below still passes — it only ever asserts about
         // the surfaces it already knows.
         const covered = new Set(PROBES.map(p => p.surface));
+        const exempt = new Set(Object.keys(NON_HTTP_SURFACES) as RuntimeSurface[]);
 
-        expect([...ALL_RUNTIME_SURFACES].filter(s => !covered.has(s))).toEqual([]);
+        expect([...ALL_RUNTIME_SURFACES].filter(s => !covered.has(s) && !exempt.has(s))).toEqual([]);
+        // And the exemption list is not a hiding place: everything on it really
+        // has no probe, so a surface cannot be excused from coverage it has.
+        expect([...exempt].filter(s => covered.has(s))).toEqual([]);
     });
 
-    it.each(ALL_RUNTIME_SURFACES)("drops exactly the %s probes when that surface is off", async (surface) => {
+    it.each(ALL_RUNTIME_SURFACES.filter(s => !(s in NON_HTTP_SURFACES)))(
+        "drops exactly the %s probes when that surface is off", async (surface) => {
         const app = await boot({ [surface]: false });
 
         const expected = PROBES.filter(p => p.surface !== surface).map(p => p.url);
 
         expect((await mounted(app)).sort()).toEqual(expected.sort());
+    }
+    );
+
+    it("attaches websockets and asks the driver to consume, by default", async () => {
+        await boot();
+
+        expect(websocketsAttached).toBe(true);
+        expect(lastInit?.realtime).toEqual({ subscribe: true, provision: true });
+    });
+
+    it("with `realtime` off, attaches no websocket server and consumes nothing", async () => {
+        // The shape a `functions` or `worker` process boots in. Before this was
+        // a surface, both attached a websocket server no client could reach and
+        // opened a dedicated LISTEN connection to deliver events to nobody — one
+        // database connection per replica, for the life of the process.
+        await boot({ realtime: false });
+
+        expect(websocketsAttached).toBe(false);
+        expect(lastInit?.realtime).toMatchObject({ subscribe: false });
+    });
+
+    it("keeps provisioning separable from consuming", async () => {
+        // An `api` behind an external migration Job subscribes without owning
+        // DDL; a process can also install capture and not consume it. The two
+        // are independent answers and the driver is told both.
+        await boot({ realtime: true });
+
+        expect(lastInit?.realtime).toMatchObject({ subscribe: true });
     });
 
     it("mounts only the selected functions", async () => {

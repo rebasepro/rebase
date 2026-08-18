@@ -75,6 +75,13 @@ type RoleShape = Pick<ResolvedRole, "surfaces" | "ownership" | "provisionSchema"
  * and sets `REBASE_CRON_SCHEDULER=false` on the api. `functions` runs no timers
  * at all — a function process is scaled by request load and replaced at will, so
  * giving it scheduled work would make its replica count mean something.
+ *
+ * `realtime` is off for the same two, and it is the surface whose cost is paid
+ * whether or not anyone calls it: a process that consumes change events holds a
+ * dedicated `LISTEN` connection outside the pool for as long as it runs, and
+ * only a process serving websockets has anybody to deliver to. Writes made *by*
+ * these processes are still heard — capture is database triggers, so a change is
+ * published by the database rather than by whichever pod made it.
  */
 const ROLES: Record<RebaseRuntimeRole, RoleShape> = {
     all: {
@@ -88,14 +95,17 @@ const ROLES: Record<RebaseRuntimeRole, RoleShape> = {
         provisionSchema: true
     },
     functions: {
-        surfaces: { auth: false, data: false, storage: false, admin: false, cron: false, meta: false },
+        surfaces: {
+            auth: false, data: false, storage: false, admin: false,
+            cron: false, meta: false, realtime: false
+        },
         ownership: { cronScheduler: false, jobWorkers: false },
         provisionSchema: false
     },
     worker: {
         surfaces: {
             auth: false, data: false, storage: false, admin: false,
-            functions: false, cron: false, meta: false
+            functions: false, cron: false, meta: false, realtime: false
         },
         ownership: {},
         provisionSchema: false

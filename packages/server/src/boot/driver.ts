@@ -259,6 +259,12 @@ export function adapterToBootstrapper(
             ? (collections, driverResult, log) =>
                 adapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        readCollectionsSchemaVersion: adapter.readCollectionsSchemaVersion
+            ? (driverResult) => adapter.readCollectionsSchemaVersion!(driverResult)
+            : undefined,
+        stampCollectionsSchemaVersion: adapter.stampCollectionsSchemaVersion
+            ? (version, driverResult) => adapter.stampCollectionsSchemaVersion!(version, driverResult)
+            : undefined,
         getAdmin: adapter.getAdmin,
         mountRoutes: adapter.mountRoutes
     };

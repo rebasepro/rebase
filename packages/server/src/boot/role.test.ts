@@ -50,6 +50,20 @@ describe("resolveRole — what each role is", () => {
             .toEqual(["functions"]);
     });
 
+    it("neither split-off role consumes realtime", () => {
+        // The surface is not a route, so it went on being served by processes
+        // that mount no routes at all — a worker holding a dedicated LISTEN
+        // connection to deliver change events to nobody. It costs a connection
+        // per replica for as long as the process runs, which is why it is a
+        // surface now and not an assumption.
+        for (const role of ["functions", "worker"] as const) {
+            expect(serving({ REBASE_ROLE: role, REBASE_MIGRATE_ON_BOOT: "none" }))
+                .not.toContain("realtime");
+        }
+        expect(serving()).toContain("realtime");
+        expect(serving({ REBASE_ROLE: "api" })).toContain("realtime");
+    });
+
     it("`functions` runs no timers at all", () => {
         // A function process is scaled by request load and replaced at will.
         // Scheduled work there would make its replica count mean something.

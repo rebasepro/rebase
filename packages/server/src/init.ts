@@ -27,6 +27,7 @@ import {
     provisionCollectionTables,
     provisionTargetFor
 } from "./boot/provision";
+import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "./boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
 import { createRoutedRealtimeService } from "./services/routed-realtime-service";
 import { Server } from "http";
@@ -751,6 +752,12 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        readCollectionsSchemaVersion: dbAdapter.readCollectionsSchemaVersion
+            ? (driverResult) => dbAdapter.readCollectionsSchemaVersion!(driverResult)
+            : undefined,
+        stampCollectionsSchemaVersion: dbAdapter.stampCollectionsSchemaVersion
+            ? (version, driverResult) => dbAdapter.stampCollectionsSchemaVersion!(version, driverResult)
+            : undefined,
         getAdmin: dbAdapter.getAdmin,
         mountRoutes: dbAdapter.mountRoutes
     };
@@ -917,6 +924,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             schemaProvisioning: {
                 attempted: schemaOutcome.status === "applied",
                 reason: schemaOutcome.status === "skipped" ? schemaOutcome.reason : undefined
+            },
+            // Two separate questions, and a split deployment answers them
+            // differently. `subscribe` is "does this process have anyone to
+            // deliver change events to" — false for the roles that serve no
+            // websockets, which is what stops a worker holding a dedicated
+            // LISTEN connection for nothing. `provision` is DDL, and it follows
+            // the same single-owner rule as the tables and the policies: the
+            // capture triggers are installed once, by the process that owns the
+            // schema, and every other process then reads what they publish.
+            realtime: {
+                subscribe: surfaces.realtime,
+                provision: config.provisionSchema ?? true
             }
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
@@ -1128,9 +1147,42 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // initialization, which just finished. A table without its policies is not
     // servable either, so skipping this half only changes the symptom from a 500
     // to an empty result.
-    await provisionCollectionPolicies(provisionable, provisionTarget, {
+    const policyOutcome = await provisionCollectionPolicies(provisionable, provisionTarget, {
         introspecting: introspectCollections,
         provision: config.provisionSchema ?? true
+    });
+
+    // ── Does this process match the schema it is about to serve? ─────────────
+    //
+    // Deliberately here, after the policies rather than after the tables: half a
+    // schema is not a schema, and the missing half is the one whose absence
+    // shows up as an empty result rather than an error. A process that just
+    // provisioned stamps what it applied; every other process compares and says
+    // so. See ./boot/schema-stamp.
+    // `provisionTarget` already answered "which adapter owns the schema, and
+    // through which handle" for the two steps above; the stamp is the third step
+    // of the same job and reads it off the same object rather than resolving it
+    // again. Two answers to that question is how the create path and the patch
+    // path drifted apart elsewhere in this codebase.
+    await enforceSchemaStamp({
+        collections: provisionable,
+        // What this process *did*, not what its role permits. The difference is
+        // the chart's default: with an external migration Job every pod runs
+        // REBASE_MIGRATE_ON_BOOT=none, including the api, whose role still says
+        // it may provision. Keyed on permission, the api would stamp a schema it
+        // had not applied — overwriting the Job's answer with its own and making
+        // the check agree with whatever booted last. Keyed on the outcome, the
+        // Job stamps and the api compares, which is what each of them actually
+        // is in that topology.
+        provisioned: schemaOutcome.status === "applied" && policyOutcome.status === "applied",
+        introspecting: introspectCollections,
+        policy: resolveSchemaMismatchPolicy(),
+        read: provisionTarget.bootstrapper.readCollectionsSchemaVersion
+            ? () => provisionTarget.bootstrapper.readCollectionsSchemaVersion!(provisionTarget.driverResult)
+            : undefined,
+        stamp: provisionTarget.bootstrapper.stampCollectionsSchemaVersion
+            ? version => provisionTarget.bootstrapper.stampCollectionsSchemaVersion!(version, provisionTarget.driverResult)
+            : undefined
     });
 
     let historyConfigResult: { historyService: import("./history/history-routes").HistoryService } | undefined = undefined;
@@ -2288,7 +2340,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         })
         : defaultRealtimeService as RealtimeProvider;
 
-    if (defaultBootstrapper.initializeWebsockets && effectiveRealtimeService) {
+    // The websocket server is attached to the HTTP server rather than mounted on
+    // a path, which is why it went on answering for roles that mount no surfaces
+    // at all. A `worker` serves no HTTP a client can reach and a `functions`
+    // process has no subscribers; upgrading a connection for either is a
+    // listener nobody asked for on a port nobody routes to.
+    if (surfaces.realtime && defaultBootstrapper.initializeWebsockets && effectiveRealtimeService) {
         await defaultBootstrapper.initializeWebsockets(config.server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter);
     }
 

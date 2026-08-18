@@ -34,12 +34,22 @@ REBASE_ROLE=all        # the default: everything, one process
 | `/api/functions/*` | ✅ | forwards (see below) | ✅ | — |
 | `/api/cron` (the admin surface) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Serves websockets, consumes change events | ✅ | ✅ | — | — |
 | Creates the schema at boot | ✅ | ✅ | — | — |
 | Runs the cron scheduler | ✅ | ✅ | — | ✅ |
 | Runs job-queue workers | ✅ | ✅ | — | ✅ |
 
 Health and metrics are on every role without exception. A process an
 orchestrator cannot probe is a process it cannot roll.
+
+Realtime is on the list because it costs something whether or not anyone uses
+it: a process that consumes change events holds a `LISTEN` connection outside
+the pool for as long as it runs, and installs the capture triggers at boot. Only
+a process serving websockets has anyone to deliver to, so the two roles that
+serve none do neither. **Writes made by those processes are still heard** — the
+capture is database triggers, so a change is published by the database rather
+than by whichever process made it. A function that writes a row still wakes up
+every subscriber on the `api`.
 
 ## Docker Compose
 
@@ -179,9 +189,12 @@ the second is what a role turns off.
 
 ## What splitting does not give you
 
-**Shared rate limits.** The default rate-limit store is per process, so N
-processes multiply every caller's allowance by N. Pass a shared `rateLimit.store`
-in your backend config if the limit has to hold across the whole deployment.
+**Shared rate limits, unless you ask.** The default store is per process, so N
+processes multiply every caller's allowance by N with nothing in any log to say
+so. Set `REBASE_RATE_LIMIT_STORE=sql` on every process that serves HTTP — it
+counts in Postgres, so the limit is the limit however many replicas there are.
+(The Helm chart sets it for you and refuses to render a multi-process topology
+that leaves it on `memory`.)
 
 **Cross-instance channels.** Broadcast and presence use an in-memory bus by
 default, which does not cross processes. This is a *replica count* question
@@ -191,6 +204,67 @@ config) whenever more than one process serves websockets.
 
 **Scale to zero.** Nothing here scales a process down to nothing or spins one up
 on demand. That is a platform capability, not a runtime one.
+
+## Releasing one unit on its own
+
+Everything above splits *where the work runs*. All of it still ships as one
+build: one image, one bundle, rolled together. That is the right default, and
+most deployments should stay there.
+
+A unit can also be held at a build of its own — a function fix that does not
+restart the API:
+
+```yaml
+# values.yaml
+split: true
+functions:
+  enabled: true
+  image:
+    tag: "0.16.0"     # this unit only; the rest stay on the release-wide tag
+```
+
+Only the tag is usually worth pinning: the repository is inherited, so this is
+one project and one image with one unit moved. `bundleUrl` does the same job
+when `bundle.mode: url`.
+
+### The rule
+
+Two units on different builds are two sets of collections against **one**
+database, and only one unit provisions it. So:
+
+> **The unit that owns the schema rolls first. A unit may lag; it must never
+> lead.**
+
+That is the migration Job, or the `api` when the Job is off. A unit running
+*ahead* of the schema queries columns that do not exist yet and relies on RLS
+policies nobody applied — the first is a SQL error on one route, the second is an
+empty result with a 200. A unit running *behind* is the ordinary state of any
+rollout in progress.
+
+### What checks it
+
+The process that provisions records the schema version it applied, in the
+database. Every other process computes its own from the collections it loaded and
+compares. On a disagreement it says so, naming both:
+
+```
+⚠️ [schema] The database was last provisioned from a different set of collections
+   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+```
+
+It warns and serves, because during a rollout that disagreement is *correct* —
+the units that have not rolled yet are supposed to be behind. Set
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (or `sharedState.requireSchemaMatch` in the
+chart) to refuse the boot instead, on a deployment that would rather not serve
+at all than serve wrong.
+
+Both sides of that comparison are **computed**, never read from a manifest. A
+version a build declares about itself is not evidence that the database agrees
+with it.
+
+Nothing checks the *direction* — a schema version is a hash, so it can say the
+two disagree and never which is ahead. That is what makes the rollout order a
+rule you follow rather than one the runtime can enforce.
 
 ## Upgrading
 

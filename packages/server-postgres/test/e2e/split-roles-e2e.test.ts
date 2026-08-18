@@ -149,6 +149,82 @@ async function tableExists(name: string): Promise<boolean> {
     }
 }
 
+/** Run a query over a plain connection, outside the runtime entirely. */
+async function query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+    const { default: pg } = await import("pg");
+    const client = new pg.Client({ connectionString: container.connectionString });
+    await client.connect();
+    try {
+        const { rows } = await client.query(sql, params);
+        return rows as T[];
+    } finally {
+        await client.end();
+    }
+}
+
+/**
+ * Is anything holding a `LISTEN` on the change-capture channel?
+ *
+ * `pg_listening_channels()` is per-session and cannot be read for another
+ * backend, so this reads the last statement each backend ran instead. A
+ * dedicated LISTEN client issues exactly one and then sits on the connection
+ * for the life of the process, which is what makes it visible here at all.
+ */
+async function cdcListenerCount(): Promise<number> {
+    const rows = await query<{ n: string }>(
+        `SELECT count(*)::text AS n FROM pg_stat_activity
+          WHERE datname = current_database()
+            AND pid <> pg_backend_pid()
+            AND query ILIKE 'LISTEN%'`
+    );
+    return Number(rows[0]?.n ?? 0);
+}
+
+/**
+ * Does the change-capture machinery exist in the database?
+ *
+ * The per-table triggers are the wrong thing to ask about: on a database whose
+ * tables do not exist yet there are none to attach to, so a process that
+ * provisions and one that does not produce the same empty answer — a check that
+ * passes for both is not a check. The trigger *function* is created first and
+ * unconditionally, which makes it the fact that actually separates them.
+ * (Verified by mutation: the earlier per-table version stayed green with the
+ * gating removed.)
+ */
+async function cdcFunctionExists(): Promise<boolean> {
+    const rows = await query<{ present: boolean }>(
+        "SELECT to_regprocedure('rebase.rebase_cdc_notify()') IS NOT NULL AS present"
+    );
+    return Boolean(rows[0]?.present);
+}
+
+/** The change-capture triggers installed on the project's own tables. */
+async function cdcTriggers(): Promise<string[]> {
+    const rows = await query<{ tgrelid: string }>(
+        `SELECT c.relname AS tgrelid FROM pg_trigger t
+           JOIN pg_class c ON c.oid = t.tgrelid
+          WHERE NOT t.tgisinternal AND t.tgname = 'rebase_cdc_trigger'`
+    );
+    return rows.map(r => r.tgrelid).sort();
+}
+
+/** The collections schema version this database currently carries. */
+async function stampedSchemaVersion(): Promise<string | null> {
+    const rows = await query<{ value: string }>(
+        `SELECT value FROM rebase.schema_meta WHERE key = 'collections_schema_version'`
+    ).catch(() => [] as { value: string }[]);
+    return rows[0]?.value ?? null;
+}
+
+/** Overwrite the stamp, to stand in for a database provisioned by a different build. */
+async function setStampedSchemaVersion(value: string): Promise<void> {
+    await query(
+        `INSERT INTO rebase.schema_meta (key, value) VALUES ('collections_schema_version', $1)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [value]
+    );
+}
+
 /**
  * Give the fixture project the dependency a deployed bundle carries.
  *
@@ -246,6 +322,24 @@ describe("a functions process against an unprovisioned database", () => {
         // the role undeployable on Kubernetes however correct it is otherwise.
         expect((await fetch(`${functions.origin}/health`)).status).toBe(200);
     });
+
+    it("installs no change-capture machinery", async () => {
+        // The role refuses to boot with REBASE_MIGRATE_ON_BOOT set, on the
+        // grounds that exactly one process owns schema DDL — and then installed
+        // CDC anyway, from a code path that never asked the role: a schema, a
+        // trigger function, and `DROP TRIGGER … ; CREATE TRIGGER …` per
+        // collection table, on every pod, on every rollout.
+        expect(await cdcFunctionExists()).toBe(false);
+        expect(await cdcTriggers()).toEqual([]);
+    });
+
+    it("opens no dedicated LISTEN connection", async () => {
+        // A functions process has no websocket clients, so a connection held
+        // open to deliver change events to nobody is one connection per replica
+        // spent on nothing — and it sits outside the pool, so it is not bounded
+        // by the pool size either.
+        expect(await cdcListenerCount()).toBe(0);
+    });
 });
 
 describe("the api process", () => {
@@ -257,6 +351,16 @@ describe("the api process", () => {
 
     it("provisions the schema the functions process would not", async () => {
         expect(await tableExists("split_notes")).toBe(true);
+    });
+
+    it("installs the change-capture the functions process would not", async () => {
+        expect(await cdcFunctionExists()).toBe(true);
+        // The other half of the ownership rule, and the half that makes the
+        // first one safe: capture is installed once, by the schema owner, and
+        // every other process then reads what the database publishes. A write
+        // made by the functions process is still heard — the trigger fires for
+        // the writer, whoever it is.
+        expect(await cdcTriggers()).toContain("split_notes");
     });
 
     it("serves the data surface", async () => {
@@ -390,6 +494,90 @@ describe("serving one named function", () => {
 // Placed last on purpose: the suites above assert against an *unprovisioned*
 // database, and a default-role process provisions on boot. Ordering is part of
 // the fixture here, not an accident.
+describe("the schema stamp", () => {
+    /**
+     * The guard that makes per-unit release safe to offer at all.
+     *
+     * A split deployment can pin its units to different builds, and they share
+     * one database that only one of them provisions. Nothing about that failure
+     * is visible: a process ahead of the schema queries a column that does not
+     * exist (a SQL error on one route) and relies on policies that were never
+     * applied (a 200 with no rows). These tests run the real processes, because
+     * the stamp is written by one and read by another and no in-process harness
+     * exercises that.
+     *
+     * Ordered after the api describe above deliberately — that boot is what
+     * provisions this database, and therefore what stamps it.
+     */
+    it("was written by the process that provisioned", async () => {
+        const stamped = await stampedSchemaVersion();
+
+        expect(stamped).toBeTruthy();
+        // It is a computed identity, not a copied manifest value. A version that
+        // looked like the manifest's would prove nothing: the contract endpoint
+        // already returns the manifest's own number verbatim, which is how the
+        // equivalent check elsewhere passed on a bundle corrupted to nonsense.
+        expect(stamped).toMatch(/^v\d+:/);
+    });
+
+    it("lets a matching process boot quietly", async () => {
+        const functions = await start({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none" });
+
+        expect(functions.output()).not.toMatch(/different set of collections/);
+        expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(200);
+    }, 120_000);
+
+    it("warns a process whose collections do not match the database", async () => {
+        const real = await stampedSchemaVersion();
+        await setStampedSchemaVersion("v1:0000000000000000");
+        try {
+            const functions = await start({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none" });
+
+            // Warns by default: mid-rollout disagreement is normal, and a
+            // deployment that crash-loops through its own rollout has traded a
+            // silent problem for a loud outage.
+            expect(functions.output()).toMatch(/different set of collections/);
+            expect(functions.output()).toContain("v1:0000000000000000");
+            expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(200);
+        } finally {
+            await setStampedSchemaVersion(real!);
+        }
+    }, 120_000);
+
+    it("refuses the boot under REBASE_REQUIRE_SCHEMA_MATCH", async () => {
+        const real = await stampedSchemaVersion();
+        await setStampedSchemaVersion("v1:0000000000000000");
+        try {
+            const said = await startExpectingRefusal({
+                REBASE_ROLE: "functions",
+                REBASE_MIGRATE_ON_BOOT: "none",
+                REBASE_REQUIRE_SCHEMA_MATCH: "true"
+            });
+
+            expect(said).toMatch(/different set of collections/);
+        } finally {
+            await setStampedSchemaVersion(real!);
+        }
+    }, 120_000);
+
+    it("does not stamp from a process that provisioned nothing", async () => {
+        // The chart's default runs an external migration Job and gives every
+        // pod REBASE_MIGRATE_ON_BOOT=none — including the api, whose role still
+        // permits provisioning. Keyed on permission rather than on outcome, that
+        // api would overwrite the Job's stamp with its own and the check would
+        // agree with whatever booted last.
+        const before = await stampedSchemaVersion();
+        await setStampedSchemaVersion("v1:1111111111111111");
+        try {
+            await start({ REBASE_ROLE: "api", REBASE_MIGRATE_ON_BOOT: "none" });
+
+            expect(await stampedSchemaVersion()).toBe("v1:1111111111111111");
+        } finally {
+            await setStampedSchemaVersion(before!);
+        }
+    }, 120_000);
+});
+
 describe("a deployment that sets no role at all", () => {
     /**
      * The shape every existing deployment is in, and the one Rebase Cloud's

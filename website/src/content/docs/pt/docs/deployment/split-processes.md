@@ -35,12 +35,23 @@ REBASE_ROLE=all        # the default: everything, one process
 | `/api/functions/*` | ✅ | reencaminha (ver abaixo) | ✅ | — |
 | `/api/cron` (a superfície de administração) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
+| Serve websockets, consome eventos de alteração | ✅ | ✅ | — | — |
 | Cria o esquema no arranque | ✅ | ✅ | — | — |
 | Executa o agendador de cron | ✅ | ✅ | — | ✅ |
 | Executa os workers da fila de tarefas | ✅ | ✅ | — | ✅ |
 
 Health e métricas existem em todos os papéis, sem exceção. Um processo que um
 orquestrador não consegue sondar é um processo que ele não consegue atualizar.
+
+O realtime está na lista porque custa alguma coisa quer alguém o use quer não: um
+processo que consome eventos de alteração mantém uma ligação `LISTEN` fora da
+pool enquanto viver, e instala os triggers de captura no arranque. Só um processo
+que serve websockets tem a quem entregar, por isso os dois papéis que não servem
+nenhum não fazem nem uma coisa nem outra. **As escritas feitas por esses
+processos continuam a ser ouvidas**: a captura são triggers de base de dados, ou
+seja, uma alteração é publicada pela base de dados e não pelo processo que a fez.
+Uma função que escreve uma linha continua a acordar todos os subscritores da
+`api`.
 
 ## Docker Compose
 
@@ -188,8 +199,10 @@ de sondagem, e só o segundo é o que um papel desliga.
 
 **Limites de taxa partilhados.** O armazenamento do limitador é por processo por
 predefinição, portanto N processos multiplicam por N a dotação de cada chamador.
-Passa um `rateLimit.store` partilhado na configuração do backend se o limite
-tiver de valer para todo o deployment.
+Define `REBASE_RATE_LIMIT_STORE=sql` em cada processo que sirva HTTP: conta no
+Postgres, por isso o limite é o limite haja as réplicas que houver. (O chart Helm
+define-o por ti e recusa-se a renderizar uma topologia com vários processos que o
+deixe em `memory`.)
 
 **Canais entre instâncias.** O broadcast e a presença usam um bus em memória por
 predefinição, que não atravessa processos. Isto é uma questão de *número de
@@ -200,6 +213,66 @@ websockets.
 
 **Escalar até zero.** Nada disto reduz um processo a nada nem levanta um a
 pedido. Isso é uma capacidade da plataforma, não do runtime.
+
+## Lançar uma unidade por si só
+
+Tudo o que está acima reparte *onde* o trabalho corre. Tudo isso continua a ser
+lançado como uma só build: uma imagem, um bundle, implantados em conjunto. É a
+predefinição certa, e a maioria dos deployments deve ficar por aí.
+
+Uma unidade também pode ficar numa build própria — uma correção de função que não
+reinicia a API:
+
+```yaml
+# values.yaml
+split: true
+functions:
+  enabled: true
+  image:
+    tag: "0.16.0"     # só esta unidade; as restantes ficam na tag do release
+```
+
+Normalmente só vale a pena fixar a tag: o repositório é herdado, portanto é um
+projeto e uma imagem com uma unidade movida. `bundleUrl` faz o mesmo quando
+`bundle.mode: url`.
+
+### A regra
+
+Duas unidades em builds diferentes são dois conjuntos de coleções contra **uma**
+base de dados, e só uma unidade a aprovisiona. Portanto:
+
+> **A unidade dona do esquema é implantada primeiro. Uma unidade pode ficar para
+> trás; nunca deve ir à frente.**
+
+É o Job de migração, ou a `api` quando o Job está desligado. Uma unidade à
+*frente* do esquema consulta colunas que ainda não existem e depende de políticas
+RLS que ninguém aplicou — a primeira é um erro SQL numa rota, a segunda um
+resultado vazio com um 200. Uma unidade *atrás* é o estado normal de qualquer
+rollout a decorrer.
+
+### O que o verifica
+
+O processo que aprovisiona regista na base de dados a versão de esquema que
+aplicou. Todos os outros processos calculam a sua a partir das coleções que
+carregaram e comparam. Havendo desacordo, dizem-no, nomeando ambas:
+
+```
+⚠️ [schema] The database was last provisioned from a different set of collections
+   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+```
+
+Avisa e serve, porque durante um rollout esse desacordo é *correto*: as unidades
+que ainda não rolaram devem estar atrás. Define
+`REBASE_REQUIRE_SCHEMA_MATCH=true` (ou `sharedState.requireSchemaMatch` no chart)
+para recusar o arranque, num deployment que prefere não servir a servir errado.
+
+Ambos os lados dessa comparação são **calculados**, nunca lidos de um manifesto.
+Uma versão que uma build afirma sobre si mesma não prova que a base de dados
+concorda.
+
+Nada verifica a *direção* — uma versão de esquema é um hash: pode dizer que as
+duas divergem, nunca qual está à frente. É por isso que a ordem do rollout é uma
+regra que segues, não uma que o runtime possa impor.
 
 ## Atualizar
 
