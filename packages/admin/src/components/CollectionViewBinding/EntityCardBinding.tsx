@@ -154,14 +154,16 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
 
             {/* Content area */}
             <div className="p-3">
-                {/* Entity ID */}
-                <Typography
-                    variant="caption"
-                    color="disabled"
-                    className="font-mono truncate block"
-                >
-                    {entity.id}
-                </Typography>
+                {/* No id line here.
+                    A card used to print the row id above its title, always —
+                    a truncated uuid (`isId: "uuid"` is the default) too short
+                    to copy and not what a card is read for. The list row and
+                    the board card show an id only when nothing else names the
+                    record; the card was the one surface that showed it even
+                    when it had a title, and the id is still the fallback below
+                    for a record that has none. The table's ID column, which is
+                    full width, copyable and governed by
+                    `hideIdFromCollection`, is where an id is actually read. */}
 
                 {/* Title slot */}
                 <div className="truncate my-1 text-sm font-medium min-h-[20px]">
