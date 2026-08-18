@@ -470,14 +470,14 @@ import { useBreadcrumbsController } from "@rebasepro/admin";
 interface BreadcrumbsController {
     breadcrumbs: BreadcrumbEntry[];
     set: (props: { breadcrumbs: BreadcrumbEntry[] }) => void;
-    updateCount: (id: string, count: number | null | undefined) => void;
 }
 
 interface BreadcrumbEntry {
     title: string;
     url: string;
-    count?: number | null;  // undefined = N/A, null = loading, number = loaded
-    id?: string;            // for targeted count updates
+    // Stable identifier (e.g. the collection path). Lets the provider tell a
+    // rebuilt-but-unchanged trail from a real navigation.
+    id?: string;
 }
 ```
 
@@ -489,12 +489,9 @@ const breadcrumbs = useBreadcrumbsController();
 breadcrumbs.set({
     breadcrumbs: [
         { title: "Dashboard", url: "/" },
-        { title: "Products", url: "/c/products", id: "products", count: null },
+        { title: "Products", url: "/c/products", id: "products" },
     ]
 });
-
-// Later, update the count without re-setting everything
-breadcrumbs.updateCount("products", 42);
 ```
 
 ---
