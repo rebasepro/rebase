@@ -19,11 +19,14 @@ store) closed, a Helm chart renders the whole topology, and the image is finally
 on Docker Hub. The default is untouched: `split: false`, `REBASE_ROLE` unset, one
 container — self-hosting stayed simple, which was the constraint.
 
-What is **not** done is the thing the goal actually names. Today a split gives
-independent *isolation, scaling and restart*. It does not give independent
-*release*: every backend unit shares one bundle and one image tag, so changing
-one function still rebuilds the bundle and rolls the API. That is §G1, and it is
-the only structural gap left on the self-host side.
+What was **not** done at the time of writing was the thing the goal actually
+names: a split gave independent *isolation, scaling and restart*, but not
+independent *release* — every backend unit shared one bundle and one image tag,
+so changing one function rebuilt the bundle and rolled the API.
+
+**That closed the same day.** See §G1: option A shipped, guard first. This
+document is kept as written, with the gaps marked where they were fixed, because
+the reasoning behind each one is what the fix rests on.
 
 ---
 
@@ -71,7 +74,7 @@ its own Deployment with **its own image repository and tag**, and
 
 ## 2. Gaps, ordered by how much they block the goal
 
-### G1 — "Independent deploy" is isolation, not release *(structural)*
+### G1 — "Independent deploy" is isolation, not release — **ADDRESSED, option A**
 
 Every backend unit renders `image: {{ include "rebase.image" $root }}`
 (`charts/rebase/templates/deployment.yaml:87`) — one global repository and tag.
@@ -87,6 +90,30 @@ Every backend unit renders `image: {{ include "rebase.image" $root }}`
 This is by design and it is written down — `docs/runtime-roles-plan-2026-08.md`
 §6 puts per-function content hashing and per-function declared resources in
 Phase 2, explicitly "after somebody has run a split deployment". Somebody now has.
+
+**What shipped** (2026-08-18, same day as this audit): option A of
+[independent-release-options-g1.md](independent-release-options-g1.md), in two
+steps. The guard first — the provisioning process stamps the collections schema
+version it applied into `rebase.schema_meta`, and every other process computes
+its own and compares, warning by default and refusing under
+`REBASE_REQUIRE_SCHEMA_MATCH`. Then the pins: `functions.image.tag`,
+`worker.image`, `api.image` and `bundleUrl`, empty by default, with two refusals
+for a pin that cannot take effect.
+
+So a unit can now be released on its own, and the failure that enables is
+visible rather than silent. What is still true is everything below about *why*
+that needed care — kept, because the reasoning is what the rule rests on, and the
+rule ("the unit that owns the schema rolls first; a unit may lag and must never
+lead") is documented rather than enforced, since a schema version is a hash and
+cannot say which side is ahead.
+
+Not done, and still Phase 2: per-function content hashing, per-function declared
+resources. Those are deploy-granularity and API-surface questions respectively,
+and neither is what "release one unit" needed.
+
+---
+
+The original analysis follows.
 
 The cheap version (per-unit `image`/`bundle` overrides in the chart) is about two
 hours of templating, **and it opens a real question rather than closing one**:
@@ -231,7 +258,8 @@ Ordered so that each step is worth doing even if the one after it is cancelled.
 1. ~~**G2 + G3 together.**~~ **Done.** Both are gates now, and both were
    mutation-tested rather than assumed.
 2. ~~**G4.**~~ **Done**, with the e2e that proves it.
-3. **G1 — decide it before building it.** Per-unit image/bundle overrides are
+3. ~~**G1 — decide it before building it.**~~ **Decided and built** — option A,
+   guard first. The paragraph below is what that decision had to weigh. Per-unit image/bundle overrides are
    easy; two units on skewed bundles against one database is not. Either accept
    skew and define the contract (which unit owns `schemaVersion`? what does the
    contract endpoint answer?), or reject it and say so in the chart, so the
