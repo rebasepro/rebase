@@ -53,7 +53,7 @@ export const productsCollection = defineCollection({
             name: "Active",
             defaultValue: true
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
@@ -214,7 +214,7 @@ Puoi impostare filtri predefiniti o forzati:
     forceFilter: { tenant_id: ["==", currentTenantId] },
 
     // Default sort
-    sort: ["created_at", "desc"]
+    sort: ["createdAt", "desc"]
 }
 ```
 

@@ -27,7 +27,7 @@ import type { DataDriver } from "@rebasepro/types";
  *
  * - It passes the default policies through their `rolesOverlap(['admin'])`
  *   arm — the same arm an application user holding the `admin` role passes.
- * - `policy.serverContext()` compiles to `auth.uid() IS NULL` and is therefore
+ * - `policy.serverContext()` compiles to `rebase.uid() IS NULL` and is therefore
  *   **false** for it. A collection with `disableDefaultPolicies: true` whose
  *   only rule is `serverContext()` denies these writes (42501) and returns
  *   zero rows for these reads.

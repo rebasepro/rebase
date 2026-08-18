@@ -30,7 +30,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -132,7 +132,7 @@ the ids you meant:
 
 ```typescript
 const stale = await client.data.sessions.findAll({
-    where: { expires_at: ["<", cutoff] }
+    where: { expiresAt: ["<", cutoff] }
 });
 await client.data.sessions.deleteMany(stale.map(s => s.id as string));
 ```
@@ -186,7 +186,7 @@ Chain methods for more expressive queries:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -270,7 +270,7 @@ To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 ```typescript
 // Sort by field (format: ["field", "direction"])
 const { data } = await client.data.products.find({
-    orderBy: ["created_at", "desc"]
+    orderBy: ["createdAt", "desc"]
 });
 
 // Fluent style
@@ -291,7 +291,7 @@ equal, the third between rows the first two do — so `orderBy` takes a list of
 ```typescript
 // By category, and newest first within each category.
 const { data } = await client.data.products.find({
-    orderBy: [["category", "asc"], ["created_at", "desc"]]
+    orderBy: [["category", "asc"], ["createdAt", "desc"]]
 });
 ```
 
@@ -301,7 +301,7 @@ call **adds** a key under the ones before it rather than replacing them:
 ```typescript
 const { data } = await client.data.products
     .orderBy("category")            // primary
-    .orderBy("created_at", "desc")  // tie-breaker
+    .orderBy("createdAt", "desc")  // tie-breaker
     .find();
 ```
 
@@ -356,7 +356,7 @@ It takes the same filters as the list endpoint, so an aggregate can be narrowed
 the same way a listing is:
 
 ```bash
-GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&created_at=gte.2026-01-01
+GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&createdAt=gte.2026-01-01
 ```
 
 :::note
@@ -504,7 +504,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -515,20 +515,20 @@ When relations are included, the response contains **both** the scalar foreign k
 
 ```typescript
 const { data } = await client.data
-    .collection<{ author_id: string; author?: { name: string } }>("posts")
+    .collection<{ authorId: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
 for (const post of data) {
     // Scalar foreign key — always present
-    console.log(post.author_id);    // "uuid-1234"
+    console.log(post.authorId);    // "uuid-1234"
 
     // Hydrated relation — present when included
     console.log(post.author?.name); // "Jane Doe"
 }
 ```
 
-> **Note:** Without `.include("author")`, only the scalar `author_id` field is returned. The hydrated `author` object will be `undefined`.
+> **Note:** Without `.include("author")`, only the scalar `authorId` field is returned. The hydrated `author` object will be `undefined`.
 
 ### Relation Names
 
@@ -575,7 +575,7 @@ Every operator works, because the thing being compared is an ordinary column:
 
 ```typescript
 where: {
-    "applications.created_at": ["<", "2026-01-01"],   // waiting since before…
+    "applications.createdAt": ["<", "2026-01-01"],   // waiting since before…
     "agency.name": ["ilike", "%staffing%"]            // through a belongsTo
 }
 ```
@@ -607,7 +607,7 @@ a filter key would *widen* the read to every row.
 // Candidates, whoever has been waiting longest first.
 const { data } = await client.data.talents.find({
     where: { "applications.status": ["in", ["applied", "reviewing"]] },
-    orderBy: [[{ relation: "applications", field: "created_at", agg: "min" }, "asc"]]
+    orderBy: [[{ relation: "applications", field: "createdAt", agg: "min" }, "asc"]]
 });
 
 // Clients, busiest first.
@@ -630,7 +630,7 @@ of nothing is `0` rather than null, so those rows sort as zero.
 Over HTTP the key is a single string, so it fits `?orderBy=` unchanged:
 
 ```bash
-GET /api/data/talents?orderBy=min(applications.created_at):asc
+GET /api/data/talents?orderBy=min(applications.createdAt):asc
 ```
 
 Cursor pagination works over it. There is no aggregate stored on the cursor row

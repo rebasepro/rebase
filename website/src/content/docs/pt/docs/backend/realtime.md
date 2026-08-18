@@ -68,7 +68,7 @@ Passe `FindParams` como primeiro argumento para filtrar a assinatura:
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 50,
   },
   (response) => {
@@ -125,7 +125,7 @@ O construtor de consultas fluente também suporta assinaturas em tempo real. Enc
 ```typescript
 const unsubscribe = client.data.orders
   .where("status", "==", "pending")
-  .orderBy("created_at", "desc")
+  .orderBy("createdAt", "desc")
   .limit(20)
   .listen(
     (response) => {
@@ -149,7 +149,7 @@ A Rebase usa uma estratégia de atualização em duas fases para assinaturas de 
 
 2. **Fase 2 — Refetch RLS com debounce:** Após um breve atraso de **300 ms** (`REFETCH_DEBOUNCE_MS`), o servidor executa um refetch autoritativo do banco de dados para a coleção que corresponde aos seus filtros e ordenação originais. Isso é crítico porque mutações de campo podem alterar a visibilidade da entidade (por ex., se o status mudou e não corresponde mais a um filtro `where`).
 
-   Para manter limites de segurança rígidos, essa consulta de refetch é executada dentro de uma transação que define as variáveis locais da transação `app.user_id` e `app.user_roles` derivadas do `SubscriptionAuthContext` do assinante. Isso garante que as restrições de segurança em nível de linha (RLS) do PostgreSQL sejam avaliadas corretamente sob a sessão de autenticação do cliente, e apenas os registros que o usuário está autorizado a ver são enviados no `collection_update` final.
+   Para manter limites de segurança rígidos, essa consulta de refetch é executada dentro de uma transação que define as variáveis locais da transação `app.userId` e `app.user_roles` derivadas do `SubscriptionAuthContext` do assinante. Isso garante que as restrições de segurança em nível de linha (RLS) do PostgreSQL sejam avaliadas corretamente sob a sessão de autenticação do cliente, e apenas os registros que o usuário está autorizado a ver são enviados no `collection_update` final.
 
 Essa abordagem garante que os filtros de lista e as políticas de acesso permaneçam perfeitamente consistentes, mantendo ao mesmo tempo uma alta responsividade da interface.
 
@@ -321,7 +321,7 @@ ws.on("error", (error) => console.error("Error:", error));
 As assinaturas WebSocket respeitam automaticamente as políticas de segurança em nível de linha (RLS). Quando o cliente está autenticado:
 
 1. A conexão WebSocket se autentica usando o mesmo token JWT que a API REST.
-2. Cada refetch de assinatura é executado dentro de uma transação PostgreSQL com `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantindo que as políticas RLS sejam aplicadas.
+2. Cada refetch de assinatura é executado dentro de uma transação PostgreSQL com `set_config('app.userId', ...)` e `set_config('app.user_roles', ...)` — garantindo que as políticas RLS sejam aplicadas.
 3. Se um token expirar durante uma sessão ativa, o cliente se reautentica e reinscreve automaticamente.
 
 Isso significa que cada usuário só recebe atualizações dos registros que tem permissão para ver.

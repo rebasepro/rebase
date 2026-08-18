@@ -73,8 +73,8 @@ Renvoie une liste d'entrées d'historique pour une entité spécifique, classée
             "operation": "update",
             "values": { "status": "shipped", "total": 99.99 },
             "previous_values": { "status": "pending", "total": 99.99 },
-            "user_id": "admin-user-id",
-            "created_at": "2025-01-15T10:30:00Z"
+            "userId": "admin-user-id",
+            "createdAt": "2025-01-15T10:30:00Z"
         }
     ]
 }

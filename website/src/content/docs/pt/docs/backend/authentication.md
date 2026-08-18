@@ -195,7 +195,7 @@ Depois, a partir do cliente:
 const profile = await rebase.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await rebase.data.team_members.create({ team_id, userId: profile.uid });
 }
 ```
 
@@ -209,7 +209,7 @@ contas; ative-o apenas quando sua UX de convite precisar.
 Na primeira inicialização, a Rebase provisiona automaticamente o esquema `auth` e as seguintes tabelas no banco de dados (vinculadas ao esquema definido na sua coleção, por ex., `rebase`):
 
 - **`rebase.users`** — Contas de usuário com e-mail, hash de senha, metadados e uma coluna `roles` text[] (os papéis são armazenados como arrays de texto inline para otimizar as consultas e evitar joins).
-- **`rebase.refresh_tokens`** — Sessões de longa duração carregando refresh tokens com hash, user agents e endereços IP. Inclui um índice único em `token_hash` e uma restrição única em `(user_id, user_agent, ip_address)` para rastrear as sessões de dispositivos ativas.
+- **`rebase.refresh_tokens`** — Sessões de longa duração carregando refresh tokens com hash, user agents e endereços IP. Inclui um índice único em `token_hash` e uma restrição única em `(userId, user_agent, ip_address)` para rastrear as sessões de dispositivos ativas.
 - **`rebase.password_reset_tokens`** — Tokens de uso único expiráveis para os fluxos de recuperação de senha.
 - **`rebase.mfa_factors`** — Métodos de autenticação multifator inscritos (por ex., segredos TOTP criptografados com AES-256).
 - **`rebase.mfa_challenges`** — Logs de verificação rastreando as tentativas de verificação MFA ativas.
@@ -220,14 +220,14 @@ Na primeira inicialização, a Rebase provisiona automaticamente o esquema `auth
 
 A Rebase conecta a autenticação da requisição diretamente até a segurança em nível de linha (RLS) do PostgreSQL. Cada consulta de banco de dados executada através de um driver com escopo de usuário é executada dentro de uma transação de banco de dados (`db.transaction()`) que configura parâmetros de configuração locais da transação:
 
-*   `app.user_id` — O ID único (`uid`) do usuário autenticado. O padrão é `'anon'` para requisições não autenticadas.
+*   `app.userId` — O ID único (`uid`) do usuário autenticado. O padrão é `'anon'` para requisições não autenticadas.
 *   `app.user_roles` — Uma string separada por vírgulas listando os papéis atribuídos ao usuário.
 *   `app.jwt` — Uma string JSON contendo o payload completo de claims do JWT (`{"sub": "<uid>", "roles": [...]}`).
 
 Esses parâmetros são configurados localmente durante a duração da transação usando a função `set_config` do Postgres:
 ```sql
 SELECT 
-    set_config('app.user_id', $1, true),
+    set_config('app.userId', $1, true),
     set_config('app.user_roles', $2, true),
     set_config('app.jwt', $3, true);
 ```
@@ -411,7 +411,7 @@ Independentemente do provedor de autenticação externo escolhido, seu adaptador
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
+  uid: string;                    // Maps to pg local 'app.userId' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL

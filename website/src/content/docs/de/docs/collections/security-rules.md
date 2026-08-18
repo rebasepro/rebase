@@ -17,7 +17,7 @@ const postsCollection = defineCollection({
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], ownerField: "author_id" }
+        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
     ]
 });
 ```
@@ -47,7 +47,7 @@ Das einfachste Muster — Benutzer können nur auf Zeilen zugreifen, die sie bes
 
 ```typescript
 securityRules: [
-    { operation: "all", ownerField: "user_id" }
+    { operation: "all", ownerField: "userId" }
 ]
 ```
 
@@ -113,9 +113,9 @@ securityRules: [
     // Admins können alles tun
     { operation: "all", roles: ["admin"], using: "true" },
     // Reguläre Benutzer können nur ihre eigenen Zeilen sehen
-    { operation: "select", ownerField: "user_id" },
+    { operation: "select", ownerField: "userId" },
     // Benutzer können einfügen, aber nur für sich selbst
-    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
+    { operation: "insert", withCheck: "{userId} = rebase.uid()" },
     // Gesperrte Zeilen können nicht aktualisiert werden
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -131,7 +131,7 @@ PostgreSQL hat zwei Richtlinienmodi:
 ```typescript
 securityRules: [
     // Permissiv: Eigentümer können auf ihre Zeilen zugreifen
-    { operation: "all", ownerField: "user_id" },
+    { operation: "all", ownerField: "userId" },
     // Restriktiv: aber gesperrte Zeilen können nicht aktualisiert werden
     { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" }
 ]
@@ -150,7 +150,7 @@ securityRules: [
 Sie können auch `operations` (Plural) verwenden, um eine Regel auf mehrere Operationen anzuwenden:
 
 ```typescript
-{ operations: ["insert", "update", "delete"], ownerField: "author_id" }
+{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
 ```
 
 ## Vollständiges SecurityRule-Interface
@@ -178,9 +178,9 @@ securityRules: [
     // Jeder kann veröffentlichte Beiträge lesen
     { operation: "select", using: "{status} = 'published'" },
     // Autoren können ihre eigenen Entwürfe sehen
-    { operation: "select", ownerField: "author_id" },
+    { operation: "select", ownerField: "authorId" },
     // Autoren können ihre eigenen Beiträge erstellen und bearbeiten
-    { operations: ["insert", "update"], ownerField: "author_id" },
+    { operations: ["insert", "update"], ownerField: "authorId" },
     // Nur Admins können löschen
     { operation: "delete", roles: ["admin"] }
 ]
@@ -257,7 +257,7 @@ Wenn eine Anfrage ohne JWT-Token eingeht, setzt das Rebase-Backend die PostgreSQ
 
 | Variable | Wert |
 |----------|-------|
-| `app.user_id` | `'anonymous'` |
+| `app.userId` | `'anonymous'` |
 | `app.user_roles` | `''` (leer) |
 
 Das bedeutet:
@@ -266,7 +266,7 @@ Das bedeutet:
 - `rebase.roles()` gibt eine leere Zeichenkette zurück
 - `access: "public"`-Richtlinien werden erfolgreich ausgeführt, da sie `USING (true)` / `WITH CHECK (true)` generieren
 - `access: "authenticated"`-Richtlinien schlagen fehl, da sie eine echte Benutzer-ID prüfen
-- `ownerField`-Richtlinien schlagen fehl, da keine Zeile `user_id = 'anonymous'` haben wird (es sei denn, dies ist explizit festgelegt)
+- `ownerField`-Richtlinien schlagen fehl, da keine Zeile `userId = 'anonymous'` haben wird (es sei denn, dies ist explizit festgelegt)
 
 ### Fortgeschritten: Rohes SQL für Anonyme
 

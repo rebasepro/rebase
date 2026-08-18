@@ -60,7 +60,7 @@ import { productsCollection } from "../config/collections";
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
     // TypeScript infers M from whichever key it sees first.
-    type Product = { name: string; price: number; active: boolean; created_at: string };
+    type Product = { name: string; price: number; active: boolean; createdAt: string };
 
     const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollection<Product, User>({
         path: "products",
@@ -70,7 +70,7 @@ function ProductList() {
             active: ["==", true],
             price: [">=", 100]
         },
-        sortBy: ["created_at", "desc"],
+        sortBy: ["createdAt", "desc"],
         searchString: "laptop"
     });
 

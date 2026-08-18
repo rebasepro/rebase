@@ -83,7 +83,7 @@ En la ruta del usuario, esto es una **tautología**. `applyAuthContext` fuerza u
 Por lo tanto, una regla que se lee como "solo usuarios autenticados" concedía acceso a **todo el mundo, incluidos los visitantes que habían cerrado sesión**. Ahora se compila como:
 
 ```sql
-auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'
 ```
 
 `policy.not(policy.authenticated())` tenía un caso especial independiente que significaba "el contexto del servidor". Ya no es así; utiliza `policy.serverContext()` para ello.
@@ -116,7 +116,7 @@ grep -rn "authenticated()" config/collections/
 Cada coincidencia es una regla cuyo significado ha cambiado. Comprueba también la sintaxis directa, que era la otra forma de escribir la misma tautología:
 
 ```bash
-grep -rn "auth.uid() IS NOT NULL" config/collections/
+grep -rnE "(auth|rebase)\.uid\(\) IS NOT NULL" config/collections/
 ```
 
 **Paso 2 — decide qué significaba cada una.** Para cada regla, pregúntate qué pretendías:
@@ -374,7 +374,7 @@ En el modo `baas` no hay archivos de colección ni `db push`, por lo que la prop
 ## Lista de comprobación para la actualización
 
 ```
-[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
 [ ] decide the intent of each rule; rewrite the ones that meant "public"
 [ ] replace not(authenticated()) with serverContext()
 [ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as

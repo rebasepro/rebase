@@ -53,7 +53,7 @@ export const productsCollection = defineCollection({
             name: "Active",
             defaultValue: true
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
@@ -214,7 +214,7 @@ Vous pouvez définir des filtres par défaut ou forcés :
     forceFilter: { tenant_id: ["==", currentTenantId] },
 
     // Tri par défaut
-    sort: ["created_at", "desc"]
+    sort: ["createdAt", "desc"]
 }
 ```
 

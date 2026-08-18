@@ -13,7 +13,7 @@
  * function `db push` uses to write `drizzle/policies.sql`, so this compares
  * against exactly what would be applied rather than a reimplementation.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";
 
 import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
 
@@ -62,7 +62,7 @@ export interface PolicyDrift {
     diverged: { expected: PolicyRef; actual: PolicyRef; differences: string[] }[];
     /**
      * A live policy whose expression is the known-permissive tautology
-     * `auth.uid() IS NOT NULL` — true for anonymous visitors too, because the
+     * `rebase.uid() IS NOT NULL` — true for anonymous visitors too, because the
      * user path coerces a blank id to the `'anonymous'` sentinel. This is what
      * `policy.authenticated()` used to compile to, so a database pushed before
      * that fix carries it, and neither the name, roles, command nor clause
@@ -243,18 +243,26 @@ async function readTablesWithRlsOff(
 }
 
 /**
- * The permissive tautology `auth.uid() IS NOT NULL`, without the
+ * The permissive tautology `rebase.uid() IS NOT NULL`, without the
  * `<> 'anonymous'` guard that makes it mean "signed in".
  *
  * Whitespace varies with Postgres's rewrite, so match on a collapsed form. The
  * guard clause (`<> 'anonymous'`, in any spelling) is what distinguishes the
  * corrected policy from the stale one, so its presence clears the text.
+ *
+ * Both schema spellings are matched. The helpers moved from `auth` to `rebase`
+ * in 1.0, and this check reads policies *as the database stored them*: a
+ * database pushed before the move still holds `auth.uid()` until it is
+ * recompiled, while everything written since — including raw `securityRules`
+ * SQL, which the compiler rewrites on the way in — stores `rebase.uid()`.
+ * Matching only the pre-1.0 name made the check blind to every policy a current
+ * release could write, which is precisely the set still worth scanning.
  */
 function isPermissiveAuthTautology(clause: string | null | undefined): boolean {
     if (!clause) return false;
     const flat = clause.toLowerCase().replace(/\s+/g, " ");
-    if (!/auth\.uid\(\)\s*is not null/.test(flat)) return false;
-    // The fix appends `AND auth.uid() <> 'anonymous'`; Postgres may store the
+    if (!/\b(?:rebase|auth)\.uid\s*\(\s*\)\s*is not null/.test(flat)) return false;
+    // The fix appends `AND rebase.uid() <> 'anonymous'`; Postgres may store the
     // literal as `'anonymous'::text`. Either spelling means it is the corrected
     // policy, not the tautology.
     return !/<>\s*'anonymous'/.test(flat) && !/!=\s*'anonymous'/.test(flat);
@@ -315,7 +323,7 @@ export async function checkPolicyDrift(
         if (clause) {
             drift.insecure.push({
                 policy: p,
-                reason: `${clause} is \`auth.uid() IS NOT NULL\`, which is true for anonymous ` +
+                reason: `${clause} is \`${RLS_UID_SQL} IS NOT NULL\`, which is true for anonymous ` +
                     `visitors too — this grants access to signed-out requests. It predates the ` +
                     `\`policy.authenticated()\` fix; re-run \`rebase db push\` to tighten it.`
             });

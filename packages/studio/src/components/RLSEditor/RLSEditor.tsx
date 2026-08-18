@@ -181,6 +181,25 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 
     const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
 
+    /**
+     * Native PostgreSQL roles, for the policy editor's `TO` list.
+     *
+     * `fetchAvailableRoles` and not `fetchApplicationRoles`: a policy's `TO`
+     * clause names database roles, and an application role put there produces a
+     * policy that either fails to create or matches nothing. The editor falls
+     * back to a static pair when the driver cannot answer.
+     */
+    const [pgRoleOptions, setPgRoleOptions] = useState<string[]>([]);
+
+    useEffect(() => {
+        let mounted = true;
+        if (!databaseAdmin?.fetchAvailableRoles) return;
+        databaseAdmin.fetchAvailableRoles()
+            .then((roles) => { if (mounted) setPgRoleOptions(roles); })
+            .catch((e) => console.error("Failed to fetch database roles", e));
+        return () => { mounted = false; };
+    }, [databaseAdmin]);
+
     const [sidebarSize, setSidebarSize] = useState(() => {
         try {
             const saved = localStorage.getItem("rebase_rls_editor_sidebar_size");
@@ -428,7 +447,14 @@ status: "live" };
                         tablename: activeTableData.tableName,
                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                         cmd: (ops[opIdx] ?? rule.operation ?? "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                        roles: [...(rule.roles ?? ["public"])],
+                        // `pgRoles`, not `roles`. This is a policy's `TO` list —
+                        // database roles — while `SecurityRule.roles` holds
+                        // *application* roles, which the generator compiles into
+                        // the USING clause via `rebase.roles()` and never puts in
+                        // the `TO` list. Reading the wrong field made every rule
+                        // scoped `roles: ["admin"]` render as `TO admin`, a
+                        // policy the framework has never written.
+                        roles: [...(rule.pgRoles ?? ["public"])],
                         qual: rule.using || null,
                         with_check: rule.withCheck || null,
                         // "both" = defined in code and live in Postgres (potentially edited)
@@ -759,6 +785,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 policy={editingPolicy === "new" ? undefined : editingPolicy}
                                 schema={activeTableData.schemaName}
                                 table={activeTableData.tableName}
+                                roleOptions={pgRoleOptions}
                                 onSave={async (newPolicy) => {
                                     /*
                                      * Where a policy for a *mapped* table belongs depends
@@ -787,7 +814,22 @@ message: e instanceof Error ? e.message : String(e) });
                                             mode: newPolicy.permissive?.toLowerCase(),
                                             using: newPolicy.qual || undefined,
                                             withCheck: newPolicy.with_check || undefined,
-                                            roles: newPolicy.roles
+                                            // The editor edits a `PostgresPolicy`, whose
+                                            // `roles` is the `TO` list — so it maps to
+                                            // `pgRoles`. Writing it to `roles` filed
+                                            // database roles as *application* roles, and
+                                            // the generator then compiled them into a
+                                            // `rebase.roles()` check no user could
+                                            // satisfy: the rule saved cleanly, pushed
+                                            // cleanly, and matched nothing.
+                                            //
+                                            // Omitted at the default so a rule that
+                                            // targets `public` — nearly all of them —
+                                            // does not carry an advanced field it does
+                                            // not need.
+                                            ...(newPolicy.roles && !(newPolicy.roles.length === 1 && newPolicy.roles[0] === "public")
+                                                ? { pgRoles: newPolicy.roles }
+                                                : {})
                                         };
 
                                         const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];

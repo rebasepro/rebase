@@ -18,6 +18,7 @@ import { describe, it, expect } from "@jest/globals";
 import { policy, rewriteLegacyRlsFunctions, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
 import { sqlToPolicy, findAnonymousGrants } from "../src/util/policy/sqlToPolicy";
+import { buildCollectionFromTableMetadata } from "../src/util/pg-column-to-property";
 
 describe("rewriteLegacyRlsFunctions", () => {
     it("rewrites all three helpers, in any case", () => {
@@ -89,6 +90,27 @@ describe("the parser reads policies written by an older release", () => {
         expect(parsed.kind).toBe("raw");
         expect((parsed as { sql: string }).sql).toContain("rebase.uid()");
         expect((parsed as { sql: string }).sql).not.toContain("auth.uid()");
+    });
+
+    it("normalises what the table importer copies out of the catalogue", () => {
+        // The importer reads `pg_policies` and writes the result into the
+        // project's own config. That is the one path where a legacy spelling
+        // does not just get read — it gets *authored*, into a file the user then
+        // owns, and every boot afterwards warns about a rule they never typed.
+        const imported = buildCollectionFromTableMetadata("posts", {
+            columns: [],
+            policies: [{
+                policy_name: "posts_owner_select",
+                roles: ["authenticated"],
+                cmd: "SELECT",
+                qual: "author_id = auth.uid()",
+                with_check: "author_id = auth.uid()"
+            }]
+        } as never);
+
+        const rule = imported.securityRules?.[0] as { using?: string; withCheck?: string };
+        expect(rule.using).toBe("author_id = rebase.uid()");
+        expect(rule.withCheck).toBe("author_id = rebase.uid()");
     });
 
     it("still flags the anonymous tautology in a legacy body", () => {

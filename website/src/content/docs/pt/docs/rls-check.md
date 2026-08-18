@@ -203,7 +203,7 @@ expressão de verificação aceita qualquer linha, respaldada por uma concessão
 
 A condição "aceita qualquer linha" é essencial e deliberadamente restrita. O Supabase concede a `anon`
 e `authenticated` DML completo por padrão, portanto uma política direcionada a essas funções não é por si só
-um problema — um caso clássico `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` está correto
+um problema — um caso clássico `FOR INSERT TO public WITH CHECK (userId = auth.uid())` está correto
 e não é relatado.
 
 ### unqualified-column-in-subquery

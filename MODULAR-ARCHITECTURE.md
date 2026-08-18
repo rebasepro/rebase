@@ -74,7 +74,7 @@ skipped, and named at boot with the SQL to protect it:
 
 ```sql
 ALTER TABLE "public"."secrets" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY secrets_owner ON secrets FOR ALL TO public USING (owner_id = auth.uid());
+CREATE POLICY secrets_owner ON secrets FOR ALL TO public USING (owner_id = rebase.uid());
 ```
 
 Two escape hatches, both explicit:

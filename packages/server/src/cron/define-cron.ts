@@ -14,7 +14,7 @@ import type { CronJobDefinition } from "@rebasepro/types";
  * against that identity, not skipped. See that constant's docblock. It clears
  * the default policies through their `rolesOverlap(['admin'])` arm, which is why
  * the distinction rarely shows; it shows against hand-written rules, where
- * `policy.serverContext()` (`auth.uid() IS NULL`) is **false** for it. Use
+ * `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** for it. Use
  * `rebase.sql()` when you need the genuine bypass — owner connection, no
  * policies.
  *

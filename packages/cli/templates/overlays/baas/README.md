@@ -16,10 +16,10 @@ table is never exposed just by existing — and logs each table it skipped and w
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
 CREATE POLICY your_table_owner ON your_table
-    FOR ALL USING (user_id = auth.uid());
+    FOR ALL USING (user_id = rebase.uid());
 ```
 
-`auth.uid()`, `auth.roles()` and `auth.jwt()` are provided by Rebase and read the
+`rebase.uid()`, `rebase.roles()` and `rebase.jwt()` are provided by Rebase and read the
 identity of the authenticated request.
 
 To serve unprotected tables anyway (development only), set

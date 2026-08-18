@@ -80,7 +80,7 @@ export function _resetRebaseMock(): void {
  * It clears the default policies through their `rolesOverlap(['admin'])` arm —
  * which is why the difference rarely shows. It shows when you write your own:
  *
- * - `policy.serverContext()` compiles to `auth.uid() IS NULL` and is therefore
+ * - `policy.serverContext()` compiles to `rebase.uid() IS NULL` and is therefore
  *   **false** for this accessor. A collection with `disableDefaultPolicies:
  *   true` whose rule is `serverContext()` denies these writes (`42501`) and
  *   returns zero rows — HTTP 200, empty — for these reads.

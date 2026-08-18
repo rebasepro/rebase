@@ -71,7 +71,7 @@ Pass `FindParams` as the first argument to filter the subscription:
 const unsubscribe = client.data.products.listen(
     {
         where: { status: ["==", "published"] },
-        orderBy: ["created_at", "desc"],
+        orderBy: ["createdAt", "desc"],
         limit: 50,
     },
     (response) => {
@@ -83,7 +83,7 @@ const unsubscribe = client.data.products.listen(
 The server respects these filters — only matching records are included in updates. Filter, sort, limit, offset, and searchString are all supported.
 
 `orderBy` takes a multi-column sort here as anywhere else —
-`orderBy: [["category", "asc"], ["created_at", "desc"]]`, or a second
+`orderBy: [["category", "asc"], ["createdAt", "desc"]]`, or a second
 `.orderBy()` call on the fluent builder, which adds a tie-breaker rather than
 replacing the first key.
 
@@ -178,7 +178,7 @@ The fluent query builder also supports realtime subscriptions. Chain your filter
 ```typescript
 const unsubscribe = client.data.orders
     .where("status", "==", "pending")
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => {
@@ -277,7 +277,7 @@ ws.send(JSON.stringify({
         subscriptionId: "sub_products_1",
         path: "products",
         filter: { status: ["==", "active"] },
-        orderBy: "created_at",
+        orderBy: "createdAt",
         order: "desc",
         limit: 50
     }

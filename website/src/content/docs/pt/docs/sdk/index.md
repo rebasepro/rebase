@@ -55,7 +55,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -110,7 +110,7 @@ Encadeie métodos para queries mais expressivas:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -175,7 +175,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -191,14 +191,14 @@ const { data } = await client.data.posts
 
 for (const post of data) {
     // Chave estrangeira escalar — sempre presente
-    console.log(post.values.author_id);    // "uuid-1234"
+    console.log(post.values.authorId);    // "uuid-1234"
 
     // Relação hidratada — presente quando incluída
     console.log(post.values.author?.name); // "Jane Doe"
 }
 ```
 
-> **Nota:** Sem `.include("author")`, apenas o campo escalar `author_id` é retornado. O objeto `author` hidratado será `undefined`.
+> **Nota:** Sem `.include("author")`, apenas o campo escalar `authorId` é retornado. O objeto `author` hidratado será `undefined`.
 
 ### Nomes de Relação
 
@@ -248,7 +248,7 @@ Também pode subscrever através do construtor de query fluente:
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),

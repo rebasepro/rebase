@@ -203,7 +203,7 @@ di controllo accetta qualsiasi riga, supportata da una concessione corrispondent
 
 La condizione "accetta qualsiasi riga" è essenziale e volutamente restrittiva. Supabase concede a `anon` e `authenticated`
 l'accesso DML completo per impostazione predefinita, quindi una policy rivolta a tali ruoli non rappresenta di per sé un
-problema — un caso da manuale come `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` è corretto e non viene segnalato.
+problema — un caso da manuale come `FOR INSERT TO public WITH CHECK (userId = auth.uid())` è corretto e non viene segnalato.
 
 ### unqualified-column-in-subquery
 

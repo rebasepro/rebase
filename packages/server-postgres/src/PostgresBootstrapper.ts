@@ -981,8 +981,8 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          *
          * The companion to {@link ensureCollectionSchema}: that creates the
          * tables, this makes them servable. Boot runs it *after* auth
-         * initialization, because the generated policies call `auth.uid()` /
-         * `auth.roles()`, and `CREATE POLICY` validates those functions exist.
+         * initialization, because the generated policies call `rebase.uid()` /
+         * `rebase.roles()`, and `CREATE POLICY` validates those functions exist.
          *
          * Runs through the same drizzle handle, one statement at a time (that
          * handle speaks the extended query protocol, which rejects multi-command

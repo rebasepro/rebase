@@ -343,7 +343,7 @@ When included, the response contains both the **scalar foreign key** and the **h
 
 ```typescript
 const { data } = await client.data
-    .collection<{ id: string; author_id: string; author?: { name: string } }>("articles")
+    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
@@ -351,7 +351,7 @@ const { data } = await client.data
 // `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.author_id;     // "uuid-1234"
+    article.authorId;     // "uuid-1234"
 
     // Hydrated relation — only present when included
     article.author?.name;  // "Jane Doe"

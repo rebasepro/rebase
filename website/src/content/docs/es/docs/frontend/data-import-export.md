@@ -177,7 +177,7 @@ exportable: {
             key: "author_name",
             builder: async ({ entity, context }) => {
                 const author = await context.data.users.findById(
-                    entity.values.author_id as string
+                    entity.values.authorId as string
                 );
                 return author?.values.displayName ?? "Unknown";
             }

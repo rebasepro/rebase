@@ -36,7 +36,7 @@ A successful read merges its rows into the local database and remembers which id
 ```typescript
 const drafts = await client.data.posts
     .where("status", "==", "draft")
-    .orderBy("updated_at", "desc")
+    .orderBy("updatedAt", "desc")
     .find();
 ```
 
@@ -77,7 +77,7 @@ Writes replay in the order you made them, across collections — so a create in 
 
 ```typescript
 const unsubscribe = client.data.posts.observe(
-    { where: { status: ["==", "draft"] }, orderBy: ["updated_at", "desc"] },
+    { where: { status: ["==", "draft"] }, orderBy: ["updatedAt", "desc"] },
     (result) => {
         render(result.data);
         setBadge(result.hasPendingWrites ? "saving…" : null);

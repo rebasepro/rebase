@@ -68,7 +68,7 @@ Pase `FindParams` como primer argumento para filtrar la suscripción:
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 50,
   },
   (response) => {
@@ -125,7 +125,7 @@ El constructor de consultas fluido también admite suscripciones en tiempo real.
 ```typescript
 const unsubscribe = client.data.orders
   .where("status", "==", "pending")
-  .orderBy("created_at", "desc")
+  .orderBy("createdAt", "desc")
   .limit(20)
   .listen(
     (response) => {
@@ -149,7 +149,7 @@ Rebase usa una estrategia de actualización en dos fases para las suscripciones 
 
 2. **Fase 2 — Refetch RLS con debounce:** Tras un breve retraso de **300 ms** (`REFETCH_DEBOUNCE_MS`), el servidor realiza un refetch autoritativo de la base de datos de la colección que coincide con sus filtros y orden originales. Esto es crítico porque las mutaciones de campos podrían alterar la visibilidad de la entidad (p. ej., si su estado cambió y ya no coincide con un filtro `where`).
 
-   Para mantener límites de seguridad estrictos, esta consulta de refetch se ejecuta dentro de una transacción que establece las variables locales de transacción `app.user_id` y `app.user_roles` mapeadas desde el `SubscriptionAuthContext` del suscriptor. Esto garantiza que las restricciones de seguridad a nivel de fila (RLS) de PostgreSQL se evalúen correctamente bajo la sesión de autenticación del cliente, y solo los registros que el usuario está autorizado a ver se envían en el `collection_update` final.
+   Para mantener límites de seguridad estrictos, esta consulta de refetch se ejecuta dentro de una transacción que establece las variables locales de transacción `app.userId` y `app.user_roles` mapeadas desde el `SubscriptionAuthContext` del suscriptor. Esto garantiza que las restricciones de seguridad a nivel de fila (RLS) de PostgreSQL se evalúen correctamente bajo la sesión de autenticación del cliente, y solo los registros que el usuario está autorizado a ver se envían en el `collection_update` final.
 
 Este enfoque garantiza que los filtros de lista y las políticas de acceso permanezcan perfectamente consistentes, manteniendo al mismo tiempo una alta capacidad de respuesta de la UI.
 
@@ -321,7 +321,7 @@ ws.on("error", (error) => console.error("Error:", error));
 Las suscripciones WebSocket respetan automáticamente las políticas de seguridad a nivel de fila (RLS). Cuando el cliente está autenticado:
 
 1. La conexión WebSocket se autentica usando el mismo token JWT que la API REST.
-2. Cada refetch de suscripción se ejecuta dentro de una transacción PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas RLS.
+2. Cada refetch de suscripción se ejecuta dentro de una transacción PostgreSQL con `set_config('app.userId', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas RLS.
 3. Si un token expira durante una sesión activa, el cliente se vuelve a autenticar y se vuelve a suscribir automáticamente.
 
 Esto significa que cada usuario solo recibe actualizaciones de los registros que tiene permiso para ver.

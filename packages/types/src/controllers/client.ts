@@ -279,7 +279,7 @@ export interface RebaseClient<DB = unknown> {
      *
      * Two consequences the name does not suggest:
      *
-     * - `policy.serverContext()` compiles to `auth.uid() IS NULL` and is
+     * - `policy.serverContext()` compiles to `rebase.uid() IS NULL` and is
      *   therefore **false** here. A collection with `disableDefaultPolicies:
      *   true` whose only rule is `serverContext()` refuses these writes
      *   (`42501`) and returns zero rows — HTTP 200, empty — for these reads.

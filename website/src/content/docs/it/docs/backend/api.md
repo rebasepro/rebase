@@ -174,7 +174,7 @@ Le risposte per una singola entità restituiscono un oggetto piatto:
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -221,7 +221,7 @@ Le relazioni incluse vengono incorporate direttamente nella risposta:
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",
@@ -421,7 +421,7 @@ polling sugli endpoint REST invece di sottoscriversi.
 | `permissions` | `ApiKeyPermission[]` | Accesso per collezione (`"*"` = tutto; `"functions/<name>"` = una funzione; `"storage"` = archiviazione file) |
 | `admin` | `boolean` | Concedere il ruolo admin — route admin + politiche admin RLS |
 | `rate_limit` | `number \| null` | Richieste per finestra di 15 min (`null` = il valore predefinito del server, 1000) |
-| `expires_at` | `string \| null` | Timestamp di scadenza ISO-8601 |
+| `expiresAt` | `string \| null` | Timestamp di scadenza ISO-8601 |
 
 La CLI richiede un ambito esplicito: passa `--permissions '<json>'` oppure scegli
 `--full-access` — non esiste un valore predefinito silenzioso di accesso completo.

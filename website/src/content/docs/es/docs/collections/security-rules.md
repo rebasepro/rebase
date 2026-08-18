@@ -17,7 +17,7 @@ const postsCollection = defineCollection({
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], ownerField: "author_id" }
+        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
     ]
 });
 ```
@@ -47,7 +47,7 @@ El patrón más simple: los usuarios solo pueden acceder a las filas que poseen:
 
 ```typescript
 securityRules: [
-    { operation: "all", ownerField: "user_id" }
+    { operation: "all", ownerField: "userId" }
 ]
 ```
 
@@ -113,9 +113,9 @@ securityRules: [
     // Los administradores pueden hacer cualquier cosa
     { operation: "all", roles: ["admin"], using: "true" },
     // Los usuarios regulares solo pueden ver sus propias filas
-    { operation: "select", ownerField: "user_id" },
+    { operation: "select", ownerField: "userId" },
     // Los usuarios pueden insertar, pero solo para sí mismos
-    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
+    { operation: "insert", withCheck: "{userId} = rebase.uid()" },
     // Las filas bloqueadas no se pueden actualizar
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -131,7 +131,7 @@ PostgreSQL tiene dos modos de política:
 ```typescript
 securityRules: [
     // Permisivo: los propietarios pueden acceder a sus filas
-    { operation: "all", ownerField: "user_id" },
+    { operation: "all", ownerField: "userId" },
     // Restrictivo: pero las filas bloqueadas no se pueden actualizar
     { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" }
 ]
@@ -150,7 +150,7 @@ securityRules: [
 También puede usar `operations` (plural) para aplicar una regla a múltiples operaciones:
 
 ```typescript
-{ operations: ["insert", "update", "delete"], ownerField: "author_id" }
+{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
 ```
 
 ## Interfaz Completa de SecurityRule
@@ -178,9 +178,9 @@ securityRules: [
     // Cualquiera puede leer publicaciones publicadas
     { operation: "select", using: "{status} = 'published'" },
     // Los autores pueden ver sus propios borradores
-    { operation: "select", ownerField: "author_id" },
+    { operation: "select", ownerField: "authorId" },
     // Los autores pueden crear y editar sus propias publicaciones
-    { operations: ["insert", "update"], ownerField: "author_id" },
+    { operations: ["insert", "update"], ownerField: "authorId" },
     // Solo los administradores pueden eliminar
     { operation: "delete", roles: ["admin"] }
 ]
@@ -257,7 +257,7 @@ Cuando una solicitud llega sin un token JWT, el backend de Rebase establece las 
 
 | Variable | Valor |
 |----------|-------|
-| `app.user_id` | `'anonymous'` |
+| `app.userId` | `'anonymous'` |
 | `app.user_roles` | `''` (vacío) |
 
 Esto significa:
@@ -266,7 +266,7 @@ Esto significa:
 - `rebase.roles()` devuelve una cadena vacía
 - Las políticas `access: "public"` pasan porque generan `USING (true)` / `WITH CHECK (true)`
 - Las políticas `access: "authenticated"` fallan porque verifican un ID de usuario real
-- Las políticas `ownerField` fallan porque ninguna fila tendrá `user_id = 'anonymous'` (a menos que se establezca explícitamente)
+- Las políticas `ownerField` fallan porque ninguna fila tendrá `userId = 'anonymous'` (a menos que se establezca explícitamente)
 
 ### Avanzado: SQL Puro para Anónimos
 

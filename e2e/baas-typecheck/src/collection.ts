@@ -117,7 +117,7 @@ const posts: PostgresCollectionConfig<Post> = {
                 where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
             })
         },
-        { operation: "delete", using: "author_id = auth.uid()" }
+        { operation: "delete", using: "author_id = rebase.uid()" }
     ],
 
     callbacks: {

@@ -226,7 +226,7 @@ const productsCollection = defineCollection({
             name: "Active",
             defaultValue: true
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create"
@@ -735,7 +735,7 @@ A rule that reads as "logged-in users only" therefore granted access to
 **everyone, including signed-out visitors**. It now compiles to:
 
 ```sql
-auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'
 ```
 
 `policy.not(policy.authenticated())` was separately special-cased to mean "the
@@ -749,13 +749,13 @@ and both are quiet:
 
 | What you do | What happens |
 |---|---|
-| Upgrade packages, **do not** re-run `db push` | Your database keeps `auth.uid() IS NOT NULL`. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
+| Upgrade packages, **do not** re-run `db push` | Your database keeps the bare `IS NOT NULL` tautology — spelled `auth.uid()` if it was pushed before section 0, `rebase.uid()` after. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
 | Upgrade packages **and** re-run `db push` | The policy tightens. Anything that was relying on the permissive behaviour — an unauthenticated read your frontend does on page load, a public listing, a webhook without a session — starts returning zero rows or 403. |
 
 > **`rebase doctor --policies` catches this, from 0.10.0 on.** It reads the live
 > `qual` and `with_check` straight out of `pg_policies` and reports, under
-> **Insecure**, any policy still carrying the bare `auth.uid() IS NOT NULL`
-> tautology. It reports the other half of the problem under **Orphaned**: a
+> **Insecure**, any policy still carrying the bare `IS NOT NULL` tautology, in
+> either schema spelling (`rebase.uid()` or the pre-1.0 `auth.uid()`). It reports the other half of the problem under **Orphaned**: a
 > policy an earlier push superseded but never dropped. Editing a rule renames its
 > policy — the generated name is a hash of the rule — so the old one is left
 > behind, and Postgres ORs permissive policies together, which makes an abandoned
@@ -794,8 +794,12 @@ Every hit is a rule whose meaning changed. Also check for the raw spelling,
 which was the other way to write the same tautology:
 
 ```bash
-grep -rn "auth.uid() IS NOT NULL" config/collections/
+grep -rnE "(auth|rebase)\.uid\(\) IS NOT NULL" config/collections/
 ```
+
+Both spellings, because section 0 moved the helpers: a rule written before it
+says `auth.uid()`, one written after says `rebase.uid()`, and the compiler
+accepts either.
 
 **Step 2 — decide what each one meant.** For each rule, ask which you intended:
 
@@ -815,7 +819,8 @@ WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
 ```
 
-Any `qual` containing `auth.uid() IS NOT NULL` **without** the
+Any `qual` containing `rebase.uid() IS NOT NULL` — or `auth.uid()` on a
+database not yet re-pushed — **without** the
 `<> 'anonymous'` clause is a stale permissive policy. `rebase doctor --policies`
 reports exactly those, and the superseded policies alongside them; this query is
 how you read the expressions yourself, which is what catches a fail-open policy
@@ -1281,7 +1286,7 @@ through the ordinary client — there is no separate package to install.
 ### Upgrade checklist
 
 ```
-[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
 [ ] decide the intent of each rule; rewrite the ones that meant "public"
 [ ] replace not(authenticated()) with serverContext()
 [ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
@@ -1537,7 +1542,7 @@ export const productsCollection = defineCollection({
             name: "Active",
             defaultValue: true
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
@@ -1737,7 +1742,7 @@ You can set default or forced filters:
     fixedFilter: { tenant_id: ["==", currentTenantId] },
 
     // Default sort
-    sort: ["created_at", "desc"]
+    sort: ["createdAt", "desc"]
 }
 ```
 
@@ -2018,14 +2023,14 @@ arrival_time: {
 Use `autoValue` to automatically set timestamps on create or update.
 
 ```typescript
-created_at: {
+createdAt: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
     admin: { readOnly: true }
 }
 
-updated_at: {
+updatedAt: {
     type: "date",
     name: "Updated At",
     autoValue: "on_update"
@@ -2618,7 +2623,7 @@ When included, the response contains both the **scalar foreign key** and the **h
 
 ```typescript
 const { data } = await client.data
-    .collection<{ id: string; author_id: string; author?: { name: string } }>("articles")
+    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
@@ -2626,7 +2631,7 @@ const { data } = await client.data
 // `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.author_id;     // "uuid-1234"
+    article.authorId;     // "uuid-1234"
 
     // Hydrated relation — only present when included
     article.author?.name;  // "Jane Doe"
@@ -2809,8 +2814,8 @@ Callbacks let you hook into the entity lifecycle to:
 type Article = {
     title: string;
     slug: string;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 };
 
 const articlesCollection: PostgresCollectionConfig<Article> = {
@@ -2820,8 +2825,8 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
     properties: {
         title: { name: "Title", type: "string" },
         slug: { name: "Slug", type: "string" },
-        created_at: { name: "Created at", type: "string" },
-        updated_at: { name: "Updated at", type: "string" }
+        createdAt: { name: "Created at", type: "string" },
+        updatedAt: { name: "Updated at", type: "string" }
     },
     callbacks: {
         beforeSave: async ({ values, id, status }) => {
@@ -2835,9 +2840,9 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
 
             // Set timestamps
             if (status === "new") {
-                values.created_at = new Date().toISOString();
+                values.createdAt = new Date().toISOString();
             }
-            values.updated_at = new Date().toISOString();
+            values.updatedAt = new Date().toISOString();
 
             return values;
         },
@@ -2876,7 +2881,7 @@ beforeSave: async ({
     context       // Full Rebase context
 }) => {
     // Return modified values
-    return { ...values, updated_at: new Date() };
+    return { ...values, updatedAt: new Date() };
 }
 ```
 
@@ -3036,7 +3041,7 @@ afterSave: async ({ values, context }) => {
     const { data: activeJobs } = await context.data.jobs.find({
         where: { status: "published" },
         limit: 10,
-        orderBy: ["created_at", "desc"]
+        orderBy: ["createdAt", "desc"]
     });
 
     // PostgREST-style operators
@@ -3100,7 +3105,7 @@ afterSave: async ({ context }) => {
     // such as an audit trail they must not be able to read or edit. Note this
     // is an admin's reach, not a bypass: a collection whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
-    // `auth.uid() IS NULL` and this accessor's uid is `service`.
+    // `rebase.uid() IS NULL` and this accessor's uid is `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
@@ -3237,7 +3242,7 @@ const postsCollection = defineCollection({
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], ownerField: "author_id" }
+        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
     ]
 });
 ```
@@ -3403,7 +3408,7 @@ securityRules: [
 You can also use `operations` (plural) to apply one rule to multiple operations:
 
 ```typescript
-{ operations: ["insert", "update", "delete"], ownerField: "author_id" }
+{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
 ```
 
 ### Full SecurityRule Interface
@@ -3431,9 +3436,9 @@ securityRules: [
     // Anyone can read published posts
     { operation: "select", using: "{status} = 'published'" },
     // Authors can see their own drafts
-    { operation: "select", ownerField: "author_id" },
+    { operation: "select", ownerField: "authorId" },
     // Authors can create and edit their own posts
-    { operations: ["insert", "update"], ownerField: "author_id" },
+    { operations: ["insert", "update"], ownerField: "authorId" },
     // Only admins can delete
     { operation: "delete", roles: ["admin"] }
 ]
@@ -3724,7 +3729,7 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | Param | Description | Example |
 |-------|-------------|---------|
 | `filter` | JSON-encoded filter conditions | `?filter={"active":["==",true]}` |
-| `orderBy` | Sort field | `?orderBy=created_at` |
+| `orderBy` | Sort field | `?orderBy=createdAt` |
 | `order` | Sort direction | `?order=desc` |
 | `limit` | Page size | `?limit=25` |
 | `startAfter` | Cursor for pagination | `?startAfter=encodedCursor` |
@@ -3910,7 +3915,7 @@ decides between rows the first calls equal:
 
 ```bash
 # By category, and newest first within each category
-GET /api/data/products?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
 ```
 
 Both spellings reach every route that lists rows, including nested ones
@@ -3961,7 +3966,7 @@ Single entity responses return a flat object:
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -4008,7 +4013,7 @@ Included relations are embedded directly in the response:
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",
@@ -5473,7 +5478,7 @@ Pass `FindParams` as the first argument to filter the subscription:
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 50,
   },
   (response) => {
@@ -5530,7 +5535,7 @@ The fluent query builder also supports realtime subscriptions. Chain your filter
 ```typescript
 const unsubscribe = client.data.orders
   .where("status", "==", "pending")
-  .orderBy("created_at", "desc")
+  .orderBy("createdAt", "desc")
   .limit(20)
   .listen(
     (response) => {
@@ -7055,7 +7060,7 @@ export default app;
 
 For most projects the distinction never surfaces, because the default policies Rebase injects onto every collection admit `serverContext() OR rolesOverlap(['admin'])`, and the service identity clears the second arm. It surfaces the moment you write your own policies:
 
-- **`policy.serverContext()` is false for it.** That helper compiles to `auth.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
+- **`policy.serverContext()` is false for it.** That helper compiles to `rebase.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
 - **Its reach equals an `admin` user's reach.** Granting the `admin` role to an application user grants them exactly the rows this accessor sees. It is not a private channel.
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
@@ -8740,14 +8745,14 @@ const productsCollection = defineCollection({
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        sort_order: { name: "Order", type: "number" }
+        sortOrder: { name: "Order", type: "number" }
     },
     name: "Products",
     table: "products",
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "sort_order",         // Property for drag-and-drop ordering
+        orderProperty: "sortOrder",         // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -8812,11 +8817,11 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sort_order: { type: "number", name: "Sort Order" }
+        sortOrder: { type: "number", name: "Sort Order" }
     },
     admin: {
         defaultViewMode: "kanban",
-        orderProperty: "sort_order",
+        orderProperty: "sortOrder",
         kanban: {
             columnProperty: "status"
         }
@@ -9171,12 +9176,12 @@ const postsCollection = defineCollection({
         title: { name: "Title", type: "string" },
         body: { name: "Body", type: "string", admin: { markdown: true } },
         status: { name: "Status", type: "string" },
-        published_at: { name: "Published at", type: "date" },
+        publishedAt: { name: "Published at", type: "date" },
         author: { name: "Author", type: "string" }
     },
     admin: {
         form: {
-            sidebar: ["status", "published_at", "author"],
+            sidebar: ["status", "publishedAt", "author"],
             showRecordMeta: true
         }
     }
@@ -9316,7 +9321,7 @@ const articlesCollection = defineCollection({
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" },
         status: { name: "Status", type: "string" },
-        published_at: { name: "Published At", type: "date" }
+        publishedAt: { name: "Published At", type: "date" }
     },
     admin: {
         entityActions: [
@@ -9325,7 +9330,7 @@ const articlesCollection = defineCollection({
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     await context.data.collection<Record<string, unknown>>(entity.path)
-                            .update(entity.id, { status: "published", published_at: new Date() });
+                            .update(entity.id, { status: "published", publishedAt: new Date() });
                     context.snackbarController.open({
                         type: "success",
                         message: "Article published!"
@@ -9758,7 +9763,7 @@ exportable: {
             key: "author_name",
             builder: async ({ entity, context }) => {
                 const author = await context.data.users.findById(
-                    entity.values.author_id as string
+                    entity.values.authorId as string
                 );
                 return author?.values.displayName ?? "Unknown";
             }
@@ -9968,7 +9973,7 @@ Fetch and subscribe to a list of entities in a collection. It automatically esta
 function ProductList() {
     // The row shape drives `filterValues`, `sortBy` and `entity.values` — without it
     // TypeScript infers M from whichever key it sees first.
-    type Product = { name: string; price: number; active: boolean; created_at: string };
+    type Product = { name: string; price: number; active: boolean; createdAt: string };
 
     const { data, dataLoading, dataLoadingError, noMoreToLoad } = useCollection<Product, User>({
         path: "products",
@@ -9978,7 +9983,7 @@ function ProductList() {
             active: ["==", true],
             price: [">=", 100]
         },
-        sortBy: ["created_at", "desc"],
+        sortBy: ["createdAt", "desc"],
         searchString: "laptop"
     });
 
@@ -10521,9 +10526,11 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 #### Field names
 
-Columns keep their real names in the generated types: a `created_at` column is `row.created_at`, and a relation's foreign key is `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
+**A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ author_id: 5 }`).
+A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
+
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`).
 
 ### Quick Example
 
@@ -10537,7 +10544,7 @@ const product = await client.data.products.create({
 // Query with filters
 const { data } = await client.data.products
     .where("price", ">=", 100)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 
@@ -10605,7 +10612,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -10707,7 +10714,7 @@ the ids you meant:
 
 ```typescript
 const stale = await client.data.sessions.findAll({
-    where: { expires_at: ["<", cutoff] }
+    where: { expiresAt: ["<", cutoff] }
 });
 await client.data.sessions.deleteMany(stale.map(s => s.id as string));
 ```
@@ -10761,7 +10768,7 @@ Chain methods for more expressive queries:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -10845,7 +10852,7 @@ To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 ```typescript
 // Sort by field (format: ["field", "direction"])
 const { data } = await client.data.products.find({
-    orderBy: ["created_at", "desc"]
+    orderBy: ["createdAt", "desc"]
 });
 
 // Fluent style
@@ -10866,7 +10873,7 @@ equal, the third between rows the first two do — so `orderBy` takes a list of
 ```typescript
 // By category, and newest first within each category.
 const { data } = await client.data.products.find({
-    orderBy: [["category", "asc"], ["created_at", "desc"]]
+    orderBy: [["category", "asc"], ["createdAt", "desc"]]
 });
 ```
 
@@ -10876,7 +10883,7 @@ call **adds** a key under the ones before it rather than replacing them:
 ```typescript
 const { data } = await client.data.products
     .orderBy("category")            // primary
-    .orderBy("created_at", "desc")  // tie-breaker
+    .orderBy("createdAt", "desc")  // tie-breaker
     .find();
 ```
 
@@ -10931,7 +10938,7 @@ It takes the same filters as the list endpoint, so an aggregate can be narrowed
 the same way a listing is:
 
 ```bash
-GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&created_at=gte.2026-01-01
+GET /api/data/orders/aggregate?select=sum(total)&status=eq.paid&createdAt=gte.2026-01-01
 ```
 
 :::note
@@ -11079,7 +11086,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -11090,20 +11097,20 @@ When relations are included, the response contains **both** the scalar foreign k
 
 ```typescript
 const { data } = await client.data
-    .collection<{ author_id: string; author?: { name: string } }>("posts")
+    .collection<{ authorId: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
 for (const post of data) {
     // Scalar foreign key — always present
-    console.log(post.author_id);    // "uuid-1234"
+    console.log(post.authorId);    // "uuid-1234"
 
     // Hydrated relation — present when included
     console.log(post.author?.name); // "Jane Doe"
 }
 ```
 
-> **Note:** Without `.include("author")`, only the scalar `author_id` field is returned. The hydrated `author` object will be `undefined`.
+> **Note:** Without `.include("author")`, only the scalar `authorId` field is returned. The hydrated `author` object will be `undefined`.
 
 #### Relation Names
 
@@ -11150,7 +11157,7 @@ Every operator works, because the thing being compared is an ordinary column:
 
 ```typescript
 where: {
-    "applications.created_at": ["<", "2026-01-01"],   // waiting since before…
+    "applications.createdAt": ["<", "2026-01-01"],   // waiting since before…
     "agency.name": ["ilike", "%staffing%"]            // through a belongsTo
 }
 ```
@@ -11182,7 +11189,7 @@ a filter key would *widen* the read to every row.
 // Candidates, whoever has been waiting longest first.
 const { data } = await client.data.talents.find({
     where: { "applications.status": ["in", ["applied", "reviewing"]] },
-    orderBy: [[{ relation: "applications", field: "created_at", agg: "min" }, "asc"]]
+    orderBy: [[{ relation: "applications", field: "createdAt", agg: "min" }, "asc"]]
 });
 
 // Clients, busiest first.
@@ -11205,7 +11212,7 @@ of nothing is `0` rather than null, so those rows sort as zero.
 Over HTTP the key is a single string, so it fits `?orderBy=` unchanged:
 
 ```bash
-GET /api/data/talents?orderBy=min(applications.created_at):asc
+GET /api/data/talents?orderBy=min(applications.createdAt):asc
 ```
 
 Cursor pagination works over it. There is no aggregate stored on the cursor row
@@ -11563,7 +11570,7 @@ The `listen()` method accepts the same `FindParams` as `find()` — you can filt
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
-        orderBy: ["created_at", "desc"],
+        orderBy: ["createdAt", "desc"],
         limit: 20
     },
     (response) => {
@@ -11654,7 +11661,7 @@ You can also subscribe through the fluent query builder. This is equivalent to c
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),
@@ -11663,7 +11670,7 @@ const unsubscribe = client.data.products
 ```
 
 A subscription takes a multi-column sort like any other query — either
-`orderBy: [["category", "asc"], ["created_at", "desc"]]` in the params, or a
+`orderBy: [["category", "asc"], ["createdAt", "desc"]]` in the params, or a
 second `.orderBy()` call, which adds a tie-breaker rather than replacing the
 first. See [Sorting](/docs/sdk/querying#sorting).
 
@@ -11932,7 +11939,7 @@ A successful read merges its rows into the local database and remembers which id
 ```typescript
 const drafts = await client.data.posts
     .where("status", "==", "draft")
-    .orderBy("updated_at", "desc")
+    .orderBy("updatedAt", "desc")
     .find();
 ```
 
@@ -11972,7 +11979,7 @@ Writes replay in the order you made them, across collections — so a create in 
 
 ```typescript
 const unsubscribe = client.data.posts.observe(
-    { where: { status: ["==", "draft"] }, orderBy: ["updated_at", "desc"] },
+    { where: { status: ["==", "draft"] }, orderBy: ["updatedAt", "desc"] },
     (result) => {
         render(result.data);
         setBadge(result.hasPendingWrites ? "saving…" : null);
@@ -13357,10 +13364,13 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Field names in the generated types are the ones the API serves, unchanged — a
-`created_at` column is `row.created_at`. Only the collection *accessor* is
-turned into a property name (`my-notes` → `client.data.myNotes`), which is what
-`collectionsDictionary` maps back to the slug.
+Field names in the generated types are the ones the API serves. A field's wire
+name is its property key, and the API is camelCase throughout: introspection
+generates a `created_at` column as a `createdAt` property carrying
+`columnName: "created_at"`, and serves it as `row.createdAt`. The column itself
+is untouched. The collection *accessor* is turned into a property name the same
+way (`my-notes` → `client.data.myNotes`), which is what `collectionsDictionary`
+maps back to the slug.
 
 ### Development Workflow
 
@@ -13987,7 +13997,7 @@ const productsCollection = defineCollection({
         name: { type: "string", name: "Name", validation: { required: true } },
         price: { type: "number", name: "Price", columnType: "numeric" },
         active: { type: "boolean", name: "Active", defaultValue: true },
-        created_at: { type: "date", name: "Created", autoValue: "on_create" }
+        createdAt: { type: "date", name: "Created", autoValue: "on_create" }
     }
 });
 ```
@@ -14137,7 +14147,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.13.0   # was 0.12.0 — your bundle is untouched
+image: rebasepro/server:0.14.1   # was 0.14.0 — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -14650,7 +14660,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.13.0
+FROM rebasepro/server:0.14.1
 COPY dist-bundle /bundle
 ```
 
@@ -14685,7 +14695,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.13.0"
+  image = "rebasepro/server:0.14.1"
 
 [http_service]
   internal_port = 8080
@@ -14745,7 +14755,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.13.0
+image: rebasepro/server:0.14.1
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -15701,7 +15711,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    published_at?: Date | null;
+    publishedAt?: Date | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -15755,11 +15765,11 @@ export const articlesCollection = defineCollection({
             admin: { multiline: true },
             validation: { max: 300 }
         },
-        published_at: {
+        publishedAt: {
             type: "date",
             name: "Published At"
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
@@ -15792,18 +15802,18 @@ export const articlesCollection = defineCollection({
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-");
             }
-            // Set published_at when publishing
-            if (values.status === "published" && !values.published_at) {
-                // `published_at` is a `date` property, so its value is a Date.
-                values.published_at = new Date();
+            // Set publishedAt when publishing
+            if (values.status === "published" && !values.publishedAt) {
+                // `publishedAt` is a `date` property, so its value is a Date.
+                values.publishedAt = new Date();
             }
             return values;
         }
     },
     securityRules: [
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "author_id" },
-        { operations: ["insert", "update"], ownerField: "author_id" },
+        { operation: "select", ownerField: "authorId" },
+        { operations: ["insert", "update"], ownerField: "authorId" },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -15839,8 +15849,8 @@ Use the client SDK to fetch articles with their relations:
 type Article = {
     title: string;
     status: string;
-    published_at?: string | null;
-    author_id: string;
+    publishedAt?: string | null;
+    authorId: string;
     author?: { name: string };
     categories?: { name: string }[];
 };
@@ -15850,7 +15860,7 @@ const { data: articles } = await client.data
     .collection<Article>("articles")
     .where("status", "==", "published")
     .include("author", "categories")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 
@@ -15858,7 +15868,7 @@ const { data: articles } = await client.data
 for (const article of articles) {
     console.log(article.title);
     console.log(article.author?.name);    // Hydrated relation
-    console.log(article.author_id);       // Scalar FK
+    console.log(article.authorId);       // Scalar FK
     console.log(article.categories);      // Array of related entities
 }
 ```

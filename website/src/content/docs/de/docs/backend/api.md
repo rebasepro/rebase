@@ -174,7 +174,7 @@ Antworten für eine einzelne Entität geben ein flaches Objekt zurück:
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -221,7 +221,7 @@ Eingebundene Relationen werden direkt in die Antwort eingebettet:
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",
@@ -421,7 +421,7 @@ authentifizierter Agent pollt die REST-Endpunkte, statt zu abonnieren.
 | `permissions` | `ApiKeyPermission[]` | Zugriff pro Collection (`"*"` = alles; `"functions/<name>"` = eine Funktion; `"storage"` = Dateispeicher) |
 | `admin` | `boolean` | Admin-Rolle gewähren — Admin-Routen + RLS-Admin-Richtlinien |
 | `rate_limit` | `number \| null` | Anfragen pro 15-Minuten-Fenster (`null` = der Server-Standard, 1000) |
-| `expires_at` | `string \| null` | ISO-8601-Ablaufzeitstempel |
+| `expiresAt` | `string \| null` | ISO-8601-Ablaufzeitstempel |
 
 Die CLI erfordert einen expliziten Bereich: Übergeben Sie `--permissions '<json>'` oder entscheiden Sie sich für
 `--full-access` — es gibt keinen stillen Standard für vollen Zugriff.

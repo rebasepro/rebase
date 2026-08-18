@@ -17,7 +17,7 @@
  * injected `default_admin` policies; a non-admin key (roles `["service"]`,
  * uid `api-key:<id>`) only sees rows that a policy explicitly grants to the
  * `service` role or to the public. Owner-style policies
- * (`owner_id = auth.uid()`) never match an API key's synthetic uid.
+ * (`owner_id = rebase.uid()`) never match an API key's synthetic uid.
  *
  * @module
  */

@@ -55,7 +55,7 @@ const { data, meta } = await client.data.products.find();
 // Mit Paginierung, Filterung und Sortierung
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -110,7 +110,7 @@ Verketten Sie Methoden für ausdrucksstärkere Abfragen:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -175,7 +175,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -191,14 +191,14 @@ const { data } = await client.data.posts
 
 for (const post of data) {
     // Skalarer Fremdschlüssel — immer vorhanden
-    console.log(post.values.author_id);    // "uuid-1234"
+    console.log(post.values.authorId);    // "uuid-1234"
 
     // Hydrierte Relation — vorhanden, wenn enthalten
     console.log(post.values.author?.name); // "Jane Doe"
 }
 ```
 
-> **Hinweis:** Ohne `.include("author")` wird nur das skalare Feld `author_id` zurückgegeben. Das hydrierte `author`-Objekt ist `undefined`.
+> **Hinweis:** Ohne `.include("author")` wird nur das skalare Feld `authorId` zurückgegeben. Das hydrierte `author`-Objekt ist `undefined`.
 
 ### Relationsnamen
 
@@ -248,7 +248,7 @@ Sie können auch über den Fluent Query Builder abonnieren:
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Button,
     cls,
@@ -20,6 +19,13 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
+import { RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL } from "@rebasepro/types";
+import {
+    COMMAND_OPTIONS,
+    POLICY_PRESETS,
+    roleOptionsFor,
+    type PolicyCommand
+} from "./policy-presets";
 import { MonacoEditor } from "../SQLEditor/MonacoEditor";
 import type { PostgresPolicy } from "./RLSEditor";
 
@@ -27,99 +33,23 @@ export interface PolicyEditorProps {
     policy?: PostgresPolicy;
     schema: string;
     table: string;
+    /**
+     * Native PostgreSQL roles this database actually has, for the `TO` list.
+     *
+     * Supplied by the caller from `fetchAvailableRoles()`. Merged with the
+     * always-offered defaults by `roleOptionsFor`, never used in place of them:
+     * `public` is a keyword and never comes back from that query.
+     */
+    roleOptions?: readonly string[];
     onSave: (policyData: Partial<PostgresPolicy>) => void;
     onCancel: () => void;
 }
-
-type PolicyCommand = "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
-const COMMAND_OPTIONS: PolicyCommand[] = ["ALL", "SELECT", "INSERT", "UPDATE", "DELETE"];
-const ROLE_OPTIONS = ["public", "authenticated", "anon", "admin"];
-
-interface PolicyPreset {
-    id: string;
-    label: string;
-    description: string;
-    policyname: string;
-    cmd: PolicyCommand;
-    permissive: "PERMISSIVE" | "RESTRICTIVE";
-    roles: string[];
-    qual: string;
-    with_check: string;
-}
-
-const POLICY_PRESETS: PolicyPreset[] = [
-    {
-        id: "public_read",
-        label: "Enable read access to everyone",
-        description: "Anyone can read data, regardless of authentication status.",
-        policyname: "Enable read access for all users",
-        cmd: "SELECT",
-        permissive: "PERMISSIVE",
-        roles: ["public"],
-        qual: "true",
-        with_check: ""
-    },
-    {
-        id: "auth_read",
-        label: "Enable read access for authenticated users only",
-        description: "Only logged-in users are allowed to read data.",
-        policyname: "Enable read access for authenticated users",
-        cmd: "SELECT",
-        permissive: "PERMISSIVE",
-        roles: ["authenticated"],
-        qual: "true",
-        with_check: ""
-    },
-    {
-        id: "auth_insert",
-        label: "Enable insert for authenticated users only",
-        description: "Only logged-in users are allowed to insert new data.",
-        policyname: "Enable insert for authenticated users only",
-        cmd: "INSERT",
-        permissive: "PERMISSIVE",
-        roles: ["authenticated"],
-        qual: "",
-        with_check: "true"
-    },
-    {
-        id: "user_select_own",
-        label: "Users can read their own rows",
-        description: "Users can only read rows where the uid matches their auth.uid()",
-        policyname: "Users can select their own data",
-        cmd: "SELECT",
-        permissive: "PERMISSIVE",
-        roles: ["authenticated"],
-        qual: "auth.uid() = uid",
-        with_check: ""
-    },
-    {
-        id: "user_update_own",
-        label: "Users can update their own rows",
-        description: "Users can only update rows where the uid matches their auth.uid()",
-        policyname: "Users can update their own data",
-        cmd: "UPDATE",
-        permissive: "PERMISSIVE",
-        roles: ["authenticated"],
-        qual: "auth.uid() = uid",
-        with_check: "auth.uid() = uid"
-    },
-    {
-        id: "user_delete_own",
-        label: "Users can delete their own rows",
-        description: "Users can only delete rows where the uid matches their auth.uid()",
-        policyname: "Users can delete their own data",
-        cmd: "DELETE",
-        permissive: "PERMISSIVE",
-        roles: ["authenticated"],
-        qual: "auth.uid() = uid",
-        with_check: ""
-    }
-];
 
 export const PolicyEditor = ({
     policy,
     schema,
     table,
+    roleOptions,
     onSave,
     onCancel
 }: PolicyEditorProps) => {
@@ -134,6 +64,11 @@ export const PolicyEditor = ({
     const [checkExpr, setCheckExpr] = useState<string>("");
 
     const [selectedPreset, setSelectedPreset] = useState<string>("");
+
+    const availableRoles = useMemo(
+        () => roleOptionsFor(roleOptions, policy?.roles),
+        [roleOptions, policy]
+    );
 
     useEffect(() => {
         if (policy) {
@@ -300,7 +235,7 @@ export const PolicyEditor = ({
                             onValueChange={setRoles}
                             placeholder={t("studio_policy_roles_placeholder")}
                         >
-                            {ROLE_OPTIONS.map(role => (
+                            {availableRoles.map(role => (
                                 <MultiSelectItem key={role} value={role}>
                                     {role}
                                 </MultiSelectItem>
@@ -396,7 +331,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step3_desc")}
                             </Typography>
                             <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: auth.uid() = uid
+                                Example: {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step3_example")}
@@ -409,7 +344,7 @@ export const PolicyEditor = ({
                                 {t("studio_policy_help_step4_desc")}
                             </Typography>
                             <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
-                                Example: auth.uid() = uid
+                                Example: {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
                                 {t("studio_policy_help_step4_example")}
@@ -423,16 +358,16 @@ export const PolicyEditor = ({
                             </Typography>
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.uid()</code>
-                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">auth.uid() = uid</code></span>
+                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_UID_SQL}</code>
+                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
                                 </li>
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.jwt()</code>
-                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">auth.jwt() -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
+                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_JWT_SQL}</code>
+                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
                                 </li>
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">auth.roles()</code>
-                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">string_to_array(auth.roles(), &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
+                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_ROLES_SQL}</code>
+                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
                                 </li>
                             </ul>
                         </Paper>

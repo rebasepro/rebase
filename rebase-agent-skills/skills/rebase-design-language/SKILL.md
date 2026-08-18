@@ -92,7 +92,7 @@ import {
     // Other
     Avatar, SearchBar, ErrorBoundary,
     // Utilities
-    cls, defaultBorderMixin, cardMixin, cardClickableMixin, paperMixin,
+    cls, defaultBorderMixin, cardMixin, cardClickableMixin, paperMixin, codeSurfaceMixin,
     // Icons (all from @rebasepro/ui, under their lucide names)
     PlusIcon, Trash2Icon
 } from "@rebasepro/ui";
@@ -181,6 +181,17 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 2. **NEVER use gradient text** (`bg-gradient-to-r ... bg-clip-text text-transparent`) for titles or headings. Use `Typography` with its built-in color prop.
 3. **NEVER use glassmorphism** (`backdrop-blur`, `backdrop-filter`, semi-transparent backgrounds) for cards or panels. Use the `Card`, `Paper` components or standard `bg-white dark:bg-surface-900` backgrounds.
 4. **All borders must use `defaultBorderMixin`** — never hardcode border colors like `border-surface-200` or `border-gray-300`.
+5. **`#0070F4` is tuned as a fill, not as ink.** White on it, or it on white, is
+   correct. Read as *text* on a `surface-900` card it measures **4.36:1** — below
+   AA, and every accent link in the product sits on exactly that surface. Dark
+   mode uses `primary-light` for accent **text** (7.34:1); fills are untouched.
+   Do not hand-write `text-primary` on a dark surface.
+6. **Never hardcode chip or badge ink.** `Chip` derives its own foreground from
+   the background it will actually sit on, walking a hue-tinted colour toward
+   black or white only as far as it must to clear the contrast floor — and an
+   `outlined` chip drops its fill and sits on the *page*, so it uses a separately
+   measured ink. One value cannot be legible against two surfaces. Writing
+   `text-white` on a chip is how 63 of 120 hue/tone/mode pairs ended up below AA.
 
 ---
 
@@ -192,24 +203,41 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 ### Variant Scale
 
-The typography scale is compact and uses semibold weights for headings — designed for high content density.
+The scale is compact — built for content density — and spans **three weights**.
+Bold is the page's first thing to read, semibold is a section, medium is UI
+chrome. A page title and the heading inside it are not the same voice.
 
 | Variant      | CSS Class             | Rendered Element | Specs                                                  |
 |--------------|-----------------------|------------------|---------------------------------------------------------|
-| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-semibold, tracking-tight                      |
-| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-semibold, tracking-tight                      |
-| `h3`         | `typography-h3`       | `<h3>`           | 2xl, font-semibold, tracking-tight                      |
-| `h4`         | `typography-h4`       | `<h4>`           | xl, font-semibold, tracking-[-0.01em]                   |
-| `h5`         | `typography-h5`       | `<h5>`           | lg, font-semibold, tracking-[-0.01em]                   |
-| `h6`         | `typography-h6`       | `<h6>`           | base, font-semibold, tracking-[-0.01em]                 |
-| `subtitle1`  | `typography-subtitle1`| `<h6>`           | sm, font-semibold, tracking-[-0.01em]                   |
-| `subtitle2`  | `typography-subtitle2`| `<h6>`           | sm, font-medium                                         |
+| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-headers, **font-bold**, tracking-display      |
+| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-headers, **font-bold**, tracking-display      |
+| `h3`         | `typography-h3`       | `<h3>`           | 2xl, font-headers, font-semibold, tracking-title        |
+| `h4`         | `typography-h4`       | `<h4>`           | xl, font-headers, font-semibold, tracking-title         |
+| `h5`         | `typography-h5`       | `<h5>`           | lg, font-headers, font-medium, tracking-heading         |
+| `h6`         | `typography-h6`       | `<h6>`           | base, font-headers, font-medium, tracking-heading       |
+| `subtitle1`  | `typography-subtitle1`| `<h6>`           | sm, font-headers, font-medium, tracking-heading         |
+| `subtitle2`  | `typography-subtitle2`| `<h6>`           | sm, font-headers, font-medium                           |
+| `lead`       | `typography-lead`     | `<p>`            | base, leading-relaxed                                   |
 | `body1`      | `typography-body1`    | `<p>`            | sm                                                      |
 | `body2`      | `typography-body2`    | `<p>`            | xs                                                      |
 | `caption`    | `typography-caption`  | `<p>`            | [11px], leading-[1.4]                                   |
+| `micro`      | `typography-micro`    | `<p>`            | 2xs, font-medium, uppercase, tracking-[0.08em]          |
+| `mono`       | `typography-mono`     | `<p>`            | font-mono, tabular-nums                                 |
+| `stat`       | `typography-stat`     | `<p>`            | 3xl, font-headers, font-bold, tracking-display, tabular-nums |
 | `label`      | `typography-label`    | `<label>`        | xs, font-medium, tracking-wide                          |
 | `inherit`    | `typography-inherit`  | `<p>`            | text-inherit (inherits parent sizing)                   |
-| `button`     | `typography-button`   | `<span>`         | xs, font-semibold, tracking-wide                        |
+| `button`     | `typography-button`   | `<span>`         | sm, font-semibold, tracking-wide                        |
+
+**The three tiers people most often improvise, and should not:**
+
+- **`lead`** is the sentence under a page title. Without it that line borrows
+  `body2` (12px), so the one line explaining what a page is *for* ends up smaller
+  than the page's own table rows.
+- **`micro`** is the uppercase field label above a value — the single sanctioned
+  tier below `text-xs`, and it earns the exception by never carrying a sentence.
+  Do not set anything a person reads at `2xs`.
+- **`mono`** carries `tabular-nums`. Proportional digits make a column of
+  measurements ragged and a live counter jitter as its glyphs change width.
 
 ### Color Prop
 
@@ -310,8 +338,8 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 
 ```tsx
 // Style mixins applied by Card:
-// cardMixin = "bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
-// cardClickableMixin = "hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150"
+// cardMixin = "bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60"
+// cardClickableMixin = "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150"
 ```
 
 ```tsx no-verify
@@ -389,10 +417,11 @@ Always import and use these mixins rather than hardcoding equivalent classes:
 
 | Mixin                        | Classes                                                                                              |
 |------------------------------|------------------------------------------------------------------------------------------------------|
-| `defaultBorderMixin`         | `border-surface-200 dark:border-surface-700`                                                         |
-| `paperMixin`                 | `bg-white rounded-lg dark:bg-surface-800 border border-surface-200 dark:border-surface-700`          |
-| `cardMixin`                  | `bg-white dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700`          |
-| `cardClickableMixin`         | `hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150`        |
+| `defaultBorderMixin`         | `border-surface-200 dark:border-surface-700/60`                                                      |
+| `paperMixin`                 | `bg-white rounded-lg dark:bg-surface-900 border border-surface-200 dark:border-surface-700`          |
+| `cardMixin`                  | `bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60`       |
+| `codeSurfaceMixin`           | `bg-surface-100 dark:bg-surface-950 rounded-md`                                                      |
+| `cardClickableMixin`         | `hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150`           |
 | `cardSelectedMixin`          | `bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75`                                     |
 
 ### Field & Focus Mixins

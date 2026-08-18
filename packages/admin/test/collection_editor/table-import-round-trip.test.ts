@@ -102,7 +102,11 @@ describe("importing a table and saving the collection", () => {
         expect(imported.securityRules?.[0]).toMatchObject({
             name: "posts_owner_select",
             operations: ["select"],
-            using: "author_id = auth.uid()"
+            // The fixture's `qual` is the pre-1.0 spelling, because that is what
+            // a database provisioned before the move actually holds. It is
+            // normalised on import: copying it through would write a call to a
+            // function 1.0 no longer creates into the project's own config.
+            using: "author_id = rebase.uid()"
         });
         // Not the CRUD verbs the discarded copy emitted, which compile to nothing.
         expect(imported.securityRules?.[0]?.operations).not.toContain("read");

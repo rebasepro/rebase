@@ -1,3 +1,4 @@
+import { rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import type {
     ArrayProperty,
     NumberProperty,
@@ -337,8 +338,14 @@ export function buildCollectionFromTableMetadata(
                 case "UPDATE": operations = ["update"]; break;
                 case "DELETE": operations = ["delete"]; break;
             }
-            const qual = policy.qual ?? undefined;
-            const withCheck = policy.with_check ?? undefined;
+            // Normalised on the way in, the same way `sqlToPolicy` normalises
+            // what the admin UI reads back. Without it, importing a table from a
+            // database provisioned before 1.0 copies `auth.uid()` straight into
+            // the project's config — a call to a function the framework no
+            // longer creates, which then boots with a legacy-helper warning
+            // forever and holds the `auth` schema open.
+            const qual = policy.qual ? rewriteLegacyRlsFunctions(policy.qual) : undefined;
+            const withCheck = policy.with_check ? rewriteLegacyRlsFunctions(policy.with_check) : undefined;
             if (qual) {
                 securityRules.push({
                     name: policy.policy_name,

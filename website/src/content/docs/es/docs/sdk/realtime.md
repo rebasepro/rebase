@@ -33,7 +33,7 @@ El método `listen()` acepta los mismos `FindParams` que `find()` — puede filt
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
-        orderBy: ["created_at", "desc"],
+        orderBy: ["createdAt", "desc"],
         limit: 20
     },
     (response) => {
@@ -121,7 +121,7 @@ También puede suscribirse a través del constructor de consultas fluido. Es equ
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),

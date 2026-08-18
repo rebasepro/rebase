@@ -194,7 +194,7 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Los nombres de campo en los tipos generados son los que sirve la API, sin cambios: una columna `created_at` es `row.created_at`. Solo el *accessor* de la colección se convierte en un nombre de propiedad (`my-notes` → `client.data.myNotes`), que es lo que `collectionsDictionary` devuelve al slug.
+Los nombres de campo en los tipos generados son los que sirve la API, sin cambios: una columna `createdAt` es `row.createdAt`. Solo el *accessor* de la colección se convierte en un nombre de propiedad (`my-notes` → `client.data.myNotes`), que es lo que `collectionsDictionary` devuelve al slug.
 
 ## Flujo de Trabajo de Desarrollo
 

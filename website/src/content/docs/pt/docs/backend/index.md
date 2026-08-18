@@ -136,7 +136,7 @@ A API REST é auto-gerada a partir das suas coleções. Cada coleção obtém es
 | Parâmetro | Descrição | Exemplo |
 |---|---|---|
 | `filter` | Condições de filtro codificadas em JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Campo de ordenação | `?orderBy=created_at` |
+| `orderBy` | Campo de ordenação | `?orderBy=createdAt` |
 | `order` | Direção de ordenação | `?order=desc` |
 | `limit` | Tamanho da página | `?limit=25` |
 | `startAfter` | Cursor para paginação | `?startAfter=encodedCursor` |

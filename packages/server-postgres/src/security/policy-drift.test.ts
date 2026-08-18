@@ -244,15 +244,34 @@ describe("checkPolicyDrift", () => {
         expect(formatPolicyDrift(drift)).toContain("db push");
     });
 
+    it("flags the tautology under the post-1.0 schema name too", async () => {
+        // The helpers moved from `auth` to `rebase` in 1.0, and the compiler
+        // rewrites raw `securityRules` SQL on the way in — so `rebase.uid() IS
+        // NOT NULL` is the only spelling a current release can store. A checker
+        // anchored on the pre-1.0 name saw none of it.
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = expected.map((p) => liveRow(p, {
+            qual: p.hasUsing ? "(rebase.uid() IS NOT NULL)" : null
+        }));
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+
+        expect(drift.insecure.length).toBeGreaterThan(0);
+        expect(drift.diverged).toHaveLength(0);
+    });
+
     it("clears the corrected expression, in either literal spelling", async () => {
         const cols = [collection("posts")];
         const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
-        for (const guard of ["<> 'anonymous'::text", "<> 'anonymous'", "!= 'anonymous'"]) {
-            const live = expected.map((p) => liveRow(p, {
-                qual: p.hasUsing ? `((auth.uid() IS NOT NULL) AND ((auth.uid())::text ${guard}))` : null
-            }));
-            const drift = await checkPolicyDrift(dbWith(live), cols);
-            expect(drift.insecure).toHaveLength(0);
+        for (const fn of ["auth.uid()", "rebase.uid()"]) {
+            for (const guard of ["<> 'anonymous'::text", "<> 'anonymous'", "!= 'anonymous'"]) {
+                const live = expected.map((p) => liveRow(p, {
+                    qual: p.hasUsing ? `((${fn} IS NOT NULL) AND ((${fn})::text ${guard}))` : null
+                }));
+                const drift = await checkPolicyDrift(dbWith(live), cols);
+                expect(drift.insecure).toHaveLength(0);
+            }
         }
     });
 

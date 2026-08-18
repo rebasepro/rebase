@@ -174,7 +174,7 @@ As respostas de uma única entidade retornam um objeto plano:
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -221,7 +221,7 @@ As relações incluídas são incorporadas diretamente na resposta:
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",
@@ -422,7 +422,7 @@ polling nos endpoints REST em vez de se inscrever.
 | `permissions` | `ApiKeyPermission[]` | Acesso por coleção (`"*"` = tudo; `"functions/<name>"` = uma função; `"storage"` = armazenamento de arquivos) |
 | `admin` | `boolean` | Conceder o papel de administrador — rotas de administrador + políticas de administrador RLS |
 | `rate_limit` | `number \| null` | Requisições por janela de 15 min (`null` = o padrão do servidor, 1000) |
-| `expires_at` | `string \| null` | Timestamp de expiração ISO-8601 |
+| `expiresAt` | `string \| null` | Timestamp de expiração ISO-8601 |
 
 A CLI requer um escopo explícito: passe `--permissions '<json>'` ou opte por
 `--full-access` — não há um padrão silencioso de acesso completo.

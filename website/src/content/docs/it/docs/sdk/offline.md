@@ -36,7 +36,7 @@ Una lettura riuscita unisce le sue righe nel database locale e ricorda quali id 
 ```typescript
 const drafts = await client.data.posts
     .where("status", "==", "draft")
-    .orderBy("updated_at", "desc")
+    .orderBy("updatedAt", "desc")
     .find();
 ```
 
@@ -77,7 +77,7 @@ Le scritture vengono ritrasmesse nell'ordine in cui le hai eseguite, attraverso 
 
 ```typescript
 const unsubscribe = client.data.posts.observe(
-    { where: { status: ["==", "draft"] }, orderBy: ["updated_at", "desc"] },
+    { where: { status: ["==", "draft"] }, orderBy: ["updatedAt", "desc"] },
     (result) => {
         render(result.data);
         setBadge(result.hasPendingWrites ? "saving…" : null);

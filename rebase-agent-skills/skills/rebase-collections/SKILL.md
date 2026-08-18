@@ -93,7 +93,7 @@ const productsCollection: PostgresCollectionConfig = {
             type: "boolean",
             defaultValue: false
         },
-        created_at: {
+        createdAt: {
             name: "Created At",
             type: "date",
             mode: "date_time",
@@ -121,7 +121,7 @@ const productsCollection: PostgresCollectionConfig = {
         selectionEnabled: true,
         propertiesOrder: [
             "name", "price", "category", "description",
-            "published", "created_at"
+            "published", "createdAt"
         ]
     }
 };
@@ -174,7 +174,7 @@ export default productsCollection;
 | `admin.fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
 | `admin.defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
 | `admin.filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
-| `admin.sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["created_at", "desc"]` |
+| `admin.sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["createdAt", "desc"]` |
 | `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
 | `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
 | `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
@@ -389,13 +389,13 @@ const postsCollection = defineCollection({
         title: { name: "Title", type: "string" },
         body: { name: "Body", type: "string", admin: { markdown: true } },
         status: { name: "Status", type: "string" },
-        published_at: { name: "Published at", type: "date" },
+        publishedAt: { name: "Published at", type: "date" },
         notes: { name: "Notes", type: "string" }
     },
     admin: {
         form: {
             // Fields beside the main column rather than in it.
-            sidebar: ["status", "published_at"],
+            sidebar: ["status", "publishedAt"],
             sections: [
                 { key: "content", properties: ["title", "body"] },
                 {
@@ -599,7 +599,7 @@ No additional options beyond `BaseProperty`.
 ## Date Properties
 
 ```typescript
-created_at: {
+createdAt: {
     name: "Created At",
     type: "date",
     mode: "date_time",
@@ -608,7 +608,7 @@ created_at: {
     admin: { readOnly: true }
 }
 
-updated_at: {
+updatedAt: {
     name: "Updated At",
     type: "date",
     mode: "date_time",
@@ -873,7 +873,8 @@ const postsCollection: PostgresCollectionConfig = {
 };
 ```
 
-This automatically creates an `author_id` foreign key column on the `posts` table.
+This automatically creates an `author_id` foreign key column on the `posts` table,
+served on the wire as `authorId`.
 
 ### Many-to-Many
 
@@ -1100,7 +1101,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
     status: string;
     description: string;
     company_id: string;
-    created_at: string;
+    createdAt: string;
 }> = {
     name: "Job Submissions",
     slug: "job_submissions",
@@ -1112,7 +1113,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
                 values.slug = values.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
             }
             if (status === "new") {
-                values.created_at = new Date().toISOString();
+                values.createdAt = new Date().toISOString();
             }
             return values;
         },
@@ -1541,7 +1542,7 @@ const postsCollection: PostgresCollectionConfig = {
         // Anyone can read published posts
         { operation: "select", using: "{status} = 'published'" },
         // Authors can see/edit their own
-        { operations: ["select", "insert", "update"], ownerField: "author_id" },
+        { operations: ["select", "insert", "update"], ownerField: "authorId" },
         // Only admins can delete
         { operation: "delete", roles: ["admin"] }
     ],

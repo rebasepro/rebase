@@ -104,7 +104,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    published_at?: string | null;
+    publishedAt?: string | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -158,11 +158,11 @@ export const articlesCollection = defineCollection({
             admin: { multiline: true },
             validation: { max: 300 }
         },
-        published_at: {
+        publishedAt: {
             type: "date",
             name: "Publicado Em"
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Criado Em",
             autoValue: "on_create",
@@ -195,17 +195,17 @@ export const articlesCollection = defineCollection({
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-");
             }
-            // Definir published_at ao publicar
-            if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date().toISOString();
+            // Definir publishedAt ao publicar
+            if (values.status === "published" && !values.publishedAt) {
+                values.publishedAt = new Date().toISOString();
             }
             return values;
         }
     },
     securityRules: [
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "author_id" },
-        { operations: ["insert", "update"], ownerField: "author_id" },
+        { operation: "select", ownerField: "authorId" },
+        { operations: ["insert", "update"], ownerField: "authorId" },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -241,14 +241,14 @@ Use o SDK do cliente para buscar artigos com suas relações:
 const { data: articles } = await client.data.articles
     .where("status", "==", "published")
     .include("author", "categories")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 
 for (const article of articles) {
     console.log(article.values.title);
     console.log(article.values.author?.name);    // Relação hidratada
-    console.log(article.values.author_id);       // Chave Estrangeira Escalar
+    console.log(article.values.authorId);       // Chave Estrangeira Escalar
     console.log(article.values.categories);      // Array de entidades relacionadas
 }
 ```

@@ -84,9 +84,11 @@ When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientR
 
 ### Field names
 
-Columns keep their real names in the generated types: a `created_at` column is `row.created_at`, and a relation's foreign key is `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
+**A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ author_id: 5 }`).
+A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
+
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`).
 
 ## Quick Example
 
@@ -100,7 +102,7 @@ const product = await client.data.products.create({
 // Query with filters
 const { data } = await client.data.products
     .where("price", ">=", 100)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 

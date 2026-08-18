@@ -23,7 +23,7 @@ const articlesCollection = defineCollection({
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" },
         status: { name: "Status", type: "string" },
-        published_at: { name: "Published At", type: "date" }
+        publishedAt: { name: "Published At", type: "date" }
     },
     admin: {
         entityActions: [
@@ -32,7 +32,7 @@ const articlesCollection = defineCollection({
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     await context.data.collection<Record<string, unknown>>(entity.path)
-                            .update(entity.id, { status: "published", published_at: new Date() });
+                            .update(entity.id, { status: "published", publishedAt: new Date() });
                     context.snackbarController.open({
                         type: "success",
                         message: "Article published!"

@@ -127,7 +127,7 @@ const productsCollection = defineCollection({
             name: "Active",
             defaultValue: true
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Created At",
             autoValue: "on_create"

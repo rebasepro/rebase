@@ -155,7 +155,7 @@ REVOKE ALL ON "public"."your_matview" FROM "anon";
 
 Eine erlaubende `INSERT`/`UPDATE`/`DELETE`/`ALL`-Policy, die ohne Authentifizierung erreichbar ist und deren Prüfausdruck jede Zeile akzeptiert, unterstützt durch eine entsprechende Rechtevergabe.
 
-Die Bedingung „akzeptiert jede Zeile“ ist essenziell und bewusst eng gefasst. Supabase gewährt `anon` und `authenticated` standardmäßig vollständige DML-Rechte, sodass eine Policy, die auf diese Rollen abzielt, für sich genommen kein Problem darstellt — ein Lehrbuchbeispiel wie `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` ist korrekt und wird nicht gemeldet.
+Die Bedingung „akzeptiert jede Zeile“ ist essenziell und bewusst eng gefasst. Supabase gewährt `anon` und `authenticated` standardmäßig vollständige DML-Rechte, sodass eine Policy, die auf diese Rollen abzielt, für sich genommen kein Problem darstellt — ein Lehrbuchbeispiel wie `FOR INSERT TO public WITH CHECK (userId = auth.uid())` ist korrekt und wird nicht gemeldet.
 
 ### unqualified-column-in-subquery
 

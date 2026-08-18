@@ -67,7 +67,7 @@ export type RebaseCallContext<USER extends User = User> = {
      * because RLS filters rather than raises. Write callbacks that tolerate
      * that, or reach for {@link client}`.dataAsAdmin` deliberately when the
      * callback genuinely has to see what an admin may see. Note what that does
-     * *not* buy you: `policy.serverContext()` (`auth.uid() IS NULL`) is false
+     * *not* buy you: `policy.serverContext()` (`rebase.uid() IS NULL`) is false
      * for the service identity, so a collection whose only rule is
      * `serverContext()` stays closed to it.
      *

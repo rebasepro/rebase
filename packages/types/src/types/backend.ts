@@ -470,7 +470,7 @@ export interface SQLAdmin {
      * Fetch the *application-level* roles in use in this project.
      *
      * These are the strings stored on the users table's `roles` column and
-     * exposed to policies as `auth.roles()` — what `SecurityRule.roles`
+     * exposed to policies as `rebase.roles()` — what `SecurityRule.roles`
      * matches against. Distinct from {@link fetchAvailableRoles}; the two are
      * not interchangeable.
      */

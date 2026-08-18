@@ -1349,7 +1349,7 @@ export class PostgresBackendDriver implements DataDriver {
      * PostgreSQL roles from `pg_roles` (`postgres`, `rebase_user`, …). Those
      * are the roles the SQL editor can `SET ROLE` to. *These* are the strings
      * held in the users table's `roles` column, injected per-transaction as
-     * `auth.roles()` and matched by `SecurityRule.roles`. Feeding the pg roles
+     * `rebase.roles()` and matched by `SecurityRule.roles`. Feeding the pg roles
      * into a `SecurityRule.roles` field produces a condition no user can ever
      * satisfy, so the two must not be conflated.
      *
@@ -1616,8 +1616,8 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             // other user, with uid 'service' and the admin role, and its
             // statements are RLS-evaluated. The comment used to list it as a
             // bypass and five docblocks followed. The GUCs are transaction-local and
-            // remain readable after the role switch, so `auth.uid()` /
-            // `auth.roles()` in policies still resolve.
+            // remain readable after the role switch, so `rebase.uid()` /
+            // `rebase.roles()` in policies still resolve.
             //
             // Fails closed: if the switch cannot be performed, the transaction
             // aborts rather than falling back to an RLS-bypassing connection.

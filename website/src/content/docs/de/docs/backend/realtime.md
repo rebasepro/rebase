@@ -68,7 +68,7 @@ Der Callback erhält ein `FindResponse<M>`, das Folgendes enthält:
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 50,
   },
   (response) => {
@@ -125,7 +125,7 @@ Der Fluent-Query-Builder unterstützt ebenfalls Echtzeit-Abonnements. Verketten 
 ```typescript
 const unsubscribe = client.data.orders
   .where("status", "==", "pending")
-  .orderBy("created_at", "desc")
+  .orderBy("createdAt", "desc")
   .limit(20)
   .listen(
     (response) => {
@@ -149,7 +149,7 @@ Rebase verwendet für Collection-Abonnements eine zweiphasige Update-Strategie, 
 
 2. **Phase 2 — Entprellter RLS-Refetch:** Nach einer kurzen Verzögerung von **300 ms** (`REFETCH_DEBOUNCE_MS`) führt der Server einen autoritativen Datenbank-Refetch der Collection durch, der Ihren ursprünglichen Filtern und der Sortierreihenfolge entspricht. Dies ist entscheidend, da Feldmutationen die Sichtbarkeit der Entität ändern könnten (z. B. wenn sich ihr Status geändert hat und nicht mehr zu einem `where`-Filter passt).
 
-   Um strenge Sicherheitsgrenzen aufrechtzuerhalten, wird diese Refetch-Abfrage innerhalb einer Transaktion ausgeführt, die die transaktionslokalen Variablen `app.user_id` und `app.user_roles` setzt, die aus dem `SubscriptionAuthContext` des Abonnenten abgeleitet sind. Dies stellt sicher, dass die Row-Level-Security-Einschränkungen (RLS) von PostgreSQL unter der Auth-Sitzung des Clients korrekt ausgewertet werden und nur die Datensätze, die der Benutzer sehen darf, im finalen `collection_update` gesendet werden.
+   Um strenge Sicherheitsgrenzen aufrechtzuerhalten, wird diese Refetch-Abfrage innerhalb einer Transaktion ausgeführt, die die transaktionslokalen Variablen `app.userId` und `app.user_roles` setzt, die aus dem `SubscriptionAuthContext` des Abonnenten abgeleitet sind. Dies stellt sicher, dass die Row-Level-Security-Einschränkungen (RLS) von PostgreSQL unter der Auth-Sitzung des Clients korrekt ausgewertet werden und nur die Datensätze, die der Benutzer sehen darf, im finalen `collection_update` gesendet werden.
 
 Dieser Ansatz garantiert, dass Listenfilter und Zugriffsrichtlinien perfekt konsistent bleiben, während gleichzeitig eine hohe UI-Reaktionsfähigkeit erhalten bleibt.
 
@@ -321,7 +321,7 @@ ws.on("error", (error) => console.error("Error:", error));
 WebSocket-Abonnements respektieren automatisch Row-Level-Security-Richtlinien (RLS). Wenn der Client authentifiziert ist:
 
 1. Die WebSocket-Verbindung authentifiziert sich mit demselben JWT-Token wie die REST-API.
-2. Jeder Abonnement-Refetch läuft innerhalb einer PostgreSQL-Transaktion mit `set_config('app.user_id', ...)` und `set_config('app.user_roles', ...)` — wodurch die RLS-Richtlinien durchgesetzt werden.
+2. Jeder Abonnement-Refetch läuft innerhalb einer PostgreSQL-Transaktion mit `set_config('app.userId', ...)` und `set_config('app.user_roles', ...)` — wodurch die RLS-Richtlinien durchgesetzt werden.
 3. Wenn ein Token während einer aktiven Sitzung abläuft, authentifiziert sich der Client automatisch neu und abonniert erneut.
 
 Das bedeutet, dass jeder Benutzer nur Updates für Datensätze erhält, die er sehen darf.

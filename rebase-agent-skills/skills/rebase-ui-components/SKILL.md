@@ -130,7 +130,7 @@ Renders text with semantic HTML elements and consistent styling.
 | `align` | `"center" \| "inherit" \| "justify" \| "left" \| "right"` | `"inherit"` | Text alignment |
 | `variantMapping` | `Record<string, string>` | built-in | Override variant→element mapping |
 
-**TypographyVariant values:** `"h1"`, `"h2"`, `"h3"`, `"h4"`, `"h5"`, `"h6"`, `"subtitle1"`, `"subtitle2"`, `"label"`, `"body1"`, `"body2"`, `"inherit"`, `"caption"`, `"button"`
+**TypographyVariant values:** `"h1"`, `"h2"`, `"h3"`, `"h4"`, `"h5"`, `"h6"`, `"subtitle1"`, `"subtitle2"`, `"lead"`, `"body1"`, `"body2"`, `"caption"`, `"micro"`, `"mono"`, `"stat"`, `"label"`, `"inherit"`, `"button"`
 
 | Variant | Default Element | CSS Class |
 |---------|----------------|-----------|
@@ -140,6 +140,10 @@ Renders text with semantic HTML elements and consistent styling.
 | `label` | `<label>` | `typography-label` |
 | `caption` | `<p>` | `typography-caption` |
 | `button` | `<span>` | `typography-button` |
+| `lead` | `<p>` | `typography-lead` — the sentence under a page title |
+| `micro` | `<p>` | `typography-micro` — uppercase field label; the only sanctioned tier below `text-xs` |
+| `mono` | `<p>` | `typography-mono` — carries `tabular-nums` |
+| `stat` | `<p>` | `typography-stat` — a dashboard figure |
 
 ```tsx
 import { Typography } from "@rebasepro/ui";
@@ -199,7 +203,7 @@ import { Card, Typography } from "@rebasepro/ui";
 
 ### Paper
 
-Minimal bordered container. Uses `paperMixin` styling: white bg, rounded-md, border.
+Minimal bordered container. Uses `paperMixin` styling: white/`surface-900` bg, `rounded-lg`, solid border. A floating surface sits *over* unknown content and keeps a definite edge — a `Card` in the document flow gets a hairline instead.
 
 ```tsx
 import { Paper } from "@rebasepro/ui";
@@ -1240,6 +1244,7 @@ import {
     defaultBorderMixin,
     paperMixin,
     cardMixin,
+    codeSurfaceMixin,
     cardClickableMixin,
     cardSelectedMixin
 } from "@rebasepro/ui";
@@ -1254,9 +1259,10 @@ import {
 | `fieldBackgroundInvisibleMixin` | Transparent field background |
 | `fieldBackgroundDisabledMixin` | Disabled field background |
 | `fieldBackgroundHoverMixin` | Field hover background |
-| `defaultBorderMixin` | Standard border: `border-surface-200/60 dark:border-surface-700/60` |
-| `paperMixin` | Paper container: white bg, rounded-md, border |
-| `cardMixin` | Card container: white/dark bg, rounded-md, border, margin |
+| `defaultBorderMixin` | Standard border: `border-surface-200 dark:border-surface-700/60` |
+| `paperMixin` | Floating surface (menu, dialog, popover): white/`surface-900` bg, `rounded-lg`, solid border |
+| `cardMixin` | Card in the document flow: white/`surface-900` bg, `rounded-xl`, hairline border |
+| `codeSurfaceMixin` | Inset code well: `bg-surface-100 dark:bg-surface-950 rounded-md` |
 | `cardClickableMixin` | Hover/click effects for interactive cards |
 | `cardSelectedMixin` | Selected card highlight: `bg-primary-bg/30 ring-1 ring-primary/75` |
 

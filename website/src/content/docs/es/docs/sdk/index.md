@@ -55,7 +55,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -110,7 +110,7 @@ Encadene métodos para consultas más expresivas:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -175,7 +175,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -191,14 +191,14 @@ const { data } = await client.data.posts
 
 for (const post of data) {
     // Scalar foreign key — always present
-    console.log(post.values.author_id);    // "uuid-1234"
+    console.log(post.values.authorId);    // "uuid-1234"
 
     // Hydrated relation — present when included
     console.log(post.values.author?.name); // "Jane Doe"
 }
 ```
 
-> **Nota:** Sin `.include("author")`, solo se devuelve el campo escalar `author_id`. El objeto `author` hidratado será `undefined`.
+> **Nota:** Sin `.include("author")`, solo se devuelve el campo escalar `authorId`. El objeto `author` hidratado será `undefined`.
 
 ### Relation Names
 
@@ -248,7 +248,7 @@ También puede suscribirse a través del constructor de consultas fluido:
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),

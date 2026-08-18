@@ -77,9 +77,9 @@ const job: CronJobDefinition = {
 
         // ✅ Use ctx.client to interact with your data
         const { data: oldSessions } = await ctx.client.data
-            .collection<{ id: string; created_at: string }>("sessions")
+            .collection<{ id: string; createdAt: string }>("sessions")
             .find({
-                where: { created_at: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
+                where: { createdAt: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
                 limit: 500,
             });
 
@@ -162,9 +162,9 @@ const job: CronJobDefinition = {
 
     async handler(ctx) {
         const { data: users } = await ctx.client.data
-            .collection<{ id: string; email: string; digest_enabled: boolean }>("users")
+            .collection<{ id: string; email: string; digestEnabled: boolean }>("users")
             .find({
-                where: { digest_enabled: ["==", true] },
+                where: { digestEnabled: ["==", true] },
             });
 
         let sent = 0;
@@ -172,7 +172,7 @@ const job: CronJobDefinition = {
             const { data: notifications } = await ctx.client.data
                 .collection<Record<string, unknown>>("notifications")
                 .find({
-                    where: { user_id: ["==", user.id], read: ["==", false] },
+                    where: { userId: ["==", user.id], read: ["==", false] },
                 });
 
             if (notifications.length > 0) {
@@ -241,7 +241,7 @@ interface CronJobContext {
 > **IMPORTANT FOR AGENTS:** `ctx.client` authenticates as the **service identity** (`userId: "service"`, `roles: ["admin"]`). All data operations through `ctx.client` go through the full REST middleware pipeline (including DataHooks and Collection Callbacks). This means:
 > - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
 > - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
-> - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`auth.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.
+> - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.
 
 ### Using `ctx.client`
 
@@ -258,8 +258,8 @@ async handler(ctx) {
     // Filtering and sorting — `where` takes [operator, value] tuples, and the key is
     // `orderBy`, not `sort`.
     const { data: stale } = await ctx.client.data.collection("tokens").find({
-        where: { expires_at: ["<", new Date().toISOString()] },
-        orderBy: ["created_at", "desc"],
+        where: { expiresAt: ["<", new Date().toISOString()] },
+        orderBy: ["createdAt", "desc"],
         limit: 500,
     });
 

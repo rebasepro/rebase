@@ -104,7 +104,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    published_at?: string | null;
+    publishedAt?: string | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -158,11 +158,11 @@ export const articlesCollection = defineCollection({
             admin: { multiline: true },
             validation: { max: 300 }
         },
-        published_at: {
+        publishedAt: {
             type: "date",
             name: "Veröffentlicht am"
         },
-        created_at: {
+        createdAt: {
             type: "date",
             name: "Erstellt am",
             autoValue: "on_create",
@@ -195,17 +195,17 @@ export const articlesCollection = defineCollection({
                     .toLowerCase()
                     .replace(/[^a-z0-9]+/g, "-");
             }
-            // Set published_at when publishing
-            if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date().toISOString();
+            // Set publishedAt when publishing
+            if (values.status === "published" && !values.publishedAt) {
+                values.publishedAt = new Date().toISOString();
             }
             return values;
         }
     },
     securityRules: [
         { operation: "select", using: "{status} = 'published'" },
-        { operation: "select", ownerField: "author_id" },
-        { operations: ["insert", "update"], ownerField: "author_id" },
+        { operation: "select", ownerField: "authorId" },
+        { operations: ["insert", "update"], ownerField: "authorId" },
         { operation: "delete", roles: ["admin"] }
     ],
     admin: {
@@ -241,8 +241,8 @@ Verwenden Sie das Client-SDK, um Artikel mit ihren Beziehungen abzurufen:
 type Article = {
     title: string;
     status: string;
-    published_at?: string | null;
-    author_id: string;
+    publishedAt?: string | null;
+    authorId: string;
     author?: { name: string };
     categories?: { name: string }[];
 };
@@ -252,7 +252,7 @@ const { data: articles } = await client.data
     .collection<Article>("articles")
     .where("status", "==", "published")
     .include("author", "categories")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 
@@ -260,7 +260,7 @@ const { data: articles } = await client.data
 for (const article of articles) {
     console.log(article.title);
     console.log(article.author?.name);    // Hydrated relation
-    console.log(article.author_id);       // Scalar FK
+    console.log(article.authorId);       // Scalar FK
     console.log(article.categories);      // Array of related entities
 }
 ```

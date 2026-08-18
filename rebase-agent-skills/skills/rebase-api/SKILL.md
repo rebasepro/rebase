@@ -19,6 +19,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 |-----------|---------|
 | `/api/data/{slug}` | Collection CRUD (auto-generated) |
 | `/api/data/{slug}/count` | Count matching entities |
+| `/api/data/{slug}/aggregate` | count/sum/avg/min/max, optionally grouped |
 | `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
 | `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
 | `/api/admin/*` | User & role management |
@@ -41,6 +42,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 |--------|----------|-------------|--------|
 | `GET` | `/api/data/{slug}` | List entities (with filtering, sorting, pagination) | `200` |
 | `GET` | `/api/data/{slug}/count` | Count matching entities (with optional filters) | `200` |
+| `GET` | `/api/data/{slug}/aggregate` | Aggregate over matching entities | `200` |
 | `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
 | `PUT` | `/api/data/{slug}/:id` | Update a entity | `200` |
@@ -87,7 +89,7 @@ Use the `orderBy` parameter. Two formats are supported:
 
 **JSON array format (for multi-column sort):**
 ```
-?orderBy=[{"field":"created_at","direction":"desc"},{"field":"name","direction":"asc"}]
+?orderBy=[{"field":"createdAt","direction":"desc"},{"field":"name","direction":"asc"}]
 ```
 
 The keys apply in the order given: the second decides between rows the first
@@ -95,7 +97,7 @@ calls equal. `direction` may be omitted and defaults to `asc`.
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
-| `orderBy` | string | Sort field and direction | `?orderBy=created_at:desc` |
+| `orderBy` | string | Sort field and direction | `?orderBy=createdAt:desc` |
 
 What an agent has to know before constructing one:
 
@@ -272,7 +274,7 @@ Returns the flat entity object directly (no `data` wrapper):
   "id": "uuid-1",
   "name": "Product A",
   "price": 29.99,
-  "created_at": "2025-01-15T10:30:00.000Z"
+  "createdAt": "2025-01-15T10:30:00.000Z"
 }
 ```
 
@@ -457,7 +459,7 @@ const hooks: BackendHooks = {
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=created_at:desc&limit=10&offset=0&include=category"
+  "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=createdAt:desc&limit=10&offset=0&include=category"
 ```
 
 ### Create a entity
@@ -495,6 +497,36 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/products/count?status=eq.active"
 ```
 
+### Aggregates
+
+`count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
+fetching them. Takes the same filters as the list endpoint.
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/orders/aggregate?select=count(),sum(total)&status=eq.paid"
+```
+
+```json
+{ "data": [{ "count": 96, "sum_total": 31200 }] }
+```
+
+Add `groupBy` for one row per value:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://example.com/api/data/orders/aggregate?select=count(),sum(total)&groupBy=status"
+```
+
+Results are keyed by function and field — `count()` becomes `count`,
+`sum(total)` becomes `sum_total`.
+
+**Row-level security applies to the rows being aggregated.** An aggregate is an
+efficient way to learn about rows you cannot read, so it runs under the caller's
+own policies: someone who can select nothing counts nothing. A driver that does
+not implement aggregates answers **501** rather than an empty result — a
+dashboard should not be told "no matches" when the truth is "not supported".
+
 ### Logical OR filtering
 
 ```bash
@@ -506,7 +538,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://example.com/api/data/authors/111094/posts?orderBy=created_at:desc&limit=5"
+  "https://example.com/api/data/authors/111094/posts?orderBy=createdAt:desc&limit=5"
 ```
 
 ## GraphQL API
@@ -569,13 +601,13 @@ query {
     limit: 10,
     offset: 0,
     where: "{\"status\":[\"==\",\"active\"]}",
-    orderBy: "created_at"
+    orderBy: "createdAt"
   ) {
     id
     name
     price
     status
-    created_at
+    createdAt
   }
 }
 ```
@@ -684,7 +716,7 @@ GET /api/collections
       "name": "Products",
       "singularName": "Product",
       "description": "Product catalog",
-      "properties": ["name", "price", "status", "created_at"],
+      "properties": ["name", "price", "status", "createdAt"],
       "relations": [
         {
           "relationName": "category",

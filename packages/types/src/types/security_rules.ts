@@ -31,9 +31,9 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * full power of PostgreSQL Row Level Security.
  *
  * The authenticated user's identity is available in raw SQL via:
- * - `auth.uid()`   — the user's ID
- * - `auth.roles()` — comma-separated app role IDs
- * - `auth.jwt()`   — full JWT claims as JSONB
+ * - `rebase.uid()`   — the user's ID
+ * - `rebase.roles()` — comma-separated app role IDs
+ * - `rebase.jwt()`   — full JWT claims as JSONB
  *
  * These are set automatically per-transaction by the backend.
  *
@@ -131,13 +131,13 @@ export interface SecurityRuleBase {
      * produce a condition no user can satisfy if used here. These are
      * application roles managed by Rebase, stored as an inline `roles TEXT[]`
      * column on the users table, and injected into each transaction as
-     * `app.user_roles` — which `auth.roles()` reads.
+     * `app.user_roles` — which `rebase.roles()` reads.
      *
      * There is no roles registry: a role exists once it is assigned to a user.
      *
      * Generates a safe array-overlap condition — the user passes if they hold
      * *any* of the listed roles:
-     *   `string_to_array(auth.roles(), ',') && ARRAY['<role1>', '<role2>']`
+     *   `string_to_array(rebase.roles(), ',') && ARRAY['<role1>', '<role2>']`
      *
      * (Note: this is a true set intersection, NOT a regex/substring match, so
      * a role named `admin` never matches `nonadmin` or `superadmin`.)
@@ -167,7 +167,7 @@ export interface SecurityRuleBase {
      *
      * **Important:** These are NOT the same as the application-level
      * {@link roles} (admin, editor, viewer, etc.) — those are enforced in the
-     * USING/WITH CHECK clauses via `auth.roles()`. This field controls the
+     * USING/WITH CHECK clauses via `rebase.roles()`. This field controls the
      * PostgreSQL `TO` clause in `CREATE POLICY ... TO role_name`.
      *
      * Use this if you have dedicated PostgreSQL roles (e.g. `app_read`,
@@ -184,7 +184,7 @@ export interface SecurityRuleBase {
 
 /**
  * Security rule that grants access based on row ownership.
- * Generates a USING/WITH CHECK clause like: `<column> = auth.uid()`
+ * Generates a USING/WITH CHECK clause like: `<column> = rebase.uid()`
  *
  * Cannot be combined with `using`, `withCheck`, or `access`.
  *
@@ -292,7 +292,7 @@ export interface StructuredSecurityRule extends SecurityRuleBase {
  * // Only the owner, or users with 'moderator' role
  * {
  *   operation: "select",
- *   using: "{user_id} = auth.uid() OR auth.roles() ~ 'moderator'"
+ *   using: "{user_id} = rebase.uid() OR rebase.roles() ~ 'moderator'"
  * }
  *
  * @group Models

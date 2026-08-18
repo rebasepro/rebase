@@ -20,7 +20,7 @@ export interface PolicyEvalContext {
      *
      * Null here means *anonymous visitor*, not "server context" — a client is
      * never the server context. `authUid` operands therefore resolve to
-     * {@link ANONYMOUS_USER_ID} rather than `null`, matching the `auth.uid()`
+     * {@link ANONYMOUS_USER_ID} rather than `null`, matching the `rebase.uid()`
      * the database would see for the same request.
      */
     uid?: string | null;
@@ -68,7 +68,7 @@ export function evaluatePolicy(expr: PolicyExpression, ctx: PolicyEvalContext): 
             return ctx.uid != null && !isAnonymousUid(ctx.uid);
         case "serverContext":
             // A client is never the server context. Postgres decides this by
-            // `auth.uid() IS NULL`, which a client request can never produce:
+            // `rebase.uid() IS NULL`, which a client request can never produce:
             // the driver substitutes ANONYMOUS_USER_ID for a missing id.
             return false;
         case "existsIn":
@@ -108,10 +108,10 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyEvalContext): Resolve
         case "literal":
             return { known: true, value: operand.value };
         case "authUid":
-            // The sentinel, not null: `auth.uid()` is never NULL for a request
+            // The sentinel, not null: `rebase.uid()` is never NULL for a request
             // that came from a client, so comparing against null here would
             // disagree with the database on exactly the rules that test for it
-            // (e.g. `auth.uid() <> 'anonymous'`).
+            // (e.g. `rebase.uid() <> 'anonymous'`).
             return { known: true, value: ctx.uid ?? ANONYMOUS_USER_ID };
         case "authRoles":
             return { known: true, value: ctx.roles ?? [] };

@@ -196,7 +196,7 @@ Poi, dal client:
 const profile = await rebase.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await rebase.data.team_members.create({ team_id, userId: profile.uid });
 }
 ```
 
@@ -210,7 +210,7 @@ account; abilitalo solo quando la tua UX di invito lo richiede.
 Al primo avvio, Rebase provisiona automaticamente lo schema `auth` e le seguenti tabelle nel database (legate allo schema definito nella tua collezione, ad es. `rebase`):
 
 - **`rebase.users`** — Account utente con email, hash della password, metadati e una colonna `roles` text[] (i ruoli sono archiviati come array di testo inline per ottimizzare le query ed evitare join).
-- **`rebase.refresh_tokens`** — Sessioni di lunga durata che trasportano refresh token hashati, user agent e indirizzi IP. Include un indice univoco su `token_hash` e un vincolo univoco su `(user_id, user_agent, ip_address)` per tracciare le sessioni dei dispositivi attive.
+- **`rebase.refresh_tokens`** — Sessioni di lunga durata che trasportano refresh token hashati, user agent e indirizzi IP. Include un indice univoco su `token_hash` e un vincolo univoco su `(userId, user_agent, ip_address)` per tracciare le sessioni dei dispositivi attive.
 - **`rebase.password_reset_tokens`** — Token monouso scadibili per i flussi di recupero password.
 - **`rebase.mfa_factors`** — Metodi di autenticazione a più fattori registrati (ad es. segreti TOTP cifrati con AES-256).
 - **`rebase.mfa_challenges`** — Log di verifica che tracciano i tentativi di verifica MFA attivi.
@@ -221,14 +221,14 @@ Al primo avvio, Rebase provisiona automaticamente lo schema `auth` e le seguenti
 
 Rebase collega l'autenticazione della richiesta direttamente fino alla sicurezza a livello di riga (RLS) di PostgreSQL. Ogni query del database eseguita tramite un driver con ambito utente viene eseguita all'interno di una transazione del database (`db.transaction()`) che configura parametri di configurazione locali alla transazione:
 
-*   `app.user_id` — L'ID univoco (`uid`) dell'utente autenticato. Il valore predefinito è `'anon'` per le richieste non autenticate.
+*   `app.userId` — L'ID univoco (`uid`) dell'utente autenticato. Il valore predefinito è `'anon'` per le richieste non autenticate.
 *   `app.user_roles` — Una stringa separata da virgole che elenca i ruoli assegnati all'utente.
 *   `app.jwt` — Una stringa JSON contenente il payload completo dei claim del JWT (`{"sub": "<uid>", "roles": [...]}`).
 
 Questi parametri vengono configurati localmente per la durata della transazione usando la funzione `set_config` di Postgres:
 ```sql
 SELECT 
-    set_config('app.user_id', $1, true),
+    set_config('app.userId', $1, true),
     set_config('app.user_roles', $2, true),
     set_config('app.jwt', $3, true);
 ```
@@ -412,7 +412,7 @@ Indipendentemente dal provider di autenticazione esterno scelto, il tuo adattato
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
+  uid: string;                    // Maps to pg local 'app.userId' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL

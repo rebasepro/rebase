@@ -28,7 +28,7 @@ const productsCollection = defineCollection({
         enabledViews: ["list", "table", "kanban"],    // Available views
         kanban: {
             columnProperty: "status",        // Enum property for columns
-            orderProperty: "sort_order"      // Property for drag-and-drop ordering
+            orderProperty: "sortOrder"      // Property for drag-and-drop ordering
         }
     }
 });
@@ -91,13 +91,13 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sort_order: { type: "number", name: "Sort Order" }
+        sortOrder: { type: "number", name: "Sort Order" }
     },
     admin: {
         defaultViewMode: "kanban",
         kanban: {
             columnProperty: "status",
-            orderProperty: "sort_order"
+            orderProperty: "sortOrder"
         }
     }
 });

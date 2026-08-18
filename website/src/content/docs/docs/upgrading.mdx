@@ -123,7 +123,7 @@ A rule that reads as "logged-in users only" therefore granted access to
 **everyone, including signed-out visitors**. It now compiles to:
 
 ```sql
-auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'
 ```
 
 `policy.not(policy.authenticated())` was separately special-cased to mean "the
@@ -137,13 +137,13 @@ and both are quiet:
 
 | What you do | What happens |
 |---|---|
-| Upgrade packages, **do not** re-run `db push` | Your database keeps `auth.uid() IS NOT NULL`. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
+| Upgrade packages, **do not** re-run `db push` | Your database keeps the bare `IS NOT NULL` tautology — spelled `auth.uid()` if it was pushed before section 0, `rebase.uid()` after. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
 | Upgrade packages **and** re-run `db push` | The policy tightens. Anything that was relying on the permissive behaviour — an unauthenticated read your frontend does on page load, a public listing, a webhook without a session — starts returning zero rows or 403. |
 
 > **`rebase doctor --policies` catches this, from 0.10.0 on.** It reads the live
 > `qual` and `with_check` straight out of `pg_policies` and reports, under
-> **Insecure**, any policy still carrying the bare `auth.uid() IS NOT NULL`
-> tautology. It reports the other half of the problem under **Orphaned**: a
+> **Insecure**, any policy still carrying the bare `IS NOT NULL` tautology, in
+> either schema spelling (`rebase.uid()` or the pre-1.0 `auth.uid()`). It reports the other half of the problem under **Orphaned**: a
 > policy an earlier push superseded but never dropped. Editing a rule renames its
 > policy — the generated name is a hash of the rule — so the old one is left
 > behind, and Postgres ORs permissive policies together, which makes an abandoned
@@ -182,8 +182,12 @@ Every hit is a rule whose meaning changed. Also check for the raw spelling,
 which was the other way to write the same tautology:
 
 ```bash
-grep -rn "auth.uid() IS NOT NULL" config/collections/
+grep -rnE "(auth|rebase)\.uid\(\) IS NOT NULL" config/collections/
 ```
+
+Both spellings, because section 0 moved the helpers: a rule written before it
+says `auth.uid()`, one written after says `rebase.uid()`, and the compiler
+accepts either.
 
 **Step 2 — decide what each one meant.** For each rule, ask which you intended:
 
@@ -203,7 +207,8 @@ WHERE schemaname = 'public'
 ORDER BY tablename, policyname;
 ```
 
-Any `qual` containing `auth.uid() IS NOT NULL` **without** the
+Any `qual` containing `rebase.uid() IS NOT NULL` — or `auth.uid()` on a
+database not yet re-pushed — **without** the
 `<> 'anonymous'` clause is a stale permissive policy. `rebase doctor --policies`
 reports exactly those, and the superseded policies alongside them; this query is
 how you read the expressions yourself, which is what catches a fail-open policy
@@ -669,7 +674,7 @@ through the ordinary client — there is no separate package to install.
 ## Upgrade checklist
 
 ```
-[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
 [ ] decide the intent of each rule; rewrite the ones that meant "public"
 [ ] replace not(authenticated()) with serverContext()
 [ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
