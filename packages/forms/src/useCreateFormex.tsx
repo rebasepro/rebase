@@ -4,6 +4,21 @@ import { deepEqual as equal } from "fast-equals";
 
 import { FormexController, FormexResetProps } from "./types";
 
+/**
+ * One step of the form's undo history.
+ *
+ * `touched` and `boundary` are set only on the pair of entries an undoable
+ * reset writes — the state it replaced and the state it produced. A reset
+ * clears the touched map and bumps `version`, so a step across that pair has to
+ * put both back. Ordinary edits leave both unset on purpose: undoing a
+ * keystroke should not re-seed every field in the form.
+ */
+type FormexHistoryEntry<T> = {
+    values: T;
+    touched?: Record<string, boolean>;
+    boundary?: boolean;
+};
+
 export function useCreateFormex<T = any>({
     initialValues,
     initialModifiedValues,
@@ -67,6 +82,11 @@ export function useCreateFormex<T = any>({
 
     const [values, setValuesInner] = useState<T>(startValues);
     const [touchedState, setTouchedState] = useState<Record<string, boolean>>(initialTouched ?? {});
+    // Read by `resetForm`, which needs the map as it stands at the moment it is
+    // about to clear it. Assigned during render rather than from an effect, so
+    // an event handler can never read one render's worth of stale state.
+    const touchedRef = useRef<Record<string, boolean>>(touchedState);
+    touchedRef.current = touchedState;
     const [errors, setErrors] = useState<Record<string, string>>(initialErrors ?? {});
     const [dirty, setDirty] = useState(initialDirty ?? !equal(initialValues, startValues));
     const [submitCount, setSubmitCount] = useState(0);
@@ -90,8 +110,18 @@ export function useCreateFormex<T = any>({
     }, []);
 
     // Replace state for history with refs
-    const historyRef = useRef<T[]>([startValues]);
+    const historyRef = useRef<FormexHistoryEntry<T>[]>([{ values: startValues }]);
     const historyIndexRef = useRef<number>(0);
+
+    /**
+     * Record a new state, dropping anything that had been undone past it.
+     */
+    const pushHistory = useCallback((entry: FormexHistoryEntry<T>) => {
+        const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+        newHistory.push(entry);
+        historyRef.current = newHistory;
+        historyIndexRef.current = newHistory.length - 1;
+    }, []);
 
     useEffect(() => {
         if (validateOnInitialRender) {
@@ -103,13 +133,9 @@ export function useCreateFormex<T = any>({
         valuesRef.current = newValues;
         setValuesInner(newValues);
         setDirty(!equal(initialValuesRef.current, newValues));
-        // Update history using refs
-        const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-        newHistory.push(newValues);
-        historyRef.current = newHistory;
-        historyIndexRef.current = newHistory.length - 1;
+        pushHistory({ values: newValues });
         callDebouncedOnValuesChange(newValues);
-    }, [callDebouncedOnValuesChange]);
+    }, [callDebouncedOnValuesChange, pushHistory]);
 
     const validate = useCallback(async () => {
         setIsValidating(true);
@@ -130,14 +156,10 @@ export function useCreateFormex<T = any>({
             if (shouldValidate) {
                 validate();
             }
-            // Update history using refs
-            const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-            newHistory.push(newValues);
-            historyRef.current = newHistory;
-            historyIndexRef.current = newHistory.length - 1;
+            pushHistory({ values: newValues });
             callDebouncedOnValuesChange(newValues);
         },
-        [validate, callDebouncedOnValuesChange]
+        [validate, callDebouncedOnValuesChange, pushHistory]
     );
 
     const setFieldError = useCallback((key: string, error: string | undefined) => {
@@ -213,20 +235,37 @@ export function useCreateFormex<T = any>({
             submitCount: submitCountProp,
             values: valuesProp,
             errors: errorsProp,
-            touched: touchedProp
+            touched: touchedProp,
+            undoable
         } = props ?? {};
-        valuesRef.current = valuesProp ?? initialValuesRef.current;
-        initialValuesRef.current = valuesProp ?? initialValuesRef.current;
-        setValuesInner(valuesProp ?? initialValuesRef.current);
+        const priorValues = valuesRef.current;
+        const priorTouched = touchedRef.current;
+        const nextValues = valuesProp ?? initialValuesRef.current;
+        const nextTouched = touchedProp ?? initialTouched ?? {};
+        valuesRef.current = nextValues;
+        initialValuesRef.current = nextValues;
+        setValuesInner(nextValues);
         setErrors(errorsProp ?? {});
-        setTouchedState(touchedProp ?? initialTouched ?? {});
+        setTouchedState(nextTouched);
         setDirty(false);
         setSubmitCount(submitCountProp ?? 0);
         setVersion((prev: number) => prev + 1);
         onReset?.(controllerRef.current);
-        // Reset history with refs
-        historyRef.current = [valuesProp ?? initialValuesRef.current];
-        historyIndexRef.current = 0;
+        if (undoable) {
+            // Keep what the user typed one step behind them. The entry stepped
+            // back into carries the touched map as well as the values: without
+            // it the values return but every field reads untouched, and a draft
+            // backup — which is extracted *through* the touched map — would come
+            // back empty.
+            const kept = historyRef.current.slice(0, historyIndexRef.current + 1);
+            kept[kept.length - 1] = { values: priorValues, touched: priorTouched };
+            kept.push({ values: nextValues, touched: nextTouched, boundary: true });
+            historyRef.current = kept;
+            historyIndexRef.current = kept.length - 1;
+        } else {
+            historyRef.current = [{ values: nextValues }];
+            historyIndexRef.current = 0;
+        }
     }, [onReset, initialTouched]);
 
     /**
@@ -259,7 +298,7 @@ export function useCreateFormex<T = any>({
         } else {
             valuesRef.current = initialValues;
             setValuesInner(initialValues);
-            historyRef.current = [initialValues];
+            historyRef.current = [{ values: initialValues }];
             historyIndexRef.current = 0;
             setDirty(false);
         }
@@ -268,29 +307,38 @@ export function useCreateFormex<T = any>({
         setVersion((prev: number) => prev + 1);
     }, [initialValues]);
 
+    const stepHistory = useCallback((newIndex: number) => {
+        const from = historyRef.current[historyIndexRef.current];
+        const entry = historyRef.current[newIndex];
+        const newValues = entry.values;
+        setValuesInner(newValues);
+        valuesRef.current = newValues;
+        historyIndexRef.current = newIndex;
+        setDirty(!equal(initialValuesRef.current, newValues));
+        if (entry.touched) {
+            setTouchedState(entry.touched);
+        }
+        // Stepping across a reset. The reset told everything reading `values`
+        // off the controller to re-read itself, so the way back has to say so
+        // too — otherwise a cleared markdown editor stays cleared while the
+        // value behind it is already back. Ordinary steps skip this.
+        if (from?.boundary || entry.boundary) {
+            setVersion((prev: number) => prev + 1);
+        }
+        callDebouncedOnValuesChange(newValues);
+    }, [callDebouncedOnValuesChange]);
+
     const undo = useCallback(() => {
         if (historyIndexRef.current > 0) {
-            const newIndex = historyIndexRef.current - 1;
-            const newValues = historyRef.current[newIndex];
-            setValuesInner(newValues);
-            valuesRef.current = newValues;
-            historyIndexRef.current = newIndex;
-            setDirty(!equal(initialValuesRef.current, newValues));
-            callDebouncedOnValuesChange(newValues);
+            stepHistory(historyIndexRef.current - 1);
         }
-    }, [callDebouncedOnValuesChange]);
+    }, [stepHistory]);
 
     const redo = useCallback(() => {
         if (historyIndexRef.current < historyRef.current.length - 1) {
-            const newIndex = historyIndexRef.current + 1;
-            const newValues = historyRef.current[newIndex];
-            setValuesInner(newValues);
-            valuesRef.current = newValues;
-            historyIndexRef.current = newIndex;
-            setDirty(!equal(initialValuesRef.current, newValues));
-            callDebouncedOnValuesChange(newValues);
+            stepHistory(historyIndexRef.current + 1);
         }
-    }, [callDebouncedOnValuesChange]);
+    }, [stepHistory]);
 
     const controllerRef = useRef<FormexController<T>>({} as FormexController<T>);
 

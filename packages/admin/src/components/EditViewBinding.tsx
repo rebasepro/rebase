@@ -45,6 +45,7 @@ import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
 import { EntityIdentityBar } from "./EntityIdentityBar";
+import { useUndoableDiscard } from "../form/useUndoableDiscard";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
 import { useRecordActions } from "../hooks/useRecordActions";
@@ -294,6 +295,8 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     const [formContext, setFormContext] = useState<FormContext<M> | undefined>(undefined);
 
     const largeLayout = useLargeLayout();
+
+    const discard = useUndoableDiscard();
 
     const customizationController = useCustomizationController();
     const plugins = customizationController.plugins;
@@ -879,7 +882,11 @@ parentEntityIds,
             // Welded to Save in the split, its own button in the overlays.
             saveAndClosePlacement={layout === "split" ? "menu" : "button"}
             onClose={onCloseRequest}
-            onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
+            // Unlike the form's own Discard, this one does not stop to ask —
+            // so it has to be reversible. See {@link useUndoableDiscard}.
+            onDiscard={canEdit && formContext
+                ? () => discard(formContext.formex, status)
+                : undefined}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             externalLink={usedEntity

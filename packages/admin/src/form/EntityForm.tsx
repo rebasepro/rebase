@@ -28,6 +28,7 @@ import { CustomFieldValidator, getEntitySchema } from "./validation";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
+import { useUndoableDiscard } from "./useUndoableDiscard";
 
 import { mergeDeep } from "@rebasepro/utils";
 import {
@@ -120,6 +121,8 @@ export function EntityForm<M extends Record<string, unknown>>({
     const [savingError, setSavingError] = useState<Error | undefined>();
     const [isSavingAutoSave, setIsSavingAutoSave] = useState<boolean>(false);
     const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
+
+    const discard = useUndoableDiscard();
 
     const autoSave = collection.formAutoSave;
 
@@ -618,8 +621,10 @@ export function EntityForm<M extends Record<string, unknown>>({
                 <DialogContent>
                     <Typography>
                         {status === "existing"
-                            ? "All unsaved changes will be lost. This cannot be undone."
-                            : "All entered values will be cleared. This cannot be undone."}
+                            ? "All unsaved changes will be lost. "
+                            : "All entered values will be cleared. "}
+                        You can bring them back with Undo (⌘Z / Ctrl+Z), or from
+                        the notification, for as long as this form stays open.
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -628,7 +633,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                     </Button>
                     <Button variant={"filled"} color={"error"} onClick={() => {
                         setDiscardDialogOpen(false);
-                        formex.resetForm({ values: baseInitialValues as M });
+                        discard(formex, status, baseInitialValues);
                     }}>
                         {status === "existing" ? "Discard" : "Clear"}
                     </Button>
