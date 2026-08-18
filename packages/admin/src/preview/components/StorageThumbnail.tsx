@@ -33,6 +33,40 @@ function areEqual(prevProps: StorageThumbnailProps, nextProps: StorageThumbnailP
 
 const URL_CACHE: Record<string, DownloadConfig> = {};
 
+/**
+ * The signed-URL request currently in flight for a given cache key.
+ *
+ * A collection view draws one thumbnail per row and rows share images far more
+ * often than not — the demo's 200 blog posts are illustrated by 20 hero images.
+ * Every one of those thumbnails mounts in the same tick, and each used to call
+ * `getSignedUrl` on its own: {@link URL_CACHE} is only written when a response
+ * *lands*, so it is still empty while the burst goes out and dedupes nothing.
+ * The result was five or more identical requests per distinct file, and minting
+ * a download token is a real request — `/api/storage/metadata/<path>` — against
+ * a rate-limited surface. One page view was enough to exhaust the budget and
+ * every thumbnail on the screen then failed with a 429.
+ *
+ * Sharing the promise collapses that burst to one request per file. It
+ * deliberately does not extend how long anything is cached: `DownloadConfig.url`
+ * is temporal, so a later mount still refetches exactly as it did before.
+ */
+const IN_FLIGHT = new Map<string, Promise<DownloadConfig>>();
+
+function getSignedUrlOnce(
+    storage: { getSignedUrl: (path: string) => Promise<DownloadConfig> },
+    path: string,
+    cacheKey: string
+): Promise<DownloadConfig> {
+    const existing = IN_FLIGHT.get(cacheKey);
+    if (existing) return existing;
+
+    const request = storage.getSignedUrl(path).finally(() => {
+        IN_FLIGHT.delete(cacheKey);
+    });
+    IN_FLIGHT.set(cacheKey, request);
+    return request;
+}
+
 export function StorageThumbnailInternal({
     storeUrl,
     interactive,
@@ -64,7 +98,7 @@ export function StorageThumbnailInternal({
         if (!storagePathOrDownloadUrl)
             return;
         let unmounted = false;
-        storage.getSignedUrl(storagePathOrDownloadUrl)
+        getSignedUrlOnce(storage, storagePathOrDownloadUrl, cacheKey)
             .then(function (downloadConfig) {
                 if (!unmounted) {
                     setDownloadConfig(downloadConfig);
