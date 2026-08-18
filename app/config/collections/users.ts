@@ -131,13 +131,13 @@ span: 4 }
         {
             name: "users_read_policy",
             operation: "select",
-            using: "auth.uid() IS NULL OR id = auth.uid()::uuid OR string_to_array(auth.roles(), ',') && ARRAY['admin']"
+            using: "rebase.uid() IS NULL OR id = rebase.uid()::uuid OR string_to_array(rebase.roles(), ',') && ARRAY['admin']"
         },
         {
             name: "users_write_policy",
             operations: ["insert", "update", "delete"],
-            using: "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']",
-            withCheck: "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']"
+            using: "rebase.uid() IS NULL OR string_to_array(rebase.roles(), ',') && ARRAY['admin']",
+            withCheck: "rebase.uid() IS NULL OR string_to_array(rebase.roles(), ',') && ARRAY['admin']"
         }
     ],
     admin: {

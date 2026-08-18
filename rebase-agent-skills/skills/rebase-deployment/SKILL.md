@@ -19,6 +19,7 @@ Rebase supports multiple deployment strategies — from fully managed Rebase Clo
 | **Scaleway** | Serverless Containers with Managed PostgreSQL (EU-only) | ⭐⭐⭐ Advanced |
 | **Hetzner** | Cost-effective VPS with Docker Compose | ⭐⭐ Medium |
 | **PaaS** | Railway, Render, Fly.io — Docker-based platforms | ⭐⭐ Medium |
+| **Kubernetes** | The `charts/rebase` Helm chart — one process or several | ⭐⭐⭐ Advanced |
 
 ## Rebase Cloud
 
@@ -887,6 +888,82 @@ ALLOW_REGISTRATION=false
 
 ---
 
+## Splitting one bundle into several processes
+
+One image and one bundle can boot as several cooperating processes. `REBASE_ROLE`
+is the only thing that differs between them:
+
+```bash
+REBASE_ROLE=api        # data, auth, admin, storage, meta — everything but functions
+REBASE_ROLE=functions  # custom functions only
+REBASE_ROLE=worker     # no HTTP surface: cron and the job queue
+REBASE_ROLE=all        # the default: everything, one process
+```
+
+Reach for it when a heavy custom function competes with the data API, or when
+cron and jobs should not share a process with request serving.
+
+**The settings whose failure mode is silence**, once there is more than one
+process:
+
+| Setting | Why |
+|---|---|
+| `REBASE_MIGRATE_ON_BOOT=none` on all but one | Exactly one process may own DDL, or boots race |
+| `REBASE_RATE_LIMIT_STORE=sql` | An in-memory limit counts per process, so N processes grant N× the limit |
+| `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` on the api | Otherwise a job runs once per replica |
+| `TRUSTED_PROXY_HOPS` on the functions tier | It sits behind another hop |
+
+A wrong `REBASE_ROLE` serves no HTTP while `/health` still answers — readiness
+passes and every request 404s. Do not guess it.
+
+**Realtime broadcast and presence do not cross processes** on the default
+in-memory bus. With more than one API replica, set
+`realtime: { bus: { type: "postgres" } }` in the project config. Ordinary
+collection subscriptions are unaffected — those travel through Postgres CDC.
+
+---
+
+## Kubernetes (Helm)
+
+`charts/rebase` is the Kubernetes peer of the self-hosting Compose setup: same
+image, same bundle, and upgrading Rebase is a tag change.
+
+```bash
+helm install rebase ./charts/rebase \
+  --set config.databaseUrl='postgres://user:pass@host:5432/db' \
+  --set config.jwtSecret="$(openssl rand -hex 32)" \
+  --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set ingress.host=api.example.com \
+  --set image.repository=my-registry/my-app
+```
+
+It deploys the **runtime only** — point `config.databaseUrl` at CloudNativePG, a
+managed database, or your own StatefulSet.
+
+Splitting is one value, and the chart then derives every setting from the table
+above rather than leaving them to be remembered:
+
+```yaml
+split: true
+functions: { enabled: true, replicas: 3 }
+worker: { enabled: true }
+```
+
+A migration Job (`migrationJob.enabled`, on by default) runs `pre-install` and
+`pre-upgrade`, so every pod boots with `REBASE_MIGRATE_ON_BOOT=none` and nothing
+on the request path owns DDL. `migrationJob.mode: push` also applies collection
+schema changes and **is destructive**; it is not the default.
+
+The chart **refuses to render** configurations that would come up and quietly
+stop being true — several HTTP processes on a memory rate-limit store, two static
+apps claiming one path, `bundle.mode=image` still pointing at the stock image.
+
+> **Maturity:** rendered and linted against Helm v4, with every refusal tested,
+> but **not yet exercised against a live cluster**. Prefer the Docker path for
+> anything you cannot afford to debug.
+
+---
+
 ## Health Check Endpoint
 
 The Docker `HEALTHCHECK` instruction hits `/health`. Mount it in your backend entry:
@@ -965,6 +1042,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 - **Docker Compose (template):** `packages/cli/templates/template/docker-compose.yml`
 - **Entrypoint:** `app/backend/entrypoint.sh`
 - **Env Schema:** `packages/server/src/env.ts`
+- **Helm chart:** `charts/rebase` (see `charts/rebase/README.md`)
+- **Role resolution:** `packages/server/src/boot/role.ts`
 - **serveSPA:** `packages/server/src/serve-spa.ts`
 - **Backend Entry:** `app/backend/src/index.ts`
 - **.env.example:** `app/.env.example`

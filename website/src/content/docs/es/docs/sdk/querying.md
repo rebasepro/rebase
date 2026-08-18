@@ -30,7 +30,7 @@ const { data, meta } = await client.data.products.find();
 // With pagination, filtering, and sorting
 const { data, meta } = await client.data.products.find({
     where: { active: ["==", true], price: [">=", 100] },
-    orderBy: ["created_at", "desc"],
+    orderBy: ["createdAt", "desc"],
     limit: 25,
     offset: 0
 });
@@ -96,7 +96,7 @@ Encadene métodos para consultas más expresivas:
 const { data } = await client.data.products
     .where("price", ">=", 100)
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(10)
     .find();
 ```
@@ -180,7 +180,7 @@ de la última. Para leer más allá de ese techo, recorra las páginas con
 ```typescript
 // Sort by field (format: ["field", "direction"])
 const { data } = await client.data.products.find({
-    orderBy: ["created_at", "desc"]
+    orderBy: ["createdAt", "desc"]
 });
 
 // Fluent style
@@ -236,7 +236,7 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts
     .where("status", "==", "published")
     .include("author")
-    .orderBy("published_at", "desc")
+    .orderBy("publishedAt", "desc")
     .limit(10)
     .find();
 ```
@@ -247,20 +247,20 @@ Cuando se incluyen relaciones, la respuesta contiene **tanto** la clave foránea
 
 ```typescript
 const { data } = await client.data
-    .collection<{ author_id: string; author?: { name: string } }>("posts")
+    .collection<{ authorId: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
 for (const post of data) {
     // Scalar foreign key — always present
-    console.log(post.author_id);    // "uuid-1234"
+    console.log(post.authorId);    // "uuid-1234"
 
     // Hydrated relation — present when included
     console.log(post.author?.name); // "Jane Doe"
 }
 ```
 
-> **Nota:** Sin `.include("author")`, solo se devuelve el campo escalar `author_id`. El objeto `author` hidratado será `undefined`.
+> **Nota:** Sin `.include("author")`, solo se devuelve el campo escalar `authorId`. El objeto `author` hidratado será `undefined`.
 
 ### Nombres de las Relaciones
 

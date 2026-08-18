@@ -33,7 +33,7 @@ The `listen()` method accepts the same `FindParams` as `find()` — you can filt
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
-        orderBy: ["created_at", "desc"],
+        orderBy: ["createdAt", "desc"],
         limit: 20
     },
     (response) => {
@@ -124,7 +124,7 @@ You can also subscribe through the fluent query builder. This is equivalent to c
 ```typescript
 const unsubscribe = client.data.products
     .where("active", "==", true)
-    .orderBy("created_at", "desc")
+    .orderBy("createdAt", "desc")
     .limit(20)
     .listen(
         (response) => console.log("Updated:", response.data),
@@ -133,7 +133,7 @@ const unsubscribe = client.data.products
 ```
 
 A subscription takes a multi-column sort like any other query — either
-`orderBy: [["category", "asc"], ["created_at", "desc"]]` in the params, or a
+`orderBy: [["category", "asc"], ["createdAt", "desc"]]` in the params, or a
 second `.orderBy()` call, which adds a tie-breaker rather than replacing the
 first. See [Sorting](/docs/sdk/querying#sorting).
 

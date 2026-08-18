@@ -619,8 +619,8 @@ interface ApiKeyWithSecret {
   admin: boolean;
   rate_limit: number | null;
   created_by: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   last_used_at: string | null;
   expires_at: string | null;
   revoked_at: string | null;
@@ -635,8 +635,8 @@ interface ApiKeyMasked {
   admin: boolean;
   rate_limit: number | null;
   created_by: string;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   last_used_at: string | null;
   expires_at: string | null;
   revoked_at: string | null;

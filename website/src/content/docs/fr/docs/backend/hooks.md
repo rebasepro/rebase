@@ -98,7 +98,7 @@ Chaque callback reçoit un objet de props unique. Champs communs :
  [Database Driver]
  ┌─────┴───────────────────────────────────────────────────────┐
  │ 3. Start PostgreSQL Transaction                             │
- │ 4. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
+ │ 4. Set Config: app.userId = '<uid>', app.user_roles = ...  │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
  │ 6. Commit Transaction                                       │
  └─────┬───────────────────────────────────────────────────────┘

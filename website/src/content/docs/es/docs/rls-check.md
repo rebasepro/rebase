@@ -168,7 +168,7 @@ REVOKE ALL ON "public"."your_matview" FROM "anon";
 
 Una política permisiva de tipo `INSERT`/`UPDATE`/`DELETE`/`ALL` accesible sin autenticación cuya expresión de comprobación acepta cualquier fila, respaldada por la concesión de permisos correspondiente.
 
-La condición "acepta cualquier fila" es esencial y deliberadamente estricta. Supabase otorga a `anon` y `authenticated` permisos completos de DML por defecto, por lo que una política dirigida a esos roles no es en sí misma un problema: una regla estándar como `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` es correcta y no se reporta.
+La condición "acepta cualquier fila" es esencial y deliberadamente estricta. Supabase otorga a `anon` y `authenticated` permisos completos de DML por defecto, por lo que una política dirigida a esos roles no es en sí misma un problema: una regla estándar como `FOR INSERT TO public WITH CHECK (userId = auth.uid())` es correcta y no se reporta.
 
 ### unqualified-column-in-subquery
 

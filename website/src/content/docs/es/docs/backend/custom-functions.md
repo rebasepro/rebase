@@ -253,7 +253,7 @@ app.post("/", async (c) => {
     if (event.type === "checkout.session.completed") {
         const session = event.data.object;
         await instance.driver.data.subscriptions.create({
-            user_id: session.client_reference_id,
+            userId: session.client_reference_id,
             stripe_id: session.subscription,
             status: "active",
         });

@@ -112,7 +112,7 @@ export class UserService implements UserRepository {
      * Run a privileged auth write with an explicitly cleared RLS context.
      *
      * The auth services run on the base/owner connection, which by design
-     * carries a NULL `app.uid` so the `auth.uid() IS NULL` server-escape
+     * carries a NULL `app.uid` so the `rebase.uid() IS NULL` server-escape
      * in the default policies applies. That NULL is normally guaranteed by
      * `set_config(..., is_local = true)` resetting at transaction end — but a
      * GUC that survives on a pooled connection (or a connection role that
@@ -120,7 +120,7 @@ export class UserService implements UserRepository {
      * turns the trusted write into an RLS-scoped one and denies it with
      * SQLSTATE 42501. Clearing the GUCs here, transaction-locally at the
      * single chokepoint, makes the server context deterministic instead of
-     * trusting whatever state the pool hands us. `auth.uid()` reads '' as
+     * trusting whatever state the pool hands us. `rebase.uid()` reads '' as
      * NULL via NULLIF, so '' is the server context.
      */
     private async withServerContext<T>(fn: (db: NodePgDatabase) => Promise<T>): Promise<T> {

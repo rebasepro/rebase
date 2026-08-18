@@ -16,7 +16,7 @@
  *     bypasses user identity entirely and therefore never exercises RLS.
  *
  * So the one path a real application actually takes — register, sign in, get a
- * token, have the server derive `auth.uid()` from it, have Postgres scope rows
+ * token, have the server derive `rebase.uid()` from it, have Postgres scope rows
  * to that uid, refresh the token, upload a file, receive a realtime event —
  * existed nowhere. That is the composition where the interesting failures live,
  * because each tier can be individually correct and still disagree at the seam.
@@ -191,7 +191,7 @@ DATABASE_URL: databaseUrl },
         // ── 4. The boundary ──────────────────────────────────────────────────
         //
         // First, because it is the assertion most likely to rot silently. RLS
-        // policies on this project are written `auth.uid() IS NULL OR …` — the
+        // policies on this project are written `rebase.uid() IS NULL OR …` — the
         // owner/service connection leaves uid null and is meant to bypass. Read
         // as a *policy* that clause is permissive, so if an anonymous HTTP
         // request ever reached the data layer it would match everything. What
@@ -248,7 +248,7 @@ password: "BobSecret1!" };
 
         // ── 6. RLS, through the whole stack ──────────────────────────────────
         //
-        // The `users` collection is scoped `id = auth.uid()::uuid OR admin`. For
+        // The `users` collection is scoped `id = rebase.uid()::uuid OR admin`. For
         // this to return one row, four independent things must agree: the SDK
         // sends the token, the server verifies it and derives a uid, it opens
         // the connection as `rebase_user` with that uid bound, and Postgres

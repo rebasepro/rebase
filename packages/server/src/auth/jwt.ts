@@ -42,7 +42,7 @@ export interface JwtConfig {
 export interface AccessTokenPayload {
     /**
      * The user's id — the same spelling the domain model, the auth adapters and
-     * the RLS layer (`auth.uid()`) all use. Tokens minted before this rename
+     * the RLS layer (`rebase.uid()`) all use. Tokens minted before this rename
      * carry `uid` instead, and older external IdPs may send `sub`;
      * {@link verifyAccessToken} accepts all three and normalises to this.
      */

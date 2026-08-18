@@ -28,7 +28,7 @@ const productsCollection = defineCollection({
         enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
         kanban: {
             columnProperty: "status",        // Propiedad de enumeración para columnas
-            orderProperty: "sort_order"      // Propiedad para el ordenamiento de arrastrar y soltar
+            orderProperty: "sortOrder"      // Propiedad para el ordenamiento de arrastrar y soltar
         }
     }
 });
@@ -91,13 +91,13 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Hecho", color: "green" }
             ]
         },
-        sort_order: { type: "number", name: "Orden de Clasificación" }
+        sortOrder: { type: "number", name: "Orden de Clasificación" }
     },
     admin: {
         defaultViewMode: "kanban",
         kanban: {
             columnProperty: "status",
-            orderProperty: "sort_order"
+            orderProperty: "sortOrder"
         }
     }
 });

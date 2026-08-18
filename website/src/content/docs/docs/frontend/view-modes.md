@@ -24,14 +24,14 @@ const productsCollection = defineCollection({
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        sort_order: { name: "Order", type: "number" }
+        sortOrder: { name: "Order", type: "number" }
     },
     name: "Products",
     table: "products",
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "sort_order",         // Property for drag-and-drop ordering
+        orderProperty: "sortOrder",         // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -96,11 +96,11 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sort_order: { type: "number", name: "Sort Order" }
+        sortOrder: { type: "number", name: "Sort Order" }
     },
     admin: {
         defaultViewMode: "kanban",
-        orderProperty: "sort_order",
+        orderProperty: "sortOrder",
         kanban: {
             columnProperty: "status"
         }

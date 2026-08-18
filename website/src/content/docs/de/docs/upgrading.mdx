@@ -82,7 +82,7 @@ Auf dem Benutzer-Pfad ist das eine **Tautologie**. `applyAuthContext` wandelt ei
 Eine Regel, die sich wie „nur angemeldete Benutzer“ liest, gewährte daher Zugriff für **jeden, einschließlich abgemeldeter Besucher**. Sie wird nun wie folgt kompiliert:
 
 ```sql
-auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'
 ```
 
 `policy.not(policy.authenticated())` war separat als Spezialfall definiert, um „der Serverkontext“ zu bedeuten. Das ist nicht mehr der Fall — verwenden Sie dafür `policy.serverContext()`.
@@ -115,7 +115,7 @@ grep -rn "authenticated()" config/collections/
 Jeder Treffer ist eine Regel, deren Bedeutung sich geändert hat. Prüfen Sie auch auf die rohe Schreibweise, die der andere Weg war, dieselbe Tautologie zu schreiben:
 
 ```bash
-grep -rn "auth.uid() IS NOT NULL" config/collections/
+grep -rnE "(auth|rebase)\.uid\(\) IS NOT NULL" config/collections/
 ```
 
 **Schritt 2 — entscheiden Sie, was die jeweilige Regel bedeuten sollte.** Fragen Sie sich bei jeder Regel, was Ihre Absicht war:
@@ -374,7 +374,7 @@ Im `baas`-Modus gibt es keine Collection-Dateien und kein `db push`, sodass das 
 ## Upgrade-Checkliste
 
 ```
-[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
 [ ] decide the intent of each rule; rewrite the ones that meant "public"
 [ ] replace not(authenticated()) with serverContext()
 [ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as

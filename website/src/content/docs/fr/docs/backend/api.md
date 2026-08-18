@@ -174,7 +174,7 @@ Les réponses pour une seule entité renvoient un objet plat :
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -221,7 +221,7 @@ Les relations incluses sont intégrées directement dans la réponse :
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",
@@ -422,7 +422,7 @@ une clé d'API interroge les endpoints REST au lieu de s'abonner.
 | `permissions` | `ApiKeyPermission[]` | Accès par collection (`"*"` = tout ; `"functions/<name>"` = une fonction ; `"storage"` = stockage de fichiers) |
 | `admin` | `boolean` | Accorder le rôle admin — routes admin + politiques admin RLS |
 | `rate_limit` | `number \| null` | Requêtes par fenêtre de 15 min (`null` = la valeur par défaut du serveur, 1000) |
-| `expires_at` | `string \| null` | Horodatage d'expiration ISO-8601 |
+| `expiresAt` | `string \| null` | Horodatage d'expiration ISO-8601 |
 
 La CLI requiert une portée explicite : passez `--permissions '<json>'` ou optez pour
 `--full-access` — il n'y a pas de valeur par défaut silencieuse d'accès complet.

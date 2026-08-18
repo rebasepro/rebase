@@ -187,7 +187,7 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | Param | Description | Example |
 |-------|-------------|---------|
 | `filter` | JSON-encoded filter conditions | `?filter={"active":["==",true]}` |
-| `orderBy` | Sort field | `?orderBy=created_at` |
+| `orderBy` | Sort field | `?orderBy=createdAt` |
 | `order` | Sort direction | `?order=desc` |
 | `limit` | Page size | `?limit=25` |
 | `startAfter` | Cursor for pagination | `?startAfter=encodedCursor` |

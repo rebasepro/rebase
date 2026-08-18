@@ -36,7 +36,7 @@ Uma leitura bem-sucedida mescla suas linhas no banco de dados local e memoriza q
 ```typescript
 const drafts = await client.data.posts
     .where("status", "==", "draft")
-    .orderBy("updated_at", "desc")
+    .orderBy("updatedAt", "desc")
     .find();
 ```
 
@@ -77,7 +77,7 @@ As escritas são reexecutadas na ordem em que você as fez, entre coleções —
 
 ```typescript
 const unsubscribe = client.data.posts.observe(
-    { where: { status: ["==", "draft"] }, orderBy: ["updated_at", "desc"] },
+    { where: { status: ["==", "draft"] }, orderBy: ["updatedAt", "desc"] },
     (result) => {
         render(result.data);
         setBadge(result.hasPendingWrites ? "saving…" : null);

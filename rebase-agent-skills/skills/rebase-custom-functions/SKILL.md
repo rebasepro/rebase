@@ -112,7 +112,7 @@ app.get("/", async (c) => {
     const entities = await driver.fetchCollection({
         path: "products",
         limit: 1000,
-        orderBy: "created_at",
+        orderBy: "createdAt",
         order: "desc"
     });
 

@@ -146,7 +146,7 @@ decides between rows the first calls equal:
 
 ```bash
 # By category, and newest first within each category
-GET /api/data/products?orderBy=[{"field":"category"},{"field":"created_at","direction":"desc"}]
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
 ```
 
 Both spellings reach every route that lists rows, including nested ones
@@ -197,7 +197,7 @@ Single entity responses return a flat object:
     "id": 1,
     "name": "Widget",
     "price": 29.99,
-    "created_at": "2026-01-15T10:30:00Z"
+    "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
 
@@ -244,7 +244,7 @@ Included relations are embedded directly in the response:
 {
     "id": 1,
     "title": "Getting Started",
-    "author_id": 42,
+    "authorId": 42,
     "author": {
         "id": 42,
         "name": "Jane Doe",

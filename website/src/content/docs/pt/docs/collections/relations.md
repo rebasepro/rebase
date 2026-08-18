@@ -84,7 +84,7 @@ relations: [
 ]
 ```
 
-Isso cria: `posts.author_id → users.id`
+Isso cria: `posts.authorId → users.id`
 
 ### Um-para-Muitos (Inverso)
 
@@ -97,7 +97,7 @@ relations: [
         kind: "hasMany",                 // The FK is on the TARGET table
         relationName: "posts",
         target: () => postsCollection,
-        foreignKeyOnTarget: "author_id"  // Column on the posts table
+        foreignKeyOnTarget: "authorId"  // Column on the posts table
     }
 ]
 ```
@@ -115,7 +115,7 @@ relations: [
         target: () => rolesCollection,
         through: {
             table: "user_roles",         // Junction table name
-            sourceColumn: "user_id",     // FK to this collection
+            sourceColumn: "userId",     // FK to this collection
             targetColumn: "role_id"      // FK to target collection
         }
     }
@@ -125,9 +125,9 @@ relations: [
 Isso cria:
 ```sql
 CREATE TABLE user_roles (
-    user_id INTEGER REFERENCES users(id),
+    userId INTEGER REFERENCES users(id),
     role_id INTEGER REFERENCES roles(id),
-    PRIMARY KEY (user_id, role_id)
+    PRIMARY KEY (userId, role_id)
 );
 ```
 
@@ -167,7 +167,7 @@ relations: [
         joinPath: [
             {
                 table: "user_roles",
-                on: { from: "id", to: "user_id" }
+                on: { from: "id", to: "userId" }
             },
             {
                 table: "roles",
@@ -264,7 +264,7 @@ const { data } = await client.data.articles
 
 for (const article of data) {
     // Scalar FK — always present
-    article.values.author_id;     // "uuid-1234"
+    article.values.authorId;     // "uuid-1234"
 
     // Hydrated relation — only present when included
     article.values.author?.name;  // "Jane Doe"

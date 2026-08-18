@@ -3,6 +3,8 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { isAnonymousUid } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
+import { extractBearerToken } from "./bearer-token";
+import { isJwtConfigured, verifyAccessToken } from "./jwt";
 import { logger } from "../utils/logger";
 
 /**
@@ -355,6 +357,41 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
     } = config;
     const trustedProxyHops = resolveTrustedProxyHops(config.trustedProxyHops);
 
+    /**
+     * Who this request is, for bucketing only.
+     *
+     * `c.get("user")` is the answer whenever an auth middleware has already run.
+     * On the storage router it has not: the limiter is registered before
+     * `route("/")`, and the JWT middlewares live inside those routes, so a
+     * signed-in caller reached here indistinguishable from an anonymous one and
+     * was bucketed `ip:` at the anonymous allowance. Everyone behind one NAT
+     * shared 300 requests per window, and the admin panel — which mints a
+     * download token per file — spent them on a single page of thumbnails.
+     *
+     * Reading the token here rather than moving the limiter is deliberate. The
+     * limiter has to run *before* the routes to guard them, and pre-resolving
+     * the user into the context instead would change authorization: the storage
+     * adapter path enforces on `c.get("user")` when its own `verifyRequest`
+     * finds nobody, so seeding that key would let a Rebase-signed JWT satisfy a
+     * deployment that delegates auth to Firebase or Clerk. Nothing here writes
+     * to the context; an identity that fails to verify simply buckets by IP,
+     * exactly as before.
+     */
+    const identify = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | undefined => {
+        const user = c.get("user") as { uid?: string } | undefined;
+        if (user?.uid) return isAnonymousUid(user.uid) ? undefined : user.uid;
+
+        // Only meaningful for Rebase-issued JWTs. A deployment authenticating
+        // through an adapter never calls `configureJwt`, and verifying would
+        // throw rather than return null.
+        if (!isJwtConfigured()) return undefined;
+        const token = extractBearerToken(c.req.header("authorization"));
+        if (token === undefined) return undefined;
+        const payload = verifyAccessToken(token);
+        if (!payload?.uid || isAnonymousUid(payload.uid)) return undefined;
+        return payload.uid;
+    };
+
     return createRateLimiter({
         windowMs,
         store,
@@ -362,16 +399,14 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         keyGenerator: (c) => {
             const key = c.get("apiKey") as { id: string } | undefined;
             if (key) return `api-key:${key.id}`;
-            const user = c.get("user") as { uid?: string } | undefined;
-            if (user?.uid && !isAnonymousUid(user.uid)) return `user:${user.uid}`;
+            const uid = identify(c);
+            if (uid) return `user:${uid}`;
             return `ip:${defaultKeyGenerator(c, trustedProxyHops)}`;
         },
         resolveLimit: (c) => {
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
             if (key) return key.rate_limit ?? apiKeyLimit;
-            const user = c.get("user") as { uid?: string } | undefined;
-            if (user?.uid && !isAnonymousUid(user.uid)) return userLimit;
-            return anonLimit;
+            return identify(c) ? userLimit : anonLimit;
         }
     });
 }

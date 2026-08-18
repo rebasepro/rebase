@@ -42,7 +42,7 @@ import { useFormex } from "@rebasepro/forms";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { useRebaseContext, useTranslation } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
-import type { PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import { RLS_ROLES_SQL, RLS_UID_SQL, type PostgresPolicy, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 
 export type { PostgresPolicy } from "@rebasepro/types";
 
@@ -466,7 +466,7 @@ function InlinePolicyEditor({
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Application Roles</Typography>
                         <Typography variant="caption" className="text-text-secondary opacity-80 -mt-1">
-                            Roles held by users of this project, matched via <span className="font-mono">auth.roles()</span>.
+                            Roles held by users of this project, matched via <span className="font-mono">{RLS_ROLES_SQL}</span>.
                             These are not PostgreSQL roles — leave empty to apply the policy to everyone.
                         </Typography>
                         {roleOptions.length > 0 && (
@@ -503,13 +503,13 @@ function InlinePolicyEditor({
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_using_expr")}</Typography>
-                            <TextField aria-label={t("studio_policy_using_expr")} value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <TextField aria-label={t("studio_policy_using_expr")} value={usingExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setUsingExpr(e.target.value)} placeholder={`e.g. ${RLS_UID_SQL} = uid`}/>
                         </div>
                     )}
                     {showCheck && (
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">{t("studio_policy_check_expr")}</Typography>
-                            <TextField aria-label={t("studio_policy_check_expr")} value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder="e.g. auth.uid() = uid"/>
+                            <TextField aria-label={t("studio_policy_check_expr")} value={checkExpr} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCheckExpr(e.target.value)} placeholder={`e.g. ${RLS_UID_SQL} = uid`}/>
                         </div>
                     )}
                 </Paper>

@@ -297,14 +297,14 @@ arrival_time: {
 Verwenden Sie `autoValue`, um Zeitstempel bei Erstellung oder Aktualisierung automatisch zu setzen.
 
 ```typescript
-created_at: {
+createdAt: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
     admin: { readOnly: true }
 }
 
-updated_at: {
+updatedAt: {
     type: "date",
     name: "Updated At",
     autoValue: "on_update"

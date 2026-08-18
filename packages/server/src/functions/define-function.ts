@@ -23,7 +23,7 @@ export interface RebaseFunctionContext {
      * through their `rolesOverlap(['admin'])` arm, the same arm an application
      * user holding the `admin` role passes. Two things follow:
      *
-     * - `policy.serverContext()` (`auth.uid() IS NULL`) is **false** here. A
+     * - `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** here. A
      *   collection with `disableDefaultPolicies: true` whose write rule is
      *   `serverContext()` will refuse these writes with `42501`, and reads
      *   against a hand-written admin policy that does not name the `admin` role

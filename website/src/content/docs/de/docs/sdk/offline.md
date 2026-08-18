@@ -36,7 +36,7 @@ Ein erfolgreicher Lesevorgang führt seine Zeilen in die lokale Datenbank zusamm
 ```typescript
 const drafts = await client.data.posts
     .where("status", "==", "draft")
-    .orderBy("updated_at", "desc")
+    .orderBy("updatedAt", "desc")
     .find();
 ```
 
@@ -77,7 +77,7 @@ Schreibvorgänge werden in der Reihenfolge wiederholt, in der Sie sie getätigt 
 
 ```typescript
 const unsubscribe = client.data.posts.observe(
-    { where: { status: ["==", "draft"] }, orderBy: ["updated_at", "desc"] },
+    { where: { status: ["==", "draft"] }, orderBy: ["updatedAt", "desc"] },
     (result) => {
         render(result.data);
         setBadge(result.hasPendingWrites ? "saving…" : null);

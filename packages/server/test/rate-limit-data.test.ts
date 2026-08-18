@@ -215,3 +215,77 @@ describe.each<[string, () => StoreHarness]>([
         expect((await store.hit("k", 1_000, 2)).allowed).toBe(true);
     });
 });
+
+/**
+ * The limiter also has to recognise a caller whose auth middleware has not run
+ * yet.
+ *
+ * On the storage router it never has: the limiter is registered before
+ * `route("/")` so that it actually guards the routes, and the JWT middlewares
+ * live inside them. A signed-in caller therefore arrived with an empty context
+ * and was bucketed `ip:` at the anonymous allowance — 300 shared by everyone
+ * behind one address, where a signed-in user should have had 1000 of their own.
+ * The admin panel mints a download token per file, so a single page of
+ * thumbnails spent the budget and every image on it failed with a 429.
+ */
+describe("createDataRateLimiter — identity with no auth middleware ahead of it", () => {
+    let store: MemoryRateLimitStore;
+
+    beforeEach(() => {
+        store = new MemoryRateLimitStore();
+    });
+
+    afterEach(() => {
+        store.dispose();
+    });
+
+    /** No principal middleware at all — the storage router's actual shape. */
+    const bareApp = (config: Parameters<typeof createDataRateLimiter>[0] = {}) => {
+        const app = new Hono();
+        app.use("/*", createDataRateLimiter({ store, ...config }));
+        app.get("/file", (c) => c.json({ ok: true }));
+        return app;
+    };
+
+    const hitWith = (app: Hono, headers: Record<string, string>) =>
+        app.fetch(new Request("http://localhost/file", { headers: { "x-real-ip": "9.9.9.9", ...headers } }));
+
+    it("gives a bearer-token caller the user allowance, not the anonymous one", async () => {
+        const { configureJwt, generateAccessToken } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const token = generateAccessToken("user-with-token", []);
+
+        const app = bareApp({ anonymous: 1, user: 3 });
+
+        // Three requests: past the anonymous allowance of 1, inside the user
+        // allowance of 3. Before this, the second was a 429.
+        expect((await hitWith(app, { authorization: `Bearer ${token}` })).status).toBe(200);
+        expect((await hitWith(app, { authorization: `Bearer ${token}` })).status).toBe(200);
+        expect((await hitWith(app, { authorization: `Bearer ${token}` })).status).toBe(200);
+        expect((await hitWith(app, { authorization: `Bearer ${token}` })).status).toBe(429);
+    });
+
+    it("buckets two signed-in callers separately even from one address", async () => {
+        const { configureJwt, generateAccessToken } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+        const one = generateAccessToken("caller-one", []);
+        const two = generateAccessToken("caller-two", []);
+
+        const app = bareApp({ anonymous: 1, user: 1 });
+
+        expect((await hitWith(app, { authorization: `Bearer ${one}` })).status).toBe(200);
+        // Same IP, different person: their own budget, not the first one's.
+        expect((await hitWith(app, { authorization: `Bearer ${two}` })).status).toBe(200);
+        expect((await hitWith(app, { authorization: `Bearer ${one}` })).status).toBe(429);
+    });
+
+    it("still buckets an unverifiable token by IP, so a forged one buys nothing", async () => {
+        const { configureJwt } = await import("../src/auth/jwt");
+        configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
+
+        const app = bareApp({ anonymous: 1, user: 50 });
+
+        expect((await hitWith(app, { authorization: "Bearer not-a-real-token" })).status).toBe(200);
+        expect((await hitWith(app, { authorization: "Bearer not-a-real-token" })).status).toBe(429);
+    });
+});

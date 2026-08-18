@@ -70,7 +70,7 @@ const productsCollection = defineCollection({
         name: { type: "string", name: "Name", validation: { required: true } },
         price: { type: "number", name: "Price", columnType: "numeric" },
         active: { type: "boolean", name: "Active", defaultValue: true },
-        created_at: { type: "date", name: "Created", autoValue: "on_create" }
+        createdAt: { type: "date", name: "Created", autoValue: "on_create" }
     }
 });
 ```

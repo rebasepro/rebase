@@ -222,10 +222,13 @@ const client = createRebaseClient<Database>({
 const { data } = await client.data.products.find();
 ```
 
-Field names in the generated types are the ones the API serves, unchanged — a
-`created_at` column is `row.created_at`. Only the collection *accessor* is
-turned into a property name (`my-notes` → `client.data.myNotes`), which is what
-`collectionsDictionary` maps back to the slug.
+Field names in the generated types are the ones the API serves. A field's wire
+name is its property key, and the API is camelCase throughout: introspection
+generates a `created_at` column as a `createdAt` property carrying
+`columnName: "created_at"`, and serves it as `row.createdAt`. The column itself
+is untouched. The collection *accessor* is turned into a property name the same
+way (`my-notes` → `client.data.myNotes`), which is what `collectionsDictionary`
+maps back to the slug.
 
 ## Development Workflow
 

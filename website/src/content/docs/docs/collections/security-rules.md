@@ -17,7 +17,7 @@ const postsCollection = defineCollection({
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], ownerField: "author_id" }
+        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
     ]
 });
 ```
@@ -184,7 +184,7 @@ securityRules: [
 You can also use `operations` (plural) to apply one rule to multiple operations:
 
 ```typescript
-{ operations: ["insert", "update", "delete"], ownerField: "author_id" }
+{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
 ```
 
 ## Full SecurityRule Interface
@@ -212,9 +212,9 @@ securityRules: [
     // Anyone can read published posts
     { operation: "select", using: "{status} = 'published'" },
     // Authors can see their own drafts
-    { operation: "select", ownerField: "author_id" },
+    { operation: "select", ownerField: "authorId" },
     // Authors can create and edit their own posts
-    { operations: ["insert", "update"], ownerField: "author_id" },
+    { operations: ["insert", "update"], ownerField: "authorId" },
     // Only admins can delete
     { operation: "delete", roles: ["admin"] }
 ]

@@ -24,8 +24,8 @@ import type { PostgresCollectionConfig } from "@rebasepro/types";
 type Article = {
     title: string;
     slug: string;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 };
 
 const articlesCollection: PostgresCollectionConfig<Article> = {
@@ -35,8 +35,8 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
     properties: {
         title: { name: "Title", type: "string" },
         slug: { name: "Slug", type: "string" },
-        created_at: { name: "Created at", type: "string" },
-        updated_at: { name: "Updated at", type: "string" }
+        createdAt: { name: "Created at", type: "string" },
+        updatedAt: { name: "Updated at", type: "string" }
     },
     callbacks: {
         beforeSave: async ({ values, id, status }) => {
@@ -50,9 +50,9 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
 
             // Set timestamps
             if (status === "new") {
-                values.created_at = new Date().toISOString();
+                values.createdAt = new Date().toISOString();
             }
-            values.updated_at = new Date().toISOString();
+            values.updatedAt = new Date().toISOString();
 
             return values;
         },
@@ -91,7 +91,7 @@ beforeSave: async ({
     context       // Full Rebase context
 }) => {
     // Return modified values
-    return { ...values, updated_at: new Date() };
+    return { ...values, updatedAt: new Date() };
 }
 ```
 
@@ -254,7 +254,7 @@ afterSave: async ({ values, context }) => {
     const { data: activeJobs } = await context.data.jobs.find({
         where: { status: "published" },
         limit: 10,
-        orderBy: ["created_at", "desc"]
+        orderBy: ["createdAt", "desc"]
     });
 
     // PostgREST-style operators
@@ -318,7 +318,7 @@ afterSave: async ({ context }) => {
     // realmente no debe ver, como un registro de auditoría que no puede leer ni
     // editar. Ojo: es el alcance de un administrador, no una omisión de RLS: una
     // colección cuya única regla sea `policy.serverContext()` le sigue estando
-    // cerrada, porque eso compila a `auth.uid() IS NULL` y el uid de este
+    // cerrada, porque eso compila a `rebase.uid() IS NULL` y el uid de este
     // accesor es `service`.
     await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }

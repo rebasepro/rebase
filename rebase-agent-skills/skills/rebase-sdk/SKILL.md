@@ -51,11 +51,14 @@ A property marked `excludeFromApi` is absent from all three — the API surface
 does not mention it, in either direction. The server still accepts one on a
 write; the generated types simply never name it.
 
-**Field names are the API's, unchanged.** A `created_at` column is
-`row.created_at`; a relation's foreign key is `author_id`. Only the collection
-accessor is turned into a property name (`my-notes` → `data.myNotes`). Do not
-guess a camelCase variant — `where` and `orderBy` are keyed off `Row`, so the
-generated name is the one the backend answers to.
+**A field's wire name is its property key, and the API is camelCase throughout.**
+A `createdAt` property stored in a `created_at` column is `row.createdAt`; a
+relation's foreign key is `authorId` while the column stays `author_id`. The
+collection accessor is turned into a property name the same way (`my-notes` →
+`data.myNotes`). A property key *you* wrote is your key, whatever its shape —
+only the two derived keys, a relation's foreign key and an introspected column,
+are camel-cased. `where` and `orderBy` are keyed off `Row`, so the generated name
+is the one the backend answers to.
 
 ### Property Type Mapping
 
@@ -78,7 +81,7 @@ the query names it in `include`. The `{ __type: "relation" }` envelope is the
 admin panel's view-model and never reaches `find()`.
 
 On writes, a `belongsTo` target can be named either way: `{ author: 5 }` (the
-relation) or `{ author_id: 5 }` (its foreign-key column). Both are in `Insert`
+relation) or `{ authorId: 5 }` (its foreign key). Both are in `Insert`
 and `Update`.
 
 ## Client Initialization
@@ -150,6 +153,53 @@ const { data: posts } = await rebase.data.collection('posts').find();
 | `update` | `update(id, data)` | `Entity` | Update an existing document |
 | `delete` | `delete(id)` | `void` | Delete a document |
 | `count` | `count(params?)` | `number` | Count matching documents |
+| `createMany` | `createMany(rows, { upsert? })` | `Entity[]` | Insert many rows in one transaction |
+| `updateMany` | `updateMany([{ id, data }])` | `Entity[]` | Update many rows in one transaction |
+| `deleteMany` | `deleteMany(ids)` | `void` | Delete many rows by id |
+| `findAll` | `findAll(params?)` | `Entity[]` | Every matching row, paging internally |
+| `iterate` | `iterate(params?)` | `AsyncIterable<Entity>` | Stream matching rows page by page |
+
+### Bulk writes
+
+```typescript
+await rebase.data.orders.createMany([{ total: 10 }, { total: 20 }]);
+
+// Update names the address separately from the values
+await rebase.data.orders.updateMany([
+    { id: 'o-1', data: { status: 'shipped' } },
+    { id: 'o-2', data: { status: 'shipped' } },
+]);
+
+await rebase.data.sessions.deleteMany(['s-1', 's-2']);
+```
+
+`createMany` takes flat rows because a row being created *is* its columns.
+`updateMany` takes `{ id, data }` because on a table keyed on something other
+than `id` — a `sku`, a composite key — a flat row cannot say which column is the
+address and which is a value to write.
+
+**`deleteMany` takes ids, never a filter.** A filter-shaped bulk delete fails by
+emptying a table when a condition is omitted or mistyped, and it cannot be
+reviewed at the call site the way an explicit list can. Read first, then pass the
+ids you meant:
+
+```typescript
+const stale = await rebase.data.sessions.findAll({
+    where: { expiresAt: ['<', cutoff] },
+});
+await rebase.data.sessions.deleteMany(stale.map(s => s.id as string));
+```
+
+### Never hand-roll a paging loop
+
+`findAll()` returns every matching row; `iterate()` yields them page by page so a
+large result never lands in memory at once. Both page internally.
+
+```typescript
+for await (const order of rebase.data.orders.iterate({ where: { status: ['==', 'paid'] } })) {
+    await handleOrder(order);
+}
+```
 
 ### Examples
 
@@ -259,13 +309,13 @@ Both spellings mean the same query.
 ```typescript
 // Params: a list of [field, direction] pairs.
 await rebase.data.posts.find({
-    orderBy: [['category', 'asc'], ['created_at', 'desc']],
+    orderBy: [['category', 'asc'], ['createdAt', 'desc']],
 });
 
 // Fluent: each call ADDS a key under the ones before it.
 await rebase.data.posts
     .orderBy('category')             // primary
-    .orderBy('created_at', 'desc')   // tie-breaker
+    .orderBy('createdAt', 'desc')   // tie-breaker
     .find();
 ```
 
@@ -283,6 +333,71 @@ Rules an agent needs before writing one:
 - `orderBy('_score')` cannot key a cursor either, for the same reason: relevance
   is computed per query rather than stored.
 - A field the collection does not have is a 400, not a silently unsorted 200.
+
+### Filtering and sorting by a related row
+
+A filter key may reach through a relation to a *column* of the related row — not
+just its id, which is all a relation filter could compare before:
+
+```typescript
+await rebase.data.talents.find({
+    where: {
+        'applications.status': ['in', ['applied', 'reviewing']],
+        'applications.createdAt': ['<', '2026-01-01'],
+    },
+});
+```
+
+A sort key may be an aggregate over a to-many relation — `min`, `max`, `count`,
+`sum`, `avg`. This is the half that cannot be worked around in the client,
+because once a result is paged the page was already chosen by the wrong order:
+
+```typescript
+// Longest-waiting first
+await rebase.data.talents.find({
+    orderBy: [[{ relation: 'applications', field: 'createdAt', agg: 'min' }, 'asc']],
+});
+```
+
+The object form is the authoring surface; on the wire the key is a single string,
+`min(applications.createdAt)`.
+
+Rules an agent needs before writing one:
+
+- **Both are driver capabilities**, `supportsRelationFieldFilters` and
+  `relationAggregateSorts`, and both default to **false** for an unclaimed
+  driver. Firestore and MongoDB declare neither. Postgres has both.
+- **The offline overlay refuses both** rather than answering them wrongly — a
+  dotted key resolves to `undefined` on a cached row, which would exclude every
+  row and read as "nothing matched".
+- `!=` on a relation column is `NOT EXISTS` of the **positive** predicate, never
+  `EXISTS` of a negated one. "Has no hired application" is the question a queue
+  asks; "has some application that differs from hired" is true of nearly
+  everyone and answers nothing.
+- `is-null` and `is-not-null` are **not** a complementary pair here. They mean
+  "has a related row whose column is unset" and "has one where it is set" — both
+  true of a candidate with two applications, one of each.
+- A relation that does not exist, or a column the target lacks, is a 400 naming
+  the target's real columns — never a dropped condition, which would widen the
+  read.
+
+### Aggregates
+
+`count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
+fetching them. **This is a REST endpoint — there is no client method, so do not
+write `rebase.data.orders.aggregate()`.** Reach it with `fetch`:
+
+```
+GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
+```
+
+Results are keyed by function and field: `count()` becomes `count`, `sum(total)`
+becomes `sum_total`. It takes the same filters as the list endpoint.
+
+Row-level security applies to the rows being aggregated — an aggregate is an
+efficient way to learn about rows you cannot read, so someone who can select
+nothing counts nothing. A driver without aggregate support answers **501**,
+not an empty result.
 
 ### Complex Logical Conditions
 
@@ -589,7 +704,7 @@ With it on, the data layer keeps a **normalized local database of rows** (Indexe
 
 ```typescript
 const unsubscribe = rebase.data.products.observe(
-    { where: { active: ['==', true] }, orderBy: ['created_at', 'desc'] },
+    { where: { active: ['==', true] }, orderBy: ['createdAt', 'desc'] },
     (result) => {
         render(result.data);          // same shape as find()
         setSaving(result.hasPendingWrites);

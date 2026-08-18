@@ -283,9 +283,9 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * 3. **Combined** — mix shortcuts with `roles` for common patterns
      *
      * The authenticated user context is available in raw SQL via:
-     * - `auth.uid()`   — the current user's ID
-     * - `auth.roles()` — comma-separated app role IDs
-     * - `auth.jwt()`   — full JWT claims as JSONB
+     * - `rebase.uid()`   — the current user's ID
+     * - `rebase.roles()` — comma-separated app role IDs
+     * - `rebase.jwt()`   — full JWT claims as JSONB
      */
     securityRules?: readonly SecurityRule[];
 
@@ -296,7 +296,7 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * baseline SELECT policy granting the trusted server context and the
      * `admin` role read access (reads run under a restricted role, so RLS
      * default-denies without it). For auth collections it additionally injects
-     * a self-read policy (`id = auth.uid()`) and an admin-only write gate
+     * a self-read policy (`id = rebase.uid()`) and an admin-only write gate
      * (INSERT/UPDATE/DELETE require the `admin` role or the trusted server
      * context), making privileged columns such as `roles` safe by default.
      *

@@ -197,7 +197,7 @@ Une politique permissive `INSERT`/`UPDATE`/`DELETE`/`ALL` accessible sans authen
 
 La condition « accepte n'importe quelle ligne » est essentielle et délibérément stricte. Supabase accorde par
 défaut les privilèges DML complets à `anon` et `authenticated`, donc une politique ciblant ces rôles n'est pas
-un problème en soi — un exemple typique comme `FOR INSERT TO public WITH CHECK (user_id = auth.uid())` est
+un problème en soi — un exemple typique comme `FOR INSERT TO public WITH CHECK (userId = auth.uid())` est
 correct et n'est pas signalé.
 
 ### unqualified-column-in-subquery

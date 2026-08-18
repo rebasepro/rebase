@@ -123,12 +123,12 @@ const postsCollection = defineCollection({
         title: { name: "Title", type: "string" },
         body: { name: "Body", type: "string", admin: { markdown: true } },
         status: { name: "Status", type: "string" },
-        published_at: { name: "Published at", type: "date" },
+        publishedAt: { name: "Published at", type: "date" },
         author: { name: "Author", type: "string" }
     },
     admin: {
         form: {
-            sidebar: ["status", "published_at", "author"],
+            sidebar: ["status", "publishedAt", "author"],
             showRecordMeta: true
         }
     }

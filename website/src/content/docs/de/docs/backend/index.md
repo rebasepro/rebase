@@ -136,7 +136,7 @@ Die REST-API wird automatisch aus Ihren Sammlungen generiert. Jede Sammlung erh�
 | Parameter | Beschreibung | Beispiel |
 |-------|-------------|---------|
 | `filter` | JSON-kodierte Filterbedingungen | `?filter={"active":["==",true]}` |
-| `orderBy` | Sortierfeld | `?orderBy=created_at` |
+| `orderBy` | Sortierfeld | `?orderBy=createdAt` |
 | `order` | Sortierrichtung | `?order=desc` |
 | `limit` | Seitengröße | `?limit=25` |
 | `startAfter` | Cursor für die Paginierung | `?startAfter=encodedCursor` |

@@ -30,7 +30,7 @@ import { getPolicyNamesForRules } from "@rebasepro/utils";
  * rows").
  *
  * **For auth collections additionally**
- *  3. A permissive **self SELECT** grant (`id = auth.uid()`), so users can read
+ *  3. A permissive **self SELECT** grant (`id = rebase.uid()`), so users can read
  *     their own row (profile, session bootstrap) without every app re-declaring
  *     it.
  *  4. A **restrictive** admin write gate. Restrictive policies are AND'd with
@@ -39,7 +39,7 @@ import { getPolicyNamesForRules } from "@rebasepro/utils";
  *     such as "a user may edit their own row". Without this, a permissive owner
  *     rule would let a user change their own `roles`.
  *
- * The server context is recognised as `auth.uid() IS NULL` (`policy.serverContext()`)
+ * The server context is recognised as `rebase.uid() IS NULL` (`policy.serverContext()`)
  * — the built-in flows that run without a user (signup, migrations) set no user
  * GUC — which also lets the owner connection satisfy these policies even under
  * FORCE RLS. A *user* request never reaches that state: an anonymous one carries
@@ -51,7 +51,7 @@ import { getPolicyNamesForRules } from "@rebasepro/utils";
 // Expressed structurally (not as raw SQL) so the admin UI can evaluate it
 // exactly — the framework's most security-critical policies must be reflected
 // precisely, not left as un-evaluable raw clauses. Compiles to
-// `auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`.
+// `rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`.
 //
 // `serverContext()`, emphatically not `not(authenticated())`: the server arm of
 // this grant must match the server context and nothing else. Anonymous visitors

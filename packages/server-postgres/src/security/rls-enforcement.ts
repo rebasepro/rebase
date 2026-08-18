@@ -30,7 +30,7 @@ import { logger } from "@rebasepro/server";
  *    that driver with `withAuth(SERVICE_IDENTITY)`, so it arrives as user
  *    context above — `rebase_user`, `app.uid = 'service'`, policies evaluated —
  *    and clears the default policies through their admin arm rather than the
- *    `auth.uid() IS NULL` one.
+ *    `rebase.uid() IS NULL` one.
  *
  * This module provides the three pieces:
  *
@@ -40,7 +40,7 @@ import { logger } from "@rebasepro/server";
  *     SELECT/INSERT/UPDATE/DELETE grants (+ default privileges so future
  *     tables stay covered).
  *  3. {@link applyAuthContext} — per-transaction: set the `app.*` GUCs the
- *     policies read (`auth.uid()` etc.) and `SET LOCAL ROLE rebase_user` so
+ *     policies read (`rebase.uid()` etc.) and `SET LOCAL ROLE rebase_user` so
  *     RLS binds. Transaction-scoped, so it composes with poolers.
  *
  * Provisioning runs from the framework's own bootstrap/migrate (which already
@@ -271,7 +271,7 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
 
 /**
  * Apply the authenticated context to a transaction: the `app.*` GUCs that RLS
- * policies read via `auth.uid()` / `auth.roles()` / `auth.jwt()`, and — when
+ * policies read via `rebase.uid()` / `rebase.roles()` / `rebase.jwt()`, and — when
  * `userRole` is set — `SET LOCAL ROLE` so RLS binds every statement in this
  * transaction (reads *and* writes).
  *
@@ -283,13 +283,13 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
  *
  * SECURITY: this function is only ever called on the **user** path (the server
  * context uses the base/owner driver and never calls it). The default policies
- * treat `auth.uid() IS NULL` as the trusted server context, and `auth.uid()`
+ * treat `rebase.uid() IS NULL` as the trusted server context, and `rebase.uid()`
  * is `NULLIF(current_setting('app.uid'), '')` — so an EMPTY user id would
  * be read as NULL and silently escalate a user request to server privileges.
  * Coerce empty/blank ids to `ANONYMOUS_USER_ID` here, at the single chokepoint,
  * rather than trusting every caller (e.g. realtime subscription auth) to do it.
  * That sentinel is exported from `@rebasepro/types` because it leaks into rule
- * semantics: it is why `auth.uid() IS NOT NULL` is true for anonymous requests.
+ * semantics: it is why `rebase.uid() IS NOT NULL` is true for anonymous requests.
  */
 export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: string): Promise<void> {
     const uid = typeof auth.uid === "string" && auth.uid.trim() !== "" ? auth.uid : ANONYMOUS_USER_ID;
@@ -322,7 +322,7 @@ const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
 
 /**
  * Warn about rules that read as "signed-in users only" but admit anonymous
- * callers — `auth.uid() IS NOT NULL`, or a comparison against another
+ * callers — `rebase.uid() IS NOT NULL`, or a comparison against another
  * platform's magic user id such as `'anon'`.
  *
  * The sibling of {@link validatePolicyPgRoles}, for the more dangerous spelling
@@ -486,7 +486,7 @@ export async function validatePolicyPgRoles(
             : "no such role exists in this database";
         const platform = FOREIGN_CONVENTION_ROLES[role];
         const hint = platform
-            ? `"${role}" is a ${platform} convention, not a PostgreSQL role. Application roles belong in \`roles: ["${role === "service_role" ? "admin" : role}"]\`, which is checked inside the policy via auth.roles().`
+            ? `"${role}" is a ${platform} convention, not a PostgreSQL role. Application roles belong in \`roles: ["${role === "service_role" ? "admin" : role}"]\`, which is checked inside the policy via rebase.roles().`
             : `Either grant it (GRANT ${role} TO ${requestRole}) or drop \`pgRoles\` so the policy targets \`public\`.`;
 
         problems.push(
