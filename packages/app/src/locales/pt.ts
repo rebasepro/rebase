@@ -43,6 +43,7 @@ export const pt: RebaseTranslations = {
     find_entity_by_id: "Encontrar entidade por ID",
     filter: "Filtrar",
     filters: "Filtros",
+    records_in_view: "Registos nesta vista",
     clear_filter: "Limpar filtro",
     clear_filter_sort: "Limpar filtro/ordenação",
     clear_sort: "Limpar ordenação",

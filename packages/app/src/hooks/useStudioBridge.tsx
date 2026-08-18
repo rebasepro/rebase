@@ -93,8 +93,7 @@ const NOOP_NAVIGATION_STATE: NavigationStateController = {
 
 const NOOP_BREADCRUMBS: BreadcrumbsController = {
     breadcrumbs: [],
-    set: () => {},
-    updateCount: () => {}
+    set: () => {}
 };
 
 const DEFAULT_CAPABILITIES: StudioCapabilities = {
