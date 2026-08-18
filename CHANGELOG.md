@@ -32,6 +32,8 @@
 
 ### Changed
 
+- **The form's metadata rail widens a little where there is room for it.** 304px to 336px past `@7xl` of *form* width — the same container signal the content column already widens on, so a side panel inside a large window keeps the narrow rail rather than taking a viewport breakpoint's word for it. 304 was picked against the narrow end, where the extra 32px went to the gap beside a chip; on a full-screen form it comes out of the gutters instead, and the status select and date picker in there are the same controls as in the column.
+
 - **Realtime is a runtime surface now, and the roles that serve no websockets no longer pay for it.** It was neither a surface nor role-aware, so every role ran it — including `functions` and `worker`, whose entire claim is that they touch nothing. Both mounted a websocket server no client could reach, both held a dedicated `LISTEN` connection outside the pool for the life of the process, and both installed the change-capture machinery at boot: a schema, a trigger function, and a `DROP`/`CREATE TRIGGER` pair per collection table.
 
   That last part contradicted the invariant the runtime otherwise refuses to boot without. `REBASE_ROLE=functions` and `REBASE_ROLE=worker` are rejected unless `REBASE_MIGRATE_ON_BOOT=none`, on the grounds that exactly one process owns schema DDL — and then the driver ran schema DDL from all of them anyway, from a code path that never asked the role. Nothing was corrupted (each statement is idempotent, and the multi-statement string is atomic), but every rollout took an `ACCESS EXCLUSIVE` lock per table per pod for no reason.
