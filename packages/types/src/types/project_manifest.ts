@@ -415,6 +415,45 @@ export interface RebaseBundleManifest {
     deps: {
         /** Runtime dependencies of user code, as declared. */
         declared: Record<string, string>;
+        /**
+         * The dependency tree ships *inside* the bundle, already installed.
+         *
+         * Absent or false means the tree is declared but not present, and
+         * whoever boots the bundle has to install it. On the managed runtime that
+         * install runs in an init container on **every** pod start — the bundle
+         * lives on a volume that is wiped each time — and it is the single
+         * largest cost in a managed pod's life: 35–55 seconds of a 40–60 second
+         * cold start. Since a pod restarts on every eviction, node failure, OOM
+         * and runtime rollout, that number is not a startup detail. It is what an
+         * outage costs.
+         *
+         * Vendoring moves the install to build time, where it happens once. It is
+         * skipped when the closure contains native code, because a prebuilt
+         * binary is only valid for the platform it was built for — see
+         * {@link vendorTarget} for what "the platform" means here.
+         */
+        vendored?: boolean;
+        /**
+         * What {@link vendored} was resolved for, recorded so a mismatch can be
+         * refused rather than discovered at import time.
+         *
+         * Cross-platform vendoring is safe for pure JavaScript and unsafe for
+         * anything compiled, and the boundary between them is not always visible
+         * in a dependency list: `esbuild` is pure-JS with a *platform-specific
+         * optional dependency* holding the actual binary, so an install run on a
+         * developer's Mac silently produces a tree that cannot run on the Linux
+         * image. The install therefore resolves optional dependencies for the
+         * target explicitly rather than for the machine it runs on, and records
+         * the answer here.
+         */
+        vendorTarget?: {
+            /** npm `--os`, e.g. `linux`. */
+            os: string;
+            /** npm `--cpu`, e.g. `x64`. */
+            cpu: string;
+            /** Node major the tree was resolved for. */
+            node: string;
+        };
     };
     build: {
         /** `@rebasepro/cli` version that produced this bundle. */

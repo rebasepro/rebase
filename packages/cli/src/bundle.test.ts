@@ -9,7 +9,8 @@ import {
     detectStorageAuthorize,
     findUnusedServerEntry,
     foldStaticIntoBundle,
-    normalizeEsmSpecifiers
+    normalizeEsmSpecifiers,
+    vendorDependencies
 } from "./bundle";
 
 let scratch: string;
@@ -549,5 +550,112 @@ hono: "1.0.0" }
     it("survives an unparseable package.json rather than failing the build", () => {
         write("package.json", "{ not json");
         expect(() => detectFrameworkDepDrift(scratch, "0.12.0")).not.toThrow();
+    });
+});
+
+/**
+ * Vendoring exists to take ~50 seconds off every managed pod start, and every
+ * assertion here guards a way it could silently fail to — or silently produce a
+ * tree that cannot run where it is going.
+ */
+describe("vendorDependencies", () => {
+    function calls() {
+        const ran: { cmd: string; args: string[]; cwd: string }[] = [];
+        return {
+            ran,
+            run: (cmd: string, args: string[], cwd: string) => {
+                ran.push({ cmd, args, cwd });
+                fs.mkdirSync(path.join(cwd, "node_modules"), { recursive: true });
+            }
+        };
+    }
+
+    it("installs the declared tree into the bundle", () => {
+        const { ran, run } = calls();
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { zod: "^3.0.0" },
+            nativeModules: [],
+            run
+        });
+        expect(result.vendored).toBe(true);
+        expect(ran).toHaveLength(1);
+        expect(ran[0].cwd).toBe(scratch);
+        expect(ran[0].args).toContain("--omit=dev");
+        expect(ran[0].args).toContain("--ignore-scripts");
+    });
+
+    it("resolves optional dependencies for the runtime image, not the build machine", () => {
+        // The failure this prevents is invisible in a dependency list: esbuild is
+        // pure JavaScript whose binary lives in a platform-specific optional
+        // dependency, so a Mac build produces a tree that dies at import inside a
+        // linux/amd64 pod.
+        const { ran, run } = calls();
+        vendorDependencies({ outDir: scratch, declared: { esbuild: "^0.28.0" }, nativeModules: [], run });
+        expect(ran[0].args).toContain("--os=linux");
+        expect(ran[0].args).toContain("--cpu=x64");
+    });
+
+    it("records the target it resolved for", () => {
+        const { run } = calls();
+        const result = vendorDependencies({ outDir: scratch, declared: { zod: "^3" }, nativeModules: [], run });
+        expect(result.target).toMatchObject({ os: "linux", cpu: "x64" });
+        expect(result.target?.node).toMatch(/^\d+$/);
+    });
+
+    it("refuses to vendor native code, and says which module", () => {
+        const { ran, run } = calls();
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { sharp: "^0.33.0" },
+            nativeModules: [{ name: "sharp", reason: "known native module" }],
+            run
+        });
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("sharp");
+        expect(ran).toHaveLength(0);
+    });
+
+    it("does nothing when the bundle declares no dependencies", () => {
+        const { ran, run } = calls();
+        const result = vendorDependencies({ outDir: scratch, declared: {}, nativeModules: [], run });
+        expect(result.vendored).toBe(false);
+        expect(ran).toHaveLength(0);
+    });
+
+    it("honours --no-vendor", () => {
+        const { ran, run } = calls();
+        const result = vendorDependencies({
+            outDir: scratch, declared: { zod: "^3" }, nativeModules: [], requested: false, run
+        });
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("--no-vendor");
+        expect(ran).toHaveLength(0);
+    });
+
+    it("never fails the build when npm fails", () => {
+        // A bundle that could not be vendored is exactly what every project
+        // shipped before this existed: slower to start, entirely functional.
+        // Failing here would trade a working deploy for a faster one that does
+        // not happen.
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { zod: "^3" },
+            nativeModules: [],
+            run: () => { throw new Error("ENOENT: npm not found"); }
+        });
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("npm install failed");
+    });
+
+    it("does not claim success when npm exits 0 but installs nothing", () => {
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { zod: "^3" },
+            nativeModules: [],
+            run: () => { /* exits cleanly, writes no node_modules */ }
+        });
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("no node_modules");
     });
 });
