@@ -90,6 +90,57 @@ path, which the runtime checks.
 `rebase deploy` for the admin is then an image tag bump on one Deployment. The
 backend does not restart.
 
+## Sizing, and the one thing that differs per cluster
+
+Every unit takes its own `resources`, which is the self-hosted half of what Rebase
+Cloud calls resource dials — the same two numbers, chosen in a values file rather
+than on a project row:
+
+```yaml
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: "2",  memory: 2Gi }
+```
+
+Requests are what the cluster reserves; limits are the ceiling a pod may burst
+to. Keeping the limit above the request is deliberate and worth preserving if you
+change these: a Rebase backend idles at single-digit millicores and spikes on
+request, so a generous limit costs nothing at rest on most clusters and is what
+absorbs a traffic spike.
+
+**The floor and the ratio band are your cluster's, not this chart's.** The
+defaults above are sized for an ordinary Kubernetes cluster — nodes you rent
+whole, where a 100m request reserves 100m. Two substrates disagree, and both do
+so silently:
+
+| Cluster | Per-pod floor | memory:CPU band | What happens outside it |
+|---|---|---|---|
+| Ordinary nodes (k3s, EKS, kubeadm, Hetzner) | none | none | the request is honoured as written |
+| **GKE Autopilot** | 250m / 512Mi | 1:1 – 6.5:1 GiB per vCPU | the request is **rewritten**, and billed at the floor |
+
+So on Autopilot this chart's default `cpu: 100m` is charged as 250m whatever it
+says, and a pod asking 250m with 4Gi is quietly given something other than
+4Gi — a pod that is not what the manifest describes. If you deploy to Autopilot,
+raise the requests to at least the floor and keep memory within 6.5 GiB per vCPU.
+Nothing here enforces that, because encoding one cloud's rules would make the
+chart wrong on the three that do not have them.
+
+## The database is not sized here
+
+`databaseInstances` has no equivalent in this chart, and that is the same
+deliberate omission as everything else about the database: this chart deploys the
+runtime and points it at a `config.databaseUrl`. How many PostgreSQL instances
+stand behind that URL, and whether they fail over, belongs to whatever runs them
+— CloudNativePG's `instances`, your managed provider's replica setting, or your
+own StatefulSet.
+
+The one thing worth carrying over from the hosted platform: **one instance means
+no failover.** A single-instance database survives a restart and does not survive
+its node. That is a legitimate choice for a staging deployment and a poor one for
+production, and it is worth making on purpose rather than discovering.
+
 ## Schema
 
 `migrationJob.enabled` (default) runs a `pre-install,pre-upgrade` Job that
