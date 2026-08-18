@@ -163,6 +163,9 @@
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
+      "^react$": "<rootDir>/node_modules/react",
+      "^react-dom$": "<rootDir>/node_modules/react-dom",
+      "^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime",
       "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts"
     }
   }

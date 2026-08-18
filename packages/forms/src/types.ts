@@ -44,4 +44,15 @@ export type FormexResetProps<T = any> = {
     submitCount?: number;
     errors?: Record<string, string>;
     touched?: Record<string, boolean>;
+    /**
+     * Leave what the reset replaced one step behind in the undo history, so
+     * {@link FormexController.undo} brings it back.
+     *
+     * For a reset the *user* asked for — a "Discard changes" or "Clear form"
+     * button — where the thing being thrown away is everything they typed, and
+     * a misclick is otherwise unrecoverable. The default clears the history,
+     * which is right for a reset the form performs on its own (a save, a new
+     * record): there is nothing there worth stepping back into.
+     */
+    undoable?: boolean;
 };
