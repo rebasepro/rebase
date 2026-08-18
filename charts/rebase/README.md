@@ -5,7 +5,7 @@ Same idea, same image, same bundle: the runtime is the image, your project is th
 bundle, and upgrading Rebase is a tag change.
 
 ```bash
-helm install rebase ./charts/rebase \
+helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \

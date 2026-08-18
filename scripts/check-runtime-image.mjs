@@ -229,6 +229,7 @@ for (const rel of USER_FACING_COMPOSE) {
 const chartPath = path.join(ROOT, CHART);
 const valuesPath = path.join(ROOT, CHART_IMAGE_DEFAULT);
 let chartAppVersion;
+let chartVersion;
 let chartRepository;
 
 if (!fs.existsSync(chartPath) || !fs.existsSync(valuesPath)) {
@@ -239,6 +240,8 @@ if (!fs.existsSync(chartPath) || !fs.existsSync(valuesPath)) {
     const chartText = fs.readFileSync(chartPath, "utf8");
     const m = /^appVersion:\s*["']?([^"'\s#]+)/m.exec(chartText);
     chartAppVersion = m?.[1];
+    const v = /^version:\s*["']?([^"'\s#]+)/m.exec(chartText);
+    chartVersion = v?.[1];
 
     const valuesText = fs.readFileSync(valuesPath, "utf8");
     const r = /^\s{2}repository:\s*["']?([^"'\s#]+)/m.exec(valuesText);
@@ -258,6 +261,34 @@ if (!fs.existsSync(chartPath) || !fs.existsSync(valuesPath)) {
             `      ${chartRepository ?? "<repository>"}:${chartAppVersion}. Ahead of the release it names a tag ` +
             `nothing has built;\n` +
             `      behind it, every default install silently runs an old runtime against a current bundle.`
+        );
+    }
+
+    // The chart's own version tracks the release too. It is what a user types
+    // into `helm install --version`, so a chart published at a number the
+    // runtime never cut is the same broken promise as an image tag that was
+    // never built — one command further back.
+    if (chartVersion !== serverVersion) {
+        problems.push(
+            `${CHART} sets ${YELLOW}version: ${chartVersion}${NC} but @rebasepro/server is ` +
+            `${YELLOW}${serverVersion}${NC}.\n` +
+            `      The chart ships with the runtime and is published at its version, so these are one number.`
+        );
+    }
+
+    // The chart is an artifact a user is told to install, exactly like the image,
+    // and it spent its first weeks reachable only by cloning the repository. The
+    // image's version of this defect shipped in 0.13.0 and cost a release; this
+    // is the same assertion one artifact over.
+    const chartPublishers = automatedWorkflows().filter(w =>
+        /helm\s+push/.test(w.text) && /charts\/rebase/.test(w.text));
+    if (chartPublishers.length === 0) {
+        problems.push(
+            `${CHART} is documented as an install target, but no automatically-triggered workflow ` +
+            `packages and pushes it.\n` +
+            `      A chart you can only get by cloning the repository is not a chart anybody installs, ` +
+            `and the\n` +
+            `      failure looks like a user who "did not read the docs" rather than like a missing artifact.`
         );
     }
 

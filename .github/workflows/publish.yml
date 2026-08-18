@@ -505,6 +505,51 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: node scripts/check-runtime-image.mjs --live --version "${{ steps.version.outputs.version }}"
 
+      # ── Helm chart ──────────────────────────────────────────
+      #
+      # The chart is the Kubernetes half of the same promise the image makes, and
+      # it shipped reachable only by cloning the repository — which is exactly
+      # the state the image was in when 0.13.0 went out with `pull access denied`
+      # as the first thing a new self-hoster saw. Pushed as an OCI artifact to
+      # the same registry, under the same credentials, in the same job, so the
+      # two cannot drift apart by one of them failing quietly.
+      - name: Set up Helm
+        if: ${{ !inputs.dry_run }}
+        uses: azure/setup-helm@v4
+        with:
+          # The version the docs claim the chart is rendered against, and the one
+          # `check:chart` runs locally. A guide that names a version CI does not
+          # use is a guide making a promise nobody checks.
+          version: v4.2.4
+
+      - name: Package and push the Helm chart
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # helm keeps its own registry credentials; the docker login above does
+          # not reach it.
+          echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io \
+            --username "$DOCKERHUB_USERNAME" --password-stdin
+          helm package charts/rebase --destination /tmp/chart
+          helm push "/tmp/chart/rebase-${VERSION}.tgz" oci://registry-1.docker.io/rebasepro
+
+      # Same reasoning as the image: a push that reported success and an artifact
+      # a stranger can actually pull are different claims.
+      - name: Verify the chart is pullable
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          helm registry logout registry-1.docker.io || true
+          helm pull oci://registry-1.docker.io/rebasepro/rebase \
+            --version "$VERSION" --destination /tmp/chart-verify
+          test -f "/tmp/chart-verify/rebase-${VERSION}.tgz"
+
       # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release (with CHANGELOG notes)
         if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'true' }}

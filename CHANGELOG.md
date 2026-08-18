@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A unit of a split deployment can be released on its own.** `functions.image.tag` in the Helm chart (and the `api` / `worker` equivalents, or `bundleUrl` under `bundle.mode: url`) holds one unit at a build of its own, so a fix to a custom function no longer restarts the API. Empty by default: every unit renders one image and one bundle, which is still the shape to prefer. Pinning only the tag inherits the repository, because the common case is one project and one image with one unit held back.
+
+  Two units on different builds are two sets of collections against **one** database, and only one unit provisions it. So the rule, stated in the values file and in the docs: **the unit that owns the schema rolls first, and a unit may lag but must never lead.** A unit running ahead queries columns that do not exist yet and relies on RLS policies nobody applied — the first is a SQL error on one route, the second is an empty result with a 200. A unit running behind is the ordinary state of any rollout in progress. The migration Job renders the release-wide image, so it always leads the pinned units by construction.
+
+- **The runtime records the collections schema version it applied, and every other process checks itself against it.** The process that provisions writes a version into `rebase.schema_meta`; every other process computes its own from the collections it loaded and compares. On a disagreement it names both versions, says which way is safe, and serves anyway — during a rollout that disagreement is *correct*, because the units that have not rolled yet are supposed to be behind. `REBASE_REQUIRE_SCHEMA_MATCH=true` (or `sharedState.requireSchemaMatch` in the chart) refuses the boot instead, for a deployment that would rather not serve at all than serve wrong.
+
+  The stamp lives in the database rather than behind an HTTP call to the api, and the difference is not stylistic. Asking the api needs its address configured on every other process — a variable whose absence disables the check silently — and makes booting depend on another process already being up. It also asks the wrong question: two processes can agree with each other while both disagree with the database, and the database is what they are all about to query. It is additionally the only form that works for a `worker`, which has no reason to know any URL, and for a single `all` deployment scaled to three, where there is no api to ask.
+
+  Both sides of the comparison are **computed** from the collections in hand, never read from a bundle manifest. A version a build declares about itself is not evidence that the database agrees with it — `/api/meta/schema-version` returns exactly that declared value, which is why comparing that endpoint to that manifest is a check that passes on a bundle whose declared version is nonsense.
+
+  What it cannot do is tell you which side is ahead: a schema version is a hash, so it reports disagreement and never direction. That is why the rollout order is a documented rule rather than something the runtime enforces.
+
+  A driver older than the runtime has neither hook — the image supplies `@rebasepro/server` while the driver comes from the bundle — and that is treated as "this driver does not record a version" rather than as a boot failure. The check starts working when the project's driver is next updated.
+
+### Changed
+
+- **Realtime is a runtime surface now, and the roles that serve no websockets no longer pay for it.** It was neither a surface nor role-aware, so every role ran it — including `functions` and `worker`, whose entire claim is that they touch nothing. Both mounted a websocket server no client could reach, both held a dedicated `LISTEN` connection outside the pool for the life of the process, and both installed the change-capture machinery at boot: a schema, a trigger function, and a `DROP`/`CREATE TRIGGER` pair per collection table.
+
+  That last part contradicted the invariant the runtime otherwise refuses to boot without. `REBASE_ROLE=functions` and `REBASE_ROLE=worker` are rejected unless `REBASE_MIGRATE_ON_BOOT=none`, on the grounds that exactly one process owns schema DDL — and then the driver ran schema DDL from all of them anyway, from a code path that never asked the role. Nothing was corrupted (each statement is idempotent, and the multi-statement string is atomic), but every rollout took an `ACCESS EXCLUSIVE` lock per table per pod for no reason.
+
+  Writes made by those processes are still heard. Capture is database triggers, so a change is published by the database rather than by whichever process made it: a function that writes a row still wakes every subscriber on the `api`.
+
+  The driver is told two things separately — whether this process consumes change events, and whether it owns the DDL — because they genuinely come apart. An `api` behind an external migration Job subscribes without provisioning.
+
+### Testing & CI
+
+- **The Helm chart is checked.** It shipped with no coverage of any kind: no lint, no `helm template`, nothing in CI — and its failure mode is a cluster that comes up looking right. `pnpm run check:chart` lints it, renders the five topologies it documents, and reads the decisions back out of the manifests: the roles, who provisions, that the worker gets no Service, that `/api/functions` reaches the functions unit in one hop through the ingress rather than two through the api's proxy, that a static app takes its own image and carries no Secret. It then extracts every `fail` from `_validate.tpl` and requires a case that reaches it, so a refusal added later fails the check until it is covered.
+
+- **The chart's default image tag is held to the runtime's version.** `appVersion` *is* the default tag — `helm install` with no `image.tag` renders it — so the chart's own documented minimum viable install is an image reference made to a user. It had drifted to `0.15.0` against a `0.14.1` runtime, which renders a tag nothing has built and lands in `ImagePullBackOff`. `check:runtime-image` now treats the chart as the user-facing reference it is, hermetically against `@rebasepro/server`'s version and, under `--live`, against the registry.
+
+- **A third adapter wrapper is held to the capability list.** `createPostgresAdapter` rebuilds the bootstrapper field by field, exactly as the two wrappers in the runtime do, and nothing was holding it to anything. It silently dropped both new schema-stamp hooks: every layer type-checked, nothing threw, and the runtime did what it does with any missing optional capability — skipped — so the stamp was never written on any real boot. A check that never runs is indistinguishable from a check that passes. `packages/server-postgres/test/adapter-forwarding.test.ts` compares the adapter against the bootstrapper's own key set, so the next capability is covered without anyone remembering to list it.
+
 ## [0.15.0] - 2026-08-17
 
 ### Added

@@ -6,8 +6,12 @@ description: >-
   of static apps — behind a single host.
 type: application
 
-# The chart's own version. Moves when the templates change.
-version: 0.1.0
+# The chart's version, which tracks the runtime release rather than moving on
+# its own. The chart ships with the runtime, its default image tag is already
+# held to the runtime's version, and a self-hoster reading two numbers has to
+# work out which pairs with which — so there is one number. `check:runtime-image`
+# holds this and `appVersion` to @rebasepro/server.
+version: 0.15.0
 
 # The default runtime image tag. A deployment pins its own with
 # `image.tag`; this is what `helm install` uses when nobody says otherwise —

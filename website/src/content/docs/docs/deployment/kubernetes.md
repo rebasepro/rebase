@@ -6,12 +6,17 @@ description: Deploy Rebase to a Kubernetes cluster with the official Helm chart 
 
 ## Overview
 
-The chart in `charts/rebase` is the Kubernetes peer of the Docker Compose
-self-hosting setup. Same idea, same image, same bundle: **the runtime is the
-image, your project is the bundle, and upgrading Rebase is a tag change.**
+The official chart is the Kubernetes peer of the Docker Compose self-hosting
+setup. Same idea, same image, same bundle: **the runtime is the image, your
+project is the bundle, and upgrading Rebase is a tag change.**
+
+It is published as an OCI artifact beside the runtime image, and the two carry
+the same version — the chart that deploys runtime `0.15.0` *is* chart `0.15.0`,
+so there is one number to track. Without `--version` you get the newest; pin it
+for a real deployment, the same way you would pin `image.tag`:
 
 ```bash
-helm install rebase ./charts/rebase \
+helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
@@ -24,12 +29,14 @@ CloudNativePG, a managed database, or your own StatefulSet, and point
 `config.databaseUrl` at it. A chart that also owned your database would own your
 backups and your failover, which is a much larger promise than "run the app".
 
-> **Maturity.** The chart is rendered and linted against Helm v4, and every
-> refusal listed below is covered by a test. It has **not yet been exercised
-> against a live cluster**, and `bundle.mode=url` in particular cannot be run
-> end to end until the runtime image is published to a public registry. Treat it
-> as a well-tested starting point rather than a production-proven default, and
-> read [Self-Hosting](/docs/deployment/self-hosting) for the path that is.
+> **Maturity.** The chart is linted and rendered in CI against Helm v4.2.4 —
+> every documented topology, and a case reaching every refusal listed below. It
+> has **not yet been exercised against a live cluster**. Treat it as a
+> well-tested starting point rather than a production-proven default, and read
+> [Self-Hosting](/docs/deployment/self-hosting) for the path that is.
+
+To work from a checkout instead — a modified chart, or an air-gapped install —
+`helm install rebase ./charts/rebase` takes the same values.
 
 ## Getting your project into the pod
 
