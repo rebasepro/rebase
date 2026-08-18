@@ -64,6 +64,30 @@ app.kubernetes.io/component: {{ .component }}
 {{- end -}}
 
 {{/*
+The image for ONE unit, which is how a unit gets released on its own.
+
+Takes {root, unit}. A unit that names neither a repository nor a tag renders
+exactly what `rebase.image` renders, so the common deployment is unchanged and
+stays a single artifact.
+
+The repository is inherited when only a tag is pinned, because pinning a tag is
+the overwhelmingly common case: one project, one image, one unit held a build
+behind while the rest move. Naming a different repository is for the case where
+the units are genuinely built separately.
+
+What this cannot do is make skew safe — see `_validate.tpl` and the schema stamp
+in the runtime. It only makes it deliberate.
+*/}}
+{{- define "rebase.unitImage" -}}
+{{- $root := .root -}}
+{{- $unit := default (dict) .unit -}}
+{{- $image := default (dict) $unit.image -}}
+{{- $repository := default $root.Values.image.repository $image.repository -}}
+{{- $tag := default (default $root.Chart.AppVersion $root.Values.image.tag) $image.tag -}}
+{{- printf "%s:%s" $repository $tag -}}
+{{- end -}}
+
+{{/*
 Whether anything other than the api provisions the schema.
 
 One answer, derived once: the Job owns DDL when it is enabled, and otherwise the
@@ -96,7 +120,14 @@ Secrets arrive by reference, never by value: a Deployment's env is readable by
 anyone who can read Deployments, which is a wider set than anyone who can read
 Secrets.
 */}}
+{{/*
+Takes {root, unit}. `unit` may be empty — the migration Job has no unit-level
+overrides and passes one — and the only thing read from it is the bundle, which
+is what lets one Deployment carry a different build than its siblings.
+*/}}
 {{- define "rebase.commonEnv" -}}
+{{- $unit := default (dict) .unit -}}
+{{- with .root -}}
 - name: PORT
   value: {{ .Values.service.port | quote }}
 - name: NODE_ENV
@@ -125,9 +156,15 @@ Secrets.
 {{- end }}
 - name: REBASE_RATE_LIMIT_STORE
   value: {{ include "rebase.rateLimitStore" . | quote }}
+{{- if .Values.sharedState.requireSchemaMatch }}
+- name: REBASE_REQUIRE_SCHEMA_MATCH
+  value: "true"
+{{- end }}
 {{- if eq .Values.bundle.mode "url" }}
+{{/* A unit may fetch a bundle of its own — that is what makes one unit
+     releasable without the others. Absent, it fetches the release's. */}}
 - name: REBASE_BUNDLE_URL
-  value: {{ .Values.bundle.url | quote }}
+  value: {{ default .Values.bundle.url $unit.bundleUrl | quote }}
 {{- if .Values.bundle.token }}
 - name: REBASE_BUNDLE_TOKEN
   valueFrom:
@@ -143,6 +180,7 @@ Secrets.
 - name: {{ $key }}
   value: {{ $value | quote }}
 {{- end }}
+{{- end -}}
 {{- end -}}
 
 {{/*

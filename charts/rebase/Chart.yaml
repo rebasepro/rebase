@@ -10,7 +10,11 @@ type: application
 version: 0.1.0
 
 # The default runtime image tag. A deployment pins its own with
-# `image.tag`; this is what `helm install` uses when nobody says otherwise.
+# `image.tag`; this is what `helm install` uses when nobody says otherwise —
+# so it must name a tag that has actually been published, not the next version.
+# `pnpm run check:runtime-image` holds it to @rebasepro/server's version, because
+# a chart whose default cannot be pulled fails as ImagePullBackOff on the one
+# command the README calls the minimum viable install.
 appVersion: "0.15.0"
 
 keywords:

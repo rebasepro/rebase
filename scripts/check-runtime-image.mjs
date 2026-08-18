@@ -56,6 +56,24 @@ const USER_FACING_COMPOSE = [
 ];
 
 /**
+ * The Helm chart makes the same promise by a different mechanism.
+ *
+ * `helm install` with no `image.tag` resolves the tag from `appVersion`, so the
+ * chart's own metadata *is* an image reference handed to a user — and the
+ * chart's README calls that command the minimum viable install. It drifted the
+ * week it was written: `appVersion` said 0.15.0 while `@rebasepro/server` was
+ * 0.14.1 and Docker Hub's newest tag was 0.14.1, so the documented install
+ * rendered a tag nothing had ever built and landed in ImagePullBackOff.
+ *
+ * Two different faults, so two checks. The hermetic one holds `appVersion` to
+ * the version the repository is actually cutting, which is the drift a commit
+ * can introduce. The `--live` one asks whether that tag exists yet, which only a
+ * release can answer.
+ */
+const CHART = "charts/rebase/Chart.yaml";
+const CHART_IMAGE_DEFAULT = "charts/rebase/values.yaml";
+
+/**
  * Images published by someone else. `postgres:18-alpine` needs no pipeline here;
  * asserting a publisher for it would be asserting something about Docker Inc.
  * Anything NOT matched by this list is ours to publish.
@@ -206,6 +224,56 @@ for (const rel of USER_FACING_COMPOSE) {
     }
 }
 
+// ── The chart's default tag ──────────────────────────────────────────────────
+
+const chartPath = path.join(ROOT, CHART);
+const valuesPath = path.join(ROOT, CHART_IMAGE_DEFAULT);
+let chartAppVersion;
+let chartRepository;
+
+if (!fs.existsSync(chartPath) || !fs.existsSync(valuesPath)) {
+    problems.push(`${CHART} or ${CHART_IMAGE_DEFAULT} does not exist — this check is stale, or the chart was deleted`);
+} else {
+    // Two flat keys out of a small file. A YAML parser is not worth a dependency
+    // this script cannot have: it runs before `pnpm install`.
+    const chartText = fs.readFileSync(chartPath, "utf8");
+    const m = /^appVersion:\s*["']?([^"'\s#]+)/m.exec(chartText);
+    chartAppVersion = m?.[1];
+
+    const valuesText = fs.readFileSync(valuesPath, "utf8");
+    const r = /^\s{2}repository:\s*["']?([^"'\s#]+)/m.exec(valuesText);
+    chartRepository = r?.[1];
+
+    const serverVersion = JSON.parse(
+        fs.readFileSync(path.join(ROOT, "packages/server/package.json"), "utf8")
+    ).version;
+
+    if (!chartAppVersion) {
+        problems.push(`${CHART} declares no appVersion — \`helm install\` then renders an image with an empty tag`);
+    } else if (chartAppVersion !== serverVersion) {
+        problems.push(
+            `${CHART} sets ${YELLOW}appVersion: ${chartAppVersion}${NC} but @rebasepro/server is ` +
+            `${YELLOW}${serverVersion}${NC}.\n` +
+            `      appVersion IS the default image tag — \`helm install\` with no \`image.tag\` renders\n` +
+            `      ${chartRepository ?? "<repository>"}:${chartAppVersion}. Ahead of the release it names a tag ` +
+            `nothing has built;\n` +
+            `      behind it, every default install silently runs an old runtime against a current bundle.`
+        );
+    }
+
+    if (!chartRepository) {
+        problems.push(`${CHART_IMAGE_DEFAULT} declares no image.repository — nothing to publish, and nothing to pull`);
+    } else if (!THIRD_PARTY.some(re => re.test(chartRepository))) {
+        checked.push({ rel: CHART_IMAGE_DEFAULT, ref: `${chartRepository}:${chartAppVersion}`, repo: chartRepository });
+        if (automatedWorkflows().filter(w => w.text.includes(chartRepository)).length === 0) {
+            problems.push(
+                `${CHART_IMAGE_DEFAULT} defaults to ${YELLOW}${chartRepository}${NC}, but no ` +
+                `automatically-triggered workflow publishes it.`
+            );
+        }
+    }
+}
+
 // Once per publisher/repository pair, not once per reference: the same image is
 // named by both shipped compose files, and reporting it twice reads as two faults.
 for (const repo of [...new Set(checked.map(c => c.repo))]) {
@@ -276,7 +344,9 @@ if (live) {
 // ── Report ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${DIM}Checked ${checked.length} first-party image reference(s) across ` +
-    `${USER_FACING_COMPOSE.length} shipped compose file(s)${live ? `, live against ${version}` : ""}.${NC}`);
+    `${USER_FACING_COMPOSE.length} shipped compose file(s) and the Helm chart` +
+    `${chartAppVersion ? ` (appVersion ${chartAppVersion})` : ""}` +
+    `${live ? `, live against ${version}` : ""}.${NC}`);
 
 if (problems.length > 0) {
     console.error(`\n${RED}✗ ${problems.length} problem(s):${NC}\n`);

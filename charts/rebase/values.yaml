@@ -77,6 +77,31 @@ api:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # ─── Releasing this unit on its own ──────────────────────────────────────
+  #
+  # Leave both empty and every unit runs one image and one bundle, which is the
+  # default and the shape to prefer. Set them and this unit can be rolled while
+  # the others stay where they are — a function fix that does not restart the
+  # API.
+  #
+  # The cost is real and is not hidden by anything here: two units on different
+  # builds are two sets of collections against ONE database. A unit running
+  # AHEAD of the schema queries columns that do not exist and relies on policies
+  # nobody applied — a SQL error on one route, and an empty 200 on another.
+  #
+  # So the rule, and it is the whole rule: **the unit that owns the schema rolls
+  # first, and a unit may lag but must never lead.** That is the migration Job,
+  # or the api when the Job is off. The runtime checks it — it stamps the schema
+  # version it applied and every other process compares itself to that — but the
+  # check reports, it cannot reorder your rollout.
+  #
+  #   image:
+  #     repository: ""   # inherited from the release-wide image when empty
+  #     tag: "0.15.0"    # pinning just the tag is the common case
+  #   bundleUrl: ""      # bundle.mode=url only: a bundle of this unit's own
+  image: {}
+  bundleUrl: ""
+
 
 # Custom functions in their own process. Only meaningful when split is true.
 functions:
@@ -92,6 +117,9 @@ functions:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # Per-unit release. See the block under `api` for the rule this obeys.
+  image: {}
+  bundleUrl: ""
 
 # Cron and the durable job queue, off the request path. Both are already safe
 # to run in several processes at once — cron claims each (job, slot) pair and
@@ -110,6 +138,9 @@ worker:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  # Per-unit release. See the block under `api` for the rule this obeys.
+  image: {}
+  bundleUrl: ""
 
 # ─── Static apps ───────────────────────────────────────────────────────────
 #
@@ -163,7 +194,21 @@ sharedState:
   # is in-memory and does not cross processes; a project that uses broadcast or
   # presence must set `realtime: { bus: { type: "postgres" } }` in its config,
   # which the chart cannot do for it. Setting this true asserts you have.
+  #
+  # Note what this is counting. Only the api unit serves websockets — the
+  # functions and worker units consume no change events at all, which is why
+  # neither holds a LISTEN connection. So the question is api.replicas, not how
+  # many units the split has: one api replica beside three functions pods needs
+  # no bus.
   channelBusConfigured: false
+  # What a unit does when the database was provisioned from a different build
+  # than it was. `false` warns and serves; `true` refuses to boot.
+  #
+  # Warning is the default because refusing fails a rollout mid-flight: between
+  # the schema owner rolling and the last unit following, the units that have
+  # not rolled yet legitimately disagree. Turn it on for a deployment that would
+  # rather not serve at all than serve wrong — and expect to roll in order.
+  requireSchemaMatch: false
 
 # ─── Networking ────────────────────────────────────────────────────────────
 ingress:

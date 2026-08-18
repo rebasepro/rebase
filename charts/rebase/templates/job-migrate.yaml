@@ -66,7 +66,7 @@ spec:
                after, and this is the one place in the chart where a unit
                provisions without being the api. */}}
           env:
-            {{- include "rebase.commonEnv" . | nindent 12 }}
+            {{- include "rebase.commonEnv" (dict "root" . "unit" dict) | nindent 12 }}
             - name: REBASE_ROLE
               value: "worker"
             - name: REBASE_MIGRATE_ON_BOOT

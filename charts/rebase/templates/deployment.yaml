@@ -13,15 +13,15 @@ what the compose file runs.
 */}}
 {{- $units := list -}}
 {{- if .Values.split -}}
-  {{- $units = append $units (dict "name" "api" "role" "api" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity) -}}
+  {{- $units = append $units (dict "name" "api" "role" "api" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity "image" .Values.api.image "bundleUrl" .Values.api.bundleUrl) -}}
   {{- if .Values.functions.enabled -}}
-    {{- $units = append $units (dict "name" "functions" "role" "functions" "replicas" .Values.functions.replicas "resources" .Values.functions.resources "nodeSelector" .Values.functions.nodeSelector "tolerations" .Values.functions.tolerations "affinity" .Values.functions.affinity) -}}
+    {{- $units = append $units (dict "name" "functions" "role" "functions" "replicas" .Values.functions.replicas "resources" .Values.functions.resources "nodeSelector" .Values.functions.nodeSelector "tolerations" .Values.functions.tolerations "affinity" .Values.functions.affinity "image" .Values.functions.image "bundleUrl" .Values.functions.bundleUrl) -}}
   {{- end -}}
   {{- if .Values.worker.enabled -}}
-    {{- $units = append $units (dict "name" "worker" "role" "worker" "replicas" .Values.worker.replicas "resources" .Values.worker.resources "nodeSelector" .Values.worker.nodeSelector "tolerations" .Values.worker.tolerations "affinity" .Values.worker.affinity) -}}
+    {{- $units = append $units (dict "name" "worker" "role" "worker" "replicas" .Values.worker.replicas "resources" .Values.worker.resources "nodeSelector" .Values.worker.nodeSelector "tolerations" .Values.worker.tolerations "affinity" .Values.worker.affinity "image" .Values.worker.image "bundleUrl" .Values.worker.bundleUrl) -}}
   {{- end -}}
 {{- else -}}
-  {{- $units = append $units (dict "name" "api" "role" "all" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity) -}}
+  {{- $units = append $units (dict "name" "api" "role" "all" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity "image" .Values.api.image "bundleUrl" .Values.api.bundleUrl) -}}
 {{- end -}}
 
 {{- $root := . -}}
@@ -83,7 +83,7 @@ spec:
         {{- include "rebase.bundleVolumes" $root | nindent 8 }}
       containers:
         - name: rebase
-          image: {{ include "rebase.image" $root }}
+          image: {{ include "rebase.unitImage" (dict "root" $root "unit" $unit) }}
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
           securityContext:
             {{- toYaml $root.Values.securityContext | nindent 12 }}
@@ -94,7 +94,7 @@ spec:
               protocol: TCP
           {{- end }}
           env:
-            {{- include "rebase.commonEnv" $root | nindent 12 }}
+            {{- include "rebase.commonEnv" (dict "root" $root "unit" $unit) | nindent 12 }}
             {{- include "rebase.roleEnv" (dict "root" $root "role" $unit.role) | nindent 12 }}
           volumeMounts:
             {{- include "rebase.bundleVolumeMounts" $root | nindent 12 }}

@@ -48,6 +48,23 @@ failed `helm install` and has one screen to work from.
   {{- end }}
 {{- end }}
 
+{{/* ── Per-unit release ─────────────────────────────────────────────────────
+     Pinning a unit is how one gets rolled without the others. Both refusals
+     below are about a pin that cannot take effect: one unit means there is
+     nothing to pin apart, and a baked-in bundle is not fetched from a URL. A
+     pin that quietly does nothing is worse than no pin — the operator believes
+     a unit is held at a version it is not held at. */}}
+{{- range $name := list "api" "functions" "worker" }}
+  {{- $unit := index $.Values $name }}
+  {{- $pinned := or (and $unit.image (or $unit.image.repository $unit.image.tag)) $unit.bundleUrl }}
+  {{- if and $pinned (not $.Values.split) }}
+    {{- fail (printf "A unit pinned to its own build needs split=true: %s.image / %s.bundleUrl do nothing while one process serves everything, because there is no second unit to hold at a different build. Set split=true, or remove the pin." $name $name) }}
+  {{- end }}
+  {{- if and $unit.bundleUrl (ne $.Values.bundle.mode "url") }}
+    {{- fail (printf "A per-unit bundle URL is only fetched when bundle.mode=url. %s.bundleUrl is set, but bundle.mode=%q, so the bundle comes from the image and that URL is never read. Use bundle.mode=url, or pin %s.image instead." $name $.Values.bundle.mode $name) }}
+  {{- end }}
+{{- end }}
+
 {{/* ── Shared state ─────────────────────────────────────────────────────────
      The count of processes that serve HTTP and could therefore hold a private
      rate-limit budget. Static units are excluded: they mount no API surface.  */}}

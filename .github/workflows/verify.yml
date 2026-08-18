@@ -132,6 +132,19 @@ jobs:
       - name: Shipped image references have a publisher
         run: pnpm run check:runtime-image
 
+      # The chart shipped with no coverage of any kind, and its failure mode is
+      # a cluster that comes up looking right: nineteen refusals in
+      # `_validate.tpl` guard topologies that produce no runtime error, and not
+      # one of them was ever reached. This lints, renders the three documented
+      # topologies and asserts every refusal is still reachable.
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+
+      - name: Helm chart renders and refuses
+        run: pnpm run check:chart
+
       # Renames leak where a codemod cannot see them: a bare name in an array,
       # a .astro file, an extensionless .env.example, a Tailwind @source path.
       - name: Package name guard

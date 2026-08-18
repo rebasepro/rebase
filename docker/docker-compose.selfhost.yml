@@ -99,7 +99,7 @@ services:
       #     # then change this line to: ../dist-bundle:/bundle:ro
       #
       # For a real deployment, prefer baking both into an image:
-      #     FROM rebasepro/server:0.11.0
+      #     FROM rebasepro/server:${REBASE_VERSION}
       #     COPY dist-bundle /bundle
       - ../dist-bundle:/bundle
     ports:
