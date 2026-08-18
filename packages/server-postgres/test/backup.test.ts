@@ -20,6 +20,32 @@ import { selectBackupsToPrune } from "../src/backup/retention";
 import { backupCronConfigFromEnv } from "../src/backup/backup-cron";
 
 describe("backup pg-tools", () => {
+    describe("splitGlobalsStatements", () => {
+        it("drops psql meta-commands that are not SQL", () => {
+            /*
+             * pg_dumpall 15+ brackets its output with `\restrict <token>` and
+             * `\unrestrict <token>` — instructions to psql. This replay sends
+             * statements over a connection instead, so they reached the server
+             * verbatim and came back as `syntax error at or near "\"`, which the
+             * restore then reported as two skipped globals. Nothing had actually
+             * failed, but the output said otherwise on every single restore.
+             */
+            const sql = [
+                "\\restrict AbC123",
+                "-- a comment",
+                "CREATE ROLE rebase_user NOLOGIN;",
+                "\\unrestrict AbC123"
+            ].join("\n");
+            expect(splitGlobalsStatements(sql)).toEqual(["CREATE ROLE rebase_user NOLOGIN"]);
+        });
+
+        it("keeps ordinary statements intact", () => {
+            expect(splitGlobalsStatements("CREATE ROLE a;\nALTER ROLE a NOSUPERUSER;"))
+                .toEqual(["CREATE ROLE a", "ALTER ROLE a NOSUPERUSER"]);
+        });
+    });
+
+
     describe("parseDbNameFromUrl", () => {
         it("extracts the database name from a standard URL", () => {
             expect(parseDbNameFromUrl("postgresql://u:p@localhost:5432/my_db")).toBe("my_db");

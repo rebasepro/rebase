@@ -32,7 +32,20 @@ import {
     VersionCompatibility
 } from "./pg-tools";
 import { BackupObject, RetentionOptions, selectBackupsToPrune } from "./retention";
-import { applyGlobalsWith, pruneWith } from "./backup-logic";
+import { applyGlobalsWith, discardPartialDumpWith, pruneWith } from "./backup-logic";
+
+/**
+ * Remove a dump artifact abandoned by a failed tool run. See
+ * {@link discardPartialDumpWith} for why this exists and why the logic lives
+ * in the execa-free module.
+ */
+export function discardPartialDump(file: string): void {
+    discardPartialDumpWith(
+        (f) => fs.existsSync(f),
+        (f) => fs.unlinkSync(f),
+        file
+    );
+}
 
 export class BackupToolError extends Error {
     constructor(message: string, readonly hint?: string) {
@@ -190,6 +203,15 @@ export async function createDump(opts: {
             env: dumpEnv
         });
     } catch (error) {
+        // pg_dump creates its `--file=` target before it finishes connecting,
+        // so any failure here — a URL libpq rejects, a dropped connection, a
+        // full disk — leaves a 0-byte file behind that nothing else removed.
+        // That corpse is not inert: `rebase db backups list` shows it as an
+        // ordinary entry, and `selectBackupsToPrune` ranks by timestamp alone,
+        // so it occupies a protected `keepMinimum` slot and can push a real
+        // backup out of retention. A missing backup is honest; an empty file
+        // that reads as a backup is not.
+        discardPartialDump(localFile);
         // The RLS failure names a table and no cause. Replace it with the
         // cause and the two ways out; anything else is re-thrown untouched.
         const diagnosis = diagnoseRowSecurityDumpFailure(error);
@@ -214,11 +236,22 @@ export async function createDump(opts: {
             );
         }
         const globalsFile = globalsFileForDump(localFile);
-        await execa(
-            dumpallBin,
-            buildPgDumpallGlobalsArgs({ connectionString: opts.connectionString, outFile: globalsFile }),
-            { stdio: opts.inheritStdio ? "inherit" : "pipe", env: { ...(env as Record<string, string>) } }
-        );
+        try {
+            await execa(
+                dumpallBin,
+                buildPgDumpallGlobalsArgs({ connectionString: opts.connectionString, outFile: globalsFile }),
+                { stdio: opts.inheritStdio ? "inherit" : "pipe", env: { ...(env as Record<string, string>) } }
+            );
+        } catch (error) {
+            // Same reasoning as the pg_dump catch above, and the dump goes with
+            // it: the pair is uploaded and pruned together, so a dump whose
+            // roles sidecar is missing restores without the roles its GRANT and
+            // RLS statements need — the exact failure the sidecar exists to
+            // prevent. Leaving half a pair on disk would look like a backup.
+            discardPartialDump(globalsFile);
+            discardPartialDump(localFile);
+            throw error;
+        }
         result.globalsFile = globalsFile;
         result.globalsSizeBytes = fs.existsSync(globalsFile) ? fs.statSync(globalsFile).size : 0;
     }
@@ -398,8 +431,9 @@ export async function listBackups(
             .filter((f) => f.endsWith(".dump"))
             .map((f) => {
                 const full = path.join(dir, f);
-                const createdAt = parseBackupTimestamp(f) ?? fs.statSync(full).mtime;
-                return { key: full, createdAt };
+                const stats = fs.statSync(full);
+                const createdAt = parseBackupTimestamp(f) ?? stats.mtime;
+                return { key: full, createdAt, sizeBytes: stats.size };
             })
             .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
     }

@@ -373,7 +373,18 @@ export function globalsFileForDump(dumpPath: string): string {
 export function splitGlobalsStatements(sql: string): string[] {
     const withoutComments = sql
         .split("\n")
-        .filter((line) => !line.trim().startsWith("--"))
+        // `--` comments, and psql meta-commands. pg_dumpall 15+ wraps its output
+        // in `\restrict <token>` / `\unrestrict <token>`, which are instructions
+        // to psql, not SQL. This replay sends statements over a connection
+        // instead, so they arrived at the server as `\restrict …` and came back
+        // as `syntax error at or near "\"` — reported to the user as two skipped
+        // globals per restore, which reads like roles failed to apply when
+        // nothing did. They carry no state worth replaying: dropping them is
+        // exactly what a SQL-level consumer should do.
+        .filter((line) => {
+            const trimmed = line.trim();
+            return !trimmed.startsWith("--") && !trimmed.startsWith("\\");
+        })
         .join("\n");
     return withoutComments
         .split(";")

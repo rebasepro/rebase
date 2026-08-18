@@ -75,8 +75,8 @@ services:
     ports:
       - "${PORT:-3001}:3001"
     environment:
-      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
-      ADMIN_CONNECTION_STRING: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path%3Dpublic
+      ADMIN_CONNECTION_STRING: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path%3Dpublic
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env — `rebase init` generates one}
       REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env — `rebase init` generates one}
       NODE_ENV: production
