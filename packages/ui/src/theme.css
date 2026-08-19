@@ -26,7 +26,7 @@
        console and the marketing site all spell the same intent the same way
        instead of each hardcoding its own em value. Pair display/title with
        font-semibold and heading with font-medium. */
-    --tracking-display: -0.025em; /* >= 30px — the headline tier */
+    --tracking-display: -0.022em; /* >= 30px — the headline tier; matches the marketing site */
     --tracking-title: -0.018em;   /* 20-24px — section titles */
     --tracking-heading: -0.01em;  /* <= 18px — labels; still a heading, not a headline */
 

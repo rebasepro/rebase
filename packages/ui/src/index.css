@@ -53,12 +53,15 @@ html.dark {
    the only things separating a heading from the copy around it — so the tiers
    have to actually differ, rather than all sitting at 600. */
 
+/* 500, not 700. This reverses the 2026-08 "700 for display" decision on
+   purpose: the marketing site and the panel were running different display
+   weights, which is the single most visible incoherence between them. */
 .typography-h1 {
-    @apply text-4xl font-headers font-bold tracking-display;
+    @apply text-4xl font-headers font-medium tracking-display;
 }
 
 .typography-h2 {
-    @apply text-3xl font-headers font-bold tracking-display;
+    @apply text-3xl font-headers font-medium tracking-display;
 }
 
 .typography-h3 {

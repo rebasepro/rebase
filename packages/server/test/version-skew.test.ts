@@ -69,14 +69,38 @@ describe("describeDriverSkew", () => {
         expect(skew.detail).toContain("0.12.0");
     });
 
-    it("does not flag a driver newer than the runtime", () => {
+    it("never calls a newer driver stale", () => {
+        // `stale` means "behind, so capabilities are missing". Ahead is a
+        // different problem with the opposite remedy, reported separately.
         expect(describeDriverSkew("0.13.0", "0.12.0").stale).toBe(false);
     });
 
+    it("flags a driver a minor or more ahead of the runtime", () => {
+        // The image lagging the packages a bundle was built against. Half of a
+        // cross-package feature runs, the other half is absent, nothing errors.
+        expect(describeDriverSkew("0.15.0", "0.13.0").ahead).toBe(true);
+        expect(describeDriverSkew("1.0.0", "0.15.0").ahead).toBe(true);
+    });
+
+    it("does not flag a driver merely a patch ahead", () => {
+        // Taking a fix early is deliberate and supported. Warning here is what
+        // would make the line noise, so the minor is the threshold.
+        expect(describeDriverSkew("0.12.1", "0.12.0").ahead).toBe(false);
+        expect(describeDriverSkew("0.12.0", "0.12.0").ahead).toBe(false);
+    });
+
     it("stays silent when either version is unknown", () => {
-        expect(describeDriverSkew(undefined, "0.12.0")).toEqual({ stale: false });
-        expect(describeDriverSkew("0.12.0", undefined)).toEqual({ stale: false });
-        expect(describeDriverSkew("weird", "0.12.0")).toEqual({ stale: false });
+        expect(describeDriverSkew(undefined, "0.12.0")).toEqual({ stale: false, ahead: false });
+        expect(describeDriverSkew("0.12.0", undefined)).toEqual({ stale: false, ahead: false });
+        expect(describeDriverSkew("weird", "0.12.0")).toEqual({ stale: false, ahead: false });
+    });
+
+    it("declines to judge an unparseable runtime rather than guessing a direction", () => {
+        // A fork's custom version string must not produce a confident wrong
+        // diagnosis in either direction.
+        const skew = describeDriverSkew("0.15.0", "nightly");
+        expect(skew.stale).toBe(false);
+        expect(skew.ahead).toBe(false);
     });
 });
 

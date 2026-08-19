@@ -91,6 +91,23 @@ export interface DriverSkew {
     /** True only when both versions parsed AND the driver is genuinely older. */
     stale: boolean;
     /**
+     * True when the driver leads the runtime by a **minor or more**.
+     *
+     * Deliberately not "any version ahead". A driver pinned one patch forward is
+     * someone taking a fix early, and warning about it would train people to
+     * ignore the line — the reason this direction was silent to begin with. A
+     * *minor* ahead is a different animal: pre-1.0 the minor is where breaking
+     * change lives, and it is the axis a feature spanning `@rebasepro/server`
+     * and a driver moves on. When the bundle's half of such a feature is present
+     * and the image's half is not, the half that landed runs against a harness
+     * that never learned to drive it, and the result is a subsystem that is
+     * silently inert in a process reporting itself perfectly healthy.
+     *
+     * Nobody chooses this pairing. It is what a floating runtime range produces
+     * when the image lags the packages a project builds against.
+     */
+    ahead: boolean;
+    /**
      * A clause naming both versions, ready to append to a sentence. Present
      * whenever both versions are known — including when they agree, because
      * "the driver is current" is the fact that redirects an investigation away
@@ -100,22 +117,50 @@ export interface DriverSkew {
 }
 
 /**
+ * Does `version` lead `against` by at least a minor?
+ *
+ * Compares the `(major, minor)` pair and ignores the patch, which is the whole
+ * point: it separates "pinned one fix ahead", a supported and deliberate thing,
+ * from "built against a framework this image predates". Pre-1.0 the minor is the
+ * breaking-change axis, so the same tuple comparison is right on both sides of
+ * 1.0 without a special case.
+ *
+ * `undefined` when either version is unparseable, so the caller declines to
+ * judge rather than guessing.
+ */
+function leadsByMinorOrMore(version: string, against: string): boolean | undefined {
+    const left = parseVersion(version);
+    const right = parseVersion(against);
+    if (!left || !right) return undefined;
+    if (left.parts[0] !== right.parts[0]) return left.parts[0] > right.parts[0];
+    return left.parts[1] > right.parts[1];
+}
+
+/**
  * Describe how a driver's version relates to the runtime asking it for work.
  *
- * Returns `stale: false` whenever it cannot tell — an unknown version, an
- * unparseable one, a driver that is newer. Silence beats a confident wrong
- * diagnosis, and the caller still prints its own local fact either way.
+ * Both directions are reportable, for opposite reasons. A driver **behind** the
+ * runtime lacks capabilities the runtime will ask for, and reports their absence
+ * in language indistinguishable from a driver that never had them. A driver
+ * **ahead** by a minor carries half of a feature whose other half lives in
+ * `@rebasepro/server` — and the image supplies that half, so the bundle's code
+ * runs against a harness that does not know about it.
+ *
+ * Returns both flags false whenever it cannot tell: an unknown version, an
+ * unparseable one, or a gap too small to mean anything. Silence beats a
+ * confident wrong diagnosis, and the caller still prints its own local fact.
  */
 export function describeDriverSkew(
     driverVersion: string | undefined,
     runtimeVersion: string | undefined
 ): DriverSkew {
-    if (!driverVersion || !runtimeVersion) return { stale: false };
+    if (!driverVersion || !runtimeVersion) return { stale: false, ahead: false };
     const order = compareVersions(driverVersion, runtimeVersion);
-    if (order === undefined) return { stale: false };
+    if (order === undefined) return { stale: false, ahead: false };
     if (order < 0) {
         return {
             stale: true,
+            ahead: false,
             detail:
                 `The driver is at ${driverVersion} while this runtime is ${runtimeVersion} — ` +
                 "the driver is OLDER, so this is very likely a stale pin rather than a driver " +
@@ -124,6 +169,7 @@ export function describeDriverSkew(
     }
     return {
         stale: false,
+        ahead: leadsByMinorOrMore(driverVersion, runtimeVersion) === true,
         detail: `Driver ${driverVersion}, runtime ${runtimeVersion}.`
     };
 }

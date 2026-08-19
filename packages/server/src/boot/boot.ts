@@ -695,11 +695,27 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
  * driver. Nothing detected that before this: the halves simply disagreed in
  * silence until some capability turned out to be missing three layers down.
  *
- * A warning rather than a refusal. Old drivers are usually fine — the pairing is
+ * A warning rather than a refusal. Either pairing can be fine — both are
  * supported, and a boot that dies on version arithmetic would be a far worse
  * failure than the drift it is guarding against. This only has to make the skew
  * *visible*, so that the next person reading the log starts from the right
  * question.
+ *
+ * ## Both directions, because only one of them was ever reported
+ *
+ * A driver *behind* the runtime was the original case: the platform ships a fix,
+ * every tenant rolls onto the new image, and none of them run the fixed driver.
+ *
+ * A driver *ahead* by a minor is the mirror image and was silent until it cost
+ * another day. It is not the deliberate pin this check used to assume — that is
+ * a patch bump, and still says nothing. It is what a floating runtime range
+ * produces when the image lags: a bundle built against a framework the image
+ * predates, so a feature split across `@rebasepro/server` and the driver has
+ * only its driver half present. Nothing errors. The half that landed reads
+ * config the older harness never sets, defaults it, and a subsystem — realtime
+ * channels, in the case that prompted this — is inert in a process that passes
+ * every probe. The fix is the opposite of the stale case, which is exactly why
+ * the two need separate sentences: bump the *image*, not the package.json.
  */
 export function warnOnDriverSkew(
     dataSources: InitializedDataSource[],
@@ -709,15 +725,29 @@ export function warnOnDriverSkew(
 
     for (const source of dataSources) {
         const skew = describeDriverSkew(source.driverVersion, runtimeVersion);
-        if (!skew.stale) continue;
-        logger.warn(
-            `Driver version skew on data source "${source.key}": ` +
-                `"${source.driverPackage}" is at ${source.driverVersion}, this runtime is ${runtimeVersion}. ` +
-                "A driver is installed from your bundle's dependencies, NOT supplied by the platform image, " +
-                "so a newer runtime does not update it. Capabilities added after " +
-                `${source.driverVersion} are unavailable to this deployment — bump ` +
-                `"${source.driverPackage}" in your project's package.json and redeploy.`
-        );
+        if (skew.stale) {
+            logger.warn(
+                `Driver version skew on data source "${source.key}": ` +
+                    `"${source.driverPackage}" is at ${source.driverVersion}, this runtime is ${runtimeVersion}. ` +
+                    "A driver is installed from your bundle's dependencies, NOT supplied by the platform image, " +
+                    "so a newer runtime does not update it. Capabilities added after " +
+                    `${source.driverVersion} are unavailable to this deployment — bump ` +
+                    `"${source.driverPackage}" in your project's package.json and redeploy.`
+            );
+            continue;
+        }
+        if (skew.ahead) {
+            logger.warn(
+                `Driver version skew on data source "${source.key}": ` +
+                    `"${source.driverPackage}" is at ${source.driverVersion}, this runtime is ${runtimeVersion}. ` +
+                    "The driver is AHEAD of the platform image by a minor or more. Your bundle supplies the " +
+                    "driver while the image supplies `@rebasepro/server`, so a feature spanning both packages " +
+                    "has only its driver half running here — the other half is missing, and the usual symptom " +
+                    "is a subsystem that is silently inert rather than one that errors. " +
+                    "Deploy a newer platform image (or pin the runtime version), " +
+                    `or pin "${source.driverPackage}" back to ${runtimeVersion} in your project's package.json.`
+            );
+        }
     }
 }
 /**
