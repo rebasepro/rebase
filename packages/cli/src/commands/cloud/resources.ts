@@ -1,3 +1,4 @@
+import fs from "fs";
 /**
  * `rebase cloud` resource subcommands: status, metrics, webhooks, storage,
  * clusters, billing.
@@ -625,7 +626,139 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── clusters ─────────────────────────────────────────────────── */
 
-export async function clustersCommand(rawArgs: string[]): Promise<void> {
+/**
+ * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
+ *
+ * Registration is deliberately an operator action: the `clusters` collection is
+ * admin-only, and a cluster record carries a credential with enough power to
+ * create namespaces and read every secret in them. A self-serve "bring your own
+ * cluster" flow is a different feature with a different threat model.
+ */
+export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    if (action === "verify") return clustersVerifyCommand(rawArgs);
+    if (action === "add") return clustersAddCommand(rawArgs);
+    return clustersListCommand(rawArgs);
+}
+
+/**
+ * Ask a registered cluster whether it can actually host a tenant.
+ *
+ * The question this exists to answer early is the one that otherwise gets
+ * answered by a customer's first deploy failing halfway through provisioning,
+ * with an error they cannot act on and half a tenant already created.
+ */
+async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const id = rawArgs.find((a) => !a.startsWith("--") && a !== "clusters" && a !== "verify");
+    if (!id) fail("Usage: rebase cloud clusters verify <cluster-id> [--baseline]", undefined, "bad_request");
+
+    const withBaseline = rawArgs.includes("--baseline");
+    let report: {
+        reachable: boolean; version?: string; unreachableReason?: string;
+        permissions: { allowed: string[]; denied: { permission: string; consequence: string }[];
+                       unknown: { permission: string; error: string }[] };
+        verdict: "ready" | "degraded" | "unusable"; blockers: string[];
+    };
+    try {
+        report = await client.functions.invoke("cluster-baseline", undefined, {
+            method: "GET",
+            path: `verify/${id}${withBaseline ? "?baseline=1" : ""}`
+        }) as never;
+    } catch (error: unknown) {
+        reportError(error, "Could not verify the cluster");
+        return;
+    }
+
+    emit(
+        () => {
+            console.log("");
+            const tone = report.verdict === "ready" ? chalk.green
+                : report.verdict === "degraded" ? chalk.yellow : chalk.red;
+            console.log(`  ${tone(chalk.bold(report.verdict.toUpperCase()))}  ${chalk.gray(String(id))}`);
+            console.log("");
+            keyValues([
+                ["Reachable", report.reachable ? "yes" : chalk.red("no")],
+                ["Permissions", `${report.permissions.allowed.length} allowed, ${report.permissions.denied.length} denied`]
+            ]);
+            if (report.blockers.length > 0) {
+                console.log("");
+                // Each blocker already says what breaks, so they are printed
+                // whole rather than summarised into a count.
+                for (const b of report.blockers) console.log(`  ${chalk.red("✗")} ${b}`);
+            }
+            console.log("");
+            if (!withBaseline && report.verdict !== "unusable") {
+                note("Add --baseline to also check ingress-nginx, cert-manager and CloudNativePG.");
+                console.log("");
+            }
+        },
+        () => report
+    );
+
+    // Non-zero so this is usable as a gate in a script or a runbook step.
+    if (report.verdict === "unusable") process.exitCode = 1;
+}
+
+/**
+ * Register a cluster from a kubeconfig file.
+ *
+ * Verifies immediately rather than reporting a successful insert: a row that
+ * names an unreachable cluster is worse than no row, because a project pointed
+ * at it fails at deploy instead of at registration.
+ */
+async function clustersAddCommand(rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const flag = (name: string): string | undefined => {
+        const i = rawArgs.indexOf(name);
+        return i === -1 ? undefined : rawArgs[i + 1];
+    };
+
+    const name = flag("--name");
+    const provider = flag("--provider");
+    const region = flag("--region");
+    const kubeconfigPath = flag("--kubeconfig");
+
+    if (!name || !provider || !region || !kubeconfigPath) {
+        fail(
+            "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path>",
+            undefined,
+            "bad_request"
+        );
+    }
+    if (!["gcp", "aws", "hetzner"].includes(provider!)) {
+        fail(`--provider must be gcp, aws or hetzner (got "${provider}")`, undefined, "bad_request");
+    }
+
+    let kubeConfigData: string;
+    try {
+        kubeConfigData = fs.readFileSync(kubeconfigPath!, "utf8");
+    } catch {
+        fail(`Could not read ${kubeconfigPath}`, undefined, "bad_request");
+        return;
+    }
+
+    let created: { id: string | number };
+    try {
+        created = await client.data.collection("clusters").create({
+            name, provider, region, authType: "kubeconfig", kubeConfigData
+        }) as never;
+    } catch (error: unknown) {
+        reportError(error, "Could not register the cluster");
+        return;
+    }
+
+    emit(
+        () => {
+            success(`Registered ${name} (${created.id}).`);
+            noteBlank();
+            note("Verifying it can host tenants:");
+            note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
+        },
+        () => ({ id: created.id, name, provider, region })
+    );
+}
+
+async function clustersListCommand(rawArgs: string[]): Promise<void> {
     const { client } = await requireClient(rawArgs);
     try {
         const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as unknown as Array<{
