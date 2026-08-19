@@ -1,0 +1,15 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import IndexV2Content from "../../components/pages/IndexV2Content.astro";
+import { getLangFromUrl, useTranslations } from "../../i18n/ui";
+
+if (import.meta.env.PROD) {
+    return Astro.redirect("/");
+}
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+---
+
+<Layout title="Home v2 — prototype" description="Prototype of the reworked home page. Development only." lang={lang}>
+    <IndexV2Content lang={lang} t={t} />
+</Layout>

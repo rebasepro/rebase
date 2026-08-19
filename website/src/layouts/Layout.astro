@@ -308,11 +308,13 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     <slot name="head"/>
 </head>
 
-<body class="font-sans bg-black text-surface-300 antialiased" style="color-scheme: dark;">
+<body class="font-sans bg-page-ground text-surface-300 antialiased" style="color-scheme: dark;">
 <div id="app-shell" class="flex flex-col min-h-screen">
 {showBanner && <ManifestoBanner />}
 <Header/>
-<main class="flex-1">
+<!-- page-v2 carries the 2026-08 system (ground, copy colour, heading tracking,
+     frame, shell and measure) to every route from one place. -->
+<main class="flex-1 bg-page-ground text-page-ink">
     <slot/>
 </main>
 <Footer/>

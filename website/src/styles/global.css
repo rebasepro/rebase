@@ -10,6 +10,80 @@
 
 
 
+/* ── Page system (2026-08 rework) ─────────────────────────────────────────────
+   Tokens, so Tailwind generates the utilities rather than us hand-writing them.
+   The only thing here that could NOT be a utility is heading tracking: the
+   `h1..h6` rule below is unlayered and beats every utility, so headings inherit
+   the system by matching its display-tier selector instead of overriding it. */
+@theme {
+    --color-page-ground: #08090a;
+    --color-page-ink: #f7f8f8;
+    --color-page-copy: #b4b8bd;
+    --spacing-shell: 72rem;
+    --spacing-measure-head: 42rem;
+    --spacing-measure-lead: 38rem;
+    --spacing-measure-sub: 34rem;
+}
+
+/* One treatment for every product surface. A demo that draws its own window
+   chrome must not also get `frame-head`. */
+@utility frame {
+    position: relative;
+    z-index: 1;
+    border-radius: 14px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: var(--color-surface-950);
+    overflow: hidden;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.05),
+        0 2px 8px rgb(0 0 0 / 0.5),
+        0 32px 72px -16px rgb(0 0 0 / 0.85);
+}
+
+@utility frame-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid rgb(255 255 255 / 0.07);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--color-surface-500);
+}
+
+/* Demos animate; an auto-height container resizes the page on every frame. */
+@utility well {
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@utility eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--color-surface-500);
+}
+
+@utility accent-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    transition: opacity 0.2s ease;
+}
+
+/* A second pass of the Neat canvas over the type. Stacking two copies of the
+   TEXT cannot work: the upper copy's backdrop is the solid copy beneath it. */
+@utility neat-over {
+    mix-blend-mode: multiply;
+    opacity: 0.42;
+}
+
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *));
 
@@ -90,8 +164,12 @@ h1, h2, h3, h4, h5, h6 {
     @apply font-headers font-medium tracking-heading;
 }
 
+/* 500, measured against the reference and matched by the reworked home page.
+   Three different display weights were in play before this: 500 on the new
+   home (its arbitrary text-[2.6rem] misses this selector), 600 here, and 700
+   in packages/ui. All three are 500 now. */
 :is(h1, h2, h3, h4, h5, h6):is(.text-3xl, .text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
-    @apply font-semibold tracking-display;
+    @apply font-medium tracking-display;
 }
 
 :is(h1, h2, h3, h4, h5, h6):is(.text-xl, .text-2xl) {

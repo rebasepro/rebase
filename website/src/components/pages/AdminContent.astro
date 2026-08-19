@@ -60,19 +60,19 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative isolate overflow-hidden pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40">
         <NeatBackground client:idle/>
 
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+        <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
                 <span class="text-sm font-medium">Optional layer · React 19 · Bring your own components</span>
             </div>
             <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-                The admin panel,<br/><span class="text-primary">as a separate product.</span>
+                The admin panel,<br/>as a separate product.
             </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                 A complete back office, generated from the collections your backend already uses. It is a layer
                 on top — not part of the backend. Add it when a human needs to touch the data, skip it when
                 nobody does, and remove it without your API noticing.
             </p>
-            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+            <div class="flex flex-wrap items-center justify-start gap-x-6 gap-y-3">
                 <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
                    data-track id="admin-hero-demo">
@@ -98,7 +98,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Real back offices, running -->
     <section class="relative z-0 pb-16 sm:pb-24 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 mb-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-8">
             <p class="text-center text-sm text-surface-500">Back offices teams run on Rebase every day</p>
         </div>
         <div class="h-72">
@@ -108,9 +108,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ 01 · THE TOUR ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     The tour
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -135,10 +135,10 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ 02 · WHAT YOUR TEAM GETS ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Day to day
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-8">
@@ -190,9 +190,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ 03 · IT IS A REACT APP ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Yours to extend
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -207,7 +207,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">a property with your components</span>
                     </div>
@@ -223,7 +223,7 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                 </div>
 
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">field widgets, configured</span>
                     </div>
@@ -255,9 +255,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ 04 · A LAYER, NOT A LOCK-IN ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     The cost of adding it
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">A layer, not a lock-in</h2>
@@ -269,7 +269,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                <div class="frame overflow-hidden">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">opting in</span>
                     </div>
@@ -280,7 +280,7 @@ import ClosingCta from "../ClosingCta.astro";
                     </p>
                 </div>
 
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                <div class="frame overflow-hidden">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
                     </div>
@@ -315,9 +315,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ 05 · WHERE IT FITS ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Where it fits
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Three layers, adopted in any order</h2>
@@ -331,7 +331,7 @@ import ClosingCta from "../ClosingCta.astro";
                         Postgres. Headless and React-free. Everything else is optional.</p>
                 </a>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-primary/30">
-                    <p class="text-xs font-mono text-primary/80 mb-2">layer 02 · you are here</p>
+                    <p class="text-xs font-mono text-surface-500 mb-2">layer 02 · you are here</p>
                     <h3 class="text-lg font-semibold text-white mb-2">The admin panel</h3>
                     <p class="text-sm text-surface-400">The generated back office for the humans on your team,
                         driven by the <code class="font-mono text-surface-300">admin</code> block in your
@@ -350,7 +350,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ CTA ═══════════════════════ -->
     <section class="py-24 sm:py-32">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
                 Add a back office in one dependency
             </h2>

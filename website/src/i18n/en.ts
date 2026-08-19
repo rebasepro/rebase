@@ -42,13 +42,13 @@ export const en = {
     "A tour of the panel: filtering, inline editing, relations and uploads — running against the same API your app calls.",
   "see.link": "Everything the admin panel adds",
   "agentera.badge": "Built for the agent era",
-  "agentera.title": 'The backend an agent <span class="text-primary">can\'t screw up</span>',
+  "agentera.title": 'The backend an agent can\'t screw up',
   "agentera.p1":
     "An AI agent can scaffold a backend in an hour. It can't tell you whether that backend is safe. Agents are extremely good at producing <em>plausible</em> backends — and famously bad at producing <em>secure</em> ones. Rebase makes the safe outcome the only outcome, by construction.",
   "agentera.p2":
     "And the surface it has to get right is small: one TypeScript file per collection, no React in it, no endpoints to hand-write, no ORM layer to keep in sync. The schema <em>is</em> the API, and the permissions live in Postgres — where an agent's mistake gets rejected by the database instead of shipped.",
   "agentera.card.title":
-    'Boilerplate depreciates. <span class="text-primary">Guarantees appreciate.</span>',
+    'Boilerplate depreciates. Guarantees appreciate.',
   "agentera.card.desc":
     "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore all AI & Agent features",
@@ -60,7 +60,7 @@ export const en = {
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
   "modes.badge": "Two products, one definition",
-  "modes.title": 'Take only the half <span class="text-primary">you actually need.</span>',
+  "modes.title": 'Take only the half you actually need.',
   "modes.subtitle":
     "The backend and the panel are separate products that share a schema. Ship headless today and add the panel the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
   "modes.baas.title":
@@ -86,7 +86,7 @@ export const en = {
   "stack.unchanged": "unchanged",
   "stack.api.note": "Identical in every configuration above. The layers change what a human can see — never what your app can call.",
   "stack.hint": "Click a layer to see what it adds.",
-  "paths.title": 'Two ways in. <span class="text-primary">Same schema.</span>',
+  "paths.title": 'Two ways in. Same schema.',
   "paths.subtitle": "Pick the half you need today. The other one is one dependency away.",
   "paths.backend.title": "The backend",
   "paths.backend.desc":
@@ -98,7 +98,7 @@ export const en = {
   "paths.admin.cta": "Explore the admin panel",
   "howitworks.badge": "Time reclaimed",
   "howitworks.title":
-    'What you\'ll <span class="text-primary">never build again.</span>',
+    'What you\'ll never build again.',
   "howitworks.subtitle":
     "Every hour you used to spend on plumbing is now spent on your product.",
   "howitworks.step1.title": "Boilerplate admin UIs",
@@ -268,7 +268,7 @@ export const en = {
   "showcase.sync.tab3.desc":
     "Design your data model visually in Rebase Studio. Every change writes back to your local TypeScript files via AST — your code stays clean, your team stays in sync.",
   "power.title":
-    'One collection.<br/><span class="text-primary">Everything generated.</span>',
+    'One collection.<br/>Everything generated.',
   "power.subtitle":
     "One TypeScript file per collection is the entire input. The database schema, the REST API, the typed SDK, the forms and every admin view come out of it — and change with it.",
   "power.badge": "Code as Truth",
@@ -815,7 +815,7 @@ export const en = {
 
   // AI & Agents Section
   "ai.badge": "Agent Infrastructure",
-  "ai.title": "The backend <span class=\"text-primary\">AI agents need.</span>",
+  "ai.title": "The backend AI agents need.",
   "ai.subtitle": "Vector search, scoped API keys, custom functions, realtime subscriptions with broadcast channels, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
 
   // Grouped Features Section

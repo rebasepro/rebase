@@ -229,7 +229,7 @@ export function AgentConsoleDemo() {
     const active = CAPABILITIES.find((c) => c.key === activeKey) ?? CAPABILITIES[0];
 
     return (
-        <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
+        <div className="frame overflow-hidden">
 
             {/* window chrome */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">

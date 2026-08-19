@@ -22,16 +22,16 @@ import ClosingCta from "../ClosingCta.astro";
  <section
  class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
             <NeatBackground client:idle />
-            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+            <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                     {t('agencies.hero.title')}
                 </h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48" set:html={t('agencies.hero.subtitle')}>
+                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t('agencies.hero.subtitle')}>
                 </p>
             </div>
         </section>
  <section class="relative isolate py-16">
-            <div class="mx-auto max-w-7xl px-8 lg:px-12">
+            <div class="mx-auto max-w-6xl px-8 lg:px-12">
                 <div class="mx-auto mt-4 mb-8 animate-on-scroll fade-in">
                     <ClientLogos filter="agencies"/>
                 </div>
@@ -47,7 +47,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Agency Advantage Section -->
  <section class="relative isolate py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-4xl text-center animate-on-scroll fade-in-up">
                     <div class="flex items-center justify-center mb-4">
                         <h3 class="m-0 text-3xl font-semibold text-white">
@@ -69,7 +69,7 @@ import ClosingCta from "../ClosingCta.astro";
 
 
  <section class="relative isolate py-16 sm:py-24">
-            <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center animate-on-scroll fade-in-up delay-100">
                     <div class="lg:col-span-6">
                         <div class="text-center mb-12 animate-on-scroll fade-in-up">
@@ -182,7 +182,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Easy to Customize Section -->
  <section class="relative isolate py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center animate-on-scroll fade-in-up">
                     <div class="rounded-xl ring-1 ring-inset ring-surface-800 overflow-hidden bg-surface-950">
                         <BodyPartsDemo client:only="react" />
@@ -225,7 +225,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Features for Agency Success Section -->
  <section class="relative isolate py-16 sm:py-24">
-            <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="text-center mb-12">
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">{t('agencies.features.title')}</h2>
                     <p class="text-xl text-surface-400">{t('agencies.features.subtitle')}</p>
@@ -411,7 +411,7 @@ import ClosingCta from "../ClosingCta.astro";
 
 
  <section class="relative isolate py-10 sm:py-12">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 gap-8 sm:grid-cols-3 text-center animate-on-scroll scale-in">
                     <div>
                         <div class="text-4xl font-semibold text-white" set:html={t('agencies.metrics.m1.value')}></div>
@@ -431,7 +431,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Agency Client Showcase Section -->
  <section class="relative isolate py-16 sm:py-24">
-            <div class="max-w-7xl mx-auto px-6 lg:px-8">
+            <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <h2 class="text-3xl md:text-4xl font-medium tracking-tight mb-12 text-center text-white animate-on-scroll fade-in-up">
                     {t('agencies.leverage.title')}</h2>
                 <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
@@ -676,7 +676,7 @@ import ClosingCta from "../ClosingCta.astro";
         <!-- Final CTA (keep consistent with site) -->
         <!-- CTA Section -->
  <section class="relative isolate py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8 animate-on-scroll fade-in-up">
                     Ready to build something amazing?</h2>
                 <div class="flex items-center justify-center gap-x-6 animate-on-scroll fade-in-up delay-100">

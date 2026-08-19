@@ -96,14 +96,14 @@ const deployTargets = [
     <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
         <NeatBackground client:idle/>
 
-        <div class="px-6 lg:px-8 mx-auto max-w-7xl relative z-10">
+        <div class="px-6 lg:px-8 mx-auto max-w-6xl relative z-10">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-6">
                     <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
                         <span class="text-sm font-medium">TypeScript · Postgres · your editor</span>
                     </div>
                     <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-                        Schema as code.<br/><span class="text-primary">Everything else follows.</span>
+                        Schema as code.<br/>Everything else follows.
                     </h1>
                     <p class="mb-8 text-lg leading-8 text-surface-300">
                         You write collections in TypeScript and run four commands. Rebase keeps the database, the
@@ -143,9 +143,9 @@ const deployTargets = [
 
     <!-- ═══════════════════════ 01 · THE LOOP ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     The loop
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -184,10 +184,10 @@ const deployTargets = [
 
     <!-- ═══════════════════════ 02 · THE PROJECT ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         The project
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -207,7 +207,7 @@ const deployTargets = [
                     </p>
                 </div>
                 <div class="lg:col-span-7">
-                    <div class="rounded-2xl border border-white/5 bg-surface-950/90 overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                    <div class="frame overflow-hidden">
                         <div class="px-4 py-3 flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
@@ -228,9 +228,9 @@ const deployTargets = [
 
     <!-- ═══════════════════════ 03 · WHERE YOUR CODE GOES ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Your code
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -243,7 +243,7 @@ const deployTargets = [
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">callbacks</span>
@@ -255,7 +255,7 @@ const deployTargets = [
                     </p>
                 </div>
 
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">backend/functions/checkout.ts</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">custom routes</span>
@@ -306,9 +306,9 @@ const deployTargets = [
 
     <!-- ═══════════════════════ 04 · ARCHITECTURE ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Architecture
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -325,10 +325,10 @@ const deployTargets = [
 
     <!-- ═══════════════════════ 05 · SHIP IT ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Ship it
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -372,7 +372,7 @@ const deployTargets = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <div class="rounded-2xl border border-surface-700/80 bg-surface-900/40 p-8 sm:p-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Your agents, too
                 </p>
                 <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-5">

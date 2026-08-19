@@ -12,14 +12,14 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
      <NeatBackground client:idle />
 
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+      <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
           <span class="text-sm font-medium">{t("manifesto.badge")}</span>
         </div>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
           {t("manifesto.hero.title")}
         </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
           {t("manifesto.hero.subtitle")}
         </p>
       </div>
@@ -196,7 +196,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- CTA -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">{t("manifesto.cta.title")}</h2>
         <div class="flex items-center justify-center gap-x-6">
           <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">

@@ -40,9 +40,6 @@ export function RichTextEditorDemo() {
             {/* Fake toolbar */}
             <div className="h-12 border-b border-surface-800/60 bg-surface-900/40 flex items-center px-4 gap-4 shrink-0">
                 <div className="flex gap-2">
-                    <div className="h-2 w-2 rounded-full bg-rose-500/80"></div>
-                    <div className="h-2 w-2 rounded-full bg-amber-400/80"></div>
-                    <div className="h-2 w-2 rounded-full bg-emerald-400/80"></div>
                 </div>
                 <div className="h-4 w-px bg-surface-700"></div>
                 <div className="flex gap-3 text-surface-500">

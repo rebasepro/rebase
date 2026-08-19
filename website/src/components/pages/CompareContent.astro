@@ -102,12 +102,12 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
         <NeatBackground client:idle/>
 
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-            <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Compare</p>
+        <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+            <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Compare</p>
             <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-                Rebase, next to<br/><span class="text-primary">the tool you already use.</span>
+                Rebase, next to<br/>the tool you already use.
             </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-10 xl:px-40">
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                 Most of these products are good. They are also solving a different problem than we are.
                 Below: what actually differs, which tool wins in which situation, and the cases where
                 you should not pick Rebase.
@@ -117,9 +117,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ FOUR FAMILIES ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-14 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Start here</p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Start here</p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                     What are you actually shopping for?
                 </h2>
@@ -163,7 +163,7 @@ import ClosingCta from "../ClosingCta.astro";
                                          aria-hidden="true"
                                          style="background: radial-gradient(420px 220px at 80% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
                                     <div class="relative">
-                                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-primary/80 mb-3">
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-3">
                                             How Rebase models it
                                         </p>
                                         <p class="text-sm text-surface-300 leading-relaxed">{family.ourModel}</p>
@@ -191,9 +191,9 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ THE FIVE AXES ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">The real differences</p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">The real differences</p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                     Five questions, not a feature checklist
                 </h2>
@@ -207,7 +207,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="hidden md:grid grid-cols-12 border-b border-surface-800/80 bg-surface-900/40">
                     <p class="col-span-3 px-6 py-3 text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500">The question</p>
                     <p class="col-span-4 px-6 py-3 text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500">Most of the category</p>
-                    <p class="col-span-5 px-6 py-3 text-2xs font-semibold uppercase tracking-[0.18em] text-primary/80">Rebase</p>
+                    <p class="col-span-5 px-6 py-3 text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500">Rebase</p>
                 </div>
                 {axes.map((row, i) => (
                         <div class={`grid grid-cols-1 md:grid-cols-12 ${i > 0 ? "border-t border-surface-800/60" : ""}`}>
@@ -228,10 +228,10 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ THE PROOF ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
                 <div class="lg:col-span-4">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Row one, in practice</p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Row one, in practice</p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
                         Policies are a file, not a setting
                     </h2>
@@ -306,7 +306,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- ═══════════════════════ CTA ═══════════════════════ -->
     <section class="relative z-0 py-24 sm:py-32">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
                 Easier to try than to compare
             </h2>

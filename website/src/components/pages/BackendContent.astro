@@ -125,19 +125,19 @@ const alsoShipped = [
     <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
         <NeatBackground client:idle/>
 
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+        <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
                 <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL · React-free</span>
             </div>
             <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-                The backend,<br/><span class="text-primary">on its own.</span>
+                The backend,<br/>on its own.
             </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                 Point it at a Postgres database and you get REST, a typed SDK, realtime over WebSocket, auth,
                 storage and an OpenAPI spec — with every access rule enforced by the database itself.
                 No admin panel required. No React in the dependency tree.
             </p>
-            <div class="mt-4 max-w-xl mx-auto">
+            <div class="mt-4 max-w-xl">
                 <HeroConnectionWidget client:load/>
             </div>
         </div>
@@ -145,10 +145,10 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 01 · THE API APPEARS ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         REST, without writing it
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -167,16 +167,13 @@ const alsoShipped = [
                 <div class="lg:col-span-7 space-y-5">
                     <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-3xs font-mono text-surface-400">api.yourapp.com</div>
                         </div>
                         <div class="h-[260px] w-full overflow-hidden" inert aria-hidden="true">
                             <ApiMiniDemo client:visible/>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                    <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                             <span class="font-mono text-xs text-surface-400">the generated surface</span>
                         </div>
@@ -189,10 +186,10 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 02 · TYPED SDK ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5 lg:order-last">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         The typed client
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -220,16 +217,13 @@ const alsoShipped = [
                 <div class="lg:col-span-7 space-y-5">
                     <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-3xs font-mono text-surface-400">app.ts</div>
                         </div>
                         <div class="h-[260px] w-full flex items-center justify-center overflow-hidden" inert aria-hidden="true">
                             <SdkMiniDemo client:visible/>
                         </div>
                     </div>
-                    <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                    <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                             <span class="font-mono text-xs text-surface-400">src/orders.ts</span>
                         </div>
@@ -247,10 +241,10 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 03 · REALTIME ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Realtime
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -281,9 +275,9 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 04 · AUTHORIZATION ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Authorization
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -298,7 +292,7 @@ const alsoShipped = [
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">what you write</span>
@@ -338,10 +332,10 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 05 · WHAT'S MOUNTED ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         One server
                     </p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
@@ -365,7 +359,7 @@ const alsoShipped = [
                 </div>
 
                 <div class="lg:col-span-7">
-                    <div class="rounded-2xl border border-white/5 bg-surface-950/90 overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                    <div class="frame overflow-hidden">
                         <div class="px-4 py-3 flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
@@ -388,9 +382,9 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 06 · HONO + DRIZZLE ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Underneath
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
@@ -403,7 +397,7 @@ const alsoShipped = [
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">backend/src/index.ts</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Hono</span>
@@ -416,7 +410,7 @@ const alsoShipped = [
                     </ul>
                 </div>
 
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">relations, resolved in one query</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">Drizzle</span>
@@ -434,9 +428,9 @@ const alsoShipped = [
 
     <!-- ═══════════════════════ 07 · HEADLESS BY DEFAULT ═══════════════════════ -->
     <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     The other half
                 </p>
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Headless by default</h2>

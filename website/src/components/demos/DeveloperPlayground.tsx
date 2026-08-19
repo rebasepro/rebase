@@ -133,9 +133,6 @@ export function DeveloperPlayground() {
                 {/* Mock Window Controls Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                         <span className="text-[11px] font-mono text-surface-500 ml-3 tracking-wide">
                             rebase-workspace / {activeTab === "schema" ? "schema_definition.ts" : activeTab === "sdk" ? "client_query.ts" : activeTab === "fields" ? "custom_rating_widget.tsx" : "row_level_security.sql"}
                         </span>

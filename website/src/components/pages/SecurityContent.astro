@@ -17,30 +17,30 @@ import ClosingCta from "../ClosingCta.astro";
  class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
             <NeatBackground client:idle />
 
-            <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-                <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+            <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+                <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     <a href="/backend" class="hover:text-primary transition-colors">The backend</a>
                     <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Security &amp; RLS</span>
                 </p>
-                <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+                <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
                     <span class="text-sm font-medium">Open source · self-hosted · Rebase Cloud (not launched)</span>
                 </div>
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                     Secured by the database.<br/>Not by middleware.
                 </h1>
-                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+                <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                     Authorization in Rebase is Postgres row-level security, enforced by the database itself —
                     and it fails closed: a table without RLS is <b>refused</b>, never leaked. That holds today when
                     you self-host the open-source stack, and it will hold on Rebase Cloud when it launches.
                 </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <div class="flex flex-col sm:flex-row gap-4 justify-start">
                     <a href="#rls"
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow">
+                       class="inline-flex items-center justify-start gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow">
                         See how it works
                         <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
                     </a>
                     <a href="https://demo.rebase.pro"
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
+                       class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
                        rel="noopener noreferrer"
                        target="_blank">
                         Try the Demo
@@ -116,7 +116,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Row-Level Security Section -->
  <section id="rls" class="relative z-0 py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="space-y-8">
                     <div class="max-w-3xl">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20 font-medium">
@@ -136,9 +136,6 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="w-full rounded-2xl border border-surface-800 bg-surface-950/90 shadow-2xl overflow-hidden">
                         <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
                             <div class="flex items-center gap-1.5">
-                                <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                                 <span class="text-2xs font-mono text-surface-500 ml-3">rls-policies.ts</span>
                             </div>
                             <span class="text-3xs font-mono text-emerald-400 flex items-center gap-1">
@@ -157,10 +154,10 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Fail closed -->
         <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                     <div class="lg:col-span-5">
-                        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">The default</p>
+                        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">The default</p>
                         <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
                             A table with no policy serves no rows
                         </h2>
@@ -211,7 +208,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- RBAC Section -->
  <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid lg:grid-cols-2 gap-12 items-center">
                     <div>
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20 font-medium">
@@ -241,9 +238,6 @@ import ClosingCta from "../ClosingCta.astro";
                         <div class="w-full max-w-md rounded-2xl border border-surface-800 bg-surface-950/90 shadow-2xl overflow-hidden">
                             <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                                     <span class="text-2xs font-mono text-surface-500 ml-3">roles</span>
                                 </div>
                             </div>
@@ -263,7 +257,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Core Pillars Section -->
  <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Security Principles</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
@@ -312,7 +306,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Data Sovereignty Section -->
  <section class="relative z-0 py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid lg:grid-cols-2 gap-12 items-center">
                     <div>
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
@@ -360,7 +354,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Self-Hosted Architecture Section -->
  <section class="relative z-0 py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium mx-auto">
                         <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
@@ -404,7 +398,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Deployment Models Section -->
         <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-12">
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Two deployment models, two security stories</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
@@ -452,7 +446,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Rebase Cloud Section -->
         <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium mx-auto">
                         <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
@@ -553,7 +547,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Privacy & Compliance Section -->
  <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="max-w-4xl mx-auto text-center mb-12">
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Where you stand on GDPR</h2>
                     <p class="text-lg text-surface-300">
@@ -621,7 +615,7 @@ import ClosingCta from "../ClosingCta.astro";
 
         <!-- Final CTA Section -->
         <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-8">Audit yours in ten seconds</h2>
                 <p class="text-lg text-surface-300 mb-8 max-w-2xl mx-auto">
                     <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code> — no signup,

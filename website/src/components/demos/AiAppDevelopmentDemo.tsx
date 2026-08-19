@@ -120,9 +120,6 @@ export default function AiAppDevelopmentDemo() {
             {/* Window Topbar */}
             <div className="px-4 py-3 bg-[#121215] border-b border-surface-900 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></span>
               </div>
               
               {activeMode === "recipes" ? (

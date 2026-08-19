@@ -26,21 +26,21 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
      <NeatBackground client:idle />
 
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+      <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
+        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
           <span class="text-sm font-medium">Rich Text · Blocks · Kanban · Inline</span>
         </div>
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
           <a href="/admin" class="hover:text-primary transition-colors">The admin panel</a>
           <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Content editing</span>
         </p>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          The editing experience<br/><span class="text-primary">your team deserves.</span>
+          The editing experience<br/>your team deserves.
         </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
           A Notion-style block editor, drag-and-drop Kanban boards, spreadsheet views, and fully extensible custom fields — all writing directly to your Postgres database.
         </p>
-        <div class="flex items-center justify-center gap-x-4">
+        <div class="flex items-center justify-start gap-x-4">
           <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
              class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
             Try It Live
@@ -92,9 +92,6 @@ import ClosingCta from "../ClosingCta.astro";
           <!-- Browser Chrome -->
           <div class="px-4 py-3 border-b border-surface-800/80 flex items-center gap-2 bg-surface-900/50 backdrop-blur-md">
             <div class="flex gap-1.5 w-16">
-              <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-              <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-              <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
             </div>
             <div class="flex-1 flex justify-center">
               <div class="bg-surface-950/80 border border-surface-800/80 rounded-lg px-3 py-1 text-2xs font-mono text-surface-500 flex items-center gap-1.5">
@@ -122,7 +119,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Editor Features Strip -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
           <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Every block you need.</h2>
           <p class="mt-4 text-surface-400 text-lg">The editor supports a comprehensive set of content blocks — from simple text to complex embeds. All stored as structured data in your database.</p>
@@ -291,7 +288,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Slash Commands Animated Demo -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div class="lg:order-last">
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
@@ -315,7 +312,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Markdown with live preview -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20">
@@ -339,7 +336,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Kanban View -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
@@ -363,7 +360,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Inline Spreadsheet Editing -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div class="lg:order-last">
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">
@@ -388,7 +385,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Extensibility: Custom Fields -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
@@ -413,7 +410,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- Full-Width Feature Strip: Data Formats -->
  <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
           <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One editor. Every content type.</h2>
           <p class="mt-4 text-surface-400 text-lg">From blog posts to product descriptions to internal docs — Rebase adapts to how your team works.</p>
@@ -529,7 +526,7 @@ import ClosingCta from "../ClosingCta.astro";
 
     <!-- CTA -->
  <section class="relative z-0 py-24 sm:py-32">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+      <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">See the editor in action.</h2>
         <p class="text-lg text-surface-400 mb-8 max-w-xl mx-auto">Try the live demo or start a project and have a full editing experience running in under 5 minutes.</p>
         <div class="flex items-center justify-center gap-x-6">

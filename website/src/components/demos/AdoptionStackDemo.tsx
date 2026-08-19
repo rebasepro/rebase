@@ -77,7 +77,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                         <Slab width="w-full" copy={backend} active alwaysLabel={labels.alwaysOn}/>
 
                         {/* Base plate — your database */}
-                        <div className="w-full rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/70 to-surface-950/60 px-6 py-4 shadow-[0_10px_0_-3px_rgba(10,12,18,0.9)]">
+                        <div className="frame w-full px-6 py-4">
                             <div className="flex items-center justify-between gap-3">
                                 <span className="flex items-center gap-2.5 text-base font-semibold text-surface-200">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -101,7 +101,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
             </div>
 
             {/* ── What that costs you ──────────────────────────────── */}
-            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
+            <div className="frame overflow-hidden">
 
                 {/* window chrome, like every other mock on this page */}
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">

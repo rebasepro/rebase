@@ -15,8 +15,10 @@ const t = useTranslations(currentLang as keyof typeof languages);
 const title = t("index.meta.title");
 const description = t("index.meta.description");
 
-import IndexContent from '../../components/pages/IndexContent.astro';
+// Home v2. IndexContent.astro is left in place untouched — reverting is one
+// line: swap this import and the tag below back.
+import IndexV2Content from '../../components/pages/IndexV2Content.astro';
 ---
 <Layout title={title} description={description} lang={currentLang} showBanner={true}>
-    <IndexContent lang={currentLang} t={t} />
+    <IndexV2Content lang={currentLang} t={t} />
 </Layout>

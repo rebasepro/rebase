@@ -26,7 +26,7 @@ export function SplitLayerDemo() {
     const full = mode === "full";
 
     return (
-        <div className="w-full rounded-2xl border border-white/5 bg-surface-950/80 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
+        <div className="frame w-full overflow-hidden">
 
             {/* Segmented control */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-surface-800/80 bg-surface-900/50">

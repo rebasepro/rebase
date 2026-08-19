@@ -202,20 +202,53 @@ page. If a demo is the proof of a claim, it lives on the page that makes the
 claim. Previously every good demo was hoarded on `/`, and the secondary pages
 were left with card grids — which is what made them feel generic.
 
-## 6. Design language (do not renegotiate)
+## 6. Design language
 
-- Stock `@rebasepro/ui` theme: primary `#0070F4`, neutral surface scale, near-black page.
-- **Semibold (600) is the maximum font weight.** No `font-bold` anywhere.
-- Never a card grid immediately after another card grid. Alternate: figure →
-  prose → figure. If two card sections must be adjacent, one becomes a demo.
-- `NeatBackground` is decoration, never a section's only light — it does not
-  render in headless screenshots. Pair it with CSS radial gradients.
-- **A free tool is not a hero.** `rls-check` lives inside the security beat, next
-  to the claim it tests — not near the top of the page, where nobody yet knows
-  what the claim is. And it is shown as its actual terminal output
-  (`RlsCheckReport.astro`, taken verbatim from `packages/rls-check/src/report.ts`),
-  never as a centred card with a command in it.
-- **Nothing sits above the header.** The manifesto banner was a 70vh interstitial
-  that pushed the product below the fold; it is a one-line dismissible strip now.
-- Section headers use the numbered eyebrow idiom (`01 · BADGE`) only on the home
-  page; deep pages use a plain uppercase eyebrow.
+Revised 2026-08-19, during the home-page rework. The previous version of this
+section was headed *"do not renegotiate"*; it was renegotiated, deliberately and
+with the owner, so what follows describes what the code now does. Anything here
+that a page contradicts is a bug in the page, not licence to drift.
+
+**The system lives in one file.** `src/styles/page-system.css`, imported by
+`Layout.astro` and scoped to `main.page-v2`, which Layout carries. Ground, copy
+colour, heading tracking, shell width, copy measures, the eyebrow, the product
+frame, the demo well and the accent link are defined there once. Do not
+re-implement any of them inline on a page.
+
+- **Ground is `#08090A`, not pure black.** Pure black kills the shadow system.
+- **Copy is `#B4B8BD`.** `surface-400` read washed at page scale.
+- **Headings are weight 500 at `-0.022em`.** The weight comes from
+  `global.css:88`, which sets `h1..h6 { font-headers font-medium tracking-heading }`
+  **unlayered** and therefore beats every Tailwind utility - override with a real
+  rule, never with `tracking-[...]` or `font-[...]` on the element. Note
+  `font-[560]` is parsed as a font-*family*; the weight syntax is
+  `font-[weight:560]`.
+- **One shell width (`72rem`) on every section**, so left edges agree across the
+  page. Copy blocks are constrained separately: 42rem for section heads, 38rem
+  for leads, 34rem for the hero sub.
+- **Headlines are one colour.** The white-line/accent-line split is retired; it
+  had reached 21 instances across 13 pages and read as a template.
+- **Section labels are neutral**, not tinted.
+- **One product frame** (`.frame`): 14px radius, a single hairline, a layered
+  shadow, no gradient fill and no hover glow. It replaced eight drifted card
+  recipes. A demo that draws its own window chrome must not also get a
+  `.frame-head`.
+- **Every embedded demo gets a reserved, clipped `.well`.** They animate; an
+  auto-height container makes the page resize on every frame.
+- **Window chrome only on real terminals.** Three survive site-wide
+  (`rebase dev`, `after rebase init`, `zsh`). File, browser and panel frames do
+  not get traffic lights.
+- **Heroes are left-aligned.**
+- **Neat is composition, not wallpaper.** Dividers use the masked, bled pattern
+  (`height: 600px` with `-my-72`, `z-index: -1`, `.neat-divider`) so the canvas
+  passes behind the neighbouring sections and leaves no seam. Every instance
+  shares one palette and `textureSeed`; only the camera differs. The hero also
+  runs a second pass of the same canvas *above* the type at
+  `mix-blend-mode: multiply`, so the shape modulates the letterforms.
+- **A free tool is not a hero.** `rls-check` lives next to the claim it tests.
+- **Nothing sits above the header.**
+- **No emoji, anywhere.**
+
+**Trap, recorded because it cost most of a day:** Astro's dev server serves stale
+component style modules after edits. A rule that appears not to apply is usually
+cache, not cascade - restart `astro dev` before debugging specificity.

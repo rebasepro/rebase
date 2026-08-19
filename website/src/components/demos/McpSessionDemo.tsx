@@ -123,7 +123,7 @@ export function McpSessionDemo() {
     const denied = CALLS.filter((c) => !(keyAllows(c) && rlsAllows(c))).length;
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+        <div className="frame overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr]">
 
                 {/* ── The key ───────────────────────────────────────── */}

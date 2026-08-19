@@ -5,7 +5,7 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 ---
 <section class="relative isolate py-28 sm:py-36 overflow-hidden border-t border-surface-800/40">
-    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-20 animate-on-scroll fade-in-up">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
                 <svg class="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
@@ -31,7 +31,7 @@ const t = useTranslations(lang);
                     <span class="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)] z-10"></span>
                 </div>
                 
-                <div class="relative rounded-2xl bg-gradient-to-br from-surface-900/80 to-surface-950/70 border border-white/5 p-6 sm:p-8 hover:border-emerald-500/30 hover:shadow-[0_10px_30px_rgba(52,211,153,0.12)] transition-all duration-300 group">
+                <div class="frame relative p-6 sm:p-8 hover:border-emerald-500/30 transition-all duration-300 group">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                         <h3 class="text-2xl font-semibold text-white">{t('roadmap.now.title')}</h3>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-medium ring-1 ring-emerald-500/20 w-fit">
@@ -129,7 +129,7 @@ const t = useTranslations(lang);
                     <span class="h-1.5 w-1.5 rounded-full bg-surface-600"></span>
                 </div>
 
-                <div class="relative rounded-2xl bg-gradient-to-br from-surface-900/80 to-surface-950/70 border border-white/5 p-6 sm:p-8 opacity-80 hover:opacity-100 hover:border-surface-700 transition-all duration-300 group">
+                <div class="frame relative p-6 sm:p-8 opacity-80 hover:opacity-100 hover:border-surface-700 transition-all duration-300 group">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                         <h3 class="text-2xl font-semibold text-white">{t('roadmap.later.title')}</h3>
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-800/50 text-surface-400 text-xs font-medium ring-1 ring-surface-700 w-fit">

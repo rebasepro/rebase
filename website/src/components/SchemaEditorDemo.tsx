@@ -622,7 +622,7 @@ export function SchemaEditorDemo() {
 
             {/* Full-Width Animated Property Selector - Covers entire demo */}
             {showDialog && (
-                <div className="absolute inset-0 z-20 bg-black/50 dark:bg-black/70 flex justify-center items-center"
+                <div className="absolute inset-0 z-20 bg-page-ground/50 dark:bg-page-ground/70 flex justify-center items-center"
                      style={{
                          opacity: showDialog ? 1 : 0,
                          transition: "opacity 400ms ease-in-out"

@@ -43,6 +43,23 @@ export default defineConfig({
                 },
                 defaultProps: {
                     frame: "none"
+                },
+                shiki: {
+                    // Two fence languages the docs use that Shiki does not resolve
+                    // on its own, which made every build log four warnings and
+                    // silently fall back to plain `txt`:
+                    //
+                    // - `env` — the grammar exists but is registered as `dotenv`
+                    //   with no alias, and the blocks are plain KEY=value, so this
+                    //   is an exact match.
+                    // - `caddyfile` — no Caddy grammar is bundled. `nginx` is the
+                    //   closest structural fit (site block, braces, directive plus
+                    //   arguments) and highlights the host and directive correctly.
+                    //   Swap this the day a real Caddy grammar ships.
+                    langAlias: {
+                        env: "dotenv",
+                        caddyfile: "nginx"
+                    }
                 }
             },
             sidebar: [

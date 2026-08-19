@@ -219,7 +219,7 @@ export function EuHostingCostDemo() {
     const boxWidth = Math.min(100, Math.max(4, (box / Math.max(bill.total, box)) * 100));
 
     return (
-        <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
+        <div className="frame overflow-hidden">
 
             {/* ── Sliders ───────────────────────────────────────────── */}
             <div className="border-b border-surface-800/60 bg-surface-950/40 px-5 py-6 sm:px-7">
@@ -454,7 +454,7 @@ export function EuHostingCostDemo() {
                 )}
 
                 {atCeiling && (
-                    <p className="mt-5 rounded-xl border border-white/5 bg-surface-900/50 p-4 text-[13px] leading-relaxed text-surface-400">
+                    <p className="frame mt-5 p-4 text-[13px] leading-relaxed text-surface-400">
                         <b className="text-surface-200">The sliders stop here on purpose.</b> Past roughly this size you
                         are no longer choosing between a box and a plan — you want object storage for the files, a
                         replica so a single machine is not the whole company, and someone whose job that is. That is a

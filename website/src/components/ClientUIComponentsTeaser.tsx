@@ -36,7 +36,7 @@ export default function ClientUIComponentsTeaser() {
     const cardClasses = "relative p-4 flex flex-col gap-2 break-inside-avoid dark:bg-surface-950 mb-4 rounded-lg";
 
     return (
-        <div className={"@container max-w-7xl mx-auto not-content my-8"}>
+        <div className={"@container max-w-6xl mx-auto not-content my-8"}>
             <div className="@xl:columns-2 @4xl:columns-3 gap-4">
 
                 <div className={cardClasses + " flex-row"}>

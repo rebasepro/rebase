@@ -1,0 +1,456 @@
+---
+import { NeatBackground } from "../NeatBackground";
+import CollectionPowerSection from "../CollectionPowerSection.astro";
+import RlsCheckReport from "../RlsCheckReport.astro";
+import RoadmapSection from "../RoadmapSection.astro";
+import ClientLogos from "../ClientLogos.astro";
+import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
+import { ApiMiniDemo } from "../demos/ApiMiniDemo";
+import { SdkMiniDemo } from "../demos/SdkMiniDemo";
+import { RealtimeMiniDemo } from "../demos/RealtimeMiniDemo";
+import { RLSEditorDemo } from "../demos/RLSEditorDemo";
+import { AdminDemoCarousel } from "../demos/AdminDemoCarousel";
+import { AgentConsoleDemo } from "../demos/AgentConsoleDemo";
+import { getLangFromUrl, useTranslations, useTranslatedPath } from "../../i18n/ui";
+import { ArrowRight, Database, LayoutDashboard, TerminalSquare } from "lucide-react";
+
+// Rendered by the home route, which supplies both; falls back for the dev route.
+const { lang: langProp, t: tProp } = Astro.props;
+const lang = langProp ?? getLangFromUrl(Astro.url);
+const t = tProp ?? useTranslations(lang);
+const translatePath = useTranslatedPath(lang);
+
+---
+<div class="isolate text-white">
+
+        <!-- ============================================================
+             HERO — Neat is the composition, not the wallpaper.
+             The canvas holds the right of the frame at full opacity and the
+             type sits in the dark half, so nothing is ever laid over the art.
+             ============================================================ -->
+        <section class="relative isolate overflow-hidden flex items-center pt-24 pb-32 sm:pt-32 sm:pb-40">
+            <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
+                <NeatBackground client:idle randomize={false} />
+            </div>
+            <!-- A second pass of the same shape, over the type, multiplying at low
+                 opacity: the ribbon darkens the letterforms where it crosses them
+                 and leaves them alone everywhere else. -->
+            <div class="neat-over absolute inset-0 pointer-events-none" aria-hidden="true">
+                <NeatBackground client:idle randomize={false} />
+            </div>
+
+            <div class="relative w-full mx-auto max-w-6xl px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+                    <div class="lg:col-span-6">
+                        <!-- The Postgres mark the old hero carried: it says what the
+                             product runs on before the headline has to. -->
+                        <span class="inline-flex items-center gap-2 rounded-full border border-surface-700 bg-surface-900/60 px-3 py-1 text-xs font-medium text-surface-400">
+                            <img src="/img/postgresql-logo.svg" alt="PostgreSQL" width="432" height="445" class="h-4 w-auto" />
+                            {t("hero.badge")}
+                        </span>
+                        <h1 class="mt-5 font-headers text-4xl sm:text-5xl leading-[1.02] text-balance">
+                            {t("hero.title.part1")}<br />{t("hero.title.part2")}
+                        </h1>
+                        <p class="mt-6 max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
+                            {t("hero.subtitle")}
+                        </p>
+                        <div class="mt-8 flex flex-wrap items-center gap-3">
+                            <a
+                                href={translatePath("/demo")}
+                                class="inline-flex items-center justify-start gap-2 rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                            >
+                                {t("hero.cta.demo")}
+                            </a>
+                            <a
+                                href={translatePath("/docs")}
+                                class="inline-flex items-center justify-start gap-2 rounded-lg border border-white/15 px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:border-white/35"
+                            >
+                                {t("cta.button.docs")}
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- The hero carries a product artifact. SITE-STORY §5 records that
+                         the WebGL-plus-type hero was replaced for exactly this reason;
+                         dropping it again left the right half of the frame empty. The
+                         install command lives here now, once, with its real output. -->
+                    <div class="lg:col-span-6">
+                        <div class="frame">
+                            <div class="frame-head">
+                                <span class="h-2 w-2 rounded-full bg-rose-500/70"></span>
+                                <span class="h-2 w-2 rounded-full bg-amber-400/70"></span>
+                                <span class="h-2 w-2 rounded-full bg-emerald-400/70"></span>
+                                <span class="ml-2">zsh · ~/work</span>
+                            </div>
+                            <div class="px-5 py-5 font-mono text-xs sm:text-sm leading-[2] text-surface-300">
+                                <p><span class="text-surface-500">$</span> pnpm dlx @rebasepro/cli init</p>
+                                <p class="text-emerald-400">{t("demo.init")}</p>
+                                <p class="text-emerald-400">{t("demo.pull")}</p>
+                                <p class="text-emerald-400">{t("demo.dev")}</p>
+                                <p class="mt-3 text-surface-500">
+                                    API on <span class="text-surface-200">:3001</span> · panel on
+                                    <span class="text-surface-200">:5173</span>
+                                </p>
+                                <p class="mt-1"><span class="text-surface-500">$</span> <span class="inline-block h-4 w-[7px] translate-y-[2px] bg-primary"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Logo wall — the short beat, straight after the tallest one. -->
+        <div class="border-y border-white/5 py-10 sm:py-14">
+            <ClientLogos />
+        </div>
+
+        <!-- ============================================================
+             NEAT DIVIDER → chapter 01. The strip is the real canvas; the
+             chapter below inherits its cyan on rules, eyebrow and link.
+             ============================================================ -->
+        <!-- Neat gradient divider, bled behind the sections either side -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
+             style="z-index: -1; height: 600px;">
+            <NeatBackground variant="b" client:visible />
+        </div>
+
+        <div>
+            <CollectionPowerSection index="01" />
+
+            <!-- The bento, with the content kept and the uniform card dropped:
+                 hairline cells on one raised plate instead of six floating cards. -->
+            <section class="relative bg-surface-900/40 border-y border-white/8 py-24 sm:py-32">
+                <div class="mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+                        <p class="eyebrow">
+                            <span class="font-mono text-surface-500">02</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
+                        </p>
+                        <h2 class="mt-4 font-headers text-3xl sm:text-4xl text-balance">
+                            {t("engine.title")}
+                        </h2>
+                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("engine.subtitle")}</p>
+                    </div>
+
+                    <!-- The demos were 232px postage stamps inside a hairline grid.
+                         They are the most interesting thing on the page, so they get
+                         the room: one wide frame, then two half-width ones. -->
+                    <div class="mt-12 animate-on-scroll fade-in-up">
+                        <div class="frame">
+                            <div class="frame-head">
+                                <span class="h-2 w-2 rounded-full bg-rose-500/70"></span>
+                                <span class="h-2 w-2 rounded-full bg-amber-400/70"></span>
+                                <span class="h-2 w-2 rounded-full bg-emerald-400/70"></span>
+                                <span class="ml-2">app.ts — typed from your collections</span>
+                                <span class="ml-auto">live · try it</span>
+                            </div>
+                            <div class="h-[330px] overflow-hidden flex items-center justify-center">
+                                <SdkMiniDemo client:visible />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="animate-on-scroll fade-in-up delay-100">
+                            <div class="frame">
+                                <div class="frame-head"><span>REST, over every table</span><span class="ml-auto">live · send a request</span></div>
+                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
+                                    <ApiMiniDemo client:visible />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="animate-on-scroll fade-in-up delay-200">
+                            <div class="frame">
+                                <div class="frame-head"><span>Realtime — LISTEN/NOTIFY</span><span class="ml-auto">live</span></div>
+                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
+                                    <RealtimeMiniDemo client:visible />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- What is left over is a line of text, not a fourth panel. -->
+                    <div class="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-6">
+                        <p class="text-sm text-[#b4b8bd] max-w-2xl">
+                            Plus auth and roles, S3-compatible storage, scheduled jobs, serverless
+                            functions and backups — all against the database you already own, under
+                            the same policies.
+                        </p>
+                        <a href={translatePath("/backend")} class="accent-link ml-auto">
+                            {t("engine.link")}
+                            <ArrowRight size={15} />
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ============================================================
+             CHAPTER 03 — SECURITY. The one chapter whose accent is the brand
+             blue, because it carries the highest-ranked claim.
+             ============================================================ -->
+        <div>
+            <section class="relative z-0 py-24 sm:py-32">
+                <div class="mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                        <div class="lg:col-span-5">
+                            <p class="eyebrow">
+                                <span class="font-mono text-surface-500">03</span>
+                                <span class="mx-2 text-surface-700">·</span>{t("security.badge")}
+                            </p>
+                            <h2 class="mt-4 font-headers text-3xl sm:text-4xl text-balance">
+                                {t("security.title")}
+                            </h2>
+                            <p class="mt-5 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("security.desc")}</p>
+                            <a href={translatePath("/studio")} class="accent-link mt-8">
+                                {t("security.link")}
+                                <ArrowRight size={15} />
+                            </a>
+                        </div>
+                        <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
+                            <div class="frame">
+                                <div class="frame-head">studio · row-level security</div>
+                                <!-- The demo reserves room for a longer policy list than it
+                                     shows, which left a tall empty well under the last card. -->
+                                <div class="p-4 bg-[#09090b] h-[430px] overflow-hidden">
+                                    <RLSEditorDemo client:visible />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 04 — MODES. No Neat here, but it still carries the accent:
+             an all-grey section between two coloured ones read as a dead zone. -->
+        <section class="chapter border-y border-white/8 bg-surface-900/30">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 pt-20 pb-4">
+                <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+                    <p class="eyebrow">
+                        <span class="font-mono text-surface-500">04</span>
+                        <span class="mx-2 text-surface-700">·</span>{t("modes.badge")}
+                    </p>
+                    <h2 class="mt-4 font-headers text-3xl sm:text-4xl text-balance">
+                        Take only the half you actually need.
+                    </h2>
+                    <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
+                </div>
+            </div>
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 pb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 border-t border-white/8 mt-10">
+                    <div class="md:border-r border-white/8 py-10 md:pr-8">
+                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.baas.tag")}</p>
+                        <h3 class="mt-4 font-headers text-xl">{t("modes.baas.title")}</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.baas.desc")}</p>
+                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/server</p>
+                    </div>
+                    <div class="md:border-r border-white/8 py-10 md:px-8 border-t md:border-t-0">
+                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.cms.tag")}</p>
+                        <h3 class="mt-4 font-headers text-xl">{t("modes.cms.title")}</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.cms.desc")}</p>
+                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/admin</p>
+                    </div>
+                    <div class="py-10 md:pl-8 border-t md:border-t-0 border-white/8">
+                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.full.tag")}</p>
+                        <h3 class="mt-4 font-headers text-xl">{t("modes.full.title")}</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.full.desc")}</p>
+                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/app</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NEAT DIVIDER → chapter 05, gold. -->
+        <!-- Neat gradient divider, bled behind the sections either side -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
+             style="z-index: -1; height: 600px;">
+            <NeatBackground variant="a" client:visible />
+        </div>
+
+        <!-- CHAPTER 05 — THE PANEL. -->
+        <div>
+            <section class="relative z-0 py-24 sm:py-32">
+                <div class="mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+                        <p class="eyebrow">
+                            <span class="font-mono text-surface-500">05</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("showcase.sync.badge")}
+                        </p>
+                        <h2 class="mt-4 font-headers text-3xl sm:text-4xl text-balance">
+                            {t("showcase.sync.tab1.title")}
+                        </h2>
+                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("showcase.sync.tab1.desc")}</p>
+                    </div>
+                    <div class="mt-12 animate-on-scroll fade-in-up">
+                        <div class="frame">
+                            <AdminDemoCarousel client:visible height={620} />
+                        </div>
+                    </div>
+                    <a href={translatePath("/admin")} class="accent-link mt-8">
+                        Explore the admin panel
+                        <ArrowRight size={15} />
+                    </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 06 — PERSONAS. Prose and hairlines; the only place a person appears. -->
+        <section class="border-t border-white/8 py-24 sm:py-32">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8">
+                <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
+                    Three people touch this. None of them the same way.
+                </h2>
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
+                    <div class="md:border-r border-white/8 py-9 md:pr-8">
+                        <h3 class="text-base font-semibold tracking-tight">The developer who owns the database</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
+                            Writes one collection file and gets a schema, REST, an SDK and policies.
+                            Never leaves the editor, and never opens the panel.
+                        </p>
+                        <a href={translatePath("/backend")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
+                            The backend <ArrowRight size={14} />
+                        </a>
+                    </div>
+                    <div class="md:border-r border-white/8 py-9 md:px-8 border-t md:border-t-0">
+                        <h3 class="text-base font-semibold tracking-tight">The operator who lives in the panel</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
+                            Fixes a wrong address, refunds an order, moves a card. Did not choose Rebase
+                            and will not read its docs — the panel answers to them.
+                        </p>
+                        <a href={translatePath("/admin")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
+                            The admin panel <ArrowRight size={14} />
+                        </a>
+                    </div>
+                    <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/8">
+                        <h3 class="text-base font-semibold tracking-tight">The agent holding a scoped key</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
+                            Reads and writes through the same API under the same policies as the humans.
+                            A first-class caller, not an integration.
+                        </p>
+                        <a href={translatePath("/ai")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
+                            AI &amp; agents <ArrowRight size={14} />
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NEAT DIVIDER → chapter 07, violet. -->
+        <!-- Neat gradient divider, bled behind the sections either side -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
+             style="z-index: -1; height: 600px;">
+            <NeatBackground variant="b" client:visible />
+        </div>
+
+        <!-- CHAPTER 07 — AGENT. -->
+        <div>
+            <section class="relative z-0 py-24 sm:py-32">
+                <div class="mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                        <div class="lg:col-span-5">
+                            <p class="eyebrow">
+                                <span class="font-mono text-surface-500">07</span>
+                                <span class="mx-2 text-surface-700">·</span>{t("agentera.badge")}
+                            </p>
+                            <h2 class="mt-4 font-headers text-3xl sm:text-4xl text-balance">
+                                The backend an agent can't screw up.
+                            </h2>
+                            <p class="mt-5 text-[#b4b8bd] leading-relaxed" set:html={t("agentera.p1")}></p>
+                            <a href={translatePath("/ai")} class="accent-link mt-8">
+                                {t("agentera.link")}
+                                <ArrowRight size={15} />
+                            </a>
+                        </div>
+                        <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
+                            <div class="frame h-[660px] overflow-hidden">
+                                <AgentConsoleDemo client:visible />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 08 — CUSTOMERS. The carousel renders its own eyebrow, title
+             and subtitle; wrapping it in a second header duplicated all three. -->
+        <div class="chapter border-t border-white/8 py-24 sm:py-32">
+            <CaseStudiesCarousel t={t} />
+        </div>
+
+        <!-- ROADMAP -->
+        <RoadmapSection />
+
+        <!-- FINAL CTA — the three lanes, as one band. -->
+        <section class="relative isolate overflow-hidden border-t border-white/8">
+            <div class="absolute inset-x-0 top-0 h-72 -z-10 opacity-70" aria-hidden="true">
+                <NeatBackground variant="a" client:visible />
+            </div>
+            <div
+                class="absolute inset-0 -z-10 pointer-events-none"
+                aria-hidden="true"
+                style="background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.9) 46%,#000 100%)"
+            ></div>
+
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 py-24 sm:py-32">
+                <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
+                    {t("cta.title")}
+                </h2>
+
+                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
+                    <div class="md:border-r border-white/10 py-9 md:pr-8">
+                        <h3 class="text-base font-semibold tracking-tight">{t("cta.lane.local.title")}</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.local.desc")}</p>
+                        <div class="mt-5 rounded-lg border border-white/10 px-3 py-2.5 font-mono text-xs text-surface-200">
+                            pnpm dlx @rebasepro/cli init
+                        </div>
+                        <a href={translatePath("/docs")} class="accent-link mt-5">
+                            {t("cta.lane.local.link")} <ArrowRight size={14} />
+                        </a>
+                    </div>
+                    <div class="md:border-r border-white/10 py-9 md:px-8 border-t md:border-t-0">
+                        <h3 class="text-base font-semibold tracking-tight">{t("cta.lane.selfhost.title")}</h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.selfhost.desc")}</p>
+                        <div class="mt-5 rounded-lg border border-white/10 px-3 py-2.5 font-mono text-xs text-surface-200">
+                            docker compose up -d
+                        </div>
+                        <a href={translatePath("/docs/deployment")} class="accent-link mt-5">
+                            {t("cta.lane.selfhost.link")} <ArrowRight size={14} />
+                        </a>
+                    </div>
+                    <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/10">
+                        <h3 class="text-base font-semibold tracking-tight flex items-center gap-3">
+                            {t("cta.lane.cloud.title")}
+                            <span class="rounded-md bg-amber-400/15 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-amber-300">
+                                {t("cta.lane.cloud.badge")}
+                            </span>
+                        </h3>
+                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.cloud.desc")}</p>
+                        <div class="mt-5 rounded-lg border border-dashed border-white/10 px-3 py-2.5 font-mono text-xs text-surface-600">
+                            no command yet
+                        </div>
+                        <a href={translatePath("/pricing")} class="accent-link mt-5">
+                            {t("cta.lane.cloud.link")} <ArrowRight size={14} />
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-10 flex flex-wrap gap-3">
+                    <a
+                        href={translatePath("/demo")}
+                        class="inline-flex items-center justify-center rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+                    >
+                        {t("cta.button.demo")}
+                    </a>
+                    <a
+                        href={translatePath("/docs")}
+                        class="inline-flex items-center justify-center rounded-lg border border-white/15 px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:border-white/35"
+                    >
+                        {t("cta.button.docs")}
+                    </a>
+                </div>
+            </div>
+        </section>
+    </div>
+

@@ -50,7 +50,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
     {/* Header — keep centred with a soft max-width just for the text */}
     <div class="mx-auto max-w-2xl text-center px-6 mb-16 animate-on-scroll fade-in-up">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{badge ?? t('power.badge')}</p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{badge ?? t('power.badge')}</p>
         <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-5xl leading-tight" set:html={title ?? t('power.title')}></h2>
         <p class="mt-6 text-lg text-surface-400">
             {t('power.subtitle')}

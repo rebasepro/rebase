@@ -76,7 +76,7 @@ export default function ClientUIComponentsShowcase({
     const [multiSelectValue, setMultiSelectValue] = useState<string[]>([]);
     const cardClasses = "relative p-4 mb-6 flex flex-col gap-2 break-inside-avoid border-none";
 
-    return <div className={"@container max-w-7xl mx-auto not-content"}>
+    return <div className={"@container max-w-6xl mx-auto not-content"}>
         <MenubarDemo/>
         <div className="@xl:columns-2 @4xl:columns-3 gap-4">
 

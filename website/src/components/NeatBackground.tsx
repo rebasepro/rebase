@@ -55,7 +55,7 @@ const NEAT_BASE_CONFIG = {
     grainIntensity: 0,
     grainSpeed: 2.4,
     resolution: 0.05,
-    yOffset: 18063.63558959961,
+    yOffset: 0,
     yOffsetWaveMultiplier: 7.2,
     yOffsetColorMultiplier: 6.8,
     yOffsetFlowMultiplier: 7.7,
@@ -104,7 +104,7 @@ const NEAT_BASE_CONFIG = {
     torusTube: 5,
     cylinderRadius: 10,
     cylinderHeight: 40,
-    planeBend: -0.8,
+    planeBend: -0.7,
     planeTwist: 1,
     silhouetteFade: 0,
     cylinderFade: 0.08,
@@ -112,12 +112,12 @@ const NEAT_BASE_CONFIG = {
     flatShading: true,
     cameraLock: false,
     cameraX: 0,
-    cameraY: -11.5,
+    cameraY: -9.5,
     cameraZ: 0,
-    cameraRotationX: 0.7310000000000001,
+    cameraRotationX: 0.8310000000000001,
     cameraRotationY: 0.483,
     cameraRotationZ: 0,
-    cameraZoom: 2.05,
+    cameraZoom: 2.3,
 };
 
 // Neat frames a "ribbon" with an orthographic camera whose *vertical* extent is
@@ -137,7 +137,6 @@ const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
     a: {
         yOffset: 0,
-        textureSeed: 217,
         planeBend: 0.2,
         planeTwist: 0.8,
         cameraX: 25.5,
@@ -149,7 +148,6 @@ const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     },
     b: {
         yOffset: 0,
-        textureSeed: 891,
         planeBend: 0.2,
         planeTwist: 0.8,
         cameraX: -29.5,

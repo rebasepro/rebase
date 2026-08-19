@@ -31,9 +31,6 @@ export function EditorMiniDemo() {
         <div className="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none relative">
             {/* Fake editor toolbar */}
             <div className="h-6 border-b border-surface-800/60 bg-surface-900/50 flex items-center px-2 gap-1 shrink-0">
-                <div className="h-2 w-2 rounded-full bg-rose-500/80"></div>
-                <div className="h-2 w-2 rounded-full bg-amber-400/80"></div>
-                <div className="h-2 w-2 rounded-full bg-emerald-400/80"></div>
                 <div className="ml-2 h-2 w-4 rounded bg-surface-700"></div>
                 <div className="h-2 w-6 rounded bg-surface-700"></div>
             </div>

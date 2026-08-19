@@ -87,7 +87,7 @@ export function JurisdictionDemo() {
     const sovereign = !vendor.thirdParty;
 
     return (
-        <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
+        <div className="frame overflow-hidden">
 
             {/* Vendor switch */}
             <div className="flex flex-wrap items-center gap-2 border-b border-surface-800/60 bg-surface-950/50 px-4 py-3 sm:px-6">
@@ -234,7 +234,7 @@ export function JurisdictionDemo() {
                     </div>
 
                     {/* The one structural sentence the whole page rests on */}
-                    <div className="relative rounded-xl border border-white/5 bg-surface-950/50 p-4">
+                    <div className="frame relative p-4">
                         <p className="text-[13px] leading-relaxed text-surface-400">
                             {sovereign ? (
                                 <>

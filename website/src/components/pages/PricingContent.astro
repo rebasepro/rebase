@@ -24,23 +24,23 @@ import ClosingCta from "../ClosingCta.astro";
 
 <div class="flex flex-col isolate">
     <section class="relative isolate overflow-hidden -mt-20 pt-44 pb-24 sm:pt-52 sm:pb-28">
-        <div class="px-4 mx-auto max-w-5xl text-center lg:px-8 relative z-10">
-            <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{t("pricing.badge")}</p>
+        <div class="px-4 mx-auto max-w-6xl lg:px-8 relative z-10">
+            <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("pricing.badge")}</p>
             <h1 class="mt-4 text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight leading-[1.1] text-white">
                 {t("pricing.title")}
             </h1>
-            <p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl mx-auto"
+            <p class="mt-5 text-lg leading-8 text-surface-400 max-w-2xl"
                set:html={t("pricing.subtitle")}>
             </p>
         </div>
     </section>
 
     <section class="relative z-0 pb-28 sm:pb-36">
-        <div class="mx-auto max-w-5xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                 <!-- Open Source tier -->
-                <div class="relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                <div class="frame relative overflow-hidden p-8 flex flex-col">
                     <div class="flex items-center gap-2 mb-2">
                         <h2 class="text-xl font-semibold text-white">{t("pricing.oss.name")}</h2>
                     </div>
@@ -114,7 +114,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <!-- Reassurance -->
-            <div class="mt-12 max-w-3xl mx-auto rounded-2xl border border-white/5 bg-surface-900/50 p-6 text-center">
+            <div class="frame mt-12 max-w-3xl mx-auto p-6 text-center">
                 <h3 class="text-white font-semibold mb-2">{t("pricing.faq.title")}</h3>
                 <p class="text-surface-400 leading-relaxed">{t("pricing.faq.desc")}</p>
             </div>

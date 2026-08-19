@@ -178,7 +178,7 @@ export function EuropeMapDemo() {
     }, []);
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+        <div className="frame overflow-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr]">
 
                 {/* ── The map ───────────────────────────────────────── */}
@@ -293,7 +293,7 @@ export function EuropeMapDemo() {
                     </div>
 
                     {/* Fixed height so hovering the chips does not reflow the page under the cursor. */}
-                    <div className="mt-5 min-h-[9.5rem] rounded-xl border border-white/5 bg-surface-950/50 p-4">
+                    <div className="frame mt-5 min-h-[9.5rem] p-4">
                         {active ? (
                             <>
                                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">

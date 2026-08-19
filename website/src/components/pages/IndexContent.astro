@@ -64,9 +64,9 @@ const faqColumns = [
         <NeatBackground client:idle randomize={false} />
 
 
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
+        <div class="px-4 mx-auto max-w-6xl lg:px-8 relative z-10 mt-8">
             <!-- Badge -->
-            <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll animate-immediate fade-in">
+            <div class="mb-8 flex items-center justify-start gap-3 animate-on-scroll animate-immediate fade-in">
                     <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400">
                         <img src="/img/postgresql-logo.svg" alt="PostgreSQL" width="432" height="445" class="h-4 w-auto"/>
                         {t("hero.badge")}
@@ -87,7 +87,7 @@ const faqColumns = [
                      and any copy edit overflows it. Base stays 36px and wraps,
                      which is correct on phones. -->
                 <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold leading-[1.08] text-white animate-on-scroll animate-immediate fade-in-up">
-                    {t("hero.title.part1")}<br/><span class="text-primary">{t("hero.title.part2")}</span>
+                    {t("hero.title.part1")}<br/>{t("hero.title.part2")}
                 </h1>
             </div>
             <!-- Measure is set with max-w, not side padding: `xl:px-40` only bit
@@ -103,11 +103,11 @@ const faqColumns = [
                  The old stack narrated its own CTAs — a note under the button, a
                  two-line paragraph introducing the command, an npx alternative
                  inside the box. Six text moments where a hero carries three. -->
-            <div class="mt-10 flex items-center justify-center gap-3 flex-wrap animate-on-scroll animate-immediate fade-in-up">
+            <div class="mt-10 flex items-center justify-start gap-3 flex-wrap animate-on-scroll animate-immediate fade-in-up">
                 <a href="https://demo.rebase.pro"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-try-demo"
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary border border-transparent px-7 py-0 min-h-(--control-xl) text-base font-medium text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center justify-start gap-x-2 rounded-lg bg-primary border border-transparent px-7 py-0 min-h-(--control-xl) text-base font-medium text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                     {t("hero.cta.demo")}
                     <svg
                             class="lucide lucide-arrow-right"
@@ -127,7 +127,7 @@ const faqColumns = [
                 </a>
                 <a href="https://github.com/rebasepro/rebase"
                    target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 px-7 py-0 min-h-(--control-xl) text-base font-medium text-surface-300 hover:text-white hover:border-surface-500 transition-all duration-200 ease-in-out">
+                   class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-surface-700 px-7 py-0 min-h-(--control-xl) text-base font-medium text-surface-300 hover:text-white hover:border-surface-500 transition-all duration-200 ease-in-out">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22l-.01 3.29c0 .32.22.7.83.57A12 12 0 0 0 12 .3Z"/>
                     </svg>
@@ -136,7 +136,7 @@ const faqColumns = [
             </div>
 
             <!-- The command, with a single line of copy doing the work three used to -->
-            <div class="mt-8 mb-6 max-w-md mx-auto animate-on-scroll animate-immediate fade-in-up">
+            <div class="mt-8 mb-6 max-w-md animate-on-scroll animate-immediate fade-in-up">
                 <p class="mb-2.5 text-sm text-surface-500">{t("hero.cli.label")}</p>
                 <div class="rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden hover:border-primary/40 transition-colors duration-300">
                     <div class="px-5 py-4 flex items-center justify-between">
@@ -171,7 +171,7 @@ const faqColumns = [
       and FireCMS" qualifier — see PRODUCT.md; these are not all Rebase users and
       the copy must not imply otherwise. -->
  <section id="s-social-proof" class="relative z-0 py-6 sm:py-8">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="border-y border-white/[0.06] py-10 sm:py-12">
                 <!-- Sentence case, not caps: this label is a nine-word sentence, and
                      uppercase + tracking is a treatment for two or three words. Caps
@@ -185,9 +185,9 @@ const faqColumns = [
     <!-- Product demo -->
  <section id="s-demo-terminal" class="relative z-0 pt-32 pb-40 sm:pt-48 sm:pb-56">
 
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">01</span><span class="mx-2 text-surface-600">·</span>{t("demo.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">01</span><span class="mx-2 text-surface-600">·</span>{t("demo.badge")}</p>
                 <h2 class="mt-3 text-3xl sm:text-5xl font-semibold tracking-tight text-white text-balance">
                     {t("demo.title")}
                 </h2>
@@ -341,25 +341,22 @@ const faqColumns = [
 
     <!-- The backend underneath: SDK / REST / realtime proof -->
  <section id="s-backend-engine" class="relative z-0 py-24 sm:py-32 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
                 <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("engine.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
                 <!-- TypeScript SDK -->
-                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in">
+                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-3xs font-mono text-surface-400">app.ts</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
@@ -389,16 +386,13 @@ const faqColumns = [
                 </div>
 
                 <!-- Instant REST API -->
-                <div class="md:col-span-1 lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
+                <div class="md:col-span-1 lg:col-span-2 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in delay-100">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <div class="ml-2 text-3xs font-mono text-surface-400">api.demo.rebase.pro</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
@@ -440,7 +434,7 @@ const faqColumns = [
                 </div>
 
                 <!-- Real-time everywhere -->
-                <div class="lg:col-span-6 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-300">
+                <div class="lg:col-span-6 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in delay-300">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -533,9 +527,9 @@ const faqColumns = [
                     mask-image: radial-gradient(75% 55% at 50% 45%, #000, transparent 72%);
                     -webkit-mask-image: radial-gradient(75% 55% at 50% 45%, #000, transparent 72%);"></div>
 
-        <div class="mx-auto max-w-7xl px-6 lg:px-12">
+        <div class="mx-auto max-w-6xl px-6 lg:px-12">
             <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</p>
                 <h2 class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white text-balance"
                     set:html={t("modes.title")}></h2>
                 <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
@@ -660,9 +654,9 @@ const faqColumns = [
 
     <!-- The admin panel, when you want one -->
  <section id="s-demo-carousel" class="relative z-0 py-24 sm:py-32">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">05</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">05</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
                 <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("see.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
             </div>
@@ -678,20 +672,17 @@ const faqColumns = [
                  History, import/export and custom React are things the admin layer gives
                  you — they belong here, not in the list of what the API serves.
 
-                 No max-w of its own: the carousel above fills the section's max-w-7xl,
+                 No max-w of its own: the carousel above fills the section's max-w-6xl,
                  and a narrower card row under it read as a different, unrelated block. -->
             <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5">
                 <!-- Data history & audit -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
+                <div class="lg:col-span-2 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in delay-100">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden">
                             <img
@@ -735,16 +726,13 @@ const faqColumns = [
                 </div>
 
                 <!-- Import & export -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
+                <div class="lg:col-span-2 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in delay-200">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden">
                             <!-- 4.3MB, and it sits two thirds of the way down the
@@ -812,16 +800,13 @@ const faqColumns = [
 
                 <!-- Extreme Customization. Keep this at span-2: the row is six
                      columns wide and the two cards above it take four. -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
+                <div class="lg:col-span-2 group relative overflow-hidden frame transition-all duration-300 animate-on-scroll fade-in delay-200">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
                             <BodyPartsDemo client:visible/>
@@ -882,12 +867,12 @@ const faqColumns = [
     <!-- Trust: security shown live, open source shown as a terminal -->
  <section id="s-security" class="relative z-0 py-28 sm:py-36 overflow-hidden">
 
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 space-y-24 sm:space-y-32">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 space-y-24 sm:space-y-32">
 
             <!-- Row 1: Security-first, with the visual RLS editor -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-5 animate-on-scroll fade-in-up">
-                    <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">06</span><span class="mx-2 text-surface-600">·</span>{t("security.badge")}</p>
+                    <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">06</span><span class="mx-2 text-surface-600">·</span>{t("security.badge")}</p>
                     <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
                         {t("security.title")}
                     </h2>
@@ -912,9 +897,6 @@ const faqColumns = [
                     <div class="rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                         <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
                             <div class="flex gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             </div>
                             <div class="ml-4 text-xs font-mono text-surface-500">studio · row-level security</div>
                         </div>
@@ -934,9 +916,6 @@ const faqColumns = [
                         <div class="relative rounded-2xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                             <div class="flex items-center justify-between px-4 py-3 border-b border-surface-800/80 bg-surface-950/50">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
-                                    <span class="h-2.5 w-2.5 rounded-full bg-amber-400/80"></span>
-                                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
                                 </div>
                                 <span class="text-2xs font-mono font-medium text-surface-500">self-host</span>
                                 <div class="w-12"></div>
@@ -1081,9 +1060,9 @@ const faqColumns = [
     <!-- The Agent Era: why a fail-closed backend matters more now -->
  <section id="s-agent-era" class="relative isolate py-28 sm:py-36 overflow-hidden">
 
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>{t("agentera.badge")}</p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>{t("agentera.badge")}</p>
                 <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance"
                     set:html={t("agentera.title")}></h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed"
@@ -1104,7 +1083,7 @@ const faqColumns = [
 
             <!-- The honest close: boilerplate depreciates, guarantees appreciate -->
             <div class="mt-12 max-w-4xl mx-auto animate-on-scroll fade-in-up delay-200">
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 sm:p-10 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 text-center">
+                <div class="frame group relative overflow-hidden p-8 sm:p-10 transition-all duration-300 text-center">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -1146,7 +1125,7 @@ const faqColumns = [
     <CaseStudiesCarousel t={t} />
     <!-- FAQ -->
  <section id="s-faq" class="py-28 sm:py-36">
-        <div class="mx-auto max-w-7xl px-6">
+        <div class="mx-auto max-w-6xl px-6">
             <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
                 <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t("faq.title")}</h2>
             </div>
@@ -1159,7 +1138,7 @@ const faqColumns = [
                     <div class="flex flex-col gap-4">
                         {column.map(({ n, href, external }) => (
                             <details
-                                    class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300 [&::-webkit-details-marker]:hidden">
+                                    class="frame group p-5 hover:border-primary/30 transition-all duration-300 [&::-webkit-details-marker]:hidden">
                                 <summary class="flex cursor-pointer items-center justify-between gap-4 text-white font-semibold marker:content-[''] [&::-webkit-details-marker]:hidden">
                                     {t(`faq.q${n}`)}
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -1204,7 +1183,7 @@ const faqColumns = [
     <!-- Final CTA -->
  <section id="s-final-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
 
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
             <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl text-balance mb-4 animate-on-scroll fade-in-up">
                 {t("cta.title")}
             </h2>

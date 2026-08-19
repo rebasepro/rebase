@@ -5,11 +5,11 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 ---
 
-<section id="s-comparison" class="relative isolate bg-black py-24 sm:py-32 border-t border-surface-900/60 overflow-hidden">
+<section id="s-comparison" class="relative isolate bg-page-ground py-24 sm:py-32 border-t border-surface-900/60 overflow-hidden">
     <!-- Subtle background radial glow -->
     <div class="absolute inset-0 pointer-events-none" aria-hidden="true" style="background: radial-gradient(circle at 50% 50%, rgba(0, 112, 244, 0.04) 0%, transparent 70%);"></div>
 
-    <div class="mx-auto max-w-7xl px-6 lg:px-8 relative z-10">
+    <div class="mx-auto max-w-6xl px-6 lg:px-8 relative z-10">
         <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
                 {t('alternatives.badge')}
@@ -24,7 +24,7 @@ const t = useTranslations(lang);
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
             <!-- vs. Supabase -->
-            <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300">
+            <div class="frame group relative overflow-hidden p-7 transition-all duration-300">
                 <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(200px 200px at 50% 0%, rgba(0,112,244,0.12), transparent 80%);"></div>
                 <div class="relative z-10 space-y-4">
                     <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary-light">
@@ -44,7 +44,7 @@ const t = useTranslations(lang);
             </div>
 
             {/* vs. Payload & Strapi */}
-            <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300">
+            <div class="frame group relative overflow-hidden p-7 transition-all duration-300">
                 <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(200px 200px at 50% 0%, rgba(0,112,244,0.12), transparent 80%);"></div>
                 <div class="relative z-10 space-y-4">
                     <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary-light">
@@ -62,7 +62,7 @@ const t = useTranslations(lang);
             </div>
 
             {/* vs. Retool */}
-            <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300">
+            <div class="frame group relative overflow-hidden p-7 transition-all duration-300">
                 <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(200px 200px at 50% 0%, rgba(0,112,244,0.12), transparent 80%);"></div>
                 <div class="relative z-10 space-y-4">
                     <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary-light">

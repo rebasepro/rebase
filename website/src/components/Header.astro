@@ -172,8 +172,8 @@ const flatNavLinks = [
     { href: translatePath("/docs"), label: t("nav.docs") }
 ];
 ---
-<header class="bg-black/40 backdrop-blur sticky top-0 z-20">
-    <nav class="mx-auto flex max-w-7xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
+<header class="bg-page-ground/40 backdrop-blur sticky top-0 z-20">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
         <div class="flex items-center">
             <a id="header-logo-link" href={translatePath("/")} class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
                 <!-- Intrinsic size is declared so the header reserves the box before
@@ -316,7 +316,7 @@ const flatNavLinks = [
 
     <!-- ═══ Mobile menu: CONTROL (dropdown sub-menus) ═══ -->
     <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu">
-        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-black/95 backdrop-blur-lg">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-page-ground/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
                 {dropdownNavLinks.map((link, index) => (
                     link.columns ? (
@@ -395,7 +395,7 @@ const flatNavLinks = [
 
     <!-- ═══ Mobile menu: FLAT-NAV (simple list) ═══ -->
     <div class="lg:hidden hidden fixed inset-0 z-50 overflow-y-auto h-screen" id="mobile-menu-flat">
-        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-black/95 backdrop-blur-lg">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-page-ground/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
                 <div class="w-full flex flex-col items-center space-y-8">
                     {flatNavLinks.map(link => (

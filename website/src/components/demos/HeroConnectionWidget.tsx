@@ -53,9 +53,6 @@ export default function HeroConnectionWidget() {
                 {/* Window header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 bg-surface-950/50">
                     <div className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                     </div>
                     <div className="text-[11px] font-mono text-surface-500 flex items-center gap-1.5">
                         <Terminal size={12} className="text-surface-500" />
