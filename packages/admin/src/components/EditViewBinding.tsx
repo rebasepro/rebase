@@ -937,6 +937,24 @@ parentEntityIds,
                     onSideTabClick(value);
                 }}>
 
+                {/* Before the record, not after it.
+
+                    `position: "start"` used to mean "first among the custom
+                    views", which put it after a tab it was already after: the
+                    record's own tab is drawn here unconditionally, so "start"
+                    and "end" only ever ordered the custom views against each
+                    other, and no collection could open with anything but the
+                    form on the left.
+
+                    A cover — a read-only summary of the record, the thing an
+                    operator opens a row to see — belongs in front of the form
+                    that edits it. That is what `defaultSelectedView` already
+                    allowed, and the strip contradicted it by drawing the
+                    selected tab second. Views that say nothing still land after
+                    the record, so nothing moves for a collection that never
+                    asked. */}
+                {customViewTabsStart}
+
                 <Tab value={MAIN_TAB_VALUE}
                      className={cls(ENTITY_VIEW_TAB_CLASS, ENTITY_VIEW_TAB_LABEL_CLASS)}>
                     <span className="flex items-center gap-1.5">
@@ -945,7 +963,6 @@ parentEntityIds,
                     </span>
                 </Tab>
 
-                {customViewTabsStart}
 
                 {customViewTabsEnd}
 

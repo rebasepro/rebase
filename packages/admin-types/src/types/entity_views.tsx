@@ -88,6 +88,18 @@ export type EntityCustomView<M extends Record<string, unknown> = Record<string, 
     tabComponent?: React.ReactNode;
     includeActions?: boolean | "bottom";
     Builder?: ComponentRef<EntityCustomViewParams<M>>;
+    /**
+     * Which side of the record's own tab this one sits on.
+     *
+     * `"end"` (the default) puts it after the record and before the
+     * subcollections, which is where an extra reading of a row belongs.
+     *
+     * `"start"` puts it *before* the record — the cover of an entity: a
+     * read-only summary an operator opens the row to see, with the form that
+     * edits it one tab to the right. Pair it with
+     * {@link AdminCollectionOptions.defaultSelectedView}, or the strip will open
+     * on a tab that is not the first one.
+     */
     position?: "start" | "end";
 };
 
