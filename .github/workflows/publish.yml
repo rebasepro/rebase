@@ -392,6 +392,22 @@ jobs:
             fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
           "
 
+          # The chart ships with the runtime and its appVersion IS the default
+          # image tag, so it has to move with them — see scripts/release.sh,
+          # which stamps it in the same place for the same reason. Left behind,
+          # `helm install` with no `image.tag` renders the previous version and
+          # `check:runtime-image` fails on the next run.
+          node -e "
+            const fs=require('fs');
+            const f='charts/rebase/Chart.yaml';
+            let t=fs.readFileSync(f,'utf8');
+            const before=t;
+            t=t.replace(/^version:.*\$/m, 'version: $VERSION');
+            t=t.replace(/^appVersion:.*\$/m, 'appVersion: \"$VERSION\"');
+            if (t===before) { console.error('Chart.yaml: neither version nor appVersion matched'); process.exit(1); }
+            fs.writeFileSync(f,t);
+          "
+
       # ── Pre-publish validation ───────────────────────────────
       - name: Validate no workspace protocol in packed output
         run: |

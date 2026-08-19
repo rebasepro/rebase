@@ -219,6 +219,25 @@ pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "
 "
 ok "Bumped all package versions"
 
+# The chart carries the *same* number as the runtime — its `version` ships with
+# the release and its `appVersion` IS the default image tag, so `helm install`
+# with no `image.tag` pulls it. Neither this script nor the publish workflow
+# used to touch it, so every release left the chart one version behind and
+# `check:runtime-image` failed after the fact — with the user-facing symptom
+# being an ImagePullBackOff on the command the README calls the minimum viable
+# install. Stamped here, beside the package bump, for the same reason.
+node -e "
+  const fs = require('fs');
+  const f = 'charts/rebase/Chart.yaml';
+  let t = fs.readFileSync(f, 'utf8');
+  const before = t;
+  t = t.replace(/^version:.*\$/m, 'version: $NEW_VERSION');
+  t = t.replace(/^appVersion:.*\$/m, 'appVersion: \\"$NEW_VERSION\\"');
+  if (t === before) { console.error('Chart.yaml: neither version nor appVersion matched'); process.exit(1); }
+  fs.writeFileSync(f, t);
+"
+ok "Bumped the Helm chart to $NEW_VERSION"
+
 # ── Build & Test ────────────────────────────────────────────
 step "Building all packages"
 pnpm run build
