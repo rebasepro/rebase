@@ -1,5 +1,16 @@
 # Build and push the platform runtime image — `rebasepro/server`.
 #
+# ─── This is now the fallback, not the path ──────────────────────────────────
+#
+# A stable release pushes both registry tags itself (`.github/workflows/publish.yml`),
+# and `publish-runtime-image.yml` rebuilds them for a version that already
+# shipped. Reach for this file when you want an image from a commit that is not a
+# release at all — a canary the fleet should try, or a build from a branch.
+#
+# Either way the image is only half the job: the fleet runs what
+# `runtime_releases` says it may run, so register the tag afterwards with
+# `pnpm release:runtime` from `saas/backend`.
+#
 # This is the image every managed tenant runs and every self-hoster can run: the
 # server package plus an entrypoint that boots a project bundle. It is the
 # artifact the whole managed tier is defined against, which is why the build for

@@ -218,7 +218,14 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write   # push tags + create release
-      id-token: write   # npm provenance
+      id-token: write   # npm provenance, and the token exchanged for Artifact Registry
+
+    # The registry Rebase Cloud pulls from. Named here rather than inline because
+    # three steps have to agree on it, and because the one thing worse than a
+    # release that cannot push to it is a release that pushes somewhere else.
+    env:
+      FLEET_REGISTRY: europe-west1-docker.pkg.dev
+      FLEET_IMAGE: europe-west1-docker.pkg.dev/rebase-578f2/rebase-saas-images/rebasepro/server
 
     steps:
       - name: Checkout
@@ -239,10 +246,10 @@ jobs:
 
       # ── Credentials, before anything irreversible ───────────────
       #
-      # The Docker Hub push happens near the end of this job, after npm publish
+      # The registry pushes happen near the end of this job, after npm publish
       # and after the version-bump commit and tag are pushed to main. Both of
       # those are one-way: a version cannot be unpublished from npm, and the tag
-      # is already on the branch. So a release with no Docker Hub credentials did
+      # is already on the branch. So a release with no registry credentials did
       # not fail — it half-succeeded, leaving npm and git carrying a version
       # whose `docker-compose.yml` names an image that was never built.
       #
@@ -252,17 +259,33 @@ jobs:
       # cannot authenticate still counts as one. Only the release itself can see
       # whether the secret exists, and the only useful moment is before the first
       # irreversible step.
+      #
+      # Two registries, two credentials, one check. Docker Hub carries the public
+      # tags a self-hoster pulls; Artifact Registry carries the private tag the
+      # managed fleet pulls. Both are checked here because a release that reaches
+      # only one of them is the failure this whole step exists to prevent — and
+      # the fleet half is the one that used to be missing entirely: 0.14.0,
+      # 0.14.1 and 0.15.0 all published to npm and Docker Hub while the newest
+      # image the fleet could see stayed at 0.13.0, because pushing it was a
+      # `gcloud builds submit` somebody had to remember to type.
       - name: Check release credentials
         if: ${{ !inputs.dry_run }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_RELEASE_SERVICE_ACCOUNT: ${{ secrets.GCP_RELEASE_SERVICE_ACCOUNT }}
         run: |
-          missing=""
-          [ -n "$DOCKERHUB_USERNAME" ] || missing="$missing DOCKERHUB_USERNAME"
-          [ -n "$DOCKERHUB_TOKEN" ] || missing="$missing DOCKERHUB_TOKEN"
-          if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing"
+          hub_missing=""
+          [ -n "$DOCKERHUB_USERNAME" ] || hub_missing="$hub_missing DOCKERHUB_USERNAME"
+          [ -n "$DOCKERHUB_TOKEN" ] || hub_missing="$hub_missing DOCKERHUB_TOKEN"
+
+          fleet_missing=""
+          [ -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" ] || fleet_missing="$fleet_missing GCP_WORKLOAD_IDENTITY_PROVIDER"
+          [ -n "$GCP_RELEASE_SERVICE_ACCOUNT" ] || fleet_missing="$fleet_missing GCP_RELEASE_SERVICE_ACCOUNT"
+
+          if [ -n "$hub_missing" ]; then
+            echo "::error::Missing Docker Hub secret(s):$hub_missing"
             echo ""
             echo "This release would publish to npm and push a tag, then fail at the Docker Hub"
             echo "login — leaving a version whose scaffolded docker-compose.yml pulls"
@@ -275,6 +298,26 @@ jobs:
             echo ""
             echo "The token needs Read & Write on rebasepro/server, and on the rebasepro"
             echo "namespace for the OCI chart."
+          fi
+
+          if [ -n "$fleet_missing" ]; then
+            echo "::error::Missing Artifact Registry secret(s):$fleet_missing"
+            echo ""
+            echo "Without these the release publishes to npm and Docker Hub and the managed"
+            echo "fleet never sees the version at all: Rebase Cloud resolves deploys against"
+            echo "images in the private Artifact Registry, so a version that is not pushed"
+            echo "there cannot be registered as a runtime release and cannot be rolled out."
+            echo ""
+            echo "Set up the federated identity once — it creates the pool, the provider and"
+            echo "the service account, and prints the two commands below:"
+            echo "  ./scripts/setup-release-wif.sh"
+            echo ""
+            echo "Then:"
+            echo "  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER -R ${{ github.repository }}"
+            echo "  gh secret set GCP_RELEASE_SERVICE_ACCOUNT    -R ${{ github.repository }}"
+          fi
+
+          if [ -n "$hub_missing" ] || [ -n "$fleet_missing" ]; then
             exit 1
           fi
 
@@ -450,6 +493,7 @@ jobs:
         run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public --report-summary
 
       - name: Commit version bump, tag, and push
+        id: bump
         if: ${{ !inputs.dry_run }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -463,6 +507,12 @@ jobs:
 
           # Push both the commit and the tag
           git push origin main --follow-tags
+
+          # The fleet tag names the COMMIT, not the marketing version, so two
+          # builds of different source can never collide on one name. That commit
+          # is this one — the one `v$VERSION` points at — and not
+          # `github.sha`, which is the checkout from before the bump.
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       # ── Self-host runtime image ─────────────────────────────
       #
@@ -480,14 +530,21 @@ jobs:
       # those versions exist would produce one that cannot boot the release it is
       # named after.
       #
-      # Note what this is NOT: the managed fleet is pinned by digest to the private
-      # Artifact Registry image that `cloudbuild-runtime.yaml` builds, and this job
-      # builds its own from the same commit and Dockerfile. Same source, different
-      # digest. That is a deliberate narrowing of the "one artifact everywhere"
-      # property, taken because a self-host path that works beats a digest that
-      # matches. Replace this with a federated `gcloud builds submit` if the single
-      # digest is wanted back — the check in `scripts/check-runtime-image.mjs` only
-      # asks that *something* automatic publishes it.
+      # One build, three tags, two registries — so the artifact a self-hoster
+      # pulls and the artifact Rebase Cloud runs are the same bytes under the
+      # same digest. This used to be two builds from the same commit, and the
+      # comment here conceded the point: "same source, different digest", with a
+      # note to replace it with a federated push if the single digest was ever
+      # wanted back. It is wanted back, and the reason is not tidiness. The
+      # managed fleet pins by digest, and a digest that no public artifact shares
+      # means "you can run what we run" was true of the source and not of the
+      # image.
+      #
+      # It also closes the gap that left the fleet three versions behind. The
+      # private tag was only ever pushed by `gcloud builds submit` typed by hand,
+      # so npm and Docker Hub moved to 0.15.0 while the newest image the control
+      # plane could resolve stayed at 0.13.0. Nothing reported that, because
+      # nothing was broken — the step simply did not exist.
       - name: Set up Docker Buildx
         if: ${{ !inputs.dry_run }}
         uses: docker/setup-buildx-action@v3
@@ -499,7 +556,39 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Federated, so no service-account key exists to leak or rotate. The job
+      # already asks for `id-token: write` for npm provenance, which is the same
+      # token this exchanges. `./scripts/setup-release-wif.sh` creates the pool,
+      # the provider and the service account, and scopes the trust to this
+      # repository — a token minted by any other repository is refused by the
+      # provider's attribute condition, not by anything here.
+      - name: Authenticate to Google Cloud
+        id: gcp-auth
+        if: ${{ !inputs.dry_run }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_RELEASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.FLEET_REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.gcp-auth.outputs.access_token }}
+
+      # For the post-push verification below, which asks the registry what the
+      # tag resolves to. Installed explicitly rather than relying on the runner
+      # image happening to carry gcloud — the verification is the step that would
+      # silently stop verifying.
+      - name: Set up gcloud
+        if: ${{ !inputs.dry_run }}
+        uses: google-github-actions/setup-gcloud@v2
+
       - name: Build and push the runtime image
+        id: image
         if: ${{ !inputs.dry_run }}
         uses: docker/build-push-action@v6
         with:
@@ -513,15 +602,42 @@ jobs:
           tags: |
             rebasepro/server:${{ steps.version.outputs.version }}
             rebasepro/server:latest
+            ${{ env.FLEET_IMAGE }}:${{ steps.version.outputs.version }}-${{ steps.bump.outputs.sha }}
           # The compose file resolves `${REBASE_VERSION:-latest}`, so `latest`
           # has to keep moving or a project that clears the variable pulls
           # whatever the first release ever pushed.
+          #
+          # The fleet tag carries a commit and no `latest`, for the opposite
+          # reason: the control plane registers a release by digest and a moving
+          # tag there would silently change what a running fleet is pinned to.
 
       # Publishing is not the same as being pullable. Ask the registry, from
       # outside, with no credentials — the way a self-hoster's daemon will.
       - name: Verify the image is pullable
         if: ${{ !inputs.dry_run }}
         run: node scripts/check-runtime-image.mjs --live --version "${{ steps.version.outputs.version }}"
+
+      # The same claim for the private tag, asked of the registry rather than of
+      # the build log — which says "naming to <tag> done" for a purely local
+      # tagging step, and has read as a successful push before.
+      - name: Verify the fleet image is in Artifact Registry
+        if: ${{ !inputs.dry_run }}
+        env:
+          FLEET_TAG: ${{ steps.version.outputs.version }}-${{ steps.bump.outputs.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          FOUND=$(gcloud artifacts docker tags list "$FLEET_IMAGE" \
+            --filter="tag:$FLEET_TAG" --format="value(version)" 2>/dev/null | head -n1)
+          if [ -z "$FOUND" ]; then
+            echo "::error::$FLEET_IMAGE:$FLEET_TAG is not in Artifact Registry."
+            exit 1
+          fi
+          if [ "$FOUND" != "$DIGEST" ]; then
+            echo "::error::$FLEET_TAG resolves to $FOUND, but this build produced $DIGEST."
+            exit 1
+          fi
+          echo "$FLEET_IMAGE:$FLEET_TAG → $DIGEST"
 
       # ── Helm chart ──────────────────────────────────────────
       #
@@ -606,5 +722,30 @@ jobs:
             echo "Install with:" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
             echo "pnpm add @rebasepro/app@${VERSION}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Publishing an image is not the same as the fleet running it. The
+            # control plane schedules onto `runtime_releases` rows, so a release
+            # nobody registers is a release Rebase Cloud cannot see — which is
+            # the state 0.14.0 through 0.15.0 are in. The command that ends that
+            # is short, and printing it here is the difference between a step
+            # somebody remembers and a step somebody reads.
+            FLEET_TAG="${VERSION}-${{ steps.bump.outputs.sha }}"
+            echo "### 🛰 Rebase Cloud — not rolled out yet" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The fleet image is published, but no managed project runs it until a" >> $GITHUB_STEP_SUMMARY
+            echo "runtime release is registered and a rollout is started:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| | |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| Fleet tag | \`${FLEET_TAG}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| Digest | \`${{ steps.image.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "From \`saas/backend\`, with a port-forward to the control plane open" >> $GITHUB_STEP_SUMMARY
+            echo "(\`../scripts/dev-prod.sh\`):" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm release:runtime --image-tag=${FLEET_TAG}          # what it would do" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm release:runtime --image-tag=${FLEET_TAG} --roll --apply" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi

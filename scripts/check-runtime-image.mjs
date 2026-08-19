@@ -171,19 +171,35 @@ function credentialOrderProblems(workflow, repo) {
     const npmPublish = text.search(/^\s*run:.*\b(?:pnpm|npm|yarn)\b[^\n]*\bpublish\b/m);
     if (npmPublish === -1) return [];
 
-    // The secrets this workflow feeds to its registry login, whatever they are
+    // The secrets this workflow feeds to its registry logins, whatever they are
     // named — matching on the login step keeps this from hard-coding Docker Hub.
-    const secretNames = [...text.matchAll(/secrets\.([A-Z0-9_]*(?:DOCKER|REGISTRY)[A-Z0-9_]*)/g)]
+    //
+    // `GCP` is in the list because the release pushes to two registries and only
+    // one of them authenticates with something called a token: the private
+    // Artifact Registry push federates, so its credentials are named
+    // `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_RELEASE_SERVICE_ACCOUNT`. They
+    // gate the image the managed fleet pulls, which makes them the half of the
+    // release with the *larger* blast radius, and until they were added here the
+    // pattern matched neither and this check had no opinion about them at all.
+    const secretNames = [...text.matchAll(/secrets\.([A-Z0-9_]*(?:DOCKER|REGISTRY|GCP)[A-Z0-9_]*)/g)]
         .map(m => m[1]);
     if (secretNames.length === 0) {
         return [`${file} pushes ${YELLOW}${repo}${NC} but names no registry credentials — ` +
             `either the login step is gone or it is authenticating some other way.`];
     }
 
-    const firstUse = Math.min(...secretNames.map(n => text.indexOf(`secrets.${n}`)));
-    if (firstUse > npmPublish) {
+    // Every credential, not the earliest one. This used to take the MINIMUM over
+    // the names, which asks "is at least one credential checked early?" — a
+    // question that stays true no matter how many others are checked late. The
+    // moment the release grew a second registry that answer became actively
+    // misleading: Docker Hub's check sat in the preflight, so a fleet credential
+    // named for the first time three steps after `npm publish` scored exactly
+    // the same. Verified by removing the fleet secrets from the preflight; the
+    // old form still passed.
+    const late = [...new Set(secretNames)].filter(n => text.indexOf(`secrets.${n}`) > npmPublish);
+    if (late.length > 0) {
         return [
-            `${file} checks its registry credentials (${YELLOW}${[...new Set(secretNames)].join(", ")}${NC}) ` +
+            `${file} checks its registry credentials (${YELLOW}${late.join(", ")}${NC}) ` +
             `only AFTER publishing to npm.\n` +
             `      npm cannot be unpublished, so a missing secret would leave a released version ` +
             `whose\n` +
