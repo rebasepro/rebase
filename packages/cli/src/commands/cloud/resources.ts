@@ -1,3 +1,4 @@
+import fs from "fs";
 /**
  * `rebase cloud` resource subcommands: status, metrics, webhooks, storage,
  * clusters, billing.
@@ -625,7 +626,139 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── clusters ─────────────────────────────────────────────────── */
 
-export async function clustersCommand(rawArgs: string[]): Promise<void> {
+/**
+ * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
+ *
+ * Registration is deliberately an operator action: the `clusters` collection is
+ * admin-only, and a cluster record carries a credential with enough power to
+ * create namespaces and read every secret in them. A self-serve "bring your own
+ * cluster" flow is a different feature with a different threat model.
+ */
+export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    if (action === "verify") return clustersVerifyCommand(rawArgs);
+    if (action === "add") return clustersAddCommand(rawArgs);
+    return clustersListCommand(rawArgs);
+}
+
+/**
+ * Ask a registered cluster whether it can actually host a tenant.
+ *
+ * The question this exists to answer early is the one that otherwise gets
+ * answered by a customer's first deploy failing halfway through provisioning,
+ * with an error they cannot act on and half a tenant already created.
+ */
+async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const id = rawArgs.find((a) => !a.startsWith("--") && a !== "clusters" && a !== "verify");
+    if (!id) fail("Usage: rebase cloud clusters verify <cluster-id> [--baseline]", undefined, "bad_request");
+
+    const withBaseline = rawArgs.includes("--baseline");
+    let report: {
+        reachable: boolean; version?: string; unreachableReason?: string;
+        permissions: { allowed: string[]; denied: { permission: string; consequence: string }[];
+                       unknown: { permission: string; error: string }[] };
+        verdict: "ready" | "degraded" | "unusable"; blockers: string[];
+    };
+    try {
+        report = await client.functions.invoke("cluster-baseline", undefined, {
+            method: "GET",
+            path: `verify/${id}${withBaseline ? "?baseline=1" : ""}`
+        }) as never;
+    } catch (error: unknown) {
+        reportError(error, "Could not verify the cluster");
+        return;
+    }
+
+    emit(
+        () => {
+            console.log("");
+            const tone = report.verdict === "ready" ? chalk.green
+                : report.verdict === "degraded" ? chalk.yellow : chalk.red;
+            console.log(`  ${tone(chalk.bold(report.verdict.toUpperCase()))}  ${chalk.gray(String(id))}`);
+            console.log("");
+            keyValues([
+                ["Reachable", report.reachable ? "yes" : chalk.red("no")],
+                ["Permissions", `${report.permissions.allowed.length} allowed, ${report.permissions.denied.length} denied`]
+            ]);
+            if (report.blockers.length > 0) {
+                console.log("");
+                // Each blocker already says what breaks, so they are printed
+                // whole rather than summarised into a count.
+                for (const b of report.blockers) console.log(`  ${chalk.red("✗")} ${b}`);
+            }
+            console.log("");
+            if (!withBaseline && report.verdict !== "unusable") {
+                note("Add --baseline to also check ingress-nginx, cert-manager and CloudNativePG.");
+                console.log("");
+            }
+        },
+        () => report
+    );
+
+    // Non-zero so this is usable as a gate in a script or a runbook step.
+    if (report.verdict === "unusable") process.exitCode = 1;
+}
+
+/**
+ * Register a cluster from a kubeconfig file.
+ *
+ * Verifies immediately rather than reporting a successful insert: a row that
+ * names an unreachable cluster is worse than no row, because a project pointed
+ * at it fails at deploy instead of at registration.
+ */
+async function clustersAddCommand(rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const flag = (name: string): string | undefined => {
+        const i = rawArgs.indexOf(name);
+        return i === -1 ? undefined : rawArgs[i + 1];
+    };
+
+    const name = flag("--name");
+    const provider = flag("--provider");
+    const region = flag("--region");
+    const kubeconfigPath = flag("--kubeconfig");
+
+    if (!name || !provider || !region || !kubeconfigPath) {
+        fail(
+            "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path>",
+            undefined,
+            "bad_request"
+        );
+    }
+    if (!["gcp", "aws", "hetzner"].includes(provider!)) {
+        fail(`--provider must be gcp, aws or hetzner (got "${provider}")`, undefined, "bad_request");
+    }
+
+    let kubeConfigData: string;
+    try {
+        kubeConfigData = fs.readFileSync(kubeconfigPath!, "utf8");
+    } catch {
+        fail(`Could not read ${kubeconfigPath}`, undefined, "bad_request");
+        return;
+    }
+
+    let created: { id: string | number };
+    try {
+        created = await client.data.collection("clusters").create({
+            name, provider, region, authType: "kubeconfig", kubeConfigData
+        }) as never;
+    } catch (error: unknown) {
+        reportError(error, "Could not register the cluster");
+        return;
+    }
+
+    emit(
+        () => {
+            success(`Registered ${name} (${created.id}).`);
+            noteBlank();
+            note("Verifying it can host tenants:");
+            note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
+        },
+        () => ({ id: created.id, name, provider, region })
+    );
+}
+
+async function clustersListCommand(rawArgs: string[]): Promise<void> {
     const { client } = await requireClient(rawArgs);
     try {
         const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as unknown as Array<{
@@ -852,4 +985,152 @@ status: acct.status ?? null }
     } catch (e) {
         reportError(e, "Failed to load billing");
     }
+}
+
+/* ─── resources: what this project is given ─────────────────────── */
+
+/** The dials, and the flag that sets each. */
+const DIAL_FLAGS = {
+    "--cpu": "cpu",
+    "--memory": "memory",
+    "--db-mode": "databaseMode",
+    "--db-instances": "databaseInstances",
+    "--db-cpu": "databaseCpu",
+    "--db-memory": "databaseMemory"
+} as const;
+
+/**
+ * `rebase cloud resources` — show what a project is given, and change it.
+ *
+ * ## Why nothing is validated here
+ *
+ * The rules are the *target cluster's*, not the CLI's: GKE Autopilot bills a
+ * 250m/512Mi floor and rewrites anything outside a 1:1–6.5:1 memory:CPU band,
+ * while a Hetzner or EKS node has neither constraint. A CLI that carried those
+ * numbers would be wrong for two of the three providers the moment it shipped,
+ * and would drift from the control plane the first time either changed.
+ *
+ * So the control plane validates and this reports what it said. The same
+ * boundary refuses a raw PATCH and a console save, which is the property worth
+ * having — a check in a client only covers the clients that run it.
+ */
+export async function resourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+
+    const project = (await client.data.collection("projects").findById(projectId)) as
+        | Record<string, unknown>
+        | undefined;
+    if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
+
+    if (action !== "set") {
+        emit(
+            () => {
+                console.log("");
+                console.log(`  ${chalk.bold(String(project!.name ?? ""))} ${chalk.gray(`[${String(project!.subdomain ?? "")}]`)}`);
+                console.log("");
+                keyValues([
+                    ["Plan", String(project!.plan ?? "legacy (no plan)")],
+                    ["App CPU", dialLine(project!.cpu)],
+                    ["App memory", dialLine(project!.memory)],
+                    ["App replicas", String(project!.replicaCount ?? 1)],
+                    ["Database", dialLine(project!.databaseMode)],
+                    ["Database instances", dialLine(project!.databaseInstances)],
+                    ["Database CPU", dialLine(project!.databaseCpu)],
+                    ["Database memory", dialLine(project!.databaseMemory)]
+                ]);
+                console.log("");
+                noteBlank();
+                note("Empty means the plan's default. Change one with:");
+                note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
+                console.log("");
+            },
+            () => ({
+                plan: project!.plan ?? null,
+                cpu: project!.cpu ?? null,
+                memory: project!.memory ?? null,
+                replicaCount: project!.replicaCount ?? 1,
+                databaseMode: project!.databaseMode ?? null,
+                databaseInstances: project!.databaseInstances ?? null,
+                databaseCpu: project!.databaseCpu ?? null,
+                databaseMemory: project!.databaseMemory ?? null
+            })
+        );
+        return;
+    }
+
+    const built = buildDialPatch(rawArgs);
+    if (built.error) fail(built.error, undefined, "bad_request");
+    const patch = built.patch;
+
+    try {
+        await client.data.collection("projects").update(projectId, patch);
+    } catch (error: unknown) {
+        // The control plane's refusals are written to be read by whoever chose
+        // the number — a ratio named, a field named — so they are surfaced
+        // verbatim rather than replaced with a generic failure.
+        reportError(error, "Could not change resources");
+        return;
+    }
+
+    emit(
+        () => {
+            success("Resources updated.");
+            noteBlank();
+            for (const [field, value] of Object.entries(patch)) {
+                note(`  ${field} → ${String(value)}`);
+            }
+            noteBlank();
+            note("Applied on the next deploy, or by the hourly reconcile — whichever is first.");
+            note("A change that restarts the database waits for a maintenance window.");
+        },
+        () => ({ updated: patch })
+    );
+}
+
+/** A dial's value, or a marker that the plan decides it. */
+function dialLine(value: unknown): string {
+    if (value === null || value === undefined || value === "") return chalk.gray("plan default");
+    return String(value);
+}
+
+/**
+ * Turn `--cpu 500m --db-instances 2` into the patch to send.
+ *
+ * Pure, and exported, so the flag handling is testable without a control plane —
+ * the same shape `buildSettingsPatch` uses. Returns an error string rather than
+ * throwing, because the caller owns how a refusal is printed in JSON mode.
+ */
+export function buildDialPatch(rawArgs: string[]): { patch: Record<string, unknown>; error?: string } {
+    const patch: Record<string, unknown> = {};
+
+    for (const [flag, field] of Object.entries(DIAL_FLAGS)) {
+        const idx = rawArgs.indexOf(flag);
+        if (idx === -1) continue;
+        const value = rawArgs[idx + 1];
+        // A flag followed by another flag is a missing value, not an empty one.
+        // Silently sending "" would clear the dial — the opposite of what
+        // someone who fumbled a flag meant.
+        if (value === undefined || value.startsWith("--")) {
+            return { patch: {}, error: `${flag} needs a value.` };
+        }
+        if (field === "databaseInstances") {
+            const n = Number(value);
+            if (!Number.isInteger(n)) {
+                return { patch: {}, error: `${flag} takes a whole number of instances, not "${value}".` };
+            }
+            // Sent as a number, not a string. The control plane's guard decides
+            // whether anything CHANGED by comparing against the stored value, and
+            // "2" against 2 differs — which would report a change on every save
+            // and, before self-serve is on, refuse every save.
+            patch[field] = n;
+        } else {
+            patch[field] = value;
+        }
+    }
+
+    if (Object.keys(patch).length === 0) {
+        return { patch: {}, error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}.` };
+    }
+    return { patch };
 }

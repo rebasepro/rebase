@@ -26,7 +26,8 @@ import {
     buildStaticBundle,
     detectFrameworkDepDrift,
     resolveCliVersion,
-    DEFAULT_BUNDLE_DIR
+    DEFAULT_BUNDLE_DIR,
+    VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
 
@@ -41,6 +42,8 @@ ${chalk.bold("Options")}
   --out <dir>                  Bundle output directory (default: ${DEFAULT_BUNDLE_DIR})
   --skip-type-check            Compile without type checking (faster; use for iteration only)
   --skip-schema                Do not regenerate the database schema from collections
+  --no-vendor                  Do not install dependencies into the bundle (they
+                               install on every pod start instead, ~40-60s slower)
   --legacy                     Run every workspace's own build script instead
   -h, --help                   Show this help
 
@@ -66,6 +69,11 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             // is canonical now; `--out` still works so no script breaks.
             "--out": "--output",
             "--skip-type-check": Boolean,
+            /* Do not install the declared dependencies into the bundle. The
+               bundle still works — it installs them at boot, as every bundle did
+               before vendoring existed — so this is for a build that must not
+               shell out to npm, not for a smaller artifact. */
+            "--no-vendor": Boolean,
             "--skip-schema": Boolean,
             /* Do not fold the frontend into the backend bundle. For a project
                that publishes its frontend elsewhere and does not want the assets
@@ -157,11 +165,37 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 runtimeRange: manifest.rebase,
                 storage: manifest.storage,
                 skipTypeCheck: args["--skip-type-check"],
-                skipSchema: args["--skip-schema"]
+                skipSchema: args["--skip-schema"],
+                vendor: args["--no-vendor"] ? false : undefined
             });
             const rel = path.relative(projectRoot, result.outDir);
             console.log(chalk.green(`  ✓ bundle → ${rel}/`));
             console.log(chalk.dim(`    ${result.collectionCount} collection(s), schema ${result.manifest.schemaVersion}`));
+            /* Say what the bundle's cold start will be, at the one moment
+               anyone is listening.
+
+               A vendored bundle starts in about five seconds; one that installs
+               at boot takes forty to sixty, on EVERY pod start — an eviction, a
+               node failure, an OOM, a runtime rollout. That is not a build
+               detail, it is what each of those events costs in downtime, and it
+               is invisible until an incident unless it is said here. */
+            if (result.vendor.vendored) {
+                console.log(chalk.dim(`    dependencies installed into the bundle (${result.vendor.target?.os}/${result.vendor.target?.cpu})`));
+                if ((result.vendor.bytes ?? 0) > VENDOR_SIZE_WARN_BYTES) {
+                    const mb = Math.round((result.vendor.bytes ?? 0) / (1024 * 1024));
+                    console.log(chalk.yellow(`    ⚠ the installed tree is ${mb} MB — close to the 100 MB upload limit`));
+                    console.log(chalk.dim("      Rebuild with --no-vendor if the deploy is rejected as too large."));
+                }
+            } else if (Object.keys(result.manifest.deps.declared).length === 0) {
+                // Nothing to install is not a degraded state — this bundle
+                // already starts as fast as a vendored one. Warning here would
+                // train people to ignore the warning that matters.
+                console.log(chalk.dim("    no dependencies to install — nothing to bundle"));
+            } else {
+                console.log(chalk.yellow(`    ⚠ dependencies not bundled: ${result.vendor.skipped}`));
+                console.log(chalk.dim("      They install on every pod start instead, which is ~40-60s of cold start."));
+            }
+
             if (result.manifest.hooks.native) {
                 const names = (result.manifest.hooks.nativeModules ?? []).map(m => m.name).join(", ");
                 console.log(chalk.yellow(`    ⚠ native dependencies detected: ${names}`));

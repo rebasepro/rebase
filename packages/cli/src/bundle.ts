@@ -16,6 +16,7 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "module";
+import { spawnSync } from "child_process";
 import { execa } from "execa";
 import chalk from "chalk";
 import {
@@ -55,6 +56,15 @@ export interface BuildBundleOptions {
      * once, by the command that owns it.
      */
     storage?: DeclaredStorageSources;
+    /**
+     * Install the declared dependencies into the bundle at build time.
+     *
+     * Omitted means "when it is safe to" — which is every bundle whose closure
+     * has no native code. `false` is the escape hatch for a build that must not
+     * shell out to npm at all (an air-gapped CI, a offline reproducibility
+     * check); the bundle still works, it simply installs at boot as before.
+     */
+    vendor?: boolean;
     /** Skip type checking. Faster, and strictly worse — for iteration only. */
     skipTypeCheck?: boolean;
     /** Skip regenerating the Drizzle schema from the collections. */
@@ -67,6 +77,13 @@ export interface BuildBundleResult {
     outDir: string;
     manifest: RebaseBundleManifest;
     collectionCount: number;
+    /**
+     * Whether the dependency tree was installed into the bundle, and why not
+     * when it was not. Reported rather than silent: "your pods will take a
+     * minute to start" is a consequence a developer should hear at build time,
+     * not discover during an incident.
+     */
+    vendor: VendorResult;
 }
 
 /** Packages whose presence means the bundle cannot run on a stock runtime image. */
@@ -1141,9 +1158,201 @@ stdio: "inherit" });
         "utf8"
     );
 
+    const vendor = vendorDependencies({
+        outDir,
+        declared,
+        nativeModules,
+        requested: options.vendor
+    });
+    if (vendor.vendored) {
+        manifest.deps.vendored = true;
+        manifest.deps.vendorTarget = vendor.target;
+        // Rewritten rather than assembled differently above: the install needs
+        // the package.json this function already wrote, so the manifest cannot
+        // know the answer until afterwards.
+        fs.writeFileSync(
+            path.join(outDir, "manifest.json"),
+            `${JSON.stringify(manifest, null, 2)}\n`,
+            "utf8"
+        );
+    }
+
     return { outDir,
 manifest,
-collectionCount: collections.length };
+collectionCount: collections.length,
+vendor };
+}
+
+/** Default install target: what the published runtime image runs. */
+export const VENDOR_TARGET_OS = "linux";
+export const VENDOR_TARGET_CPU = "x64";
+
+export interface VendorResult {
+    vendored: boolean;
+    target?: { os: string; cpu: string; node: string };
+    /** Why nothing was installed. Present exactly when `vendored` is false. */
+    skipped?: string;
+    /** Size of the installed tree on disk, when one was installed. */
+    bytes?: number;
+}
+
+/**
+ * Where a vendored bundle starts being too big to upload.
+ *
+ * The control plane refuses a bundle over 100 MB, and that ceiling is not
+ * arbitrary or easily raised: its pod has a 512Mi memory limit and the upload
+ * route holds the body while it writes it, so the cap protects the process that
+ * also serves the console, deploys and billing. Vendoring is the one change that
+ * can push a bundle near it.
+ *
+ * So the warning is here, at build time, where the remedy is one flag away —
+ * rather than at deploy time as a 413 nobody can act on without rebuilding. The
+ * threshold sits below the real cap because this measures the tree on disk and
+ * the upload is compressed: crossing it means "getting close", not "will fail".
+ */
+export const VENDOR_SIZE_WARN_BYTES = 150 * 1024 * 1024;
+
+/** Bytes on disk under `dir`. Bounded so a pathological tree cannot hang a build. */
+function directorySize(dir: string, budget = 200_000): number {
+    let total = 0;
+    let visited = 0;
+    const stack = [dir];
+    while (stack.length > 0 && visited < budget) {
+        const current = stack.pop()!;
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(current, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+        for (const entry of entries) {
+            visited++;
+            const full = path.join(current, entry.name);
+            if (entry.isDirectory()) {
+                stack.push(full);
+            } else if (entry.isFile()) {
+                try {
+                    total += fs.statSync(full).size;
+                } catch {
+                    // A file that vanished between readdir and stat contributes
+                    // nothing; it is not worth failing a build over.
+                }
+            }
+        }
+    }
+    return total;
+}
+
+/**
+ * Install the bundle's declared dependencies into the bundle itself.
+ *
+ * ## What this buys
+ *
+ * A managed pod's bundle lives on an `emptyDir`, so it is re-fetched and
+ * re-installed on **every** start — an eviction, a node failure, an OOM, a
+ * runtime rollout. The install is 35–55 seconds of a 40–60 second cold start,
+ * which makes it the price of every unplanned restart a tenant suffers. Doing it
+ * once at build time instead of every time at boot takes that to roughly the
+ * cost of untarring.
+ *
+ * The pod side needs no change to benefit: the init container already skips
+ * installing when `node_modules` is present, a guard that existed for
+ * pre-baked images and turns out to be exactly the hook this needs.
+ *
+ * ## Why it refuses to vendor native code
+ *
+ * A compiled binary is valid only for the platform it was built for, and a
+ * developer's machine is rarely the deployment's. The managed runtime already
+ * refuses bundles containing native modules for the same reason, so this refusal
+ * costs nothing there — but a self-hosted project may legitimately use them, and
+ * for those the honest answer is to install in the container, where the platform
+ * is known.
+ *
+ * ## Why `--os` and `--cpu` are not optional
+ *
+ * The dangerous case is not native code, which is detectable. It is a pure-JS
+ * package whose real work lives in a **platform-specific optional dependency** —
+ * `esbuild` being the one everybody meets. Installing on an Apple Silicon Mac
+ * resolves `@esbuild/darwin-arm64`, produces a tree that looks complete, and
+ * fails at import inside a linux/amd64 pod. npm resolves optional dependencies
+ * for the declared target rather than the host when told to, so it is told to.
+ */
+export function vendorDependencies(options: {
+    outDir: string;
+    declared: Record<string, string>;
+    nativeModules: NativeDependency[];
+    /** `false` disables; `undefined` means "when it is safe to". */
+    requested?: boolean;
+    /** Injected in tests. */
+    run?: (cmd: string, args: string[], cwd: string) => void;
+}): VendorResult {
+    if (options.requested === false) {
+        return { vendored: false, skipped: "disabled with --no-vendor" };
+    }
+    if (Object.keys(options.declared).length === 0) {
+        // Not a failure and not worth a warning: a project using only what the
+        // runtime already provides installs nothing at boot either way.
+        return { vendored: false, skipped: "the bundle declares no dependencies" };
+    }
+    if (options.nativeModules.length > 0) {
+        const names = options.nativeModules.map(m => m.name).join(", ");
+        return {
+            vendored: false,
+            skipped:
+                `the dependency closure contains native code (${names}), which is only valid on the ` +
+                "platform it was compiled for"
+        };
+    }
+
+    const target = {
+        os: VENDOR_TARGET_OS,
+        cpu: VENDOR_TARGET_CPU,
+        node: process.versions.node.split(".")[0]
+    };
+
+    const run = options.run ?? ((cmd, args, cwd) => {
+        const result = spawnSync(cmd, args, { cwd, stdio: "pipe", encoding: "utf8" });
+        if (result.error) throw result.error;
+        if (result.status !== 0) {
+            throw new Error(
+                `${cmd} ${args.join(" ")} exited ${result.status}\n${result.stderr || result.stdout || ""}`.trim()
+            );
+        }
+    });
+
+    try {
+        run(
+            "npm",
+            [
+                "install",
+                "--omit=dev",
+                // Matches what the runtime image's entrypoint insists on, and
+                // what the init container passes. A bundle whose dependencies
+                // ran lifecycle scripts at build time would arrive at the pod
+                // carrying whatever they produced.
+                "--ignore-scripts",
+                "--no-audit",
+                "--no-fund",
+                `--os=${target.os}`,
+                `--cpu=${target.cpu}`
+            ],
+            options.outDir
+        );
+    } catch (error: unknown) {
+        // Never fatal. A bundle that could not be vendored is exactly the bundle
+        // every project shipped before this existed — slower to start, entirely
+        // functional — and failing the build over a speed optimisation would
+        // trade a working deploy for a faster one that does not happen.
+        return {
+            vendored: false,
+            skipped: `npm install failed: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+
+    if (!fs.existsSync(path.join(options.outDir, "node_modules"))) {
+        return { vendored: false, skipped: "npm install produced no node_modules" };
+    }
+    return { vendored: true, target, bytes: directorySize(path.join(options.outDir, "node_modules")) };
 }
 
 /**

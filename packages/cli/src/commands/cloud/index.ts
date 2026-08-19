@@ -26,6 +26,7 @@ import {
     metricsCommand,
     webhooksCommand,
     storageCommand,
+    resourcesCommand,
     clustersCommand,
     billingCommand,
     printStorageHelp
@@ -236,8 +237,11 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "storage":
             await storageCommand(action, rawArgs);
             break;
+        case "resources":
+            await resourcesCommand(action, rawArgs);
+            break;
         case "clusters":
-            await clustersCommand(rawArgs);
+            await clustersCommand(action, rawArgs);
             break;
         case "billing":
             await billingCommand(rawArgs);
@@ -372,6 +376,11 @@ ${chalk.green.bold("Databases")}
 
 ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("webhooks list|create|delete")}
+  ${chalk.blue.bold("clusters")}                List the clusters tenants run on
+  ${chalk.blue.bold("clusters add")}            Register a cluster from a kubeconfig
+  ${chalk.blue.bold("clusters verify")}         Ask a cluster whether it can host tenants
+  ${chalk.blue.bold("resources")}               Show the CPU, memory and database this project is given
+  ${chalk.blue.bold("resources set")}           Change them (--cpu, --memory, --db-mode, --db-instances, --db-cpu, --db-memory)
   ${chalk.blue.bold("storage")}                 List storage buckets
   ${chalk.blue.bold("storage create")}          Provision platform-managed storage
   ${chalk.blue.bold("storage attach")}          Attach your own S3-compatible bucket

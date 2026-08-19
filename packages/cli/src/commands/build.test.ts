@@ -24,7 +24,14 @@ vi.mock("../bundle", async (importOriginal) => {
             outDir: "/tmp/dist-bundle",
             collectionCount: 0,
             manifest: { schemaVersion: "v1",
-hooks: { native: false } }
+hooks: { native: false },
+deps: { declared: {} } },
+            // The real function always reports this; a double that omits it
+            // makes the command look broken when only the double is stale.
+            vendor: { vendored: true,
+target: { os: "linux",
+cpu: "x64",
+node: "22" } }
         })),
         detectFrameworkDepDrift: vi.fn(() => ({ behind: [],
 disagreeing: [] }))
