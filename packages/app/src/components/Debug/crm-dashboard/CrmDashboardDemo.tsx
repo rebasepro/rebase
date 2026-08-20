@@ -708,7 +708,7 @@ export function CrmDashboardDemo() {
                             onClick={() => openClientDrawer(clientInfo.id)}
                         >
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center font-bold">
+                                <div className="w-8 h-8 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center font-semibold">
                                     {clientInfo.name[0].toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -758,7 +758,7 @@ export function CrmDashboardDemo() {
         return (
             <div className="flex-1 space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary dark:text-primary-light flex items-center justify-center text-xl font-bold">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary dark:text-primary-light flex items-center justify-center text-xl font-semibold">
                         {client.name[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">

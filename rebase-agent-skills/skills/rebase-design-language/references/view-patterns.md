@@ -320,7 +320,7 @@ export function EditorSidebar() {
             </Tabs>
             <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                 <Typography variant="caption"
-                            className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
+                            className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                     TABLES
                 </Typography>
                 <IconButton size="small"><SettingsIcon size={iconSize.smallest}/></IconButton>

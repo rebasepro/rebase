@@ -275,5 +275,5 @@ function StatusBadge({ code }: { code: string }) {
                 ? "text-amber-600 dark:text-amber-400"
                 : "text-red-600 dark:text-red-400";
 
-    return <span className={cls("text-xs font-bold font-mono", color)}>{code}</span>;
+    return <span className={cls("text-xs font-semibold font-mono", color)}>{code}</span>;
 }

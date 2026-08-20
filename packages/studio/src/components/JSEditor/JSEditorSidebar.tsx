@@ -119,7 +119,7 @@ export const JSEditorSidebar = ({
                 {activeTab === "collections" && (
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
+                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 Collections
                             </Typography>
                         </div>
@@ -147,7 +147,7 @@ export const JSEditorSidebar = ({
                 {activeTab === "reference" && (
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
+                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 SDK Reference
                             </Typography>
                         </div>
@@ -187,7 +187,7 @@ export const JSEditorSidebar = ({
                     return (
                         <div className="flex flex-col h-full">
                             <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                                <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Snippets</Typography>
+                                <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Snippets</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
                                 {snippets.length === 0 ? (
@@ -200,7 +200,7 @@ export const JSEditorSidebar = ({
                                     <>
                                         {favorites.length > 0 && (
                                             <div className="mb-3">
-                                                <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
+                                                <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
                                                     <svg className="w-3 h-3 mr-1 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                                                     Favorites
                                                 </Typography>
@@ -214,7 +214,7 @@ export const JSEditorSidebar = ({
                                         {others.length > 0 && (
                                             <div>
                                                 {favorites.length > 0 && (
-                                                    <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1">
+                                                    <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1">
                                                         Others
                                                     </Typography>
                                                 )}
@@ -236,7 +236,7 @@ export const JSEditorSidebar = ({
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">History</Typography>
+                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">History</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">
                             {history.length === 0 ? (

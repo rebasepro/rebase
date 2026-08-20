@@ -187,12 +187,12 @@ icon }}
                         <span className="w-3 shrink-0 text-center">
                             {col.isPrimaryKey && (
                                 <Tooltip title="Primary Key">
-                                    <span className="text-amber-500 text-[10px] font-bold">🔑</span>
+                                    <span className="text-amber-500 text-[10px] font-semibold">🔑</span>
                                 </Tooltip>
                             )}
                             {col.isForeignKey && !col.isPrimaryKey && (
                                 <Tooltip title={`FK → ${col.relationName ?? "?"}`}>
-                                    <span className="text-blue-400 text-[10px] font-bold">🔗</span>
+                                    <span className="text-blue-400 text-[10px] font-semibold">🔗</span>
                                 </Tooltip>
                             )}
                         </span>

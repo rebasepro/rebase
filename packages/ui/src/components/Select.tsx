@@ -304,7 +304,7 @@ export const SelectGroup = React.memo(function SelectGroup({
     return <>
         <SelectPrimitive.Group
             className={cls(
-                "text-xs text-surface-accent-900 dark:text-white uppercase tracking-wider font-bold mt-6 first:mt-2",
+                "text-xs text-surface-accent-900 dark:text-white uppercase tracking-wider font-semibold mt-6 first:mt-2",
                 "px-2 py-2",
                 className
             )}>

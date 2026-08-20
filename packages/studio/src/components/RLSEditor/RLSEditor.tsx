@@ -529,7 +529,7 @@ totalPolicies };
                             {sidebarTab === "tables" && (
                                 <div className="flex flex-col h-full">
                                     <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
+                                        <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                             {t("studio_schema_tables")}
                                         </Typography>
                                         <IconButton size="small" onClick={fetchRLSData} title="Refresh">
@@ -626,7 +626,7 @@ totalPolicies };
                             {sidebarTab === "info" && (
                                 <div className="flex flex-col h-full">
                                     <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
+                                        <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                             Overview
                                         </Typography>
                                     </div>

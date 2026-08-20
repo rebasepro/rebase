@@ -56,7 +56,7 @@ function ArticlePreview({
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
-            <h1 className="text-3xl font-bold">{title}</h1>
+            <h1 className="text-3xl font-semibold">{title}</h1>
             <div dangerouslySetInnerHTML={{ __html: content }} />
         </div>
     );

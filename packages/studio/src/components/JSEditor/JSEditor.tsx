@@ -778,7 +778,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                         <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-950 overflow-hidden min-h-0">
                                             {/* Result header — matches SQL editor */}
                                             <div className={cls("p-2 px-4 bg-surface-100 dark:bg-surface-900 border-b shrink-0 flex items-center", defaultBorderMixin)}>
-                                                <Typography variant="caption" className="font-bold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">
+                                                <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">
                                                     {t("studio_sql_query_results")}
                                                 </Typography>
 
@@ -846,7 +846,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                         {matchedCollections.length > 0 && (
                                                             <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                                                                 <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
-                                                                    <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
+                                                                    <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                                                                 </Tooltip>
                                                                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                                                                     {matchedCollections.map(mc => (
@@ -1002,11 +1002,11 @@ id: String(ra.entityId) })}
                                                 <div className={cls("p-2 px-4 border-t bg-surface-50 dark:bg-surface-900 flex justify-between items-center shrink-0", defaultBorderMixin)}>
                                                     <div className="flex space-x-4">
                                                         <div className="flex items-center text-[11px]">
-                                                            <span className="font-bold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
+                                                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
                                                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{tableData.data.length}</span>
                                                         </div>
                                                         <div className="flex items-center text-[11px]">
-                                                            <span className="font-bold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
+                                                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
                                                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{result.duration.toFixed(0)}ms</span>
                                                         </div>
                                                     </div>
@@ -1014,7 +1014,7 @@ id: String(ra.entityId) })}
                                                         <Button
                                                             size="small"
                                                             variant="text"
-                                                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                                                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                                                             onClick={handleExportMarkdown}
                                                         >
                                                             {t("studio_sql_copy_markdown")}
@@ -1022,7 +1022,7 @@ id: String(ra.entityId) })}
                                                         <Button
                                                             size="small"
                                                             variant="text"
-                                                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                                                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                                                             onClick={exportResult}
                                                         >
                                                             {t("studio_sql_export_json")}
@@ -1030,7 +1030,7 @@ id: String(ra.entityId) })}
                                                         <Button
                                                             size="small"
                                                             variant="text"
-                                                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                                                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                                                             onClick={handleExportCSV}
                                                         >
                                                             {t("studio_sql_export_csv")}

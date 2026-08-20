@@ -37,17 +37,14 @@ html.dark {
    and holding 600 all the way down to text-sm made every heading shout equally
    — a heading stops being a headline somewhere, and the scale should say where.
 
-   The ladder now spans three weights rather than two. 600 everywhere at the top
-   meant a page title and the section heading inside it were the same voice at
-   two sizes, so a screen had no clear first thing to read. 700 is the *display*
-   tier only — h1 and h2, page titles and stat numbers — and nothing in the UI
-   chrome (nav, labels, buttons, table headers) goes above 600.
+   The ladder spans three weights — 400/500/600 — and 600 is the ceiling. No
+   tier goes to 700: the display end separates itself by SIZE and tracking, not
+   by weight, and a 30px 700 next to a 30px 500 elsewhere on the same product
+   reads as two different type systems rather than one ladder.
 
-   This costs nothing on the wire: both faces are loaded as VARIABLE fonts
-   (@fontsource-variable/inter, @fontsource-variable/instrument-sans), so the
-   whole weight axis is already in the file that ships. The earlier "never above
-   600" rule was written when static weights meant every step was another
-   download; that constraint no longer exists.
+   Both faces load as VARIABLE fonts (@fontsource-variable/inter,
+   @fontsource-variable/instrument-sans), so the whole axis ships either way —
+   the 600 ceiling is a design decision, not a payload one.
 
    With a single face carrying both headings and body, weight and tracking are
    the only things separating a heading from the copy around it — so the tiers
@@ -147,10 +144,11 @@ html.dark {
     @apply font-mono tabular-nums;
 }
 
-/* The headline number on a stat tile. Display weight, display tracking, and
-   tabular figures so a row of tiles shares a baseline grid. */
+/* The headline number on a stat tile. Display tracking and tabular figures so a
+   row of tiles shares a baseline grid. Semibold, not bold: the number is
+   already the largest thing on the tile, and 600 is the system ceiling. */
 .typography-stat {
-    @apply text-3xl font-headers font-bold tracking-display tabular-nums;
+    @apply text-3xl font-headers font-semibold tracking-display tabular-nums;
 }
 
 :focus-visible {

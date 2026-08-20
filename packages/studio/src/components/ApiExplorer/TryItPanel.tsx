@@ -456,7 +456,7 @@ function ResponseBadge({ status }: { status: number }) {
     else if (status >= 400 && status < 500) colorClass = "text-amber-500";
 
     return (
-        <span className={cls("text-xs font-bold font-mono", colorClass)}>
+        <span className={cls("text-xs font-semibold font-mono", colorClass)}>
             {status || "ERR"}
         </span>
     );

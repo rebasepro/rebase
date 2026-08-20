@@ -352,7 +352,7 @@ function FilePreviewPanel({
                     {/* Metadata */}
                     <div className="p-4 space-y-3">
                         <div>
-                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] uppercase tracking-wider font-bold mb-1 block">
+                            <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[10px] uppercase tracking-wider font-semibold mb-1 block">
                                 File Info
                             </Typography>
                         </div>
@@ -992,9 +992,9 @@ message: e instanceof Error ? e.message : String(e) });
                                         onCheckedChange={handleSelectAll}
                                     />
                                 </th>
-                                <th className="px-2 py-2 font-bold">Name</th>
-                                <th className="px-4 py-2 font-bold w-24">Type</th>
-                                <th className="px-4 py-2 font-bold w-24 text-right">Size</th>
+                                <th className="px-2 py-2 font-semibold">Name</th>
+                                <th className="px-4 py-2 font-semibold w-24">Type</th>
+                                <th className="px-4 py-2 font-semibold w-24 text-right">Size</th>
                                 <th className="px-2 py-2 w-10"/>
                             </tr>
                         </thead>
@@ -1124,7 +1124,7 @@ message: e instanceof Error ? e.message : String(e) });
                 {/* Folder cards */}
                 {folders.length > 0 && (
                     <div className="mb-4">
-                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-bold text-text-disabled dark:text-text-disabled-dark mb-2 block">
+                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
                             Folders
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
@@ -1159,7 +1159,7 @@ message: e instanceof Error ? e.message : String(e) });
                 {/* FileIcon cards */}
                 {files.length > 0 && (
                     <div>
-                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-bold text-text-disabled dark:text-text-disabled-dark mb-2 block">
+                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark mb-2 block">
                             Files ({files.length})
                         </Typography>
                         <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(140px,1fr))]">
@@ -1198,7 +1198,7 @@ message: e instanceof Error ? e.message : String(e) });
 
                                             {/* Extension badge */}
                                             {getExtension(file.name) && (
-                                                <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-black/50 text-white backdrop-blur-sm">
+                                                <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-black/50 text-white backdrop-blur-sm">
                                                     {getExtension(file.name)}
                                                 </div>
                                             )}
@@ -1408,7 +1408,7 @@ message: e instanceof Error ? e.message : String(e) });
                             {/* Status bar */}
                             <div className={cls("px-4 py-1.5 border-t bg-surface-50 dark:bg-surface-800 flex items-center justify-between shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-4 text-[11px]">
-                                    <span className="text-text-disabled dark:text-text-disabled-dark font-bold uppercase tracking-tighter">
+                                    <span className="text-text-disabled dark:text-text-disabled-dark font-semibold uppercase tracking-tighter">
                                         Path
                                     </span>
                                     <span className="font-mono text-text-secondary dark:text-text-secondary-dark">

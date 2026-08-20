@@ -21,7 +21,7 @@ const TOTAL = 12;
                 { val: "219", label: "Contributors & Forks", color: "text-violet-400", href: "https://github.com/firecmsco/firecms/forks" },
             ].map(s => (
                 <a href={s.href} target="_blank" rel="noopener" class="text-center hover:bg-surface-800/50 rounded-lg p-2 transition-colors">
-                    <div class={`text-2xl font-black mb-0.5 ${s.color}`}>{s.val}</div>
+                    <div class={`text-2xl font-semibold mb-0.5 ${s.color}`}>{s.val}</div>
                     <p class="text-3xs text-surface-300">{s.label}</p>
                 </a>
             ))}

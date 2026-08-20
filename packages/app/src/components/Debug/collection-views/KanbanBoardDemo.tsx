@@ -36,7 +36,7 @@ function KanbanProjectCard({ item, isDragging, isGroupedOver, style }: BoardItem
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
                         <div className="flex items-center gap-1">
-                            <div className="w-4 h-4 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center text-[8px] font-bold">{project.assignee[0]}</div>
+                            <div className="w-4 h-4 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center text-[8px] font-semibold">{project.assignee[0]}</div>
                             <Typography variant="caption" color="secondary" className="truncate max-w-[80px] text-[10px]">{project.assignee}</Typography>
                         </div>
                         <Typography variant="caption" className={cls("font-mono text-[10px]", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>

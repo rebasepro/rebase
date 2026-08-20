@@ -383,7 +383,7 @@ active: false }
                                 </Tabs>
                                 {/* Section header pattern — used in all editor sidebars */}
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                                    <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
+                                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
@@ -444,7 +444,7 @@ active: false }
                                     <Tab value="history">History</Tab>
                                 </Tabs>
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                                    <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
+                                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
@@ -478,7 +478,7 @@ active: false }
                                     <Tab value="info">Info</Tab>
                                 </Tabs>
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                                    <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
+                                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
                                     </IconButton>
@@ -511,7 +511,7 @@ enabled: false }].map(t => (
                             <Typography variant="caption" color="secondary" className="block mb-1">Collection Editor Sidebar</Typography>
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-white dark:bg-surface-950", defaultBorderMixin)}>
                                 <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                                    <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
+                                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
                                     <IconButton size="small">
                                         <PlusIcon size={iconSize.smallest}/>
                                     </IconButton>

@@ -484,7 +484,7 @@ export function LoginView({
                                     {(title || subtitle) && (
                                         <div className="text-center mb-2">
                                             {title && (
-                                                <Typography variant="h6" className="mb-0.5 font-bold">
+                                                <Typography variant="h6" className="mb-0.5 font-semibold">
                                                     {title}
                                                 </Typography>
                                             )}

@@ -110,7 +110,7 @@ function CollectionPanelInner({
             {title !== false && (
                 <Typography
                     variant="subtitle2"
-                    className="font-bold mb-2 text-surface-700 dark:text-surface-300"
+                    className="font-semibold mb-2 text-surface-700 dark:text-surface-300"
                 >
                     {title ?? mergedCollection.name}
                 </Typography>

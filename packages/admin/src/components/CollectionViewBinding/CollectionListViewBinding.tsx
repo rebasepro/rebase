@@ -1385,7 +1385,7 @@ function ListHeaderLabel({
             {direction === "asc" && <ArrowUpIcon size={12} className="flex-shrink-0"/>}
             {direction === "desc" && <ArrowDownIcon size={12} className="flex-shrink-0"/>}
             {direction && position !== undefined && (
-                <span className="flex-shrink-0 text-[9px] font-bold leading-none tabular-nums">
+                <span className="flex-shrink-0 text-[9px] font-semibold leading-none tabular-nums">
                     {position + 1}
                 </span>
             )}

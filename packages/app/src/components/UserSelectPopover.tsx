@@ -207,7 +207,7 @@ export function UserSelectPopover({
                     )}
                     <span className="max-w-[120px] truncate">{effectiveUserLabel}</span>
                     {selectedUser && (
-                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-bold uppercase">
+                        <span className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold uppercase">
                             impersonating
                         </span>
                     )}
@@ -225,7 +225,7 @@ export function UserSelectPopover({
                 <div className={cls("px-3 py-2 border-b flex items-center justify-between shrink-0", defaultBorderMixin)}>
                     <Typography
                         variant="caption"
-                        className="font-bold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark"
+                        className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark"
                     >
                         Run as user
                     </Typography>

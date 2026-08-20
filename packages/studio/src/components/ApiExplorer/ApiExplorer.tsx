@@ -210,7 +210,7 @@ allEndpoints: [] };
                                         <span className="truncate text-[13px] opacity-90">{ep.summary || ep.shortPath}</span>
                                         <span
                                             className={cls(
-                                                "text-[10px] font-bold uppercase shrink-0",
+                                                "text-[10px] font-semibold uppercase shrink-0",
                                                 METHOD_COLORS[ep.method] ?? "text-text-secondary"
                                             )}
                                         >
@@ -247,7 +247,7 @@ allEndpoints: [] };
                             <div className="flex items-center gap-3 min-w-0">
                                 <span
                                     className={cls(
-                                        "text-xs font-bold uppercase",
+                                        "text-xs font-semibold uppercase",
                                         METHOD_COLORS[selectedEndpoint.method] ?? ""
                                     )}
                                 >

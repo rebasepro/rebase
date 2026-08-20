@@ -27,7 +27,7 @@ export const Boxy = () => (
                 <Tab value="history">History</Tab>
             </Tabs>
             <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Tables</Typography>
+                <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Tables</Typography>
                 <IconButton size="small" aria-label="Settings"><SettingsIcon size={14}/></IconButton>
             </div>
             <div className="p-3 h-20">

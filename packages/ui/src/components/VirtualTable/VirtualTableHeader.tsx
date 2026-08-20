@@ -194,7 +194,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                     and nothing about which one decides. */}
                                 {sort && sortPosition !== undefined && (
                                     <span
-                                        className="flex-shrink-0 -ml-0.5 mr-0.5 text-[10px] font-bold leading-none tabular-nums text-text-secondary dark:text-text-secondary-dark"
+                                        className="flex-shrink-0 -ml-0.5 mr-0.5 text-[10px] font-semibold leading-none tabular-nums text-text-secondary dark:text-text-secondary-dark"
                                         aria-hidden={true}
                                     >
                                         {sortPosition + 1}

@@ -1012,7 +1012,7 @@ role: selectedRole });
                 if (plan) {
                     return (
                         <div className="flex-grow overflow-auto p-4 bg-surface-50 dark:bg-surface-900 flex flex-col items-start">
-                            <Typography variant="caption" className="font-bold text-text-secondary mb-4 tracking-wider uppercase">{t("studio_sql_visual_execution_plan")}</Typography>
+                            <Typography variant="caption" className="font-semibold text-text-secondary mb-4 tracking-wider uppercase">{t("studio_sql_visual_execution_plan")}</Typography>
                             <div className="pb-12">
                                 <ExplainVisualizer plan={plan}/>
                             </div>
@@ -1083,7 +1083,7 @@ resizable: false }, ...dataColumns]
                 {actionableCollections.length > 0 && (
                     <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
                         <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
-                            <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
+                            <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                         </Tooltip>
                         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                             {actionableCollections.map(mc => (
@@ -1207,11 +1207,11 @@ id: String(ra.entityId) })}
                 <div className={cls("p-2 px-4 border-t bg-surface-50 dark:bg-surface-900 flex justify-between items-center shrink-0", defaultBorderMixin)}>
                     <div className="flex space-x-4">
                         <div className="flex items-center text-[11px]">
-                            <span className="font-bold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
+                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{results.length}</span>
                         </div>
                         <div className="flex items-center text-[11px]">
-                            <span className="font-bold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
+                            <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_time")}</span>
                             <span className="font-mono text-text-secondary dark:text-text-secondary-dark">{execTime}ms</span>
                         </div>
                     </div>
@@ -1219,7 +1219,7 @@ id: String(ra.entityId) })}
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                             onClick={handleExportMarkdown}
                         >
                             {t("studio_sql_copy_markdown")}
@@ -1227,7 +1227,7 @@ id: String(ra.entityId) })}
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                             onClick={handleExportJSON}
                         >
                             {t("studio_sql_export_json")}
@@ -1235,7 +1235,7 @@ id: String(ra.entityId) })}
                         <Button
                             size="small"
                             variant="text"
-                            className="text-[10px] uppercase font-bold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
+                            className="text-[10px] uppercase font-semibold text-text-secondary dark:text-text-secondary-dark whitespace-nowrap"
                             onClick={handleExportCSV}
                         >
                             {t("studio_sql_export_csv")}
@@ -1403,7 +1403,7 @@ isFavorite: !s.isFavorite } : s));
                                 >
                                     <div className="max-h-64 overflow-y-auto">
                                         <div className="px-3 py-1.5 border-b border-surface-200 dark:border-surface-950 mb-1">
-                                            <Typography variant="caption" className="font-bold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_database")}</Typography>
+                                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_database")}</Typography>
                                         </div>
                                         {isLoadingConfig ? (
                                             <div className="flex items-center justify-center p-4">
@@ -1422,7 +1422,7 @@ isFavorite: !s.isFavorite } : s));
                                                 ))}
 
                                                 <div className="px-3 py-1.5 border-y border-surface-200 dark:border-surface-950 mb-1 mt-1">
-                                                    <Typography variant="caption" className="font-bold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_role")}</Typography>
+                                                    <Typography variant="caption" className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_role")}</Typography>
                                                 </div>
                                                 {availableRoles.map(role => (
                                                     <MenuItem key={role} dense onClick={() => handleRoleChange(role)} className={cls("text-xs", selectedRole === role && "text-primary dark:text-primary-dark")}>
@@ -1464,7 +1464,7 @@ isFavorite: !s.isFavorite } : s));
                             secondPanel={
                                 <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-950 overflow-hidden min-h-0">
                                     <div className={cls("p-2 px-4 bg-surface-100 dark:bg-surface-900 border-b shrink-0 flex items-center", defaultBorderMixin)}>
-                                        <Typography variant="caption" className="font-bold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
+                                        <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
                                     </div>
                                     <div className="flex-grow flex flex-col min-h-0 overflow-hidden">
                                         {renderResults()}

@@ -263,7 +263,7 @@ duration: 400 }
                     >
                         <Typography
                             variant="caption"
-                            className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"
+                            className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark"
                         >
                             Tables
                         </Typography>

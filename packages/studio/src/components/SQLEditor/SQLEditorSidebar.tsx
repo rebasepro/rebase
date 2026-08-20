@@ -65,7 +65,7 @@ export const SQLEditorSidebar = ({
                     return (
                         <div className="flex flex-col h-full">
                             <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                                <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_snippets")}</Typography>
+                                <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_snippets")}</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
                                 {snippets.length === 0 ? (
@@ -76,7 +76,7 @@ export const SQLEditorSidebar = ({
                                     <>
                                         {favorites.length > 0 && (
                                             <div className="mb-4">
-                                                <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
+                                                <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 flex items-center">
                                                     <svg className="w-3 h-3 mr-1 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"/></svg>
                                                     Favorites
                                                 </Typography>
@@ -107,7 +107,7 @@ export const SQLEditorSidebar = ({
                                         {others.length > 0 && (
                                             <div>
                                                 {favorites.length > 0 && (
-                                                    <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 mt-4">
+                                                    <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark mb-2 px-1 mt-4">
                                                         Others
                                                     </Typography>
                                                 )}
@@ -145,7 +145,7 @@ export const SQLEditorSidebar = ({
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-bold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_history")}</Typography>
+                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_history")}</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">
                             {history.length === 0 ? (

@@ -203,14 +203,15 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 ### Variant Scale
 
-The scale is compact — built for content density — and spans **three weights**.
-Bold is the page's first thing to read, semibold is a section, medium is UI
-chrome. A page title and the heading inside it are not the same voice.
+The scale is compact — built for content density — and spans **three weights:
+400 / 500 / 600. Semibold (600) is the ceiling — nothing goes to 700.** The
+display tier separates itself by size and tracking, not by weight: medium at
+4xl is a page title, semibold at 2xl is a section, medium at sm is UI chrome.
 
 | Variant      | CSS Class             | Rendered Element | Specs                                                  |
 |--------------|-----------------------|------------------|---------------------------------------------------------|
-| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-headers, **font-bold**, tracking-display      |
-| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-headers, **font-bold**, tracking-display      |
+| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-headers, font-medium, tracking-display        |
+| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-headers, font-medium, tracking-display        |
 | `h3`         | `typography-h3`       | `<h3>`           | 2xl, font-headers, font-semibold, tracking-title        |
 | `h4`         | `typography-h4`       | `<h4>`           | xl, font-headers, font-semibold, tracking-title         |
 | `h5`         | `typography-h5`       | `<h5>`           | lg, font-headers, font-medium, tracking-heading         |
@@ -223,7 +224,7 @@ chrome. A page title and the heading inside it are not the same voice.
 | `caption`    | `typography-caption`  | `<p>`            | [11px], leading-[1.4]                                   |
 | `micro`      | `typography-micro`    | `<p>`            | 2xs, font-medium, uppercase, tracking-[0.08em]          |
 | `mono`       | `typography-mono`     | `<p>`            | font-mono, tabular-nums                                 |
-| `stat`       | `typography-stat`     | `<p>`            | 3xl, font-headers, font-bold, tracking-display, tabular-nums |
+| `stat`       | `typography-stat`     | `<p>`            | 3xl, font-headers, font-semibold, tracking-display, tabular-nums |
 | `label`      | `typography-label`    | `<label>`        | xs, font-medium, tracking-wide                          |
 | `inherit`    | `typography-inherit`  | `<p>`            | text-inherit (inherits parent sizing)                   |
 | `button`     | `typography-button`   | `<span>`         | sm, font-semibold, tracking-wide                        |
@@ -277,8 +278,9 @@ chrome. A page title and the heading inside it are not the same voice.
 // ❌ NEVER: Gradient text on headings
 <Typography className="bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">
 
-// ❌ NEVER: Overriding font-weight excessively
-<Typography className="font-extrabold">
+// ❌ NEVER: Going above semibold. 600 is the ceiling of the system —
+// font-bold/extrabold/black are never correct, on any surface.
+<Typography className="font-bold">
 
 // ❌ NEVER: Custom tracking/sizing overrides
 <Typography className="tracking-widest text-[10px] uppercase">
@@ -734,7 +736,7 @@ Before submitting UI code, verify you have NONE of these:
 | 10| Custom shadow colors (`shadow-blue-500/20`)           | No shadows on hover — use `hover:bg-surface-50` only   |
 | 11| `animate-bounce`, `animate-pulse` on alerts           | Use static `Alert` component                           |
 | 12| Custom CSS classes like `glass-card`, `shimmer-shine` | Remove and use standard UI kit patterns                |
-| 13| `font-extrabold` overrides on Typography              | Let the variant handle font weight                     |
+| 13| `font-bold`/`font-extrabold` overrides on Typography  | Let the variant handle font weight — 600 is the ceiling |
 | 14| `text-[10px]`, `tracking-widest` custom overrides     | Use `Typography variant="caption"`                     |
 | 15| Per-card colored themes (blue card, green card, etc.) | Use uniform `Card` with plain muted icons              |
 | 16| `dark:bg-surface-950` for page background             | Use `dark:bg-surface-800`                              |

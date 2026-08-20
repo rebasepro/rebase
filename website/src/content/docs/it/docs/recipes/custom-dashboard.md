@@ -48,7 +48,7 @@ function DashboardView() {
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+            <h1 className="text-2xl font-semibold mb-6">Dashboard</h1>
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <StatCard title="Ordini Totali" value={stats.totalOrders} />
                 <StatCard title="Entrate" value={`$${stats.totalRevenue.toFixed(2)}`} />
@@ -70,7 +70,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
     return (
         <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6">
             <p className="text-sm text-surface-500">{title}</p>
-            <p className="text-3xl font-bold">{value}</p>
+            <p className="text-3xl font-semibold">{value}</p>
         </div>
     );
 }
