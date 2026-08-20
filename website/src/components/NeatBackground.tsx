@@ -177,6 +177,25 @@ function useOrientation() {
     return portrait;
 }
 
+// How long the page must be still before a gradient is allowed to compile.
+const SCROLL_QUIET_MS = 250;
+
+// One listener for the page, not one per instance: the home page mounts six of
+// these. `lastScrollAt` starts at 0 so a fresh load reads as "settled" and the
+// hero gradient still starts immediately.
+let lastScrollAt = 0;
+let watchingScroll = false;
+
+function watchScroll() {
+    if (watchingScroll || typeof window === "undefined") return;
+    watchingScroll = true;
+    window.addEventListener("scroll", () => { lastScrollAt = performance.now(); }, { passive: true });
+}
+
+function msSinceScroll() {
+    return performance.now() - lastScrollAt;
+}
+
 export function NeatBackground({ variant = "hero", randomize = true }: { variant?: "hero" | "a" | "b"; randomize?: boolean }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const portrait = useOrientation();
@@ -246,12 +265,37 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
             scrollHandler?.();
         };
 
+        // Building the gradient is one synchronous 300-450ms block, and an idle
+        // callback does not make that safe: a callback that overruns its deadline
+        // is not preempted, so taking an idle slot between two wheel events still
+        // costs the same twenty dropped frames. The divider variants mount on
+        // `client:visible`, which means they hydrate *while the page is moving* by
+        // construction — precisely when that block is most visible, and why the
+        // page stuttered every time a divider came into view.
+        //
+        // So wait for the scroll to stop rather than for the main thread to look
+        // free. The gradients are decorative and `aria-hidden`; arriving a quarter
+        // second after the page settles costs nothing. If the reader never stops,
+        // the gradient never compiles, which is the right answer too — someone
+        // travelling to the footer is not looking at a background.
+        let settleTimer: ReturnType<typeof setTimeout> | undefined;
+        const startWhenSettled = () => {
+            if (cancelled) return;
+            const quietFor = msSinceScroll();
+            if (quietFor < SCROLL_QUIET_MS) {
+                settleTimer = setTimeout(startWhenSettled, SCROLL_QUIET_MS - quietFor);
+                return;
+            }
+            startGradient();
+        };
+
         const scheduleGradient = () => {
             if (cancelled) return;
+            watchScroll();
             if ("requestIdleCallback" in window) {
-                requestIdleCallback(startGradient, { timeout: 2000 });
+                requestIdleCallback(startWhenSettled, { timeout: 2000 });
             } else {
-                setTimeout(startGradient, 200);
+                setTimeout(startWhenSettled, 200);
             }
         };
 
@@ -266,6 +310,7 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
         if (prefersReducedMotion) {
             return () => {
                 cancelled = true;
+                clearTimeout(settleTimer);
                 removeEventListener("load", scheduleGradient);
                 if (neat) neat.destroy();
             };
@@ -301,6 +346,7 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
 
         return () => {
             cancelled = true;
+            clearTimeout(settleTimer);
             removeEventListener("load", scheduleGradient);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
