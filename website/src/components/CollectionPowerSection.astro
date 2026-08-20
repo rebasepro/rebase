@@ -98,13 +98,20 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                 const svg = document.getElementById('cp-connectors');
                 if (!diagram || !svg) return;
 
+                // `#cp-diagram` is `hidden lg:flex`, so below 1024px it is
+                // display:none. Every rect read below then returns zero and every
+                // path appended is invisible — phones and tablets were paying for
+                // the whole routine, the largest single script cost on the page,
+                // to build a diagram they never show. One rect read decides it.
+                const dRect = diagram.getBoundingClientRect();
+                if (dRect.width === 0 || dRect.height === 0) return;
+
                 const codeBlock = diagram.querySelector('#cp-code-block');
                 if (!codeBlock) return;
 
                 const cards = diagram.querySelectorAll('[data-card]');
                 if (!cards.length) return;
 
-                const dRect = diagram.getBoundingClientRect();
                 const cRect = codeBlock.getBoundingClientRect();
 
                 // Code block center relative to diagram
