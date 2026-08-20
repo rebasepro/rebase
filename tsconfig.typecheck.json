@@ -190,6 +190,13 @@
     "packages/types/src",
     "packages/ui/src",
     "packages/utils/src",
+    // The scaffolded example function, which nothing type-checked. It is the
+    // file every custom route in every generated project is copied from, and it
+    // is authored against the same APIs as the rest of the repository — so when
+    // one of them is renamed, this is where the rename goes unnoticed. Narrow on
+    // purpose: the rest of the template is a project skeleton with placeholder
+    // package names, not a program this config can build.
+    "packages/cli/templates/template/backend/functions",
     "e2e"
   ],
   // Test files are excluded here and type-checked by `tsconfig.tests.json`

@@ -437,6 +437,19 @@ export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>,
      * Execute raw SQL against the database. Always present server-side for SQL
      * engines. Values interpolated into the query should be passed via
      * `params`, referenced as `$1`, `$2`, … placeholders in the query text.
+     *
+     * **Runtime note.** This is the one accessor on this object that is not
+     * portable. It runs on the database owner connection over a TCP socket, so
+     * it is available wherever the framework holds that connection — every Node
+     * deployment, self-hosted or managed — and not on a host that has no
+     * sockets and no business holding owner credentials.
+     *
+     * Nothing about that is a problem for a Node deployment, and it is not a
+     * reason to avoid it there. It is a reason not to build a function's *only*
+     * data path on it if that function may later move: `c.get("driver")` and
+     * `rebase.dataAsAdmin` go over the same wire wherever they run. A function
+     * that genuinely needs raw SQL can ask `runtimeKey()` and degrade, rather
+     * than discovering it at the call.
      */
     sql(query: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 }

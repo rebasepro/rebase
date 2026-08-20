@@ -1,6 +1,7 @@
 import { Server } from "http";
 import { RealtimeProvider } from "@rebasepro/types";
 import { logger } from "../utils/logger";
+import { drainBackgroundWork } from "../functions/wait-until";
 
 interface ShutdownConfig {
     server: Server;
@@ -144,6 +145,30 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 if (config.jobQueue) {
                     await config.jobQueue.stop();
                     logger.info("Job queue stopped");
+                }
+
+                // 1c. Wait for post-response work handed to `waitUntil()`.
+                //
+                // Before the pool closes and before realtime teardown, because
+                // that is the work most likely to be touching both: the whole
+                // point of `waitUntil` is the write nobody is waiting for, and
+                // a webhook delivery or an audit row is exactly what a deploy
+                // silently drops today. `waitUntil` exists chiefly so the same
+                // function file survives a move to an isolate host — this is
+                // what it buys on Node, where a floating promise at SIGTERM is
+                // otherwise lost with no trace at all.
+                //
+                // Bounded well inside the overall budget: outstanding work is
+                // worth waiting for, but not worth turning a rolling deploy
+                // into a stall.
+                const drainBudget = timeoutMs > 0 ? Math.min(5_000, timeoutMs) : 5_000;
+                const stillPending = await drainBackgroundWork(drainBudget);
+                if (stillPending > 0) {
+                    logger.warn(
+                        `${stillPending} background task(s) handed to waitUntil() did not finish within ` +
+                        `${drainBudget}ms and are being dropped. Give them an AbortSignal, or move work ` +
+                        "this long into a cron job or the job queue, where it is restartable."
+                    );
                 }
 
                 // 2. Tear down realtime services (LISTEN clients, debounce timers,

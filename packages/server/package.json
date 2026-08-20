@@ -33,7 +33,7 @@
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
+    "build": "vite build && vite build --config vite.config.functions.ts && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs && node --experimental-vm-modules --no-warnings ../../scripts/assert-portable-entry.mjs dist/functions/index.js",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --passWithNoTests --forceExit",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
@@ -43,6 +43,11 @@
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
       "import": "./dist/index.es.js"
+    },
+    "./functions": {
+      "types": "./dist/functions/index.d.ts",
+      "development": "./dist/functions/index.js",
+      "import": "./dist/functions/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -111,7 +116,8 @@
   },
   "files": [
     "bin",
-    "dist"
+    "dist",
+    "functions"
   ],
   "bin": {
     "rebase-server": "bin/rebase-server.js"

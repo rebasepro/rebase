@@ -54,6 +54,23 @@ export const TRACKED = [
          * again, this fails loudly instead of quietly recording a bare name.
          */
         mustHaveMembers: ["rebase"]
+    },
+    {
+        /**
+         * The portable authoring surface, tracked separately because it is a
+         * separate published entry point with a separate contract.
+         *
+         * If anything in this file deserves the strictest reading of "removing
+         * one breaks tenants at boot", it is this: `@rebasepro/server/functions`
+         * is what every custom function imports, and those functions are the
+         * user code most likely to be running unchanged across an image swap.
+         * Its surface is also small enough that a removal here is never an
+         * accident of refactoring — it is a decision, and it should have to
+         * look like one in a diff.
+         */
+        pkg: "@rebasepro/server/functions",
+        dts: "packages/server/dist/functions/index.d.ts",
+        mustHaveMembers: ["rebase"]
     }
 ];
 

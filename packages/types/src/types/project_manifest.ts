@@ -333,6 +333,36 @@ export interface NativeDependency {
  * `manifest.json` — generated, and the document the runtime and control plane
  * both validate against.
  */
+/**
+ * One custom function, as recorded in a built bundle.
+ *
+ * @see RebaseBundleManifest.functions
+ */
+export interface RebaseBundleFunction {
+    /**
+     * The filename without its extension — which is also the URL segment it
+     * mounts at (`/api/functions/<name>`), the API-key permission that grants
+     * it, and the name `REBASE_FUNCTIONS_ONLY` selects by. One identity, used
+     * everywhere.
+     */
+    name: string;
+    /** Path inside the bundle, so a host can point at the file. */
+    file: string;
+    /**
+     * `false` when the function's own source imports a Node built-in or a
+     * package that needs one.
+     *
+     * Descriptive, never a gate: nothing refuses to build or deploy on this. It
+     * says where this function *could* run, not where it should.
+     */
+    portable: boolean;
+    /**
+     * Why it is not portable — one short phrase per reason, deduplicated.
+     * Absent when it is.
+     */
+    requires?: string[];
+}
+
 export interface RebaseBundleManifest {
     /** @see BUNDLE_FORMAT_VERSION */
     bundleFormat: number;
@@ -373,6 +403,28 @@ export interface RebaseBundleManifest {
     entry: RebaseBundleEntrypoints;
     /** Collection slugs contained in the bundle, for quick inspection. */
     collections?: string[];
+    /**
+     * Every custom function in the bundle, named and classified.
+     *
+     * Two things are recorded per function, and both are answers a host would
+     * otherwise have to get by importing user code:
+     *
+     * - **What it is called.** That name is the function's identity everywhere —
+     *   the URL segment it mounts at, the `functions/<name>` API-key
+     *   permission, the value `REBASE_FUNCTIONS_ONLY` selects by. A host that
+     *   wants to give one slow function its own replica count currently has to
+     *   boot the bundle to discover what is in it.
+     * - **Whether it needs Node.** Purely descriptive: a function that opens a
+     *   file or runs raw SQL is a fine function, and every deployment today is
+     *   a Node process. It is recorded because the question "which of these
+     *   could run somewhere else" has to be answerable from the artifact, and
+     *   because answering it per-file after the fact — across a codebase
+     *   already written — is the expensive version of the same question.
+     *
+     * Absent on a bundle built before this field existed, which is why every
+     * consumer must treat it as optional rather than as an empty list.
+     */
+    functions?: RebaseBundleFunction[];
     hooks: {
         /**
          * Whether the dependency closure contains native code.

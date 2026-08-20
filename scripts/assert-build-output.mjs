@@ -55,6 +55,50 @@ function declaredEntryPoints(manifest) {
     return [...found];
 }
 
+/**
+ * Redirect directories — a `<subpath>/package.json` whose `main`/`types` point
+ * back into `dist`.
+ *
+ * These exist because TypeScript's legacy `moduleResolution: "node"` ignores
+ * the `exports` map entirely and resolves a subpath as a directory. A project
+ * scaffolded by `rebase init` compiles that way, so `@rebasepro/server/functions`
+ * type-checks *only* through one of these. They are inert at runtime — Node
+ * honours `exports` and never looks at them — which is exactly what makes a
+ * broken one invisible: the import keeps working, the types silently become
+ * `any`, and the first symptom is an unrelated-looking implicit-any error in
+ * somebody else's project.
+ *
+ * So they are checked here with the declared entry points, and for the same
+ * reason.
+ */
+function redirectTargets(pkgDir, manifest) {
+    const targets = [];
+    for (const entry of manifest.files ?? []) {
+        if (typeof entry !== "string" || entry === "dist" || entry === "bin") continue;
+        const redirect = resolve(pkgDir, entry, "package.json");
+        if (!existsSync(redirect)) continue;
+
+        let json;
+        try {
+            json = JSON.parse(readFileSync(redirect, "utf8"));
+        } catch {
+            targets.push({ from: `${entry}/package.json`, target: "(unparseable JSON)" });
+            continue;
+        }
+
+        for (const field of ["main", "module", "types", "typings"]) {
+            const value = json[field];
+            if (typeof value !== "string") continue;
+            targets.push({
+                from: `${entry}/package.json#${field}`,
+                target: value,
+                path: resolve(pkgDir, entry, value)
+            });
+        }
+    }
+    return targets;
+}
+
 const entries = declaredEntryPoints(pkg);
 const missing = entries.filter((entry) => !existsSync(resolve(pkgDir, entry)));
 
@@ -76,4 +120,25 @@ Both look like the consumer is misconfigured. It isn't.
     process.exit(1);
 }
 
-console.log(`✓ ${pkg.name}: ${entries.length} declared entry point${entries.length === 1 ? "" : "s"} present`);
+const redirects = redirectTargets(pkgDir, pkg);
+const brokenRedirects = redirects.filter((redirect) => !redirect.path || !existsSync(redirect.path));
+
+if (brokenRedirects.length > 0) {
+    console.error(`\n\x1b[31m✖ ${pkg.name} has a broken resolution redirect\x1b[0m:\n`);
+    for (const redirect of brokenRedirects) {
+        console.error(`    ${redirect.from} → ${redirect.target} (does not exist)`);
+    }
+    console.error(`
+A redirect directory is how a subpath import type-checks under TypeScript's
+legacy 'moduleResolution: "node"', which ignores the exports map. Node never
+reads it, so a broken one does not fail at runtime and does not fail at import:
+the module resolves and its types quietly become 'any'. The first symptom is an
+implicit-any error in a consumer's own file, pointing at their code.
+`);
+    process.exit(1);
+}
+
+const suffix = redirects.length > 0
+    ? `, ${redirects.length} redirect target${redirects.length === 1 ? "" : "s"} resolved`
+    : "";
+console.log(`✓ ${pkg.name}: ${entries.length} declared entry point${entries.length === 1 ? "" : "s"} present${suffix}`);

@@ -1,4 +1,5 @@
 import type { RebaseServerClient } from "@rebasepro/types";
+import { hostEnv } from "./utils/host";
 
 /**
  * The backing instance lives on a process-global slot, NOT in a module-local
@@ -20,16 +21,63 @@ import type { RebaseServerClient } from "@rebasepro/types";
  */
 const INSTANCE_SLOT = Symbol.for("@rebasepro/server:singleton-instance");
 
+/**
+ * A *function* that answers "which client is this call for", for hosts where
+ * one answer per process is the wrong shape.
+ *
+ * A Node server boots once and serves every request from the same client, so
+ * {@link INSTANCE_SLOT} is the whole story. An isolate-based host is different
+ * in a way that matters: the environment arrives attached to the **request**,
+ * not to the module, so there is nothing to publish at import time, and an
+ * isolate can be reused across requests that must not share state. Such a host
+ * registers a resolver — typically reading an `AsyncLocalStorage` populated per
+ * request — and it is consulted first.
+ *
+ * This exists now, before there is a host that needs it, because of what it
+ * protects: `rebase` is a lazy Proxy, so every property access already goes
+ * through `getInstance()`. Backing that lookup with a resolver is therefore the
+ * entire porting story for the singleton — **no function anyone has already
+ * written changes**. Take the resolver away and the only alternative is asking
+ * users to thread a client through their handlers, which is a rewrite of every
+ * function file in existence.
+ */
+const RESOLVER_SLOT = Symbol.for("@rebasepro/server:singleton-resolver");
+
 type GlobalWithInstance = typeof globalThis & {
     [INSTANCE_SLOT]?: RebaseServerClient | null;
+    [RESOLVER_SLOT]?: (() => RebaseServerClient | null) | null;
 };
 
 function getInstance(): RebaseServerClient | null {
-    return (globalThis as GlobalWithInstance)[INSTANCE_SLOT] ?? null;
+    const global = globalThis as GlobalWithInstance;
+    // Resolver first: a host that registered one knows something per-request
+    // that a process-wide slot cannot express, and a host that boots normally
+    // never registers one.
+    const resolver = global[RESOLVER_SLOT];
+    if (resolver) {
+        const resolved = resolver();
+        if (resolved) return resolved;
+    }
+    return global[INSTANCE_SLOT] ?? null;
 }
 
 function setInstance(client: RebaseServerClient | null): void {
     (globalThis as GlobalWithInstance)[INSTANCE_SLOT] = client;
+}
+
+/**
+ * @internal Register the per-call resolver described on {@link RESOLVER_SLOT}.
+ *
+ * For runtime adapters, not for application code. Pass `null` to unregister.
+ * Returns the previous resolver so an adapter can restore it.
+ */
+export function _setRebaseResolver(
+    resolve: (() => RebaseServerClient | null) | null
+): (() => RebaseServerClient | null) | null {
+    const global = globalThis as GlobalWithInstance;
+    const previous = global[RESOLVER_SLOT] ?? null;
+    global[RESOLVER_SLOT] = resolve;
+    return previous;
 }
 
 /**
@@ -45,7 +93,7 @@ export function _initRebase(client: RebaseServerClient): void {
  * Throws an error if used in a non-test environment to prevent production abuse.
  */
 export function _setRebaseMock(mockInstance: Partial<RebaseServerClient>): void {
-    if (process.env.NODE_ENV !== "test") {
+    if (hostEnv().NODE_ENV !== "test") {
         throw new Error("_setRebaseMock can only be called in a test environment (NODE_ENV=test).");
     }
     setInstance({ ...(getInstance() || {} as RebaseServerClient),
@@ -56,7 +104,7 @@ export function _setRebaseMock(mockInstance: Partial<RebaseServerClient>): void 
  * @internal Resets the singleton instance, useful for afterEach() in test suites.
  */
 export function _resetRebaseMock(): void {
-    if (process.env.NODE_ENV !== "test") {
+    if (hostEnv().NODE_ENV !== "test") {
         throw new Error("_resetRebaseMock can only be called in a test environment.");
     }
     setInstance(null);

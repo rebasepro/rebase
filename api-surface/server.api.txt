@@ -84,33 +84,47 @@ function createTwitterProvider
 function defaultBackoff
 function defineCron
 function defineFunction
+function drainBackgroundWork
 function envSuffixForKey
 function escapeHtml
 function extractUserFromToken
 function findCollectionConfigProblems
 function generateSecurePassword
+function getApiKey
+function getDriver
 function getEmailVerificationTemplate { html, subject, text }
+function getEnv
 function getJwks { keys }
 function getMagicLinkTemplate { html, subject, text }
 function getPasswordResetTemplate { html, subject, text }
+function getRequestId
+function getRoles
+function getUser
+function getUserId
 function getUserInvitationTemplate { html, subject, text }
 function getWelcomeEmailTemplate { html, subject, text }
 function hasAsymmetricSigningKey
+function hasRole
 function hashPassword
 function html
 function httpMethodToOperation
+function identityResolved
 function initializeDataSource
 function initializeDataSources
 function initializeRebaseBackend
 function installShutdownHandlers
+function isAdmin
 function isApiKeyToken
 function isAuthAdapter
+function isAuthenticated
 function isConcurrentDdlRace
 function isDatabaseAdapter
 function isDuplicateObjectRace
 function isLocalhostOrigin
+function isNodeRuntime
 function isOperationAllowed
 function isTransformableImage
+function lazyResource
 function listBackupObjects
 function listenWithPortRetry
 function loadBootEnv
@@ -123,16 +137,21 @@ function loadCronJobsWithDiagnostics
 function loadDeclaredStorageSources
 function loadEnv
 function loadFunctionsFromDirectory
+function loadFunctionsWithDiagnostics
 function loadUsersCollection
 function oauthCodeFlowSchema
 function parseBackupDestination
 function parseBackupTimestamp
 function parseTransformOptions
+function pendingBackgroundWork
 function pkceTokenParams
 function providerVerifiedEmail
 function raw
 function readBackupBytes
 function readBundleManifest
+function requireDriver
+function requireEnv
+function requireRole
 function resolveAuthHooks
 function resolveAuthOptions
 function resolveCorsOrigin
@@ -144,6 +163,7 @@ function resolveRequireAuth
 function resolveStorageBackend
 function resolveStorageSources
 function runFromBundle
+function runtimeKey
 function safeCompare
 function serveSPA
 function transformImage
@@ -154,6 +174,7 @@ function validateCronExpression
 function validatePasswordStrength
 function verifyOidcIdToken
 function verifyPassword
+function waitUntil
 interface AccessTokenPayload { aal, amr, displayName, email, iat, mfa_verified, photoURL, roles, uid }
 interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
@@ -196,6 +217,7 @@ interface EmailService { isConfigured, send, verifyConnection }
 interface EnqueueOptions { delayMs, idempotencyKey, maxAttempts }
 interface ErrorResponse { error }
 interface FetchCollectionOptions { collection, databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
+interface FunctionUser { email, roles, uid }
 interface GCSStorageConfig { allowedMimeTypes, bucket, credentials, keyFilename, maxFileSize, projectId, signedUrlExpiration, type }
 interface GoogleProviderConfig { clientId, clientSecret }
 interface ImageTransformOptions { fit, format, height, quality, width }
@@ -213,6 +235,7 @@ interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, p
 interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, manifest, staticApps }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
+interface LoadedFunctions { functions, problems }
 interface LocalStorageConfig { allowedMimeTypes, basePath, baseUrl, maxFileSize, type }
 interface Logger { child, debug, error, info, warn }
 interface MagicLinkTokenInfo { expiresAt, uid }
@@ -290,3 +313,33 @@ type StorageOperation
 type UnknownKeyPolicy
 type UserInvitationTemplateFunction
 type WelcomeEmailTemplateFunction
+
+## @rebasepro/server/functions
+class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+const requireAdmin
+const requireAuth
+function defineFunction
+function env
+function getApiKey
+function getDriver
+function getEnv
+function getRequestId
+function getRoles
+function getUser
+function getUserId
+function hasRole
+function identityResolved
+function isAdmin
+function isAuthenticated
+function isNodeRuntime
+function lazyResource
+function requireDriver
+function requireEnv
+function requireRole
+function runtimeKey
+function waitUntil
+interface ApiResponse { data, error, meta }
+interface FunctionUser { email, roles, uid }
+interface RebaseFunctionContext { rebase }
+type HonoEnv { Variables }

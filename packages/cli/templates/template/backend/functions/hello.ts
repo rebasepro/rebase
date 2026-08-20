@@ -1,4 +1,10 @@
-import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
+import {
+    defineFunction,
+    requireAuth,
+    requireAdmin,
+    getUser,
+    getUserId
+} from "@rebasepro/server/functions";
 
 /**
  * Example custom function route.
@@ -11,17 +17,24 @@ import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
  * Call from the client SDK:
  *   const result = await client.call("functions/hello", { name: "World" });
  *
- * Authored with `defineFunction`, which hands you a pre-typed Hono app
- * (so `c.get("user")` / `c.get("driver")` are typed) and the `rebase`
- * singleton via the injected context — use any Hono middleware, define any
- * HTTP methods, access the request/response directly.
+ * Authored with `defineFunction`, which hands you a pre-typed Hono app (so
+ * `c.get("user")` / `c.get("driver")` are typed) and the `rebase` singleton via
+ * the injected context — use any Hono middleware, define any HTTP methods,
+ * access the request/response directly.
+ *
+ * **Import from `@rebasepro/server/functions`, not `@rebasepro/server`.** Same
+ * code, but that entry point is the portable one: it pulls in nothing that
+ * needs Node, so a function written against it can run on any JavaScript
+ * runtime. The package root reaches the whole framework — the boot sequence,
+ * the file loaders, the WebSocket layer — which is correct for a server
+ * entrypoint and is not what a route handler needs.
  *
  * **Custom functions are not authenticated for you.** The functions router
  * parses the caller's token and puts the result in the context, but it does
  * not reject anonymous requests — a webhook receiver (Stripe, GitHub) has no
  * token to send, and that has to keep working. So every route in this folder
- * is public until you say otherwise, and reading `c.get("user")` is not a
- * check: an anonymous caller just gets `undefined` and the handler runs anyway.
+ * is public until you say otherwise, and reading `getUser(c)` is not a check:
+ * an anonymous caller just gets `undefined` and the handler runs anyway.
  *
  * Say otherwise with `requireAuth` / `requireAdmin`, in the route's own
  * middleware slot as below. `requireAuth` answers 401 without a valid token.
@@ -35,18 +48,24 @@ import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
  * bypass** — your policies are still evaluated, just against that identity. So
  * `policy.serverContext()` is false for it (that arm means "no uid at all"),
  * and anything an `admin` user can reach, it can reach too. For request-scoped
- * data access use c.get("user") and c.get("driver"), which carry the caller's
- * identity. `rebase.sql()` is the real bypass — owner connection, no policies.
- * (`rebase` also exposes auth, storage, email.)
+ * data access use `getUser(c)` and `getDriver(c)`, which carry the caller's
+ * identity. `rebase.sql()` is the real bypass — owner connection, no policies,
+ * and the one accessor that is Node-only. (`rebase` also exposes auth, storage,
+ * email.)
+ *
+ * Two habits worth keeping from the start, because both are free here and
+ * expensive to retrofit later:
+ *
+ *   - Read configuration **inside** a handler — `requireEnv(c, "STRIPE_KEY")`
+ *     or `lazyResource(...)` — never `process.env.X` at the top of the file. A
+ *     module-scope read that comes back undefined takes the whole file down at
+ *     import time, and the loader reports that only as "skipped".
+ *   - Wrap work that outlives the response in `waitUntil(c, promise)` rather
+ *     than leaving a floating promise. It is what lets a graceful shutdown wait
+ *     for your webhook instead of dropping it.
  */
 export default defineFunction((app, { rebase }) => {
     void rebase; // available for dataAsAdmin/auth/storage/email — see commented usage below
-
-    /** The caller's id, or undefined when nobody is signed in. */
-    const uidOf = (user: unknown): string | undefined =>
-        (typeof user === "object" && user !== null && "uid" in user)
-            ? (user as { uid?: string }).uid
-            : undefined;
 
     // ── Public ────────────────────────────────────────────────────────────
     // Deliberately public: no guard, so anyone can call it. That is a fine
@@ -68,17 +87,17 @@ export default defineFunction((app, { rebase }) => {
         // await rebase.email.send({
         //     to: "admin@example.com",
         //     subject: "Function called",
-        //     html: `<p>Hello from ${uidOf(c.get("user"))}!</p>`,
+        //     html: `<p>Hello from ${getUserId(c)}!</p>`,
         // });
         //
-        // Admin-scoped data (bypasses RLS — trusted work only):
+        // Admin-scoped data (RLS evaluated as the `admin` role — trusted work
+        // only):
         // const authors = await rebase.dataAsAdmin.authors.find({ limit: 5 });
-        // For user-scoped data (RLS applies), use the request-scoped driver
-        // (c.get("driver")), which carries the caller's identity.
+        // For user-scoped data (RLS applies as the caller), use getDriver(c).
 
         return c.json({
             message: `Hello, ${body.name || "World"}!`,
-            user: uidOf(c.get("user"))
+            user: getUserId(c)
         });
     });
 
@@ -86,6 +105,8 @@ export default defineFunction((app, { rebase }) => {
     // Order matters: `requireAuth` first (401 for anonymous), then
     // `requireAdmin` (403 for a signed-in non-admin).
     app.get("/stats", requireAuth, requireAdmin, (c) => {
-        return c.json({ admin: uidOf(c.get("user")) });
+        // `getUser` returns a narrowed `{ uid, roles, ...claims }` — no cast,
+        // and `roles` is always an array.
+        return c.json({ admin: getUser(c)?.uid });
     });
 });

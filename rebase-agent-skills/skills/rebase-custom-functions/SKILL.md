@@ -15,6 +15,14 @@ Custom functions let you add arbitrary HTTP endpoints to your Rebase backend. Th
 2. Default-export a **Hono app** (or a factory function that returns one)
 3. Rebase auto-mounts it at `/api/functions/{filename}`
 
+> **🚨 IMPORT PATH — ALWAYS `@rebasepro/server/functions`, NEVER `@rebasepro/server`.**
+> Inside `backend/functions/` use the `/functions` subpath. It is the portable
+> authoring surface — it pulls in nothing that requires Node, so the function can
+> run on any JavaScript runtime — and it carries typed context accessors
+> (`getUser`, `getDriver`) so you never cast `c.get("user")`. The package root
+> reaches the entire framework and is for a server entrypoint, not a route
+> handler. Both work today; only one of them still works later.
+
 ## Setup
 
 Enable custom functions by adding `functionsDir` to your backend config:
@@ -28,30 +36,31 @@ const backend = await initializeRebaseBackend({
 
 ## Creating a Function
 
-Each file default-exports a Hono app:
+Use `defineFunction` — it gives you a pre-typed Hono app plus the `rebase`
+singleton, and returns exactly the app a hand-written `new Hono<HonoEnv>()`
+would:
 
 ```typescript
 // backend/functions/send-invoice.ts
-import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
+import { defineFunction, requireAuth } from "@rebasepro/server/functions";
 
-const app = new Hono<HonoEnv>();
+export default defineFunction((app, { rebase }) => {
+    app.post("/", requireAuth, async (c) => {
+        const { orderId, email } = await c.req.json();
 
-app.post("/", async (c) => {
-    const { orderId, email } = await c.req.json();
+        await rebase.email.send({
+            to: email,
+            subject: `Invoice for order ${orderId}`,
+            html: "<p>Thanks for your order.</p>"
+        });
 
-    // Your custom logic here — send email, call Stripe, generate PDF, etc.
-    console.log(`Sending invoice for order ${orderId} to ${email}`);
+        return c.json({ success: true, message: `Invoice sent to ${email}` });
+    });
 
-    return c.json({ success: true, message: `Invoice sent to ${email}` });
+    app.get("/status/:id", requireAuth, (c) => {
+        return c.json({ invoiceId: c.req.param("id"), status: "sent" });
+    });
 });
-
-app.get("/status/:id", async (c) => {
-    const id = c.req.param("id");
-    return c.json({ invoiceId: id, status: "sent" });
-});
-
-export default app;
 ```
 
 This auto-mounts as:
@@ -67,7 +76,7 @@ You can also export a factory function:
 ```typescript
 // backend/functions/webhooks.ts
 import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
+import type { HonoEnv } from "@rebasepro/server/functions";
 
 export default function () {
     const app = new Hono<HonoEnv>();
@@ -88,38 +97,115 @@ export default function () {
 }
 ```
 
-## Accessing Auth & Services
+## Guarding Routes
 
-Custom functions run within the Hono middleware chain, so you have access to auth context:
+> **🚨 CRITICAL FOR AGENTS: functions are PUBLIC by default.** The router parses
+> the caller's token and puts the result in the context, but does not reject
+> anonymous requests — webhook receivers have no token to send. Reading
+> `getUser(c)` is **not** a check: an anonymous caller gets `undefined` and the
+> handler runs anyway. Every route needs a deliberate decision.
 
 ```typescript
 // backend/functions/admin-export.ts
-import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
+import {
+    defineFunction, requireAuth, requireAdmin, requireRole, requireDriver
+} from "@rebasepro/server/functions";
 
-const app = new Hono<HonoEnv>();
-
-app.get("/", async (c) => {
-    // Access the authenticated user from middleware
-    const user = c.get("user");
-    if (!user) {
-        return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    // Access the data driver to query collections.
-    // fetchCollection takes ONE object; the collection goes in `path`.
-    const driver = c.get("driver");
-    const entities = await driver.fetchCollection({
-        path: "products",
-        limit: 1000,
-        orderBy: "createdAt",
-        order: "desc"
+export default defineFunction((app) => {
+    // 401 for anonymous callers.
+    app.get("/mine", requireAuth, async (c) => {
+        // The request-scoped driver runs as the CALLER: RLS applies to them.
+        // fetchCollection takes ONE object; the collection goes in `path`.
+        const rows = await requireDriver(c).fetchCollection({
+            path: "products",
+            limit: 1000
+        });
+        return c.json({ data: rows });
     });
 
-    return c.json({ data: entities });
-});
+    // 401 anonymous, then 403 without an administrative role. Order matters.
+    app.get("/", requireAuth, requireAdmin, async (c) => {
+        return c.json({ data: await requireDriver(c).fetchCollection({ path: "products" }) });
+    });
 
-export default app;
+    // Any one of the named roles.
+    app.post("/publish", requireAuth, requireRole("editor", "admin"), (c) => c.json({ ok: true }));
+});
+```
+
+Put guards in the **route's own middleware slot**, as above — not
+`app.use("/*", requireAuth)`. `use()` covers only routes declared *below* it, so
+a route appended later at the bottom of the file is silently unprotected.
+
+## Reading the caller
+
+Use the typed accessors, never a cast:
+
+```typescript
+import { defineFunction, getUser, getUserId, getRoles, isAdmin } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    app.get("/me", (c) => {
+        const user = getUser(c);            // { uid, roles, ...claims } | undefined
+        if (!user) return c.json({ error: "Unauthorized" }, 401);
+        return c.json({ uid: getUserId(c), roles: getRoles(c), admin: isAdmin(c) });
+    });
+});
+```
+
+`getUser` narrows whatever the middleware resolved: `uid` is a string, `roles` is
+always an array. `getDriver(c)` / `requireDriver(c)` return the caller-scoped
+driver; `getApiKey(c)` and `getRequestId(c)` are there too.
+
+## Configuration — never at module scope
+
+> **🚨 CRITICAL FOR AGENTS: never write `process.env.X` at the top of a function
+> file.** It is evaluated when the file is *imported*. If the variable is unset,
+> the import throws and the loader reports the whole file as a **skipped
+> function** — the route 404s with the reason buried in a boot log. Read
+> configuration inside the handler.
+
+```typescript
+import { defineFunction, requireEnv, lazyResource } from "@rebasepro/server/functions";
+
+// Built once, on first use — not at import time.
+const apiKey = lazyResource((env) => env.PRICING_API_KEY ?? "");
+
+export default defineFunction((app) => {
+    app.get("/price", async (c) => {
+        const endpoint = requireEnv(c, "PRICING_API_URL");   // throws naming the variable
+        const response = await fetch(endpoint, {
+            headers: { authorization: `Bearer ${apiKey(c)}` }
+        });
+        return c.json(await response.json());
+    });
+});
+```
+
+`getEnv(c)` returns the whole bag; `env(c, "NAME")` one value (trimmed, blank =
+unset). `rebase doctor` reports module-scope reads.
+
+## Work that outlives the response
+
+> **🚨 CRITICAL FOR AGENTS: do not leave a floating promise.** Use
+> `waitUntil(c, promise)`. A floating promise is dropped when the process shuts
+> down mid-deploy; `waitUntil` is what a graceful shutdown waits for, and what an
+> isolate-based host needs to keep the isolate alive past the response.
+
+```typescript
+import { defineFunction, requireAuth, waitUntil } from "@rebasepro/server/functions";
+
+export default defineFunction((app, { rebase }) => {
+    app.post("/orders", requireAuth, async (c) => {
+        const order = await c.req.json();
+        waitUntil(c, rebase.email.send({
+            to: "warehouse@example.com",
+            subject: `Order ${order.id}`,
+            html: "<p>Pick and pack</p>"
+        }));
+        return c.json({ received: true });   // caller does not wait
+    });
+});
 ```
 
 ### Use the `rebase` singleton for platform services — not raw SDKs
@@ -130,7 +216,7 @@ export default app;
 > the platform already provides.
 
 ```typescript
-import { rebase } from "@rebasepro/server";
+import { rebase } from "@rebasepro/server/functions";
 
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
 await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
@@ -140,9 +226,9 @@ await rebase.email.send({ to, subject, html: "<p>Thanks for your order.</p>" });
 | Need | ✅ Use | ❌ Never import directly |
 |------|--------|--------------------------|
 | Object storage | `rebase.storage` (see **rebase-storage** skill) | `@aws-sdk/client-s3`, `@google-cloud/storage` |
-| Database / collections | `rebase.dataAsAdmin` (or `c.get("driver")`) | `pg`, `drizzle` clients by hand |
+| Database / collections | `rebase.dataAsAdmin` (or `requireDriver(c)`) | `pg`, `drizzle` clients by hand |
 | Email | `rebase.email` | `nodemailer`, provider SDKs |
-| Auth / users | `rebase.auth` / `c.get("user")` | custom JWT parsing |
+| Auth / users | `rebase.auth` / `getUser(c)` | custom JWT parsing |
 
 Importing a provider SDK hardcodes one backend, bypasses the app's config
 (`STORAGE_TYPE`, `DATABASE_URL`, SMTP, …), and defeats the point of the platform.
@@ -163,10 +249,10 @@ The `user` object set by the auth middleware uses reserved values for system ide
 
 > **TIP:** Use these to differentiate internal vs. external callers in your custom functions:
 > ```typescript
-> app.get("/sensitive-data", async (c) => {
->     const user = c.get("user");
->     const isInternal = user?.uid === "service" || user?.roles?.includes("admin");
+> app.get("/sensitive-data", requireAuth, (c) => {
+>     const isInternal = getUserId(c) === "service" || isAdmin(c);
 >     // Return full or masked data based on identity
+>     return c.json({ full: isInternal });
 > });
 > ```
 
@@ -276,8 +362,34 @@ const result = await client.functions.invoke('extract-job', { url });
 
 - Files must be `.ts` or `.js` (not `.d.ts`, not `.test.*`)
 - `index.ts` / `index.js` are ignored
+- **Top level only** — `functions/admin/users.ts` is compiled but never mounted. Flatten it (`admin-users.ts`)
 - Each file's default export must be a Hono app or a factory returning one
 - The loader uses duck-typing (`fetch()` + `routes` array) — any Hono-compatible instance works
+
+## Runtime Portability
+
+A function is a Hono app, and Hono runs everywhere. What pins a function to a
+Node process is only what its own file imports and touches. None of this is a
+restriction on what you may write — every deployment today is Node — but an
+agent writing a new function should default to the portable choice, because it
+costs nothing and cannot be retrofitted cheaply.
+
+**Portable:** everything from `@rebasepro/server/functions`; `requireDriver(c)`
+and `rebase.dataAsAdmin`; `rebase.auth`/`storage`/`email`; `fetch`, `URL`,
+`crypto.subtle`, `TextEncoder`.
+
+**Node-only:** `rebase.sql()` (owner TCP connection); a directly imported
+`pg`/`drizzle-orm`/`mongodb` client; Node built-ins (`fs`, `path`, `node:crypto`,
+`child_process`); packages built on them (`jsonwebtoken`, `nodemailer`, `sharp`,
+`bcrypt`).
+
+**Bugs on every runtime:** `process.env` at module scope; floating promises
+instead of `waitUntil`; relying on a handler continuing after its request timed
+out.
+
+`runtimeKey()` / `isNodeRuntime()` let a function degrade rather than fail.
+`rebase build` records a per-function verdict in the bundle manifest and
+`rebase doctor` reports it without building.
 
 ## References
 

@@ -17,6 +17,8 @@ import {
     findEnvFile
 } from "../utils/project";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
+import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
+import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 
 /**
  * Files that can hold a connection string the project actually runs on.
@@ -105,6 +107,37 @@ function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): void {
  * what it does is the one question that cannot require being somewhere
  * particular to ask.
  */
+/**
+ * What each custom function needs from its host.
+ *
+ * Prints nothing when there is nothing to say — which is the common case, and
+ * the reason it can afford to run every time. When it does print, the ordering
+ * is deliberate: the one finding that is a bug *today* comes first, and the
+ * rest is a single descriptive line about where these functions could run.
+ */
+function reportFunctionPortability(projectRoot: string): void {
+    let results: ReturnType<typeof analyseFunctionsDirectory>;
+    try {
+        const backend = findBackendApp(loadManifest(projectRoot).manifest);
+        if (!backend) return;
+        const paths = resolveBackendPaths(backend.app, projectRoot);
+        results = analyseFunctionsDirectory(path.join(projectRoot, paths.functions), projectRoot);
+    } catch {
+        // A project with no manifest, or one shaped differently — doctor has
+        // plenty else to report, and this section is advisory.
+        return;
+    }
+
+    const lines = summarisePortability(results);
+    if (lines.length === 0) return;
+
+    console.log(chalk.bold("\nCustom functions"));
+    for (const line of lines) {
+        console.log(line.trimStart().startsWith("⚠") ? chalk.yellow(line) : chalk.gray(line));
+    }
+    console.log(chalk.gray("      See https://rebase.pro/docs/backend/custom-functions#runtime-portability"));
+}
+
 function printDoctorHelp(): void {
     console.log(`
 ${chalk.bold("rebase doctor")} — Check a project for drift and misconfiguration
@@ -157,6 +190,11 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // URL is the problem then anything that tries to connect with it first will
     // fail with a worse message.
     reportLibpqUrlProblems(findLibpqUrlProblems(projectRoot, envFile));
+
+    // Same reasoning: no database needed, and one of these findings — a
+    // `process.env` read at module scope — is a live failure whose only symptom
+    // today is a function quietly missing from `GET /api/functions`.
+    reportFunctionPortability(projectRoot);
 
     try {
         const isTs = pluginCli.endsWith(".ts");

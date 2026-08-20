@@ -87,7 +87,7 @@ Drop a Hono app in `backend/functions/` and it's auto-mounted at `/api/functions
 
 ```typescript
 // backend/functions/hello.ts
-import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
+import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
     // Deliberately public — anyone can call this.

@@ -2,6 +2,7 @@ import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
+import { hostEnv } from "../utils/host";
 
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
@@ -262,7 +263,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             (reqId ? ` [${reqId}]` : "")
         );
         // In dev mode, show a one-time hint to run `rebase doctor`
-        if (!_schemaDriftHinted && process.env.NODE_ENV !== "production") {
+        if (!_schemaDriftHinted && hostEnv().NODE_ENV !== "production") {
             _schemaDriftHinted = true;
             logger.warn([
                 "",
@@ -326,7 +327,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // outside production.
     const dbDetails = dbError ? {
         dbCode: dbError.code,
-        ...(process.env.NODE_ENV !== "production" && {
+        ...(hostEnv().NODE_ENV !== "production" && {
             dbMessage: dbError.message,
             ...(dbError.detail && { detail: dbError.detail }),
             ...(dbError.hint && { hint: dbError.hint })
