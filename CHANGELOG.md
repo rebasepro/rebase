@@ -48,6 +48,12 @@
 
   The driver is told two things separately — whether this process consumes change events, and whether it owns the DDL — because they genuinely come apart. An `api` behind an external migration Job subscribes without provisioning.
 
+### Fixed
+
+- **A select in a side panel opens where you can see it.** The panel hands its descendants a portal host — itself — so their popups open inside the modal, where the focus and scroll locks let them be used at all. It also carried `will-change: transform` for the slide-in, and that (like `transform`, `filter` or `perspective`) makes an element a *containing block* for its `position: fixed` descendants. A select dropdown is fixed and positioned in viewport coordinates, so inside the panel those coordinates resolved against the panel instead and every list came out displaced by the panel's own left offset — far enough, on a right-hand panel, to open past the edge of the screen. Open, correctly stacked, and nowhere anyone could see it, which is indistinguishable from a select that ignores clicks.
+
+  Popovers, menus and date pickers in the same panel were unaffected: their positioning measures the offset parent and subtracts it. Only the select's item-aligned placement does the arithmetic against the viewport itself, which is why one control looked broken while its neighbours did not.
+
 ### Testing & CI
 
 - **Type names claimed in prose are checked, not just the ones in code fences.** Every doc verifier so far read *fenced code* — `check-api-names` greps imports, `typecheck-snippets` compiles the fences outright. A markdown **table** is neither, and a reference table is the shape nobody runs: it is where the agent skills had drifted furthest. `check-prose-types.mjs` reads backticked `*Props` / `*Config` / `*Options` / `*Hooks` / `*Context` / `*Callbacks` names *outside* fences and requires that something in `packages/*/src` declares them.
