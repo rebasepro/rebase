@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **A vendored tree too large to upload is not vendored.** The control plane refuses a bundle over 100 MB, and vendoring is the one thing that can push a bundle near it — so a build that crossed the line shipped a bundle whose deploy would be rejected, with the remedy (`--no-vendor`) only discoverable by knowing that had happened. Past 200 MB on disk the tree is now thrown away and the bundle ships unvendored: 40–60s of cold start, and a deploy that works. `--vendor` keeps it regardless, for a deploy that builds from source and never uploads the tree at all.
+
+  The ceiling assumes a pessimistic 2× floor on compression, because the limit is on the *compressed* upload while this measures the tree on disk. The warning below it now says which quantity is which — "201 MB, close to the 100 MB upload limit" was two different numbers described as one, and read as nonsense.
+
 ## [0.16.0] - 2026-08-20
 
 ### Added

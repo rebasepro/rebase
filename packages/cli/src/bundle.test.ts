@@ -10,7 +10,8 @@ import {
     findUnusedServerEntry,
     foldStaticIntoBundle,
     normalizeEsmSpecifiers,
-    vendorDependencies
+    vendorDependencies,
+    VENDOR_SIZE_MAX_BYTES
 } from "./bundle";
 
 let scratch: string;
@@ -680,6 +681,48 @@ describe("vendorDependencies", () => {
                 const dir = path.join(cwd, "node_modules", "@rebasepro", "server-postgres");
                 fs.mkdirSync(dir, { recursive: true });
                 fs.writeFileSync(path.join(dir, "package.json"), "{}");
+            }
+        });
+
+        expect(result.vendored).toBe(true);
+        expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(true);
+    });
+
+    it("refuses a tree too large to upload, rather than shipping a 413", () => {
+        // The control plane's limit is on the compressed upload and this
+        // measures the tree on disk, so the ceiling assumes a pessimistic 2x
+        // compression floor. Past it, an unvendored bundle deploys and a
+        // vendored one does not.
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { huge: "^1" },
+            nativeModules: [],
+            run: (_cmd, _args, cwd) => {
+                const dir = path.join(cwd, "node_modules", "huge");
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(path.join(dir, "package.json"), "{}");
+                fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.alloc(VENDOR_SIZE_MAX_BYTES + 1024));
+            }
+        });
+
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("100 MB");
+        expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(false);
+    });
+
+    it("keeps an oversized tree when vendoring was asked for explicitly", () => {
+        // `--vendor` is the deploy that builds from source: the tree is copied
+        // into an image and the upload the ceiling protects never happens.
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { huge: "^1" },
+            nativeModules: [],
+            requested: true,
+            run: (_cmd, _args, cwd) => {
+                const dir = path.join(cwd, "node_modules", "huge");
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(path.join(dir, "package.json"), "{}");
+                fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.alloc(VENDOR_SIZE_MAX_BYTES + 1024));
             }
         });
 

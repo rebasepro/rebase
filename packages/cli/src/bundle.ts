@@ -1216,6 +1216,26 @@ export interface VendorResult {
  */
 export const VENDOR_SIZE_WARN_BYTES = 150 * 1024 * 1024;
 
+/**
+ * Where vendoring stops being an optimisation and becomes a bundle nobody can
+ * deploy.
+ *
+ * Past this, shipping the tree anyway trades a faster cold start for a 413 — and
+ * the 413 arrives at deploy time, after a build nobody watches, with a remedy
+ * (`--no-vendor`) that requires knowing this happened. Unvendoring here costs
+ * 40–60s of cold start and produces a bundle that uploads; that is the better
+ * side of the trade to be on by default.
+ *
+ * 200 MB assumes a **2x** floor on compression, which is pessimistic for a tree
+ * of JavaScript (3–5x is typical) and deliberately so: source maps and prebuilt
+ * binaries compress far worse than source, and the failure this prevents is
+ * asymmetric — a bundle refused at the door versus a minute of cold start.
+ * `--vendor` overrides it, for a deploy path with no upload at all (a Dockerfile
+ * built from source, where the tree is copied into an image and the control
+ * plane never sees it).
+ */
+export const VENDOR_SIZE_MAX_BYTES = 200 * 1024 * 1024;
+
 /** Bytes on disk under `dir`. Bounded so a pathological tree cannot hang a build. */
 function directorySize(dir: string, budget = 200_000): number {
     let total = 0;
@@ -1393,7 +1413,22 @@ export function vendorDependencies(options: {
         };
     }
 
-    return { vendored: true, target, bytes: directorySize(installed) };
+    const bytes = directorySize(installed);
+    if (bytes > VENDOR_SIZE_MAX_BYTES && options.requested !== true) {
+        fs.rmSync(installed, { recursive: true, force: true });
+        fs.rmSync(path.join(options.outDir, "package-lock.json"), { force: true });
+        return {
+            vendored: false,
+            skipped:
+                `the installed tree is ${Math.round(bytes / (1024 * 1024))} MB, past the point where the ` +
+                "upload can be expected to fit under the control plane's 100 MB limit — a bundle that " +
+                "is refused at the door is worse than one that installs at boot. Pass --vendor to keep " +
+                "it anyway (a deploy that builds from source never uploads the tree), or shrink the " +
+                "declared dependencies"
+        };
+    }
+
+    return { vendored: true, target, bytes };
 }
 
 /**

@@ -44,6 +44,8 @@ ${chalk.bold("Options")}
   --skip-schema                Do not regenerate the database schema from collections
   --no-vendor                  Do not install dependencies into the bundle (they
                                install on every pod start instead, ~40-60s slower)
+  --vendor                     Install them whatever the tree's size — for a
+                               deploy that builds from source and never uploads it
   --legacy                     Run every workspace's own build script instead
   -h, --help                   Show this help
 
@@ -74,6 +76,10 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                before vendoring existed — so this is for a build that must not
                shell out to npm, not for a smaller artifact. */
             "--no-vendor": Boolean,
+            /* Keep the installed tree whatever its size. The size ceiling
+               protects an upload that a source-built deploy never performs, so
+               that path needs a way to say so. */
+            "--vendor": Boolean,
             "--skip-schema": Boolean,
             /* Do not fold the frontend into the backend bundle. For a project
                that publishes its frontend elsewhere and does not want the assets
@@ -166,7 +172,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 storage: manifest.storage,
                 skipTypeCheck: args["--skip-type-check"],
                 skipSchema: args["--skip-schema"],
-                vendor: args["--no-vendor"] ? false : undefined
+                vendor: args["--no-vendor"] ? false : (args["--vendor"] ? true : undefined)
             });
             const rel = path.relative(projectRoot, result.outDir);
             console.log(chalk.green(`  ✓ bundle → ${rel}/`));
@@ -183,8 +189,15 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 console.log(chalk.dim(`    dependencies installed into the bundle (${result.vendor.target?.os}/${result.vendor.target?.cpu})`));
                 if ((result.vendor.bytes ?? 0) > VENDOR_SIZE_WARN_BYTES) {
                     const mb = Math.round((result.vendor.bytes ?? 0) / (1024 * 1024));
-                    console.log(chalk.yellow(`    ⚠ the installed tree is ${mb} MB — close to the 100 MB upload limit`));
-                    console.log(chalk.dim("      Rebuild with --no-vendor if the deploy is rejected as too large."));
+                    /* The limit is on the *compressed* upload and this is the
+                       tree on disk, so a number above 100 does not mean the
+                       upload fails — but "201 MB, close to the 100 MB limit"
+                       reads as nonsense and got ignored for exactly that
+                       reason. Say which quantity is which. */
+                    console.log(chalk.yellow(
+                        `    ⚠ the installed tree is ${mb} MB on disk — enough to risk the control plane's 100 MB ` +
+                        "limit on the compressed upload"));
+                    console.log(chalk.dim("      Shrink the declared dependencies, or rebuild with --no-vendor."));
                 }
             } else if (Object.keys(result.manifest.deps.declared).length === 0) {
                 // Nothing to install is not a degraded state — this bundle
