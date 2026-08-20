@@ -10,7 +10,7 @@
  * sixth template inherits it instead of having to remember it.
  */
 
-import { html, raw } from "./html";
+import { html, raw, RawHtml } from "./html";
 
 interface TemplateUser {
     email: string;
@@ -92,12 +92,102 @@ const styles = {
 };
 
 /**
+ * The app name every template falls back to when `email.appName` is unset.
+ */
+const DEFAULT_APP_NAME = "Rebase";
+
+/**
+ * The Rebase mark, hosted. Mail clients do not render SVG (Gmail strips it
+ * outright), so this is the PNG rather than `logo.svg`, and it is an absolute
+ * URL rather than a data URI because Gmail blocks those in `<img src>` too.
+ */
+const REBASE_LOGO_URL = "https://rebase.pro/img/logo_small.png";
+
+/**
+ * Whether a configured logo can actually be fetched by a mail client.
+ *
+ * A relative path, a `data:` URI or a `file:` URL all produce a broken image in
+ * the recipient's inbox rather than an error anyone would see, so an unusable
+ * value renders no logo at all instead. This is deliberately not a boot-time
+ * assert like `assertEmailLinkBases`: a dead link makes the mail useless, a
+ * missing logo only makes it plain.
+ */
+function isMailableImageUrl(url: string | undefined): url is string {
+    if (!url) return false;
+    try {
+        const { protocol } = new URL(url);
+        return protocol === "https:" || protocol === "http:";
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Whether this config still carries the stock app name — i.e. nobody has
+ * branded this install.
+ *
+ * Testing against the *value* rather than against `undefined` is deliberate and
+ * load-bearing: `APP_NAME` is declared `z.string().default("Rebase")` in the
+ * cloud, in the demo app and in the eject template, so `appName` arrives here as
+ * the literal string "Rebase" even when the operator set nothing. Keying the
+ * fallback on `appName === undefined` would mean the logo never appeared in any
+ * Rebase-run product.
+ */
+function isUnbranded(appName: string | undefined): boolean {
+    return !appName || appName === DEFAULT_APP_NAME;
+}
+
+/**
+ * Resolve the branding a template should render from the email config.
+ *
+ * The fallback is asymmetric on purpose. `appName` falls back to "Rebase"
+ * because an unconfigured app has no better name to show. The *logo* is stricter:
+ * an app that named itself "Acme" but set no `logoUrl` gets no logo at all,
+ * because the alternative is mailing Acme's users a Rebase mark from Acme's
+ * domain. Only an install that has not renamed itself is treated as Rebase's own.
+ */
+export function resolveEmailBranding(
+    config?: { appName?: string; logoUrl?: string }
+): { appName: string; logoUrl?: string } {
+    const logoUrl = config?.logoUrl ?? (isUnbranded(config?.appName) ? REBASE_LOGO_URL : undefined);
+    return {
+        appName: config?.appName || DEFAULT_APP_NAME,
+        logoUrl: isMailableImageUrl(logoUrl) ? logoUrl : undefined
+    };
+}
+
+/**
+ * The logo block that sits above the card in every default template.
+ *
+ * `width`/`height` are attributes as well as CSS because Outlook's Word renderer
+ * ignores the style block. `alt` carries the app name, for screen readers and
+ * for the very common case of a client that blocks remote images on a first
+ * email from an unknown sender.
+ *
+ * The type styling on the `<img>` is what that blocked case falls back to: alt
+ * text inherits it, and at the body's 16px "Rebase" overflows a 48px box and
+ * renders as "Rebas". 12px plus `height: auto` — CSS the clients that block
+ * images do read, while Outlook still sizes from the attributes — lets the name
+ * through intact.
+ */
+function renderHeader(appName: string, logoUrl?: string): RawHtml {
+    if (!logoUrl) return raw("");
+    return html`
+        <div style="text-align: center; margin-bottom: 24px;">
+            <img src="${logoUrl}" width="48" height="48" alt="${appName}"
+                 style="display: inline-block; width: 48px; height: auto; border: 0; outline: none; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #64748b;">
+        </div>
+`;
+}
+
+/**
  * Default password reset email template
  */
 export function getPasswordResetTemplate(
     resetUrl: string,
     user: TemplateUser,
-    appName = "Rebase"
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -112,7 +202,7 @@ export function getPasswordResetTemplate(
     <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
-    <div style="${styles.container}">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Reset Your Password</h1>
             
@@ -179,7 +269,8 @@ text };
 export function getEmailVerificationTemplate(
     verifyUrl: string,
     user: TemplateUser,
-    appName = "Rebase"
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -194,7 +285,7 @@ export function getEmailVerificationTemplate(
     <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
-    <div style="${styles.container}">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Verify Your Email</h1>
             
@@ -252,7 +343,8 @@ text };
 export function getUserInvitationTemplate(
     setPasswordUrl: string,
     user: TemplateUser,
-    appName = "Rebase"
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -267,7 +359,7 @@ export function getUserInvitationTemplate(
     <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
-    <div style="${styles.container}">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Welcome to ${appName}!</h1>
             
@@ -332,8 +424,9 @@ text };
  */
 export function getWelcomeEmailTemplate(
     user: TemplateUser,
-    appName = "Rebase",
-    loginUrl?: string
+    appName = DEFAULT_APP_NAME,
+    loginUrl?: string,
+    logoUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
     const url = loginUrl || "";
@@ -349,7 +442,7 @@ export function getWelcomeEmailTemplate(
     <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
-    <div style="${styles.container}">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">¡Bienvenido/a a ${appName}!</h1>
             
@@ -413,7 +506,8 @@ text };
 export function getMagicLinkTemplate(
     magicLinkUrl: string,
     user: TemplateUser,
-    appName = "Rebase"
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
 ): { subject: string; html: string; text: string } {
     const greeting = getGreeting(user);
 
@@ -428,7 +522,7 @@ export function getMagicLinkTemplate(
     <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
-    <div style="${styles.container}">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
             <h1 style="${styles.heading}">Sign In to ${appName}</h1>
             

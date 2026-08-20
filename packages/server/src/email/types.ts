@@ -115,6 +115,21 @@ export interface EmailConfig {
     appName?: string;
 
     /**
+     * Absolute URL of the logo shown at the top of the default email templates,
+     * rendered at 48x48 (e.g. "https://myapp.com/logo.png").
+     *
+     * Must be a PNG or JPG on a public `https:` URL — mail clients do not render
+     * SVG and block `data:` URIs, and the image is fetched from the recipient's
+     * client, not from the server. A value that is not an absolute http(s) URL
+     * renders no logo rather than a broken image.
+     *
+     * Defaults to the Rebase mark **only when `appName` is also unset**. Setting
+     * `appName` without `logoUrl` deliberately yields no logo, so that an app
+     * that has branded itself never mails its users someone else's mark.
+     */
+    logoUrl?: string;
+
+    /**
      * Custom email templates (optional - defaults are provided).
      *
      * A template receives `user.displayName` exactly as the account was

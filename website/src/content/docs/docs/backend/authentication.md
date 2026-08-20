@@ -50,6 +50,7 @@ const backend = await initializeRebaseBackend({
                     name: env.SMTP_NAME,               // Optional EHLO/HELO hostname
                 },
                 appName: env.APP_NAME,
+                logoUrl: env.EMAIL_LOGO_URL,           // Logo shown atop the default templates
                 resetPasswordUrl: env.FRONTEND_URL,    // URL for password reset page
             }
             : undefined,
@@ -121,6 +122,34 @@ side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 :::
+
+### Branding the default emails
+
+The built-in password-reset, verification, invitation, welcome and magic-link
+templates render a logo above the card. It comes from `email.logoUrl`:
+
+```ts
+email: {
+    // …
+    appName: "Acme",
+    logoUrl: "https://acme.example/logo.png"   // 48×48, absolute https URL
+}
+```
+
+It must be a **PNG or JPG on an absolute `http(s)` URL**. Mail clients do not
+render SVG and block `data:` URIs, and the image is fetched by the recipient's
+client rather than by your server — so a relative path, a data URI or a local
+file renders no logo rather than a broken image. `appName` is used as the `alt`
+text, so a client with images turned off still shows the name.
+
+The fallback is deliberately asymmetric. `appName` falls back to `Rebase`, but
+the logo only falls back to the Rebase mark while the install has **not** renamed
+itself. Set `appName` to anything else and you get no logo until you set
+`logoUrl` — otherwise Acme's users would receive a Rebase mark in mail signed by
+Acme's domain.
+
+If you replace a template through `email.templates`, none of this applies: your
+function owns the whole body.
 
 ### OAuth Providers
 

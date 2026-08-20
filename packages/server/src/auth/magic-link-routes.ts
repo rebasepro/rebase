@@ -4,7 +4,7 @@ import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
-import { getMagicLinkTemplate } from "../email/templates";
+import { getMagicLinkTemplate, resolveEmailBranding } from "../email/templates";
 import { resolveEmailLinkBase } from "../email/link-base";
 import { strictAuthLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -91,11 +91,11 @@ export function mountMagicLinkRoutes(deps: {
             const magicLinkUrl = `${baseUrl}/auth/magic-link?token=${token}`;
 
             // Get email template
-            const appName = emailConfig?.appName || "Rebase";
+            const { appName, logoUrl } = resolveEmailBranding(emailConfig);
             const templateFn = emailConfig?.templates?.magicLink;
             const emailContent = templateFn
                 ? templateFn(magicLinkUrl, { email: user.email, displayName: user.displayName })
-                : getMagicLinkTemplate(magicLinkUrl, { email: user.email, displayName: user.displayName }, appName);
+                : getMagicLinkTemplate(magicLinkUrl, { email: user.email, displayName: user.displayName }, appName, logoUrl);
 
             // Send email
             try {

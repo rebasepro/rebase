@@ -25,3 +25,8 @@ export { resolveEmailLinkBase, assertEmailLinkBases } from "./link-base";
 export type { EmailLinkKind } from "./link-base";
 
 export { getPasswordResetTemplate, getEmailVerificationTemplate, getUserInvitationTemplate, getWelcomeEmailTemplate, getMagicLinkTemplate } from "./templates";
+
+// Every auth route resolves the name and logo through this rather than reading
+// `emailConfig.appName` directly, so the "branded app never gets Rebase's mark"
+// rule lives in one place instead of six.
+export { resolveEmailBranding } from "./templates";

@@ -26,6 +26,7 @@ pass: env.SMTP_PASS ?? "" }
             name: env.SMTP_NAME
         },
         appName: env.APP_NAME,
+        logoUrl: env.EMAIL_LOGO_URL,
         resetPasswordUrl: env.FRONTEND_URL
     };
 }

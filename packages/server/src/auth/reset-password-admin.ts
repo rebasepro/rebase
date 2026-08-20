@@ -14,7 +14,7 @@ import { createRequireAuth, requireAdmin } from "./middleware";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { generateSecurePassword, generateSecureToken, hashToken } from "./admin-user-ops";
-import { getPasswordResetTemplate } from "../email/templates";
+import { getPasswordResetTemplate, resolveEmailBranding } from "../email/templates";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import type { AuthCollectionConfig } from "@rebasepro/types";
@@ -118,13 +118,13 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                     const baseUrl = emailConfig?.resetPasswordUrl || "";
                     const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
 
-                    const appName = emailConfig?.appName || "Rebase";
+                    const { appName, logoUrl } = resolveEmailBranding(emailConfig);
                     const templateFn = emailConfig?.templates?.passwordReset;
                     const emailContent = templateFn
                         ? templateFn(setPasswordUrl, { email: existing.email,
 displayName: existing.displayName })
                         : getPasswordResetTemplate(setPasswordUrl, { email: existing.email,
-displayName: existing.displayName }, appName);
+displayName: existing.displayName }, appName, logoUrl);
 
                     await emailService!.send({
                         to: existing.email,

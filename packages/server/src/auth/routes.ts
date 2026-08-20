@@ -10,7 +10,7 @@ import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
 import { requireAuth } from "./middleware";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
-import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate } from "../email/templates";
+import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
 import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -283,12 +283,12 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
      */
     function sendWelcomeEmail(user: { email: string; displayName?: string | null }) {
         if (!isEmailConfigured()) return;
-        const appName = emailConfig?.appName || "Rebase";
+        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
         const loginUrl = resolveEmailLinkBase(emailConfig, "resetPassword"); // reuse base URL → the login / app page
         const templateFn = emailConfig?.templates?.welcomeEmail;
         const emailContent = templateFn
             ? templateFn(user, appName)
-            : getWelcomeEmailTemplate(user, appName, loginUrl ? `${loginUrl}/app` : undefined);
+            : getWelcomeEmailTemplate(user, appName, loginUrl ? `${loginUrl}/app` : undefined, logoUrl);
 
         emailService!.send({
             to: user.email,
@@ -786,13 +786,13 @@ displayName: user.displayName });
             const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
             // Get email template
-            const appName = emailConfig?.appName || "Rebase";
+            const { appName, logoUrl } = resolveEmailBranding(emailConfig);
             const templateFn = emailConfig?.templates?.passwordReset;
             const emailContent = templateFn
                 ? templateFn(resetUrl, { email: user.email,
 displayName: user.displayName })
                 : getPasswordResetTemplate(resetUrl, { email: user.email,
-displayName: user.displayName }, appName);
+displayName: user.displayName }, appName, logoUrl);
 
             // Send email
             try {
@@ -949,13 +949,13 @@ message: "Password has been changed successfully" });
         const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
 
         // Get email template
-        const appName = emailConfig?.appName || "Rebase";
+        const { appName, logoUrl } = resolveEmailBranding(emailConfig);
         const templateFn = emailConfig?.templates?.emailVerification;
         const emailContent = templateFn
             ? templateFn(verifyUrl, { email: user.email,
 displayName: user.displayName })
             : getEmailVerificationTemplate(verifyUrl, { email: user.email,
-displayName: user.displayName }, appName);
+displayName: user.displayName }, appName, logoUrl);
 
         // Send email
         await emailService!.send({

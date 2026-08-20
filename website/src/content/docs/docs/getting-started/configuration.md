@@ -124,6 +124,7 @@ All configuration is done via environment variables in your `.env` file at the p
 | `SMTP_FROM` | Sender address for system emails |
 | `SMTP_NAME` | Display name on the sender address |
 | `APP_NAME` | Product name used in email subjects and bodies (default: `Rebase`) |
+| `EMAIL_LOGO_URL` | Logo shown atop the default email templates. Absolute `http(s)` PNG or JPG — clients strip SVG and block `data:` URIs. Unset, an app still named `Rebase` gets the Rebase mark and a renamed one gets none |
 
 ### Database connection pool
 

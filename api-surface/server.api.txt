@@ -137,6 +137,7 @@ function resolveAuthHooks
 function resolveAuthOptions
 function resolveCorsOrigin
 function resolveDataSources
+function resolveEmailBranding { appName, logoUrl }
 function resolveEmailLinkBase
 function resolveEmailOptions
 function resolveRequireAuth
@@ -189,7 +190,7 @@ interface DatabaseConnection { close, isConnected, type }
 interface DdlBootstrapper { ensureObject, isReadable, step }
 interface DriverConnection { connectionString, db, pool, query }
 interface DriverRegistry { get, getDefault, getOrDefault, has, list, register, size }
-interface EmailConfig { appName, from, magicLinkUrl, resetPasswordUrl, sendEmail, smtp, templates, verifyEmailUrl }
+interface EmailConfig { appName, from, logoUrl, magicLinkUrl, resetPasswordUrl, sendEmail, smtp, templates, verifyEmailUrl }
 interface EmailSendOptions { html, replyTo, subject, text, to }
 interface EmailService { isConfigured, send, verifyConnection }
 interface EnqueueOptions { delayMs, idempotencyKey, maxAttempts }

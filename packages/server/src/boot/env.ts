@@ -21,6 +21,19 @@ const bootEnvExtension = z.object({
     SMTP_FROM: z.string().optional(),
     SMTP_NAME: z.string().optional(),
     APP_NAME: z.string().default("Rebase"),
+    /**
+     * Logo shown above the card in the default email templates, at 48x48.
+     *
+     * Must be a PNG or JPG on an absolute `http(s)` URL: mail clients do not
+     * render SVG and block `data:` URIs, and the image is fetched by the
+     * recipient's client rather than by this process. Anything else renders no
+     * logo rather than a broken image — see `resolveEmailBranding`.
+     *
+     * Left unset, an app that still answers to the default `APP_NAME` gets the
+     * Rebase mark and one that has renamed itself gets nothing. This is the only
+     * way a managed tenant, which ships no code of its own, can set its own.
+     */
+    EMAIL_LOGO_URL: z.string().optional(),
 
     // ── Runtime behaviour ────────────────────────────────────────────────────
     /**

@@ -16,7 +16,7 @@ import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { AuthCollectionConfig, AuthCollectionContext } from "@rebasepro/types";
-import { getUserInvitationTemplate } from "../email/templates";
+import { getUserInvitationTemplate, resolveEmailBranding } from "../email/templates";
 import { logger } from "../utils/logger";
 
 // ─── Shared Crypto Utilities ────────────────────────────────────────────────
@@ -223,13 +223,13 @@ export async function finalizeAdminUserCreation(
             // account has been created for you … set your password and get
             // started". `reset-password-admin.ts` keeps the reset template,
             // because there the account really does already exist.
-            const appName = ctx.emailConfig?.appName || "Rebase";
+            const { appName, logoUrl } = resolveEmailBranding(ctx.emailConfig);
             const templateFn = ctx.emailConfig?.templates?.userInvitation;
             const emailContent = templateFn
                 ? templateFn(setPasswordUrl, { email: entity.values.email as string,
 displayName: entity.values.displayName as string })
                 : getUserInvitationTemplate(setPasswordUrl, { email: entity.values.email as string,
-displayName: entity.values.displayName as string }, appName);
+displayName: entity.values.displayName as string }, appName, logoUrl);
 
             await ctx.emailService!.send({
                 to: entity.values.email as string,

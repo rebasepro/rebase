@@ -157,6 +157,7 @@ auth: {
     email: {
         from: env.SMTP_FROM,
         appName: "MyApp",
+        logoUrl: "https://myapp.com/logo.png",   // 48x48 above every template
         smtp: env.SMTP_HOST ? {
             host: env.SMTP_HOST,
             port: env.SMTP_PORT,
@@ -185,13 +186,24 @@ SMTP_USER=noreply@myapp.com
 SMTP_PASS=your-app-password
 SMTP_FROM=MyApp <noreply@myapp.com>
 
+# Logo atop the default templates (managed runtime reads this directly)
+EMAIL_LOGO_URL=https://myapp.com/logo.png
+
 # Used for password reset / verification links AND SMTP EHLO name
 FRONTEND_URL=https://myapp.com
 ```
 
 ## Built-in Email Templates
 
-Rebase ships four built-in HTML email templates. All templates include both HTML and plain-text versions, use responsive inline CSS, and follow a consistent card-based design with a blue (#3b82f6) call-to-action button.
+Rebase ships five built-in HTML email templates. All templates include both HTML and plain-text versions, use responsive inline CSS, and follow a consistent card-based design with a blue (#3b82f6) call-to-action button.
+
+Each one renders `email.logoUrl` at 48x48 above the card. It must be a **PNG or
+JPG on an absolute `http(s)` URL** — mail clients do not render SVG and block
+`data:` URIs — and anything else renders no logo rather than a broken image.
+`appName` becomes the `alt` text. Unset, the logo falls back to the Rebase mark
+only while `appName` is still the default `Rebase`; name the app anything else
+and there is no logo until `logoUrl` is set, so a branded app never mails its
+users someone else's mark. On the managed runtime, set `EMAIL_LOGO_URL` instead.
 
 ### Template Overview
 
@@ -201,6 +213,7 @@ Rebase ships four built-in HTML email templates. All templates include both HTML
 | Email Verification | `POST /api/auth/send-verification` | `"Verify your {appName} email address"` | No expiry (stored as user field) |
 | User Invitation | `POST /api/admin/users` (admin-created user, no explicit password) | `"You've been invited to {appName}"` | 1 hour (uses password reset token) |
 | Welcome Email | `POST /api/auth/register` and OAuth first-login | `"¡Bienvenido/a a {appName}!"` | N/A (informational) |
+| Magic Link | `POST /api/auth/magic-link` (needs `auth.magicLink: true`) | `"Sign in to {appName}"` | 15 minutes |
 
 ### Template Functions
 
