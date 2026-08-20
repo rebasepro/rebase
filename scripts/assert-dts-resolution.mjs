@@ -215,6 +215,7 @@ const VALUE_FLAGS = ts.SymbolFlags.Function | ts.SymbolFlags.Variable | ts.Symbo
  * functions, consts, classes — are the honest signal.
  */
 function inspect(consumerDir, specifier, mode, packageDir) {
+    const realPackageDir = fs.realpathSync(packageDir).replace(/\\/g, "/");
     const fixture = path.join(consumerDir, `probe-${mode.name}.ts`);
     fs.writeFileSync(
         fixture,
@@ -261,8 +262,22 @@ function inspect(consumerDir, specifier, mode, packageDir) {
         .getPreEmitDiagnostics(program)
         .filter(diagnostic => {
             if (!diagnostic.file) return false;
-            // Only this package's own emitted declarations are under test.
-            if (!diagnostic.file.fileName.includes("/packages/")) return false;
+            // Only *this* package's own emitted declarations are under test —
+            // scoped to the directory under test, not to a path shape the
+            // repository happens to have. A dependency's broken declarations
+            // are that dependency's gate run to fail, and scoping here is what
+            // keeps one package's defect from being reported against another's
+            // name. (An earlier `/packages/` test did both jobs badly: it
+            // reported a sibling's diagnostics under `@rebasepro/admin`, and it
+            // silently exempted any package outside that directory — which is
+            // every fixture this gate is tested with.)
+            //
+            // Compared on the *real* path: TypeScript reports resolved paths,
+            // and on macOS `/var/folders/…` is a symlink to `/private/var/…`,
+            // so a literal prefix test silently matches nothing for anything
+            // under the temp directory — which is every fixture, and so was
+            // every test of this gate.
+            if (!diagnostic.file.fileName.startsWith(realPackageDir)) return false;
 
             const text = ts.flattenDiagnosticMessageText(diagnostic.messageText, " ");
             // 2834/2835: a relative import needs an explicit extension — the
