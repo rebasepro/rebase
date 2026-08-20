@@ -196,6 +196,23 @@ function msSinceScroll() {
     return performance.now() - lastScrollAt;
 }
 
+// Compiles are serialised across instances. The three hero gradients all become
+// eligible in the same tick, and three synchronous compiles that share one task
+// are one ~700ms block rather than three separate ones — the browser gets no
+// frame in between, so it reads as a single freeze. The lock is released from a
+// later task so the next gradient always starts with a clean slate.
+let compiling = false;
+
+function takeCompileSlot(): boolean {
+    if (compiling) return false;
+    compiling = true;
+    return true;
+}
+
+function releaseCompileSlot() {
+    setTimeout(() => { compiling = false; }, 0);
+}
+
 export function NeatBackground({ variant = "hero", randomize = true }: { variant?: "hero" | "a" | "b"; randomize?: boolean }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const portrait = useOrientation();
@@ -278,6 +295,18 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
         // second after the page settles costs nothing. If the reader never stops,
         // the gradient never compiles, which is the right answer too — someone
         // travelling to the footer is not looking at a background.
+        // `client:visible` hydrates a divider once and never revisits the decision,
+        // so a reader who scrolls straight past every divider to the footer arrives
+        // with six gradients all waiting for the same quiet moment — and pays for
+        // five they cannot see. Re-check at compile time instead: only build the
+        // ones still near the viewport, and let the rest keep waiting until the
+        // reader comes back to them.
+        const NEAR_VIEWPORT_PX = 600;
+        const nearViewport = () => {
+            const r = canvas.getBoundingClientRect();
+            return r.bottom > -NEAR_VIEWPORT_PX && r.top < window.innerHeight + NEAR_VIEWPORT_PX;
+        };
+
         let settleTimer: ReturnType<typeof setTimeout> | undefined;
         const startWhenSettled = () => {
             if (cancelled) return;
@@ -286,7 +315,22 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
                 settleTimer = setTimeout(startWhenSettled, SCROLL_QUIET_MS - quietFor);
                 return;
             }
-            startGradient();
+            if (!nearViewport()) {
+                // Off-screen: nothing to show yet. This poll stops for good once the
+                // gradient compiles, so it costs one layout read per idle instance.
+                settleTimer = setTimeout(startWhenSettled, 250);
+                return;
+            }
+            if (!takeCompileSlot()) {
+                // Another gradient holds the slot; come back for the next one.
+                settleTimer = setTimeout(startWhenSettled, 32);
+                return;
+            }
+            try {
+                startGradient();
+            } finally {
+                releaseCompileSlot();
+            }
         };
 
         const scheduleGradient = () => {
