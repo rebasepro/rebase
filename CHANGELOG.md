@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-20
+
 ### Added
 
 - **A relation picker can create the row it is looking for.** The list ends in an *Add …* action that opens the target collection's form in the side panel, over the form you are already filling in; saving it closes the panel and leaves the new row selected, with no second trip through the picker. Until now a relation could only point at something that already existed, so a company that was not in the list meant abandoning the form, going to that collection, creating the row and starting again — and on a record being created, everything typed so far was lost.

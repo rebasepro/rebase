@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/codegen",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Generate a typed JS SDK from Rebase collection definitions",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",

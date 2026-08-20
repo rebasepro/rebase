@@ -1,11 +1,12 @@
 ---
 slug: docs/changelog
 title: Changelog
-description: Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 ---
 # Changelog
 
 ## [Unreleased]
+
+## [0.16.0] - 2026-08-20
 
 ### Added
 
