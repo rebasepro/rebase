@@ -11,9 +11,21 @@ set -euo pipefail
 
 # ─── Configuration ───────────────────────────────────────────────────
 PROJECT="rebase-578f2"
-REGION="europe-west3"
+# The demo moved to europe-west1 on 2026-08-20: demo.rebase.pro is a Cloud Run
+# *domain mapping*, and europe-west3 does not offer them. The old west3 service
+# was deleted; deploying there now creates a dead service nothing routes to.
+REGION="europe-west1"
 SERVICE="rebase-demo"
+# Artifact Registry stays in west3 — the repo is regional, the deploy is not.
 IMAGE="europe-west3-docker.pkg.dev/${PROJECT}/rebase-demo/rebase-backend:latest"
+# DATABASE_URL is `...@localhost/rebase_demo?host=/cloudsql/<instance>`, i.e. a
+# unix socket that only exists if the revision has the instance attached. This
+# used to be invisible: the flag persists across updates of an existing service,
+# so the hand-created west3 service carried it for 112 revisions while the
+# script never passed it. Recreating the service exposed it — the first boot
+# query failed, node exit(1)'d, and Cloud Run reported the generic "failed to
+# start and listen on PORT" error.
+SQL_INSTANCE="${PROJECT}:europe-west3:rebase-578f2-instance"
 
 # ─── Colors ──────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -92,6 +104,7 @@ gcloud run deploy "$SERVICE" \
   --cpu=1 \
   --min-instances=1 \
   --max-instances=3 \
+  --add-cloudsql-instances="$SQL_INSTANCE" \
   --set-env-vars="NODE_ENV=production,CORS_ORIGINS=*,FORCE_LOCAL_STORAGE=true,ALLOW_LOCALHOST_IN_PRODUCTION=true,REBASE_CRON_ALWAYS_ON=1,ALLOW_REGISTRATION=true" \
   --set-secrets="DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ADMIN_CONNECTION_STRING=ADMIN_CONNECTION_STRING:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
 
