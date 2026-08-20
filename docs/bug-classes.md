@@ -2683,3 +2683,46 @@ than the browser's wording. `serveSPA` 404s a missing build artifact instead of
 serving the index. Both covered: `packages/ui/test/lazy-chunk.test.tsx`,
 `packages/server/src/serve-spa.test.ts` and the staged-deploy e2e above, which
 fails on a mutation that removes either half.
+
+---
+
+## 47. A containing block on the element popups are portalled into
+
+The sibling of class 25, one layer down: the layer is painted *above* everything
+it should be, and still nobody can see it, because it is positioned against the
+wrong box.
+
+`position: fixed` resolves against the viewport — unless an ancestor is a
+**containing block**, which `transform`, `will-change: transform`, `filter`,
+`backdrop-filter`, `perspective` and `contain: paint` all create. Then the same
+coordinates resolve against that ancestor instead, and everything fixed inside it
+lands displaced by the ancestor's own offset.
+
+`Sheet` hands its descendants a portal host — itself — so their popups open inside
+the modal, where the focus and scroll locks let them be used at all. It also wore
+`will-change-transform` for the slide-in. Radix's item-aligned `Select` content is
+`position: fixed`, positioned from `getBoundingClientRect()` in viewport
+coordinates, so every dropdown in a side panel was pushed right by the panel's left
+offset: `left: 992px` computed, painted at `x = 1145`, off a 1280px screen. Open,
+correct, unreachable — and indistinguishable from a Select that ignores clicks,
+which is how it was reported.
+
+Radix's *popper* positioning was unaffected in the same panel: Floating UI measures
+the offset parent and subtracts it. Only the hand-rolled viewport math broke, which
+is why one component looked broken and its neighbours did not.
+
+**Sweep:** find the portal hosts, then read the classes on each and on everything
+between it and the document root. `grep -rn "PortalContainerProvider" packages/*/src`
+gives the hosts (`Sheet`, `Dialog`); for each, check for the six properties above.
+`Dialog` passes: its host is a zero-sized `relative z-70` div and no ancestor is
+transformed — the paper that *is* scaled (`scale-100`) is a sibling of the host, not
+its parent. That is the shape to copy.
+
+**Watch for:** the hint that costs nothing being the whole bug. `will-change:
+transform` is advice to the compositor with no visual effect whatsoever, so it reads
+as free and survives every review of the animation it was added for — while quietly
+re-parenting the coordinate system of every fixed descendant. `transform-gpu` in the
+same class list had already been dropped by `twMerge` (it conflicts with `transform`),
+so the one surviving line was the one nobody would suspect. Covered by
+`packages/ui/test/sheet-portal-container.test.tsx`, which asserts the host wears none
+of them.

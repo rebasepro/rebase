@@ -99,8 +99,16 @@ export const Sheet: React.FC<SheetProps> = ({
                         "outline-none",
                         borderClass[side],
                         defaultBorderMixin,
-                        "transform-gpu",
-                        "will-change-transform",
+                        // No `will-change: transform` / `transform-gpu` here, however
+                        // tempting the layer hint is on a panel this size. Either one
+                        // makes this element a *containing block* for its
+                        // `position: fixed` descendants, and everything portaled into
+                        // the panel below — a Select dropdown, above all — is fixed and
+                        // positioned in viewport coordinates. Inside a containing block
+                        // those coordinates are resolved against the panel instead, so
+                        // every popup was displaced by the panel's own offset and a
+                        // right-hand Select opened its list off the edge of the screen:
+                        // the dropdown was open, just nowhere anyone could see it.
                         "text-surface-accent-900 dark:text-white",
                         "fixed transform z-50 transition-[transform,opacity] ease-in-out",
                         !displayed ? "duration-150" : "duration-100",
