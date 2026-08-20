@@ -26,6 +26,7 @@ import {
     confirmDestructive,
     type CloudClient
 } from "./context";
+import { buildDialPatch } from "./resources";
 
 interface ProjectRow {
     id: string | number;
@@ -104,18 +105,23 @@ export async function listProjects(rawArgs: string[]): Promise<void> {
 
 /* ─── create ───────────────────────────────────────────────────── */
 
-/** Default region + VM size per provider (both are required on create). */
-function providerDefaults(provider: string): { region: string; vmSize: string } {
+/**
+ * Default region per provider. Required on create; the rest is dialled.
+ *
+ * There used to be a `vmSize` here too — `e2-small`, `cx21` — naming a machine
+ * on a price list this platform does not buy from. The column was dropped on
+ * 2026-08-20 and this went on sending it, which a control plane can only ignore
+ * or refuse. What a project reserves is a set of dials now, and a project that
+ * sets none takes the platform default.
+ */
+function providerDefaults(provider: string): { region: string } {
     switch (provider) {
         case "gcp":
-            return { region: "europe-west1",
-vmSize: "e2-small" };
+            return { region: "europe-west1" };
         case "aws":
-            return { region: "us-east-1",
-vmSize: "t3.small" };
+            return { region: "us-east-1" };
         default:
-            return { region: "nbg1",
-vmSize: "cx21" };
+            return { region: "nbg1" };
     }
 }
 
@@ -128,8 +134,9 @@ vmSize: "cx21" };
  * never contradicted by a failure; it just sits in the record. The CLI used to
  * default to `hetzner`/`nbg1` unconditionally, which is how projects running on
  * our GKE cluster came to describe themselves as Hetzner in the console — and
- * `provider` is half the Stripe compute lookup key (`compute_<provider>_<vmSize>`),
- * so that is a mispricing, not a cosmetic slip.
+ * `provider` also decides which substrate's rules a project's dials are clamped
+ * to — Autopilot's 250m floor and 1:1-6.5:1 band do not apply on Hetzner or EKS
+ * — so a wrong value here resizes pods, it is not a cosmetic slip.
  *
  * The control plane already publishes the infrastructure that actually exists,
  * and the console's create wizard reads it. Ask the same question here.
@@ -191,10 +198,23 @@ export const CREATE_PROJECT_FLAGS = {
     "--branch": String,
     "--provider": String,
     "--region": String,
-    "--vm-size": String,
     "--org": String,
     "--link": Boolean,
-    "-n": "--name"
+    "-n": "--name",
+    // The resource dials, same spelling as `rebase cloud resources set`. Every
+    // one is optional: a project that names none takes the platform default.
+    // `--vm-size` used to sit here and named a machine on a price list this
+    // platform does not buy from; the column it wrote was dropped on 2026-08-20.
+    "--cpu": String,
+    "--memory": String,
+    "--replicas": String,
+    "--spot": String,
+    "--scale-to-zero": String,
+    "--db-mode": String,
+    "--db-instances": String,
+    "--db-cpu": String,
+    "--db-memory": String,
+    "--storage": String
 } as const;
 
 export async function createProject(rawArgs: string[]): Promise<void> {
@@ -245,13 +265,19 @@ message: "Subdomain:" });
         (args["--provider"] || a.provider)?.trim() || undefined
     );
     const provider = target.provider;
-    // region + vmSize are required by the control plane; default sensibly per
-    // provider so a headless `projects create` needs only name + subdomain. The
-    // target's own region wins where it has one: a per-provider guess is how a
-    // GKE project ended up recorded in `nbg1`.
+    // region is required by the control plane; default sensibly per provider so
+    // a headless `projects create` needs only name + subdomain. The target's own
+    // region wins where it has one: a per-provider guess is how a GKE project
+    // ended up recorded in `nbg1`.
     const defaults = providerDefaults(provider);
     const region = (args["--region"] || target.region || defaults.region).trim();
-    const vmSize = (args["--vm-size"] || defaults.vmSize).trim();
+
+    // Resources, if the caller named any. The same flags `resources set` takes,
+    // parsed by the same function — a second parser here would be the place the
+    // two spellings of a dial drift apart. Nothing is required: a project that
+    // names no dial takes the platform default and can change it afterwards.
+    const dials = buildDialPatch(rawArgs, { requireOne: false });
+    if (dials.error) fail(dials.error, undefined, "bad_request");
 
     if (!name || !subdomain) {
         fail(
@@ -291,7 +317,7 @@ message: "Subdomain:" });
             gitBranch,
             provider,
             region,
-            vmSize,
+            ...dials.patch,
             organization: org,
             createdById: user.uid,
             status: "provisioning"
@@ -329,7 +355,7 @@ orgId: String(org) });
                 host: host ?? null,
                 provider,
                 region,
-                vmSize,
+                dials: dials.patch,
                 branch: gitBranch,
                 org: String(org),
                 linked
