@@ -1162,6 +1162,10 @@ stdio: "inherit" });
         outDir,
         declared,
         nativeModules,
+        // The driver is the one package the image does not supply, so it is the
+        // one a vendored tree must actually contain.
+        required: [getActiveBackendPlugin(path.join(projectRoot, "backend"))].filter(
+            (name): name is string => Boolean(name)),
         requested: options.vendor
     });
     if (vendor.vendored) {
@@ -1281,6 +1285,12 @@ export function vendorDependencies(options: {
     outDir: string;
     declared: Record<string, string>;
     nativeModules: NativeDependency[];
+    /**
+     * Packages the runtime resolves *from the bundle* and cannot boot without —
+     * in practice the database driver, which the image deliberately does not
+     * supply. A vendored tree missing one of these is refused; see below.
+     */
+    required?: string[];
     /** `false` disables; `undefined` means "when it is safe to". */
     requested?: boolean;
     /** Injected in tests. */
@@ -1349,10 +1359,41 @@ export function vendorDependencies(options: {
         };
     }
 
-    if (!fs.existsSync(path.join(options.outDir, "node_modules"))) {
+    const installed = path.join(options.outDir, "node_modules");
+    if (!fs.existsSync(installed)) {
         return { vendored: false, skipped: "npm install produced no node_modules" };
     }
-    return { vendored: true, target, bytes: directorySize(path.join(options.outDir, "node_modules")) };
+
+    // An *incomplete* vendored tree is worse than none, because of the very
+    // guard that makes vendoring free: the init container skips installing when
+    // `node_modules` is present. So a tree missing the database driver does not
+    // start slowly — it does not start at all, with the boot dying on
+    // `Cannot find package "@rebasepro/server-postgres"`, and the step that
+    // would have installed it declining to run precisely because this directory
+    // exists.
+    //
+    // A driver goes missing whenever the project declares it in a way the
+    // registry cannot serve — `workspace:*` in a monorepo, a `link:` override —
+    // since `collectDeclaredDependencies` drops exactly those. Such a project
+    // could never deploy this bundle anyway; what it must not do is have a
+    // *build-time* optimisation quietly remove its ability to boot from source.
+    // Refusing leaves the bundle in the state every project shipped before
+    // vendoring existed.
+    const missing = (options.required ?? []).filter(name =>
+        !fs.existsSync(path.join(installed, ...name.split("/"), "package.json")));
+    if (missing.length > 0) {
+        fs.rmSync(installed, { recursive: true, force: true });
+        fs.rmSync(path.join(options.outDir, "package-lock.json"), { force: true });
+        return {
+            vendored: false,
+            skipped:
+                `the installed tree is missing ${missing.join(", ")}, which the runtime resolves from ` +
+                "the bundle — the bundle declares it at a version no registry can serve (a workspace " +
+                "link), so nothing was vendored rather than shipping a tree that boots without a driver"
+        };
+    }
+
+    return { vendored: true, target, bytes: directorySize(installed) };
 }
 
 /**

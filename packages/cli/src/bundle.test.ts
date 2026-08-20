@@ -648,6 +648,45 @@ describe("vendorDependencies", () => {
         expect(result.skipped).toContain("npm install failed");
     });
 
+    it("refuses a tree that installed without the driver, and removes it", () => {
+        // The init container skips installing when node_modules is present, so
+        // an incomplete vendored tree does not start slowly — it does not start.
+        // The bundle must be left exactly as an unvendored one.
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { zod: "^3" },
+            required: ["@rebasepro/server-postgres"],
+            nativeModules: [],
+            run: (_cmd, _args, cwd) => {
+                fs.mkdirSync(path.join(cwd, "node_modules", "zod"), { recursive: true });
+                fs.writeFileSync(path.join(cwd, "node_modules", "zod", "package.json"), "{}");
+                fs.writeFileSync(path.join(cwd, "package-lock.json"), "{}");
+            }
+        });
+
+        expect(result.vendored).toBe(false);
+        expect(result.skipped).toContain("@rebasepro/server-postgres");
+        expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(false);
+        expect(fs.existsSync(path.join(scratch, "package-lock.json"))).toBe(false);
+    });
+
+    it("vendors when the driver is in the installed tree", () => {
+        const result = vendorDependencies({
+            outDir: scratch,
+            declared: { "@rebasepro/server-postgres": "^0.16.0" },
+            required: ["@rebasepro/server-postgres"],
+            nativeModules: [],
+            run: (_cmd, _args, cwd) => {
+                const dir = path.join(cwd, "node_modules", "@rebasepro", "server-postgres");
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(path.join(dir, "package.json"), "{}");
+            }
+        });
+
+        expect(result.vendored).toBe(true);
+        expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(true);
+    });
+
     it("does not claim success when npm exits 0 but installs nothing", () => {
         const result = vendorDependencies({
             outDir: scratch,
