@@ -680,6 +680,13 @@ jobs:
         run: |
           set -euo pipefail
           helm registry logout registry-1.docker.io || true
+          # helm writes the tarball through a temp file *inside* --destination
+          # and does not create that directory: without this the pull succeeds,
+          # prints the digest, and then dies on
+          # "open /tmp/chart-verify/rebase-<v>.tgz<random>: no such file or
+          # directory" — which reads as an unpullable chart and failed the 0.16.0
+          # release *after* npm, the tag and both images had already gone out.
+          mkdir -p /tmp/chart-verify
           helm pull oci://registry-1.docker.io/rebasepro/rebase \
             --version "$VERSION" --destination /tmp/chart-verify
           test -f "/tmp/chart-verify/rebase-${VERSION}.tgz"
