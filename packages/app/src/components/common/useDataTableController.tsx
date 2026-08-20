@@ -210,7 +210,26 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
     const [noMoreToLoad, setNoMoreToLoad] = useState<boolean>(false);
 
-    const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? defaultFilter ?? undefined), [fixedFilter, defaultFilter]);
+    /**
+     * Clear the user's filters. `fixedFilter` survives — it is the collection
+     * forcing a scope, not something the user chose — but `defaultFilter` does
+     * not: a default is where the view *opens*, not a floor it can never go
+     * below.
+     *
+     * It used to reset to `defaultFilter`, which made "clear" unable to clear
+     * whenever a collection defined one, and every caller here wanted the
+     * opposite. `ClearFilterSortButton` is labelled "clear filter" and left one
+     * set. `EditorCollectionActionStart` calls this and then re-applies
+     * `collection.defaultFilter` on the next line — redundant under the old
+     * behaviour, and the clearest statement of what it expected.
+     * `FilterPresetsButton` documents "clearing all filters deactivates all
+     * chips", which was false: it derives a chip's active state from the
+     * filters, so a preset whose values equalled `defaultFilter` switched
+     * itself straight back on. That chip could not be turned off at all — click
+     * it, the keys are removed, the filter resets to the identical default, and
+     * the chip lights up again.
+     */
+    const clearFilter = useCallback(() => setFilterValues(fixedFilter ?? undefined), [fixedFilter]);
 
     const updateFilterValues = useCallback((updatedFilter: FilterValues<Extract<keyof M, string> | (string & {})> | undefined) => {
         if (fixedFilter) {
