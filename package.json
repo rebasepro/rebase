@@ -63,6 +63,7 @@
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node scripts/check-undeclared-deps.mjs",
     "check:api-surface": "node scripts/check-api-surface.mjs",
+    "check:dts": "node scripts/assert-dts-resolution.mjs --all",
     "write:api-surface": "node scripts/api-surface.mjs --write",
     "check:release-bump": "node scripts/check-release-bump.mjs",
     "check:derived-names": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx scripts/check-derived-names.mts",

@@ -7,14 +7,6 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
-### Changed
-
-- **A vendored tree too large to upload is not vendored.** The control plane refuses a bundle over 100 MB, and vendoring is the one thing that can push a bundle near it — so a build that crossed the line shipped a bundle whose deploy would be rejected, with the remedy (`--no-vendor`) only discoverable by knowing that had happened. Past 200 MB on disk the tree is now thrown away and the bundle ships unvendored: 40–60s of cold start, and a deploy that works. `--vendor` keeps it regardless, for a deploy that builds from source and never uploads the tree at all.
-
-  The ceiling assumes a pessimistic 2× floor on compression, because the limit is on the *compressed* upload while this measures the tree on disk. The warning below it now says which quantity is which — "201 MB, close to the 100 MB upload limit" was two different numbers described as one, and read as nonsense.
-
-## [0.16.0] - 2026-08-20
-
 ### Added
 
 - **Custom functions have their own entry point: `@rebasepro/server/functions`.** `import { defineFunction } from "@rebasepro/server"` reaches the whole framework — the boot sequence, the collection loader, the backup routes, the SPA server, `@hono/node-server`, `ws`, `jsonwebtoken`, Drizzle. On Node that costs a little start-up time and nothing else, which is why it stood. It also meant a function file could only ever resolve inside a Node process, however portable the function's own code was — and since that import line is in every function file, every template and every documentation page, it is not a thing that can be changed later without breaking everyone who wrote one.
@@ -30,6 +22,26 @@ description: Every released change to Rebase — new features, fixes, and the br
 - **Configuration is read from the request: `getEnv`, `env`, `requireEnv`, `lazyResource`.** `const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)` at the top of a function file is a live defect today, not merely an unportable one: it is evaluated while the file is being imported, so an unset variable throws before any request exists and the loader reports the whole file as a *skipped function*. The route 404s, and the reason is one line in a boot log. `lazyResource(env => new Stripe(env.STRIPE_SECRET_KEY!))` builds the same client once, on first use, from that request's configuration. `rebase doctor` and `rebase build` now report module-scope `process.env` reads in the functions directory.
 
 - **`rebase build` records what each function needs from its host.** The bundle manifest gains a `functions` array — name, file, and whether the function's own source reaches a Node built-in or a package that needs one. Purely descriptive: nothing fails, and a function that opens a file or runs raw SQL is a fine function. It is recorded because the name is already the function's identity everywhere (`/api/functions/<name>`, the `functions/<name>` API-key permission, `REBASE_FUNCTIONS_ONLY`), and a host that wants to know what is in a bundle should not have to boot it to find out.
+
+### Changed
+
+- **A vendored tree too large to upload is not vendored.** The control plane refuses a bundle over 100 MB, and vendoring is the one thing that can push a bundle near it — so a build that crossed the line shipped a bundle whose deploy would be rejected, with the remedy (`--no-vendor`) only discoverable by knowing that had happened. Past 200 MB on disk the tree is now thrown away and the bundle ships unvendored: 40–60s of cold start, and a deploy that works. `--vendor` keeps it regardless, for a deploy that builds from source and never uploads the tree at all.
+
+  The ceiling assumes a pessimistic 2× floor on compression, because the limit is on the *compressed* upload while this measures the tree on disk. The warning below it now says which quantity is which — "201 MB, close to the 100 MB upload limit" was two different numbers described as one, and read as nonsense.
+
+### Fixed
+
+- **The published types were `any` for anyone using modern Node module resolution.** Every package here is `"type": "module"`, and `tsc` writes relative specifiers into `.d.ts` exactly as the source wrote them — extensionless, because the source is compiled by a bundler. Under `moduleResolution: "nodenext"` (or `"node16"`) an extensionless relative specifier inside an ESM declaration file is an error, and TypeScript's response is the part that matters: it does not fail at the consumer's import. It resolves the package, discards every declaration it could not follow, and types the whole import `any`.
+
+  So there was no diagnostic anywhere near the cause. The first thing a consumer saw was an implicit-any error in **their own file**, pointing at their code, in a project that had done nothing wrong. Measured on `@rebasepro/server`: `bundler` resolution saw 170 value exports, `nodenext` saw **zero**. It had been that way for the entire life of the packages and was never reported, which is what a silent failure looks like from the outside.
+
+  Fixed by appending the extension the declarations always needed — `./init` → `./init.js`, and `./auth` → `./auth/index.js` where the target is a directory, resolved against the filesystem rather than guessed. This is not a trade: TypeScript maps a `./x.js` specifier onto `./x.d.ts` under `node10`, `bundler` and `nodenext` alike, so nothing that worked before stops working. The rewrite runs as a build step in all twenty-one published packages.
+
+  Nothing in this repository could have caught it, and that is the more interesting half. `pnpm typecheck`, the docs verifier and the template checks all map `@rebasepro/*` onto **source**; the API-surface gate reads a single `.d.ts` in isolation. Every gate looked at something other than the artifact a stranger installs. `pnpm check:dts` now looks at that: it installs each built package into a throwaway directory by symlink, imports it, and asks the type checker whether the result is `any` — a question that needs no knowledge of any package's API, and so keeps working as they change. It runs in CI after the build.
+
+## [0.16.0] - 2026-08-20
+
+### Added
 
 - **A relation picker can create the row it is looking for.** The list ends in an *Add …* action that opens the target collection's form in the side panel, over the form you are already filling in; saving it closes the panel and leaves the new row selected, with no second trip through the picker. Until now a relation could only point at something that already existed, so a company that was not in the list meant abandoning the form, going to that collection, creating the row and starting again — and on a record being created, everything typed so far was lost.
 
