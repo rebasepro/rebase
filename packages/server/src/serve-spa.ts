@@ -125,6 +125,54 @@ function isAssetRequest(requestPath: string, destination: string | undefined): b
 }
 
 /**
+ * Does this filename carry a content hash, and may it therefore be cached forever?
+ *
+ * The two answers a build needs are opposites, and picking wrong in either
+ * direction is a real bug. A hashed chunk (`index-vgugiqRO.js`) can be
+ * `immutable` for a year because a new build gives it a new URL. `index.html`
+ * cannot be cached at all: it is the document naming those hashed chunks, so a
+ * cached copy pins a tab to the previous deploy's filenames, which the new build
+ * no longer contains — the page dies on a 404 for a chunk, and the user has no
+ * way to know a reload is what they need.
+ *
+ * Erring toward "not hashed" is therefore the safe direction: the cost is a
+ * revalidation that usually answers 304, against serving a year-stale file with
+ * no way to recall it. So this demands positive evidence of a hash rather than
+ * assuming one — a segment of 8+ characters after the last `-` that is not
+ * ordinary lowercase prose. Vite and Rollup emit base64url digests, which
+ * essentially always carry a digit or a capital; a hand-written
+ * `vendor-analytics.js` does not, and gets revalidated.
+ *
+ * Deliberately not "everything under /assets/": that is a Vite convention, not a
+ * guarantee, and a build that drops an unhashed file there would have it pinned
+ * in every visitor's cache for a year with no way to correct it.
+ */
+function isContentHashed(requestPath: string): boolean {
+    const lastSegment = requestPath.slice(requestPath.lastIndexOf("/") + 1);
+    const dot = lastSegment.lastIndexOf(".");
+    if (dot <= 0) return false;
+
+    const stem = lastSegment.slice(0, dot);
+    const dash = stem.lastIndexOf("-");
+    if (dash < 0) return false;
+
+    const suffix = stem.slice(dash + 1);
+    if (suffix.length < 8) return false;
+    if (!/^[A-Za-z0-9_-]+$/.test(suffix)) return false;
+    return /[0-9A-Z]/.test(suffix);
+}
+
+/** A year, and never revalidated: the URL changes when the bytes do. */
+const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+
+/**
+ * Store it, but check before using it. Not `no-store`: revalidation answers 304
+ * on an unchanged document, which is cheaper than re-sending it, and correctness
+ * here needs freshness rather than absence.
+ */
+const REVALIDATE_CACHE = "no-cache";
+
+/**
  * Serve a Single Page Application from an Hono app.
  *
  * @internal Not part of the stable public API. Exported only because the
@@ -172,6 +220,29 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // priority where the build emitted .br/.gz siblings: those cost no CPU and
     // give brotli, and set Content-Encoding themselves, which makes the
     // compression middleware skip them.
+    // Cache-Control, for everything this mount answers — the static middleware
+    // below and the SPA fallback at the end alike.
+    //
+    // Registered first so its post-`next` half runs last, after the response
+    // exists and after compression has had its say. Without this, nothing here
+    // set the header at all: `app.rebase.pro` served `index.html` with no
+    // `Cache-Control`, which leaves browsers applying *heuristic* freshness —
+    // a fraction of the document's age, decided per browser, unbounded by
+    // anything the server said. A tab could therefore hold a deploy-old
+    // document naming chunks that no longer exist, and the only cure was a
+    // hard reload that nobody knows to perform.
+    //
+    // An explicit header already on the response wins: a route that has thought
+    // about its own caching knows more than a default does.
+    app.use(scope, async (c, next) => {
+        await next();
+        if (c.res.headers.has("cache-control")) return;
+        // 404s and redirects are not the build's artifacts to cache. A 304 is,
+        // and carries the header from the 200 that seeded it.
+        if (c.res.status !== 200) return;
+        c.header("Cache-Control", isContentHashed(c.req.path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE);
+    });
+
     app.use(scope, responseCompression());
     app.use(scope, serveStatic({
         root: path.relative(process.cwd(), frontendPath),

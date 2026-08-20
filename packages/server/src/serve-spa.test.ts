@@ -63,6 +63,11 @@ async function get(app: Hono, url: string, headers?: Record<string, string>): Pr
 body: await res.text() };
 }
 
+async function cacheControl(app: Hono, url: string): Promise<string | null> {
+    const res = await app.request(`http://localhost${url}`);
+    return res.headers.get("cache-control");
+}
+
 beforeEach(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-serve-spa-"));
 });
@@ -223,5 +228,57 @@ describe("serveSPA edge cases", () => {
         })).not.toThrow();
 
         expect((await get(app, "/admin")).body).toBe("FELL_THROUGH");
+    });
+});
+
+/**
+ * The header that decides whether a deploy reaches the people already using the
+ * app. `app.rebase.pro` shipped with no `Cache-Control` at all, which does not
+ * mean "do not cache" — it means every browser applies its own heuristic
+ * freshness, so a tab can hold a document naming chunks the new build no longer
+ * has, and the page dies on a 404 with nothing telling the user to reload.
+ */
+describe("serveSPA cache headers", () => {
+    function hashedBuild(): Hono {
+        return mount([{
+            path: "/",
+            spa: true,
+            dir: writeApp("site", {
+                "index.html": "SITE_INDEX",
+                "assets/index-vgugiqRO.js": "HASHED",
+                "assets/vendor-analytics.js": "UNHASHED",
+                "favicon.svg": "ICON"
+            })
+        }]);
+    }
+
+    it("pins a content-hashed chunk for a year", async () => {
+        // Safe precisely because the URL changes with the bytes.
+        expect(await cacheControl(hashedBuild(), "/assets/index-vgugiqRO.js"))
+            .toBe("public, max-age=31536000, immutable");
+    });
+
+    it("never pins index.html, which names those chunks", async () => {
+        expect(await cacheControl(hashedBuild(), "/")).toBe("no-cache");
+    });
+
+    it("never pins the SPA fallback either", async () => {
+        // A deep link is answered with the same document, and inherits the same
+        // reasoning — it is served by a different code path.
+        expect(await cacheControl(hashedBuild(), "/o/acme/projects")).toBe("no-cache");
+    });
+
+    it("revalidates a file whose name carries no hash, rather than guessing", async () => {
+        // Being under /assets/ is a Vite convention, not evidence. Erring this
+        // way costs a 304; erring the other way pins a wrong file for a year
+        // with no way to recall it.
+        expect(await cacheControl(hashedBuild(), "/assets/vendor-analytics.js")).toBe("no-cache");
+        expect(await cacheControl(hashedBuild(), "/favicon.svg")).toBe("no-cache");
+    });
+
+    it("does not cache a missing asset", async () => {
+        // 404s are not artifacts of the build and must not be remembered as if
+        // they were: the next deploy may well add the file.
+        expect(await cacheControl(hashedBuild(), "/assets/gone-A1b2C3d4.js")).toBeNull();
     });
 });
