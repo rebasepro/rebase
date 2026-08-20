@@ -271,7 +271,14 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
             };
         }
 
-        scrollHandler = () => {
+        // Coalesced into one rAF tick. This used to run per scroll event, and the
+        // non-hero branch reads `getBoundingClientRect()` — a forced layout. With
+        // four canvases on the home page that was three synchronous layout reads
+        // plus four WebGL uniform writes on every event, which scroll fires far
+        // more often than once a frame. That is the jank.
+        let ticking = false;
+        const applyOffset = () => {
+            ticking = false;
             if (!neat) return;
             if (variant === "hero") {
                 neat.yOffset = baseOffset + window.scrollY * 0.3;
@@ -283,7 +290,14 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
             }
         };
 
+        scrollHandler = () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(applyOffset);
+        };
+
         window.addEventListener("scroll", scrollHandler, { passive: true });
+        applyOffset();
 
         return () => {
             cancelled = true;

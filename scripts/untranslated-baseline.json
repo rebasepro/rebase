@@ -153,8 +153,6 @@
   "packages/admin/src/editor/selectors/node-selector.tsx::editor_todo_list": 1,
   "packages/admin/src/form/components/StorageUploadProgress.tsx::error_uploading_file": 1,
   "packages/admin/src/form/EntityForm.tsx::clear_form": 1,
-  "packages/admin/src/form/EntityForm.tsx::clear_form_confirmation": 1,
-  "packages/admin/src/form/EntityForm.tsx::discard_changes_confirmation": 1,
   "packages/admin/src/form/EntityForm.tsx::settings_heading": 1,
   "packages/admin/src/form/EntityFormActions.tsx::create_copy": 1,
   "packages/admin/src/form/EntityFormActions.tsx::fix_errors_before_saving": 1,

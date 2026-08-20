@@ -825,7 +825,7 @@ width: "100%" }}
             <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
               {/* Logo — always visible, shrink-0 w-[56px] h-[40px] centered */}
               <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
-                <img src="/img/rebase_logo.svg" width="583" height="583" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
+                <img src="/img/rebase_logo.svg" width="306" height="306" alt="Rebase" className="w-[28px] h-[28px] object-contain"/>
               </div>
               {/* Title — hidden when collapsed: opacity-0 w-0 */}
               <div className="flex flex-row items-center overflow-hidden transition-all duration-200 ease-in-out opacity-0 w-0 ml-0"/>

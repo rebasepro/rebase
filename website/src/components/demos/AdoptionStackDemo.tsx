@@ -103,14 +103,8 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
             {/* ── What that costs you ──────────────────────────────── */}
             <div className="frame overflow-hidden">
 
-                {/* window chrome, like every other mock on this page */}
                 <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">
-                    <span className="flex gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"/>
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]"/>
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]"/>
-                    </span>
-                    <span className="ml-2 font-mono text-[11px] text-surface-500">package.json</span>
+                    <span className="font-mono text-[11px] text-surface-500">package.json</span>
                 </div>
 
                 <div className="px-6 pt-5">

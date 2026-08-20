@@ -18,7 +18,8 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 
 // Code is defined in frontmatter so whitespace is preserved exactly
-const codeHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
+const codeHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig }
+  <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
 
 <span class="text-primary-light">export const</span> <span class="text-white">products</span>: PostgresCollectionConfig = {
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Products"</span>,
@@ -149,7 +150,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     const glow2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                     glow2.setAttribute('d', d);
                     glow2.setAttribute('fill', 'none');
-                    glow2.setAttribute('stroke', 'rgba(217,119,6,0.04)');
+                    glow2.setAttribute('stroke', 'rgba(0,112,244,0.05)');
                     glow2.setAttribute('stroke-width', '10');
                     glow2.classList.add('connector');
                     svg.appendChild(glow2);
@@ -158,7 +159,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     const glow1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                     glow1.setAttribute('d', d);
                     glow1.setAttribute('fill', 'none');
-                    glow1.setAttribute('stroke', 'rgba(217,119,6,0.08)');
+                    glow1.setAttribute('stroke', 'rgba(0,112,244,0.10)');
                     glow1.setAttribute('stroke-width', '4');
                     glow1.classList.add('connector');
                     svg.appendChild(glow1);
@@ -167,7 +168,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                     line.setAttribute('d', d);
                     line.setAttribute('fill', 'none');
-                    line.setAttribute('stroke', 'rgba(217,119,6,0.5)');
+                    line.setAttribute('stroke', 'rgba(0,112,244,0.55)');
                     line.setAttribute('stroke-width', '1');
                     line.classList.add('connector');
                     svg.appendChild(line);
@@ -187,7 +188,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         {/* ══════════ LEFT CARDS ══════════ */}
         <div class="flex flex-col items-end justify-center gap-6 flex-1 min-w-0 z-20">
             {/* Admin views — matches real VirtualTable styling */}
-            <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl relative z-10 w-[360px] xl:w-[400px] mr-2 xl:mr-4">
+            <div data-card class="frame relative z-10 w-[360px] xl:w-[400px] mr-2 xl:mr-4">
                 {/* Toolbar — collection name + search + add */}
                 <div class="flex items-center justify-between px-3 py-2 border-b border-surface-700/40">
                     <span class="text-sm text-white font-medium">Products</span>
@@ -266,7 +267,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
             </div>
 
             {/* Entity Form — matches real EntityForm styling */}
-            <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl w-[320px] xl:w-[350px] mr-6 xl:mr-10">
+            <div data-card class="frame w-[320px] xl:w-[350px] mr-6 xl:mr-10">
                 {/* Form content — no card header, title inline like real product */}
                 <div class="px-5 pt-5 pb-4 space-y-4">
                     {/* Title + sync indicator */}
@@ -348,23 +349,15 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         {/* ══════════ CENTER: Code block ══════════ */}
         <div class="flex flex-col gap-4 w-[340px] xl:w-[400px] shrink-0 z-20">
             {/* Radial glow behind code block */}
-            <div id="cp-code-block" class="relative shadow-[0_0_60px_rgba(217,119,6,0.08)] rounded-xl">
-                <div class="absolute -inset-12 rounded-2xl pointer-events-none"
-                     style="background: radial-gradient(ellipse at center, rgba(217,119,6,0.08) 0%, rgba(217,119,6,0.03) 50%, transparent 80%);"></div>
-
-                <div class="relative z-10 rounded-xl overflow-hidden ring-1 ring-amber-600/50 shadow-[0_0_15px_rgba(217,119,6,0.25)] bg-surface-950">
+            <div id="cp-code-block" class="relative rounded-xl">
+                <div class="frame relative z-10 ring-1 ring-primary/40">
                     <div class="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-surface-800">
                         <div class="flex items-center gap-3">
-                            <div class="flex gap-1.5">
-                                <div class="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
-                                <div class="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
-                            </div>
                             <span class="text-2xs text-surface-400 font-mono tracking-wider uppercase font-semibold ml-2">{t('power.appcode')}</span>
                         </div>
                         <span class="text-2xs text-surface-500 font-mono">products.ts</span>
                     </div>
-                    <pre class="bg-surface-950 px-5 py-5 font-mono text-xs leading-relaxed text-surface-300 overflow-x-auto" set:html={codeHtml}></pre>
+                    <pre class="bg-surface-950 px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={codeHtml}></pre>
                 </div>
             </div>
 
@@ -395,7 +388,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         {/* ══════════ RIGHT CARDS ══════════ */}
         <div class="flex flex-col items-start justify-center gap-5 flex-1 min-w-0 z-20">
             {/* DB Schema — offset up */}
-            <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl xl:-mt-10 w-[270px] xl:w-[310px] ml-2 xl:ml-6">
+            <div data-card class="frame xl:-mt-10 w-[270px] xl:w-[310px] ml-2 xl:ml-6">
                 <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
 
 <svg
@@ -434,7 +427,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
             </div>
 
             {/* Typed SDK */}
-            <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl w-[350px] xl:w-[420px] ml-4 xl:ml-8 relative z-10">
+            <div data-card class="frame w-[350px] xl:w-[420px] ml-4 xl:ml-8 relative z-10">
                 <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
 
 <svg
@@ -476,14 +469,20 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Camera"</span>,
   <span class="text-blue-300">price</span>: <span class="text-amber-500">299</span>,
   <span class="text-blue-300">category</span>: <span class="text-green-400">"Electronics"</span>
-});`}></pre>
+});
+
+<span class="text-surface-500">// Realtime, over the same collection</span>
+<span class="text-primary-light">const</span> <span class="text-white">unsubscribe</span> = <span class="text-white">client</span>.data.products.<span class="text-blue-300">listen</span>(
+  { <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>] } },
+  (<span class="text-white">res</span>) =&gt; <span class="text-white">setRows</span>(<span class="text-white">res</span>.<span class="text-blue-300">data</span>)
+);`}></pre>
                 </div>
             </div>
 
             {/* API Column — REST API */}
             <div class="flex flex-row gap-4 items-start w-full ml-0 xl:ml-6">
                 {/* REST API */}
-                <div data-card class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl w-[185px] xl:w-[200px] shrink-0">
+                <div data-card class="frame w-[185px] xl:w-[200px] shrink-0">
                     <div class="flex items-center gap-2 px-3 py-2.5 border-b border-surface-800 bg-surface-900/60">
 
 <svg
@@ -528,7 +527,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
 
     {/* Mobile fallback */}
     <div class="lg:hidden px-6 space-y-4 animate-on-scroll fade-in-up delay-100">
-        <div class="rounded-xl overflow-hidden ring-1 ring-amber-500/20 bg-surface-950">
+        <div class="rounded-xl overflow-hidden frame">
             <div class="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-surface-800">
                 <span class="text-2xs text-surface-400 font-mono uppercase font-semibold">{t('power.appcode')} — products.ts</span>
             </div>

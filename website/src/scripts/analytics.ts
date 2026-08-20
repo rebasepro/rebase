@@ -93,11 +93,19 @@ class Analytics {
         });
 
         // Scroll depth tracking
+        // rAF-coalesced: `document.body.scrollHeight` forces layout, and this ran
+        // on every scroll event alongside the gradient handlers.
+        let depthTicking = false;
         window.addEventListener("scroll", () => {
-            const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
-            if (scrollPercent > this.maxScroll) {
-                this.maxScroll = Math.floor(scrollPercent / 25) * 25;
-            }
+            if (depthTicking) return;
+            depthTicking = true;
+            requestAnimationFrame(() => {
+                depthTicking = false;
+                const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+                if (scrollPercent > this.maxScroll) {
+                    this.maxScroll = Math.floor(scrollPercent / 25) * 25;
+                }
+            });
         });
 
         // Send exit metrics on navigation / close

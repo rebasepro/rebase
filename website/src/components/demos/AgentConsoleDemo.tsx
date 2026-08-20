@@ -233,12 +233,7 @@ export function AgentConsoleDemo() {
 
             {/* window chrome */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">
-                <span className="flex gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"/>
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]"/>
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]"/>
-                </span>
-                <span className="ml-2 font-mono text-[11px] text-surface-500">
+                <span className="font-mono text-[11px] text-surface-500">
                     agent · what it can reach
                 </span>
             </div>
@@ -267,8 +262,12 @@ export function AgentConsoleDemo() {
                     })}
                 </nav>
 
-                {/* detail — fixed floor so switching capabilities never resizes the window */}
-                <div className="p-6 sm:p-7 min-w-0 lg:min-h-[420px]">
+                {/* Detail pane. A min-height alone did not hold: content ranges
+                    464-619px across the nine capabilities, so the window still
+                    resized on every switch. A fixed height with its own scroll
+                    keeps it constant without leaving dead space under the short
+                    ones. */}
+                <div className="p-6 sm:p-7 min-w-0 lg:h-[560px] lg:overflow-y-auto">
                     <h3 className="text-lg font-semibold text-white">{active.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-surface-400 max-w-2xl">{active.desc}</p>
 
