@@ -78,6 +78,23 @@ packages/forms/.yarn/
 /patch_*.js
 *.diff
 /refactor-*.mjs
+
+# The same scratch scripts, ANYWHERE — not only at the root.
+#
+# AGENT.md bans one-off scripts in the repo root *and inside any package
+# directory*, but every pattern above is root-anchored, so only half of that was
+# enforced. `website/.v.mjs` — a throwaway Playwright screenshot script writing
+# into an agent scratchpad — sailed past all of them and sat untracked in the
+# tree, one `git add -A` away from being committed. Unanchored on purpose.
+**/scratch.*
+**/fix-*.mjs
+**/patch-*.mjs
+**/.v.mjs
+
+# Live session state from the `impeccable` skill: a PID/port heartbeat
+# (`{"pid":…,"port":…,"lastBeat":…}`), rewritten while a session runs. Not
+# source, and it had already been `git add`ed once.
+.impeccable/
 /eslint-errors*.json
 /graph.json
 /lerna-debug.log
