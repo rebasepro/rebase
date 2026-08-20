@@ -162,16 +162,38 @@ function entrySpecifiers(packageDir, manifest) {
  */
 function stageConsumer(packageDir, manifest) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dts-probe-"));
-    const scoped = manifest.name.startsWith("@");
-    const target = scoped
-        ? path.join(dir, "node_modules", manifest.name.split("/")[0])
-        : path.join(dir, "node_modules");
-    fs.mkdirSync(target, { recursive: true });
-    fs.symlinkSync(
-        packageDir,
-        path.join(dir, "node_modules", manifest.name),
-        "dir"
-    );
+    const modules = path.join(dir, "node_modules");
+
+    /**
+     * Every workspace package, not just the one under test.
+     *
+     * A real consumer's `node_modules` is flat: an installer puts the whole
+     * transitive closure there, so a declaration that names a sibling package
+     * resolves by an ordinary upward lookup. Staging only the package under
+     * test does not reproduce that — a sibling reference then resolves only
+     * through the *workspace's* nested links, which node10 cannot follow, and
+     * the probe reports a TS2307 that no installed consumer would ever see.
+     *
+     * That is not hypothetical: it fired on `@rebasepro/admin` the first time
+     * declaration checking was switched on, and it was the probe's fault, not
+     * the package's.
+     */
+    for (const name of fs.readdirSync(path.join(ROOT, "packages"))) {
+        const siblingPath = path.join(ROOT, "packages", name);
+        const siblingManifest = path.join(siblingPath, "package.json");
+        if (!fs.existsSync(siblingManifest)) continue;
+
+        const sibling = JSON.parse(fs.readFileSync(siblingManifest, "utf8"));
+        const linkPath = path.join(modules, sibling.name);
+        fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+        if (!fs.existsSync(linkPath)) fs.symlinkSync(siblingPath, linkPath, "dir");
+    }
+
+    // …and the package under test, in case it lives outside `packages/`.
+    const linkPath = path.join(modules, manifest.name);
+    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+    if (!fs.existsSync(linkPath)) fs.symlinkSync(packageDir, linkPath, "dir");
+
     return dir;
 }
 
@@ -204,9 +226,11 @@ function inspect(consumerDir, specifier, mode, packageDir) {
         noEmit: true,
         strict: true,
         target: ts.ScriptTarget.ES2022,
-        // Errors inside third-party `@types` are not this probe's business.
-        // `explain()` re-checks without this when a failure needs a cause.
-        skipLibCheck: true,
+        // Declaration files ARE the thing under test, so they cannot be
+        // skipped — `skipLibCheck: true` suppresses the very diagnostics this
+        // probe exists to find. Noise from third-party `@types` is excluded by
+        // filtering diagnostics to the package's own directory instead.
+        skipLibCheck: false,
         ...mode.options
     });
 
@@ -222,6 +246,51 @@ function inspect(consumerDir, specifier, mode, packageDir) {
             mode: mode.name,
             resolved: false,
             reason: ts.flattenDiagnosticMessageText(unresolved[0].messageText, " ")
+        };
+    }
+
+    // The defect itself, read directly off the package's own declarations
+    // rather than inferred from what the export surface looks like afterwards.
+    //
+    // This is here because inference is not enough: a re-export that carries
+    // only *types* can fail to resolve without changing the number of value
+    // exports at all, and an earlier version of this probe passed a package
+    // whose `./types/index` re-export had been broken by hand. The export-set
+    // comparisons below are the general net; this is the specific one.
+    const declarationErrors = ts
+        .getPreEmitDiagnostics(program)
+        .filter(diagnostic => {
+            if (!diagnostic.file) return false;
+            // Only this package's own emitted declarations are under test.
+            if (!diagnostic.file.fileName.includes("/packages/")) return false;
+
+            const text = ts.flattenDiagnosticMessageText(diagnostic.messageText, " ");
+            // 2834/2835: a relative import needs an explicit extension — the
+            // nodenext rule, and the whole reason this probe exists.
+            if (diagnostic.code === 2834 || diagnostic.code === 2835) return true;
+            // 2307 counts only for a *relative* specifier. For a bare one it is
+            // an artifact of how the probe stages the package: symlinking means
+            // TypeScript resolves from the real repository path, so an upward
+            // lookup for a sibling `@rebasepro/*` never reaches the staged
+            // node_modules — while a real install, where the whole closure is
+            // flat, resolves it without trouble. Counting those would fail
+            // every package for something no consumer can experience.
+            return diagnostic.code === 2307 && /Cannot find module '\.{1,2}\//.test(text);
+        });
+
+    if (declarationErrors.length > 0) {
+        const first = declarationErrors[0];
+        const { line } = first.file.getLineAndCharacterOfPosition(first.start ?? 0);
+        return {
+            mode: mode.name,
+            resolved: true,
+            broken: `${path.relative(ROOT, first.file.fileName)}:${line + 1} TS${first.code}: ` +
+                `${ts.flattenDiagnosticMessageText(first.messageText, " ")}` +
+                (declarationErrors.length > 1 ? ` (${declarationErrors.length} such)` : ""),
+            names: new Set(),
+            valueNames: new Set(),
+            anyValued: [],
+            fixture
         };
     }
 
@@ -260,27 +329,6 @@ function inspect(consumerDir, specifier, mode, packageDir) {
         valueNames,
         anyValued
     };
-}
-
-/** Why the declarations were discarded — the diagnostics inside the package. */
-function explain(fixture, mode, packageDir) {
-    const program = ts.createProgram([fixture], {
-        noEmit: true,
-        strict: true,
-        target: ts.ScriptTarget.ES2022,
-        skipLibCheck: false,
-        ...mode.options
-    });
-
-    const inPackage = ts
-        .getPreEmitDiagnostics(program)
-        .filter(diagnostic => diagnostic.file?.fileName.startsWith(packageDir.replace(/\\/g, "/")));
-
-    if (inPackage.length === 0) return undefined;
-    const first = inPackage[0];
-    const { line } = first.file.getLineAndCharacterOfPosition(first.start ?? 0);
-    return `${path.relative(ROOT, first.file.fileName)}:${line + 1} TS${first.code}: ` +
-        `${ts.flattenDiagnosticMessageText(first.messageText, " ")} (${inPackage.length} such)`;
 }
 
 function checkPackage(packageDirInput) {
@@ -324,14 +372,26 @@ function checkPackage(packageDirInput) {
             const resolved = results.filter(one => one.resolved);
             if (resolved.length === 0) continue;
 
+            // The package's own declarations failed to type-check. Reported
+            // first and on its own, because it is the cause rather than a
+            // symptom — and because it is the only signal that catches a
+            // re-export carrying nothing but types, which changes no export
+            // count and so is invisible to every comparison below.
+            for (const result of resolved.filter(one => one.broken)) {
+                failures.push({
+                    specifier,
+                    mode: result.mode,
+                    reason: `its own declarations do not type-check — ${result.broken}`
+                });
+            }
+
             // A value export typed `any` is the direct evidence.
             for (const result of resolved) {
                 if (result.anyValued.length > 0) {
                     failures.push({
                         specifier,
                         mode: result.mode,
-                        reason: `${result.anyValued.length} value export(s) are \`any\`, e.g. ${result.anyValued.slice(0, 3).join(", ")}`,
-                        cause: explain(result.fixture, MODES.find(m => m.name === result.mode), packageDir)
+                        reason: `${result.anyValued.length} value export(s) are \`any\`, e.g. ${result.anyValued.slice(0, 3).join(", ")}`
                     });
                 }
             }
@@ -342,17 +402,23 @@ function checkPackage(packageDirInput) {
             // the modes against each other needs no external notion of what the
             // package "should" export, which is what keeps this probe honest as
             // the packages change.
-            const best = resolved.reduce((a, b) => (b.valueNames.size > a.valueNames.size ? b : a));
-            for (const result of resolved) {
+            // Compared on *all* exports, not only the value ones. Types are
+            // most of what a package like `@rebasepro/types` publishes, and a
+            // type-only re-export can vanish without moving the value count at
+            // all — which is exactly how a hand-broken specifier in
+            // `@rebasepro/admin` slipped past an earlier version of this.
+            const healthy = resolved.filter(one => !one.broken);
+            if (healthy.length < 2) continue;
+            const best = healthy.reduce((a, b) => (b.names.size > a.names.size ? b : a));
+            for (const result of healthy) {
                 if (result === best) continue;
-                const missing = [...best.valueNames].filter(name => !result.valueNames.has(name));
+                const missing = [...best.names].filter(name => !result.names.has(name));
                 if (missing.length === 0) continue;
                 failures.push({
                     specifier,
                     mode: result.mode,
-                    reason: `sees ${result.valueNames.size} value exports where ${best.mode} sees ${best.valueNames.size}` +
-                        ` — missing e.g. ${missing.slice(0, 3).join(", ")}`,
-                    cause: explain(result.fixture, MODES.find(m => m.name === result.mode), packageDir)
+                    reason: `sees ${result.names.size} exports where ${best.mode} sees ${best.names.size}` +
+                        ` — missing e.g. ${missing.slice(0, 3).join(", ")}`
                 });
             }
 
