@@ -158,7 +158,7 @@ function SelectProduct() {
 }
 ```
 
-## `useNavigationController`
+## `useNavigationStateController`
 
 Zugriff auf Navigationszustand und aufgelöste Sammlungen:
 

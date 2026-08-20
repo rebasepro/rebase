@@ -168,7 +168,7 @@ this — enable `allowUserLookup` and use the built-in primitive:
 const profile = await rebase.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await rebase.dataAsAdmin.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 
@@ -594,10 +594,19 @@ When a request arrives with a `rk_` prefixed bearer token:
 2. Expiry and revocation status are checked.
 3. If `admin: true`, the key is assigned `roles: ["admin", "service"]` — granting access to admin routes. Otherwise `roles: ["service"]`.
 4. Permissions are validated against the requested collection and HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`).
-5. The DataDriver is scoped with `withAuth()` using the key's service identity (bypasses RLS).
+5. The DataDriver is scoped with `withAuth()` using the key's service identity. This does **not** bypass RLS — the statements run as the restricted `rebase_user` role with `app.uid = 'api-key:{id}'`, and your policies are evaluated against that.
 6. Per-key rate limiting is enforced if `rate_limit` is set.
 
-> **WARNING FOR AGENTS:** API keys bypass RLS. They are designed for trusted server-side use only. Never expose API keys to client-side code.
+> **WARNING FOR AGENTS:** an API key is a long-lived credential carrying a broad
+> identity (`service`, or `admin` too when `admin: true`). It is for trusted
+> server-side use only — never expose one to client-side code.
+>
+> It does **not** bypass RLS, and assuming it does produces the opposite bug to
+> the one you expect: a non-admin key with `"*"` permissions can read **nothing**,
+> because no policy grants the `service` role. That is RLS working. Either grant
+> `service` in the relevant collections' security rules, or use an admin key,
+> which clears the built-in default policies through their `rolesOverlap(['admin'])`
+> arm. Owner-style rules (`owner_id = rebase.uid()`) never match a key.
 
 ### Role Summary
 
@@ -915,7 +924,14 @@ This allows Postgres RLS policies to handle public access explicitly.
 
 ### Service Key Scoping
 
-Requests with the `serviceKey` bypass RLS — they receive admin-level access with `uid: "service"` and `roles: ["admin"]`.
+Requests with the `serviceKey` are scoped as `uid: "service"`, `roles: ["admin"]`.
+That is admin-scoped, **not** RLS-bypassing: the statements still run as
+`rebase_user` with policies evaluated against that identity — the admin role
+simply satisfies the built-in default policies. `policy.serverContext()`
+(`rebase.uid() IS NULL`) is **false** for it, so a collection with
+`disableDefaultPolicies: true` whose only rule is `serverContext()` denies these
+writes and returns zero rows for these reads. `rebase.sql()` is the real bypass:
+owner connection, no policies.
 
 ### API Key Scoping
 
@@ -923,18 +939,18 @@ API keys use a service identity for RLS scoping: `uid: "api-key:{id}"`, `roles: 
 
 ### Reserved System Identities
 
-The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (Collection Callbacks / DataHooks) and `c.get("user")` (custom functions):
+The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (global and collection callbacks) and `c.get("user")` (custom functions):
 
 | Auth Method | `userId` | `roles` | When It Occurs |
 |---|---|---|---|
 | JWT (end-user) | Real user ID (e.g. `"abc123"`) | User's assigned roles (e.g. `["viewer"]`) | Normal authenticated requests |
-| Service Key | `"service"` | `["admin"]` | Server-side `rebase.data` calls, cron jobs, or any request with `Authorization: Bearer <serviceKey>` |
+| Service Key | `"service"` | `["admin"]` | Server-side `rebase.dataAsAdmin` calls, cron jobs, or any request with `Authorization: Bearer <serviceKey>` |
 | API Key (default) | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
 | API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | Admin API key requests |
 | Anonymous | `"anon"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
-> **IMPORTANT FOR AGENTS:** Server-side `rebase.data` (the singleton used in cron jobs, custom functions, and webhooks) is built with `createRebaseClient({ token: serviceKey })`. It round-trips through the REST API, so all middleware, DataHooks, and Collection Callbacks fire with `userId: "service"`, `roles: ["admin"]`. This lets developers distinguish server-internal reads from end-user reads in callbacks.
+> **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` still resolves at runtime as an alias, but `RebaseServerClient` omits it from the type so the privileged plane has exactly one name.
 
 ---
 
@@ -1166,76 +1182,85 @@ Admin user and role management is handled via dedicated admin routes (mounted un
 
 ---
 
-## Backend Hooks
+## Auth hooks (`auth.hooks`)
 
-Backend hooks intercept data at the **API boundary** (after DB operations, before API responses). They are separate from auth hooks and collection-level `CollectionCallbacks`.
+<!-- docs-verify: ignore -->
+> **IMPORTANT FOR AGENTS: there is no `hooks` key on `RebaseBackendConfig`, and
+> no `BackendHooks`, `UserHooks`, `DataHooks` or `BackendHookContext` type.**
+> A config object shaped like that type-errors, and in plain JavaScript it is
+> silently ignored. There are exactly two extension points, and they sit in
+> different places:
+>
+> | Want to… | Use | Where |
+> |---|---|---|
+> | React to sign-up / login / logout / password reset, or replace hashing | `auth.hooks` (`AuthHooks`) | inside the `auth` block |
+> | Transform or gate **collection data** across every collection | `callbacks` (`CollectionCallbacks`) | top level of the backend config |
+>
+> Auth writes bypass the collection save pipeline (see the warning above), which
+> is exactly why `auth.hooks` exists: a `beforeSave` on the users collection does
+> not fire for registration, OAuth or admin user management.
 
-### BackendHooks Interface
-
-```typescript
-interface BackendHooks {
-  users?: UserHooks;
-  data?: DataHooks;
-}
-```
-
-### UserHooks (Admin User Management)
-
-| Hook | Signature | Description |
-|---|---|---|
-| `afterRead` | `(user, context) => AdminUser \| null` | Transform user after DB read. Return `null` to hide. |
-| `beforeSave` | `(data, context) => data` | Transform before write. Throw to abort. |
-| `afterSave` | `(user, context) => void` | After user create/update. Side effects. |
-| `beforeDelete` | `(userId, context) => void` | Throw to prevent deletion. |
-| `afterDelete` | `(userId, context) => void` | After user deleted. |
-
-### DataHooks (All Collection Entities)
+### `AuthHooks`
 
 | Hook | Signature | Description |
 |---|---|---|
-| `afterRead` | `(slug, entity, context) => entity \| null` | Transform entity after read. Return `null` to filter out. |
-| `beforeSave` | `(slug, values, entityId, context) => values` | Transform before write. Throw to abort. |
-| `afterSave` | `(slug, entity, context) => void` | After entity create/update. Side effects. |
-| `beforeDelete` | `(slug, entityId, context) => void` | Throw to prevent deletion. |
-| `afterDelete` | `(slug, entityId, context) => void` | After entity deleted. |
+| `hashPassword` | `(password) => Promise<string>` | Replace the password hash function |
+| `verifyPassword` | `(password, storedHash) => Promise<boolean>` | Replace hash verification |
+| `validatePasswordStrength` | `(password) => PasswordValidationResult` | Enforce your own password policy |
+| `verifyCredentials` | `(email, password, repo) => Promise<UserData \| null>` | Replace credential checking entirely |
+| `beforeUserCreate` | `(data) => Promise<CreateUserData>` | Transform the record before it is written |
+| `afterUserCreate` | `(user) => Promise<void>` | Side effects on sign-up (provision a team, send a welcome email) |
+| `beforeLogin` | `(email, method) => Promise<void>` | Throw to block a sign-in |
+| `onAuthenticated` | `(user, method) => Promise<void>` | Fires on every successful authentication |
+| `afterLogout` | `(uid) => Promise<void>` | Side effects on sign-out |
+| `onMfaVerified` | `(uid, factorId) => Promise<void>` | Fires when a second factor is accepted |
+| `customizeAccessToken` | `(claims, user) => Promise<claims>` | Add claims to the access token |
+| `transformAuthResponse` | — | Reshape the JSON an auth route returns |
+| `onPasswordReset` | `(uid) => Promise<void>` | Fires after a reset completes |
+| `beforeUserDelete` / `afterUserDelete` | `(uid) => Promise<void>` | Throw in `before` to prevent deletion |
+| `onAdminCreateUser` | — | Fires when an administrator creates a user |
+| `onAdminResetPassword` | — | Fires when an administrator resets a password |
 
-### BackendHookContext
-
-```typescript
-interface BackendHookContext {
-  requestUser?: { userId: string; roles: string[] };
-  method: "GET" | "POST" | "PUT" | "DELETE";
-}
-```
-
-### Example: PII Masking
+`AuthMethod` is `"login" | "register" | "oauth" | "refresh" | "password-reset" |
+"anonymous" | "magic-link" | "mfa"`.
 
 ```typescript no-verify
-const hooks: BackendHooks = {
-  data: {
-    afterRead(slug, entity, ctx) {
-      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
-        return { ...entity, email: "***" };
-      }
-      return entity;
-    },
-  },
-  users: {
-    afterRead(user, ctx) {
-      // Hide system users from admin panel
-      if (user.email.endsWith("@system.internal")) return null;
-      return user;
-    },
-  },
-};
-
 await initializeRebaseBackend({
-  // ...
-  hooks,
+    // ...
+    auth: {
+        collection: usersCollection,
+        jwtSecret: process.env.JWT_SECRET,
+        hooks: {
+            async afterUserCreate(user) {
+                await provisionPersonalTeam(user.id);
+            },
+            async customizeAccessToken(claims, user) {
+                return { ...claims, tenant: user.metadata?.tenantId };
+            }
+        }
+    }
 });
 ```
 
----
+### Masking data instead
+
+PII masking is **not** an auth hook — it belongs in the global `callbacks`
+block, which fires on every data path (REST, realtime, and server-side
+`rebase.dataAsAdmin`):
+
+```typescript no-verify
+await initializeRebaseBackend({
+    // ...
+    callbacks: {
+        afterRead({ row, context }) {
+            if (!context.user?.roles?.includes("admin") && row.email) {
+                return { ...row, email: "***" };
+            }
+            return row;
+        }
+    }
+});
+```
 
 ## Email Configuration
 
@@ -1332,7 +1357,7 @@ When a request includes `Authorization: Bearer <serviceKey>`:
 - Comparison is done with constant-time comparison to prevent timing attacks.
 - Must be ≥ 32 characters (validated at startup).
 
-> **TIP:** In Collection Callbacks and DataHooks, server-side `rebase.data` calls appear as `userId: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
+> **TIP:** In global and collection callbacks, server-side `rebase.dataAsAdmin` calls appear as `uid: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
 
 ### Token Rotation
 

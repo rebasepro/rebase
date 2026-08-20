@@ -122,14 +122,6 @@ rebase db migrate
 - Les applique dans l'ordre à la base de données
 - Suit quelles migrations ont été appliquées
 
-### `rebase db studio`
-
-Ouvrez Drizzle Studio pour parcourir et modifier votre base de données visuellement :
-
-```bash
-rebase db studio
-```
-
 ### `rebase db branch`
 
 Branchement de base de données pour le développement parallèle :

@@ -71,7 +71,15 @@ These options are set internally when mounting routes but are derived from the b
 
 ## Per-Object Authorization
 
-> **REQUIRED FOR MULTI-TENANT APPS.** `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an `authorize` hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model.
+> **REQUIRED FOR MULTI-TENANT APPS.** `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an `authorize` hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys need not even be guessed.
+
+> **STORAGE REFUSES TO BOOT IN PRODUCTION WITHOUT ONE.** Collections are protected by row-level security; storage is not, and there is no per-object equivalent in the bucket — so this hook *is* the model. When storage is configured and `NODE_ENV=production`, `initializeRebaseBackend` **throws at startup** unless one of these is set:
+>
+> - `storageAuthorize` — a hook, per object. Recommended.
+> - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
+> - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every signed-in user is trusted with every file. Named to be read twice.
+>
+> In development it logs a warning instead, so a project can be wrong about this and work fine locally right up until it is deployed. The environment spellings are `STORAGE_PUBLIC_READ` and `STORAGE_ALLOW_ANY_AUTHENTICATED`. A scaffolded project ships a hook in `config/storage.ts` already — read it before replacing it, and note that it models a CMS's *shared content library*, which is not the shape of per-user files.
 
 Set `storageAuthorize` on `initializeRebaseBackend`. It is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
 
@@ -92,8 +100,9 @@ await initializeRebaseBackend({
 | `key` | `string` | Object key, bucket prefix stripped and traversal sanitized |
 | `bucket` | `string` | Resolved bucket (`"default"` when unspecified) |
 | `operation` | `"read" \| "write" \| "delete" \| "list"` | What the request is attempting |
-| `user` | `{ userId, email?, roles? } \| null` | Resolved caller; `null` when the route allows anonymous access |
+| `user` | `{ uid, email?, roles? } \| null` | Resolved caller; `null` when the route allows anonymous access |
 | `storageId` | `string \| undefined` | Named backend, when the request targeted one |
+| `data` | `StorageAuthorizeData \| undefined` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses RLS deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
 
@@ -127,7 +136,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-> **WARNING FOR AGENTS:** In production the backend **refuses to boot** on `type: "local"`. Local storage is the container filesystem, so every uploaded file is destroyed on the next restart or redeploy — silently, with no error at write or read time. Use S3/GCS in production. `FORCE_LOCAL_STORAGE=true` overrides the refusal, and is only correct when a durable volume is actually mounted at the storage path.
+> **WARNING FOR AGENTS:** in production the local backend is **not registered at all**. The backend still boots — data, auth and realtime keep serving — but the storage routes answer `501 STORAGE_NOT_CONFIGURED`, because local storage is the container filesystem and every uploaded file is destroyed on the next restart or redeploy, silently, with no error at write or read time. (Dropping the backend rather than throwing is deliberate: a crash-looping rollout would take the whole app down over uploads.) Use S3/GCS in production. `FORCE_LOCAL_STORAGE=true` re-registers it, and is only correct when a durable volume really is mounted at the storage path.
 
 Local storage uses a `{basePath}/{bucket}/{path}` directory structure. The default bucket is `"default"`, and it is applied consistently across `putObject`, `getObject`, `deleteObject` and `listObjects` — a bare key round-trips. Every uploaded file gets a sidecar `.metadata.json` file containing:
 
@@ -259,7 +268,7 @@ The backend validates storage-related environment variables via a Zod schema:
 |----------|------|---------|-------------|
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | Storage provider type |
 | `STORAGE_PATH` | `string` | `"./uploads"` | Base path for local storage / TUS temp directory |
-| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Allow local storage in production (refuses to boot otherwise) |
+| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Allow local storage in production. Without it the local backend is not registered and uploads answer `501 STORAGE_NOT_CONFIGURED` — the backend still boots |
 | `S3_BUCKET` | `string` | — | S3 bucket name |
 | `S3_REGION` | `string` | — | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | — | S3 access key ID |

@@ -19,6 +19,10 @@
  * resolves it. For a `node <path>` launch the path must exist in the workspace
  * package it names; for `npx`/`pnpm dlx` the package must exist and must expose
  * a bin to run.
+ *
+ * `checkRepositoryUrls` is the second half, for the same class one level up: a
+ * manifest can also point at a *repository* that does not exist. See its own
+ * docblock.
  */
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
@@ -146,5 +150,94 @@ export function checkAgentBundle(root) {
         }
     }
 
+    checkRepositoryUrls(root, findings);
+
     return { findings, scanned };
+}
+
+/**
+ * GitHub URLs that claim to be *this* project, against the repository its
+ * package.json declares.
+ *
+ * `rebase-agent-skills/README.md` offered six ways to install, and five of them
+ * routed through `github.com/rebaseco/agent-skills` — a standalone mirror that
+ * does not exist. `npx skills add`, `gemini extensions install`, `claude plugin
+ * marketplace add` and a `git clone` all resolved to a 404, and the two plugin
+ * manifests advertised the same address as their `homepage` and `repository`.
+ * The one path that worked, `rebase skills install`, was Option 1 and the only
+ * one that needs no repository at all.
+ *
+ * Checking that a URL *resolves* would need the network, which a gate must not.
+ * Checking that it names the repository this package declares needs nothing, and
+ * is what actually went wrong.
+ *
+ * Only first-party-looking URLs are checked, and "first-party-looking" is the
+ * whole design of this check: an owner one or two characters from ours
+ * (`rebaseco` for `rebasepro`), or a repo literally named after this bundle. A
+ * skill that links `github.com/nvm-sh/nvm` for installing nvm is documentation
+ * doing its job, and a check that flagged it would be turned off within a week.
+ *
+ * `<!-- docs-verify: ignore -->` exempts the block that follows, which the one
+ * paragraph that has to *name* the dead repository in order to warn about it
+ * needs.
+ */
+function checkRepositoryUrls(root, findings) {
+    let declared;
+    try {
+        const pkg = JSON.parse(readFileSync(path.join(root, "rebase-agent-skills/package.json"), "utf8"));
+        const url = typeof pkg.repository === "string" ? pkg.repository : pkg.repository?.url;
+        declared = /github\.com[/:]([\w.-]+\/[\w.-]+?)(?:\.git)?(?:$|[/#?])/.exec(url ?? "")?.[1];
+    } catch { /* no package.json is a different problem */ }
+    if (!declared) return;
+
+    const declaredOwner = declared.split("/")[0];
+
+    /** Levenshtein, bounded — only used to answer "is this a typo of our org?". */
+    const near = (a, b) => {
+        if (a === b) return true;
+        if (Math.abs(a.length - b.length) > 2) return false;
+        let prev = [...Array(b.length + 1).keys()];
+        for (let i = 1; i <= a.length; i++) {
+            const row = [i];
+            for (let j = 1; j <= b.length; j++) {
+                row[j] = Math.min(row[j - 1] + 1, prev[j] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+            }
+            prev = row;
+        }
+        return prev[b.length] <= 2;
+    };
+
+    for (const rel of globSync(["rebase-agent-skills/**/*.md", "rebase-agent-skills/**/*.json"], { cwd: root })) {
+        if (rel.split(path.sep).some(part => part === "node_modules")) continue;
+        const lines = readFileSync(path.join(root, rel), "utf8").split("\n");
+
+        const skip = new Set();
+        for (let i = 0; i < lines.length; i++) {
+            if (!/<!--\s*docs-verify:\s*ignore\s*-->/.test(lines[i])) continue;
+            skip.add(i + 1);
+            let j = i + 1;
+            while (j < lines.length && lines[j].trim() === "") j++;
+            for (; j < lines.length && lines[j].trim() !== ""; j++) skip.add(j + 1);
+        }
+
+        const reported = new Set();
+        lines.forEach((line, i) => {
+            if (skip.has(i + 1)) return;
+            for (const m of line.matchAll(/github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?(?=$|[\s/#?)"'`])/g)) {
+                const [owner, repo] = [m[1], m[2]];
+                const named = `${owner}/${repo}`;
+                if (named === declared || owner === "sponsors") continue;
+                const firstParty = near(owner, declaredOwner) || repo === "agent-skills";
+                if (!firstParty || reported.has(named)) continue;
+                reported.add(named);
+                findings.push({
+                    file: `${rel}:${i + 1}`,
+                    message:
+                        `names \`github.com/${named}\`, but this bundle is published from ` +
+                        `\`github.com/${declared}\` (its package.json says so). A repository that ` +
+                        `does not exist answers 404 for every install command built on it.`
+                });
+            }
+        });
+    }
 }

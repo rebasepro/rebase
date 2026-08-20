@@ -27,70 +27,58 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-### Option 2: Agent Skills CLI
+### Option 2: The npm package
 
-For most popular AI-assistive tools, you can use the `skills` CLI to install Rebase agent skills:
-
-```bash
-npx skills add rebaseco/agent-skills
-```
-
-### Option 3: Gemini CLI Extension
-
-This repository is configured as a Gemini CLI extension. You can add it using the Gemini CLI:
+The skills are published as `@rebasepro/agent-skills`. Add it and copy from
+`node_modules/@rebasepro/agent-skills/skills/` into whatever layout your agent
+expects — this is what Option 1 automates.
 
 ```bash
-gemini extensions install https://github.com/rebaseco/agent-skills
+pnpm add -D @rebasepro/agent-skills
 ```
 
-### Option 4: Claude Plugin
+### Option 3: Manual set up
 
-1. Add the Rebase marketplace for Claude plugins:
+Clone the monorepo and copy the `rebase-agent-skills/skills` directory:
 
 ```bash
-claude plugin marketplace add rebaseco/agent-skills
+git clone https://github.com/rebasepro/rebase.git
 ```
 
-Install the Claude plugin for Rebase:
+Common destinations:
+
+| Agent | Location | Layout |
+|---|---|---|
+| Claude Code | `.claude/skills/<name>/SKILL.md` | one directory per skill |
+| Cursor | `.cursor/rules/<name>.mdc` | flat |
+| Windsurf | `.windsurf/rules/<name>.md` | flat |
+| Gemini CLI / Antigravity | `.agents/skills/<name>/SKILL.md` | one directory per skill |
+| GitHub Copilot | `.github/copilot-instructions.md` | a single instruction file |
+
+### Option 4: Agent Skills CLI, from a local clone
+
+The `skills` CLI can install from a directory:
 
 ```bash
-claude plugin install rebase@rebaseco
+npx skills add /path/to/rebase/rebase-agent-skills/skills
 ```
 
-Verify the installation:
-
-```bash
-claude plugin marketplace list
-```
-
-### Option 5: Manual Set Up
-
-1. Clone this repository:
-
-```bash
-git clone https://github.com/rebaseco/agent-skills.git
-```
-
-2. Copy the contents of the `skills` directory to the appropriate location for your AI tool. Common locations include:
-   - **Cursor**: `.cursor/rules/`
-   - **Windsurf**: `.windsurf/rules/`
-   - **GitHub Copilot**: `.github/copilot-instructions.md` (or project-specific instruction files)
-
-### Option 6: Local Path via Agent Skills CLI
-
-The `skills` CLI also supports installing skills from a local directory. If you have cloned this repository, you can add skills by pointing the CLI to your local folder:
-
-```bash
-npx skills add /path/to/your/local/rebase-agent-skills/skills
-```
-
-If you make changes to the local skills repository and want to update your project with the new changes, you can update them by running:
+To pick up later edits to that directory:
 
 ```bash
 npx skills experimental_install
 ```
 
-### Option 7: Local Development (Live Symlinking)
+<!-- docs-verify: ignore -->
+> **There is no standalone `rebaseco/agent-skills` repository.** These skills
+> live in the Rebase monorepo, at `rebase-agent-skills/`, and ship as an npm
+> package. Commands that name a standalone repo — `npx skills add
+> rebaseco/agent-skills`, `gemini extensions install
+> https://github.com/rebaseco/agent-skills`, `claude plugin marketplace add
+> rebaseco/agent-skills` — resolve to nothing. Use `rebase skills install`,
+> which is first-party and needs no repository at all.
+
+### Option 5: Local development (live symlinking)
 
 If you are actively contributing to or developing these skills, use a symlink so that changes in your local clone are immediately reflected in your test project.
 

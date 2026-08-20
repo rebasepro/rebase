@@ -117,17 +117,17 @@ Esses componentes só podem ser substituídos no nível do provedor raiz `<Rebas
 
 Esses componentes podem ser substituídos globalmente (agindo como padrões para todas as coleções) ou em coleções individuais.
 
-| Chave do Componente | Props Originais | Descrição |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | A página inicial completa da coleção |
-| `"Collection.Table"` | `CollectionTableProps` | A visão tabular tipo planilha padrão |
-| `"Collection.Card"` | `CollectionCardProps` | O invólucro do item da visão em cards |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Visão exibida quando uma coleção está vazia |
-| `"Collection.Actions"` | `CollectionActionsProps` | Botões da barra de ferramentas acima da tabela/cards |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Campo de filtro personalizado para uma coluna |
-| `"Entity.Form"` | `EntityFormProps` | O formulário de detalhe para criar/atualizar |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Barra de botões de envio/cancelamento do formulário |
-| `"DetailView"` | `EntityDetailViewProps` | Visão de detalhe somente leitura |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | O contêiner do painel lateral para formulário/detalhe |
-| `"EntityPreview"` | `EntityPreviewProps` | Pré-visualização inline do chip de referência/relação |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Renderizado quando uma entidade referenciada está ausente |
+| Chave do Componente | Descrição |
+|---|---|
+| `"Collection.View"` | A página inicial completa da coleção |
+| `"Collection.Table"` | A visão tabular tipo planilha padrão |
+| `"Collection.Card"` | O invólucro do item da visão em cards |
+| `"Collection.EmptyState"` | Visão exibida quando uma coleção está vazia |
+| `"Collection.Actions"` | Botões da barra de ferramentas acima da tabela/cards |
+| `"Collection.FilterField"` | Campo de filtro personalizado para uma coluna |
+| `"Entity.Form"` | O formulário de detalhe para criar/atualizar |
+| `"EditView.FormActions"` | Barra de botões de envio/cancelamento do formulário |
+| `"DetailView"` | Visão de detalhe somente leitura |
+| `"Entity.SidePanel"` | O contêiner do painel lateral para formulário/detalhe |
+| `"EntityPreview"` | Pré-visualização inline do chip de referência/relação |
+| `"Entity.MissingReference"` | Renderizado quando uma entidade referenciada está ausente |

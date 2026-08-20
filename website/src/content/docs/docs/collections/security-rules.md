@@ -120,6 +120,40 @@ being checked (`documents`). Combine with `policy.authUid()` to scope to the
 current user. Because it is enforced by the database, the admin UI treats it as
 server-authoritative.
 
+#### The `policy` builder, in full
+
+Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
+
+| Expression | Compiles to |
+|---|---|
+| `policy.true()` / `policy.false()` | `true` / `false` |
+| `policy.and(…)` / `policy.or(…)` | conjunction / disjunction |
+| `policy.not(e)` | negation |
+| `policy.compare(left, op, right)` | a comparison between two operands |
+| `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
+| `policy.rolesContain(roles)` | the caller has **all** of these app roles |
+| `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
+| `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
+| `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
+| `policy.raw(sql)` | an escape hatch, inserted verbatim |
+
+| Operand | Means |
+|---|---|
+| `policy.field(name)` | a column of the collection being checked — or, inside `existsIn`, of the joined one |
+| `policy.outerField(name)` | inside `existsIn`, a column of the outer row |
+| `policy.literal(value)` | a string, number, boolean or `null` |
+| `policy.authUid()` | `rebase.uid()` |
+| `policy.authRoles()` | `rebase.roles()` |
+
+:::caution[`serverContext()` is not satisfied by the server singleton]
+It compiles to `rebase.uid() IS NULL`, and `rebase.dataAsAdmin` runs as
+`uid: "service"` — so it is **false** for the accessor most people mean by "the
+server". A collection with `disableDefaultPolicies: true` whose only rule is
+`serverContext()` denies those writes (`42501`) and returns zero rows — HTTP 200,
+empty — for those reads. `rebase.sql()` is the accessor that genuinely bypasses
+policies.
+:::
+
 ## Raw SQL Expressions
 
 For complex logic, use `using` and `withCheck`:
@@ -189,19 +223,34 @@ You can also use `operations` (plural) to apply one rule to multiple operations:
 
 ## Full SecurityRule Interface
 
-```typescript
-interface SecurityRule {
-    name?: string;              // Human-readable policy name
-    operation?: SecurityOperation;   // Single operation
-    operations?: SecurityOperation[]; // Multiple operations
-    mode?: "permissive" | "restrictive"; // Default: "permissive"
-    access?: "public" | "authenticated";
-    ownerField?: string;        // Column containing the owner user ID
-    roles?: string[];           // App roles that this policy applies to
-    using?: string;             // Raw SQL USING expression
-    withCheck?: string;         // Raw SQL WITH CHECK expression
+`SecurityRule` is a **union**, not one open object: a rule picks exactly one way
+of expressing its predicate, and the others are typed `never` so mixing them is a
+compile error rather than a policy that silently ignores half of what you wrote.
+
+```typescript no-verify
+// Shared by every variant
+interface SecurityRuleBase {
+    name?: string;                        // Policy name. Omit it and one is derived
+    operation?: SecurityOperation;        // "select" | "insert" | "update" | "delete" | "all"
+    operations?: SecurityOperation[];     // …or several at once
+    mode?: "permissive" | "restrictive";  // Default: "permissive"
+    roles?: string[];                     // App roles, via rebase.roles()
+    pgRoles?: string[];                   // Native Postgres roles — the CREATE POLICY `TO` clause.
+                                          // NOT the same as `roles`. Default: ["public"]
 }
+
+// …plus exactly one of:
+{ ownerField: string }                        // <column> = rebase.uid()
+{ access: "public" | "authenticated" }        // the shortcut forms
+{ condition: PolicyExpression;                // the structured builder — `policy.*`
+  check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
+{ using?: string; withCheck?: string }        // raw SQL
 ```
+
+`roles` and `pgRoles` are the two that get confused. `roles` is an application
+role, enforced *inside* the `USING` / `WITH CHECK` clause through
+`rebase.roles()`. `pgRoles` is a database role, and controls which connections
+the policy is attached to at all. Almost every project wants `roles`.
 
 ## Examples
 

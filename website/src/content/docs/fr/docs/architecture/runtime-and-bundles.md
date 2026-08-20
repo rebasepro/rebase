@@ -101,7 +101,7 @@ Le runtime est entièrement configuré par des variables d'environnement, car c'
 | `PORT` | Port d'écoute. Par défaut `3001` en local, `8080` dans l'image. |
 | `REBASE_SERVICE_KEY` | Clé serveur à serveur accordant l'accès administrateur. |
 | `REBASE_METRICS` | `true` pour exposer les métriques Prometheus sur `/metrics`. |
-| `REBASE_MIGRATE_ON_BOOT` | `none`, `ensure` ou `push`. Par défaut à `none` en production. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` (la valeur par défaut, y compris en production) exécute la passe **additive** : créer les tables, colonnes et types enum manquants, sans jamais en supprimer ni en réécrire. `none` ne touche à rien. L'image publiée n'accepte que ces deux valeurs et **refuse de démarrer sur `push`**. |
 | `REBASE_SERVE_STATIC` | Sert les ressources statiques du bundle depuis ce processus. Activé par défaut. |
 
 Plusieurs bases de données et plusieurs buckets sont configurés en ajoutant la clé de la source en suffixe de la variable — voir [Bases de données et buckets multiples](/docs/backend/multiple-sources/).

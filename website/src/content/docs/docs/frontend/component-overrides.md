@@ -117,17 +117,34 @@ These components can only be overridden at the root `<Rebase>` provider level si
 
 These components can be overridden globally (acting as defaults for all collections) or on individual collections.
 
-| Component Key | Original Props | Description |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | The entire collection landing page |
-| `"Collection.Table"` | `CollectionTableProps` | The default spreadsheet tabular view |
-| `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | View shown when a collection is empty |
-| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Custom filter input for a column |
-| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
-| `"DetailView"` | `EntityDetailViewProps` | Read-only detail view |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
-| `"EntityPreview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is missing |
+| Component Key | Description |
+|---|---|
+| `"Collection.View"` | The entire collection landing page |
+| `"Collection.Table"` | The default spreadsheet tabular view |
+| `"Collection.Card"` | The card view item wrapper |
+| `"Collection.EmptyState"` | View shown when a collection is empty |
+| `"Collection.Actions"` | Toolbar buttons above the table/cards |
+| `"Collection.FilterField"` | Custom filter input for a column |
+| `"Entity.Form"` | The detail form for creating/updating |
+| `"EditView.FormActions"` | Form submission/cancel button bar |
+| `"DetailView"` | Read-only detail view |
+| `"Entity.SidePanel"` | The side panel container for form/detail |
+| `"EntityPreview"` | Inline reference/relation chip preview |
+| `"Entity.MissingReference"` | Rendered when a referenced entity is missing |
+
+:::note[Three keys break the `Entity.` pattern]
+`"DetailView"`, `"EntityPreview"` and `"EditView.FormActions"` carry no `Entity.`
+prefix. `"Entity.DetailView"`, `"Entity.Preview"` and `"Entity.FormActions"` are
+not in the union — they type-error, and in plain JavaScript the override simply
+never applies.
+:::
+
+Your replacement receives the same props the built-in component was given. The
+override map does not name a props type per key — `ComponentOverride<P>` defaults
+`P` to `Record<string, unknown>` — so type the parameter yourself, or pass a type
+argument, when you want the props checked. A few of the built-ins do export a
+props type you can import and reuse: `CollectionViewProps` (`@rebasepro/ui`);
+`CollectionEmptyStateProps`, `CollectionActionsProps` and
+`FilterFieldBindingProps` (`@rebasepro/admin-types`); `EntityFormProps` and
+`EntityFormActionsProps` (`@rebasepro/admin`). The rest have no exported props
+type — write the shape you actually read.

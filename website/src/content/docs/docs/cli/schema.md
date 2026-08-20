@@ -145,14 +145,6 @@ rebase db migrate
 - Applies them in order to the database
 - Tracks which migrations have been applied
 
-### `rebase db studio`
-
-Open Drizzle Studio to browse and edit your database visually:
-
-```bash
-rebase db studio
-```
-
 ### `rebase db branch`
 
 Database branching for parallel development:

@@ -341,7 +341,7 @@ The `initializeRebaseBackend()` coordinator calls bootstrapper methods in this o
 | `cronPersistence` | `boolean` | `true` | Persist cron execution logs to database |
 | `maxBodySize` | `number` | `10485760` (10MB) | Max request body size in bytes. `0` to disable |
 | `csrf` | `{ origin: string \| string[] \| (origin: string) => boolean }` | — | CSRF protection (opt-in, disabled by default) |
-| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection, on every data path (REST, realtime, server-side `rebase.data`) |
+| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection, on every data path (REST, realtime, server-side `rebase.dataAsAdmin`) |
 | `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table without RLS has no authorization model, so serving it would hand every row to every logged-in user. `"serve"` overrides, for trusted callers only |
 | `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | — | Log level configuration |
 
@@ -449,7 +449,7 @@ In non-production mode, `loadEnv()` **auto-generates** ephemeral `JWT_SECRET` an
 | `FRONTEND_URL` | No | — | Frontend URL (used for CORS) |
 | `STORAGE_TYPE` | No | `local` | `local`, `s3`, or `gcs` |
 | `STORAGE_PATH` | No | — | Path for local file storage |
-| `FORCE_LOCAL_STORAGE` | No | `false` | Allow local storage in production — **the backend refuses to boot without it** |
+| `FORCE_LOCAL_STORAGE` | No | `false` | Allow local storage in production. Without it the local backend is not registered — the backend still boots, but uploads answer `501 STORAGE_NOT_CONFIGURED` |
 | `S3_BUCKET` | No (if s3) | — | S3 bucket name |
 | `S3_REGION` | No | — | S3 region |
 | `S3_ACCESS_KEY_ID` | No (if s3) | — | S3 access key |

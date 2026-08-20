@@ -6,8 +6,8 @@
     "name": "Rebase",
     "url": "https://rebase.pro/"
   },
-  "homepage": "https://github.com/rebaseco/agent-skills",
-  "repository": "https://github.com/rebaseco/agent-skills.git",
+  "homepage": "https://rebase.pro",
+  "repository": "https://github.com/rebasepro/rebase.git",
   "license": "MIT",
   "keywords": ["rebase", "mcp", "cms", "headless-cms", "postgresql", "drizzle", "admin-panel", "baas"]
 }

@@ -117,17 +117,17 @@ Estos componentes solo pueden sustituirse a nivel del proveedor raíz `<Rebase>`
 
 Estos componentes pueden sustituirse globalmente (actuando como valores predeterminados para todas las colecciones) o en colecciones individuales.
 
-| Clave del Componente | Props Originales | Descripción |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | La página de inicio completa de la colección |
-| `"Collection.Table"` | `CollectionTableProps` | La vista tabular tipo hoja de cálculo predeterminada |
-| `"Collection.Card"` | `CollectionCardProps` | El envoltorio del elemento de la vista de tarjeta |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Vista mostrada cuando una colección está vacía |
-| `"Collection.Actions"` | `CollectionActionsProps` | Botones de la barra de herramientas sobre la tabla/tarjetas |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Campo de filtro personalizado para una columna |
-| `"Entity.Form"` | `EntityFormProps` | El formulario de detalle para crear/actualizar |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Barra de botones de envío/cancelación del formulario |
-| `"DetailView"` | `EntityDetailViewProps` | Vista de detalle de solo lectura |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | El contenedor del panel lateral para formulario/detalle |
-| `"EntityPreview"` | `EntityPreviewProps` | Vista previa en línea de chip de referencia/relación |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Se renderiza cuando falta una entidad referenciada |
+| Clave del Componente | Descripción |
+|---|---|
+| `"Collection.View"` | La página de inicio completa de la colección |
+| `"Collection.Table"` | La vista tabular tipo hoja de cálculo predeterminada |
+| `"Collection.Card"` | El envoltorio del elemento de la vista de tarjeta |
+| `"Collection.EmptyState"` | Vista mostrada cuando una colección está vacía |
+| `"Collection.Actions"` | Botones de la barra de herramientas sobre la tabla/tarjetas |
+| `"Collection.FilterField"` | Campo de filtro personalizado para una columna |
+| `"Entity.Form"` | El formulario de detalle para crear/actualizar |
+| `"EditView.FormActions"` | Barra de botones de envío/cancelación del formulario |
+| `"DetailView"` | Vista de detalle de solo lectura |
+| `"Entity.SidePanel"` | El contenedor del panel lateral para formulario/detalle |
+| `"EntityPreview"` | Vista previa en línea de chip de referencia/relación |
+| `"Entity.MissingReference"` | Se renderiza cuando falta una entidad referenciada |

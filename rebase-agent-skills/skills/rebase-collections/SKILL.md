@@ -32,6 +32,7 @@ Properties define the fields of your collection. Rebase supports these built-in 
 | `reference` | Legacy FK reference by collection slug (Firestore-style) | `UUID` with FK |
 | `geopoint` | Latitude/longitude pairs | `JSONB` |
 | `vector` | Embedding vectors for similarity search | `VECTOR` |
+| `binary` | Raw bytes; crosses the API as a base64 string | `BYTEA` |
 
 ### Reference vs Relation
 
@@ -133,9 +134,19 @@ export default productsCollection;
 > **Presentation lives under `admin`.** Keys written `admin.x` below go inside a nested
 > `admin: { … }` block, not at the top level. The backend never reads inside it, which is
 > what lets a BaaS or headless project have no React in its dependency tree at all.
-> Annotate the collection with `AdminCollectionConfig` (a **type-only** import from
-> `@rebasepro/admin-types`) to get the block type-checked — with plain `CollectionConfig`
-> it is opaque and a typo compiles.
+<!-- docs-verify: ignore -->
+> **There is no `AdminCollectionConfig` wrapper type** — do not import one. The block is
+> typed by a **program-level augmentation**: put one triple-slash reference in the config
+> package,
+>
+> ```ts
+> /// <reference types="@rebasepro/admin-types" />
+> ```
+>
+> and `admin` is typed on every collection and every property from then on. An
+> augmentation applies to a whole TypeScript *program*, and `config/` and `frontend/` are
+> separate programs, which is why the reference belongs in `config/`. Without it, `admin`
+> is opaque and a typo compiles.
 
 
 ### Collection Options
@@ -195,7 +206,6 @@ export default productsCollection;
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
 | `search` | `SearchConfig` | — | Opt in to ranked full-text search over named fields (Postgres only). See **Search** below |
 | `childCollections` | `() => CollectionConfig[]` | — | Nested child collections (populated automatically) |
-| `overrides` | `EntityOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
 | `admin.components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
@@ -1073,13 +1083,13 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 | Caller | `context.user.uid` | `context.user.roles` |
 |---|---|---|
 | JWT-authenticated end-user | Real user ID (e.g. `"abc123"`) | Their assigned roles (e.g. `["viewer"]`) |
-| Server-side `rebase.data` (cron jobs, custom functions) | `"service"` | `["admin"]` |
+| Server-side `rebase.dataAsAdmin` (cron jobs, custom functions) | `"service"` | `["admin"]` |
 | API key (default) | `"api-key:{id}"` | `["service"]` |
 | API key (admin) | `"api-key:{id}"` | `["admin", "service"]` |
 | Anonymous (no auth, `requireAuth: false`) | `"anon"` | `["anon"]` |
 | Anonymous REST (no token) | `undefined` | N/A — `context.user` is not set; only the DataDriver is scoped |
 
-> **IMPORTANT FOR AGENTS:** `rebase.data` calls (used in cron jobs, afterSave side-effects, custom functions) go through the full middleware pipeline with the service key, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
+> **IMPORTANT FOR AGENTS:** `rebase.dataAsAdmin` calls (used in cron jobs, afterSave side-effects, custom functions) run through the native driver scoped as the service identity, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
 >
 > ```typescript
 > afterRead: async ({ row, context }) => {
@@ -1447,19 +1457,35 @@ const productsCollection: PostgresCollectionConfig = {
 
 ### Collection-Scoped Overridable Components
 
-| Component Key | Original Props | Description |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | The entire collection landing page |
-| `"Collection.Table"` | `CollectionTableProps` | The default table view |
-| `"Collection.Card"` | `CollectionCardProps` | The card view item wrapper |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Displayed when a collection has no items |
-| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar buttons above the table/cards |
-| `"Entity.Form"` | `EntityFormProps` | The detail form for creating/updating |
-| `"Entity.FormActions"` | `EntityFormActionsProps` | Form submission/cancel button bar |
-| `"Entity.DetailView"` | `EntityDetailViewProps` | Read-only detail view |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | The side panel container for form/detail |
-| `"Entity.Preview"` | `EntityPreviewProps` | Inline reference/relation chip preview |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendered when a referenced entity is deleted or missing |
+The keys are the `CollectionComponentName` union in
+`@rebasepro/admin-types`. They are string keys, not exported components — see the
+**rebase-admin** skill.
+
+| Component Key | Description |
+|---|---|
+| `"Collection.View"` | The entire collection landing page |
+| `"Collection.Table"` | The default table view |
+| `"Collection.Card"` | The card view item wrapper |
+| `"Collection.EmptyState"` | Displayed when a collection has no items |
+| `"Collection.Actions"` | Toolbar buttons above the table/cards |
+| `"Collection.FilterField"` | The per-property filter input |
+| `"Entity.Form"` | The detail form for creating/updating |
+| `"EditView.FormActions"` | Form submission/cancel button bar |
+| `"DetailView"` | Read-only detail view |
+| `"Entity.SidePanel"` | The side panel container for form/detail |
+| `"EntityPreview"` | Inline reference/relation chip preview |
+| `"Entity.MissingReference"` | Rendered when a referenced entity is deleted or missing |
+
+> **IMPORTANT FOR AGENTS:** three of these do **not** carry the `Entity.` prefix
+> the others do — `"DetailView"`, `"EntityPreview"` and `"EditView.FormActions"`.
+> Writing `"Entity.DetailView"`, `"Entity.Preview"` or `"Entity.FormActions"`
+> type-errors against `CollectionComponentName`, and in plain JavaScript it is a
+> key nothing ever reads: the override silently does not apply.
+
+App-scoped keys (set on `<Rebase>` rather than per collection) are
+`"Shell.AppBar"`, `"Shell.Drawer"`, `"Shell.DrawerNavigationItem"`,
+`"Shell.DrawerNavigationGroup"`, `"HomePage"`, `"HomePage.CollectionCard"` and
+`"Auth.LoginView"`.
 
 ## Authentication Collection Configuration (auth)
 

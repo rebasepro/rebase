@@ -40,6 +40,7 @@ import { checkDeployBuildContext } from "./docs-verify/check-deploy-build-contex
 import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.mjs";
 import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
+import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -67,6 +68,7 @@ if (asJson) {
         out.marketing = checkMarketingSnippets(ROOT).findings;
         out.docCommands = checkDocCommands(ROOT).findings;
         out.agentBundle = checkAgentBundle(ROOT).findings;
+        out.proseTypes = checkProseTypes(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -170,6 +172,22 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} manifest(s) pointing at nothing:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Type names claimed in prose (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkProseTypes(ROOT);
+    console.log(`${DIM}Scanned ${scanned} documentation files.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every type name written outside a fence is declared.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} type name(s) that do not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
         }
     }

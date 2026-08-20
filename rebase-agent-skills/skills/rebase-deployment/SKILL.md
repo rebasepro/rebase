@@ -409,7 +409,7 @@ All variables recognized by the base `rebaseEnvSchema`:
 | `DATABASE_READ_URL` | `string` (URL) | No | — | Read replica database URL |
 | `STORAGE_TYPE` | `enum` | No | `"local"` | `"local"`, `"s3"`, or `"gcs"` |
 | `STORAGE_PATH` | `string` | No | — | Local file storage directory |
-| `FORCE_LOCAL_STORAGE` | `optionalBoolString` | No | `undefined` → `false` | Allow `STORAGE_TYPE=local` in production — **the backend refuses to boot without it** |
+| `FORCE_LOCAL_STORAGE` | `optionalBoolString` | No | `undefined` → `false` | Allow `STORAGE_TYPE=local` in production. Without it the local backend is not registered — the backend still boots, but uploads answer `501 STORAGE_NOT_CONFIGURED` |
 | `S3_BUCKET` | `string` | If S3 | — | S3 bucket name |
 | `S3_REGION` | `string` | No | — | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | If S3 | — | S3 access key |

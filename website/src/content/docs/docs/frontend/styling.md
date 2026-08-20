@@ -78,7 +78,7 @@ Custom UI needs the theme's CSS and Tailwind pointed at the packages, or the uti
 @custom-variant dark (&:where(.dark, .dark *));
 ```
 
-`rebase create` writes this for you. If your custom view renders unstyled, this is the first thing to check.
+`rebase init` writes this for you. If your custom view renders unstyled, this is the first thing to check.
 
 ## Checklist
 

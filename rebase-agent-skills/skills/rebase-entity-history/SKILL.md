@@ -7,7 +7,9 @@ description: Guide for tracking and reverting entity changes with Rebase's built
 
 Rebase includes a built-in entity history system that records entities of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The admin panel shows the revisions in the record inspector, with one-click revert.
 
-> **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual collection. If either is missing, no history is recorded for that collection.
+> **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual collection. If either is missing, no history is recorded for that collection — the driver's guard is literally `historyService && collection.history`.
+>
+> Under the **runtime** (`rebase dev`, `rebase start`, the published image — the default) the global flag comes from `REBASE_HISTORY`, which **defaults to `true`**. So in a scaffolded project the global half is already on and the per-collection `history: true` is the one you have to write. A hand-written `initializeRebaseBackend` call has to pass `history` itself.
 
 ## Enabling History
 

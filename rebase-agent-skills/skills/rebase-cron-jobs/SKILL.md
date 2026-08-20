@@ -7,14 +7,14 @@ description: Guide for scheduling recurring background tasks with Rebase's built
 
 > **IMPORTANT FOR AGENTS**: Rebase has a **built-in cron scheduler** — do NOT install external libraries (`node-cron`, `agenda`, `bull`) or set up separate worker processes. Drop a TypeScript file in the `crons/` directory.
 
-> **IMPORTANT FOR AGENTS**: Every cron handler receives `ctx.client` — a full `RebaseClient` instance. This is **THE** primary way cron jobs read/write data. Always use `ctx.client` in examples, never raw SQL or direct DB imports.
+> **IMPORTANT FOR AGENTS**: Every cron handler receives `ctx.rebase` — the server-side Rebase singleton, the same object `import { rebase } from "@rebasepro/server"` returns. `ctx.rebase.dataAsAdmin` is **THE** primary way cron jobs read/write data. Always use it in examples, never raw SQL or direct DB imports. `ctx.client` is the deprecated old name for the same object and will be removed in the next major — do not write it in new code.
 
 ## Overview
 
 Rebase includes a built-in cron job scheduler for running recurring background tasks. Cron jobs follow the **file-based discovery** pattern — drop a TypeScript file in `crons/`, and it's automatically registered and scheduled.
 
 - **Zero dependencies** — No external scheduler libraries needed
-- **`ctx.client`** — Full `RebaseClient` for CRUD, auth, storage, and more
+- **`ctx.rebase`** — the server-side Rebase singleton: `dataAsAdmin` for CRUD, plus `email`, `storage`, `sql`, …
 - **Concurrency guard** — A job that's still running is skipped, never double-executed
 - **Timeout enforcement** — Handlers are raced against a configurable timeout
 - **Studio dashboard** — Monitor all jobs, view execution history, trigger manually
@@ -75,8 +75,8 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // ✅ Use ctx.client to interact with your data
-        const { data: oldSessions } = await ctx.client.data
+        // ✅ Use ctx.rebase.dataAsAdmin to interact with your data
+        const { data: oldSessions } = await ctx.rebase.dataAsAdmin
             .collection<{ id: string; createdAt: string }>("sessions")
             .find({
                 where: { createdAt: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
@@ -84,7 +84,7 @@ const job: CronJobDefinition = {
             });
 
         for (const session of oldSessions) {
-            await ctx.client.data.collection<Record<string, unknown>>("sessions").delete(session.id);
+            await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("sessions").delete(session.id);
         }
 
         ctx.log(`Cleaned up ${oldSessions.length} expired sessions`);
@@ -119,9 +119,9 @@ const job: CronJobDefinition = {
 
         ctx.log("Fetched rates for", Object.keys(data.rates).length, "currencies");
 
-        // Upsert into your collection using ctx.client
+        // Upsert into your collection using ctx.rebase.dataAsAdmin
         for (const [currency, rate] of Object.entries(data.rates)) {
-            const existing = await ctx.client.data
+            const existing = await ctx.rebase.dataAsAdmin
                 .collection<{ id: string; currency: string; rate: number }>("exchange_rates")
                 .find({
                     where: { currency: ["==", currency] },
@@ -129,12 +129,12 @@ const job: CronJobDefinition = {
                 });
 
             if (existing.data.length > 0) {
-                await ctx.client.data.collection<Record<string, unknown>>("exchange_rates").update(existing.data[0].id, {
+                await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("exchange_rates").update(existing.data[0].id, {
                     rate: rate as number,
                     updatedAt: new Date().toISOString(),
                 });
             } else {
-                await ctx.client.data.collection<Record<string, unknown>>("exchange_rates").create({
+                await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("exchange_rates").create({
                     currency,
                     rate: rate as number,
                 });
@@ -161,7 +161,7 @@ const job: CronJobDefinition = {
     timeoutSeconds: 120,
 
     async handler(ctx) {
-        const { data: users } = await ctx.client.data
+        const { data: users } = await ctx.rebase.dataAsAdmin
             .collection<{ id: string; email: string; digestEnabled: boolean }>("users")
             .find({
                 where: { digestEnabled: ["==", true] },
@@ -169,7 +169,7 @@ const job: CronJobDefinition = {
 
         let sent = 0;
         for (const user of users) {
-            const { data: notifications } = await ctx.client.data
+            const { data: notifications } = await ctx.rebase.dataAsAdmin
                 .collection<Record<string, unknown>>("notifications")
                 .find({
                     where: { userId: ["==", user.id], read: ["==", false] },
@@ -213,7 +213,7 @@ interface CronJobDefinition {
 
 ## CronJobContext (Handler Argument)
 
-> **IMPORTANT FOR AGENTS**: `ctx.client` is a full `RebaseClient` instance — the **same admin-level server client** used by the Rebase singleton. It bypasses the network and goes through Hono's internal request handler. Use it for all data operations inside cron handlers.
+> **IMPORTANT FOR AGENTS**: `ctx.rebase` **is** the server singleton, not a copy of it. Its data plane (`dataAsAdmin`) is backed by the native DataDriver — no JSON serialization, no HTTP dispatch, no middleware — while the control plane (`auth`, `admin`, `cron`, `functions`, `storage`) still routes through Hono's internal request handler. Use `rebase.dataAsAdmin` for all data operations inside cron handlers.
 
 ```typescript
 interface CronJobContext {
@@ -226,8 +226,11 @@ interface CronJobContext {
     /** A simple logger scoped to this job run — output captured in the execution log. */
     log: (...args: unknown[]) => void;
 
-    /** The RebaseClient instance to interact with the database. */
-    client: RebaseClient;
+    /** The server-side Rebase singleton — data, email, storage, raw SQL. */
+    rebase: RebaseServerClient;
+
+    /** @deprecated The same object, under the name this context used before. */
+    client: RebaseServerClient & { data: RebaseSdkData };
 }
 ```
 
@@ -236,28 +239,29 @@ interface CronJobContext {
 | `jobId` | `string` | Derived from the filename (e.g. `cleanup-sessions`). |
 | `scheduledAt` | `Date` | The timestamp when this execution was scheduled to start. |
 | `log` | `(...args: unknown[]) => void` | Logger whose output is captured in `CronJobLogEntry.logs`. Use like `console.log`. |
-| `client` | `RebaseClient` | Admin-level client for CRUD, auth, storage, and any SDK operation. |
+| `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
+| `client` | *deprecated* | The same object under its old name. Removed in the next major; its type re-exposes `client.data`, which `RebaseServerClient` deliberately omits so the privileged plane has one name. |
 
-> **IMPORTANT FOR AGENTS:** `ctx.client` authenticates as the **service identity** (`userId: "service"`, `roles: ["admin"]`). All data operations through `ctx.client` go through the full REST middleware pipeline (including DataHooks and Collection Callbacks). This means:
+> **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so DataHooks and Collection Callbacks still run on this path even though the HTTP loop is skipped. This means:
 > - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
 > - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
 > - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.
 
-### Using `ctx.client`
+### Using `ctx.rebase`
 
-`ctx.client` is the same `RebaseClient` returned by `createRebaseClient()`. It supports all SDK operations:
+`ctx.rebase` is the server singleton. Its data plane is `dataAsAdmin`:
 
 ```typescript
 async handler(ctx) {
     // Collection CRUD
-    const { data } = await ctx.client.data.collection("orders").find({ limit: 100 });
-    await ctx.client.data.collection("orders").update(id, { status: "archived" });
-    await ctx.client.data.collection("orders").delete(id);
-    await ctx.client.data.collection("metrics").create({ key: "daily_total", value: 42 });
+    const { data } = await ctx.rebase.dataAsAdmin.collection("orders").find({ limit: 100 });
+    await ctx.rebase.dataAsAdmin.collection("orders").update(id, { status: "archived" });
+    await ctx.rebase.dataAsAdmin.collection("orders").delete(id);
+    await ctx.rebase.dataAsAdmin.collection("metrics").create({ key: "daily_total", value: 42 });
 
     // Filtering and sorting — `where` takes [operator, value] tuples, and the key is
     // `orderBy`, not `sort`.
-    const { data: stale } = await ctx.client.data.collection("tokens").find({
+    const { data: stale } = await ctx.rebase.dataAsAdmin.collection("tokens").find({
         where: { expiresAt: ["<", new Date().toISOString()] },
         orderBy: ["createdAt", "desc"],
         limit: 500,

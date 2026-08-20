@@ -28,6 +28,8 @@ Properties define the columns in your database table and how they are rendered i
 | `geopoint` | Latitude/longitude pair | `jsonb` |
 | `reference` | Embedded reference to another entity | `varchar` (stores ID) |
 | `relation` | SQL foreign key relation | Uses the `relations` array |
+| `vector` | Embedding, for nearest-neighbour search | `VECTOR(n)` (pgvector) |
+| `binary` | Raw bytes, read and written as base64 | `bytea` |
 
 ## Common Properties
 
@@ -468,6 +470,40 @@ These apply to both `reference` and `relation` properties.
 | `admin.includeId` | `boolean` | Show the related entity's id in previews (default: true) |
 | `admin.includeEntityLink` | `boolean` | Show a link that opens the related entity (default: true) |
 | `admin.previewProperties` | `string[]` | Which of the target's properties appear in the preview (max 3) |
+
+## Vector Properties
+
+An embedding column, for nearest-neighbour search. Postgres only.
+
+```typescript
+embedding: {
+    type: "vector",
+    name: "Embedding",
+    dimensions: 1536
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `dimensions` | `number` | **Required.** Length of the vector. Compiles to `VECTOR(n)`. |
+
+Query it with [`.vectorSearch()`](/docs/sdk/querying#vector-search), which also
+covers what pgvector needs to be installed and when to add an index.
+
+## Binary Properties
+
+Raw bytes, stored as `bytea`. Values cross the API as **base64 strings** —
+including `defaultValue`.
+
+```typescript
+signature: {
+    type: "binary",
+    name: "Signature"
+}
+```
+
+Large files belong in [storage](/docs/backend/storage), not in a column: a
+`bytea` is read and written whole, with the row.
 
 ## Enum Values
 

@@ -1556,7 +1556,7 @@ import { RichTextEditor } from "@rebasepro/admin/editor";
 import type { RichTextEditorProps, JSONContent, EditorAIController } from "@rebasepro/admin";
 ```
 
-> **Note:** The previous export name `RebaseEditor` still works but is deprecated. Always use `RichTextEditor`.
+> **Note:** the editor was once exported as `RebaseEditor`. That name is **gone**, not deprecated — nothing in the workspace declares it, so importing it fails. Use `RichTextEditor`.
 
 ### Props
 

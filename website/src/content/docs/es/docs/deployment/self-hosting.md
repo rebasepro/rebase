@@ -102,8 +102,11 @@ de datos del despliegue. Realiza una simulación (dry-run) del cambio primero, r
 cambios destructivos sin una confirmación explícita y puede hacer una copia de seguridad
 antes de aplicarlos.
 
-`REBASE_MIGRATE_ON_BOOT` acepta `ensure` (el valor por defecto —solo tablas de auth) y
-`none`.
+`REBASE_MIGRATE_ON_BOOT` acepta `ensure` (el valor por defecto) y `none`, y nada
+más — la imagen **se niega a arrancar** con `push`, por el motivo anterior.
+`ensure` es aditivo sobre todo el esquema, no solo sobre las tablas de auth:
+crea tablas, columnas y tipos enum que falten, y nunca elimina ni reescribe
+ninguno.
 
 ## Otras plataformas
 

@@ -131,7 +131,7 @@ interface CronJobDefinition {
 
 Each handler receives a `CronJobContext` containing utility methods and the Rebase Client instance:
 
-```typescript
+```typescript no-verify
 interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
@@ -142,16 +142,46 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
-    // Backing RebaseClient instance running with full admin privileges
-    client: RebaseClient;
+    // The server-side Rebase singleton — the same object `import { rebase }
+    // from "@rebasepro/server"` returns, and the same one `defineFunction`
+    // hands its callback.
+    rebase: RebaseServerClient;
+
+    /** @deprecated The same object, under the name this context used before. */
+    client: RebaseServerClient & { data: RebaseSdkData };
 }
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
 
-### Interacting with Database & Services via `ctx.client`
+:::note[`ctx.client` is the old name for `ctx.rebase`]
+They are the same object. `client` is deprecated and will be removed in the next
+major: it contradicted every other server-side surface, where the singleton is
+`rebase`, and its type re-exposed `client.data` — the alias `RebaseServerClient`
+deliberately omits so that the privileged plane has exactly one name. A reader
+who learned `client.data` here carried it into a collection callback, where
+`context.data` is the *user-scoped* plane: same spelling, opposite privilege.
+:::
 
-The `ctx.client` parameter provides direct, server-side access to all Rebase services under administrative privileges. This means database operations run with bypass of Row-Level Security (RLS) policies:
+### Interacting with the database and services via `ctx.rebase`
+
+`ctx.rebase.dataAsAdmin` is the admin-scoped data plane. A cron has no
+per-request user, so there is no user-scoped alternative here — scope every
+query's filters yourself.
+
+:::caution[Admin-scoped is not RLS-bypassing]
+`dataAsAdmin` is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`.
+Every read and write still runs in a transaction that has done `SET LOCAL ROLE
+rebase_user` with `app.uid = 'service'`, and **your policies are evaluated** —
+against that identity. It clears the built-in default policies through their
+`rolesOverlap(['admin'])` arm, which is why the difference rarely shows. It
+shows when you write your own: `policy.serverContext()` compiles to
+`rebase.uid() IS NULL` and is therefore **false** here, so a collection with
+`disableDefaultPolicies: true` whose only rule is `serverContext()` denies these
+writes and returns zero rows — HTTP 200, empty — for these reads.
+
+`rebase.sql()` *is* an unconditional bypass: owner connection, no policies.
+:::
 
 ```typescript
 // backend/crons/expire-users.ts
@@ -168,7 +198,7 @@ export default defineCron({
         // gives the query builder the row type — `where` keys are checked
         // against it. Every filter is an `[operator, value]` tuple; a bare
         // value is passed straight through and builds a malformed query.
-        const users = ctx.client.data.collection<{
+        const users = ctx.rebase.dataAsAdmin.collection<{
             id: string;
             email: string;
             trial_status: string;
@@ -191,14 +221,12 @@ export default defineCron({
                 status: "disabled"
             });
             
-            // Send email notification using Rebase email service
-            if (ctx.client.email) {
-                await ctx.client.email.send({
-                    to: user.email,
-                    subject: "Your trial has expired",
-                    html: "<p>Please upgrade your subscription to continue.</p>"
-                });
-            }
+            // Send email notification using the Rebase email service
+            await ctx.rebase.email.send({
+                to: user.email,
+                subject: "Your trial has expired",
+                html: "<p>Please upgrade your subscription to continue.</p>"
+            });
         }
     }
 });

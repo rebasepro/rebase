@@ -34,13 +34,24 @@ const bootEnvExtension = z.object({
     /**
      * What the runtime may do to the database schema at boot.
      *
-     * - `none` (default in production) — touch nothing. Schema changes are a
-     *   deliberate, reviewable step, not a side effect of a restart.
-     * - `ensure` — create the auth/system tables if missing, never touch
-     *   collection tables. The default outside production.
-     * - `push` — reconcile collection tables with the bundle's schema. Convenient
-     *   for a local compose stack; in production it means a container restart can
-     *   rewrite the schema, so it must be asked for explicitly.
+     * - `none` — touch nothing. The schema is provisioned by something else: a
+     *   migration step, or another process in a split deployment.
+     * - anything else, **including unset** — run the additive provisioning pass
+     *   in `boot/provision.ts`: create missing tables, columns and enum types,
+     *   never drop or rewrite one.
+     *
+     * The default is `ensure` everywhere, production included — see
+     * `provisioningDisabled`, which is the single place the value is read and
+     * which only asks whether it is `none`.
+     *
+     * `push` is in the enum and is **not** distinguished from `ensure` anywhere
+     * in the boot path; nothing implements "reconcile destructively" here. The
+     * published image goes further and refuses to start on it
+     * (`docker/entrypoint.mjs`), because a full push computes a diff and will
+     * happily `DROP COLUMN` — and a container restart must never be able to
+     * destroy a production column as a side effect of rescheduling. Reshaping
+     * and destructive changes stay a deliberate `rebase db generate` + `rebase
+     * db migrate`, or a reviewed `rebase db push` from a checkout.
      */
     REBASE_MIGRATE_ON_BOOT: z.enum(["none", "ensure", "push", ""]).optional(),
     /** Expose Prometheus metrics at `/metrics`. Off unless asked for. */
@@ -81,8 +92,13 @@ const bootEnvExtension = z.object({
      *
      * Deliberately tri-state, and resolved against NODE_ENV by
      * {@link resolveEnableSwagger} rather than defaulted here. Unset means "on
-     * in development, off in production" — an explicit `true` or `false` always
-     * wins in both.
+     * in development, off in production"; `false` turns both off anywhere.
+     *
+     * `true` in production is only half a switch, and the asymmetry is in
+     * `init/docs.ts` rather than here: the *spec* at `/api/docs` is served
+     * whenever this is not `false`, but the Swagger *UI* at `/api/swagger` is
+     * gated on `NODE_ENV !== "production"` independently and this variable
+     * cannot open it.
      *
      * It used to default to `"false"` outright, which reads as a safe default
      * and was not one: the runtime is how every scaffolded project boots, so

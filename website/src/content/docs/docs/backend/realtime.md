@@ -393,7 +393,14 @@ database: createPostgresAdapter({
 | `memory`     | **Default.** Single instance. No cross-instance delivery, no overhead.                                   |
 | `postgres`   | Two or more instances. Uses `LISTEN/NOTIFY` on the database you already have — no new service to deploy. |
 
-The transport can also be set per deployment with `REALTIME_CHANNEL_BUS=memory|postgres`, which overrides the configured value.
+The transport can also be set per deployment with
+`REALTIME_CHANNEL_BUS=memory|postgres`, so it can be changed without a rebuild.
+It overrides a **named** built-in (`bus: { type: "memory" }`), and is
+deliberately **ignored** when `realtime.bus` was handed a constructed
+`ChannelBus` *instance* — the variable can only name transports this package
+knows how to build, so honouring it there would mean silently discarding the
+object the application supplied. That case logs a warning naming both, and an
+unrecognised value falls back to whatever was configured rather than to memory.
 
 ### Why there is no Redis option in the box
 

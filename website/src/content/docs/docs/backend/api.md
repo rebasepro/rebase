@@ -109,6 +109,23 @@ GET /api/data/products?tags=csa.(electronics,books)
 | `nin` | Not in array | `?status=nin.(a,b)` |
 | `cs` | Array contains | `?tags=cs.value` |
 | `csa` | Array contains any | `?tags=csa.(a,b)` |
+| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
+| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
+| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
+| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
+| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
+| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
+
+`isnull` and `notnull` ignore their value — the operator is the whole condition,
+and anything after the dot is discarded. The SDK writes `.null`, so that is the
+spelling you will see on the wire.
+
+:::caution[`eq.null` is the four-character string, not `IS NULL`]
+`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
+never true, so there is no reading of `eq.null` that could mean the null test —
+use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
+`isnull.null` for exactly this reason.
+:::
 
 ### Logical Operators
 
@@ -278,10 +295,18 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
    These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
 
 
-## OpenAPI / Swagger
+## System endpoints
 
-- **OpenAPI spec**: `GET /api/docs` — Returns the full OpenAPI 3.0 JSON specification
-- **Swagger UI**: `GET /api/swagger` — Interactive API explorer (dev mode only)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
+| `GET` | `/api/docs` | none | The OpenAPI 3.0 JSON specification |
+| `GET` | `/api/swagger` | none | Swagger UI. On in development, off in production; `REBASE_ENABLE_SWAGGER` overrides either way |
+| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from — deliberately unauthenticated, and it returns only that hash |
+| `GET` | `/api/meta/contract` | admin, service key or admin API key | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
+| `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
+
+## OpenAPI / Swagger
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 

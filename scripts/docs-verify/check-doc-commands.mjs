@@ -42,6 +42,18 @@ const DOC_GLOBS = [
     "rebase-agent-skills/**/*.md",
     "examples/*/*.md",
     "examples/*.md",
+    // The published documentation, every locale.
+    //
+    // This was the last surface the command check did not reach, and it held
+    // the same two bugs the check was written for: `rebase db studio` had a
+    // section of its own in the CLI reference *and* in the schema page, and
+    // `rebase auth create-user` was the first line of the auth example — six
+    // locales each, because the translations are generated from English and
+    // inherit whatever it says. Fenced blocks and inline code spans are what
+    // `invocations()` already reads, so pointing it here needed no new parser,
+    // only the glob nobody had added.
+    "website/src/content/docs/**/*.md",
+    "website/src/content/docs/**/*.mdx",
     ...AGENT_INSTRUCTION_GLOBS
 ];
 
@@ -310,6 +322,12 @@ export function checkDocCommands(root) {
 
     for (const rel of new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))) {
         if (rel.split(path.sep).some(part => part === "node_modules" || part === "dist")) continue;
+        // A changelog is a record of what *was* true. `rebase link` and `rebase
+        // db pull` both shipped and were both later removed; the entries
+        // announcing them are correct history, and rewriting them to match
+        // today's CLI would be the actual error. It is also generated from the
+        // release notes, so an edit here would not survive `check:generated`.
+        if (path.basename(rel) === "CHANGELOG.md") continue;
         scanned++;
         const text = readFileSync(path.join(root, rel), "utf8");
         const skip = ignoredLines(text.split("\n"));

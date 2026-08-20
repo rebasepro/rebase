@@ -99,10 +99,14 @@ export interface CronJobContext {
      * hands its callback. Spelled the same way here so that one thing has one
      * name across every server-side authoring surface.
      *
-     * Its data plane is {@link RebaseServerClient.dataAsAdmin}, which runs with
-     * **admin privileges and bypasses RLS** (`{ uid: "service", roles:
-     * ["admin"] }`). A cron has no per-request user, so there is no user-scoped
-     * alternative here and no policy to fall back on: scope every query's
+     * Its data plane is {@link RebaseServerClient.dataAsAdmin}, scoped as
+     * `{ uid: "service", roles: ["admin"] }` — **admin-scoped, not
+     * RLS-bypassing**. Statements still run as `rebase_user` with the policies
+     * evaluated against that identity; the admin role merely clears the default
+     * policies through their `rolesOverlap(['admin'])` arm, and
+     * `policy.serverContext()` (`rebase.uid() IS NULL`) is *false* for it.
+     * `rebase.sql()` is the unconditional bypass. A cron has no per-request
+     * user, so there is no user-scoped alternative here: scope every query's
      * filters yourself.
      *
      * @example

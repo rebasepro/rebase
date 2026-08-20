@@ -117,17 +117,17 @@ Ces composants ne peuvent être surchargés qu'au niveau du provider racine `<Re
 
 Ces composants peuvent être surchargés globalement (agissant comme valeurs par défaut pour toutes les collections) ou sur des collections individuelles.
 
-| Clé du composant | Props d'origine | Description |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | La page d'accueil complète de la collection |
-| `"Collection.Table"` | `CollectionTableProps` | La vue tabulaire de type tableur par défaut |
-| `"Collection.Card"` | `CollectionCardProps` | L'enveloppe de l'élément de la vue en cartes |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Vue affichée lorsqu'une collection est vide |
-| `"Collection.Actions"` | `CollectionActionsProps` | Boutons de barre d'outils au-dessus du tableau/des cartes |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Champ de filtre personnalisé pour une colonne |
-| `"Entity.Form"` | `EntityFormProps` | Le formulaire de détail pour créer/mettre à jour |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Barre de boutons de soumission/annulation du formulaire |
-| `"DetailView"` | `EntityDetailViewProps` | Vue de détail en lecture seule |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | Le conteneur du panneau latéral pour formulaire/détail |
-| `"EntityPreview"` | `EntityPreviewProps` | Aperçu en ligne de la puce de référence/relation |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Rendu lorsqu'une entité référencée est manquante |
+| Clé du composant | Description |
+|---|---|
+| `"Collection.View"` | La page d'accueil complète de la collection |
+| `"Collection.Table"` | La vue tabulaire de type tableur par défaut |
+| `"Collection.Card"` | L'enveloppe de l'élément de la vue en cartes |
+| `"Collection.EmptyState"` | Vue affichée lorsqu'une collection est vide |
+| `"Collection.Actions"` | Boutons de barre d'outils au-dessus du tableau/des cartes |
+| `"Collection.FilterField"` | Champ de filtre personnalisé pour une colonne |
+| `"Entity.Form"` | Le formulaire de détail pour créer/mettre à jour |
+| `"EditView.FormActions"` | Barre de boutons de soumission/annulation du formulaire |
+| `"DetailView"` | Vue de détail en lecture seule |
+| `"Entity.SidePanel"` | Le conteneur du panneau latéral pour formulaire/détail |
+| `"EntityPreview"` | Aperçu en ligne de la puce de référence/relation |
+| `"Entity.MissingReference"` | Rendu lorsqu'une entité référencée est manquante |

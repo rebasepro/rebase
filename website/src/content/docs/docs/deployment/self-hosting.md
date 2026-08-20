@@ -100,8 +100,10 @@ Run it from a checkout or a CI job, pointed at the deployment's database. It
 dry-runs the change first, refuses destructive ones without explicit
 confirmation, and can take a backup before applying.
 
-`REBASE_MIGRATE_ON_BOOT` accepts `ensure` (the default — auth tables only) and
-`none`.
+`REBASE_MIGRATE_ON_BOOT` accepts `ensure` (the default) and `none`, and nothing
+else — the image **refuses to boot** on `push`, for the reason above. `ensure` is
+additive across the whole schema, not just the auth tables: it creates missing
+tables, columns and enum types, and never drops or rewrites one.
 
 ## Other platforms
 

@@ -185,6 +185,8 @@ Client                                                   Rebase Server
 | `GCS_KEY_FILENAME` | Path to a GCP service account key file (omit on GKE — Workload Identity/ADC supplies credentials) |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
+| `STORAGE_PUBLIC_READ` | Serve stored objects to unauthenticated readers. The env spelling of `storagePublicRead`, and one of the three ways to satisfy the [production boot guard](#per-object-authorization). |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Opt out of the boot guard, restoring the behaviour where any signed-in user may read, overwrite, delete or list any key. The env spelling of `storageInsecureAllowAnyAuthenticated`. Only defensible when every signed-in user is trusted with every file. |
 
 ## Several Buckets
 
@@ -314,8 +316,9 @@ await initializeRebaseBackend({
 | `key` | Object key, bucket prefix stripped and traversal sanitized |
 | `bucket` | Resolved bucket (`"default"` when unspecified) |
 | `operation` | `"read"`, `"write"`, `"delete"` or `"list"` |
-| `user` | `{ userId, email?, roles? }`, or `null` where the route allows anonymous access |
+| `user` | `{ uid, email?, roles? }`, or `null` where the route allows anonymous access |
 | `storageId` | The named backend, when the request targeted one |
+| `data` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses row-level security deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design. |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
 

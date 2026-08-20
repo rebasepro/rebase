@@ -84,14 +84,6 @@ rebase db migrate
 
 Applies all unapplied migrations to the database.
 
-### `rebase db studio`
-
-Open Drizzle Studio to browse your database visually:
-
-```bash
-rebase db studio
-```
-
 ### `rebase generate-sdk`
 
 Generate a typed client SDK from your collection definitions:
@@ -115,8 +107,7 @@ rebase doctor
 Authentication management commands:
 
 ```bash
-rebase auth create-user --email admin@example.com --password secret
-rebase auth reset-password --email admin@example.com
+rebase auth reset-password --email admin@example.com --password NewPassword123!
 ```
 
 ### `rebase skills install`

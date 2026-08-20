@@ -117,17 +117,17 @@ Questi componenti possono essere sovrascritti solo a livello del provider radice
 
 Questi componenti possono essere sovrascritti globalmente (agendo come predefiniti per tutte le collezioni) o su collezioni individuali.
 
-| Chiave del Componente | Props Originali | Descrizione |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | L'intera home page della collezione |
-| `"Collection.Table"` | `CollectionTableProps` | La vista tabellare tipo foglio di calcolo predefinita |
-| `"Collection.Card"` | `CollectionCardProps` | Il wrapper dell'elemento della vista a card |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Vista mostrata quando una collezione è vuota |
-| `"Collection.Actions"` | `CollectionActionsProps` | Pulsanti della toolbar sopra la tabella/le card |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Campo di filtro personalizzato per una colonna |
-| `"Entity.Form"` | `EntityFormProps` | Il modulo di dettaglio per creare/aggiornare |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Barra dei pulsanti di invio/annullamento del modulo |
-| `"DetailView"` | `EntityDetailViewProps` | Vista di dettaglio in sola lettura |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | Il contenitore del pannello laterale per modulo/dettaglio |
-| `"EntityPreview"` | `EntityPreviewProps` | Anteprima inline del chip di riferimento/relazione |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Renderizzato quando un'entità referenziata è mancante |
+| Chiave del Componente | Descrizione |
+|---|---|
+| `"Collection.View"` | L'intera home page della collezione |
+| `"Collection.Table"` | La vista tabellare tipo foglio di calcolo predefinita |
+| `"Collection.Card"` | Il wrapper dell'elemento della vista a card |
+| `"Collection.EmptyState"` | Vista mostrata quando una collezione è vuota |
+| `"Collection.Actions"` | Pulsanti della toolbar sopra la tabella/le card |
+| `"Collection.FilterField"` | Campo di filtro personalizzato per una colonna |
+| `"Entity.Form"` | Il modulo di dettaglio per creare/aggiornare |
+| `"EditView.FormActions"` | Barra dei pulsanti di invio/annullamento del modulo |
+| `"DetailView"` | Vista di dettaglio in sola lettura |
+| `"Entity.SidePanel"` | Il contenitore del pannello laterale per modulo/dettaglio |
+| `"EntityPreview"` | Anteprima inline del chip di riferimento/relazione |
+| `"Entity.MissingReference"` | Renderizzato quando un'entità referenziata è mancante |

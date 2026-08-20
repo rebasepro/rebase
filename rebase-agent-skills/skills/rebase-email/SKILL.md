@@ -434,11 +434,13 @@ export default defineFunction((app, { rebase }) => {
     app.post("/", async (c) => {
         const { email, reportData } = await c.req.json();
 
-        if (!ctx.client.email) {
-            return ctx.json({ error: "Email not configured" }, 503);
+        // `rebase.email` always exists server-side — when SMTP is not
+        // configured it is a no-op sender, so ask whether it can actually send.
+        if (!rebase.email.isConfigured()) {
+            return c.json({ error: "Email not configured" }, 503);
         }
 
-        await rebase.email?.send({
+        await rebase.email.send({
             to: email,
             subject: "Your Monthly Report",
             html: `<h1>Report</h1><pre>${JSON.stringify(reportData, null, 2)}</pre>`
@@ -459,18 +461,18 @@ export default defineCron({
     name: "weekly-digest",
     schedule: "0 9 * * 1",  // Every Monday at 9 AM
     handler: async (ctx) => {
-        if (!ctx.client.email) {
-            console.warn("Email not configured, skipping digest");
+        if (!ctx.rebase.email.isConfigured()) {
+            ctx.log("Email not configured, skipping digest");
             return;
         }
 
         // Fetch subscribers
-        const { data: subscribers } = await ctx.client.data
+        const { data: subscribers } = await ctx.rebase.dataAsAdmin
             .collection<{ email: string; active: boolean }>("subscribers")
             .find({ where: { active: ["==", true] } });
 
         for (const sub of subscribers) {
-            await ctx.client.email.send({
+            await ctx.rebase.email.send({
                 to: sub.email,
                 subject: "Your Weekly Digest",
                 html: "<h1>This Week's Updates</h1>...",
@@ -485,18 +487,15 @@ export default defineCron({
 ```typescript
 import { rebase } from "@rebasepro/server";
 
-// rebase.email is undefined when no email config is provided at all
-if (!rebase.email) {
-    console.log("Email not configured");
-}
-
-// rebase.email exists but may not be functional
-if (rebase.email && !rebase.email.isConfigured()) {
+// `rebase.email` is ALWAYS present server-side — `RebaseServerClient` declares
+// it non-optional, and a no-op sender is wired when SMTP is not configured. So
+// `if (!rebase.email)` is dead code; the question worth asking is whether it can
+// send.
+if (!rebase.email.isConfigured()) {
     console.log("Email service exists but has no SMTP or sendEmail function");
 }
 
-// Full check
-if (rebase.email?.isConfigured()) {
+if (rebase.email.isConfigured()) {
     console.log("Email is ready to send");
 }
 ```

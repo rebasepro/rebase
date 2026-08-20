@@ -135,7 +135,7 @@ every deployment target agrees on.
 | `PORT` | Port to bind. Default `3001` locally, `8080` in the image. |
 | `REBASE_SERVICE_KEY` | Server-to-server key granting admin access. |
 | `REBASE_METRICS` | `true` to expose Prometheus metrics at `/metrics`. |
-| `REBASE_MIGRATE_ON_BOOT` | `none`, `ensure` or `push`. Defaults to `none` in production. |
+| `REBASE_MIGRATE_ON_BOOT` | `none` leaves the schema alone; anything else — including unset — runs the additive provisioning pass. Defaults to `ensure` everywhere, production included. |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static assets from this process. Default on. |
 
 Several databases and several buckets are configured by suffixing the variable

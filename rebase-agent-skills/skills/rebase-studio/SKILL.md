@@ -83,7 +83,7 @@ function RoleSimulator() {
 
 ## Studio Dev Tools
 
-The Studio ships 9 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
+The Studio ships 11 built-in dev tools, all **lazy-loaded** (code-split) so they don't impact the initial bundle. Heavy dependencies (Monaco, `@xyflow/react`, `dagre`, `pgsql-ast-parser`) are only loaded when a tool is visited.
 
 ### Tool Reference
 
@@ -96,14 +96,16 @@ The Studio ships 9 built-in dev tools, all **lazy-loaded** (code-split) so they 
 | `"cron"` | `CronJobsView` | Cron Jobs | Compute | `Clock` | Monitor and manage scheduled background tasks |
 | `"schema-visualizer"` | `SchemaVisualizer` | Schema Visualizer | Database | `Network` | Interactive ERD showing tables, columns, and relationships |
 | `"branches"` | `BranchesView` | Branches | Database | `GitBranch` | Create and manage isolated database copies for development |
+| `"backups"` | `BackupsView` | Backups | Database | `Database` | Browse and download database backups |
 | `"api"` | `ApiExplorer` | API Explorer | API | `BookOpen` | Interactive API documentation with live request testing |
 | `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
+| `"api-keys"` | `ApiKeysView` | API Keys | Access Control | `KeyRound` | Create and manage scoped service API keys |
 
 > **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseAdmin>`. Do not try to register it manually.
 
 ### Enabling/Disabling Tools
 
-By default, **all 9 tools** are enabled. Use the `tools` prop on `<RebaseStudio>` to selectively enable a subset:
+By default, **all 11 tools** are enabled. Use the `tools` prop on `<RebaseStudio>` to selectively enable a subset:
 
 ```tsx
 // Enable all tools (default behavior — both are equivalent)
@@ -114,19 +116,19 @@ By default, **all 9 tools** are enabled. Use the `tools` prop on `<RebaseStudio>
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
 // Enable everything except branches
-<RebaseStudio tools={["sql", "js", "rls", "storage", "cron", "schema-visualizer", "api", "logs"]} />
+<RebaseStudio tools={["sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
 
 ```typescript
 type ToolKey = "sql" | "js" | "rls" | "schema" | "storage" | "cron"
-    | "schema-visualizer" | "branches" | "api" | "logs";
+    | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys";
 
 // Default when tools is undefined:
 const DEFAULT_TOOLS: ToolKey[] = [
-    "sql", "js", "rls", "storage", "cron",
-    "schema-visualizer", "branches", "api", "logs"
+    "sql", "js", "rls", "storage", "cron", "schema-visualizer",
+    "branches", "backups", "api", "logs", "api-keys"
 ];
 ```
 
@@ -147,7 +149,7 @@ bundle.
 
 ## Frontend Composition
 
-The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseAdmin>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the `RebaseRegistry`. `<RebaseShell>` then reads the registry and builds the actual UI.
+The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseAdmin>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the registry (`RebaseRegistryController`, read with `useRebaseRegistry()`). `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
 import { useRebaseAuthController, RebaseAuth } from "@rebasepro/app";
@@ -253,12 +255,19 @@ These components can be overridden globally on `<Rebase>` (which acts as a fallb
 - `"Collection.Card"` — Individual card wrapper.
 - `"Collection.EmptyState"` — View shown when a collection is empty.
 - `"Collection.Actions"` — Toolbar actions header.
+- `"Collection.FilterField"` — The per-property filter input.
 - `"Entity.Form"` — The detail form view.
-- `"Entity.FormActions"` — Form action button bar.
-- `"Entity.DetailView"` — Read-only detail view.
+- `"EditView.FormActions"` — Form action button bar.
+- `"DetailView"` — Read-only detail view.
 - `"Entity.SidePanel"` — Side panel wrapper.
-- `"Entity.Preview"` — Reference / relation preview chip.
+- `"EntityPreview"` — Reference / relation preview chip.
 - `"Entity.MissingReference"` — Placeholder view when a relation references a deleted/non-existent entity.
+
+> **IMPORTANT FOR AGENTS:** three keys break the `Entity.` pattern the rest
+> follow — `"EditView.FormActions"`, `"DetailView"` and `"EntityPreview"`.
+> `"Entity.FormActions"`, `"Entity.DetailView"` and `"Entity.Preview"` are not in
+> the union: they type-error, and in plain JavaScript the override silently never
+> applies.
 
 ## RebaseAdmin Configuration
 
@@ -321,7 +330,7 @@ interface NavigationGroupMapping {
 ```typescript
 interface RebaseStudioConfig {
     tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron"
-        | "schema-visualizer" | "branches" | "api" | "logs")[];
+        | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
     homePage?: ReactNode;
     devViews?: AppView[];  // Computed internally — not passed by consumers
 }
@@ -411,7 +420,7 @@ Use `<RebaseAuth>` with the `loginView` prop to replace the default login UI:
 </Rebase>
 ```
 
-The `loginView` is registered into the `RebaseRegistry` via `registerAuth()` and consumed by `<RebaseAuthGate>`.
+The `loginView` is registered into the registry via `registerAuth()` and consumed by `<RebaseAuthGate>`.
 
 ## Custom Views
 

@@ -117,17 +117,17 @@ Diese Komponenten können nur auf Ebene des Root-`<Rebase>`-Providers überschri
 
 Diese Komponenten können global (als Standard für alle Collections) oder auf einzelnen Collections überschrieben werden.
 
-| Komponenten-Schlüssel | Original-Props | Beschreibung |
-|---|---|---|
-| `"Collection.View"` | `CollectionViewProps` | Die gesamte Collection-Startseite |
-| `"Collection.Table"` | `CollectionTableProps` | Die standardmäßige tabellarische Tabellenansicht |
-| `"Collection.Card"` | `CollectionCardProps` | Der Wrapper des Kartenansichts-Elements |
-| `"Collection.EmptyState"` | `CollectionEmptyStateProps` | Ansicht, die angezeigt wird, wenn eine Collection leer ist |
-| `"Collection.Actions"` | `CollectionActionsProps` | Toolbar-Schaltflächen über der Tabelle/den Karten |
-| `"Collection.FilterField"` | `FilterFieldBindingProps` | Benutzerdefiniertes Filterfeld für eine Spalte |
-| `"Entity.Form"` | `EntityFormProps` | Das Detailformular zum Erstellen/Aktualisieren |
-| `"EditView.FormActions"` | `EntityFormActionsProps` | Schaltflächenleiste zum Absenden/Abbrechen des Formulars |
-| `"DetailView"` | `EntityDetailViewProps` | Schreibgeschützte Detailansicht |
-| `"Entity.SidePanel"` | `EntitySidePanelProps` | Der Seitenleisten-Container für Formular/Detail |
-| `"EntityPreview"` | `EntityPreviewProps` | Inline-Vorschau des Referenz-/Relations-Chips |
-| `"Entity.MissingReference"` | `MissingReferenceProps` | Wird gerendert, wenn eine referenzierte Entität fehlt |
+| Komponenten-Schlüssel | Beschreibung |
+|---|---|
+| `"Collection.View"` | Die gesamte Collection-Startseite |
+| `"Collection.Table"` | Die standardmäßige tabellarische Tabellenansicht |
+| `"Collection.Card"` | Der Wrapper des Kartenansichts-Elements |
+| `"Collection.EmptyState"` | Ansicht, die angezeigt wird, wenn eine Collection leer ist |
+| `"Collection.Actions"` | Toolbar-Schaltflächen über der Tabelle/den Karten |
+| `"Collection.FilterField"` | Benutzerdefiniertes Filterfeld für eine Spalte |
+| `"Entity.Form"` | Das Detailformular zum Erstellen/Aktualisieren |
+| `"EditView.FormActions"` | Schaltflächenleiste zum Absenden/Abbrechen des Formulars |
+| `"DetailView"` | Schreibgeschützte Detailansicht |
+| `"Entity.SidePanel"` | Der Seitenleisten-Container für Formular/Detail |
+| `"EntityPreview"` | Inline-Vorschau des Referenz-/Relations-Chips |
+| `"Entity.MissingReference"` | Wird gerendert, wenn eine referenzierte Entität fehlt |

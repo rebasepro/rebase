@@ -88,7 +88,7 @@ rebase db push
 
 Esegui il comando da un checkout o da un job di CI, puntandolo al database di deployment. Esegue prima una prova (dry-run) delle modifiche, rifiuta quelle distruttive senza conferma esplicita e può effettuare un backup prima dell'applicazione.
 
-`REBASE_MIGRATE_ON_BOOT` accetta `ensure` (il valore predefinito — solo tabelle auth) e `none`.
+`REBASE_MIGRATE_ON_BOOT` accetta `ensure` (il valore predefinito) e `none`, e nient'altro — l'immagine **rifiuta di avviarsi** con `push`, per il motivo sopra. `ensure` è additivo sull'intero schema, non solo sulle tabelle di auth: crea tabelle, colonne e tipi enum mancanti, e non ne elimina né riscrive mai uno.
 
 ## Altre piattaforme
 

@@ -219,6 +219,16 @@ const { data } = await client.data.products
 | `"not-in"` | `"nin"` | Value not in array |
 | `"array-contains"` | `"cs"` | Array field contains value |
 | `"array-contains-any"` | `"csa"` | Array field contains any of values |
+| `"like"` | `"like"` | Case-**sensitive** pattern match; `%` and `_` are the wildcards |
+| `"ilike"` | `"ilike"` | Case-insensitive pattern match |
+| `"not-like"` | `"nlike"` | Does not match the pattern |
+| `"not-ilike"` | `"nilike"` | Does not match the pattern, case-insensitively |
+| `"is-null"` | `"isnull"` | Column is `NULL`. Takes no value — whatever you pass is normalized away |
+| `"is-not-null"` | `"notnull"` | Column is not `NULL`. Takes no value |
+
+The alias column is the **wire** spelling, used in REST query strings. It never
+appears in application code: the SDK and the admin panel both speak the
+canonical operator on the left.
 
 ### Where Clause Syntaxes
 

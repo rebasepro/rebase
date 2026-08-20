@@ -14,8 +14,8 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 | Service | Description |
 |---------|-------------|
 | **Collections** | Schema-as-Code data models with full CRUD endpoints |
-| **Authentication** | Built-in JWT auth with Google OAuth support |
-| **Roles & RLS** | Application-level row-level security policies |
+| **Authentication** | Built-in JWT auth, twelve OAuth providers, magic links, anonymous sign-in and TOTP two-factor |
+| **Roles & RLS** | **Database-level** row-level security — collections compile to real PostgreSQL policies, and the app role reaches SQL through `rebase.uid()` / `rebase.roles()` |
 | **Storage** | Local, S3-compatible, or Google Cloud Storage — always via `rebase.storage` (never a cloud SDK directly) |
 | **Realtime** | WebSocket-based live updates (LISTEN/NOTIFY) |
 | **Offline** | Opt-in local-first sync in the client SDK — local row database, queued writes, live queries |

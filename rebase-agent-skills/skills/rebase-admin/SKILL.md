@@ -835,13 +835,15 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `RebaseAdmin` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages |
-| `DataCollectionView` | The collection view component |
-| `EntityCustomView` | Entity detail/edit view |
-| `EntityPreview` | Reference/relation preview chip |
-| `EntityCard` | Card representation of a entity |
+| `CollectionViewBinding` | The collection view, bound to Rebase data |
+| `CollectionTableBinding` | The table rendering of a collection |
+| `CollectionCardViewBinding` | The card/grid rendering of a collection |
+| `EntityViewBinding` | Entity detail/edit view |
+| `EntityPreviewBinding` | Reference/relation preview chip |
+| `EntityCardBinding` | Card representation of an entity |
+| `SelectionTableBinding` / `SelectableTable` | Table for selecting entities |
 | `SideDialogs` | Side dialog container |
-| `SideEntityProvider` | Context provider for side entity controller |
-| `EntitySelectionTable` | Table for selecting entities |
+| `SidePanelProvider` | Context provider for the side panel controller |
 | `Scaffold` | Layout scaffold component |
 | `AppBar` | Top app bar |
 | `Drawer` / `DefaultDrawer` | Sidebar drawer |
@@ -849,6 +851,14 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `RebaseNavigation` | Navigation provider |
 | `RebaseLayout` | Layout wrapper |
 | `RebaseRouteDefs` | Route definitions |
+
+> **IMPORTANT FOR AGENTS: a component-override *slot name* is not an export.**
+> `"DetailView"`, `"EntityPreview"`, `"Collection.View"`, `"Collection.Table"`,
+> `"Collection.Card"`, `"Entity.Form"`, `"Entity.SidePanel"` and
+> `"Entity.MissingReference"` are string keys in the `OverridableComponentName`
+> union — what you pass to `components={{ … }}` to *replace* a component. There
+> is no `import { EntityPreview } from "@rebasepro/admin"`; the component that
+> ships is `EntityPreviewBinding`. Importing a slot name gets you `undefined`.
 
 ## Exported Hooks
 

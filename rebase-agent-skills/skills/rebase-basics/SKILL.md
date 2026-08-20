@@ -411,7 +411,25 @@ function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & 
 
 When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) with your custom Zod object, so all fields are validated together in a single pass.
 
-### Complete Environment Variable Reference
+### The `loadEnv()` schema
+
+Everything `rebaseEnvSchema` declares — what an **ejected** project's own
+`backend/src/env.ts` validates.
+
+> **IMPORTANT FOR AGENTS:** this is not the whole environment a project reads. A
+> project booted by the **runtime** (`rebase dev`, `rebase start`, the published
+> image — the default, and what `rebase init` scaffolds) uses `loadBootEnv`,
+> which extends this schema with the variables the runtime itself owns: `SMTP_*`
+> and `APP_NAME`; `REBASE_SERVE_STATIC`, `REBASE_MIGRATE_ON_BOOT`,
+> `REBASE_METRICS`, `REBASE_METRICS_TOKEN`, `LOG_LEVEL`; `STORAGE_PUBLIC_READ`
+> and `STORAGE_ALLOW_ANY_AUTHENTICATED`; `AUTH_REQUIRE`,
+> `AUTH_ALLOW_USER_LOOKUP`, `AUTH_COOKIE_SAME_SITE`, `AUTH_DEFAULT_ROLE`,
+> `GITHUB_CLIENT_*`, `MICROSOFT_CLIENT_*`; `REBASE_BASE_PATH`,
+> `REBASE_ENABLE_SWAGGER`, `REBASE_MAX_BODY_SIZE`, `REBASE_COMPRESSION`,
+> `REBASE_HISTORY`; and the split-deployment set `REBASE_ROLE`,
+> `REBASE_CRON_SCHEDULER`, `REBASE_JOB_WORKERS`, `REBASE_FUNCTIONS_ONLY`,
+> `REBASE_FUNCTIONS_EXCLUDE`, `REBASE_FUNCTIONS_UPSTREAM`. Do not tell a user a
+> variable "is not supported" because it is missing from the table below.
 
 | Variable | Type | Default | Required | Description |
 |----------|------|---------|----------|-------------|
@@ -423,11 +441,15 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `ADMIN_CONNECTION_STRING` | `string` (URL) | — | No | Admin-level DB connection |
 | `JWT_SECRET` | `string` (≥32 chars) | Auto-generated in dev | **Yes** (prod) | JWT signing secret |
 | `JWT_ACCESS_EXPIRES_IN` | `string` | `"1h"` | No | Access token TTL |
-| `JWT_REFRESH_EXPIRES_IN` | `string` | `"30d"` | No | Refresh token TTL |
+| `JWT_REFRESH_EXPIRES_IN` | `string` | `"400d"` | No | Refresh token TTL. Sliding — each rotation re-ups it |
+| `JWT_PRIVATE_KEY` | `string` (PEM) | — | No | Sign access tokens asymmetrically (RS256). Accepts a real-newline PEM, a `\n`-escaped PEM, or base64 of the whole PEM |
+| `JWT_KEY_ID` | `string` | `"default"` | No | The `kid` naming `JWT_PRIVATE_KEY` in the token header and the JWKS |
 | `REBASE_SERVICE_KEY` | `string` | Auto-generated in dev | No | Static key for server-to-server auth |
 | `GOOGLE_CLIENT_ID` | `string` | — | No | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | `string` | — | No | Google OAuth client secret |
-| `ALLOW_REGISTRATION` | `"true" \| "false"` | `"false"` | No | Allow public user registration |
+| `ALLOW_REGISTRATION` | `"true" \| "false"` | `"false"` | No | Allow public user registration. The first user on an empty table is admitted regardless |
+| `DISABLE_SELF_REGISTRATION` | `"true" \| "false"` | — | No | Kill switch — also closes the first-user bootstrap window |
+| `ALLOW_ANONYMOUS` | `"true" \| "false"` | — | No | Enable `POST /api/auth/anonymous` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | `"true" \| "false"` | — | No | Skip localhost URL checks in production |
 | `CORS_ORIGINS` | `string` | — | **Yes** (prod) | Allowed CORS origins (comma-separated) |
 | `FRONTEND_URL` | `string` | — | Prod alt | Alternative to CORS_ORIGINS for single frontend |
@@ -436,7 +458,7 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `DB_POOL_CONNECT_TIMEOUT` | `string` → `number` | `"10000"` | No | Pool connect timeout (ms) |
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | No | File storage backend type |
 | `STORAGE_PATH` | `string` | — | No | Local storage directory path |
-| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | — | No | Allow local storage in production — **the backend refuses to boot without it**, since the container filesystem loses uploads on restart |
+| `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | — | No | Allow `STORAGE_TYPE=local` in production. Without it the local backend is **not registered** — the backend still boots and serves data, auth and realtime, but uploads are refused with `501 STORAGE_NOT_CONFIGURED` rather than landing on a filesystem the next redeploy erases. Set it only when a durable volume really is mounted at `STORAGE_PATH` |
 | `S3_BUCKET` | `string` | — | When S3 | S3 bucket name |
 | `S3_REGION` | `string` | — | When S3 | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | — | When S3 | S3 access key |
@@ -445,7 +467,8 @@ When `extend` is provided, the base `rebaseEnvSchema` is merged (`.merge()`) wit
 | `S3_FORCE_PATH_STYLE` | `"true" \| "false"` | — | No | Use path-style S3 URLs |
 | `GCS_BUCKET` | `string` | — | When GCS | GCS/Firebase Storage bucket name |
 | `GCS_PROJECT_ID` | `string` | — | When GCS | GCP project ID |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | When GCS | Path to GCP service account JSON |
+| `GCS_KEY_FILENAME` | `string` (path) | — | No | GCP service-account key file. Omit on GCP: Workload Identity/ADC supplies credentials |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | No | Standard ADC variable, read by the Google SDK itself rather than by `loadEnv()` |
 
 ### Production Validations
 
@@ -488,7 +511,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
-| `history` | `unknown` | — | Entity history/audit-log configuration |
+| `history` | `HistoryConfig` (`boolean \| { retention?: number }`) | `true` | Entity history / audit log. `retention` is in days |
 | `enableSwagger` | `boolean` | `true` | Enable OpenAPI spec at `/api/docs` and Swagger UI at `/api/swagger` (dev only) |
 | `functionsDir` | `string` | — | Directory for auto-discovered custom function handlers |
 | `cronsDir` | `string` | — | Directory for auto-discovered cron job handlers |
@@ -500,6 +523,27 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode |
 | `storageSources` | `StorageSourceDefinition[]` | — | Named storage backends for multi-source setups. Each has a `key` that collection properties point at via `StorageConfig.storageSource` |
 | `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | `"info"` | Log level configuration |
+| `storageAuthorize` | `StorageAuthorize` | — | **Per-object access control**, the storage analogue of RLS. Without one, any authenticated user can read, overwrite, delete or list any key they can name — and `GET /storage/list?prefix=` means they need not guess. See the boot guard below |
+| `storagePublicRead` | `boolean` | `false` | Serve stored objects to unauthenticated readers |
+| `storageInsecureAllowAnyAuthenticated` | `boolean` | `false` | Opt out of the storage boot guard. Named to be read twice |
+| `jobs` | `JobQueueOptions` | — | The durable job queue: `{ enabled, tasks, concurrency, pollIntervalMs, visibilityTimeoutMs, maxAttempts, backoff }`. Off unless asked for |
+| `rateLimit` | `DataRateLimitConfig` | — | Rate limiting for the data API |
+| `compression` | `boolean` | `true` | gzip/brotli responses |
+| `functionsTimeoutMs` | `number` | — | Per-invocation timeout for custom functions |
+| `functionsSelection` | `FunctionSelection` | — | Which functions this process serves (split deployments) |
+| `functionsUpstream` | `string` | — | Forward `/api/functions/*` to another process instead of mounting them |
+| `surfaces` | `RuntimeSurfaceOptions` | — | Which route groups this process mounts (`api`/`functions`/`worker` roles) |
+| `ownership` | `RuntimeOwnershipOptions` | — | Which background responsibilities this process owns (cron timers, job workers) |
+| `provisionSchema` | `boolean` | `true` | Whether **this process** runs the boot DDL. Exactly one process in a split deployment may |
+| `schemaVersion` / `runtimeVersion` | `string` | — | Stamps carried from the bundle manifest |
+
+> **IMPORTANT FOR AGENTS: storage refuses to boot in production without an access
+> model.** When storage is configured and `NODE_ENV=production`,
+> `initializeRebaseBackend` **throws at startup** unless one of `storageAuthorize`,
+> `storagePublicRead: true`, or `storageInsecureAllowAnyAuthenticated: true` is
+> set. In development it logs a warning instead — so a project can be wrong about
+> this and work fine locally right up until it is deployed. A scaffolded project
+> ships a hook in `config/storage.ts`; read it before replacing it.
 
 > **IMPORTANT FOR AGENTS:** `maxBodySize` applies to all API routes under `basePath`. Storage upload routes have their **own** limit derived from the storage config's `maxFileSize` property (default: 50 MB), which overrides the global limit.
 
@@ -510,14 +554,22 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `collection` | `CollectionConfig` | `defaultUsersCollection` | The collection used for auth users |
 | `jwtSecret` | `string` | — | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
-| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
+| `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL. The **runtime** passes `JWT_REFRESH_EXPIRES_IN` instead, whose own default is `"400d"`, so this `"30d"` is only what a hand-written `initializeRebaseBackend` call falls back to |
 | `requireAuth` | `boolean` | `true` | Require authentication for data routes |
 | `allowRegistration` | `boolean` | `false` | Allow public user registration |
 | `serviceKey` | `string` | — | Static secret for server-to-server auth (≥32 chars) |
 | `defaultRole` | `string` | — | Role assigned to new users on registration |
 | `email` | `EmailConfig` | — | SMTP email configuration |
 | `hooks` | `AuthHooks` | — | Override auth behavior (password hashing, validation, etc.) |
-| `providers` | `OAuthProvider[]` | — | Custom OAuth providers |
+| `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array. The named provider fields below resolve into it at startup; the two forms merge |
+| `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept. Unset, the only check is the provider's own registered-URI match — which authorises every URI on that OAuth client, `localhost` included |
+| `disableSelfRegistration` | `boolean` | `false` | Kill switch. Also closes the first-user bootstrap window `allowRegistration: false` leaves open |
+| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` |
+| `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` (minimal public profile, authenticated callers only) |
+| `magicLink` | `boolean` | `false` | Passwordless email sign-in. Needs `email`; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
+| `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body. Requires `credentials: "include"` on the client and an explicit CORS origin list |
+| `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys, so a verifier holding the JWKS cannot mint tokens |
+| `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 
 #### Built-in OAuth Providers
 
@@ -664,20 +716,33 @@ The singleton is a JavaScript `Proxy` object. Any property access on `rebase.*` 
 - If the server **has not** been initialized yet, a descriptive error is thrown: `"rebase.<prop>: server not initialized yet"`.
 - The proxy is **read-only** — attempting to assign `rebase.anything = value` throws.
 
-The underlying client uses an internal `app.request()` fetch (no network hop) and authenticates with the `serviceKey`, giving it **admin-level access** (bypasses RLS).
+The singleton has **two planes**, and they do not work the same way:
+
+- **Data** (`rebase.dataAsAdmin`) is backed by the native DataDriver — no JSON
+  serialization, no HTTP dispatch, no middleware. It is scoped once, at boot, as
+  `{ uid: "service", roles: ["admin"] }`: **admin-scoped, not RLS-bypassing**.
+- **Control plane** (`rebase.auth`, `rebase.admin`, `rebase.cron`,
+  `rebase.storage`, …) routes through the Hono app's internal request handler
+  (`app.request()`, so no network hop) with an internal per-boot service key.
+
+`rebase.sql()` is the one unconditional bypass: owner connection, no policies.
 
 ### What It Exposes
 
-The `rebase` singleton implements the `RebaseClient` interface:
+The `rebase` singleton implements `RebaseServerClient` — `RebaseClient` narrowed
+to the guarantees that always hold on a server, and with `data` **omitted from
+the type** so the privileged plane has exactly one name. (`rebase.data` still
+resolves at runtime as an alias of `dataAsAdmin`, so untyped JavaScript keeps
+working, but do not write it.)
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access — scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is **evaluated against that identity, not bypassed**. Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
 | `rebase.auth` | `AuthClient` | Authentication operations |
 | `rebase.storage` | `StorageSource \| undefined` | File storage operations |
-| `rebase.email` | `EmailService \| undefined` | Send emails via SMTP (only when email is configured) |
+| `rebase.email` | `EmailService` | Send emails. **Always present** — a no-op sender is wired when SMTP is not configured, so ask `rebase.email.isConfigured()` rather than testing for the property |
 | `rebase.admin` | `AdminAPI \| undefined` | User management API |
-| `rebase.sql` | `(query: string) => Promise<Record[]> \| undefined` | Raw SQL execution (only for SQL databases). Runs on the owner connection — this, not `dataAsAdmin`, is the unconditional RLS bypass |
+| `rebase.sql` | `(query, options?) => Promise<Record[]>` | Raw SQL. Always present server-side on SQL engines. Pass values via `options.params` and reference them as `$1`, `$2`, … Runs on the owner connection — this, not `dataAsAdmin`, is the unconditional RLS bypass |
 | `rebase.baseUrl` | `string \| undefined` | The base HTTP URL of the backend |
 
 ### Usage Examples
@@ -692,7 +757,7 @@ const { data: posts } = await rebase.dataAsAdmin.collection<Record<string, unkno
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
 
 // Send an email
-await rebase.email?.send({
+await rebase.email.send({
     to: "admin@company.com",
     subject: "Daily Report",
     html: "<p>Today's summary...</p>",

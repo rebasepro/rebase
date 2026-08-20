@@ -157,7 +157,7 @@ function SelectProduct() {
 }
 ```
 
-## `useNavigationController`
+## `useNavigationStateController`
 
 Acceder al estado de navegación y colecciones resueltas:
 

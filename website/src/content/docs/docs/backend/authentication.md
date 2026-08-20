@@ -64,6 +64,54 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
+### The `auth` block, in full
+
+| Key | Type | Default | What it does |
+|-----|------|---------|--------------|
+| `collection` | `CollectionConfig` | — | The users collection. See [Collection-Level Auth Configuration](#collection-level-auth-configuration) |
+| `jwtSecret` | `string` | — | HS256 signing secret. Required in production |
+| `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](#asymmetric-tokens-and-jwks) |
+| `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
+| `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
+| `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
+| `requireAuth` | `boolean` | `true` | Require a session for the data API |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. The first user on an empty table is admitted either way |
+| `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
+| `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
+| `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
+| `defaultRole` | `string` | — | Role given to a newly registered user when none is specified |
+| `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](#service-key-authentication) |
+| `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
+| `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
+| `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
+| `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
+| `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
+| `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
+
+#### Refresh tokens in an `httpOnly` cookie
+
+```typescript no-verify
+auth: { cookieAuth: { sameSite: "Lax" } }
+```
+
+The refresh token is the long-lived credential, and in the default JSON-body
+mode any XSS on the page can read it. `cookieAuth` moves it into a cookie the
+page's own JavaScript cannot touch. The **access** token stays in the JSON body,
+because the client has to put it in an `Authorization` header.
+
+Two things have to follow, or sign-in breaks rather than degrades: client fetches
+to the auth endpoints need `credentials: "include"`, and CORS has to allow
+credentials — which means an explicit origin list, never `origin: "*"`.
+`AUTH_COOKIE_SAME_SITE` is the environment spelling of `sameSite`.
+
+| Key | Default | |
+|-----|---------|--|
+| `cookieName` | `__rb_refresh` | |
+| `domain` | current domain | |
+| `path` | `/` | |
+| `sameSite` | `Lax` | `None` is only for a genuinely cross-site frontend |
+| `secure` | auto | Forced on when `sameSite` is `None`; otherwise taken from the request protocol |
+
 :::caution[Collection callbacks do not fire for auth users]
 User creation and updates through the auth system — registration, admin user
 management, and OAuth — write **directly** to the user store and bypass the
@@ -94,6 +142,37 @@ auth: {
     spotify:   { clientId: "...", clientSecret: "..." },
 }
 ```
+
+`gitlab` also takes an optional `baseUrl`, for a self-hosted GitLab instance.
+
+Each named field is resolved at startup into `auth.providers`, which is the
+canonical array and the extension point for anything the named fields do not
+cover. Entries are built with the `create*Provider` factories, and the two forms
+merge — named fields are appended after explicit entries:
+
+```typescript no-verify
+import { createGoogleProvider, createGitHubProvider } from "@rebasepro/server";
+
+auth: {
+    providers: [
+        createGoogleProvider({ clientId: "…", clientSecret: "…" }),
+        createGitHubProvider({ clientId: "…", clientSecret: "…" })
+    ]
+}
+```
+
+#### Narrowing the redirect URIs
+
+```typescript no-verify
+auth: { allowedRedirectUris: ["https://admin.example.com/"] }
+```
+
+Left unset, the only check on an OAuth redirect is the provider's own
+registered-URI match — which authorises **every** URI registered on that OAuth
+client, including the `localhost` entry someone added for development and the
+staging host nobody removed. Listing the origins this backend actually serves
+narrows it to those. URIs are compared on origin plus path; query, fragment and
+a trailing slash are ignored.
 
 ### Account Linking Across Sign-In Methods
 
@@ -168,13 +247,42 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
-| `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in) |
+| `POST` | `/api/auth/find-user` | Resolve an email to a minimal public profile (opt-in — `AUTH_ALLOW_USER_LOOKUP`) |
+| `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated) |
+| `GET` | `/api/auth/me` | The caller's own profile |
+| `PATCH` | `/api/auth/me` | Update the caller's own profile |
+| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `emailServiceEnabled`, `magicLinkEnabled`, `anonymousLoginEnabled`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
+| `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
+| `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
+| `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
+| `POST` | `/api/auth/magic-link/verify` | Exchange a magic-link token for a session |
+| `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
+| `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
+| `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
+| `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
+| `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
+| `GET` | `/api/auth/jwks.json` | The public JWKS, when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
 | `POST` | `/api/auth/mfa/challenge` | Open a challenge against a verified factor |
 | `POST` | `/api/auth/mfa/challenge/verify` | Answer a challenge — this is what issues the session |
 | `DELETE` | `/api/auth/mfa/unenroll` | Remove a factor (requires an `aal2` session) |
+
+Administrative user and role management is a **separate surface**, mounted at
+`/api/admin/` rather than `/api/auth/`, and gated on the `admin` role or the
+service key:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/users` | List users (paginated) |
+| `POST` | `/api/admin/users` | Create a user |
+| `GET` | `/api/admin/users/:uid` | Read one user |
+| `PUT` | `/api/admin/users/:uid` | Update one user |
+| `DELETE` | `/api/admin/users/:uid` | Delete one user |
+| `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
+| `GET` | `/api/admin/roles` | List the roles this backend knows |
+| `POST` | `/api/admin/bootstrap` | Create the first administrator on an empty user table — see [First User Bootstrap](#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 

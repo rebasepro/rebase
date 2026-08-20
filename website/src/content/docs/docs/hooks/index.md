@@ -363,7 +363,7 @@ function SelectProduct() {
 }
 ```
 
-## `useNavigationController`
+## `useNavigationStateController`
 
 Access navigation state and resolved collections:
 

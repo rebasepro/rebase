@@ -162,6 +162,7 @@ const posts = defineCollection({
 });
 ```
 
+<!-- docs-verify: ignore -->
 An augmentation applies to the whole TypeScript *program*, and `config/` and `frontend/`
 are separate programs — which is why the reference belongs in the config package. There
 is no `AdminCollectionConfig` wrapper type: with the field merged in, `CollectionConfig`

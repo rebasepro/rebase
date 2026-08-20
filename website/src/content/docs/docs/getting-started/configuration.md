@@ -8,7 +8,16 @@ description: All environment variables and configuration options for Rebase proj
 
 All configuration is done via environment variables in your `.env` file at the project root.
 
-> **Important**: Rebase uses **Zod** to validate environment variables at startup in `src/env.ts`. If any required variables are missing or incorrectly formatted (like URLs or ports), the server will fail to start and provide a clear error message.
+> **Important**: Rebase validates environment variables with **Zod** at startup. If
+> anything required is missing or malformed (a URL that is not a URL, a port that
+> is not a number), the server refuses to boot and names the variable.
+>
+> Where the schema lives depends on how you run the backend. A project booted by
+> the runtime — `rebase dev`, `rebase start`, the published image — uses the
+> schema the runtime owns (`loadBootEnv` in `@rebasepro/server`), which is the
+> union of every table below. A project that has run [`rebase eject`](/docs/cli)
+> owns a `backend/src/env.ts` calling `loadEnv({ extend })`, and can add its own
+> typed variables there.
 
 ### Required
 
@@ -56,7 +65,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | Port for the backend HTTP server | `3001` |
+| `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
@@ -69,12 +78,25 @@ All configuration is done via environment variables in your `.env` file at the p
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `JWT_SECRET` | Secret for JWT signing (required in production, auto-generated in development) | — |
+| `JWT_PRIVATE_KEY` | PEM private key for signing access tokens asymmetrically (RS256), so anything holding the JWKS can verify a session without being able to mint one. Accepts a PEM with real newlines, a PEM with `\n` escapes, or base64 of the whole PEM. Without it tokens stay HS256. | — |
+| `JWT_KEY_ID` | Names `JWT_PRIVATE_KEY` in the token header and in the JWKS. Change it whenever the key changes — rotation depends on old and new being distinguishable. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `30d` |
-| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). First user can always register. | `true` |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
+| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). The **first** user can always register, whatever this says — an empty user table has to admit somebody. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. | — |
+| `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
+| `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
+| `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |
+| `AUTH_ALLOW_USER_LOOKUP` | Mount `POST /api/auth/find-user`, which resolves an email to a minimal public profile (`uid`, `displayName`, `photoURL`) for invite-by-email flows. Authenticated callers only, and it never returns the email, roles or metadata of the user it found. Off by default: it is an enumeration surface. | `false` |
+| `AUTH_COOKIE_SAME_SITE` | `SameSite` on the refresh cookie: `Strict`, `Lax` or `None`. `None` requires HTTPS and is only for a genuinely cross-site frontend. | `Lax` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | — |
+| `GITHUB_CLIENT_ID` | GitHub OAuth client ID | — |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | — |
+| `MICROSOFT_CLIENT_ID` | Microsoft OAuth client ID | — |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
+| `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 
 ### Storage
 
@@ -100,6 +122,74 @@ All configuration is done via environment variables in your `.env` file at the p
 | `SMTP_USER` | SMTP username |
 | `SMTP_PASS` | SMTP password |
 | `SMTP_FROM` | Sender address for system emails |
+| `SMTP_NAME` | Display name on the sender address |
+| `APP_NAME` | Product name used in email subjects and bodies (default: `Rebase`) |
+
+### Database connection pool
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_POOL_MAX` | Maximum pooled connections | `20` |
+| `DB_POOL_IDLE_TIMEOUT` | Milliseconds an idle connection is kept | `30000` |
+| `DB_POOL_CONNECT_TIMEOUT` | Milliseconds to wait for a connection | `10000` |
+| `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. | — |
+| `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. | — |
+
+### Runtime behaviour
+
+Read by the runtime — `rebase dev`, `rebase start` and the published server
+image. A project that has ejected owns these decisions in its own code instead.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
+| `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
+| `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
+| `REBASE_COMPRESSION` | gzip/brotli responses. | `true` |
+| `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). | — |
+| `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state: unset means on in development, off in production; `false` turns both off anywhere. Note that `true` in production serves the **spec** at `/api/docs` but not the Swagger **UI** at `/api/swagger` — the UI is gated on `NODE_ENV` separately. | — |
+| `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
+| `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
+| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` touches nothing. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
+| `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
+| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime#database-level-change-capture-cdc). | `auto` |
+| `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
+| `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
+
+:::note[Boot provisioning is additive, and is not a migration tool]
+The boot pass runs unattended with nobody reading a diff, so it will never drop
+a column, narrow a type or rewrite a table. That is also why the image refuses
+`REBASE_MIGRATE_ON_BOOT=push`: a full push computes a diff and will happily
+`DROP COLUMN`, and a container restart must never be able to destroy a
+production column as a side effect of rescheduling.
+
+Destructive or reshaping changes stay where they can be reviewed: `rebase db
+generate` + `rebase db migrate`, or `rebase db push` from a checkout or CI,
+which dry-runs the change, refuses destructive ones without confirmation, and
+can take a backup first.
+:::
+
+### Split deployments
+
+One image and one bundle can be booted several times over, each serving a
+different part of the project. `REBASE_ROLE`, `REBASE_CRON_SCHEDULER`,
+`REBASE_JOB_WORKERS`, `REBASE_FUNCTIONS_ONLY`, `REBASE_FUNCTIONS_EXCLUDE` and
+`REBASE_FUNCTIONS_UPSTREAM` are documented in full on
+**[Split Processes](/docs/deployment/split-processes)**.
+
+### Backups
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BACKUP_SCHEDULE` | Cron expression for scheduled backups. Unset means scheduled backups are off. | — |
+| `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. | `./backups` |
+| `BACKUP_RETENTION_DAYS` | Delete backups older than N days. Unset or `0` keeps everything. | — |
+| `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
+| `PG_DUMP_PATH` | Override the `pg_dump` binary — it must match the server's major version. | — |
+| `PG_RESTORE_PATH` | Override the `pg_restore` binary. | — |
+
+Backups contain secrets and PII. Use a private destination with
+encryption-at-rest.
 
 ## Backend Config Object
 

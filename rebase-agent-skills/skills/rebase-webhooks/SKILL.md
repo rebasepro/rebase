@@ -46,6 +46,7 @@ const dispatcher = new WebhookDispatcher({
 | `timeoutMs` | `number` | `10000` | Deadline for one attempt, covering the response body. |
 | `allowPrivateNetworks` | `boolean` | `false` | Permit destinations that resolve to loopback/private/link-local addresses. Re-opens SSRF — only for a receiver you run yourself. |
 | `lookup` | `(hostname: string) => Promise<string[]>` | `dns.lookup` | Resolver used by the destination guard. For tests. |
+| `jobQueue` | `JobQueueClient` | — | Where `enqueueEntityChange` puts deliveries. Without it, an in-memory array a crash empties; with it, rows retried with backoff by a worker. See **Durable delivery** below. |
 
 ### Register Webhooks
 
@@ -591,7 +592,24 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 Same matching and same payload, queued instead of awaited. Returns `void` immediately; the deliveries run on an in-process drain loop after the caller returns, so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
-The queue is in memory: a crash or a deploy between the enqueue and the delivery drops the event, and the receiver may see the notification a few milliseconds before the row is committed. For deliveries that must survive a restart, write an outbox row in the same transaction and drain it from a job.
+By default the queue is **in memory**: a crash or a deploy between the enqueue and the delivery drops the event, and the receiver may see the notification a few milliseconds before the row is committed.
+
+#### Durable delivery
+
+For deliveries that must survive a restart, hand the dispatcher the job queue rather than writing your own outbox — each delivery then becomes a row, retried with backoff by a worker that need not even be the process that queued it:
+
+```typescript no-verify
+import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK, initializeRebaseBackend } from "@rebasepro/server";
+
+const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
+
+const dispatcher = new WebhookDispatcher({ jobQueue });
+dispatcher.setWebhooks(myWebhooks);
+
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+```
+
+Only the webhook's **id** goes on the job, never the webhook itself: its signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as retention keeps the row, and a webhook edited between the enqueue and the delivery should go out as it is now.
 
 ### `flush(): Promise<void>`
 

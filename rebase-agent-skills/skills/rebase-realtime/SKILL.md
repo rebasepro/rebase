@@ -233,7 +233,7 @@ For environments where the SDK is not available, you can use the raw WebSocket p
 1. Open a WebSocket connection to the server URL.
 2. Send an `AUTHENTICATE` message with your JWT token.
 3. Wait for `AUTH_SUCCESS` before sending subscription or other messages.
-4. Send `subscribe_collection` or `subscribe_entity` to start receiving data.
+4. Send `subscribe_collection` or `subscribe_one` to start receiving data.
 5. Receive `collection_update`, `entity_update`, and `collection_entity_patch` messages.
 6. Send `unsubscribe` to stop a subscription.
 
@@ -288,7 +288,7 @@ ws.send(JSON.stringify({
 
 ```typescript
 ws.send(JSON.stringify({
-    type: "subscribe_entity",
+    type: "subscribe_one",
     payload: {
         subscriptionId: "sub_product_42",
         path: "products",
@@ -348,7 +348,7 @@ ws.onmessage = (event) => {
 |------|---------|-------------|
 | `AUTHENTICATE` | `{ token }` | Authenticate the WebSocket session with a JWT |
 | `subscribe_collection` | `{ subscriptionId, path, filter?, orderBy?, order?, limit?, offset?, startAfter?, searchString? }` | Subscribe to collection changes |
-| `subscribe_entity` | `{ subscriptionId, path, entityId }` | Subscribe to a single entity |
+| `subscribe_one` | `{ subscriptionId, path, entityId }` | Subscribe to a single entity |
 | `unsubscribe` | `{ subscriptionId }` | Unsubscribe from a subscription |
 | `join_channel` | `{ channel }` | Join a broadcast channel |
 | `leave_channel` | `{ channel }` | Leave a broadcast channel |
@@ -357,12 +357,21 @@ ws.onmessage = (event) => {
 | `presence_untrack` | `{ channel }` | Stop tracking presence |
 | `presence_state` | `{ channel }` | Request full presence entity |
 | `channel_history` | `{ channel, sinceSeq?, limit? }` | Request retained messages after `sinceSeq` (retained channels only) |
-| `FETCH_COLLECTION` | `FetchCollectionProps` | One-shot collection fetch (request/response) |
-| `FETCH_ENTITY` | `FetchEntityProps` | One-shot entity fetch |
-| `SAVE_ENTITY` | `SaveEntityProps` | Create or update a entity |
-| `DELETE_ENTITY` | `DeleteEntityProps` | Delete a entity |
-| `COUNT_ENTITIES` | `FetchCollectionProps` | Count entities matching criteria |
+| `FETCH_COLLECTION` | `{ path, filter?, orderBy?, limit?, offset?, … }` | One-shot collection fetch (request/response) |
+| `FETCH_ONE` | `{ path, entityId }` | One-shot entity fetch |
+| `SAVE` | `{ path, entityId?, values, status }` | Create or update an entity |
+| `DELETE` | `{ path, entityId }` | Delete an entity |
+| `COUNT` | `{ path, filter?, … }` | Count entities matching criteria |
 | `CHECK_UNIQUE_FIELD` | `{ path, name, value, entityId?, collection? }` | Check field uniqueness |
+
+> **IMPORTANT FOR AGENTS:** the one-shot operations are named `FETCH_ONE`,
+> `SAVE`, `DELETE` and `COUNT` — **not** `FETCH_ENTITY`, `SAVE_ENTITY`,
+> `DELETE_ENTITY` or `COUNT_ENTITIES`. The server's dispatch is a `switch` on the
+> exact string, so a wrong name is an unhandled message, not an error you can see.
+> The admin/studio surface adds `EXECUTE_SQL`, `FETCH_DATABASES`,
+> `FETCH_CURRENT_DATABASE`, `FETCH_TABLE_METADATA`, `FETCH_UNMAPPED_TABLES`,
+> `FETCH_ROLES`, `FETCH_APPLICATION_ROLES`, `LIST_BRANCHES`, `CREATE_BRANCH` and
+> `DELETE_BRANCH`.
 
 ### Server → Client
 
@@ -379,10 +388,10 @@ ws.onmessage = (event) => {
 | `channel_history` | `{ channel, messages, retained, latestSeq? }` | Retained messages a client missed. `retained: false` means the channel keeps no history |
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
 | `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { entities } }` | Response to FETCH_COLLECTION |
-| `FETCH_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to FETCH_ENTITY |
-| `SAVE_ENTITY_SUCCESS` | `{ requestId, payload: { entity } }` | Response to SAVE_ENTITY |
-| `DELETE_ENTITY_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to DELETE_ENTITY |
-| `COUNT_ENTITIES_SUCCESS` | `{ requestId, payload: { count } }` | Response to COUNT_ENTITIES |
+| `FETCH_ONE_SUCCESS` | `{ requestId, payload: { entity } }` | Response to `FETCH_ONE` |
+| `SAVE_SUCCESS` | `{ requestId, payload: { entity } }` | Response to `SAVE` |
+| `DELETE_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to `DELETE` |
+| `COUNT_SUCCESS` | `{ requestId, payload: { count } }` | Response to `COUNT` |
 | `CHECK_UNIQUE_FIELD_SUCCESS` | `{ requestId, payload: { isUnique } }` | Response to CHECK_UNIQUE_FIELD |
 
 ### Error Codes
@@ -928,13 +937,13 @@ const unsubscribe = client.data.products.listen(
 
 ### Pending Request Timeout
 
-To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_ENTITY`, `SAVE_ENTITY`, `DELETE_ENTITY`, `COUNT_ENTITIES`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_ONE`, `SAVE`, `DELETE`, `COUNT`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
 
 If the server does not respond within this window, the client automatically deletes the pending request record and rejects the request's promise with an `ApiError`:
 - Message: `"Request timed out"`
 - Code: `undefined`
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_entity`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
 
 ### Production Error Sanitization
 

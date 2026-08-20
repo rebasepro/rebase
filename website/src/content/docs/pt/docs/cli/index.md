@@ -84,14 +84,6 @@ rebase db migrate
 
 Aplica todas as migrações não aplicadas ao banco de dados.
 
-### `rebase db studio`
-
-Abra o Drizzle Studio para navegar visualmente em seu banco de dados:
-
-```bash
-rebase db studio
-```
-
 ### `rebase generate-sdk`
 
 Gere um SDK de cliente tipado a partir das definições de suas coleções:
@@ -115,8 +107,7 @@ rebase doctor
 Comandos de gerenciamento de autenticação:
 
 ```bash
-rebase auth create-user --email admin@example.com --password secret
-rebase auth reset-password --email admin@example.com
+rebase auth reset-password --email admin@example.com --password NewPassword123!
 ```
 
 ## Fluxo de Trabalho de Migração

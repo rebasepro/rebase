@@ -138,7 +138,7 @@ lo standard condiviso da qualsiasi destinazione di deployment.
 | `PORT` | Porta a cui effettuare il bind. Predefinita `3001` in locale, `8080` nell'immagine. |
 | `REBASE_SERVICE_KEY` | Chiave server-to-server che garantisce l'accesso amministrativo. |
 | `REBASE_METRICS` | `true` per esporre le metriche Prometheus su `/metrics`. |
-| `REBASE_MIGRATE_ON_BOOT` | `none`, `ensure` o `push`. Il valore predefinito è `none` in produzione. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` (il valore predefinito, produzione inclusa) esegue il passaggio **additivo**: creare tabelle, colonne e tipi enum mancanti, senza mai eliminarne o riscriverne uno. `none` non tocca nulla. L'immagine pubblicata accetta solo questi due e **rifiuta di avviarsi con `push`**. |
 | `REBASE_SERVE_STATIC` | Serve gli asset statici del bundle da questo processo. Attivo di default. |
 
 È possibile configurare più database e più bucket aggiungendo un suffisso alla

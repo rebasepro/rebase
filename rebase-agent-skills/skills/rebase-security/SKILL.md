@@ -140,19 +140,38 @@ export async function scopeDataDriver(
 | Auth Method | `uid` | `roles` | RLS Behavior |
 |---|---|---|---|
 | JWT (authenticated user) | User's ID | User's app roles | Full RLS enforcement |
-| Service Key | `"service"` | `["admin"]` | Bypasses RLS (admin access) |
-| API Key (default) | `"api-key:{id}"` | `["service"]` | Bypasses RLS, scoped by permissions |
-| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | Bypasses RLS, full admin access |
+| Service Key | `"service"` | `["admin"]` | **RLS is enforced**, against the `admin` role |
+| API Key (default) | `"api-key:{id}"` | `["service"]` | **RLS is enforced**, against the `service` role, *and* the key's permission list |
+| API Key (admin) | `"api-key:{id}"` | `["admin", "service"]` | **RLS is enforced**, against the `admin` role, *and* the key's permission list |
 | Anonymous (`requireAuth: false`) | `"anon"` | `["anon"]` | RLS with anonymous identity |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
+> **IMPORTANT FOR AGENTS: none of these identities bypasses RLS.** Every one of
+> them runs inside a transaction that has done `SET LOCAL ROLE rebase_user` with
+> `app.uid` set, so the policies are *evaluated* — the admin-roled identities
+> merely clear the built-in default policies through their
+> `rolesOverlap(['admin'])` arm. Two consequences worth knowing before you
+> design around them:
+>
+> - `policy.serverContext()` compiles to `rebase.uid() IS NULL` and is therefore
+>   **false** for all of them. A collection with `disableDefaultPolicies: true`
+>   whose only rule is `serverContext()` denies these writes (`42501`) and
+>   returns zero rows — HTTP 200, empty — for these reads.
+> - A non-admin API key with `"*"` permissions can still read nothing. That is
+>   RLS working: grant the `service` role in the collection's security rules, or
+>   use an admin key.
+>
+> The one genuine, unconditional bypass is `rebase.sql()`, which runs on the
+> owner connection and never goes through `withAuth`. Of the accessors on the
+> server singleton, the quieter one is the more privileged.
+
 > **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing callbacks, developers should use these identities to gate behavior:
-> - `uid: "service"` + `roles: ["admin"]` — Server-side `rebase.data` calls (cron jobs, custom functions using `rebase.data`, webhooks). These go through the full middleware pipeline authenticated with the service key.
+> - `uid: "service"` + `roles: ["admin"]` — server-side `rebase.dataAsAdmin` calls (cron jobs, custom functions, webhooks). The driver is scoped with this identity once, at boot.
 > - `uid: "anon"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. **Note:** for anonymous REST requests, `context.user` in Collection Callbacks may be `undefined`; only the DataDriver is scoped with the anon identity. For WebSocket connections, a full `User` object with `uid: "anon"` is provided.
 > - `uid: "api-key:{id}"` + `roles: ["service"]` (or `["admin", "service"]`) — API key requests.
 > - Real user IDs and roles for JWT-authenticated requests.
 >
-> **Key insight:** `rebase.data` (the server-side singleton) is NOT a raw admin driver — it round-trips through the REST API using the service key, so all callbacks fire with `uid: "service"`, `roles: ["admin"]`. This means callbacks can distinguish server-internal reads from end-user reads by checking `context.user?.roles?.includes("admin")`.
+> **Key insight:** `rebase.dataAsAdmin` is not a raw admin driver either. It is the native DataDriver scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is still evaluated and callbacks still fire — they live in the driver, not at the route boundary. Callbacks can therefore distinguish server-internal reads from end-user ones by checking `context.user?.roles?.includes("admin")`.
 
 ---
 
@@ -637,7 +656,7 @@ Use this checklist when setting up security for a Rebase project:
 - [ ] **Sensitive fields are masked** — `afterRead` masks PII for non-admin users
 - [ ] **Ownership is enforced** — `beforeSave` stamps `user_id` on creation; Collection Callbacks verify ownership on update/delete
 - [ ] **API keys are scoped** — API keys have minimal permissions (specific collections + operations)
-- [ ] **API keys are never client-side** — API keys bypass RLS; only use server-side
+- [ ] **API keys are never client-side** — a key carries a broad, long-lived identity (`service`, or `admin` for an admin key) and its own permission list; only use server-side
 - [ ] **CORS is configured** — Restrict origins in production
 - [ ] **Rate limiting is in place** — Default limiters apply to auth endpoints; add custom limiters for sensitive operations
 

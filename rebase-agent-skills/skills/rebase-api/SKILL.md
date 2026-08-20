@@ -31,8 +31,9 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/swagger` | Swagger UI (dev only) |
 | `/api/graphql` | GraphQL endpoint (when enabled) |
 | `/api/graphiql` | GraphiQL IDE (dev only, when GraphQL enabled) |
-| `/api/health` | Health check (when using `RebaseApiServer`) |
-| `/api/collections` | Collections metadata (when using `RebaseApiServer`) |
+| `/api/health` | Health check |
+| `/api/meta/contract` | Collection contract, for remote SDK generation (admin / service-key / admin API-key gated) |
+| `/api/meta/schema-version` | The schema hash this backend was built from (unauthenticated) |
 
 ### CRUD Operations
 
@@ -411,47 +412,53 @@ POST /api/admin/api-keys
 - **Public access:** Set `requireAuth: false` to allow anonymous access. Access control is then fully delegated to Postgres Row-Level Security (RLS) policies.
 - **Fail-closed:** The raw unscoped driver is never placed in the request context. Every request is either RLS-scoped or rejected.
 
-## DataHooks Lifecycle
+## Global callbacks
 
-DataHooks run at the REST API boundary (after DB operations, before response) and apply to **all** collections. They are configured via `hooks.data` in the backend config.
+<!-- docs-verify: ignore -->
 
-| Hook | Trigger | Can Modify? | Can Abort? |
-|------|---------|-------------|------------|
-| `afterRead(slug, entity, ctx)` | GET (list & single) | Return modified entity, or `null` to filter it out | No |
-| `beforeSave(slug, values, entityId, ctx)` | POST and PUT, before DB write | Return modified values | Throw to abort |
-| `afterSave(slug, entity, ctx)` | POST and PUT, after DB write | No (fire-and-forget) | No |
-| `beforeDelete(slug, entityId, ctx)` | DELETE, before DB delete | No | Throw to abort |
-| `afterDelete(slug, entityId, ctx)` | DELETE, after DB delete | No (fire-and-forget) | No |
+There is no `hooks.data` block and no `BackendHooks` type. Cross-cutting logic
+that applies to **every** collection is configured with the top-level
+`callbacks` key, whose shape is exactly a collection's own `CollectionCallbacks`
+— one concept, one signature, applied at two scopes.
 
-The `BackendHookContext` provides:
-
-```typescript
-interface BackendHookContext {
-  requestUser?: { userId: string; roles: string[] };
-  method: "GET" | "POST" | "PUT" | "DELETE";
-}
-```
-
-> **IMPORTANT FOR AGENTS:** `afterSave` and `afterDelete` are fire-and-forget — they run asynchronously and do not block the response. Errors in these hooks are logged but not returned to the client.
-
-**Example — masking PII for non-admin users:**
-
-```typescript
-const hooks: BackendHooks = {
-  data: {
-    afterRead(slug, entity, ctx) {
-      if (!ctx.requestUser?.roles.includes("admin") && entity.email) {
-        return { ...entity, email: "***" };
-      }
-      return entity;
-    },
-    beforeSave(slug, values, entityId, ctx) {
-      // Add audit trail
-      return { ...values, updatedBy: ctx.requestUser?.userId };
+```typescript no-verify
+await initializeRebaseBackend({
+    // ...
+    callbacks: {
+        afterRead({ row, context }) {
+            if (!context.user?.roles?.includes("admin") && row.email) {
+                return { ...row, email: "***" };
+            }
+            return row;
+        },
+        beforeSave({ values, context }) {
+            return { ...values, updatedBy: context.user?.uid };
+        }
     }
-  }
-};
+});
 ```
+
+| Callback | Trigger | Can modify? | Can abort? |
+|----------|---------|-------------|------------|
+| `afterRead({ row, context, … })` | Every read | Return the transformed row | No |
+| `beforeSave({ values, status, context, … })` | Before every write | Return modified values | Throw → 400 |
+| `afterSave({ id, values, context, … })` | After a successful write | No | No |
+| `afterSaveError({ values, context, … })` | After a failed write | No | No |
+| `beforeDelete({ row, id, context, … })` | Before every delete | No | Return `false` or throw |
+| `afterDelete({ row, id, context, … })` | After a delete | No | No |
+
+Every callback takes **one props object**, not positional arguments. Common
+fields: `collection`, `path`, `row`, `id`, `values`, `previousValues`, `status`
+(`"new" | "existing"`) and `context`. `context.user` carries `uid` and `roles`,
+or is `undefined` for a public request.
+
+> **IMPORTANT FOR AGENTS:** these are not an API-boundary interceptor. They live
+> in the driver, so they fire on *every* data path — REST, WebSocket/realtime and
+> server-side `rebase.dataAsAdmin` — which is what makes `afterRead` safe to rely
+> on for redaction. The global callback runs first, then the collection's own.
+
+See the **rebase-security** skill for using them as the authorization layer, and
+`packages/types/src/types/entity_callbacks.ts` for the types.
 
 ## REST API Examples
 
@@ -757,4 +764,4 @@ GET /api/collections
 - **Server Setup:** `packages/server/src/api/server.ts`
 - **API Types:** `packages/server/src/api/types.ts`
 - **Auth Middleware:** `packages/server/src/auth/middleware.ts`
-- **DataHooks Types:** `packages/types/src/types/backend_hooks.ts`
+- **Callback Types:** `packages/types/src/types/entity_callbacks.ts`
