@@ -888,7 +888,7 @@ projectId }
                 },
                 { org,
 account: null,
-plan: null,
+monthlyEur: null,
 paymentMethod: null }
             );
             return;
@@ -910,9 +910,14 @@ path: `payment-method/${org}` }
             // status endpoint optional — fall back to the local account record
         }
 
-        // Best-effort: show which plan the linked/`--project` project is on.
-        // BYO-cluster projects pay a flat platform fee; the rest pay managed compute.
-        let plan: string | undefined;
+        // Best-effort: what the linked/`--project` project costs per month.
+        //
+        // This used to name a plan, and before that a `compute_<provider>_<vmSize>`
+        // price — a key for a machine on a price list this platform does not buy
+        // from, which stopped resolving when `vmSize` was removed and printed a
+        // bare label ever since. A project is priced from its dials now, so the
+        // honest thing to show is the number the control plane would invoice.
+        let monthly: string | undefined;
         try {
             const parsed = arg({ "--project": String,
 "-p": "--project" }, { argv: rawArgs.slice(2),
@@ -921,29 +926,20 @@ permissive: true });
             const projectId = ref ? await lookupProjectId(ref, client) : undefined;
             if (projectId) {
                 const proj = (await client.data.collection("projects").findById(projectId)) as
-                    | { cluster_id?: string | number; cluster?: unknown; provider?: string; vmSize?: string }
+                    | Record<string, unknown>
                     | undefined;
                 const hasCluster = proj?.cluster_id != null || proj?.cluster != null;
-                plan = hasCluster ? "platform fee (own cluster)" : "managed compute";
-
-                // Best-effort: append the resolved monthly amount from Stripe (via
-                // the control plane's /api/functions/pricing). Keep working if the
-                // endpoint is unreachable — the label alone is still useful.
-                try {
-                    const pricing = await client.functions.invoke<{
-                        items: Array<{ lookupKey: string; amountEur: number }>;
-                    }>("pricing", undefined, { method: "GET" });
-                    const key = hasCluster
-                        ? "platform_byo"
-                        : `compute_${proj?.provider || "hetzner"}_${proj?.vmSize || "cx21"}`;
-                    const item = pricing.items?.find((i) => i.lookupKey === key);
-                    if (item) plan = `${plan} — €${item.amountEur.toFixed(2)}/mo`;
-                } catch {
-                    // pricing endpoint unreachable — keep the plan label without an amount
-                }
+                const quote = await client.functions.invoke<ResourceQuote>(
+                    "pricing/quote",
+                    proj,
+                    { method: "POST" }
+                );
+                monthly = `€${quote.totalEur.toFixed(2)}/mo`;
+                if (hasCluster) monthly = `${monthly} — platform fee, your own cluster`;
             }
         } catch {
-            // no linked/resolvable project — skip the Plan line
+            // No linked project, or a control plane without the quote endpoint.
+            // Skip the line rather than printing a figure nobody can stand behind.
         }
 
         emit(
@@ -955,7 +951,7 @@ permissive: true });
                     ["Account", acct ? String(acct.id) : undefined],
                     ["Email", acct?.billingEmail],
                     ["Status", acct?.status ? colorStatus(acct.status) : undefined],
-                    ["Plan", plan],
+                    ["Resources", monthly],
                     [
                         "Payment method",
                         card.hasPaymentMethod
@@ -972,7 +968,7 @@ permissive: true });
 billingEmail: acct.billingEmail ?? null,
 status: acct.status ?? null }
                     : null,
-                plan: plan ?? null,
+                monthlyEur: monthly ?? null,
                 paymentMethod: {
                     hasPaymentMethod: Boolean(card.hasPaymentMethod),
                     brand: card.brand ?? null,
@@ -993,11 +989,20 @@ status: acct.status ?? null }
 const DIAL_FLAGS = {
     "--cpu": "cpu",
     "--memory": "memory",
+    "--replicas": "replicaCount",
+    "--spot": "preemptible",
+    "--scale-to-zero": "scaleToZero",
     "--db-mode": "databaseMode",
     "--db-instances": "databaseInstances",
     "--db-cpu": "databaseCpu",
-    "--db-memory": "databaseMemory"
+    "--db-memory": "databaseMemory",
+    "--storage": "storageMode"
 } as const;
+
+/** Dials whose column is a number, not the text a flag carries. */
+const NUMERIC_DIALS = new Set(["databaseInstances", "replicaCount"]);
+/** Dials that are a yes/no. `--spot false` has to reach the row as `false`. */
+const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
 
 /**
  * `rebase cloud resources` — show what a project is given, and change it.
@@ -1024,36 +1029,63 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
     if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
     if (action !== "set") {
+        // What this costs, priced by the control plane. Best-effort: an older
+        // control plane has no quote endpoint, and a resources listing that
+        // fails because a price could not be fetched would be worse than one
+        // without the price.
+        let quote: ResourceQuote | undefined;
+        try {
+            quote = await client.functions.invoke<ResourceQuote>("pricing/quote", project, { method: "POST" });
+        } catch {
+            // No quote — the dials below are still the answer to the question asked.
+        }
+
         emit(
             () => {
                 console.log("");
                 console.log(`  ${chalk.bold(String(project!.name ?? ""))} ${chalk.gray(`[${String(project!.subdomain ?? "")}]`)}`);
                 console.log("");
                 keyValues([
-                    ["Plan", String(project!.plan ?? "legacy (no plan)")],
                     ["App CPU", dialLine(project!.cpu)],
                     ["App memory", dialLine(project!.memory)],
-                    ["App replicas", String(project!.replicaCount ?? 1)],
+                    ["App replicas", dialLine(project!.replicaCount)],
+                    ["Capacity", dialLine(project!.preemptible, { true: "spot", false: "on demand" })],
+                    ["When idle", dialLine(project!.scaleToZero, { true: "scale to zero", false: "stay warm" })],
                     ["Database", dialLine(project!.databaseMode)],
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
-                    ["Database memory", dialLine(project!.databaseMemory)]
+                    ["Database memory", dialLine(project!.databaseMemory)],
+                    ["Object storage", dialLine(project!.storageMode)],
+                    ["Per month", quote ? `€${quote.totalEur.toFixed(2)}` : undefined]
                 ]);
+                // Itemised, because a total nobody can decompose is a number
+                // someone has to trust rather than check.
+                if (quote) {
+                    console.log("");
+                    for (const line of quote.lines) {
+                        const qty = line.unit ? chalk.gray(`${line.quantity} × €${line.unitEur}`) : "";
+                        note(`  ${line.label.padEnd(24)} ${qty.padEnd(28)} €${line.amountEur.toFixed(2)}`);
+                    }
+                }
                 console.log("");
                 noteBlank();
-                note("Empty means the plan's default. Change one with:");
+                note("Empty means the platform default. Change one with:");
                 note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
                 console.log("");
             },
             () => ({
-                plan: project!.plan ?? null,
+                monthlyEur: quote?.totalEur ?? null,
+                lines: quote?.lines ?? null,
                 cpu: project!.cpu ?? null,
                 memory: project!.memory ?? null,
-                replicaCount: project!.replicaCount ?? 1,
+                replicaCount: project!.replicaCount ?? null,
+                preemptible: project!.preemptible ?? null,
+                scaleToZero: project!.scaleToZero ?? null,
                 databaseMode: project!.databaseMode ?? null,
                 databaseInstances: project!.databaseInstances ?? null,
                 databaseCpu: project!.databaseCpu ?? null,
-                databaseMemory: project!.databaseMemory ?? null
+                databaseMemory: project!.databaseMemory ?? null,
+                storageMode: project!.storageMode ?? null
             })
         );
         return;
@@ -1081,17 +1113,31 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 note(`  ${field} → ${String(value)}`);
             }
             noteBlank();
-            note("Applied on the next deploy, or by the hourly reconcile — whichever is first.");
+            note("Applied now: the app rolls its pods and your subscription is prorated from today.");
             note("A change that restarts the database waits for a maintenance window.");
         },
         () => ({ updated: patch })
     );
 }
 
-/** A dial's value, or a marker that the plan decides it. */
-function dialLine(value: unknown): string {
-    if (value === null || value === undefined || value === "") return chalk.gray("plan default");
-    return String(value);
+/** What the control plane says a set of dials costs, itemised. */
+interface ResourceQuote {
+    lines: { lookupKey: string; label: string; quantity: number; unit?: string; unitEur: number; amountEur: number }[];
+    totalEur: number;
+}
+
+/**
+ * A dial's value, or a marker that the platform default decides it.
+ *
+ * The two are different states and the distinction is not cosmetic: an unset
+ * dial follows the default and moves if it does, while one pinned to the same
+ * number will not. Printing the inherited value would make them identical on
+ * screen.
+ */
+function dialLine(value: unknown, labels?: Record<string, string>): string {
+    if (value === null || value === undefined || value === "") return chalk.gray("default");
+    const key = String(value);
+    return labels?.[key] ?? key;
 }
 
 /**
@@ -1101,7 +1147,16 @@ function dialLine(value: unknown): string {
  * the same shape `buildSettingsPatch` uses. Returns an error string rather than
  * throwing, because the caller owns how a refusal is printed in JSON mode.
  */
-export function buildDialPatch(rawArgs: string[]): { patch: Record<string, unknown>; error?: string } {
+export function buildDialPatch(
+    rawArgs: string[],
+    /**
+     * `requireOne: false` for `projects create`, where naming no dial is the
+     * ordinary case — a new project takes the platform default. On
+     * `resources set` a patch with nothing in it is a typo, and saying so beats
+     * a success message for a change nobody made.
+     */
+    opts?: { requireOne?: boolean }
+): { patch: Record<string, unknown>; error?: string } {
     const patch: Record<string, unknown> = {};
 
     for (const [flag, field] of Object.entries(DIAL_FLAGS)) {
@@ -1114,22 +1169,31 @@ export function buildDialPatch(rawArgs: string[]): { patch: Record<string, unkno
         if (value === undefined || value.startsWith("--")) {
             return { patch: {}, error: `${flag} needs a value.` };
         }
-        if (field === "databaseInstances") {
+        if (NUMERIC_DIALS.has(field)) {
             const n = Number(value);
             if (!Number.isInteger(n)) {
-                return { patch: {}, error: `${flag} takes a whole number of instances, not "${value}".` };
+                return { patch: {}, error: `${flag} takes a whole number, not "${value}".` };
             }
-            // Sent as a number, not a string. The control plane's guard decides
-            // whether anything CHANGED by comparing against the stored value, and
-            // "2" against 2 differs — which would report a change on every save
-            // and, before self-serve is on, refuse every save.
+            // Sent as a number, not a string. The control plane decides whether
+            // anything CHANGED by comparing against the stored value — and it
+            // re-syncs a Stripe subscription and rolls a tenant's pods when
+            // something did. "2" against 2 differs, so a string here would turn
+            // every unrelated save into a resize.
             patch[field] = n;
+        } else if (BOOLEAN_DIALS.has(field)) {
+            if (value !== "true" && value !== "false") {
+                return { patch: {}, error: `${flag} takes true or false, not "${value}".` };
+            }
+            // The string "false" is truthy, and would put a project that asked
+            // for on-demand capacity onto preemptible nodes at a third of the
+            // price — with restarts it explicitly declined.
+            patch[field] = value === "true";
         } else {
             patch[field] = value;
         }
     }
 
-    if (Object.keys(patch).length === 0) {
+    if (opts?.requireOne !== false && Object.keys(patch).length === 0) {
         return { patch: {}, error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}.` };
     }
     return { patch };
