@@ -605,7 +605,7 @@ When displaying numeric KPIs, use plain muted icons (matching NavigationCard) �
 ## 12. Icons
 
 - Import icons from `lucide-react` for functional/semantic icons.
-- Import icons from `@rebasepro/ui` for navigation icons (`AddIcon`, `DeleteIcon`, etc.)
+- Import icons from `@rebasepro/ui`, which re-exports `lucide-react` under its own names — `PlusIcon`, `Trash2Icon`, `ArrowRightIcon`. There are no `AddIcon` or `DeleteIcon` exports
 - **Icon treatment**: plain muted color (`text-surface-400 dark:text-surface-500`). **No** background pill, **no** primary tint, **no** gradients.
 - Icon size: typically `h-4 w-4` or `h-5 w-5`.
 - No decorative arrow icons on cards — the card itself is the affordance.

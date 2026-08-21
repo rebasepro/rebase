@@ -567,62 +567,145 @@ Available at `GET /api/swagger` in non-production environments. Renders an inter
 
 ## Metadata Endpoints
 
-### Health Check (RebaseApiServer only)
+### Health Check
 
 ```
-GET /api/health
-```
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-01-15T10:30:00.000Z",
-  "collections": ["products", "users", "orders"],
-  "driver": "postgres"
-}
-```
-
-### Collections Metadata (RebaseApiServer only)
-
-```
-GET /api/collections
+GET /health        # what an orchestrator probes
+GET /api/health    # the same answer, under basePath
 ```
 
 ```json
 {
-  "data": [
-    {
-      "slug": "products",
-      "name": "Products",
-      "singularName": "Product",
-      "description": "Product catalog",
-      "properties": ["name", "price", "status", "createdAt"],
-      "relations": [
-        {
-          "relationName": "category",
-          "target": "categories",
-          "cardinality": "many_to_one",
-          "direction": "outbound"
-        }
-      ]
-    }
-  ]
+  "status": "ok",
+  "latencyMs": 3
 }
 ```
 
-## Server Configuration (ApiConfig)
+`status` is `"ok"` with HTTP 200, or `"degraded"` with HTTP **503**. A `details` object is included when the driver supplies one, and a `dataSources` array lists any secondary source that failed its probe.
+
+Both paths are registered by the bundle boot path (`packages/server/src/boot/boot.ts`), not by `initializeRebaseBackend` — an orchestrator probes `/health`, so it cannot live under `basePath` alone.
+
+`GET /livez` answers `{ "status": "ok" }` without touching the database. Use `/livez` for liveness and `/health` for readiness: a database blip should not make an orchestrator kill an otherwise healthy process.
+
+### Collection Contract
+
+There is no `GET /api/collections`. The equivalent is the contract endpoint, which is what a remotely generated SDK is built from:
+
+```
+GET /api/meta/contract
+```
+
+Gated — admin, a service key, or an admin API key.
+
+```json
+{
+  "schemaVersion": "a1b2c3…",
+  "runtime": { "version": "0.16.0", "contract": 1 },
+  "collections": [ "…serialized collections, client-safe fields only…" ],
+  "collectionSlugs": ["orders", "products", "users"],
+  "generatedAt": "2026-08-21T10:30:00.000Z"
+}
+```
+
+```
+GET /api/meta/schema-version
+```
+
+Unauthenticated and deliberately tiny — `{ "schemaVersion": "a1b2c3…" }`. Use it in CI to tell whether a generated SDK is stale without holding admin credentials. Both responses also carry the value in an `x-rebase-schema` header.
+
+
+## Server Configuration (RebaseBackendConfig)
+
+The backend is configured by the object passed to `initializeRebaseBackend(config)`. The type is **`RebaseBackendConfig`**, defined in `packages/server/src/init.ts`. There is no `ApiConfig` type.
+
+> A scaffolded project does not build this object itself. `rebase dev` and the published runtime boot from the bundle: collections and `storageAuthorize` come from `config/index.ts`, and everything else from environment variables. Pass this object directly only when embedding Rebase in a server you own.
+
+### Required
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `server` | `Server` | Node HTTP server — used for the WebSocket upgrade and graceful shutdown |
+| `app` | `Hono<HonoEnv>` | The Hono app the routes are mounted onto |
+
+### Collections and routing
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `basePath` | `string` | `"/api"` | Base path for all API routes |
-| `enableREST` | `boolean` | `true` | Enable REST CRUD endpoints |
-| `requireAuth` | `boolean` | `true` | Require authentication for API endpoints |
-| `pagination.defaultLimit` | `number` | `20` | Default page size |
-| `pagination.maxLimit` | `number` | `100` | Maximum allowed page size |
-| `cors.origin` | `string \| string[] \| boolean` | — | CORS origin configuration |
-| `cors.credentials` | `boolean` | `false` | Allow credentials in CORS |
-| `collections` | `CollectionConfig[]` | `[]` | Collections to generate APIs for |
-| `collectionsDir` | `string` | — | Directory to auto-discover collections |
+| `collections` | `AnyCollectionConfig[]` | — | Collections to serve |
+| `collectionsDir` | `string` | — | Directory to auto-discover collections from |
+| `basePath` | `string` | `"/api"` | Prefix for every API route |
+| `dataSources` | `DataSourceDefinition[]` | — | Declared sources; resolves each collection's engine and transport |
+| `surfaces` | `RuntimeSurfaceOptions` | all | Which HTTP surfaces this process mounts. Omit to mount everything |
+| `ownership` | `RuntimeOwnershipOptions` | all | Which background singletons this process runs (cron scheduler, job worker) |
+| `provisionSchema` | `boolean` | `true` | Whether this process creates the collection schema and its RLS policies at boot. `false` on every process but one in a split deployment |
+
+### Database and authentication
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `database` | `DatabaseAdapter` | — | Takes precedence over `bootstrappers` |
+| `bootstrappers` | `BackendBootstrapper[]` | — | Used when no `database` adapter is given |
+| `auth` | `RebaseAuthConfig \| AuthAdapter` | — | **`requireAuth`, `jwtSecret`, `serviceKey`, `allowRegistration`, OAuth providers and `email` all live inside this object**, not at the top level |
+| `baas` | `BaasOptions` | — | `unprotectedTables: "exclude" \| "serve"` — what to do with introspected tables that have RLS disabled |
+
+### Storage
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `storage` | `BackendStorageConfig \| StorageController \| Record<string, …>` | One backend, or a map of them for multi-bucket setups |
+| `storageSources` | `StorageSourceDefinition[]` | Only needed for `direct`-transport sources the backend does not proxy |
+| `storageAuthorize` | `StorageAuthorize` | Per-object access control. **In production, storage refuses to boot unless this, `storagePublicRead`, or `storageInsecureAllowAnyAuthenticated` is set** |
+| `storagePublicRead` | `boolean` | Unauthenticated reads. Writes, deletes and listing still require auth |
+| `storageInsecureAllowAnyAuthenticated` | `boolean` | Opts out of the boot guard: any signed-in user may touch any key. Single-tenant only |
+
+### Functions, cron and jobs
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `functionsDir` | `string` | — | Directory of custom functions |
+| `functionsTimeoutMs` | `number` | `30000` | Per-request ceiling for `/api/functions/*`. `0` disables it; a timeout answers 504 |
+| `functionsSelection` | `FunctionSelection` | — | Serve only some of the bundle's functions. An unknown name fails the boot |
+| `functionsUpstream` | `string` | — | Forward `/api/functions/*` elsewhere. Only consulted when the `functions` surface is off |
+| `cronsDir` | `string` | — | Directory of cron definitions |
+| `cronPersistence` | `boolean` | `true` | Persist cron execution logs to the database |
+| `jobs` | `JobQueueOptions` | off | The durable job queue. Requires `enabled: true` and a driver that can run SQL |
+
+### Request handling
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `rateLimit` | `DataRateLimitConfig` | on, loose | Per caller: API key by id, user by uid, everyone else by IP. In-process counts unless you supply a `store` |
+| `maxBodySize` | `number` | 10 MB | `0` disables it. Storage uploads use the storage config's `maxFileSize` instead |
+| `compression` | `boolean` | `true` | Set `false` when a proxy already compresses |
+| `csrf` | `{ origin }` | off | Opt-in. Off by default because mobile apps, cross-origin SPAs and CLIs consume the same API |
+| `corsHandled` | `boolean` | `false` | Declares that the app installs its own CORS middleware, suppressing the "no CORS configuration detected" warning |
+
+**CORS itself is not a config key.** It is set from the `CORS_ORIGINS` and `FRONTEND_URL` environment variables, and a production boot fails if neither is set.
+
+### Everything else
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks, run before per-collection ones on every data path |
+| `history` | `HistoryConfig` | off | `true`, or `{ retention }` in days |
+| `logging` | `{ level }` | — | `"error" \| "warn" \| "info" \| "debug"` |
+| `enableSwagger` | `boolean` | dev only | Swagger UI at `/api/swagger` |
+| `schemaEditor` | `boolean` | see note | Defaults to on when `collectionsDir` is set, outside production, in `cms` mode. Always `false` on a bundle boot |
+| `schemaVersion` | `string` | computed | The version this deployment serves, as recorded at build time |
+| `runtimeVersion` | `string` | — | Reported by the contract endpoint. Informational |
+
+### Pagination is not configurable
+
+There is no `pagination` option. List bounds are constants in `@rebasepro/types`:
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `DEFAULT_LIST_LIMIT` | `50` | Page size when the client sends no `?limit` |
+| `MAX_LIST_LIMIT` | `1000` | Largest `?limit` a client may ask for |
+| `DEFAULT_VECTOR_LIST_LIMIT` | `10` | Default for a vector search |
+
+A `?limit` above the maximum is a **400, not a clamp** — the request is rejected rather than quietly returning fewer rows than asked for.
+
 
 ## References
 
@@ -632,7 +715,8 @@ GET /api/collections
 - **Query Parser:** `packages/server/src/api/rest/query-parser.ts`
 - **OpenAPI Generator:** `packages/server/src/api/openapi-generator.ts`
 - **Error Handling:** `packages/server/src/api/errors.ts`
-- **Server Setup:** `packages/server/src/api/server.ts`
+- **Server Setup / config type:** `packages/server/src/init.ts`
+- **Bundle boot (health, CORS, static apps):** `packages/server/src/boot/boot.ts`
 - **API Types:** `packages/server/src/api/types.ts`
 - **Auth Middleware:** `packages/server/src/auth/middleware.ts`
 - **Callback Types:** `packages/types/src/types/entity_callbacks.ts`

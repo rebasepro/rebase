@@ -530,7 +530,7 @@ The Studio Bridge provides CMS capabilities to Studio components. When CMS is pr
 ```typescript
 interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
-    sideEntityController: SidePanelController;
+    sidePanelController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;

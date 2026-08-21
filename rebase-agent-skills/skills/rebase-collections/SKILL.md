@@ -1099,7 +1099,7 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 > }
 > ```
 
-> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sideEntityController`, etc.). Entity callbacks always receive `RebaseCallContext`.
+> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sidePanelController`, etc.). Entity callbacks always receive `RebaseCallContext`.
 
 ### Callback Example
 
@@ -1307,12 +1307,12 @@ The `onClick` and `isEnabled` handlers receive:
 | `entity` | `Entity<M> \| undefined` | The current entity |
 | `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
 | `path` | `string \| undefined` | Collection path |
-| `collection` | `CollectionConfig<M> \| undefined` | Collection definition |
+| `collection` | `AdminCollection<M> \| undefined` | Collection definition |
 | `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
-| `sideEntityController` | `SidePanelController \| undefined` | Side panel control |
-| `admin.selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
+| `sidePanelController` | `SidePanelController \| undefined` | Side panel control |
+| `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
-| `admin.openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
+| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
 | `highlightEntity` | `(entity) => void` | Highlight a entity row |
 | `unhighlightEntity` | `(entity) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
