@@ -702,7 +702,6 @@ export interface RebaseTranslations {
     add_your: string;
     database_collections: string;
     no_unmapped_collections: string;
-    query_and_update_with_datatalk: string;
 
     // --- Welcome ---
     welcome_to_rebase: string;

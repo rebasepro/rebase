@@ -523,7 +523,6 @@ export const hi: RebaseTranslations = {
     add_your: "अपने",
     database_collections: "डेटाबेस संग्रह",
     no_unmapped_collections: "कोई असंबद्ध संग्रह नहीं",
-    query_and_update_with_datatalk: "DATATALK के साथ प्राकृतिक भाषा में अपना डेटा क्वेरी और अपडेट करें",
     welcome_to_rebase: "Rebase में आपका स्वागत है",
     admin_panel_ready_bring_data: "आपका पैनल तैयार है। अपना डेटा जोड़कर शुरू करें।",
     admin_panel_ready_get_started: "शुरू करें",

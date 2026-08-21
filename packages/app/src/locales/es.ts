@@ -533,7 +533,6 @@ export const es: RebaseTranslations = {
     add_your: "Añade tus",
     database_collections: "colecciones de base de datos",
     no_unmapped_collections: "No hay colecciones sin mapear en la base de datos",
-    query_and_update_with_datatalk: "Consulta y actualiza tus datos en lenguaje natural con",
 
     welcome_to_rebase: "Bienvenido a Rebase Cloud",
     admin_panel_ready_bring_data: "Tu panel de administración está listo. Traigamos tus datos.",

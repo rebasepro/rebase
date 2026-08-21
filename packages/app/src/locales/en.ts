@@ -637,7 +637,6 @@ export const en: RebaseTranslations = {
     add_your: "Add your",
     database_collections: "database collections",
     no_unmapped_collections: "No unmapped collections in the database",
-    query_and_update_with_datatalk: "Query and update your data in natural language with",
 
     welcome_to_rebase: "Welcome to Rebase Cloud",
     admin_panel_ready_bring_data: "Your admin panel is ready. Let's bring in your data.",
