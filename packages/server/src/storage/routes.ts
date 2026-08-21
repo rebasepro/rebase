@@ -10,10 +10,12 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import type { Stats } from "node:fs";
 import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import { objectValidators, isNotModified, applyCacheHeaders } from "./cache-headers";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
@@ -555,6 +557,27 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // sources holding the same key shared one entry.
         const transformKeyPrefix = `${storageId || "(default)"}/${bucket}/${resolvedPath}`;
 
+        // Whether a *shared* cache may keep this. An object under the public
+        // prefix needs no credentials, so a CDN holding it is the point; any
+        // other object required this caller's credentials, and `public` would
+        // be permission to serve it to the next caller instead.
+        const sharedCacheable = publicRead === true || isPublicStoragePath(resolvedPath);
+        const cachePolicy = (maxAgeSeconds: number) => ({
+            isPublic: sharedCacheable,
+            maxAgeSeconds,
+            staleWhileRevalidateSeconds: 86400
+        });
+
+        // Short, because the object is mutable: `putObject` on an existing key
+        // is ordinary, so a long window is a window in which a replaced file is
+        // invisible. The validators below make the revalidation cheap — a 304
+        // and no body — which is what buys the correctness back.
+        const OBJECT_MAX_AGE = 60;
+        // Longer for a derived rendition: recomputing one costs a decode, a
+        // resize and an encode, against a conditional request that costs a round
+        // trip. Still finite, and still revalidated, for the same reason.
+        const TRANSFORM_MAX_AGE = 3600;
+
         // Parse image transform query params (e.g. ?width=300&format=webp)
         const transformOpts = transformOptionsOrBadRequest(c.req.query() as Record<string, string>);
 
@@ -564,9 +587,13 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
             const absolutePath = localController.getAbsolutePath(resolvedPath, bucket ?? "default");
 
-            // Check if file exists
+            // `stat` rather than `access`: it answers the same existence
+            // question and also carries the size and mtime the validators are
+            // built from, so this is one syscall doing two jobs rather than two
+            // doing one each.
+            let localStat: Stats;
             try {
-                await fsp.access(absolutePath);
+                localStat = await fsp.stat(absolutePath);
             } catch {
                 throw ApiError.notFound("File not found");
             }
@@ -590,15 +617,25 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                     transformOpts,
                     async () => Buffer.from(await fsp.readFile(absolutePath))
                 );
+                const validators = objectValidators(transformed.data.byteLength, localStat.mtimeMs);
+                applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
+                if (isNotModified(c, validators)) return c.body(null, 304);
                 c.header("Content-Type", transformed.contentType);
-                c.header("Cache-Control", "public, max-age=31536000, immutable");
                 return c.body(new Uint8Array(transformed.data));
             }
 
-            const fileContent = await fsp.readFile(absolutePath);
+            const validators = objectValidators(localStat.size, localStat.mtimeMs);
+            applyCacheHeaders(c, validators, cachePolicy(OBJECT_MAX_AGE));
+
             const served = resolveServedContentType(contentType);
             c.header("Content-Type", served.contentType);
             if (served.attachment) c.header("Content-Disposition", "attachment");
+
+            // Checked after the headers are set and before the file is read:
+            // the whole point is not to read or send the body.
+            if (isNotModified(c, validators)) return c.body(null, 304);
+
+            const fileContent = await fsp.readFile(absolutePath);
             return c.body(new Uint8Array(fileContent));
         }
 
@@ -621,15 +658,21 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 transformOpts,
                 async () => Buffer.from(await fileObject.arrayBuffer())
             );
+            const validators = objectValidators(transformed.data.byteLength, fileObject.lastModified);
+            applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
+            if (isNotModified(c, validators)) return c.body(null, 304);
             c.header("Content-Type", transformed.contentType);
-            c.header("Cache-Control", "public, max-age=31536000, immutable");
             return c.body(new Uint8Array(transformed.data));
         }
 
         const servedRemote = resolveServedContentType(remoteContentType);
         c.header("Content-Type", servedRemote.contentType);
         if (servedRemote.attachment) c.header("Content-Disposition", "attachment");
-        c.header("Cache-Control", "public, max-age=3600, immutable");
+
+        const remoteValidators = objectValidators(fileObject.size, fileObject.lastModified);
+        applyCacheHeaders(c, remoteValidators, cachePolicy(OBJECT_MAX_AGE));
+        if (isNotModified(c, remoteValidators)) return c.body(null, 304);
+
         const buf = await fileObject.arrayBuffer();
         return c.body(new Uint8Array(buf));
     });
