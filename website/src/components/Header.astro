@@ -27,9 +27,11 @@ const iconSvgPaths: Record<string, string> = {
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 // The nav itself has to teach the product: Rebase is a backend, and the admin
-// panel is a layer you opt into. So the Product menu is two labelled columns,
-// backend on the left, panel on the right — not six overlapping links.
-// See website/SITE-STORY.md.
+// panel is a layer you opt into. So each menu is three labelled columns —
+// backend, panel, then where to go next — not a list of overlapping links.
+// Three columns rather than two keeps the panel short enough to read at a
+// glance; the overview/docs links that used to sit in a full-width footer row
+// are the third column now. See website/SITE-STORY.md.
 const dropdownNavLinks = [
     {
         href: translatePath("/product"),
@@ -87,21 +89,24 @@ const dropdownNavLinks = [
                     },
                 ]
             },
+            {
+                heading: t("nav.col.explore"),
+                items: [
+                    {
+                        href: translatePath("/product"),
+                        label: t("nav.overview"),
+                        description: t("nav.overview.desc"),
+                        icon: "layers"
+                    },
+                    {
+                        href: translatePath("/compare"),
+                        label: t("nav.compare"),
+                        description: t("nav.compare.desc"),
+                        icon: "git-compare-arrows"
+                    },
+                ]
+            },
         ],
-        footer: [
-            {
-                href: translatePath("/product"),
-                label: t("nav.overview"),
-                description: t("nav.overview.desc"),
-                icon: "layers"
-            },
-            {
-                href: translatePath("/compare"),
-                label: t("nav.compare"),
-                description: t("nav.compare.desc"),
-                icon: "git-compare-arrows"
-            },
-        ]
     },
     {
         href: translatePath("/developers"),
@@ -147,15 +152,18 @@ const dropdownNavLinks = [
                     },
                 ]
             },
-        ],
-        footer: [
             {
-                href: "/docs",
-                label: t("nav.docs"),
-                description: t("nav.docs.desc"),
-                icon: "briefcase"
+                heading: t("nav.col.resources"),
+                items: [
+                    {
+                        href: "/docs",
+                        label: t("nav.docs"),
+                        description: t("nav.docs.desc"),
+                        icon: "briefcase"
+                    },
+                ]
             },
-        ]
+        ],
     },
 
 
@@ -191,41 +199,25 @@ const flatNavLinks = [
                 {dropdownNavLinks.map(link => (
                     link.columns ? (
                             <NavigationDropdown title={link.label} href={link.href}>
-                                <div class="grid grid-cols-2 gap-x-10 gap-y-4 max-w-3xl">
+                                <div class="grid grid-cols-3 gap-x-10 gap-y-3">
                                     {link.columns.map(column => (
                                             <div class="flex flex-col gap-1">
                                                 <p class="px-3 pb-2 text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500">{column.heading}</p>
                                                 {column.items.map(subLink => (
                                                         <a href={subLink.href}
-                                                           class="flex items-start gap-4 p-3 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
+                                                           class="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
                                                             <svg class="w-6 h-6 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                 <path d={iconSvgPaths[subLink.icon] || ""} />
                                                             </svg>
                                                             <div>
                                                                 <p class="font-semibold text-white">{subLink.label}</p>
-                                                                <p class="text-surface-400 text-sm">{subLink.description}</p>
+                                                                <p class="text-surface-400 text-sm leading-snug">{subLink.description}</p>
                                                             </div>
                                                         </a>
                                                 ))}
                                             </div>
                                     ))}
                                 </div>
-                                {link.footer && (
-                                        <div class="mt-6 pt-5 border-t border-surface-800/80 grid grid-cols-2 gap-x-10 max-w-3xl">
-                                            {link.footer.map(subLink => (
-                                                    <a href={subLink.href}
-                                                       class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
-                                                        <svg class="w-5 h-5 text-surface-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                            <path d={iconSvgPaths[subLink.icon] || ""} />
-                                                        </svg>
-                                                        <span class="text-sm text-surface-300">
-                                                            <span class="text-white font-medium">{subLink.label}</span>
-                                                            <span class="text-surface-500"> — {subLink.description}</span>
-                                                        </span>
-                                                    </a>
-                                            ))}
-                                        </div>
-                                )}
                             </NavigationDropdown>
                     ) : (
                             <a
@@ -335,7 +327,7 @@ const flatNavLinks = [
                                 </button>
                                 <div class="hidden flex-col items-center space-y-4 mt-4"
                                      id={`mobile-submenu-${index}`}>
-                                    {[...link.columns.flatMap(c => c.items), ...(link.footer ?? [])].map(subLink => (
+                                    {link.columns.flatMap(c => c.items).map(subLink => (
                                             <a
                                                     href={subLink.href}
                                                     class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${
