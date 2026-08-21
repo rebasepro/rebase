@@ -56,8 +56,8 @@ export function CustomFieldsDemo() {
             <div className="flex flex-col gap-8">
                 {/* Custom Rating Field */}
                 <div className={`transition-opacity duration-300 ${step >= 0 ? 'opacity-100' : 'opacity-50'}`}>
-                    <label className="block text-xs font-medium text-surface-400 mb-2">Customer Rating (Custom Component)</label>
-                    <div className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${step === 1 || step === 2 ? 'bg-surface-900 border-primary/50 ring-1 ring-primary/20' : 'bg-surface-900/50 border-surface-800'}`}>
+                    <label className="block text-sm font-medium text-text-secondary-dark mb-2">Customer Rating (Custom Component)</label>
+                    <div className={`field flex items-center gap-2 p-3 transition-all ${step === 1 || step === 2 ? 'ring-2 ring-primary/50' : ''}`}>
                         {[1, 2, 3, 4, 5].map((star) => (
                             <svg 
                                 key={star} 
@@ -76,8 +76,8 @@ export function CustomFieldsDemo() {
 
                 {/* Custom Color Picker Field */}
                 <div className={`transition-opacity duration-300 ${step >= 3 ? 'opacity-100' : 'opacity-40'}`}>
-                    <label className="block text-xs font-medium text-surface-400 mb-2">Brand Color (ColorPicker Widget)</label>
-                    <div className={`flex items-center gap-4 p-3 rounded-lg border transition-all ${step === 3 || step === 4 ? 'bg-surface-900 border-emerald-500/50 ring-1 ring-emerald-500/20' : 'bg-surface-900/50 border-surface-800'}`}>
+                    <label className="block text-sm font-medium text-text-secondary-dark mb-2">Brand Color (ColorPicker Widget)</label>
+                    <div className={`field flex items-center gap-4 p-3 transition-all ${step === 3 || step === 4 ? 'ring-2 ring-emerald-500/50' : ''}`}>
                         <div className="w-10 h-10 rounded-full border-2 border-surface-700 shadow-inner transition-colors duration-500" style={{ backgroundColor: color }}></div>
                         <div className="flex-1">
                             <div className="flex gap-2">
@@ -96,8 +96,8 @@ export function CustomFieldsDemo() {
 
                 {/* Simulated Map Field */}
                 <div className={`transition-opacity duration-300 ${step >= 5 ? 'opacity-100' : 'opacity-40'}`}>
-                    <label className="block text-xs font-medium text-surface-400 mb-2">Location (Mapx Widget)</label>
-                    <div className="relative h-24 rounded-lg border border-surface-800 bg-surface-900/50 overflow-hidden flex items-center justify-center">
+                    <label className="block text-sm font-medium text-text-secondary-dark mb-2">Location (Mapx Widget)</label>
+                    <div className="field relative h-24 overflow-hidden flex items-center justify-center">
                         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary via-surface-900 to-black"></div>
                         <svg className="w-6 h-6 text-primary absolute animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ top: '30%', left: '45%' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         <div className="absolute bottom-2 left-2 text-[10px] text-surface-500 font-mono">40.7128° N, 74.0060° W</div>

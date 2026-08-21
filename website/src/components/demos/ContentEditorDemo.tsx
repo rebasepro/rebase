@@ -38,9 +38,11 @@ const POSTS: BlogPost[] = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-    Published: { bg: "rgb(147,224,136)", text: "rgb(11,29,5)" },
-    "In Review": { bg: "rgb(255,169,129)", text: "rgb(107,38,19)" },
-    Draft: { bg: "rgb(204,204,204)", text: "rgb(4,4,4)" },
+    // CHIP_COLORS[hue + "Light"] in DARK mode — packages/ui/src/util/chip_colors.ts.
+    // These held the light-mode stops, painted onto a black panel.
+    Published: { bg: "#20c933", text: "#0b1d05" },
+    "In Review": { bg: "#ff6f2c", text: "#581f10" },
+    Draft: { bg: "#666666", text: "#eeeeee" },
 };
 
 /* ─── Editor Content (the Notion-style block content shown inside the form panel) ─── */
@@ -224,12 +226,12 @@ export function ContentEditorDemo() {
                             <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500"><MI size={18}>filter_list</MI></button>
                         </div>
                         <div className="flex items-center gap-1">
-                            <div className="flex items-center rounded-md bg-surface-800 px-2.5 py-1 gap-1.5 min-w-[140px]">
+                            <div className="flex items-center h-8 rounded-lg bg-surface-900 border border-surface-700/60 px-2.5 gap-1.5 min-w-[140px]">
                                 <MI size={16} className="text-surface-400">search</MI>
                                 <span className="text-xs text-surface-400">Search</span>
                             </div>
                             <button aria-label="Settings" className="p-1.5 text-surface-500"><MI size={18}>settings</MI></button>
-                            <button className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm"><MI size={18}>add</MI></button>
+                            <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide"><MI size={18}>add</MI></button>
                         </div>
                     </div>
 
@@ -264,7 +266,7 @@ export function ContentEditorDemo() {
                                         </div>
                                         <div className="flex-shrink-0 flex items-center px-3 truncate text-white" style={{ width: 300 }}>{post.title}</div>
                                         <div className="flex-shrink-0 flex items-center px-3" style={{ width: 120 }}>
-                                            <span className="rounded-lg px-2.5 py-0.5 text-xs font-normal" style={{ backgroundColor: sc.bg, color: sc.text }}>{post.status}</span>
+                                            <span className="chip font-normal" style={{ backgroundColor: sc.bg, color: sc.text }}>{post.status}</span>
                                         </div>
                                         <div className="flex-shrink-0 flex items-center px-3 text-surface-300 text-sm" style={{ width: 140 }}>{post.author}</div>
                                         <div className="flex-shrink-0 flex items-center px-3 text-surface-500 text-xs" style={{ width: 100 }}>{post.updated}</div>
@@ -310,31 +312,31 @@ export function ContentEditorDemo() {
                         </div>
 
                         {/* Title field */}
-                        <div className="relative rounded-md bg-surface-800/60 min-h-[48px] flex flex-col justify-center mb-3">
-                            <span className="absolute top-1.5 left-3 text-[10px] font-medium text-primary">Title <span className="text-red-400">*</span></span>
+                        <div className="field min-h-[48px] flex flex-col justify-center mb-3">
+                            <span className="field-label text-primary">Title <span className="text-red-500">*</span></span>
                             <div className="px-3 pt-6 pb-2 text-sm text-surface-200">Building a Modern CMS with Rebase</div>
                         </div>
 
                         {/* Status field */}
-                        <div className="relative rounded-md bg-surface-800/60 min-h-[48px] flex flex-col justify-center mb-3">
-                            <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Status</span>
+                        <div className="field min-h-[48px] flex flex-col justify-center mb-3">
+                            <span className="field-label">Status</span>
                             <div className="px-3 pt-6 pb-2 flex items-center justify-between">
-                                <span className="rounded-lg px-2.5 py-0.5 text-xs" style={{ backgroundColor: STATUS_COLORS.Draft.bg, color: STATUS_COLORS.Draft.text }}>Draft</span>
+                                <span className="chip" style={{ backgroundColor: STATUS_COLORS.Draft.bg, color: STATUS_COLORS.Draft.text }}>Draft</span>
                                 <MI size={18} className="text-surface-400">expand_more</MI>
                             </div>
                         </div>
 
                         {/* Content (rich text) field — this is the star */}
-                        <div className="relative rounded-md bg-surface-800/60 min-h-[200px] flex flex-col mb-3">
-                            <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Content</span>
+                        <div className="field min-h-[200px] flex flex-col mb-3">
+                            <span className="field-label">Content</span>
                             <div className="px-3 pt-6 pb-3">
                                 <EditorContent step={editorStep} />
                             </div>
                         </div>
 
                         {/* Author field */}
-                        <div className="relative rounded-md bg-surface-800/60 min-h-[48px] flex flex-col justify-center mb-3">
-                            <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Author</span>
+                        <div className="field min-h-[48px] flex flex-col justify-center mb-3">
+                            <span className="field-label">Author</span>
                             <div className="px-3 pt-6 pb-2 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <MI size={20} className="text-primary">person</MI>
@@ -356,11 +358,11 @@ export function ContentEditorDemo() {
                         <button className="p-1.5 rounded text-surface-500"><MI size={16}>delete</MI></button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="px-3 py-1.5 rounded-md text-surface-400 text-[11px] font-semibold uppercase">Discard</button>
-                        <button className={`px-3 py-1.5 rounded-md text-[11px] font-semibold uppercase ${formDirty ? "text-surface-300" : "text-surface-500 opacity-30"}`}>
+                        <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide">Discard</button>
+                        <button className={`min-h-[40px] px-3 rounded-lg border border-transparent text-sm font-semibold tracking-wide ${formDirty ? "text-primary" : "text-primary opacity-30"}`}>
                             {isSaving ? "Saving..." : "Save"}
                         </button>
-                        <button className="px-3 py-1.5 rounded-md bg-primary text-white text-[11px] font-semibold uppercase">Save and Close</button>
+                        <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">Save and close</button>
                     </div>
                 </div>
             </div>

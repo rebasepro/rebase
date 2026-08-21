@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="A dónde va el dinero de España">
+  <!-- The app's own mark, taken verbatim from its favicon: three stacked bands
+       whose widths are the budget's own proportions. -->
+  <rect width="64" height="64" rx="12" fill="#1a1a19"/>
+  <rect x="12" y="16" width="40" height="9" rx="2" fill="#e0a458"/>
+  <rect x="12" y="29" width="27" height="9" rx="2" fill="#c25b52"/>
+  <rect x="12" y="42" width="16" height="9" rx="2" fill="#5b8ca8"/>
+</svg>

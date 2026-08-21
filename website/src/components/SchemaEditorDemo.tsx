@@ -365,7 +365,7 @@ export function SchemaEditorDemo() {
                 <div className="flex my-2">
                     <div className="flex-grow mb-4">
                         <div
-                            className="rounded-md relative max-w-full bg-opacity-0 dark:bg-opacity-0 hover:bg-opacity-70 dark:hover:bg-opacity-40 hover:bg-surface-accent-200/70 hover:dark:bg-surface-700/40 min-h-[32px] -ml-1">
+                            className="rounded-lg relative max-w-full bg-surface-accent-200/0 dark:bg-white/0 hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] min-h-[32px] -ml-1">
                             <input
                                 name="name"
                                 className="w-full outline-none bg-transparent px-3 rounded-md min-h-[32px] py-2 pr-3 text-2xl font-headers text-text-primary dark:text-text-primary-dark"
@@ -474,7 +474,7 @@ export function SchemaEditorDemo() {
                     <div className="flex mt-2 justify-between">
                         <div className="w-full flex flex-col gap-2">
                             <div
-                                className="select-none rounded-md text-sm p-4 bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 relative flex items-center">
+                                className="select-none rounded-lg text-sm p-4 bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] relative flex items-center">
                                 <div className="flex items-center">
                                     <div className="mr-8">
                                         <div
@@ -504,11 +504,11 @@ export function SchemaEditorDemo() {
                         {/* Field Name */}
                         <div className="flex flex-col gap-2 col-span-12">
                             <div
-                                className="rounded-md relative max-w-full bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 min-h-[64px]"
+                                className="rounded-lg relative max-w-full bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] min-h-[64px]"
                                 style={{ fontSize: "20px" }}>
                                 <input
                                     name="name"
-                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-md min-h-[64px] py-2 pr-3 text-text-primary dark:text-text-primary-dark"
+                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-lg min-h-[64px] py-2 pr-3 text-text-primary dark:text-text-primary-dark"
                                     placeholder="Field name"
                                     type="text"
                                     value="Name"
@@ -518,7 +518,7 @@ export function SchemaEditorDemo() {
 
                             {/* ID Field */}
                             <div
-                                className="rounded-md relative max-w-full bg-opacity-50 dark:bg-opacity-90 bg-surface-accent-200/50 dark:bg-surface-800/90 min-h-[32px]">
+                                className="rounded-lg relative max-w-full bg-surface-accent-200/50 dark:bg-white/[0.03] min-h-[32px]">
                                 <label
                                     className="text-sm font-medium block whitespace-nowrap overflow-hidden max-w-full transform translate-y-[2px] scale-75 translate-x-[12px] pointer-events-none absolute top-[-1px] text-text-secondary dark:text-text-secondary-dark opacity-50">
                                     ID
@@ -526,7 +526,7 @@ export function SchemaEditorDemo() {
                                 <input
                                     name="id"
                                     disabled
-                                    className="w-full leading-normal px-3 rounded-md bg-opacity-50 dark:bg-opacity-90 bg-surface-accent-200/50 dark:bg-surface-800/90 min-h-[32px] pt-4 pb-2 pr-3 outline-none opacity-50 dark:opacity-50 text-surface-accent-800 dark:text-white"
+                                    className="w-full leading-normal px-3 rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.03] min-h-[32px] pt-4 pb-2 pr-3 outline-none opacity-50 dark:opacity-50 text-surface-accent-800 dark:text-white"
                                     type="text"
                                     value="name"
                                     readOnly
@@ -535,14 +535,14 @@ export function SchemaEditorDemo() {
 
                             {/* Description */}
                             <div
-                                className="rounded-md relative max-w-full bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 min-h-[64px]">
+                                className="rounded-lg relative max-w-full bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] min-h-[64px]">
                                 <label
                                     className="text-sm font-medium block whitespace-nowrap overflow-hidden max-w-full transform translate-y-[2px] scale-75 translate-x-[12px] pointer-events-none absolute top-1 text-text-secondary dark:text-text-secondary-dark">
                                     Description
                                 </label>
                                 <input
                                     name="description"
-                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-md min-h-[64px] pt-8 pb-2 pr-3 text-text-primary dark:text-text-primary-dark"
+                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-lg min-h-[64px] pt-8 pb-2 pr-3 text-text-primary dark:text-text-primary-dark"
                                     type="text"
                                     value="Name of this product"
                                     readOnly
@@ -556,7 +556,7 @@ export function SchemaEditorDemo() {
                                 className="border-opacity-40 dark:border-opacity-40 border-surface-200/40 dark:border-surface-700/40 border rounded-md w-full">
                                 <button
                                     type="button"
-                                    className="rounded-t flex items-center justify-between w-full min-h-[52px] hover:bg-surface-accent-200 hover:bg-opacity-40 dark:hover:bg-surface-800 dark:hover:bg-opacity-40 p-4 py-4 transition-all duration-200 bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60"
+                                    className="rounded-t flex items-center justify-between w-full min-h-[52px] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] p-4 py-4 transition-all duration-200 bg-surface-accent-200/50 dark:bg-white/[0.055]"
                                 >
                                     <div className="flex flex-row text-text-secondary dark:text-text-secondary-dark items-center">
                                         <Icon iconKey="CheckSquare" size={24} className="select-none" />
@@ -570,14 +570,14 @@ export function SchemaEditorDemo() {
                         {/* Default Value */}
                         <div className="col-span-12">
                             <div
-                                className="rounded-md relative max-w-full bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 min-h-[64px]">
+                                className="rounded-lg relative max-w-full bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] min-h-[64px]">
                                 <label
                                     className="text-sm font-medium block whitespace-nowrap overflow-hidden max-w-full translate-x-[16px] transform translate-y-[16px] scale-100 pointer-events-none absolute top-1 text-text-secondary dark:text-text-secondary-dark">
                                     Default value
                                 </label>
                                 <input
                                     name="defaultValue"
-                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-md min-h-[64px] pt-8 pb-2 pr-3 text-text-primary dark:text-text-primary-dark"
+                                    className="w-full outline-none bg-transparent leading-normal px-3 rounded-lg min-h-[64px] pt-8 pb-2 pr-3 text-text-primary dark:text-text-primary-dark"
                                     type="text"
                                     value=""
                                     readOnly
@@ -590,26 +590,26 @@ export function SchemaEditorDemo() {
                             <div className="grid grid-cols-12 gap-2">
                                 <div className="col-span-12">
                                     <div
-                                        className="bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 cursor-pointer rounded-md max-w-full justify-between box-border relative inline-flex items-center text-text-primary dark:text-text-primary-dark min-h-[42px] pl-4 pr-6 flex-row w-full">
+                                        className="bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] cursor-pointer rounded-lg max-w-full justify-between box-border relative inline-flex items-center text-text-primary dark:text-text-primary-dark min-h-[40px] pl-4 pr-6 flex-row w-full">
                                         <button
                                             type="button"
-                                            className="w-[42px] h-[26px] min-w-[42px] min-h-[26px] outline-none rounded-full relative shadow-sm bg-opacity-54 bg-white/60 dark:bg-surface-accent-900 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700"
+                                            className="w-[44px] h-[26px] min-w-[44px] min-h-[26px] outline-none rounded-full relative shadow-sm bg-white/54 dark:bg-surface-accent-900 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700"
                                         >
                                             <div
-                                                className="block rounded-full transition-transform duration-100 transform bg-surface-accent-600 dark:bg-surface-accent-400 w-[21px] h-[21px] translate-x-[3px]"/>
+                                                className="block rounded-full transition-transform duration-100 transform bg-surface-accent-600 dark:bg-surface-accent-400 w-[20px] h-[20px] translate-x-[3px]"/>
                                         </button>
                                         <div className="flex-grow ml-4 text-base">Hide from collection</div>
                                     </div>
                                 </div>
                                 <div className="col-span-12">
                                     <div
-                                        className="bg-opacity-50 bg-surface-accent-200 dark:bg-surface-800 dark:bg-opacity-60 hover:bg-opacity-70 dark:hover:bg-opacity-40 cursor-pointer rounded-md max-w-full justify-between box-border relative inline-flex items-center text-text-primary dark:text-text-primary-dark min-h-[42px] pl-4 pr-6 flex-row w-full">
+                                        className="bg-surface-accent-200/50 dark:bg-white/[0.055] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] cursor-pointer rounded-lg max-w-full justify-between box-border relative inline-flex items-center text-text-primary dark:text-text-primary-dark min-h-[40px] pl-4 pr-6 flex-row w-full">
                                         <button
                                             type="button"
-                                            className="w-[42px] h-[26px] min-w-[42px] min-h-[26px] outline-none rounded-full relative shadow-sm bg-opacity-54 bg-white/60 dark:bg-surface-accent-900 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700"
+                                            className="w-[44px] h-[26px] min-w-[44px] min-h-[26px] outline-none rounded-full relative shadow-sm bg-white/54 dark:bg-surface-accent-900 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700"
                                         >
                                             <div
-                                                className="block rounded-full transition-transform duration-100 transform bg-surface-accent-600 dark:bg-surface-accent-400 w-[21px] h-[21px] translate-x-[3px]"/>
+                                                className="block rounded-full transition-transform duration-100 transform bg-surface-accent-600 dark:bg-surface-accent-400 w-[20px] h-[20px] translate-x-[3px]"/>
                                         </button>
                                         <div className="flex-grow ml-4 text-base">Read only</div>
                                     </div>

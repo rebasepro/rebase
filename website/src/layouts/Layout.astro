@@ -60,7 +60,13 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 ---
 
 <!DOCTYPE html>
-<html lang={lang} data-theme="dark">
+<!-- `data-theme` drives Tailwind (see the `@custom-variant dark` in global.css);
+     `class="dark"` is what the RUNTIME reads. @rebasepro/ui/index.css keys
+     `color-scheme` off `html.dark`, and Chip picks its palette in JS from
+     `documentElement.classList.contains("dark")` — with only the attribute set,
+     every real <Chip> on this site rendered its LIGHT scheme on a black page.
+     The product sets the class (useBuildModeController); so do we. -->
+<html lang={lang} data-theme="dark" class="dark">
 <head>
     <meta charset="UTF-8">
 

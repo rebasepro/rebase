@@ -26,11 +26,14 @@ const MOCK_ORDERS: Order[] = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-    Confirmed: "bg-blue-950 text-blue-300 border-blue-900/40",
-    Delivered: "bg-green-950 text-green-300 border-green-900/40",
-    Shipped: "bg-indigo-950 text-indigo-300 border-indigo-900/40",
-    Cancelled: "bg-rose-950 text-rose-300 border-rose-900/40",
-    Processing: "bg-amber-950 text-amber-300 border-amber-900/40"
+    // The product's chip palette (CHIP_COLORS, dark) — see the `chip-*`
+    // utilities in styles/global.css. Tailwind's own `-950/-300` pair is a
+    // different hue family several stops darker.
+    Confirmed: "chip-blue",
+    Delivered: "chip-green",
+    Shipped: "chip-indigo",
+    Cancelled: "chip-red",
+    Processing: "chip-yellow"
 };
 
 export default function InteractiveDemo() {
@@ -114,7 +117,7 @@ await client.data.orders.update("${activeOrder.id}", {
                     </div>
                     
                     {/* Search bar */}
-                    <div className="relative rounded-md bg-surface-950 border border-surface-800 px-2 py-1 flex items-center gap-1.5 w-48">
+                    <div className="relative h-8 rounded-lg bg-surface-900 border border-surface-700/60 px-2 flex items-center gap-1.5 w-48">
                         <Search size={12} className="text-surface-500" />
                         <input 
                             type="text" 
@@ -145,7 +148,7 @@ await client.data.orders.update("${activeOrder.id}", {
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs text-surface-400 font-sans">{order.customer}</span>
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[order.status]}`}>
+                                            <span className={`chip chip-xs ${STATUS_COLORS[order.status]}`}>
                                                 {order.status}
                                             </span>
                                         </div>
@@ -169,24 +172,24 @@ await client.data.orders.update("${activeOrder.id}", {
                             {/* Editable Fields */}
                             <div className="space-y-3">
                                 {/* Customer Name Field */}
-                                <div className="relative rounded-lg bg-surface-950 border border-surface-800 p-2.5 flex flex-col">
-                                    <span className="text-[9px] font-medium text-primary uppercase tracking-wider">Customer Name *</span>
+                                <div className="field min-h-[48px] px-3 pt-6 pb-2 flex flex-col">
+                                    <span className="field-label text-primary">Customer name <span className="text-red-500">*</span></span>
                                     <input 
                                         type="text" 
                                         value={activeOrder.customer}
                                         onChange={(e) => handleUpdateCustomer(e.target.value)}
-                                        className="bg-transparent border-0 outline-0 p-0 text-xs text-white font-sans font-semibold mt-1 focus:ring-0 focus:outline-none"
+                                        className="bg-transparent border-0 outline-0 p-0 text-sm text-white font-sans focus:ring-0 focus:outline-none"
                                     />
                                 </div>
 
                                 {/* Status Select Field */}
-                                <div className="relative rounded-lg bg-surface-950 border border-surface-800 p-2.5 flex flex-col">
-                                    <span className="text-[9px] font-medium text-surface-500 uppercase tracking-wider">Status</span>
+                                <div className="field min-h-[48px] px-3 pt-6 pb-2 flex flex-col">
+                                    <span className="field-label">Status</span>
                                     <div 
                                         onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                                        className="flex items-center justify-between mt-1 cursor-pointer"
+                                        className="flex items-center justify-between cursor-pointer"
                                     >
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_COLORS[activeOrder.status]}`}>
+                                        <span className={`chip chip-xs ${STATUS_COLORS[activeOrder.status]}`}>
                                             {activeOrder.status}
                                         </span>
                                         <ChevronDown size={14} className="text-surface-400" />
@@ -210,20 +213,20 @@ await client.data.orders.update("${activeOrder.id}", {
 
                                 {/* Order summary stats */}
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="rounded-lg bg-surface-950/50 border border-surface-900 p-2.5">
-                                        <div className="text-[9px] text-surface-500 uppercase tracking-wider">Total price</div>
-                                        <div className="text-xs font-semibold text-white mt-0.5 font-mono">{activeOrder.total}</div>
+                                    <div className="field min-h-[48px] px-3 pt-6 pb-2">
+                                        <span className="field-label">Total price</span>
+                                        <div className="text-sm text-white font-mono">{activeOrder.total}</div>
                                     </div>
-                                    <div className="rounded-lg bg-surface-950/50 border border-surface-900 p-2.5">
-                                        <div className="text-[9px] text-surface-500 uppercase tracking-wider">Items Count</div>
-                                        <div className="text-xs font-semibold text-white mt-0.5 font-mono">{activeOrder.items} items</div>
+                                    <div className="field min-h-[48px] px-3 pt-6 pb-2">
+                                        <span className="field-label">Items count</span>
+                                        <div className="text-sm text-white font-mono">{activeOrder.items} items</div>
                                     </div>
                                 </div>
 
                                 {/* Address */}
-                                <div className="rounded-lg bg-surface-950/50 border border-surface-900 p-2.5">
-                                    <div className="text-[9px] text-surface-500 uppercase tracking-wider">Shipping Address</div>
-                                    <div className="text-xs text-surface-300 mt-1">{activeOrder.address}</div>
+                                <div className="field min-h-[48px] px-3 pt-6 pb-2">
+                                    <span className="field-label">Shipping address</span>
+                                    <div className="text-sm text-white">{activeOrder.address}</div>
                                 </div>
                             </div>
                         </div>
@@ -231,7 +234,7 @@ await client.data.orders.update("${activeOrder.id}", {
                         {/* Interactive Hint */}
                         <div className="mt-4 pt-3 border-t border-surface-850 text-[10px] text-surface-500 leading-normal flex items-start gap-1.5">
                             <Play size={10} className="text-primary-light shrink-0 mt-0.5" />
-                            <span>Try changing the **Customer Name** or **Status** to see the SDK and REST API update live in the right inspector!</span>
+                            <span>Try changing the <strong className="font-semibold text-surface-300">customer name</strong> or <strong className="font-semibold text-surface-300">status</strong> — the SDK call and the REST response on the right update live.</span>
                         </div>
                     </div>
                 </div>

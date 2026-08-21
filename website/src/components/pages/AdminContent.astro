@@ -227,7 +227,10 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">field widgets, configured</span>
                     </div>
-                    <div class="h-[420px]" inert aria-hidden="true">
+                    {/* The demo renders 449px of content; at 420 it spilled out of the frame and
+                         over the caption underneath. `overflow-hidden` keeps a future content
+                         change from doing it again. */}
+                    <div class="h-[460px] overflow-hidden" inert aria-hidden="true">
                         <CustomFieldsDemo client:visible/>
                     </div>
                     <div class="px-5 pb-5">

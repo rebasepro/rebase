@@ -21,7 +21,7 @@ const STEPS = [
     number: "2",
     title: "Get everything, instantly",
     description:
-      "Admin panel, entity forms, REST & GraphQL APIs, typed SDK, and real-time subscriptions — all generated from your schema.",
+      "Admin panel, entity forms, a REST API, typed SDK, and real-time subscriptions — all generated from your schema.",
     code: null,
     icon: "⚡"
   },

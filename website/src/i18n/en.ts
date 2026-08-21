@@ -19,6 +19,8 @@ export const en = {
   "rlscheck.cta": "See all 14 checks",
   "demo.badge": "The first five minutes",
   "demo.title": "Init. Push. Run.",
+  "copy.command": "Copy",
+  "copy.command.done": "Copied",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
@@ -114,7 +116,8 @@ export const en = {
   "showcase.title.part1": "Teams ship faster with",
   "showcase.title.part2": "Rebase",
   "showcase.subtitle":
-    "From <b>marketplaces</b> to <b>SaaS platforms</b> and <b>internal tools</b> — three very different products, the same definition underneath.",
+    "From <b>marketplaces</b> to <b>retail loyalty</b>, <b>public data</b> and <b>internal tools</b> — seven very different products, the same definition underneath.",
+  "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
   "showcase.case0.desc":
@@ -154,6 +157,22 @@ export const en = {
   "showcase.case2.feat3.title": "Clinical Operations in the Admin",
   "showcase.case2.feat3.desc":
     "Clinicians and content teams monitor engagement, manage the exercise library, and produce reports — in the same panel the engineers use to inspect the data.",
+  "showcase.case3.badge": "Public data · Built by the Rebase team",
+  "showcase.case3.title": "A dónde va el dinero de España",
+  "showcase.case3.desc":
+    "A public reading of Spanish government spending, from €725bn down to a single budget line. There is no database in the read path: a cron recompiles the official figures each month, storage serves them as JSON, and the page itself makes zero API calls.",
+  "showcase.case4.badge": "AI sales agent · Built by the Rebase team",
+  "showcase.case4.title": "Prospector",
+  "showcase.case4.desc":
+    "An outbound agent that reads your site, plans audiences, then finds real companies and the people at them — each one verified against its own website. Crons, functions and the review board are stock Rebase. It drafts; the schema has no state in which it sends.",
+  "showcase.case5.badge": "Retail loyalty",
+  "showcase.case5.title": "Unfeigned",
+  "showcase.case5.desc":
+    "The loyalty programme behind an apparel brand. Orders from Odoo POS and Shopify land in Postgres, a tier engine recomputes points and discounts, and the Apple and Google Wallet passes customers scan at the till are issued from the same schema.",
+  "showcase.case6.badge": "Internal tool · CRM and workflow automation",
+  "showcase.case6.title": "Edith",
+  "showcase.case6.desc":
+    "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three collections generated the entire back office — no admin screens were written.",
   "features.title": "Everything your schema generates",
   "features.subtitle":
     "Production-grade features, all driven by your TypeScript schema. Every view updates in real time.",
@@ -205,13 +224,13 @@ export const en = {
     "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
   "faq.q4": "Is Rebase open-source?",
   "faq.a4":
-    "Yes. The entire framework is free and MIT-licensed — the schema editor, data import/export, user management, generated APIs, typed SDK, and every feature ships at no cost, fully self-hosted. Optional paid plans add enterprise support, SSO/SAML, and SLAs; see <a class=\"text-primary hover:underline\" href=\"/pricing\">pricing</a>.",
+    "Yes. The entire framework is free and MIT-licensed — the schema editor, data import/export, user management, generated APIs, typed SDK, and every feature ships at no cost, fully self-hosted. Optional paid plans add enterprise support and SLAs; see <a class=\"text-primary hover:underline\" href=\"/pricing\">pricing</a>.",
   "faq.q5": "What's the tech stack?",
   "faq.a5":
     'The admin panel is a <strong class="text-white font-medium">React 19 SPA</strong> built with TypeScript and Tailwind CSS. The backend is a lightweight <strong class="text-white font-medium">Node.js</strong> service that connects directly to your PostgreSQL database. No SSR, no monolithic framework.',
   "faq.q6": "Do you support SSO or enterprise auth?",
   "faq.a6":
-    "Yes. SSO, SAML, and advanced enterprise authentication are supported. Enterprise plans with dedicated support and SLAs are available — reach out to talk through your requirements.",
+    "SSO, yes — through OIDC, including Microsoft Entra ID, alongside Google, GitHub, Apple and other providers. MFA, scoped API keys and custom auth adapters ship in the open-source framework too. SAML is not built in; the custom auth adapter is the supported route to it today. Enterprise plans add dedicated support and SLAs — reach out to talk through your requirements.",
   "faq.q7": "Can I embed Rebase inside my existing React app?",
   "faq.a7":
     "Yes. Rebase is distributed as npm packages. You can mount the entire admin panel inside your existing React application, or deploy it as a standalone SPA. It's designed to be embeddable.",
@@ -287,6 +306,8 @@ export const en = {
   "nav.col.admin": "The admin panel",
   "nav.col.build": "Build",
   "nav.col.ship": "Ship",
+  "nav.col.explore": "Explore",
+  "nav.col.resources": "Resources",
   "nav.overview": "Platform overview",
   "nav.overview.desc": "Both layers, every subsystem",
   "nav.compare": "Compare",
@@ -707,7 +728,7 @@ export const en = {
   "mosaic.title": "A visual framework for any use case.",
   "mosaic.subtitle": "From e-commerce and asset management to visual builders and live code edits. Rebase's schema-driven UI scales to meet any dashboard or editor requirement.",
   "pricing.meta.title": "Pricing | Rebase",
-  "pricing.meta.description": "Rebase is free and open-source (MIT) — self-host everything at no cost. Optional enterprise plans add SSO/SAML, dedicated support, and SLAs.",
+  "pricing.meta.description": "Rebase is free and open-source (MIT) — self-host everything at no cost. Optional enterprise plans add SSO, dedicated support, and SLAs.",
   "pricing.badge": "Pricing",
   "pricing.title": "Free and open-source. Pay only for enterprise support.",
   "pricing.subtitle":
@@ -729,14 +750,14 @@ export const en = {
   "pricing.ent.desc": "For teams that need enterprise authentication, compliance, and a support commitment.",
   "pricing.ent.cta": "Contact sales",
   "pricing.ent.feat1": "Everything in Open Source",
-  "pricing.ent.feat2": "SSO, SAML & advanced enterprise auth",
+  "pricing.ent.feat2": "SSO via OIDC & Microsoft Entra ID, MFA, custom auth adapters",
   "pricing.ent.feat3": "Dedicated support & onboarding",
   "pricing.ent.feat4": "SLAs and priority bug fixes",
   "pricing.ent.feat5": "Architecture & security review",
   "pricing.ent.popular": "Most support",
   "pricing.faq.title": "Is anything in the framework paywalled?",
   "pricing.faq.desc":
-    "No. Every feature of the open-source framework is free and MIT-licensed. Enterprise plans only add support, enterprise auth (SSO/SAML), and SLAs — never core product features.",
+    "No. Every feature of the open-source framework is free and MIT-licensed. Enterprise plans only add support and SLAs — never core product features.",
   "nav.pricing": "Pricing",
   "footer.pricing": "Pricing",
 

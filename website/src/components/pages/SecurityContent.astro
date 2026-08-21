@@ -62,7 +62,7 @@ import ClosingCta from "../ClosingCta.astro";
                             Check the database you already have
                         </h2>
                         <p class="mt-4 text-base leading-7 text-surface-400">
-                            You do not have to take any of this on faith. <code class="font-mono text-surface-300">rls-check</code>
+                            You do not have to take any of this on faith. <code class="font-mono text-surface-300">rls-check</code>{" "}
                             reads your database's own catalog and reports what is actually exposed: tables served with
                             row-level security switched off, policies that evaluate to true for everyone, views that read
                             straight past the RLS on their base tables. It works on any Postgres — Supabase, Neon, RDS or
@@ -316,7 +316,7 @@ import ClosingCta from "../ClosingCta.astro";
                         <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Your Data, Your Infrastructure</h2>
                         <p class="text-lg text-surface-300 mb-8">
                             This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
-                            control your data, the open-source Rebase server connects directly to <b>your own</b>
+                            control your data, the open-source Rebase server connects directly to <b>your own</b>{" "}
                             PostgreSQL database, on infrastructure you operate. It is the only model available
                             today. If you are waiting on <b>Rebase Cloud</b> instead, skip to the Rebase Cloud
                             section below.
@@ -502,7 +502,7 @@ import ClosingCta from "../ClosingCta.astro";
                         </div>
                         <h3 class="text-xl font-semibold text-white mb-3">Network isolation between tenants</h3>
                         <p class="text-surface-400 text-sm">
-                            Every tenant namespace is created with a Kubernetes <span class="font-mono text-surface-300">NetworkPolicy</span>
+                            Every tenant namespace is created with a Kubernetes <span class="font-mono text-surface-300">NetworkPolicy</span>{" "}
                             covering both ingress and egress, so one project's pods cannot open connections to another
                             project's pods or database. Tenant applications are served from
                             <span class="font-mono text-surface-300">*.rebase.website</span> — a separate registrable

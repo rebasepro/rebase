@@ -101,10 +101,13 @@ export function SpreadsheetDemo() {
                                     {user.email}
                                 </div>
                                 <div className="p-3 border-r border-surface-800/50 flex items-center">
-                                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                                        user.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                        user.status === 'Inactive' ? 'bg-surface-500/10 text-surface-400 border border-surface-500/20' :
-                                        'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    {/* Chip: the product's rounded-lg fill, from CHIP_COLORS (dark).
+                                        These were tinted `-500/10` pills with a border, which is a
+                                        different shape and a different palette from an enum chip. */}
+                                    <span className={`chip ${
+                                        user.status === 'Active' ? 'chip-green' :
+                                        user.status === 'Inactive' ? 'chip-gray' :
+                                        'chip-yellow'
                                     }`}>
                                         {user.status}
                                     </span>

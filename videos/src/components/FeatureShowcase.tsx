@@ -13,7 +13,7 @@ const FEATURES = [
 label: "Admin Panel",
 color: "#0070F4" },
   { icon: "🔌",
-label: "REST & GraphQL APIs",
+label: "REST API",
 color: "#FF3773" },
   { icon: "⌨️",
 label: "Typed TypeScript SDK",

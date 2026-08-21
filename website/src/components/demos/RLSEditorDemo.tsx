@@ -327,7 +327,7 @@ function VisualRuleBuilder({
                                     handleUpdate({ left, operator: "=", right: "true" });
                                 }
                             }}
-                            className="bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all cursor-pointer"
+                            className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                         >
                             <option value="rebase.uid()">rebase.uid() [User ID]</option>
                             <option value="auth.role()">auth.role() [User Role]</option>
@@ -343,7 +343,7 @@ function VisualRuleBuilder({
                                 <select
                                     value={cond.operator}
                                     onChange={(e) => handleUpdate({ operator: e.target.value })}
-                                    className="bg-surface-850 border border-surface-700/40 rounded px-1.5 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all cursor-pointer"
+                                    className="field px-1.5 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                 >
                                     <option value="=">=</option>
                                     <option value="!=">!=</option>
@@ -354,7 +354,7 @@ function VisualRuleBuilder({
                                     <select
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
-                                        className="bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all cursor-pointer"
+                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                     >
                                         {columns.map(col => (
                                             <option key={col} value={col}>{col}</option>
@@ -364,7 +364,7 @@ function VisualRuleBuilder({
                                     <select
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
-                                        className="bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all cursor-pointer"
+                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                     >
                                         <option value="public">public</option>
                                         <option value="authenticated">authenticated</option>
@@ -377,7 +377,7 @@ function VisualRuleBuilder({
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
                                         placeholder="value (e.g. true, 'admin')"
-                                        className="bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all flex-1 min-w-[80px]"
+                                        className="field px-2 py-1 text-surface-200 font-mono outline-none focus:ring-2 focus:ring-primary/50 transition-all flex-1 min-w-[80px]"
                                     />
                                 )}
                             </>
@@ -390,7 +390,7 @@ function VisualRuleBuilder({
                             value={cond.right}
                             onChange={(e) => handleUpdate({ right: e.target.value })}
                             placeholder="raw SQL condition expression (e.g. rebase.uid() = id OR is_admin = true)"
-                            className="w-full bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-[11px] font-mono text-amber-300 outline-none focus:border-primary transition-all resize-none"
+                            className="w-full field px-2 py-1 text-[11px] font-mono text-amber-300 outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none"
                         />
                     )}
 
@@ -743,19 +743,19 @@ export function RLSEditorDemo() {
                                                 
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Policy Name</label>
+                                                        <label className="typography-micro text-text-secondary-dark block mb-1">Policy Name</label>
                                                         <input
                                                             type="text"
-                                                            className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all"
+                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                                             value={editName}
                                                             onChange={(e) => setEditName(e.target.value)}
                                                             placeholder="policy_name"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Command / Action</label>
+                                                        <label className="typography-micro text-text-secondary-dark block mb-1">Command / Action</label>
                                                         <select
-                                                            className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all cursor-pointer"
+                                                            className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                                             value={editCommand}
                                                             onChange={(e) => setEditCommand(e.target.value as RLSPolicy["command"])}
                                                         >
@@ -770,7 +770,7 @@ export function RLSEditorDemo() {
 
                                                 {/* Roles multi-select */}
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-0.5">Target Roles</label>
+                                                    <label className="typography-micro text-text-secondary-dark block mb-0.5">Target Roles</label>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {["public", "authenticated", "anon", "admin"].map(role => {
                                                             const isSelected = editRoles.includes(role);
@@ -846,19 +846,19 @@ export function RLSEditorDemo() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Name</label>
+                                            <label className="typography-micro text-text-secondary-dark block mb-1">Name</label>
                                             <input
                                                 type="text"
-                                                className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all"
+                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                                                 value={newPolicyName}
                                                 onChange={(e) => setNewPolicyName(e.target.value)}
                                                 placeholder="policy_name"
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Command / Action</label>
+                                            <label className="typography-micro text-text-secondary-dark block mb-1">Command / Action</label>
                                             <select
-                                                className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all cursor-pointer"
+                                                className="field w-full px-2.5 py-1.5 text-[11px] font-mono text-surface-200 outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                                                 value={newPolicyCommand}
                                                 onChange={(e) => setNewPolicyCommand(e.target.value as RLSPolicy["command"])}
                                             >
@@ -873,7 +873,7 @@ export function RLSEditorDemo() {
 
                                     {/* Roles Selector */}
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-0.5">Target Roles</label>
+                                        <label className="typography-micro text-text-secondary-dark block mb-0.5">Target Roles</label>
                                         <div className="flex flex-wrap gap-1.5">
                                             {["public", "authenticated", "anon", "admin"].map(role => {
                                                 const isSelected = newPolicyRoles.includes(role);

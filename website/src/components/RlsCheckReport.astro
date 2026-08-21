@@ -32,7 +32,7 @@ const rule = "─".repeat(64);
 <span class="text-rose-400">CRITICAL</span>
 <span class="text-surface-700">{rule}</span>
 
-  <span class="text-rose-400">[critical]</span> <span class="text-white">rls-disabled</span>  <span class="text-cyan-300">public.invoices</span>
+  <span class="text-rose-400">[critical]</span> <span class="text-white">rls-disabled</span>  <span class="text-cyan-300">public.invoices</span>{" "}
       public.invoices has row-level security disabled and is
       granted to anon and authenticated
       <span class="text-white">Impact</span>  Any client holding the anon key can read — and
@@ -40,14 +40,14 @@ const rule = "─".repeat(64);
       <span class="text-white">Fix</span>
           <span class="text-emerald-400">ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;</span>
 
-  <span class="text-rose-400">[critical]</span> <span class="text-white">policy-always-true</span>  <span class="text-cyan-300">public.documents, policy "documents_read"</span>
+  <span class="text-rose-400">[critical]</span> <span class="text-white">policy-always-true</span>  <span class="text-cyan-300">public.documents, policy "documents_read"</span>{" "}
       USING (true) grants every row to every role the policy
       applies to.
 
 <span class="text-amber-400">HIGH</span>
 <span class="text-surface-700">{rule}</span>
 
-  <span class="text-amber-400">[high]</span> <span class="text-white">view-bypasses-rls</span>  <span class="text-cyan-300">public.billing_overview</span>
+  <span class="text-amber-400">[high]</span> <span class="text-white">view-bypasses-rls</span>  <span class="text-cyan-300">public.billing_overview</span>{" "}
       The view runs as its owner, so it reads past the RLS on
       public.invoices.
 

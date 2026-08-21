@@ -108,10 +108,13 @@ export function RealtimeMiniDemo() {
         return at - last === 1 ? "just now" : "1m ago";
     }
 
+    // The product's chip palette (CHIP_COLORS, dark) rather than a tinted
+    // Tailwind pill — these are enum values in a collection cell, and they
+    // should read as the same object they are in the admin panel.
     const statusColor = (s: string) => {
-        if (s === "active") return "text-emerald-400 bg-emerald-400/10";
-        if (s === "pending") return "text-amber-400 bg-amber-400/10";
-        return "text-surface-500 bg-surface-800";
+        if (s === "active") return "chip-green";
+        if (s === "pending") return "chip-yellow";
+        return "chip-gray";
     };
 
     // A plain function, not a nested component: a component defined inside the
@@ -159,7 +162,7 @@ export function RealtimeMiniDemo() {
                             >
                                 <div className="flex-1 text-[9px] text-white truncate">{row.name}</div>
                                 <div className="w-12">
-                                    <span className={`text-[8px] px-1 py-0.5 rounded transition-colors duration-300 ${statusColor(row.status)}`}>{row.status}</span>
+                                    <span className={`chip text-[8px] px-1 py-0.5 rounded-md transition-colors duration-300 ${statusColor(row.status)}`}>{row.status}</span>
                                 </div>
                                 <div className={`w-10 text-[8px] text-right truncate ${lit ? "text-primary" : "text-surface-500"}`}>{row.updated}</div>
                             </div>

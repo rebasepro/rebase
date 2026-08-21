@@ -88,9 +88,12 @@ const MOCK_ENTITIES: Entity[] = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  Available: { bg: "rgb(147, 224, 136)", text: "rgb(11, 29, 5)" },
-  "Out of Stock": { bg: "rgb(255, 169, 129)", text: "rgb(107, 38, 19)" },
-  Discontinued: { bg: "rgb(204, 204, 204)", text: "rgb(4, 4, 4)" },
+  // CHIP_COLORS[hue + "Light"] in DARK mode — see packages/ui/src/util/chip_colors.ts.
+  // These used to hold the light-mode stops (#93e088 / #ffa981 / #cccccc), which
+  // is the same palette read off the wrong side of the theme.
+  Available: { bg: "#20c933", text: "#0b1d05" },
+  "Out of Stock": { bg: "#ff6f2c", text: "#581f10" },
+  Discontinued: { bg: "#666666", text: "#eeeeee" },
 };
 
 // ─── Kanban Data (for TAGS collection) ───────────────────
@@ -338,7 +341,7 @@ width: 120 }}
             loading="lazy"
           />
         ) : (
-          <div className="w-[90px] h-[40px] rounded-md bg-surface-200/40 dark:bg-surface-800/60 flex items-center justify-center">
+          <div className="w-[90px] h-[40px] rounded-md bg-surface-accent-200/50 dark:bg-white/[0.055] flex items-center justify-center">
             <MI size={18} className="text-surface-400">image</MI>
           </div>
         )}
@@ -352,7 +355,7 @@ maxWidth: 140,
 width: 140 }}
       >
         <span
-          className="rounded-lg inline-flex items-center px-2.5 py-0.5 text-xs font-normal whitespace-nowrap"
+          className="chip whitespace-nowrap"
           style={{
             backgroundColor: statusColor.bg,
             color: statusColor.text
@@ -405,7 +408,7 @@ width: 240 }}
         <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
           <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0 overflow-hidden max-h-[38px]">
             <span
-              className="rounded-lg inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-200 whitespace-nowrap"
+              className="chip chip-gray whitespace-nowrap"
             >
               <MI size={12} className="text-primary opacity-70">
                 folder
@@ -918,7 +921,7 @@ width: "100%" }}
             {/* Right side */}
             <div className="flex items-center gap-1">
               {/* Search bar — matches production SearchBar expandable */}
-              <div className="flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2.5 py-1 gap-1.5 min-w-[160px]">
+              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700/60 px-2.5 gap-1.5 min-w-[160px]">
                 <MI size={16} className="text-surface-400">search</MI>
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
@@ -928,7 +931,7 @@ width: "100%" }}
               <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50">
                 <MI size={18}>delete</MI>
               </button>
-              <button aria-label="Add new entry" className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm">
+              <button aria-label="Add new entry" className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
                 <MI size={18}>add</MI>
               </button>
             </div>
@@ -985,17 +988,17 @@ width: "100%" }}
                   return (
                     <div
                       key={entity.id}
-                      className={`rounded-lg border overflow-hidden cursor-pointer transition-all duration-200 ${
+                      className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 border-surface-200 dark:border-surface-700/60 bg-white dark:bg-surface-900 ${
                         isHovered
-                          ? "border-primary/50 shadow-md scale-[1.02]"
-                          : "border-surface-200 dark:border-surface-700/50 hover:shadow-sm"
-                      } bg-white dark:bg-surface-900`}
+                          ? "ring-1 ring-primary/50 shadow-md scale-[1.02]"
+                          : "hover:shadow-sm"
+                      }`}
                       onMouseEnter={() => setHoveredRow(entity.id)}
                       onMouseLeave={() => setHoveredRow(null)}
                       onClick={() => openEntity(entity.id)}
                     >
                       {/* Card thumbnail */}
-                      <div className="w-full h-28 bg-surface-100 dark:bg-surface-800 overflow-hidden">
+                      <div className="w-full h-28 rounded-t-xl bg-surface-accent-200/50 dark:bg-white/[0.055] overflow-hidden">
                         {merged.image ? (
                           <img src={merged.image} {...imgDims(merged.image)} alt={merged.title} className="w-full h-full object-cover" loading="lazy"/>
                         ) : (
@@ -1011,7 +1014,7 @@ width: "100%" }}
                         </div>
                         <div className="flex items-center justify-between">
                           <span
-                            className="rounded-lg inline-flex items-center px-2 py-0.5 text-[10px] font-normal"
+                            className="chip chip-xs"
                             style={{ backgroundColor: statusColor.bg, color: statusColor.text }}
                           >
                             {merged.status}
@@ -1034,10 +1037,10 @@ width: "100%" }}
                   return (
                     <div
                       key={col.id}
-                      className="border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-surface-200 dark:border-surface-700/50"
+                      className="border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-surface-200 dark:border-surface-800"
                     >
                       {/* Column header */}
-                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-50 dark:bg-surface-950">
+                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-50 dark:bg-surface-800">
                         <h4 className="py-3 px-3 flex-grow select-none flex items-center gap-3 text-sm font-semibold text-surface-800 dark:text-surface-200">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
@@ -1072,10 +1075,10 @@ width: "100%" }}
                           return (
                             <div key={card.id} className="py-1">
                               <div
-                                className={`p-2 flex items-start border rounded-lg cursor-pointer transition-colors border-surface-200 dark:border-surface-700/50 ${
+                                className={`p-3 flex items-start border rounded-xl cursor-pointer transition-colors border-surface-200 dark:border-surface-700/60 bg-white dark:bg-surface-900 ${
                                   isHighlighted
-                                    ? "bg-white dark:bg-surface-900 ring-2 ring-primary"
-                                    : "bg-white dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
+                                    ? "ring-2 ring-primary"
+                                    : "hover:bg-primary/5 dark:hover:bg-primary/5"
                                 }`}
                               >
                                 {card.image ? (
@@ -1142,7 +1145,7 @@ width: "100%" }}
                     }}
                   >
                     <div
-                      className="p-2 flex items-start border rounded-lg ring-2 ring-primary bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700/50"
+                      className="p-3 flex items-start border rounded-xl ring-2 ring-primary bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700/60"
                       style={{
                         boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
                         opacity: 0.95
@@ -1225,7 +1228,7 @@ width: "100%" }}
                 </div>
 
                 {/* Path */}
-                <div className="w-full rounded-md bg-surface-100 dark:bg-surface-800/40 px-3 py-1.5 mb-6">
+                <div className="w-full rounded-md bg-surface-100 dark:bg-surface-950 px-3 py-1.5 mb-6">
                   <code className="text-[11px] text-surface-500">
                     products/{selectedEntityId}
                   </code>
@@ -1234,9 +1237,9 @@ width: "100%" }}
                 {/* Form fields */}
                 <div className="flex flex-col gap-3">
                   {/* Title field */}
-                  <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center">
-                    <span className="absolute top-1.5 left-3 text-[10px] font-medium text-primary">
-                      Title <span className="text-red-400">*</span>
+                  <div className="field min-h-[48px] flex flex-col justify-center">
+                    <span className="field-label text-primary">
+                      Title <span className="text-red-500">*</span>
                     </span>
                     <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">
                       {formValues.title}
@@ -1244,8 +1247,8 @@ width: "100%" }}
                   </div>
 
                   {/* Image field */}
-                  <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[64px] flex flex-col">
-                    <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
+                  <div className="field min-h-[64px] flex flex-col">
+                    <span className="field-label">
                       Image
                     </span>
                     <div className="px-3 pt-6 pb-2">
@@ -1260,14 +1263,14 @@ width: "100%" }}
                   </div>
 
                   {/* Status field */}
-                  <div className={`relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-green-500" : ""}`}>
-                    <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
+                  <div className={`field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-green-500" : ""}`}>
+                    <span className="field-label">
                       Status
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between">
                       {formValues.status && (
                         <span
-                          className="rounded-lg inline-flex items-center px-2.5 py-0.5 text-xs font-normal"
+                          className="chip"
                           style={{
                             backgroundColor:
                               STATUS_COLORS[formValues.status]?.bg,
@@ -1284,8 +1287,8 @@ width: "100%" }}
                   </div>
 
                   {/* Brand field */}
-                  <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center">
-                    <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
+                  <div className="field min-h-[48px] flex flex-col justify-center">
+                    <span className="field-label">
                       Brand
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between">
@@ -1310,15 +1313,15 @@ width: "100%" }}
                   </div>
 
                   {/* Category field */}
-                  <div className="relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center">
-                    <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">
+                  <div className="field min-h-[48px] flex flex-col justify-center">
+                    <span className="field-label">
                       Category
                     </span>
                     <div className="px-3 pt-6 pb-2 flex items-center justify-between gap-2">
                       <div className="flex flex-wrap gap-1 flex-1">
                         {formValues.category ? (
                           <span
-                            className="rounded-lg inline-flex items-center gap-0.5 px-2 py-0.5 text-xs bg-surface-200 dark:bg-surface-700 text-surface-700 dark:text-surface-200"
+                            className="chip chip-gray"
                           >
                             <MI
                               size={12}
@@ -1357,17 +1360,17 @@ width: "100%" }}
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button className="px-3 py-1.5 rounded-md text-surface-400 text-[11px] font-semibold uppercase">
+                <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide">
                   Discard
                 </button>
                 <button
                   disabled={!formDirty || isSaving}
-                  className="px-3 py-1.5 rounded-md text-surface-500 text-[11px] font-semibold uppercase disabled:opacity-30"
+                  className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide disabled:opacity-30"
                 >
                   {isSaving ? "Saving..." : "Save"}
                 </button>
-                <button className="px-3 py-1.5 rounded-md bg-primary text-white text-[11px] font-semibold uppercase">
-                  Save and Close
+                <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
+                  Save and close
                 </button>
               </div>
             </div>

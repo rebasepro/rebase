@@ -284,7 +284,7 @@ const alsoShipped = [
                     The rules live in Postgres, not in this server
                 </h2>
                 <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Requests execute as a restricted database role. Your <code class="font-mono text-surface-300">securityRules</code>
+                    Requests execute as a restricted database role. Your <code class="font-mono text-surface-300">securityRules</code>{" "}
                     compile to real row-level security policies, so a query that should return nothing returns
                     nothing — whether it arrives through the SDK, a REST call, the admin panel, an agent's API key
                     or a psql session. A collection with no policy serves no rows: the default is closed, not open.
@@ -323,7 +323,7 @@ const alsoShipped = [
                 </a>
                 <span class="text-surface-700">·</span>
                 <span class="text-sm text-surface-500">
-                    Already on Postgres? <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code>
+                    Already on Postgres? <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code>{" "}
                     audits it without installing anything.
                 </span>
             </div>

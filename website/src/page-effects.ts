@@ -1,3 +1,8 @@
+// Reset timers for the copy buttons, keyed by button: a second click has to
+// restart the confirmation window rather than let the first timeout clear a
+// button that just re-copied.
+const copyResetTimers = new WeakMap<Element, number>();
+
 // Mouse spotlight effect for cards
 function initPageEffects() {
   const cards = document.querySelectorAll("[data-spotlight-card]");
@@ -77,24 +82,76 @@ function initPageEffects() {
     lazyVideos.forEach(video => videoObserver.observe(video));
   }
 
-  // Global copy-btn logic
+  // Global copy-btn logic.
+  //
+  // The confirmation used to be a `title` swap and a colour change, which means
+  // the only unambiguous "it worked" signal lived in a tooltip the reader has to
+  // hover to see. A button that can swap its own icon and label says so on the
+  // button: mark the two icons `data-copy-idle` / `data-copy-done` and the text
+  // node `data-copy-label`, and this handler drives them. Buttons without those
+  // hooks keep the old colour-only behaviour.
   document.querySelectorAll(".copy-btn").forEach(button => {
     button.addEventListener("click", () => {
       const command = button.getAttribute("data-command");
-      if (command) {
-        navigator.clipboard.writeText(command).then(() => {
-          const originalText = button.getAttribute("title") || "Copy to clipboard";
-          button.setAttribute("title", "Copied!");
-          
-          button.classList.add("text-emerald-400");
-          button.classList.remove("text-surface-500");
-          
-          setTimeout(() => {
-            button.setAttribute("title", originalText);
-            button.classList.remove("text-emerald-400");
-            button.classList.add("text-surface-500");
-          }, 1500);
-        });
+      if (!command) return;
+
+      const idle = button.querySelector<HTMLElement>("[data-copy-idle]");
+      const done = button.querySelector<HTMLElement>("[data-copy-done]");
+      const label = button.querySelector<HTMLElement>("[data-copy-label]");
+      const idleLabel = label?.textContent ?? "";
+      const originalTitle = button.getAttribute("title") || "Copy to clipboard";
+      // One timer per button: clicking again mid-confirmation must restart the
+      // window, not let the first timeout reset a button that just re-copied.
+      const timers = copyResetTimers;
+
+      const confirm = () => {
+        button.setAttribute("title", "Copied!");
+        button.classList.add("text-emerald-400");
+        button.classList.remove("text-surface-500");
+        if (idle && done) {
+          idle.hidden = true;
+          done.hidden = false;
+        }
+        if (label) label.textContent = button.getAttribute("data-copy-done-label") || "Copied";
+
+        const pending = timers.get(button);
+        if (pending) clearTimeout(pending);
+        timers.set(button, window.setTimeout(() => {
+          button.setAttribute("title", originalTitle);
+          button.classList.remove("text-emerald-400");
+          button.classList.add("text-surface-500");
+          if (idle && done) {
+            idle.hidden = false;
+            done.hidden = true;
+          }
+          if (label) label.textContent = idleLabel;
+          timers.delete(button);
+        }, 1800));
+      };
+
+      // `navigator.clipboard` is undefined on a non-secure origin, and rejects
+      // when the document is not focused — both leave the reader with a button
+      // that did nothing at all. Fall back to a selection copy.
+      const fallback = () => {
+        const scratch = document.createElement("textarea");
+        scratch.value = command;
+        scratch.setAttribute("readonly", "");
+        scratch.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+        document.body.appendChild(scratch);
+        scratch.select();
+        try {
+          document.execCommand("copy");
+          confirm();
+        } catch {
+          /* nothing sensible left to try */
+        }
+        scratch.remove();
+      };
+
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(command).then(confirm, fallback);
+      } else {
+        fallback();
       }
     });
   });

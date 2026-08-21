@@ -48,11 +48,14 @@ const MOCK_ORDERS: Order[] = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  Confirmed: { bg: "rgb(59, 130, 246)", text: "rgb(255, 255, 255)" },
-  Delivered: { bg: "rgb(34, 197, 94)", text: "rgb(255, 255, 255)" },
-  Shipped: { bg: "rgb(99, 102, 241)", text: "rgb(255, 255, 255)" },
-  Cancelled: { bg: "rgb(239, 68, 68)", text: "rgb(255, 255, 255)" },
-  Processing: { bg: "rgb(245, 158, 11)", text: "rgb(255, 255, 255)" },
+  // CHIP_COLORS in DARK mode — packages/ui/src/util/chip_colors.ts. These were
+  // Tailwind's `-500` stops with flat white ink, which is the pairing the chip
+  // rework removed: white on amber-500 measures ~2:1 and is not readable.
+  Confirmed: { bg: "#2750ae", text: "#cfdfff" },
+  Delivered: { bg: "#338a17", text: "#030801" },
+  Shipped: { bg: "#4f46e5", text: "#e0e7ff" },
+  Cancelled: { bg: "#ba1e45", text: "#ffdce5" },
+  Processing: { bg: "#b87503", text: "#261801" },
 };
 
 /* ─── KPI Card ─── */
@@ -116,10 +119,11 @@ function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
       <div className="flex-grow min-w-0 ml-3">
         <div className="text-sm font-semibold text-surface-900 dark:text-white">{order.id}</div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wider ${
-            order.paymentStatus === "paid" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" :
-            order.paymentStatus === "pending" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20" :
-            "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
+          {/* An enum value, so it is a chip — not a bordered, uppercase pill. */}
+          <span className={`chip chip-xs ${
+            order.paymentStatus === "paid" ? "chip-emerald" :
+            order.paymentStatus === "pending" ? "chip-yellow" :
+            "chip-red"
           }`}>
             {order.paymentStatus}
           </span>
@@ -145,7 +149,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 }) {
   const statusColor = STATUS_COLORS[order.status];
   const fieldClass = (name: string) =>
-    `relative rounded-md bg-surface-100 dark:bg-surface-800/60 min-h-[48px] flex flex-col justify-center transition-all duration-300 ${
+    `field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${
       highlightedField === name ? "ring-2 ring-green-500" : ""
     }`;
 
@@ -174,7 +178,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
           <div className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">{order.id}</div>
 
           {/* Path */}
-          <div className="w-full rounded-md bg-surface-100 dark:bg-surface-800/40 px-3 py-1.5 mb-6">
+          <div className="w-full rounded-md bg-surface-100 dark:bg-surface-950 px-3 py-1.5 mb-6">
             <code className="text-[11px] text-surface-500">orders/{order.id}</code>
           </div>
 
@@ -182,7 +186,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
           <div className="flex flex-col gap-3">
             {/* Customer */}
             <div className={fieldClass("customer")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-primary">Customer <span className="text-red-400">*</span></span>
+              <span className="field-label text-primary">Customer <span className="text-red-500">*</span></span>
               <div className="px-3 pt-6 pb-2 flex items-center gap-2">
                 <span className="text-sm font-semibold text-surface-900 dark:text-white">{order.customer}</span>
                 <span className="text-xs text-surface-500 dark:text-surface-400">({order.email})</span>
@@ -191,9 +195,9 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 
             {/* Status */}
             <div className={fieldClass("status")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Status</span>
+              <span className="field-label">Status</span>
               <div className="px-3 pt-6 pb-2 flex items-center justify-between">
-                <span className="rounded-lg inline-flex items-center px-2.5 py-0.5 text-xs font-normal"
+                <span className="chip"
                   style={{ backgroundColor: statusColor.bg, color: statusColor.text }}>
                   {order.status}
                 </span>
@@ -203,12 +207,12 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 
             {/* Payment */}
             <div className={fieldClass("payment")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Payment</span>
+              <span className="field-label">Payment</span>
               <div className="px-3 pt-6 pb-2">
-                <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider inline-block ${
-                  order.paymentStatus === "paid" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20" :
-                  order.paymentStatus === "pending" ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20" :
-                  "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/20"
+                <span className={`chip ${
+                  order.paymentStatus === "paid" ? "chip-emerald" :
+                  order.paymentStatus === "pending" ? "chip-yellow" :
+                  "chip-red"
                 }`}>
                   {order.paymentStatus}
                 </span>
@@ -217,19 +221,19 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
 
             {/* Total */}
             <div className={fieldClass("total")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Total</span>
+              <span className="field-label">Total</span>
               <div className="px-3 pt-6 pb-2 text-sm font-semibold text-surface-900 dark:text-surface-200">{order.total}</div>
             </div>
 
             {/* Items */}
             <div className={fieldClass("items")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Items</span>
+              <span className="field-label">Items</span>
               <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">{order.items} item{order.items > 1 ? "s" : ""}</div>
             </div>
 
             {/* Address */}
             <div className={fieldClass("address")}>
-              <span className="absolute top-1.5 left-3 text-[10px] font-medium text-surface-400">Shipping Address</span>
+              <span className="field-label">Shipping Address</span>
               <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">{order.address}</div>
             </div>
           </div>
@@ -402,7 +406,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               </button>
             </div>
             <div className="flex items-center gap-1">
-              <div className="flex items-center rounded-md bg-surface-100 dark:bg-surface-800 px-2.5 py-1 gap-1.5 min-w-[160px]">
+              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700/60 px-2.5 gap-1.5 min-w-[160px]">
                 <Search size={16} className="text-surface-400" />
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
@@ -411,7 +415,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500"><Settings size={16} /></button>
               <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50"><Trash2 size={16} /></button>
               <span className="text-xs text-surface-400 mx-1">(0)</span>
-              <button className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-white text-sm">
+              <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
                 <Plus size={16} /><span className="text-xs font-medium">Add Order</span>
               </button>
             </div>

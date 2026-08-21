@@ -315,7 +315,7 @@ fontWeight: 600 }}>
       {/* Feature badges floating at the bottom */}
       <FeatureBadge label="Admin Panel" icon="📊" delay={38} x={120} y={580}/>
       <FeatureBadge
-        label="REST & GraphQL"
+        label="REST API"
         icon="🔌"
         delay={42}
         x={340}
