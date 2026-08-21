@@ -287,6 +287,8 @@ export const en = {
   "nav.col.admin": "The admin panel",
   "nav.col.build": "Build",
   "nav.col.ship": "Ship",
+  "nav.col.explore": "Explore",
+  "nav.col.resources": "Resources",
   "nav.overview": "Platform overview",
   "nav.overview.desc": "Both layers, every subsystem",
   "nav.compare": "Compare",

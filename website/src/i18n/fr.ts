@@ -190,6 +190,8 @@ export const fr = {
   "nav.col.admin": "Le panneau d'administration",
   "nav.col.build": "Construire",
   "nav.col.ship": "Déployer",
+  "nav.col.explore": "Explorer",
+  "nav.col.resources": "Ressources",
   "nav.overview": "Vue d'ensemble de la plateforme",
   "nav.overview.desc": "Les deux couches, sous-système par sous-système",
   "nav.compare": "Comparatifs",
