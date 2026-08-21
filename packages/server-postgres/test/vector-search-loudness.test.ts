@@ -101,12 +101,13 @@ describe("a database without pgvector", () => {
         await expect(ensureCollectionTables(client as never, [withVector]))
             .rejects.toThrow(/pgvector is not installed/);
         // The three things missing from `type "vector" does not exist`: what to
-        // install, that Rebase will not do it, and that the scaffold's image
-        // does not carry it.
+        // install, that Rebase will not do it, and an image that carries it —
+        // which is now the scaffold's own, so anyone reaching this is pointed at
+        // a database somebody else provisioned and needs the image named.
         await expect(ensureCollectionTables(client as never, [withVector]))
             .rejects.toThrow(/CREATE EXTENSION vector/);
         await expect(ensureCollectionTables(client as never, [withVector]))
-            .rejects.toThrow(/postgres:18-alpine/);
+            .rejects.toThrow(/pgvector\/pgvector/);
     });
 
     it("leaves every other DDL failure worded as it was", async () => {
