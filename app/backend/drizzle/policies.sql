@@ -233,7 +233,7 @@ CREATE POLICY "tickets_default_admin_write_delete" ON "public"."tickets" AS PERM
 ALTER TABLE "rebase"."users" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "users_read_policy" ON "rebase"."users";
-CREATE POLICY "users_read_policy" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR ((id)::text = rebase.uid()) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
+CREATE POLICY "users_read_policy" ON "rebase"."users" AS PERMISSIVE FOR SELECT TO "public" USING ((rebase.uid() IS NULL) OR (id = rebase.uid()::uuid) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_write_policy_insert" ON "rebase"."users";
 CREATE POLICY "users_write_policy_insert" ON "rebase"."users" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']));
 DROP POLICY IF EXISTS "users_write_policy_update" ON "rebase"."users";

@@ -100,7 +100,8 @@ CREATE TABLE "public"."orders" (
   "shipped_date" TIMESTAMP WITH TIME ZONE,
   "delivered_date" TIMESTAMP WITH TIME ZONE,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
+  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  "order" TEXT
 );
 
 CREATE TABLE "public"."posts" (

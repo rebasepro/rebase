@@ -12,6 +12,18 @@ CREATE OR REPLACE FUNCTION public.rebase_search_text(jsonb) RETURNS text
     $$ SELECT coalesce(string_agg(v, ' '), '')
        FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == "string")')) AS v $$;
 
+DO $rebase_search$
+DECLARE recorded text;
+BEGIN
+    SELECT col_description(a.attrelid, a.attnum) INTO recorded
+    FROM pg_attribute a
+    WHERE a.attrelid = '"public"."posts"'::regclass AND a.attname = 'search_vector' AND NOT a.attisdropped;
+    IF recorded LIKE 'rebase:search:v1:%' AND recorded <> 'rebase:search:v1:fae069ed8fc5ebca' THEN
+        RAISE EXCEPTION 'Rebase: the search block for public.posts changed after the generated column "search_vector" was built (recorded %, expected rebase:search:v1:fae069ed8fc5ebca). Postgres cannot alter a generated expression in place. Drop the column and re-apply this file — it rewrites the table and rebuilds the index: ALTER TABLE "public"."posts" DROP COLUMN "search_vector";', recorded;
+    END IF;
+END
+$rebase_search$;
 ALTER TABLE "public"."posts" ADD COLUMN IF NOT EXISTS "search_vector" tsvector GENERATED ALWAYS AS (setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("excerpt", '')), 'C') || setweight(to_tsvector('english', public.rebase_search_text(coalesce("content", '{}'::jsonb))), 'D')) STORED;
+COMMENT ON COLUMN "public"."posts"."search_vector" IS 'rebase:search:v1:fae069ed8fc5ebca';
 CREATE INDEX IF NOT EXISTS "posts_search_vector_gin" ON "public"."posts" USING GIN ("search_vector");
 
