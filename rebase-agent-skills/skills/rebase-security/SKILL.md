@@ -28,12 +28,12 @@ Rebase implements a **multi-layered, defense-in-depth** security architecture. S
 
 ## Security Architecture Overview
 
-Every request — REST, GraphQL, and WebSocket — passes through **5 security layers** before data is returned to the client. These layers are enforced at the **application level** and work independently of any database-native security mechanism.
+Every request — REST and WebSocket — passes through **5 security layers** before data is returned to the client. These layers are enforced at the **application level** and work independently of any database-native security mechanism.
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │                    CLIENT REQUEST                     │
-│              (REST / GraphQL / WebSocket)             │
+│                  (REST / WebSocket)                   │
 └──────────────┬───────────────────────────────────────┘
                │
 ┌──────────────▼───────────────────────────────────────┐
@@ -81,12 +81,6 @@ All three protocols share the same security middleware stack:
 ```
 HTTP Request → Auth Middleware → API Key Guard → Scoped Driver → global callbacks → collection callbacks → property callbacks → Response
 ```
-
-### GraphQL
-```
-GraphQL Request → Auth Middleware → API Key Guard → Scoped Driver → Collection Callbacks → Response
-```
-GraphQL shares the same Hono middleware chain as REST. Resolvers extract the scoped driver from context and throw if unavailable.
 
 ### WebSocket
 ```
@@ -190,7 +184,7 @@ interface ApiKeyPermission {
 - `POST` / `PUT` / `PATCH` → requires `"write"` permission
 - `DELETE` → requires `"delete"` permission
 
-This layer runs in both REST and GraphQL. If the API key lacks the required permission, the request is rejected with **403 Forbidden**.
+This layer runs on every REST request. If the API key lacks the required permission, the request is rejected with **403 Forbidden**.
 
 ---
 

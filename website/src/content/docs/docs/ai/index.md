@@ -44,7 +44,7 @@ visibility, not about authentication. Granting it does not add a caller to the
 permission list, and withholding it does not stop one.
 
 The mechanics — creating keys, the permission JSON, rotation, expiry, rate
-limits — are covered in [REST & GraphQL API → API Keys](/docs/backend/api#api-keys).
+limits — are covered in [REST API → API Keys](/docs/backend/api#api-keys).
 Do not skip [Security Rules (RLS)](/docs/collections/security-rules) on the way
 past; the second gate is only as good as the policies you wrote.
 
@@ -65,7 +65,7 @@ It is already documented, in two places rather than one:
 
 - [Querying Data → Vector Search](/docs/sdk/querying#vector-search) — the SDK
   method, the `_distance` field it adds to each row, and the caveats
-- [REST & GraphQL API → Vector Search](/docs/backend/api#vector-search) — the
+- [REST API → Vector Search](/docs/backend/api#vector-search) — the
   `vector_search`, `vector`, `vector_distance` and `vector_threshold` query
   parameters
 

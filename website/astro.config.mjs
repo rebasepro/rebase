@@ -71,7 +71,8 @@ export default defineConfig({
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
-                        { label: "Upgrading", slug: "docs/upgrading" }
+                        { label: "Upgrading", slug: "docs/upgrading" },
+                        { label: "Compatibility", slug: "docs/compatibility" }
                     ]
                 },
                 {
@@ -90,7 +91,7 @@ export default defineConfig({
                     collapsed: false,
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
-                        { label: "REST & GraphQL API", slug: "docs/backend/api" },
+                        { label: "REST API", slug: "docs/backend/api" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },

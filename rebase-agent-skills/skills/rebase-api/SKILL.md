@@ -1,13 +1,13 @@
 ---
 name: rebase-api
-description: Guide for working with Rebase auto-generated REST and GraphQL APIs. Use this skill when the user needs to understand the API endpoints, query parameters, filtering, sorting, pagination, or GraphQL schema.
+description: Guide for working with Rebase's auto-generated REST API. Use this skill when the user needs to understand the API endpoints, query parameters, filtering, sorting, or pagination.
 ---
 
 # Rebase Auto-Generated APIs
 
-> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`) instead of making raw REST or GraphQL API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
+> **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`) instead of making raw REST API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
 
-Every collection defined in Rebase automatically gets full REST CRUD and GraphQL endpoints. No manual route creation needed.
+Every collection defined in Rebase automatically gets full REST CRUD endpoints. No manual route creation needed.
 
 ## REST API
 
@@ -29,8 +29,6 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/schema-editor/*` | Visual schema editor (dev only) |
 | `/api/docs` | OpenAPI 3.0.3 JSON spec |
 | `/api/swagger` | Swagger UI (dev only) |
-| `/api/graphql` | GraphQL endpoint (when enabled) |
-| `/api/graphiql` | GraphiQL IDE (dev only, when GraphQL enabled) |
 | `/api/health` | Health check |
 | `/api/meta/contract` | Collection contract, for remote SDK generation (admin / service-key / admin API-key gated) |
 | `/api/meta/schema-version` | The schema hash this backend was built from (unauthenticated) |
@@ -548,131 +546,6 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/authors/111094/posts?orderBy=createdAt:desc&limit=5"
 ```
 
-## GraphQL API
-
-### Endpoint
-
-```
-POST /api/graphql
-```
-
-GraphQL is **enabled by default** (`enableGraphQL: true` in `ApiConfig`). In non-production environments, a GraphiQL IDE is also available at `/api/graphiql`.
-
-### Auto-Generated Schema
-
-For each collection, Rebase generates the following GraphQL types and operations:
-
-**Types:**
-- `{TypeName}` — Entity output type (e.g., `Product`, `BlogPost`)
-- `{TypeName}Input` — Input type for create/update mutations
-
-The type name is derived from `collection.singularName` (spaces removed) or by removing the last character of `collection.name`.
-
-**Queries:**
-
-| Query | Arguments | Returns | Description |
-|-------|-----------|---------|-------------|
-| `{typeName}` (lowercase) | `id: String!` | `{TypeName}` | Get single entity |
-| `{collection.slug}` | `limit: Int = 20`, `offset: Int = 0`, `where: String`, `orderBy: String` | `[{TypeName}]` | List entities |
-
-**Mutations:**
-
-| Mutation | Arguments | Returns | Description |
-|----------|-----------|---------|-------------|
-| `create{TypeName}` | `input: {TypeName}Input!` | `{TypeName}` | Create entity |
-| `update{TypeName}` | `id: String!`, `input: {TypeName}Input!` | `{TypeName}` | Update entity |
-| `delete{TypeName}` | `id: String!` | `Boolean` | Delete entity (returns `true`/`false`) |
-
-### GraphQL Type Mapping
-
-| Rebase Property Type | GraphQL Type |
-|---------------------|--------------|
-| `string` | `String` |
-| `binary` | `String` |
-| `number` | `Float` |
-| `boolean` | `Boolean` |
-| `date` | `String` |
-| `array` | `[String]` |
-| `vector` | `[Float]` |
-| All others | `String` |
-
-Fields with `validation.required` are wrapped in `GraphQLNonNull`.
-
-### GraphQL Query Examples
-
-**List products with filters:**
-
-```graphql
-query {
-  products(
-    limit: 10,
-    offset: 0,
-    where: "{\"status\":[\"==\",\"active\"]}",
-    orderBy: "createdAt"
-  ) {
-    id
-    name
-    price
-    status
-    createdAt
-  }
-}
-```
-
-> **IMPORTANT FOR AGENTS:** The `where` argument is a JSON **string**, not an object. It must be a valid JSON object where keys are field names and values are `[operator, value]` tuples. The `orderBy` argument is a plain field name string.
-
-**Get single product:**
-
-```graphql
-query {
-  product(id: "uuid-123") {
-    id
-    name
-    price
-    category
-  }
-}
-```
-
-**Create product:**
-
-```graphql
-mutation {
-  createProduct(input: {
-    name: "New Widget",
-    price: 19.99,
-    status: "draft"
-  }) {
-    id
-    name
-    price
-  }
-}
-```
-
-**Update product:**
-
-```graphql
-mutation {
-  updateProduct(id: "uuid-123", input: {
-    name: "Updated Widget",
-    price: 24.99
-  }) {
-    id
-    name
-    price
-  }
-}
-```
-
-**Delete product:**
-
-```graphql
-mutation {
-  deleteProduct(id: "uuid-123")
-}
-```
-
 ## OpenAPI / Swagger
 
 ### OpenAPI 3.0.3 Spec
@@ -742,7 +615,6 @@ GET /api/collections
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
-| `enableGraphQL` | `boolean` | `true` | Enable GraphQL endpoint |
 | `enableREST` | `boolean` | `true` | Enable REST CRUD endpoints |
 | `requireAuth` | `boolean` | `true` | Require authentication for API endpoints |
 | `pagination.defaultLimit` | `number` | `20` | Default page size |
@@ -758,7 +630,6 @@ GET /api/collections
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
 - **REST API Generator:** `packages/server/src/api/rest/api-generator.ts`
 - **Query Parser:** `packages/server/src/api/rest/query-parser.ts`
-- **GraphQL Generator:** `packages/server/src/api/graphql/graphql-schema-generator.ts`
 - **OpenAPI Generator:** `packages/server/src/api/openapi-generator.ts`
 - **Error Handling:** `packages/server/src/api/errors.ts`
 - **Server Setup:** `packages/server/src/api/server.ts`

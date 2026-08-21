@@ -74,7 +74,7 @@ For specific topics, see:
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies
 - `rebase-security` — Backend security architecture, RLS, API keys, threat model
-- `rebase-api` — Auto-generated REST and GraphQL APIs
+- `rebase-api` — Auto-generated REST API
 - `rebase-studio` — Visual admin panel, collection editor, custom views
 - `rebase-deployment` — Rebase Cloud, Docker, Firebase Hosting
 - `rebase-storage` — File uploads, S3, local storage

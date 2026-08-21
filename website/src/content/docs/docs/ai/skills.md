@@ -84,7 +84,7 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | `rebase-basics` | Core principles, workflow and maintenance — the entry point the others assume |
 | `rebase-collections` | Defining collections, property types, validation, searchability |
 | `rebase-backend-postgres` | The Postgres backend: setup, schema generation, migrations, pooling, read replicas |
-| `rebase-api` | The generated REST and GraphQL APIs — endpoints, filtering, sorting, pagination |
+| `rebase-api` | The generated REST API — endpoints, filtering, sorting, pagination |
 | `rebase-sdk` | The generated TypeScript SDK: CRUD, filtering, search, auth, realtime, offline, storage |
 | `rebase-auth` | Authentication, roles, RLS policies, MFA, API keys, OAuth, custom adapters |
 | `rebase-security` | Access control, interception, fail-closed design, PII masking, tenant isolation |

@@ -59,7 +59,7 @@
     "check:templates": "node scripts/check-templates.mjs",
     "check:eject": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx scripts/check-eject.mts",
     "check:examples": "pnpm --filter \"./examples/*\" -r run typecheck",
-    "check:generated": "pnpm -C website run generate-all && git -c core.fsmonitor=false diff --exit-code -- website/public/llms.txt website/public/sitemap.md website/src/content/docs/docs/CHANGELOG.md",
+    "check:generated": "pnpm -C website run generate-all && git -c core.fsmonitor=false diff --exit-code -- website/public/llms.txt website/public/sitemap.md website/src/content/docs/docs/CHANGELOG.md website/src/content/docs/docs/compatibility.md",
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node scripts/check-undeclared-deps.mjs",
     "check:api-surface": "node scripts/check-api-surface.mjs",

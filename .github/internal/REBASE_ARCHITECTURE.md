@@ -6,7 +6,7 @@ Rebase is a full Backend-as-a-Service (BaaS), designed as a completely open-sour
 While Supabase stitched together many tools (GoTrue, PostgREST, Realtime), Rebase is fully integrated, tightly coupled, and written natively in TypeScript powered by Drizzle ORM.
 
 ### Core Pillars
-1. **Auto-Generated PostgREST-style APIs:** Every collection gets full REST CRUD and GraphQL endpoints dynamically.
+1. **Auto-Generated PostgREST-style APIs:** Every collection gets full REST CRUD endpoints dynamically.
 2. **Built-in Authentication & RLS:** Simple context injection to protect all endpoints based on Application-Level Security Rules.
 3. **Integrated Storage:** S3 / Local storage registries handled smoothly.
 4. **Realtime Engine:** WebSockets for instant table updates broadcast to clients.

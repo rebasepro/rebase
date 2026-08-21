@@ -1,8 +1,8 @@
 ---
 name: "rebase"
 displayName: "Build with Rebase"
-description: "Build headless CMS backends with Rebase — PostgreSQL, auto-generated REST & GraphQL APIs, authentication with RLS, realtime WebSockets, visual schema editor, and full admin panel"
-keywords: ["rebase", "cms", "headless-cms", "postgresql", "drizzle", "admin-panel", "baas", "rest-api", "graphql", "realtime", "authentication", "rls", "storage"]
+description: "Build headless CMS backends with Rebase — PostgreSQL, an auto-generated REST API, authentication with RLS, realtime WebSockets, visual schema editor, and full admin panel"
+keywords: ["rebase", "cms", "headless-cms", "postgresql", "drizzle", "admin-panel", "baas", "rest-api", "realtime", "authentication", "rls", "storage"]
 mcpServers: ["rebase"]
 ---
 
@@ -55,7 +55,6 @@ Once configured, the MCP server provides Rebase capabilities to your AI assistan
 
 ### Additional Capabilities (via Backend)
 - **Auto-Generated REST API**: Full CRUD endpoints for every collection
-- **Auto-Generated GraphQL API**: Query and mutate data with GraphQL
 - **Realtime Engine**: WebSocket-based instant table updates
 - **Storage**: S3 and local file storage
 - **RLS Policies**: Row-Level Security with auth context injection

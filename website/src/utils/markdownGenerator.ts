@@ -222,7 +222,7 @@ Bulletproof, version-controlled access control for your PostgreSQL database.
 - **Row-Level Security (RLS)**: Define RLS policies directly in your TypeScript schema — no raw SQL required.
 - **Role-Based Access Control (RBAC)**: Fine-grained permissions per collection, per field, and per user role.
 - **JWT Authentication**: Secure JSON Web Token plumbing out of the box.
-- **Enterprise Integrations**: Supported SAML, SSO, and OAuth providers.
+- **SSO & OAuth**: OIDC single sign-on including Microsoft Entra ID, plus Google, GitHub, Apple, LinkedIn and more.
 `;
   }
 

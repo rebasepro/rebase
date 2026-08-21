@@ -313,7 +313,7 @@ async function buildSlugMap(directoryPath, slugMap) {
 
 const intro = `# Rebase Documentation
 
-> Rebase is an open-source TypeScript backend built on Postgres: REST & GraphQL APIs, authentication,
+> Rebase is an open-source TypeScript backend built on Postgres: a REST API, authentication,
 > row-level security, realtime subscriptions, storage, cron jobs, and an MCP server for AI agents —
 > all generated from your schema, with a full admin panel and SQL editor included on top.
 > Connect an existing PostgreSQL database or start fresh; Rebase uses Drizzle ORM under the hood and
