@@ -4,6 +4,9 @@ Thank you for your interest in contributing! Whether it's a bug fix, new feature
 
 If you're new to open source, check out [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/).
 
+Taking part in this project — issues, pull requests, code review, or the Discord —
+means agreeing to our [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Prerequisites
 
 - **Node.js** ≥ 20

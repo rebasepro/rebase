@@ -4,12 +4,14 @@ What Rebase promises across versions, and what it does not.
 
 This is the document to read before changing anything a deployed project or a
 running Rebase Cloud tenant already depends on. It is also the honest answer to
-"if I build on 0.13, what breaks under me later?"
+"if I build on Rebase today, what breaks under me later?"
 
-## The 0.13 promise
+## The 0.x promise
 
-Rebase is `0.x`. **Breaking changes to the authored TypeScript API are still
-allowed in a minor**, and the changelog is where they are announced. What is
+Rebase is `0.x` — 0.16 at the time of writing. This section is written to hold
+for every 0.x release rather than for one of them, so it does not go stale on
+each cut. **Breaking changes to the authored TypeScript API are still allowed in
+a minor**, and the changelog is where they are announced. What is
 *not* allowed to break silently is the set of versioned contracts below: each
 one is stamped into an artifact or a database, each is checked at boot or at
 intake, and each fails **loudly and specifically** rather than degrading.

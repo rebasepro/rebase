@@ -2,16 +2,20 @@
 
 ## Supported Versions
 
-Rebase is pre-1.0 and moves quickly. Security fixes land on the latest minor
-release line; older lines do not receive backports.
+Rebase is pre-1.0 and moves quickly. Security fixes land on the **latest minor
+release line only**; older lines do not receive backports.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.10.x  | ✅ Yes    |
-| < 0.10  | ❌ No — please upgrade |
+| Latest minor (currently 0.16.x) | ✅ Yes |
+| Anything older | ❌ No — please upgrade |
+
+The table names a version so you can check yourself at a glance, but the rule is
+the one above it: whatever the newest minor on npm is, that is the supported
+line. `npm view @rebasepro/server version` answers it authoritatively.
 
 Rebase Cloud (`app.rebase.pro`) always runs a supported version. If you self-host,
-upgrading to the latest 0.10.x release is the supported path to a security fix.
+upgrading to the latest minor is the supported path to a security fix.
 
 ## Reporting a Vulnerability
 
