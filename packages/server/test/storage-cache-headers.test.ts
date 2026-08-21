@@ -223,3 +223,66 @@ describe("GET /file/* — headers on the wire", () => {
         expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     });
 });
+
+describe("transform cache — a replaced source is not served from the old rendition", () => {
+    let app: Hono<HonoEnv>;
+    let tempDir: string;
+    let controller: LocalStorageController;
+    let key: string;
+
+    /** A real PNG of a given size, so sharp does real work. */
+    const png = async (width: number, height: number, colour: number) => {
+        const sharp = (await import("sharp")).default;
+        return sharp({
+            create: { width, height, channels: 3, background: { r: colour, g: colour, b: colour } }
+        }).png().toBuffer();
+    };
+
+    const put = async (bytes: Buffer) => {
+        await controller.putObject({
+            file: new File([new Uint8Array(bytes)], "a.png", { type: "image/png" }),
+            key
+        });
+    };
+
+    beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-transform-stale-"));
+        controller = new LocalStorageController({ basePath: tempDir });
+        // Unique per run: the transform cache is module-scoped and outlives a test.
+        key = `photos/${path.basename(tempDir)}.png`;
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({ controller, requireAuth: false }));
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+    });
+
+    it("serves the new image after the source is overwritten", async () => {
+        const url = `http://localhost/api/storage/file/${key}?width=32`;
+
+        await put(await png(64, 64, 10));
+        const first = Buffer.from(await (await app.fetch(new Request(url))).arrayBuffer());
+
+        // A visibly different source: same dimensions would still re-encode to a
+        // different body, but a different colour makes the difference obvious.
+        await put(await png(64, 64, 250));
+        const second = Buffer.from(await (await app.fetch(new Request(url))).arrayBuffer());
+
+        // Before the key carried the source's validator, the second read hit the
+        // module-scoped cache and returned the first rendition for a full hour.
+        expect(second.equals(first)).toBe(false);
+    });
+
+    it("still serves a cached rendition when the source has not changed", async () => {
+        const url = `http://localhost/api/storage/file/${key}?width=32`;
+        await put(await png(64, 64, 10));
+
+        const a = Buffer.from(await (await app.fetch(new Request(url))).arrayBuffer());
+        const b = Buffer.from(await (await app.fetch(new Request(url))).arrayBuffer());
+
+        expect(b.equals(a)).toBe(true);
+    });
+});

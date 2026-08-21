@@ -15,7 +15,7 @@ import { StorageController, type StorageAuthorize, type StorageAuthorizeData, ty
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
-import { objectValidators, isNotModified, applyCacheHeaders } from "./cache-headers";
+import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
@@ -555,6 +555,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // wildcard admits several spellings of one object (`x.png`,
         // `default/x.png`), and it omitted the storage source entirely — two
         // sources holding the same key shared one entry.
+        //
+        // It names the object but not *which version* of it, which is the other
+        // half: a key can be overwritten, and a rendition of the old bytes stayed
+        // valid for the cache's full hour. Each call site appends the source's
+        // validator below, so replacing the source changes the key rather than
+        // shadowing it, and the superseded entry ages out on its own.
         const transformKeyPrefix = `${storageId || "(default)"}/${bucket}/${resolvedPath}`;
 
         // Whether a *shared* cache may keep this. An object under the public
@@ -611,7 +617,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
             // Apply image transforms if requested and the file is a transformable image
             if (transformOpts && isTransformableImage(contentType)) {
-                const cacheKey = transformCache.buildKey(transformKeyPrefix, transformOpts);
+                const sourceVersion = buildEntityTag(localStat.size, localStat.mtimeMs);
+                const cacheKey = transformCache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
                 const transformed = await transformOnce(
                     cacheKey,
                     transformOpts,
@@ -652,7 +659,8 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         // Apply image transforms for remote storage too
         if (transformOpts && isTransformableImage(remoteContentType)) {
-            const cacheKey = transformCache.buildKey(transformKeyPrefix, transformOpts);
+            const sourceVersion = buildEntityTag(fileObject.size, fileObject.lastModified);
+            const cacheKey = transformCache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
             const transformed = await transformOnce(
                 cacheKey,
                 transformOpts,
