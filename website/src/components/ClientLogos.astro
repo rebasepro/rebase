@@ -11,7 +11,7 @@ const INTRINSIC: Record<string, [number, number]> = {
     "/img/logos/deardoc.webp": [290, 66],
     "/img/logos/mm_logo.webp": [288, 71],
     "/img/logos/proton_logo.svg": [710, 710],
-    "/img/logos/withu.png": [300, 163],
+    "/img/logos/withu.png": [202, 39],
     "/img/logos/social_income_logo.svg": [1493, 157],
     "/img/logos/clario.svg": [139, 38],
     "/img/logos/gearfocus_logo.svg": [300, 64],
@@ -24,7 +24,31 @@ const INTRINSIC: Record<string, [number, number]> = {
     "/img/logos/fyc.svg": [204, 30],
     "/img/logos/kodecreators.svg": [141, 44],
     "/img/logos/viscap.svg": [300, 52],
-    "/img/logos/abacus.svg": [102, 30]
+    "/img/logos/abacus.svg": [102, 30],
+    "/img/logos/mm_logo_white.webp": [474, 116],
+    "/img/logos/teamglobalexp.png": [411, 106],
+    "/img/logos/azzurri.png": [1002, 93],
+    "/img/logos/atecspine.png": [300, 148],
+    "/img/logos/imerco.svg": [300, 48],
+    "/img/logos/gft.svg": [300, 70],
+    "/img/logos/swissmilk.svg": [300, 59],
+    "/img/logos/shiftinc.svg": [300, 71],
+    "/img/logos/recharge.svg": [300, 38],
+    "/img/logos/aquileia.svg": [140, 59],
+    "/img/logos/hubx.svg": [300, 79],
+    "/img/logos/bettha.svg": [87, 22],
+    "/img/logos/colearn.svg": [120, 30],
+    "/img/logos/lovevolve.png": [400, 59],
+    "/img/logos/seesight.png": [477, 121],
+    "/img/logos/teamdrs.svg": [108, 31],
+    "/img/logos/yalantis.svg": [116, 26],
+    "/img/logos/rush.svg": [219, 80],
+    "/img/logos/inoxoft.svg": [128, 30],
+    "/img/logos/nerdzlab.svg": [113, 30],
+    "/img/logos/polymorph.png": [244, 48],
+    "/img/logos/gorin.webp": [374, 51],
+    "/img/logos/holition.svg": [222, 59],
+    "/img/logos/accurat.svg": [300, 27]
 };
 
 // Shared by the server-rendered markup below AND the carousel script that swaps
@@ -37,6 +61,9 @@ const INTRINSIC: Record<string, [number, number]> = {
 // the box is reserved correctly before the file arrives. `object-contain` covers
 // the wide logos, where `max-w-full` clamps width against a fixed inline height
 // and would otherwise squash the artwork (viscap wants 242px at h-42, cell is 144).
+const LOGO_TEXT_CLASSES =
+    "font-semibold text-center text-surface-200 opacity-60 hover:opacity-100 hover:text-white transition-all duration-500";
+
 const LOGO_IMG_CLASSES =
     "max-w-full w-auto h-auto object-contain grayscale opacity-60 hover:opacity-100 transition-all duration-500";
 
@@ -79,7 +106,7 @@ const allLogos = [
         product: "rebase" as LogoProduct,
         alt: "MedicalMotion Logo",
         href: "https://medicalmotion.com",
-        src: "/img/logos/mm_logo.webp",
+        src: "/img/logos/mm_logo_white.webp",
         invert: false,
         height: 36,
         type: "startups"
@@ -99,15 +126,7 @@ const allLogos = [
         href: "https://www.withuapp.com//",
         src: "/img/logos/withu.png",
         invert: true,
-        type: "startups"
-    },
-    {
-        key: "claimgem",
-        alt: "ClaimGem",
-        href: "https://claimgem.com/",
-        text: "ClaimGem",
-        invert: false,
-        height: 28,
+        height: 25,
         type: "startups"
     },
     {
@@ -225,6 +244,290 @@ const allLogos = [
         invert: true,
         height: 32,
         type: "agencies"
+    },
+    {
+        key: "teamglobalexpress",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Team Global Express",
+        href: "https://teamglobalexp.com/",
+        src: "/img/logos/teamglobalexp.png",
+        invert: true,
+        height: 34,
+        type: "companies"
+    },
+    {
+        key: "azzurri",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Azzurri Group",
+        href: "https://www.azzurrigroup.co.uk/",
+        src: "/img/logos/azzurri.png",
+        invert: false,
+        height: 14,
+        type: "companies"
+    },
+    {
+        key: "atecspine",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "ATEC Spine",
+        href: "https://atecspine.com/",
+        src: "/img/logos/atecspine.png",
+        invert: false,
+        height: 46,
+        type: "companies"
+    },
+    {
+        key: "imerco",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Imerco",
+        href: "https://www.imerco.dk/",
+        src: "/img/logos/imerco.svg",
+        invert: true,
+        height: 22,
+        type: "companies"
+    },
+    {
+        key: "gft",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "GFT Technologies",
+        href: "https://www.gft.com/",
+        src: "/img/logos/gft.svg",
+        invert: true,
+        height: 26,
+        type: "companies"
+    },
+    {
+        key: "swissmilk",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Swissmilk",
+        href: "https://www.swissmilk.ch/",
+        src: "/img/logos/swissmilk.svg",
+        invert: true,
+        height: 26,
+        type: "companies"
+    },
+    {
+        key: "shift",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "SHIFT Inc.",
+        href: "https://www.shiftinc.jp/",
+        src: "/img/logos/shiftinc.svg",
+        invert: true,
+        height: 28,
+        type: "companies"
+    },
+    {
+        key: "recharge",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Recharge.com",
+        href: "https://www.recharge.com/",
+        src: "/img/logos/recharge.svg",
+        invert: false,
+        height: 18,
+        type: "companies"
+    },
+    {
+        key: "aquileia",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Basilica di Aquileia",
+        href: "https://www.basilicadiaquileia.it/",
+        src: "/img/logos/aquileia.svg",
+        invert: false,
+        height: 40,
+        type: "companies"
+    },
+    {
+        key: "hubx",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "HubX",
+        href: "https://hubx.co/",
+        src: "/img/logos/hubx.svg",
+        invert: true,
+        height: 28,
+        type: "startups"
+    },
+    {
+        key: "aumio",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Aumio Health",
+        href: "https://www.aumio.com/",
+        text: "Aumio",
+        invert: false,
+        type: "startups"
+    },
+    {
+        key: "bettha",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Bettha",
+        href: "https://bettha.com/",
+        src: "/img/logos/bettha.svg",
+        invert: false,
+        height: 26,
+        type: "startups"
+    },
+    {
+        key: "colearn",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "CoLearn",
+        href: "https://colearn.id/",
+        src: "/img/logos/colearn.svg",
+        invert: true,
+        height: 28,
+        type: "startups"
+    },
+    {
+        key: "lovevolve",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "LovEvolve",
+        href: "https://lovevolve.com/",
+        src: "/img/logos/lovevolve.png",
+        invert: true,
+        height: 21,
+        type: "startups"
+    },
+    {
+        key: "seesight",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "See Sight Tours",
+        href: "https://www.seesight-tours.com/",
+        src: "/img/logos/seesight.png",
+        invert: true,
+        height: 33,
+        type: "startups"
+    },
+    {
+        key: "declutterthemind",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Declutter The Mind",
+        href: "https://declutterthemind.com/",
+        text: "Declutter The Mind",
+        textClass: "text-base leading-tight",
+        invert: false,
+        type: "startups"
+    },
+    {
+        key: "drs",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "DRS",
+        href: "https://teamdrs.ai/",
+        src: "/img/logos/teamdrs.svg",
+        invert: false,
+        height: 30,
+        type: "startups"
+    },
+    {
+        key: "yalantis",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Yalantis",
+        href: "https://yalantis.com/",
+        src: "/img/logos/yalantis.svg",
+        invert: true,
+        height: 26,
+        type: "agencies"
+    },
+    {
+        key: "rush",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "RUSH",
+        href: "https://rush.co.nz/",
+        src: "/img/logos/rush.svg",
+        invert: false,
+        height: 34,
+        type: "agencies"
+    },
+    {
+        key: "inoxoft",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Inoxoft",
+        href: "https://inoxoft.com/",
+        src: "/img/logos/inoxoft.svg",
+        invert: false,
+        height: 28,
+        type: "agencies"
+    },
+    {
+        key: "nerdzlab",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "NerdzLab",
+        href: "https://nerdzlab.com/",
+        src: "/img/logos/nerdzlab.svg",
+        invert: false,
+        height: 30,
+        type: "agencies"
+    },
+    {
+        key: "polymorph",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Polymorph",
+        href: "https://polymorph.co.za/",
+        src: "/img/logos/polymorph.png",
+        invert: false,
+        height: 26,
+        type: "agencies"
+    },
+    {
+        key: "gorinsystems",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Gorin Systems",
+        href: "https://gorinsystems.com/",
+        src: "/img/logos/gorin.webp",
+        invert: true,
+        height: 20,
+        type: "agencies"
+    },
+    {
+        key: "holition",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Holition",
+        href: "https://holition.com/",
+        src: "/img/logos/holition.svg",
+        invert: false,
+        height: 28,
+        type: "agencies"
+    },
+    {
+        key: "accurat",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "Accurat",
+        href: "https://www.accurat.it/",
+        src: "/img/logos/accurat.svg",
+        invert: true,
+        height: 13,
+        type: "agencies"
+    },
+    {
+        key: "200apps",
+        // FireCMS Cloud customer, verified from signup + project activity.
+        product: "firecms" as LogoProduct,
+        alt: "200Apps",
+        href: "https://www.200apps.com/",
+        text: "200Apps",
+        invert: false,
+        type: "agencies"
     }
 ];
 
@@ -234,12 +537,14 @@ interface Props {
 
 const { filter } = Astro.props;
 
-const filteredLogos = allLogos.filter(logo => !filter || logo.type === filter);
+// Established companies and institutions belong on every page rather than to one
+// audience, so they survive whichever filter is applied.
+const filteredLogos = allLogos.filter(logo => !filter || logo.type === filter || logo.type === "companies");
 
 const initialLogos = filteredLogos.slice(0, 5);
 ---
 
-<div class="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-6 gap-y-4" id="logo-container">
+<div class="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 sm:gap-x-6 gap-y-4" id="logo-container">
     {initialLogos.map((logo) => (
             <a
                     target="_blank"
@@ -264,12 +569,12 @@ const initialLogos = filteredLogos.slice(0, 5);
                         ]}
                 />}
                 {logo.text && <span
-                        class="text-2xl font-semibold text-surface-400 hover:text-white transition-colors">{logo.text}</span>}
+                        class:list={[LOGO_TEXT_CLASSES, logo.textClass ?? "text-2xl"]}>{logo.text}</span>}
             </a>
     ))}
 </div>
 
-<script define:vars={{ allLogos: filteredLogos, INTRINSIC, LOGO_IMG_CLASSES }}>
+<script define:vars={{ allLogos: filteredLogos, INTRINSIC, LOGO_IMG_CLASSES, LOGO_TEXT_CLASSES }}>
     document.addEventListener('astro:page-load', () => {
         const container = document.getElementById('logo-container');
         if (!container) return;
@@ -345,7 +650,7 @@ const initialLogos = filteredLogos.slice(0, 5);
                     newElement.appendChild(img);
                 } else if (newLogo.text) {
                     const span = document.createElement('span');
-                    span.className = 'text-2xl font-semibold text-surface-400 hover:text-white transition-colors';
+                    span.className = `${LOGO_TEXT_CLASSES} ${newLogo.textClass ?? 'text-2xl'}`;
                     span.textContent = newLogo.text;
                     newElement.appendChild(span);
                 }
