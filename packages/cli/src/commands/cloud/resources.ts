@@ -125,10 +125,17 @@ export function describeRuntime(project: {
     const version = project.runtimeVersion ?? "unknown";
     const framework = project.runtimeFrameworkVersion;
     const pin = project.runtimeVersionPin ? chalk.gray(` · pinned to ${project.runtimeVersionPin}`) : "";
+    // "image framework", not "framework". This one is what the IMAGE ships (the
+    // server half); `cloud deployments` reports what each BUNDLE installed (the
+    // driver half). Two facts about the two sides of the boundary the intake
+    // floor exists to police — and while both were printed as "framework
+    // version", the only way to read them was as one number contradicting
+    // itself, which is exactly how it was reported.
+    //
     // Absent rather than guessed: a release whose image tag is not a semver
     // (a `latest`, a branch build) records no framework version, and inventing
     // one here would defeat the point of storing it.
-    const frameworkPart = framework ? chalk.gray(` · framework ${framework}`) : "";
+    const frameworkPart = framework ? chalk.gray(` · image framework ${framework}`) : "";
     return `managed ${version}${frameworkPart}${pin}`;
 }
 
@@ -190,7 +197,15 @@ createdAt: deploy.createdAt ?? null } : null,
                 runtime: {
                     mode: project.runtimeMode ?? "custom",
                     version: project.runtimeVersion ?? null,
-                    frameworkVersion: project.runtimeFrameworkVersion ?? null,
+                    // `imageFrameworkVersion`, not `frameworkVersion`: this is
+                    // the framework the IMAGE ships, while a row from
+                    // `cloud deployments` carries `builtAgainst`, the framework
+                    // that BUNDLE installed. They are routinely different (the
+                    // image supplies the server, the bundle supplies the
+                    // driver) and were both called `frameworkVersion`, so the
+                    // two commands read as the control plane contradicting
+                    // itself about one number.
+                    imageFrameworkVersion: project.runtimeFrameworkVersion ?? null,
                     contract: project.runtimeContract ?? null,
                     range: project.runtimeRange ?? null,
                     pin: project.runtimeVersionPin ?? null

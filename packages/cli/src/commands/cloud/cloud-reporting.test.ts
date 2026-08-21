@@ -128,7 +128,7 @@ describe("deployments list", () => {
         expect(parseDeploymentsLimit(5)).toBe(5);
     });
 
-    it("surfaces the label and framework version that make a row identifiable", () => {
+    it("surfaces the label and the framework the bundle was built against", () => {
         // Without these, a --source project's history is N rows carrying the
         // same placeholder commit message, separable only by timestamp.
         const row = {
@@ -139,7 +139,12 @@ describe("deployments list", () => {
         } as DeploymentRow;
         const view = deploymentView(row);
         expect(view.message).toBe("canvas selection fix");
-        expect(view.frameworkVersion).toBe("0.11.0-canary.20260722");
+        // Published as `builtAgainst`, never `frameworkVersion`: that name is
+        // what `cloud status` gives the framework the runtime IMAGE ships, and
+        // the two being routinely different read as one number contradicting
+        // itself across two commands.
+        expect(view.builtAgainst).toBe("0.11.0-canary.20260722");
+        expect(view.frameworkVersion).toBeUndefined();
     });
 
     it("reads snake_case columns, as the rest of this view does", () => {
@@ -149,14 +154,14 @@ describe("deployments list", () => {
             framework_version: "0.10.0"
         } as DeploymentRow);
         expect(view.message).toBe("from raw sql");
-        expect(view.frameworkVersion).toBe("0.10.0");
+        expect(view.builtAgainst).toBe("0.10.0");
     });
 
     it("reports absent label and version as null, never as an empty string", () => {
         const view = deploymentView({ id: 44,
 deployMessage: "   " } as DeploymentRow);
         expect(view.message).toBeNull();
-        expect(view.frameworkVersion).toBeNull();
+        expect(view.builtAgainst).toBeNull();
     });
 });
 
@@ -167,14 +172,16 @@ describe("describeRuntime", () => {
      * project's own bundle installs `0.11.0` is a real state. Printing both is
      * the whole point, so that a reader never has to infer one from the other.
      */
-    it("names the runtime and the framework it ships", () => {
+    it("names the runtime and the framework its IMAGE ships", () => {
         const line = stripAnsi(describeRuntime({
             runtimeMode: "managed",
             runtimeVersion: "1.2.0",
             runtimeFrameworkVersion: "0.10.0"
         }));
         expect(line).toContain("managed 1.2.0");
-        expect(line).toContain("framework 0.10.0");
+        // "image framework", so it cannot be read as the bundle's own — that
+        // one is `cloud deployments`' `builtAgainst`.
+        expect(line).toContain("image framework 0.10.0");
     });
 
     it("says nothing about a framework it was not told", () => {

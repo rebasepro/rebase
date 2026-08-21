@@ -123,12 +123,20 @@ export function deploymentView(dep: DeploymentRow): Record<string, unknown> {
         isRollback: str(dep, "rollbackOf", "rollback_of") !== null,
         rollbackable: isRollbackable(dep),
         trigger: triggerInfo(dep),
-        // The caller's own label for this deploy, and the framework version the
-        // bundle resolved. Without them a `--source` project's history is N rows
+        // The caller's own label for this deploy, and the framework THIS BUNDLE
+        // installed. Without them a `--source` project's history is N rows
         // carrying an identical placeholder commit message, distinguishable only
         // by timestamp — which is not enough to answer "did mine go out?".
+        //
+        // Published as `builtAgainst` — the manifest field it comes from
+        // (`runtime.builtAgainst`, read off the installed `@rebasepro/server`) —
+        // and NOT as `frameworkVersion`, which is what `cloud status` calls the
+        // framework the runtime IMAGE ships. The two are routinely different:
+        // the image supplies the server, the bundle supplies the driver. Under
+        // one name they read as the control plane disagreeing with itself, and
+        // that is how this was reported as a bug.
         message: str(dep, "deployMessage", "deploy_message"),
-        frameworkVersion: str(dep, "frameworkVersion", "framework_version"),
+        builtAgainst: str(dep, "frameworkVersion", "framework_version"),
         commit: {
             hash: str(dep, "gitCommitHash", "gitCommitHash"),
             message: str(dep, "gitCommitMessage", "gitCommitMessage")
@@ -206,10 +214,13 @@ export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
                     console.log(
                         `  ${chalk.gray(`[${v.id}]`)} ${colorStatus(v.status as string)}  ${chalk.gray(String(v.createdAt ?? "—"))}  ${dur}  ${chalk.gray(trig)}${roll}`
                     );
-                    // The label and framework version are what make one row
-                    // distinguishable from the next; indented under it so the
-                    // status line stays scannable when they are absent.
-                    const label = [v.message, v.frameworkVersion ? `@rebasepro/* ${v.frameworkVersion}` : null]
+                    // The label and the framework this bundle was built against
+                    // are what make one row distinguishable from the next;
+                    // indented under it so the status line stays scannable when
+                    // they are absent. Spelled "built against" so it cannot be
+                    // read as the framework `cloud status` reports, which is the
+                    // image's.
+                    const label = [v.message, v.builtAgainst ? `built against @rebasepro/* ${v.builtAgainst}` : null]
                         .filter(Boolean)
                         .join("  ·  ");
                     if (label) console.log(`      ${chalk.gray(label)}`);
