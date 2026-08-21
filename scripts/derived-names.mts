@@ -164,7 +164,11 @@ const products: Fixture = {
         },
         // A plain reference, which names a column the same way and is a
         // different code path to get there.
-        supplier: { type: "reference", path: "suppliers" }
+        supplier: { type: "reference", path: "suppliers" },
+        // A vector column, so the ANN index name is frozen like any other
+        // derived identifier. 1536 is within what pgvector can index; a wider
+        // one creates no index and would therefore name nothing to freeze.
+        embedding: { type: "vector", dimensions: 1536 }
     }
 };
 
@@ -358,7 +362,13 @@ function readStatement(surface: Surface, producer: Producer, statement: string):
         return;
     }
 
-    if ((m = sql.match(/^CREATE(?: UNIQUE)? INDEX(?: IF NOT EXISTS)? "?([^"\s]+)"? ON "([^"]+)"\."([^"]+)"/i))) {
+    // CONCURRENTLY is optional because the two producers differ on exactly it:
+    // a migration replays as one unit and may not build concurrently, while the
+    // boot-time ensure runs statement by statement against live tables and must.
+    // Without this alternative the boot producer's indexes matched nothing here,
+    // so every index name would have rendered push-only — which this file's own
+    // header calls a defect.
+    if ((m = sql.match(/^CREATE(?: UNIQUE)? INDEX(?: CONCURRENTLY)?(?: IF NOT EXISTS)? "?([^"\s]+)"? ON "([^"]+)"\."([^"]+)"/i))) {
         record(surface, producer, "index", `${m[2]}.${m[3]}.${m[1]}`);
         return;
     }

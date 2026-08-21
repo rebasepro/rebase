@@ -174,7 +174,7 @@ const PROPERTY_KEYS_BY_TYPE: Record<string, string[]> = {
     date: ["columnType", "mode", "timezone", "autoValue"],
     geopoint: [],
     binary: [],
-    vector: ["dimensions"],
+    vector: ["dimensions", "index"],
     reference: ["isId", "path", "fixedFilter", "includeId", "includeEntityLink"],
     relation: ["isId", "relation", "resolvedRelation", "fixedFilter", "includeId", "includeEntityLink", "widget"],
     array: ["columnType", "of", "oneOf", "sortable", "canAddElements"],

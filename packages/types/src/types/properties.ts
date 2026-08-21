@@ -400,6 +400,48 @@ export interface BooleanProperty extends BaseProperty {
     validation?: PropertyValidationSchema;
 }
 
+/**
+ * Which pgvector distance a query measures with, and therefore which operator
+ * class an index has to be built for. The names match the `distance` option on
+ * `vectorSearch`, because an index built for one operator is not used by a
+ * query that asks for another.
+ *
+ * @group Entity properties
+ */
+export type VectorDistance = "cosine" | "l2" | "inner_product";
+
+/**
+ * How the ANN index over a vector column is built.
+ *
+ * Without an index, `vectorSearch` is an exact scan: correct at any size,
+ * and linear in the number of rows. With one, it is approximate and fast.
+ * That trade is why this is configurable rather than implied.
+ *
+ * @group Entity properties
+ */
+export interface VectorIndexConfig {
+    /**
+     * `hnsw` (the default) builds a navigable-graph index: slower to build,
+     * better recall, and it needs no training data, so it works on an empty
+     * table. `ivfflat` is cheaper to build but partitions by centroid, so an
+     * index built on an empty or tiny table has useless partitions — build it
+     * after the data is loaded, and set {@link lists}.
+     */
+    method?: "hnsw" | "ivfflat";
+    /**
+     * Which distance operators to index, defaulting to `cosine` — the default
+     * `vectorSearch` measures with. Name several to index several; each one is
+     * a separate index with its own build cost and its own storage.
+     */
+    distance?: VectorDistance | VectorDistance[];
+    /** HNSW: connections per node. Postgres defaults to 16. */
+    m?: number;
+    /** HNSW: candidate-list size while building. Postgres defaults to 64. */
+    efConstruction?: number;
+    /** IVFFlat: number of partitions. Postgres defaults to 100. */
+    lists?: number;
+}
+
 export interface VectorProperty extends BaseProperty {
     type: "vector";
     /**
@@ -407,6 +449,18 @@ export interface VectorProperty extends BaseProperty {
      */
     defaultValue?: Vector;
     dimensions: number;
+    /**
+     * ANN index configuration for this column.
+     *
+     * Omitted, a single HNSW index for cosine distance is created — which is
+     * what the default `vectorSearch` uses. `false` creates none, leaving
+     * `vectorSearch` an exact scan.
+     *
+     * Indexes are only created when {@link dimensions} is at most 2000:
+     * pgvector cannot index a wider `vector` column, so a 3072-dimension
+     * embedding is left unindexed rather than failing the boot.
+     */
+    index?: VectorIndexConfig | false;
     validation?: PropertyValidationSchema;
 }
 

@@ -15,6 +15,11 @@ import {
     searchIndexNames,
     type SearchColumnSpec
 } from "./search-column";
+import {
+    buildVectorIndexPlan,
+    vectorIndexStatements,
+    type VectorIndexPlan
+} from "./vector-index";
 import { REBASE_SCHEMA } from "@rebasepro/types";
 
 // --- Helper Functions ---
@@ -717,6 +722,16 @@ export const generatePostgresDdl = async (
                 const fuzzyDef = fuzzyColumnDefinition(searchSpec);
                 if (fuzzyDef) columns.push(`  ${fuzzyDef}`);
                 indexStatements.push(...searchIndexStatements(searchSpec));
+            }
+
+            // ANN indexes for vector columns. Emitted with the other indexes
+            // rather than inline, because `CREATE INDEX` is a statement and a
+            // column definition is not — and because a column too wide for
+            // pgvector to index still needs its column.
+            const vectorPlan: VectorIndexPlan = buildVectorIndexPlan(collection, resolveColumnName);
+            indexStatements.push(...vectorIndexStatements(vectorPlan));
+            for (const skip of vectorPlan.skipped) {
+                indexStatements.push(`-- No ANN index on "${skip.schema}"."${skip.table}"."${skip.column}": ${skip.reason}`);
             }
 
             // Backwards compatibility: add default id primary key if missing

@@ -48,6 +48,7 @@ import {
     planJunctionTables,
     quoteSqlLiteral
 } from "./generate-postgres-ddl-logic";
+import { buildVectorIndexPlan, vectorIndexStatement, type SkippedVectorIndex } from "./vector-index";
 import {
     AUTH_USERS_COLUMNS,
     authUsersColumnDefinition,
@@ -138,6 +139,17 @@ export interface EnsurePlan {
      * current block cannot be known, which is what the caller reports.
      */
     searchAdopted: { table: string; column: string }[];
+    /**
+     * Vector columns this plan is deliberately leaving unindexed, because
+     * pgvector cannot build an ANN index that wide.
+     *
+     * Reported rather than thrown: the column is valid, storable and
+     * searchable, and refusing the boot over it would make a working
+     * configuration unbootable. Reported rather than dropped: an unindexed
+     * vector column and an indexed one differ only in latency, so nothing
+     * about the running system says which one you got.
+     */
+    vectorIndexSkipped: SkippedVectorIndex[];
 }
 
 /**
@@ -595,7 +607,26 @@ export function planCollectionSchemaEnsure(
         }
     }
 
-    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys, searchDrift, searchAdopted };
+    //    ANN indexes for vector columns, on the same terms: the column has to
+    //    exist, the build is real work against real rows, and CONCURRENTLY is
+    //    what keeps that from locking writes for its duration.
+    //
+    //    A column too wide for pgvector to index is reported, not planned —
+    //    silence there would read as "indexed" to anyone watching the boot.
+    const vectorIndexSkipped: SkippedVectorIndex[] = [];
+    for (const collection of collections) {
+        const plan = buildVectorIndexPlan(collection, resolveColumnName);
+        for (const spec of plan.specs) {
+            actions.push({
+                kind: "create-index",
+                target: `${spec.schema}.${spec.table}`,
+                sql: vectorIndexStatement(spec).replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+            });
+        }
+        vectorIndexSkipped.push(...plan.skipped);
+    }
+
+    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys, searchDrift, searchAdopted, vectorIndexSkipped };
 }
 
 /** Read what the database has, for the schemas the collections live in. */
@@ -790,6 +821,15 @@ export async function ensureCollectionTables(
             "change made *before* this version was deployed cannot be, so if search has been missing content, " +
             `rebuild the column once: ALTER TABLE "${adopted.table.split(".").join('"."')}" DROP COLUMN "${adopted.column}"; and boot again.`;
         logger.info(`[schema] ${message}`);
+        log?.(message);
+    }
+
+    // Said once per column, every boot: an unindexed vector column and an
+    // indexed one behave identically apart from latency, so the only way anyone
+    // learns which one they have is if the boot says so.
+    for (const skip of plan.vectorIndexSkipped) {
+        const message = `No ANN index on "${skip.table}"."${skip.column}": ${skip.reason}`;
+        logger.warn(`[schema] ${message}`);
         log?.(message);
     }
 
