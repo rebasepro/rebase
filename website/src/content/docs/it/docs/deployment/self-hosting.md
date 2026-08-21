@@ -24,7 +24,7 @@ Un `docker-compose.yml` minimo:
 ```yaml
 services:
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

@@ -26,7 +26,17 @@ services:
     #   rebase db backup --out ./backups
     #   docker compose down -v && docker compose up -d db
     #   rebase db restore ./backups/<file>.dump
-    image: postgres:18-alpine
+    #
+    # pgvector's image rather than the plain `postgres:18-alpine`: it is the
+    # official Postgres image with the `vector` extension already built in, on
+    # the same major. A `{ type: "vector" }` property compiles to `VECTOR(n)`,
+    # which a stock Postgres answers with `type "vector" does not exist` — a
+    # boot failure whose cause is an image, not a config. Nothing here installs
+    # extensions on your behalf, so the image is where that decision lives.
+    #
+    # Swapping this for `postgres:18-alpine` is safe on the same major if you
+    # never declare a vector property.
+    image: pgvector/pgvector:pg18
     restart: unless-stopped
     environment:
       POSTGRES_USER: rebase

@@ -738,20 +738,23 @@ function searchDriftMessage(drift: SearchColumnDrift[]): string {
  * The missing-pgvector explanation, appended to the error that reveals it.
  *
  * A `{ type: "vector" }` property compiles to `VECTOR(n)`, and nothing in the
- * OSS pipeline installs pgvector — not this ensure, not `db push`, not the
- * scaffold's `postgres:18-alpine`, which does not ship it. Installing an
- * extension on someone's database is a decision with a deployment behind it
+ * OSS pipeline installs pgvector — not this ensure, not `db push`. Installing
+ * an extension on someone's database is a decision with a deployment behind it
  * (image, superuser, cloud allow-list), so this path stays a refusal; what it
  * must not stay is a bare `type "vector" does not exist` on a crash-looping
  * pod, which names nothing the reader can act on.
+ *
+ * The scaffold now ships `pgvector/pgvector:pg18`, so this is reached by a
+ * project pointed at a database someone else provisioned — which is exactly
+ * the case where naming the extension and the image is worth the words.
  */
 function vectorExtensionHint(message: string): string {
     if (!/type "(vector|halfvec|sparsevec)" does not exist/i.test(message)) return "";
     return (
         "\n  pgvector is not installed on this database, and Rebase does not install it: it is a server extension, " +
-        "so it needs an image that ships it (e.g. `pgvector/pgvector:pg18` — the scaffold's `postgres:18-alpine` " +
+        "so it needs an image that ships it (the scaffold's `pgvector/pgvector:pg18` does; a stock `postgres:18` " +
         "does not) and a role allowed to run `CREATE EXTENSION vector;`. Install it once, then boot again. " +
-        "Note also that Rebase creates no ANN index for a vector column, so `vectorSearch` is an exact scan."
+        "Rebase then creates an ANN index for the column automatically — see the `index` option on the property."
     );
 }
 

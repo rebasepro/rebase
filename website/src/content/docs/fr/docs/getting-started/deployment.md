@@ -30,7 +30,7 @@ Le projet généré inclut déjà un `docker-compose.yml` fonctionnel (Postgres 
 ```yaml title="docker-compose.yml (généré — abrégé)"
 services:
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}

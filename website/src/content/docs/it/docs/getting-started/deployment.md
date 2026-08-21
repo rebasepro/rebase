@@ -30,7 +30,7 @@ Il progetto generato include un `Dockerfile` e un `docker-compose.yml`. Questo Ã
 ```yaml title="docker-compose.yml"
 services:
   postgres:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: rebase
