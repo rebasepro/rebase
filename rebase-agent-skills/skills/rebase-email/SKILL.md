@@ -441,10 +441,10 @@ if (rebase.email) {
 
 ```typescript
 // functions/send-report.ts
-import { defineFunction } from "@rebasepro/server";
+import { defineFunction, requireAuth } from "@rebasepro/server/functions";
 
 export default defineFunction((app, { rebase }) => {
-    app.post("/", async (c) => {
+    app.post("/", requireAuth, async (c) => {
         const { email, reportData } = await c.req.json();
 
         // `rebase.email` always exists server-side — when SMTP is not

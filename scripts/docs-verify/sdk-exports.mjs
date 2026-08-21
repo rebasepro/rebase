@@ -19,6 +19,11 @@ const require = createRequire(import.meta.url);
 export const PACKAGE_ENTRIES = {
     "@rebasepro/client": "packages/client/src/index.ts",
     "@rebasepro/server": "packages/server/src/index.ts",
+    // A published subpath, and the one the documentation tells people to import
+    // in a function file — so its named imports need checking like any package
+    // root's. Keyed by the full specifier: `byPackage` is looked up by whatever
+    // the snippet wrote.
+    "@rebasepro/server/functions": "packages/server/src/functions/index.ts",
     "@rebasepro/server-postgres": "packages/server-postgres/src/index.ts",
     "@rebasepro/server-mongo": "packages/server-mongo/src/index.ts",
     "@rebasepro/client-postgres": "packages/client-postgres/src/index.ts",

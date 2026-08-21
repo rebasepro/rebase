@@ -103,8 +103,12 @@ export async function checkApiNames(root) {
         const lines = s.code.split("\n");
 
         // ── 1. Named imports from workspace packages ──
+        // The optional trailing segment covers published subpaths that
+        // PACKAGE_ENTRIES knows about — `@rebasepro/server/functions` is one.
+        // A subpath it does not know about resolves to no export set and is
+        // skipped, exactly as before.
         for (const m of s.code.matchAll(
-            /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["'](@rebasepro\/[^"'/]+)["']/g
+            /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["'](@rebasepro\/[^"'/]+(?:\/[^"'/]+)?)["']/g
         )) {
             const exported = byPackage.get(m[2]);
             if (!exported) continue; // package not in the graph — nothing to assert

@@ -201,6 +201,12 @@ pass: env.SMTP_PASS! }
     //   import { requireAuth, requireAdmin } from "@rebasepro/server";
     //   app.get("/admin/report", requireAuth, requireAdmin, handler);
     //
+    // From the package root here, deliberately — **not** from
+    // `@rebasepro/server/functions`. The guards on that subpath read an
+    // identity that a Rebase router has already resolved, which is the right
+    // thing inside `backend/functions/` and useless out here, where no such
+    // middleware ran. These verify the token themselves.
+    //
     // `requireAuth` answers 401 without a valid token; `requireAdmin` answers
     // 403 without the `admin` role and must follow `requireAuth`. Note that
     // `c.get("driver")` — the driver carrying the caller's identity — is only

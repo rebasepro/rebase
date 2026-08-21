@@ -52,6 +52,14 @@ export function resolveFunctionsTimeoutMs(configured?: number): number {
  * eventual result is dropped. It is a ceiling, not a kill switch, and the exact
  * number matters far less than its existence.
  *
+ * "The handler keeps running" is a **Node** guarantee, not a property of the
+ * contract. It follows from the process outliving the request, which is not
+ * true on an isolate-based host: there, work still in flight when the response
+ * resolves is terminated rather than orphaned. So a handler must not depend on
+ * finishing after its 504 — anything that has to complete belongs in
+ * `waitUntil()`, which is the one construct both hosts honour. See
+ * `./wait-until.ts`.
+ *
  * Mounted in front of the auth middleware rather than behind it, so a wedged
  * driver — the failure that also hangs `withAuth()` — is covered too.
  */

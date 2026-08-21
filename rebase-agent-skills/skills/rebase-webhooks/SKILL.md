@@ -290,35 +290,53 @@ Author it with `defineFunction`, which hands you a typed `Hono` app and the
 `rebase` singleton. Mount no auth middleware on this route — external services
 need to reach it, and the HMAC check *is* the authentication.
 
+Two details in this example are deliberate and worth copying:
+
+- **WebCrypto, not `node:crypto`.** `crypto.subtle.verify` compares in constant
+  time by construction, so there is no `timingSafeEqual` length dance to get
+  wrong — and it is available on every runtime, which `createHmac` is not.
+- **The secret is read inside the handler.** `process.env.SECRET!` at module
+  scope throws while the file is being *imported* if the variable is unset, and
+  the loader reports that as a skipped function: the webhook endpoint 404s and
+  the sender's retries all fail identically.
+
 ```typescript
 // backend/functions/webhook-receiver.ts
-import { defineFunction } from "@rebasepro/server";
-import { createHmac, timingSafeEqual } from "crypto";
+import { defineFunction, requireEnv } from "@rebasepro/server/functions";
 
-const WEBHOOK_SECRET = process.env.EXTERNAL_WEBHOOK_SECRET!;
+/** Constant-time HMAC check. Returns false for anything malformed. */
+async function signatureMatches(secret: string, body: string, header: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["verify"]
+    );
+    const hex = header.replace(/^sha256=/, "");
+    // An odd-length or non-hex value simply fails to verify.
+    const provided = Uint8Array.from((hex.match(/../g) ?? []).map((byte) => parseInt(byte, 16)));
+    return crypto.subtle.verify("HMAC", key, provided, encoder.encode(body));
+}
 
 export default defineFunction((app, { rebase }) => {
     // No requireAuth here — the signature below is what authenticates the caller.
     app.post("/incoming-webhook", async (c) => {
         const signature = c.req.header("x-webhook-signature");
-        const rawBody = await c.req.text();
-
         if (!signature) return c.json({ error: "Missing signature" }, 401);
 
-        const expected = `sha256=${createHmac("sha256", WEBHOOK_SECRET)
-            .update(rawBody)
-            .digest("hex")}`;
+        // Read the raw body BEFORE parsing: the signature covers these exact
+        // bytes, and `JSON.parse` + re-stringify will not reproduce them.
+        const rawBody = await c.req.text();
 
-        // Compare lengths first: timingSafeEqual throws on a length mismatch.
-        if (
-            signature.length !== expected.length ||
-            !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
-        ) {
+        if (!await signatureMatches(requireEnv(c, "EXTERNAL_WEBHOOK_SECRET"), rawBody, signature)) {
             return c.json({ error: "Invalid signature" }, 401);
         }
 
         const payload = JSON.parse(rawBody);
         void payload; // Process it — `rebase.dataAsAdmin` is available here.
+        void rebase;
 
         return c.json({ received: true });
     });
@@ -455,23 +473,31 @@ Trigger webhooks from a custom function endpoint:
 
 ```typescript
 // backend/functions/process-payment.ts
-import { defineFunction } from "@rebasepro/server";
+import { defineFunction, requireAuth, lazyResource } from "@rebasepro/server/functions";
+// `WebhookDispatcher` is host machinery, so it comes from the package root —
+// which is also why a function that uses it is a Node function.
 import { WebhookDispatcher } from "@rebasepro/server";
 
-const dispatcher = new WebhookDispatcher();
-dispatcher.setWebhooks([
-    {
-        id: "wh_payments",
-        url: "https://accounting.example.com/hooks/payments",
-        secret: process.env.PAYMENT_WEBHOOK_SECRET,
-        events: ["INSERT"],
-        table: "payments",
-        enabled: true,
-    },
-]);
+// Configured on the first request rather than at import time, so an unset
+// secret cannot take the whole file — and every route in it — down at load.
+const dispatcherFor = lazyResource((environment) => {
+    const dispatcher = new WebhookDispatcher();
+    dispatcher.setWebhooks([
+        {
+            id: "wh_payments",
+            url: "https://accounting.example.com/hooks/payments",
+            secret: environment.PAYMENT_WEBHOOK_SECRET,
+            events: ["INSERT"],
+            table: "payments",
+            enabled: true,
+        },
+    ]);
+    return dispatcher;
+});
 
 export default defineFunction((app, { rebase }) => {
-    app.post("/process-payment", async (c) => {
+    app.post("/process-payment", requireAuth, async (c) => {
+        const dispatcher = dispatcherFor(c);
         const { orderId, amount } = await c.req.json();
 
         // Create the payment record

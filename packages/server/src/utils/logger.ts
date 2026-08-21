@@ -12,7 +12,14 @@
  *   import { logger } from "./utils/logger";
  *   logger.info("Server started", { port: 3001 });
  *   logger.error("Request failed", { path: "/api/test", error: err });
+ *
+ * Every host global goes through `./host`, and that is load-bearing rather than
+ * tidy: this module is reachable from `@rebasepro/server/functions`, the
+ * authoring surface that has to import cleanly on a runtime with no `process`.
+ * A bare `process.env.NODE_ENV` here would make the first log line of the first
+ * request on workerd a `ReferenceError`.
  */
+import { hostEnv, writeLine } from "./host";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -47,11 +54,11 @@ export interface Logger {
 }
 
 function isProduction(): boolean {
-    return process.env.NODE_ENV === "production";
+    return hostEnv().NODE_ENV === "production";
 }
 
 function getMinLevel(): LogLevel {
-    const env = (process.env.LOG_LEVEL || "info").toLowerCase();
+    const env = (hostEnv().LOG_LEVEL || "info").toLowerCase();
     if (env in LOG_PRIORITY) return env as LogLevel;
     return "info";
 }
@@ -106,8 +113,8 @@ function isSensitiveKey(key: string): boolean {
  * it, and it never re-enables the key deny-list.
  */
 function rawQueriesAllowed(): boolean {
-    return process.env.NODE_ENV !== "production"
-        && process.env.REBASE_LOG_RAW_QUERIES === "true";
+    return hostEnv().NODE_ENV !== "production"
+        && hostEnv().REBASE_LOG_RAW_QUERIES === "true";
 }
 
 /**
@@ -232,9 +239,9 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
             const line = JSON.stringify(entry);
 
             if (level === "error") {
-                process.stderr.write(line + "\n");
+                writeLine("err", line);
             } else {
-                process.stdout.write(line + "\n");
+                writeLine("out", line);
             }
         } else {
             // Human-readable for development

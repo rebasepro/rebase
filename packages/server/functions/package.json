@@ -1,0 +1,24 @@
+{
+    "//": [
+        "Not a package. A resolution redirect, so that `@rebasepro/server/functions`",
+        "works under TypeScript's legacy `moduleResolution: \"node\"` as well as under",
+        "`bundler` / `node16` / `nodenext`.",
+        "",
+        "The `exports` map in ../package.json is the real declaration, and it is what",
+        "Node uses at runtime — once a package has `exports`, Node ignores directory",
+        "redirects like this one entirely. TypeScript's node10 mode does the opposite:",
+        "it ignores `exports` and resolves subpaths as directories. A project scaffolded",
+        "by `rebase init` compiles with `moduleResolution: \"node\"`, so without this file",
+        "the very import the template ships — `@rebasepro/server/functions` — fails its",
+        "own `tsc` with TS2307, while running perfectly.",
+        "",
+        "Deleting this file breaks type-checking for every such project and nothing",
+        "else, which is the hardest kind of breakage to attribute. `files` in",
+        "../package.json ships it; assert-build-output.mjs verifies the targets exist."
+    ],
+    "type": "module",
+    "main": "../dist/functions/index.js",
+    "module": "../dist/functions/index.js",
+    "types": "../dist/functions/index.d.ts",
+    "sideEffects": false
+}

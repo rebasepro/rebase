@@ -1,6 +1,11 @@
-import { VectorSearchParams, LogicalCondition, FilterValues } from "@rebasepro/types";
+// Every import here is `import type`, and that is enforced rather than
+// stylistic: this module is the `HonoEnv` a custom function imports, so it is
+// in the graph of `@rebasepro/server/functions` — the surface that must bundle
+// for a runtime with no Node built-ins. A value import of `@rebasepro/types`
+// would drag that package's whole runtime graph into an edge bundle for the
+// sake of two interfaces. See `functions/portability.test.ts`.
+import type { VectorSearchParams, LogicalCondition, FilterValues, DataDriver } from "@rebasepro/types";
 import type { AuthResult } from "../auth/middleware";
-import { DataDriver } from "@rebasepro/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 
 /**

@@ -178,9 +178,57 @@ export { createHistoryRoutes } from "./history";
 
 // =============================================================================
 // Custom Functions (auto-discovered Hono routes)
+//
+// The authoring surface has its own entry point — `@rebasepro/server/functions`
+// — which is the one a function file should import, because this barrel reaches
+// the whole framework and does not resolve on a runtime without Node built-ins.
+// See `functions/index.ts` for why that mattered enough to split.
+//
+// Everything portable is re-exported here as well, so that importing from the
+// root keeps working and so a Node-only project need not think about it. Two
+// names are not: `requireAuth` and `requireAdmin` already exist on this barrel
+// from `./auth`, exported for the data and admin routes, where the
+// token-parsing versions are the ones that must run. Inside a function the two
+// are equivalent — the identity is resolved before any handler — so a function
+// importing them from here behaves identically to one importing them from the
+// subpath.
 // =============================================================================
-export { loadFunctionsFromDirectory, createFunctionRoutes, defineFunction } from "./functions";
-export type { LoadedFunction, RebaseFunctionContext } from "./functions";
+export { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics, createFunctionRoutes } from "./functions/internal";
+export type { LoadedFunction, LoadedFunctions } from "./functions/internal";
+export { defineFunction } from "./functions";
+export type { RebaseFunctionContext } from "./functions";
+export {
+    // Request context
+    getUser,
+    getUserId,
+    getRoles,
+    hasRole,
+    isAdmin,
+    isAuthenticated,
+    getDriver,
+    requireDriver,
+    getApiKey,
+    getRequestId,
+    identityResolved,
+    // Guards not already exported from ./auth above
+    requireRole,
+    // Configuration. `env` is deliberately NOT re-exported here: on the
+    // subpath it sits beside `getEnv` and `requireEnv` and reads as one of
+    // three, while on this barrel it would sit beside `loadEnv` — which reads
+    // a `.env` file into the process — and the two would be indistinguishable
+    // at the import line. Reach it through `@rebasepro/server/functions`.
+    getEnv,
+    requireEnv,
+    runtimeKey,
+    isNodeRuntime,
+    lazyResource,
+    // Background work
+    waitUntil
+} from "./functions";
+export type { FunctionUser } from "./functions";
+// Not on the portable surface: shutdown drains background work, and only the
+// host has a shutdown.
+export { drainBackgroundWork, pendingBackgroundWork } from "./functions/wait-until";
 
 // =============================================================================
 // Cron Jobs (auto-discovered scheduled tasks)

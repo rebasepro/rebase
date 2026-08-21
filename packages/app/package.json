@@ -33,7 +33,7 @@
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js && node ../../scripts/assert-build-output.mjs",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/add-dts-extensions.mjs dist && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js && node ../../scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
     "clean": "rm -rf dist && find ./src \\( -name '*.js' -o -name '*.d.ts' \\) -type f | xargs rm -f",

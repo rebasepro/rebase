@@ -244,6 +244,18 @@ jobs:
       - name: Runtime API surface
         run: pnpm run check:api-surface
 
+      # Whether the *published* types survive being resolved. Every other gate
+      # in this file maps `@rebasepro/*` onto source, so all of them were blind
+      # to the state the packages were actually shipped in: extensionless
+      # relative specifiers in the emitted .d.ts, which `moduleResolution:
+      # "nodenext"` rejects — and TypeScript answers by typing the whole import
+      # `any` rather than by erroring. Nobody reported it in the entire life of
+      # the packages, because the only symptom appears in the consumer's own
+      # file and reads as their tsconfig being wrong. Reads dist, hence after
+      # the build.
+      - name: Published types resolve
+        run: pnpm run check:dts
+
       # What a browser downloads before the login screen paints. Nothing
       # measured it, and three separate libraries had drifted into that set:
       # exceljs (940 kB) behind a `lazy()` that a barrel re-export cancelled,

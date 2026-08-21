@@ -29,9 +29,11 @@ import {
     type DeclaredStorageSources,
     type NativeDependency,
     type RebaseBundleManifest,
+    type RebaseBundleFunction,
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
 import { resolveBackendPaths } from "./manifest";
+import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
 import {
     getActiveBackendPlugin,
     resolveLocalBin,
@@ -1094,6 +1096,33 @@ stdio: "inherit" });
     const relative = (target: string): string | undefined =>
         fs.existsSync(path.join(outDir, target)) ? target : undefined;
 
+    // What is in the functions directory, and what each one needs from its
+    // host. Read from the *source*, not the compiled output, because the answer
+    // is about imports and `tsc` has already resolved some of them away.
+    const functionReports = analyseFunctionsDirectory(
+        path.join(projectRoot, paths.functions),
+        projectRoot
+    );
+    const bundledFunctions: RebaseBundleFunction[] = functionReports.map(report => {
+        const requires = [...new Set(
+            report.issues
+                .filter(issue => issue.kind === "node-builtin" || issue.kind === "node-only-package")
+                .map(issue => issue.message)
+        )];
+        return {
+            name: report.name,
+            // The path as it exists *in the bundle*: sources are compiled 1:1,
+            // so this is the same relative path with a `.js` extension.
+            file: report.file.replace(/\.ts$/, ".js"),
+            portable: report.portable,
+            ...(requires.length > 0 ? { requires } : {})
+        };
+    });
+
+    for (const line of summarisePortability(functionReports)) {
+        console.log(line.trimStart().startsWith("⚠") ? chalk.yellow(line) : chalk.dim(line));
+    }
+
     const manifest: RebaseBundleManifest = {
         bundleFormat: BUNDLE_FORMAT_VERSION,
         runtime: {
@@ -1123,6 +1152,7 @@ stdio: "inherit" });
             .map(collection => collection.slug)
             .filter((slug): slug is string => Boolean(slug))
             .sort(),
+        ...(bundledFunctions.length > 0 ? { functions: bundledFunctions } : {}),
         hooks: {
             native: nativeModules.length > 0,
             nativeModules: nativeModules.length > 0 ? nativeModules : undefined
