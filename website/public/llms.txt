@@ -4782,6 +4782,34 @@ hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 :::
 
+#### Email in development
+
+Without `SMTP_HOST`, auth mail has nowhere to go. Rather than refusing the
+request, a development server captures the message and prints its links:
+
+```
+⚠️  No SMTP is configured, so auth email is being captured here instead of sent.
+ℹ️  [email] Sign in to Acme → you@example.com
+             http://localhost:5173/auth/magic-link?token=…
+```
+
+Follow the link and the flow completes. Nothing about the token changes — it is
+minted, stored and validated exactly as it would be from a real inbox; only
+delivery is different.
+
+This is on whenever all three hold, and there is no setting that changes them:
+
+- `SMTP_HOST` is unset — a configured mail server always wins;
+- `NODE_ENV` is not `production`. A captured password-reset mail carries a
+  working reset token, so the capture buffer is a credential store and must not
+  exist in production;
+- `FRONTEND_URL` is an absolute `http(s)` URL, because otherwise the emailed
+  link has no base and would be dead on arrival.
+
+If any of them does not hold, `POST /auth/magic-link` and
+`POST /auth/forgot-password` answer `503 EMAIL_NOT_CONFIGURED` as before. In
+production, set `SMTP_HOST` (or `auth.email.sendEmail`) to send mail for real.
+
 #### Branding the default emails
 
 The built-in password-reset, verification, invitation, welcome and magic-link

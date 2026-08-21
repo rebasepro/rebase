@@ -1,17 +1,58 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import type { RebaseAuthConfig } from "../init";
 import type { EmailConfig } from "../email";
+import { createDevEmailSink } from "../email/dev-sink";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
 
 /**
- * Build the email configuration, or `undefined` when no SMTP host is set.
+ * True when an emailed link would be followable — i.e. when there is an
+ * absolute base to build one from. Mirrors `assertEmailLinkBases`, which
+ * refuses the boot otherwise.
+ */
+function hasAbsoluteLinkBase(value: string | undefined): boolean {
+    if (!value) return false;
+    try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Build the email configuration.
  *
- * Without it the auth adapter still works; password-reset and verification mail
- * simply has nowhere to go, which the auth routes report for themselves.
+ * With `SMTP_HOST`, that is a real SMTP transport. Without it, outside
+ * production, it is the development sink: mail is captured and its links are
+ * printed, so `POST /auth/magic-link` and `POST /auth/forgot-password` complete
+ * on a fresh project instead of answering `503 EMAIL_NOT_CONFIGURED`. The token
+ * was always minted and valid; only delivery was missing.
+ *
+ * Three conditions, all required, none configurable:
+ *
+ *  - no `SMTP_HOST` — a configured mail server always wins;
+ *  - `NODE_ENV` is not `production` — a captured reset mail carries a working
+ *    token, so this must not be reachable there (see `dev-sink.ts`);
+ *  - an absolute `FRONTEND_URL`, or the emailed link has no base and is dead on
+ *    arrival — which is the condition `assertEmailLinkBases` fails the boot on.
+ *
+ * When any of those does not hold this returns `undefined`, exactly as before,
+ * and the auth routes report the missing service for themselves.
  */
 export function resolveEmailOptions(env: RebaseBootEnv): EmailConfig | undefined {
-    if (!env.SMTP_HOST) return undefined;
+    if (!env.SMTP_HOST) {
+        if (env.NODE_ENV === "production") return undefined;
+        if (!hasAbsoluteLinkBase(env.FRONTEND_URL)) return undefined;
+
+        return {
+            from: env.SMTP_FROM || `${env.APP_NAME} <noreply@rebase.pro>`,
+            sendEmail: createDevEmailSink().sendEmail,
+            appName: env.APP_NAME,
+            logoUrl: env.EMAIL_LOGO_URL,
+            resetPasswordUrl: env.FRONTEND_URL
+        };
+    }
 
     return {
         from: env.SMTP_FROM || `${env.APP_NAME} <noreply@rebase.pro>`,
