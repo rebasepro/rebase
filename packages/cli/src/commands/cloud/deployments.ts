@@ -144,6 +144,77 @@ export function deploymentView(dep: DeploymentRow): Record<string, unknown> {
     };
 }
 
+/** What `POST /api/functions/deploy/cancel` answers. */
+export interface CancelResponse {
+    success: boolean;
+    /**
+     * The deployment that was cancelled — `null` when there was none.
+     *
+     * Nullable because "nothing was in flight" is a real, successful outcome
+     * and not an error: a project's `status` column can claim `deploying` while
+     * no deployment row backs the claim, and cancelling is what clears it.
+     */
+    deploymentId: string | null;
+    buildJobDeleted: boolean;
+    /** The request cleared a stuck `deploying` claim rather than stopping a build. */
+    unstranded?: boolean;
+    /** The status the project settled on when it did. */
+    projectStatus?: string | null;
+}
+
+/**
+ * What `rebase cloud cancel` says it did.
+ *
+ * Split out of the command because there are now two outcomes behind one
+ * `success: true`, and only one of them is "a build was stopped". The control
+ * plane learned to clear a project stranded at `deploying` with no deployment
+ * row behind it — the state `prospector` was wedged in for five days — and it
+ * reports that through this same endpoint. An unbranched caller printed
+ * "Cancelled deployment null" for it, which reads as a bug in the thing that
+ * had just fixed the bug.
+ *
+ * The ABSENT ID is what decides, not the `unstranded` flag: the flag is the
+ * server being explicit, and it is the newer half of the contract. Branching on
+ * the id means a client that meets a control plane which grew the behaviour
+ * without the flag still says something true.
+ */
+export function cancelView(res: CancelResponse): {
+    /** The headline, for `success()`. */
+    headline: string;
+    /** Dimmed follow-ups, printed under it. */
+    notes: string[];
+    /** The stable JSON view, which is what a piped run gets. */
+    json: Record<string, unknown>;
+} {
+    const deploymentId = res.deploymentId ? String(res.deploymentId) : null;
+    const projectStatus =
+        typeof res.projectStatus === "string" && res.projectStatus.length > 0 ? res.projectStatus : null;
+
+    if (!deploymentId) {
+        return {
+            headline:
+                "No deploy was in flight — cleared this project's stuck 'deploying' status" +
+                (projectStatus ? ` (now ${chalk.bold(projectStatus)})` : ""),
+            notes: ["Its status claimed a deploy that no deployment backed. Redeploy is available again."],
+            json: { success: true,
+deploymentId: null,
+buildJobDeleted: false,
+unstranded: true,
+projectStatus }
+        };
+    }
+
+    return {
+        headline: `Cancelled deployment ${chalk.bold(deploymentId)}`,
+        notes: res.buildJobDeleted ? ["The build job was deleted."] : [],
+        json: { success: true,
+deploymentId,
+buildJobDeleted: Boolean(res.buildJobDeleted),
+unstranded: Boolean(res.unstranded),
+projectStatus }
+    };
+}
+
 async function fetchDeployments(client: CloudClient, projectId: string, limit = 100): Promise<DeploymentRow[]> {
     const res = await client.data.collection("deployments").find({
         where: { project: ["==", projectId] },
@@ -359,21 +430,20 @@ export async function cancelCommand(rawArgs: string[]): Promise<void> {
     });
 
     try {
-        const res = await client.functions.invoke<{ success: boolean; deploymentId: string; buildJobDeleted: boolean }>(
+        const res = await client.functions.invoke<CancelResponse>(
             "deploy",
             explicitId ? { projectId,
 deploymentId: explicitId } : { projectId },
             { path: "cancel" }
         );
+        const view = cancelView(res);
         emit(
             () => {
-                success(`Cancelled deployment ${chalk.bold(res.deploymentId)}`);
-                if (res.buildJobDeleted) console.log(chalk.gray("  The build job was deleted."));
+                success(view.headline);
+                for (const note of view.notes) console.log(chalk.gray(`  ${note}`));
                 console.log("");
             },
-            { success: true,
-deploymentId: res.deploymentId,
-buildJobDeleted: res.buildJobDeleted }
+            view.json
         );
     } catch (e) {
         const err = e as { status?: number };
