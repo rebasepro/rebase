@@ -172,6 +172,16 @@ const bootEnvExtension = z.object({
     REBASE_JOB_WORKERS: z.enum(["true", "false", ""]).optional()
         .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
     /**
+     * Override whether this process runs the scheduled RLS audit. Unset follows
+     * the role.
+     *
+     * Unlike cron and the job workers this is not claim-protected — every owner
+     * scans on its own timer, which is redundant rather than unsafe — so a split
+     * deployment sets it false everywhere but one process.
+     */
+    REBASE_RLS_AUDIT: z.enum(["true", "false", ""]).optional()
+        .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
+    /**
      * Comma-separated function names this process serves. Unset means all.
      *
      * `functions` role only. A name that is not in the bundle is a boot failure,

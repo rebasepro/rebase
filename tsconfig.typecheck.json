@@ -143,6 +143,12 @@
       "@rebasepro/ui/*": [
         "./packages/ui/src/*"
       ],
+      "@rebasepro/rls-check": [
+        "./packages/rls-check/src"
+      ],
+      "@rebasepro/rls-check/*": [
+        "./packages/rls-check/src/*"
+      ],
       "@rebasepro/utils": [
         "./packages/utils/src"
       ],

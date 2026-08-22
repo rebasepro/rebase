@@ -117,13 +117,18 @@ afterEach(() => {
 
 describe("resolveOwnership", () => {
     it("owns everything when nothing is named", () => {
-        expect(resolveOwnership()).toEqual({ cronScheduler: true, jobWorkers: true });
+        expect(resolveOwnership()).toEqual({
+            cronScheduler: true,
+            jobWorkers: true,
+            rlsAudit: true
+        });
     });
 
     it("leaves the unnamed half owned", () => {
         expect(resolveOwnership({ cronScheduler: false })).toEqual({
             cronScheduler: false,
-            jobWorkers: true
+            jobWorkers: true,
+            rlsAudit: true
         });
     });
 });

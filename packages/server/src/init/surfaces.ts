@@ -80,6 +80,16 @@ export interface RuntimeOwnership {
     cronScheduler: boolean;
     /** Start the durable job queue's workers. Only relevant when `jobs.enabled`. */
     jobWorkers: boolean;
+    /**
+     * Run the scheduled row-level-security audit. Only relevant when
+     * `rlsAudit.enabled`.
+     *
+     * Unlike the two above, this one is not claim-protected — every process that
+     * owns it introspects the catalog on its own timer. That is read-only and
+     * harmless, just wasteful, so a split deployment should give it to one
+     * process the same way it gives it cron.
+     */
+    rlsAudit: boolean;
 }
 
 /** A fully-resolved answer for every owned singleton. */
@@ -116,7 +126,8 @@ export function resolveSurfaces(options?: RuntimeSurfaceOptions): ResolvedSurfac
 export function resolveOwnership(options?: RuntimeOwnershipOptions): ResolvedOwnership {
     return {
         cronScheduler: options?.cronScheduler ?? true,
-        jobWorkers: options?.jobWorkers ?? true
+        jobWorkers: options?.jobWorkers ?? true,
+        rlsAudit: options?.rlsAudit ?? true
     };
 }
 

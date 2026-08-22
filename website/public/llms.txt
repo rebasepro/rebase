@@ -14528,6 +14528,71 @@ credentials), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats`, and `
 Each finding carries `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
 `docs` and `confidence`.
 
+### Running it on a schedule
+
+A check you have to remember to run is a check that reports a clean database
+right up until the day it matters. The backend can run this one for you and
+serve the result to the admin panel:
+
+```ts
+
+const rlsAudit: RebaseBackendConfig["rlsAudit"] = {
+    enabled: true,
+    scan,
+    intervalMs: 24 * 60 * 60 * 1000,  // the default
+    warnAtSeverity: "high"            // the default
+};
+```
+
+Pass that as `rlsAudit` in the object you hand `initializeRebaseBackend`.
+
+The result is served at `GET /api/admin/rls-audit`, admin-gated like every other
+admin surface, and each run logs one line — at `warn` when a finding reaches
+`warnAtSeverity`, at `info` otherwise:
+
+```
+⚠️  [rls-audit] RLS audit found 3 issue(s) — 1 critical, 2 medium. 1 table(s)
+    without RLS. Read the detail at GET /api/admin/rls-audit.
+```
+
+#### Why you pass `scan` in
+
+`@rebasepro/server` has no database driver — that is what keeps it usable with
+Postgres, Mongo and Firebase alike. `@rebasepro/rls-check` carries `pg`, because
+it connects to Postgres. Importing it inside the server package would put a
+Postgres driver in every install, for a feature only some of them can use, so
+you hand the function in instead.
+
+#### In a split deployment
+
+The audit is an *owned* singleton, like the cron scheduler. Every process that
+owns it runs its own scan, which is read-only and harmless but redundant — give
+it to one process:
+
+```ts
+ownership: { rlsAudit: false }   // on every process but one
+```
+
+or, for a runtime configured by environment:
+
+```bash
+REBASE_RLS_AUDIT=false
+```
+
+The `functions` role already owns it as `false` — that process runs no timers at
+all. Naming one ownership override never moves another: turning off cron leaves
+the audit alone, and vice versa.
+
+A process that serves the admin surface without owning the scan answers the
+endpoint honestly, saying the scan does not run there.
+
+#### It is a safety net, not a monitor
+
+The default interval is a day, because the thing being watched is a schema:
+it changes on deploys, not on traffic. A failed scan is logged and recorded in
+the status — never thrown. Turning a security check into a new way for the
+server to fall over would be a bad trade in both directions.
+
 ### How to read the report
 
 **Confirmed findings come first; heuristic ones are in a separate "worth checking"
