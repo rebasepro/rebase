@@ -671,6 +671,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 }
             }
 
+            // Declared on the full response too, not only on a 206. A player
+            // sends HEAD before it seeks, and without a length it cannot work
+            // out what to ask for — which makes `Accept-Ranges` above an offer
+            // it has no way to take up.
+            c.header("Content-Length", String(localStat.size));
+
             const fileContent = await fsp.readFile(absolutePath);
             return c.body(new Uint8Array(fileContent));
         }
@@ -731,6 +737,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             return c.body(new Uint8Array(buf.slice(start, end + 1)), 206);
         }
 
+        c.header("Content-Length", String(fileObject.size));
         return c.body(new Uint8Array(buf));
     });
 

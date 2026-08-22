@@ -192,3 +192,53 @@ describe("GET /file/* — ranges over the wire", () => {
         expect(res.headers.get("Cache-Control")).toContain("private");
     });
 });
+
+describe("GET/HEAD /file/* — the size a player needs before it seeks", () => {
+    let app: Hono<HonoEnv>;
+    let tempDir: string;
+    const BODY = "hello world, this is the object";
+
+    beforeEach(async () => {
+        configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-head-"));
+        const controller = new LocalStorageController({ basePath: tempDir });
+        await controller.putObject({
+            file: new File([Buffer.from(BODY)], "clip.bin", { type: "application/octet-stream" }),
+            key: "media/clip.bin"
+        });
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/api/storage", createStorageRoutes({ controller, requireAuth: false }));
+    });
+
+    afterEach(async () => {
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+    });
+
+    const req = (method: string, headers: Record<string, string> = {}) =>
+        app.fetch(new Request("http://localhost/api/storage/file/media/clip.bin", { method, headers }));
+
+    it("answers HEAD with the size and the range offer", async () => {
+        const res = await req("HEAD");
+        expect(res.status).toBe(200);
+        expect(res.headers.get("Content-Length")).toBe(String(BODY.length));
+        expect(res.headers.get("Accept-Ranges")).toBe("bytes");
+        expect(await res.text()).toBe("");
+    });
+
+    it("declares the size on a full GET too", async () => {
+        const res = await req("GET");
+        expect(res.headers.get("Content-Length")).toBe(String(BODY.length));
+    });
+
+    it("still sends the whole body, unaffected by the declared length", async () => {
+        expect(await (await req("GET")).text()).toBe(BODY);
+    });
+
+    it("declares the slice length, not the object length, on a 206", async () => {
+        const res = await req("GET", { Range: "bytes=0-4" });
+        expect(res.status).toBe(206);
+        expect(res.headers.get("Content-Length")).toBe("5");
+        expect(await res.text()).toBe(BODY.slice(0, 5));
+    });
+});
