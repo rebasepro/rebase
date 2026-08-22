@@ -6,6 +6,31 @@ This is the document to read before changing anything a deployed project or a
 running Rebase Cloud tenant already depends on. It is also the honest answer to
 "if I build on Rebase today, what breaks under me later?"
 
+## What "beta" means here
+
+Rebase is in public beta. Most projects use that word to mean "anything may
+break", which tells a reader nothing they can plan around, so here is the line
+this project actually draws:
+
+> **The API you write against can change in a minor, with a changelog entry.
+> Your data cannot break quietly.**
+
+The first half is ordinary `0.x` behaviour and is described below. The second
+half is the part worth checking, because it is a claim about mechanisms rather
+than intentions: the versioned contracts in the next section are each stamped
+into an artifact or a database, each is checked at boot or at intake, and each
+**fails loudly and specifically** rather than degrading. A schema push that
+would drop a column is refused by a destructive gate
+(`packages/server-postgres/test/e2e/db-push-safety.test.ts`), and the upgrade
+path itself is a test: `upgrade-e2e.test.ts` restores databases as older
+releases left them, runs the current migration path over each one, and asserts
+the rows survive — not merely that the boot did.
+
+What beta does mean: features are still missing, some subsystems are newer than
+others, and the shape of a rough edge is that something is absent or awkward,
+not that it silently corrupts something. Which subsystems are which is published
+and dated rather than left to be discovered.
+
 ## The 0.x promise
 
 Rebase is `0.x` — 0.16 at the time of writing. This section is written to hold
