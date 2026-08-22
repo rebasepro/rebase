@@ -398,6 +398,18 @@ describe("parseArgs", () => {
         return parsed.options;
     };
 
+    it("takes a path for --html, and defaults to not writing one", () => {
+        expect(ok([]).html).toBeNull();
+        expect(ok(["--html", "rls-report.html"]).html).toBe("rls-report.html");
+        expect(ok(["--html=rls-report.html"]).html).toBe("rls-report.html");
+    });
+
+    it("rejects --html without a path, rather than writing somewhere surprising", () => {
+        const parsed = parseArgs(["--html"]);
+        expect(parsed.ok).toBe(false);
+        if (!parsed.ok) expect(parsed.message).toContain("--html needs a file path");
+    });
+
     it("defaults to failing on high with colour undecided", () => {
         const options = ok([]);
         expect(options.failOn).toBe("high");
@@ -559,6 +571,12 @@ describe("runCli", () => {
         expect(await runCli(["--help"], io)).toBe(0);
         expect(io.out.join("")).toContain("Usage");
         expect(io.out.join("")).toContain("Exit codes");
+    });
+
+    it("documents --html in the help text", async () => {
+        const io = captureIo();
+        await runCli(["--help"], io);
+        expect(io.out.join("")).toContain("--html <path>");
     });
 
     it("prints the version and exits 0", async () => {
