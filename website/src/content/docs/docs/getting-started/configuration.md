@@ -192,6 +192,31 @@ different part of the project. `REBASE_ROLE`, `REBASE_CRON_SCHEDULER`,
 Backups contain secrets and PII. Use a private destination with
 encryption-at-rest.
 
+## Secrets in development
+
+`JWT_SECRET` and `REBASE_SERVICE_KEY` are required in production and generated
+for you outside it, so you can start without setting anything up.
+
+Those generated values are cached in `.rebase-dev-secrets.json`, beside
+`.rebase-dev-port` and `.rebase-dev-url` and gitignored with them. Before, they
+were regenerated on every boot — so restarting the dev server logged you out of
+your own app and invalidated any API key you had just created.
+
+- Set either variable explicitly and yours is used; nothing is cached or read.
+- Point the cache somewhere else with `REBASE_DEV_SECRETS_FILE`.
+- Delete the file to roll both secrets. The next boot writes a fresh one.
+- If the file cannot be written — a read-only container, say — the server starts
+  anyway with an ephemeral secret, exactly as it used to.
+
+Nothing is cached in production, or under a test runner. In production a boot
+that had to generate either secret still fails, naming the variable, and that is
+unchanged:
+
+```
+JWT_SECRET must be explicitly set in production.
+Do not rely on auto-generated secrets outside development.
+```
+
 ## Backend Config Object
 
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:

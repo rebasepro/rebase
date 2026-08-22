@@ -29,6 +29,7 @@ uploads/
 # Rebase dev
 .rebase-dev-url
 .rebase-dev-port
+.rebase-dev-secrets.json
 
 # Built project bundle (`rebase build`)
 dist-bundle/
