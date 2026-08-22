@@ -45,6 +45,7 @@ import { configureLogLevel } from "./utils/logging";
 import { logger } from "./utils/logger";
 import { configureMiddlewares } from "./init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
+import { resolveStorageAccessControl } from "./storage/policies";
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
@@ -433,6 +434,31 @@ export interface RebaseBackendConfig {
      * is set — see `assertStorageAccessControlConfigured`.
      */
     storageAuthorize?: import("./storage/types").StorageAuthorize;
+
+    /**
+     * Per-object access control, declared rather than coded.
+     *
+     * Storage is not under row-level security, so without this or
+     * {@link storageAuthorize} any authenticated caller may read, overwrite,
+     * delete or list any key they can name — the keys share one flat namespace.
+     *
+     * ```ts
+     * storagePolicies: [
+     *     { path: "public/**", operations: ["read"], allow: "public" },
+     *     { path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }
+     * ]
+     * ```
+     *
+     * **A key matched by no policy is refused.** Every widening is an explicit
+     * line, and a mistake here denies rather than grants.
+     *
+     * `storageAuthorize` still runs when no policy matched, so ownership that
+     * lives in a row — which no path pattern can express — stays expressible.
+     * Neither can narrow the other: each only says yes.
+     *
+     * Satisfies the production boot guard on its own.
+     */
+    storagePolicies?: import("./storage/policies").StoragePolicy[];
 
     /**
      * Allow unauthenticated read access to stored files (default: false).
@@ -1600,9 +1626,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // boot in production unless the deployment has stated an access-control
         // intent (a hook, public-read, or the explicit insecure opt-out); warn
         // loudly in development.
+        // Compiled before the guard runs, so a malformed pattern fails the boot
+        // here rather than on the first upload.
+        const storageAccessControl = resolveStorageAccessControl({
+            storagePolicies: config.storagePolicies,
+            storageAuthorize: config.storageAuthorize
+        });
+
         assertStorageAccessControlConfigured(
             {
-                hasAuthorize: !!config.storageAuthorize,
+                hasAuthorize: !!config.storageAuthorize || !!config.storagePolicies?.length,
                 publicRead: config.storagePublicRead === true,
                 allowAnyAuthenticated: config.storageInsecureAllowAnyAuthenticated === true
             },
@@ -1616,7 +1649,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             requireAuth: resolveRequireAuth(config.auth),
             publicRead: config.storagePublicRead === true,
             authAdapter,
-            authorize: config.storageAuthorize,
+            authorize: storageAccessControl,
             // Resolved lazily: the admin data plane is built further down, well
             // after these routes are mounted, but always before a request runs.
             authorizeData: () => storageAuthorizeData.current
