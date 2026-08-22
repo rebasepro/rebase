@@ -214,8 +214,116 @@ export async function installBundleDependencies(
     }
     logger.info("Bundle dependencies installed", { ms: Date.now() - started });
 
+    // The install is what creates the duplicate, so the dedupe belongs to it.
+    // In a container this used to happen in the entrypoint, which runs BEFORE
+    // the runtime and therefore before this install exists — so on the fetch
+    // path it would have run against an empty directory and every custom
+    // function would have 500ed.
+    dedupeRuntimePackages(bundleRoot, imageModulesDir());
+
     // Cosmetic — a pod that cannot clean its cache still boots.
     await exec("npm", ["cache", "clean", "--force"], { cwd: bundleRoot }).catch(() => undefined);
+}
+
+/**
+ * Packages the runtime image provides and a bundle must not carry its own copy of.
+ *
+ * Exactly one, deliberately. `@rebasepro/server` holds the framework singleton,
+ * and a second copy is not merely wasteful — it is a total, silent breakage of
+ * custom functions. Every function imports `defineFunction` from
+ * `@rebasepro/server`, so it resolves the BUNDLE's copy, which is a different
+ * module instance from the one `runFromBundle` booted. The singleton
+ * initialised by the boot is invisible to it, so `rebase.data`,
+ * `rebase.dataAsAdmin` and `rebase.storage` throw "server not initialized yet"
+ * on every request, in a process that is otherwise healthy and reports itself
+ * ready. Seen in production as every custom-function route 500ing while
+ * `/api/data/*` served fine.
+ *
+ * It arrives transitively: `@rebasepro/admin` and `@rebasepro/server-postgres`
+ * both depend on it, and nearly every project declares one of them.
+ *
+ * NOT every package the image ships. The image installs the narrow set of
+ * dependencies the runtime itself needs, while the bundle's install resolved
+ * each package's FULL tree — so redirecting a package at the image's copy can
+ * point it at a tree missing something. `@rebasepro/server-postgres` is the
+ * proof: the image's copy has no `chokidar`, and redirecting it took the
+ * database driver down and crash-looped the pod. `@rebasepro/server` is the one
+ * package where the redirect is both necessary (it holds the singleton) and
+ * provably safe (the process is already running from the image's copy).
+ */
+/**
+ * Where the runtime image keeps its own `node_modules`, when there is an image.
+ *
+ * An environment variable, set by the image, rather than something derived from
+ * this module's own location. Deriving it is the obvious approach and it does
+ * not survive the build: `__filename` is undefined in the ESM bundle vite emits,
+ * and `import.meta.url` is a syntax error under the CJS transform the jest
+ * suites use — so any version of this that reads its own path works in exactly
+ * one of the two places it has to.
+ *
+ * Found by booting the built image (`scripts/check-runtime-image-boots.mjs`),
+ * which is the only thing that runs the artifact this ships as. The unit tests
+ * were green.
+ *
+ * Absent outside a container, where there is no second copy to collapse and
+ * nothing to do.
+ */
+export const RUNTIME_MODULES_ENV = "REBASE_RUNTIME_MODULES";
+
+function imageModulesDir(): string | undefined {
+    return process.env[RUNTIME_MODULES_ENV] || undefined;
+}
+
+export const RUNTIME_PROVIDED_PACKAGES = ["@rebasepro/server"] as const;
+
+/**
+ * Collapse a duplicate framework copy in the bundle onto the image's.
+ *
+ * Node resolves a module's identity by its real path, so replacing the
+ * duplicate with a symlink makes the two one instance again. It is also the
+ * honest version of what was already true: the image's copy is the one that
+ * booted and owns the process, so a bundle pinning a different version was
+ * never running that version — it just carried a second, dead one alongside it.
+ *
+ * Non-fatal by design. A project with no custom functions is unaffected by the
+ * duplicate, and refusing to boot over it would turn a degraded start into no
+ * start at all.
+ *
+ * @param imageModules the runtime image's own `node_modules`. Absent, there is
+ *   nothing to dedupe against and this is a no-op — which is the case in every
+ *   context except a container built from the runtime image.
+ */
+export function dedupeRuntimePackages(bundleRoot: string, imageModules: string | undefined): string[] {
+    if (!imageModules || !fs.existsSync(imageModules)) return [];
+
+    const deduped: string[] = [];
+    for (const pkg of RUNTIME_PROVIDED_PACKAGES) {
+        const provided = path.join(imageModules, pkg);
+        const inBundle = path.join(bundleRoot, "node_modules", pkg);
+        if (!fs.existsSync(provided)) continue;
+
+        let stat: fs.Stats;
+        try {
+            stat = fs.lstatSync(inBundle);
+        } catch {
+            continue; // The bundle did not install its own copy. Nothing to do.
+        }
+        // An existing symlink is this fix, already applied.
+        if (stat.isSymbolicLink()) continue;
+
+        try {
+            fs.rmSync(inBundle, { recursive: true, force: true });
+            fs.symlinkSync(provided, inBundle, "dir");
+            deduped.push(pkg);
+            logger.info("Deduped a bundle package onto the runtime's own copy", { package: pkg });
+        } catch (error: unknown) {
+            logger.warn("Could not dedupe a bundle package; custom functions may not see the runtime", {
+                package: pkg,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+    return deduped;
 }
 
 /** One download attempt, streamed to `destination`. */
