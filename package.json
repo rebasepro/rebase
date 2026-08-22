@@ -83,7 +83,7 @@
     "harness:preflight": "node scripts/harness/harness.mjs preflight",
     "harness:eval": "node scripts/harness/harness.mjs eval",
     "test:harness": "node --test scripts/harness/test/harness.test.mjs",
-    "test:gates": "node --test scripts/test/api-surface.test.mjs scripts/test/release-bump.test.mjs scripts/test/add-dts-extensions.test.mjs scripts/test/dts-resolution.test.mjs",
+    "test:gates": "node --test scripts/test/api-surface.test.mjs scripts/test/release-bump.test.mjs scripts/test/add-dts-extensions.test.mjs scripts/test/dts-resolution.test.mjs scripts/test/runtime-provided.test.mjs",
     "clean": "pnpm -r run clean",
     "release": "./scripts/release.sh",
     "release:patch": "./scripts/release.sh patch",

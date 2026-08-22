@@ -263,6 +263,44 @@ check(
     `${asService.status} ${asService.body.slice(0, 70)}`
 );
 
+// ── Custom functions and crons ───────────────────────────────────────────────
+//
+// The reference app ships one function file and two cron files, all of which
+// open `import { defineFunction } from "@rebasepro/server"` — a package the
+// bundle deliberately does not declare, because the image supplies it. When the
+// entrypoint fails to link it in, every one of them fails to load, their routes
+// 404, and the container still reports itself healthy: the runtime is fine, and
+// only a WARNING in the boot log says that half the application is missing.
+//
+// So this is asserted over HTTP and over the log, because each catches
+// something the other does not. 401 rather than 404 is the tell: the route
+// exists and its `requireAuth` ran.
+const fn = await get("/api/functions/insights/home");
+check(
+    "a custom function is mounted (401, not 404)",
+    fn.status === 401,
+    `${fn.status} ${fn.body.slice(0, 60)}`
+);
+
+// The precise property, rather than "nothing was skipped": no file may fail to
+// load because of a package the IMAGE promised to supply. A bundle that fails on
+// its own undeclared dependency is a different problem and the project's own.
+//
+// It matters here because this repository's reference app declares
+// `@rebasepro/server-postgres` as `workspace:*`, which the bundler correctly
+// drops (a registry cannot serve it) — so one cron legitimately cannot load in
+// THIS build and would in any real project. Asserting "nothing skipped" would
+// bake that local artifact in as a requirement.
+const bootLog = compose(["logs", "api"], true).stdout ?? "";
+const providedMisses = [...bootLog.matchAll(
+    /Cannot find package '(@rebasepro\/(?:server|types|client|common|utils))'/g
+)].map(m => m[1]);
+check(
+    "nothing failed to load on a package the image supplies",
+    providedMisses.length === 0,
+    providedMisses.length ? [...new Set(providedMisses)].join(", ") : "no misses"
+);
+
 const authConfig = await get("/api/auth/config");
 check("GET /api/auth/config answers", authConfig.status === 200, `${authConfig.status}`);
 
