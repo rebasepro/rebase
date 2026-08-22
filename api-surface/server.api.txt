@@ -191,7 +191,7 @@ interface BackendInstance { admin, collectionRegistry, connection, destroy, enti
 interface BackupRoutesConfig { getDestination, storage }
 interface BootOptions { bundle, bundleDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
-interface BuiltinAuthAdapterConfig { allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableMagicLink, oauthProviders, serviceKey }
+interface BuiltinAuthAdapterConfig { allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableMagicLink, oauthProviders, serviceKey }
 interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storageSources }
 interface BundleSchema { enums, relations, tables }
 interface CollectionDefaults { defaultSecurityRules }
@@ -253,7 +253,7 @@ interface QueryFilter { field, operator, value }
 interface QueryOptions { fields, include, limit, logical, offset, orderBy, vectorSearch, where }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
-interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
+interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
 interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, logging, maxBodySize, ownership, provisionSchema, provisioningDriverResult, rateLimit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePublicRead, storageSources, surfaces }
 interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, driver, driverRegistry, healthCheck, history, jobQueue, realtimeService, realtimeServices, setCollectionCallbacks, shutdown, storageController, storageRegistry }
 interface RebaseFunctionContext { rebase }
