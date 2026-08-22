@@ -50,6 +50,7 @@
     "verify:docs": "node --max-old-space-size=8192 scripts/verify-docs.mjs",
     "verify:docs:strict": "node --max-old-space-size=8192 scripts/verify-docs.mjs --strict",
     "verify:selfhost": "node --import tsx scripts/verify-selfhost.mts",
+        "verify:selfhost:docker": "node --import tsx scripts/verify-selfhost-docker.mts",
     "verify:corpus": "node --import tsx scripts/verify-bundle-corpus.mts",
     "rls:check": "node --import tsx scripts/rls-scan.mts",
     "check:headless": "node scripts/headless-guard/check.mjs",

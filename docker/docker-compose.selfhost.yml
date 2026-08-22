@@ -5,10 +5,30 @@
 # same published image every Rebase deployment runs, and your project travels as
 # a bundle.
 #
-#   rebase build                          # produces ./dist-bundle
-#   docker compose -f docker/docker-compose.selfhost.yml up -d db
-#   rebase db push                        # create the collection tables, once
-#   docker compose -f docker/docker-compose.selfhost.yml up
+#   rebase build                # produces ./dist-bundle
+#   ./docker/quickstart.sh      # generates docker/.env if absent, then brings it up
+#
+# `quickstart.sh` is one command doing two obvious things, and it prints both.
+# The long form, if you would rather own each step:
+#
+#   docker compose -f docker/docker-compose.selfhost.yml --env-file docker/.env up
+#
+# Bring the database up separately with `up -d db` if you want it first, but you
+# do not need to: `api` waits on the healthcheck below.
+#
+# ── About `rebase db push` ───────────────────────────────────────────────────
+#
+# This recipe used to list a push between the two commands, described as the way
+# collection tables get created. That is not what happens: with
+# REBASE_MIGRATE_ON_BOOT at its default the runtime provisions collection tables
+# and their RLS at boot, additively, so a first start against an empty database
+# comes up serving them.
+#
+# `rebase db push` is still worth running, for two things boot does not do:
+# junction-table RLS for many-to-many relations, and any change that is not
+# purely additive. Boot never alters a column type, never removes anything, and
+# never edits an enum's existing labels — deliberately, because a container
+# restart must not be able to reshape a schema as a side effect.
 #
 # To upgrade Rebase, change the image tag and restart. Your bundle is untouched.
 
@@ -33,7 +53,18 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: rebase
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # `/var/lib/postgresql`, NOT `/var/lib/postgresql/data`.
+      #
+      # The 18 image places its data in a major-versioned subdirectory of this
+      # path, so that `pg_upgrade --link` can run without crossing a mount
+      # boundary. Mounting the old `/data` path leaves it treating the volume as
+      # "an unused mount/volume", refusing to start, and restart-looping — which
+      # is what this file did from the moment the image was bumped from 17 to 18
+      # (in a commit about a website page, which is how it went unnoticed).
+      #
+      # Moving an existing 17-era volume needs the same dump/restore as the
+      # major upgrade above; there is no in-place path for either.
+      - db-data:/var/lib/postgresql
     healthcheck:
       # The runtime must not start before the database can answer, or its first
       # boot fails on a connection refused and the container restarts for no
@@ -61,9 +92,11 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origins your frontend is served from}
       PORT: 8080
 
-      # Auth tables are created at boot. Collection tables are not: run
-      # `rebase db push` once, against the database below. A container restart
-      # must not be able to change a schema as a side effect.
+      # `ensure` (the default) creates auth tables AND collection tables with
+      # their RLS, additively, on every boot. It never alters a column type,
+      # never drops anything and never edits an existing enum label — those go
+      # through `rebase db push`, so that a container restart cannot reshape a
+      # schema as a side effect. `none` opts out of both entirely.
       REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
 
       # File storage is off unless a bucket is configured. It is not a default
@@ -101,7 +134,12 @@ services:
       # For a real deployment, prefer baking both into an image:
       #     FROM rebasepro/server:${REBASE_VERSION}
       #     COPY dist-bundle /bundle
-      - ../dist-bundle:/bundle
+      # Relative paths resolve against this file's directory, so the default is
+      # the `dist-bundle` beside it in a normal project layout. REBASE_BUNDLE_DIR
+      # overrides it — an absolute path when your bundle lives somewhere else,
+      # which is also how the acceptance gate points at this repository's own
+      # reference app.
+      - ${REBASE_BUNDLE_DIR:-../dist-bundle}:/bundle
     ports:
       - "${PORT:-8080}:8080"
 

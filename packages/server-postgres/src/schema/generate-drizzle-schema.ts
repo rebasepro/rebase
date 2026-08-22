@@ -2,7 +2,6 @@ import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import chokidar from "chokidar";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { CollectionConfig } from "@rebasepro/types";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
@@ -93,7 +92,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
     }
 };
 
-const main = () => {
+const main = async () => {
     const collectionsFilePathArg = process.argv.find(arg => arg.startsWith("--collections="));
     const collectionsFilePath = collectionsFilePathArg ? collectionsFilePathArg.split("=")[1] : process.argv[2];
 
@@ -112,6 +111,18 @@ const main = () => {
 
     if (watch) {
         out(`Watching for changes in ${resolvedPath}...`);
+        // Imported here rather than at module scope, and this is not a style
+        // choice: chokidar is needed only by `--watch`, which is a
+        // schema-authoring path that never runs inside the runtime image. A
+        // top-level import puts it on the boot path of the published driver
+        // bundle, and the image installs a hand-listed set of runtime
+        // dependencies that does not include it — so the whole driver failed to
+        // load with "Cannot find package 'chokidar'", and every self-hosted
+        // container answered 500 with a stack trace about a file watcher.
+        //
+        // Same reasoning the image already applies to @ariga/atlas: an
+        // authoring-only dependency does not belong on a boot path.
+        const { default: chokidar } = await import("chokidar");
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,
             ignoreInitial: false

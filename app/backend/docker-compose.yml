@@ -17,7 +17,11 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # `/var/lib/postgresql`, not `/var/lib/postgresql/data` — the 18 image
+      # keeps its data in a major-versioned subdirectory of this path and
+      # refuses to start against the old mount. The CLI templates were fixed
+      # for this; the reference app and the self-host recipe were missed.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
       interval: 5s
