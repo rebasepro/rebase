@@ -98,31 +98,31 @@ export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
     return out;
 }
 
-export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    if (!subcommand || subcommand === "--help") {
-        printDbHelp();
-        return;
-    }
-
+/**
+ * Run a database subcommand through the active driver's CLI, throwing on
+ * failure instead of exiting.
+ *
+ * `dbCommand` below turns every failure into `process.exit(1)`, which is right
+ * for a command the user invoked directly and wrong for a caller that has more
+ * to do afterwards — `rebase dev` runs a schema push during start-up and must
+ * survive it failing. Exiting is therefore the wrapper's job, not this
+ * function's.
+ */
+export async function runDriverDbCommand(rawArgs: string[]): Promise<void> {
     const projectRoot = requireProjectRoot();
-
-    // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
-    // the command is what the user is waiting for, and a slow collector must not
-    // sit in front of it.
-    void recordEvent("cli.db", { subcommand: subcommand ?? "none" }, { projectRoot });
     const backendDir = requireBackendDir(projectRoot);
 
     const activePlugin = getActiveBackendPlugin(backendDir);
     if (!activePlugin) {
-        console.error(chalk.red("✗ Could not detect an active database plugin."));
-        console.error(chalk.gray("  Make sure a package like @rebasepro/server-postgres is installed in backend/package.json."));
-        process.exit(1);
+        throw new Error(
+            "Could not detect an active database plugin. Make sure a package like "
+            + "@rebasepro/server-postgres is installed in backend/package.json."
+        );
     }
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        console.error(chalk.red(`✗ Could not find CLI entry point for ${activePlugin}.`));
-        process.exit(1);
+        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -136,29 +136,39 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     // child is handed a different one. See absolutizeLocalPathArgs.
     const childArgs = absolutizeLocalPathArgs(rawArgs.slice(2), process.cwd());
 
+    const isTs = pluginCli.endsWith(".ts");
+    if (isTs) {
+        const tsxBin = resolveTsx(projectRoot);
+        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
+        return;
+    }
+    await execa("node", [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
+}
+
+export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    if (!subcommand || subcommand === "--help") {
+        printDbHelp();
+        return;
+    }
+
+    const projectRoot = requireProjectRoot();
+
+    // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
+    // the command is what the user is waiting for, and a slow collector must not
+    // sit in front of it.
+    void recordEvent("cli.db", { subcommand: subcommand ?? "none" }, { projectRoot });
+
     try {
-        const isTs = pluginCli.endsWith(".ts");
-        if (isTs) {
-            const tsxBin = resolveTsx(projectRoot);
-            if (!tsxBin) {
-                console.error(chalk.red("✗ Could not find tsx binary."));
-                process.exit(1);
-            }
-            await execa(tsxBin, [pluginCli, ...childArgs], {
-                cwd: backendDir,
-                stdio: "inherit",
-                env
-            });
-        } else {
-            await execa("node", [pluginCli, ...childArgs], {
-                cwd: backendDir,
-                stdio: "inherit",
-                env
-            });
+        await runDriverDbCommand(rawArgs);
+    } catch (error) {
+        // A child that exited non-zero already printed its diagnostics through
+        // inherited stdio; only the errors raised above have a message worth
+        // adding here.
+        const message = error instanceof Error ? error.message : "";
+        if (message && !/Command failed|exited with code/i.test(message)) {
+            console.error(chalk.red(`✗ ${message}`));
         }
-    } catch {
-        // If the process exits with an error code, execa will throw,
-        // but inherit stdio means the user already saw the output.
         process.exit(1);
     }
 }

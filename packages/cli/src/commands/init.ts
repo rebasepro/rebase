@@ -704,27 +704,27 @@ async function createProject(options: InitOptions) {
             console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         }
     } else if (isBaas) {
+        // One step, then the thing that is actually this mode's job. `dev`
+        // starts the database container itself; a headless project has no
+        // collections, so there is no schema to push and the tables are the
+        // developer's to create.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start the PostgreSQL database container:"));
-        console.log(`  ${chalk.cyan("docker compose up -d db")}`);
+        console.log(chalk.gray("  # 1. Start everything — the database container comes up with it:"));
+        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         console.log("");
         console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
         console.log(chalk.gray("  #    A table is served once it has an authorization model, i.e."));
         console.log(chalk.gray("  #    row-level security enabled plus at least one policy:"));
         console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
         console.log(chalk.gray("  #    The API logs any table it skips, and why."));
-        console.log("");
-        console.log(chalk.gray("  # 3. Start the API — every protected table is served automatically:"));
-        console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     } else {
+        // The whole first run, in one command: `dev` starts the database
+        // container and pushes the schema before it starts the servers. The two
+        // steps that used to be printed here are still available — and still
+        // documented under `rebase dev --help` — for anyone who wants to drive
+        // them separately.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start the PostgreSQL database container:"));
-        console.log(`  ${chalk.cyan("docker compose up -d db")}`);
-        console.log("");
-        console.log(chalk.gray("  # 2. Push the Rebase schema to initialize database tables:"));
-        console.log(`  ${chalk.cyan(runDbPush.join(" "))}`);
-        console.log("");
-        console.log(chalk.gray("  # 3. Start the development server (frontend + backend):"));
+        console.log(chalk.gray("  # Start everything — the database container and schema are set up for you:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
     }
 
