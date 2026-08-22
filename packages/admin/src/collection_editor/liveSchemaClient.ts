@@ -73,6 +73,18 @@ export interface LiveSchemaResult {
 export interface LiveSchemaStatus {
     enabled: boolean;
     canPlan: boolean;
+    /**
+     * Whether *this caller* may apply, as opposed to whether the server can.
+     *
+     * Applying commits to the repository under an author, and a credential is
+     * not an author — so an API key or the service key may preview a change and
+     * not make one. Reported here so the panel can grey out the button and say
+     * why, rather than letting somebody read a plan, decide, press, and only
+     * then be refused.
+     */
+    canApply: boolean;
+    applyRefusedBecause?: string;
+    applyRefusedCode?: string;
     repository?: string;
     code?: string;
     reason?: string;
@@ -178,6 +190,14 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
                     return {
                         enabled: body.enabled === true,
                         canPlan: body.canPlan === true,
+                        // Absent on a backend from before capabilities existed.
+                        // Read as "yes" there, because on that server being
+                        // through the admin gate *was* the whole permission —
+                        // defaulting to no would take the feature away from
+                        // every deployment that has not upgraded.
+                        canApply: body.canApply ?? body.enabled === true,
+                        applyRefusedBecause: body.applyRefusedBecause,
+                        applyRefusedCode: body.applyRefusedCode,
                         repository: body.repository,
                         code: body.code,
                         reason: body.reason
@@ -186,6 +206,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
                 return {
                     enabled: false,
                     canPlan: false,
+                    canApply: false,
                     code: body.error?.code,
                     reason: body.error?.message
                         ?? `The backend refused to say whether its schema is editable (HTTP ${response.status}).`
@@ -194,6 +215,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
                 return {
                     enabled: false,
                     canPlan: false,
+                    canApply: false,
                     reason: err instanceof Error ? err.message : "The backend could not be reached."
                 };
             }

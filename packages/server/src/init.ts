@@ -51,6 +51,14 @@ import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { createLiveSchemaRoutes } from "./api/live-schema-routes";
 import { mountWithLegacyAlias } from "./api/mount";
+import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
+
+/**
+ * Who may change this project's schema through a running backend.
+ *
+ * @see `packages/server/src/schema-edit/schema-edit-permissions.ts`
+ */
+export interface LiveSchemaConfig extends SchemaEditPolicy {}
 import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
 import nodePath from "node:path";
 import nodeFs from "node:fs/promises";
@@ -350,6 +358,16 @@ export interface RebaseBackendConfig {
      * `collectionsDir` to write to.
      */
     schemaEditor?: boolean;
+
+    /**
+     * Live schema editing — changing the database and committing the change.
+     *
+     * Distinct from `schemaEditor`, which only rewrites collection source.
+     * There is nothing to switch on here: the surface mounts whenever there is
+     * a `collectionsDir`, and refuses in its own words when it cannot act. What
+     * this configures is *who* may act.
+     */
+    liveSchema?: LiveSchemaConfig;
 
     /** Options that only apply when collections are derived from the database. */
     baas?: BaasOptions;
@@ -1673,6 +1691,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             applyAdminGate(liveSchemaRouter, "Live schema editing");
 
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
+                // Off unless the project says otherwise. An automated schema
+                // change is a legitimate thing to want and a poor default:
+                // the credential that would make it is the one most likely to
+                // be sitting in a CI environment variable.
+                policy: {
+                    allowMachineApply: config.liveSchema?.allowMachineApply
+                        ?? process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY === "true"
+                },
                 getCollections: () => collectionRegistry.getRawCollections(),
                 getAdmin: () => defaultDriver.admin,
                 getRepository: (author) => {

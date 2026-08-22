@@ -44,19 +44,48 @@ const APP_JWT_TTL_SECONDS = 9 * 60;
 /** Renew an installation token this long before it lapses. */
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
+/**
+ * How to authenticate to GitHub.
+ *
+ * Two ways, because there are two deployments. A Cloud tenant is one of many
+ * behind a single app, so it authenticates as an *installation* of that app and
+ * holds no credential of its own. A self-hoster running a bundle has the same
+ * problem — no source on the machine — and no app: standing one up so that a
+ * server can commit to a repository they already own would be a great deal of
+ * ceremony around a one-line credential.
+ *
+ * Both end in the same place. Everything past the bearer token is the plain Git
+ * Data API and is identical for either, which is the point: the cloud is a
+ * better implementation of this interface, never the only one.
+ */
+export type GitHubAuth =
+    | {
+        kind: "app";
+        /** Numeric app id, or the client id — GitHub accepts either as `iss`. */
+        appId: string;
+        /**
+         * The app's private key, PEM.
+         *
+         * Accepts the literal PEM, a PEM with escaped newlines, or base64 —
+         * pass it through `normalizePemFromEnv` first, which is what the boot
+         * path does.
+         */
+        privateKey: string;
+        /** Which installation to act as. Produced when the app is installed. */
+        installationId: string;
+    }
+    | {
+        kind: "token";
+        /**
+         * A personal access token, or a fine-grained token with write access to
+         * the repository's contents. Used as the bearer directly — there is
+         * nothing to exchange and nothing to cache.
+         */
+        token: string;
+    };
+
 export interface GitHubRepositoryOptions {
-    /** Numeric app id, or the client id — GitHub accepts either as `iss`. */
-    appId: string;
-    /**
-     * The app's private key, PEM.
-     *
-     * Accepts the literal PEM, a PEM with escaped newlines, or base64 — pass it
-     * through `normalizePemFromEnv` before handing it here, which is what the
-     * boot path does.
-     */
-    privateKey: string;
-    /** Which installation to act as. Produced when the app is installed. */
-    installationId: string;
+    auth: GitHubAuth;
     owner: string;
     repo: string;
     /** Branch to commit onto. */
@@ -129,12 +158,22 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
         return await response.json() as T;
     };
 
-    const installationToken = async (): Promise<string> => {
+    /**
+     * The bearer for the Git Data calls.
+     *
+     * A token is already one. An app has to mint one: sign a JWT with the
+     * private key, which authenticates the *app* and can touch no repository,
+     * then exchange it for an installation token, which expires in an hour and
+     * is what can actually write. Cached until shortly before it lapses,
+     * because a schema edit makes several calls and minting is a round trip.
+     */
+    const bearer = async (): Promise<string> => {
+        if (options.auth.kind === "token") return options.auth.token;
         if (token && token.expiresAtMs - TOKEN_REFRESH_MARGIN_MS > now()) return token.value;
 
-        const jwt = createAppJwt(options.appId, options.privateKey, now());
+        const jwt = createAppJwt(options.auth.appId, options.auth.privateKey, now());
         const minted = await call<{ token: string; expires_at: string }>(
-            `/app/installations/${options.installationId}/access_tokens`,
+            `/app/installations/${options.auth.installationId}/access_tokens`,
             { method: "POST", auth: jwt }
         );
         token = { value: minted.token, expiresAtMs: Date.parse(minted.expires_at) };
@@ -163,7 +202,7 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
         async commit(paths: string[], message: string): Promise<string> {
             if (staged.length === 0) throw new Error("Refusing to commit with nothing staged.");
 
-            const auth = await installationToken();
+            const auth = await bearer();
             const base = `/repos/${owner}/${repo}`;
 
             // Read first, and commit against exactly this. Anything that lands

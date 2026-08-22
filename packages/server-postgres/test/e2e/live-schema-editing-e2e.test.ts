@@ -220,4 +220,170 @@ describe("live schema editing, end to end", () => {
         expect(git("show", "--name-only", "--pretty=", "HEAD")).toContain("drizzle/schema.sql");
         expect(await columnsOf("posts")).not.toHaveProperty("summary");
     }, 180_000);
+
+    /**
+     * The three changes that used to apply in part and report success.
+     *
+     * These live here rather than in a unit test for one reason: what makes
+     * them bugs is what Postgres does, and a fake cannot be wrong about
+     * Postgres in the same way Postgres is. So the assertions are on the
+     * catalogue and on the rows, never on the plan — a plan that says the right
+     * thing while the database disagrees is the exact failure being tested for.
+     */
+    describe("constraints the configuration asks for", () => {
+        const enumProperty = (values: string[]) => ({
+            name: "Status",
+            type: "string",
+            enum: values.map(id => ({ id, label: id }))
+        });
+
+        const enumValues = async (typeName: string): Promise<string[]> => {
+            const { rows } = await admin.query<{ value: string }>(
+                `SELECT e.enumlabel AS value FROM pg_enum e
+                 JOIN pg_type t ON e.enumtypid = t.oid
+                 WHERE t.typname = $1 ORDER BY e.enumsortorder`,
+                [typeName]
+            );
+            return rows.map(row => row.value);
+        };
+
+        const applyThrough = async (before: never[], after: never[]) => {
+            const plan = await driver.admin.planSchemaChange!(before, after);
+            return applySchemaChange({
+                plan,
+                repository: createLocalGitRepository({ root: repoRoot }),
+                apply: async (statements) => {
+                    for (const statement of statements) await admin.query(statement);
+                }
+            });
+        };
+
+        it("adds a value to an enum type that already exists", async () => {
+            // The bug: `ensure` skipped a type it already saw, so the value
+            // never reached the database and the first row using it was
+            // rejected by a type that had never heard of it. Nothing reported
+            // anything — the boot said success and the insert said constraint
+            // violation, hours apart.
+            const withEnum = [posts({ status: enumProperty(["draft", "live"]) })];
+            await applyThrough([posts({})] as never[], withEnum as never[]);
+            expect(await enumValues("posts_status")).toEqual(["draft", "live"]);
+
+            const widened = [posts({ status: enumProperty(["draft", "live", "archived"]) })];
+            const result = await applyThrough(withEnum as never[], widened as never[]);
+
+            expect(result.applied).toBe(true);
+            expect(await enumValues("posts_status")).toEqual(["draft", "live", "archived"]);
+
+            // The proof that matters: a row can now be written with it.
+            await admin.query(
+                `INSERT INTO public.posts (id, title, status) VALUES ('2', 'second', 'archived')`
+            );
+            const { rows } = await admin.query("SELECT status FROM public.posts WHERE id = '2'");
+            expect(rows[0]).toEqual({ status: "archived" });
+            await admin.query("DELETE FROM public.posts WHERE id = '2'");
+        }, 180_000);
+
+        it("adds a required column NOT NULL when the table is empty", async () => {
+            await admin.query(`CREATE TABLE public.empty_authors (id VARCHAR(255) PRIMARY KEY);`);
+            const authors = (properties: Record<string, unknown>) => ({
+                slug: "empty_authors",
+                name: "Authors",
+                table: "empty_authors",
+                properties: { id: { name: "ID", type: "string", isId: true }, ...properties }
+            }) as never;
+
+            const result = await applyThrough(
+                [authors({})] as never[],
+                [authors({ email: { name: "Email", type: "string", validation: { required: true } } })] as never[]
+            );
+
+            expect(result.applied).toBe(true);
+            // NO means NOT NULL. On an empty table the constraint cannot fail,
+            // so withholding it was never protecting anything — it just left a
+            // column the config calls required accepting nulls forever.
+            expect((await columnsOf("empty_authors")).email).toBe("NO");
+
+            await expect(
+                admin.query(`INSERT INTO public.empty_authors (id) VALUES ('x')`)
+            ).rejects.toThrow(/null value in column "email"/);
+        }, 180_000);
+
+        it("withholds NOT NULL on a populated table, and says which column", async () => {
+            // `posts` holds a row with no value for the new column, so the
+            // constraint would be checked against it and fail. Refused — but
+            // refused in words, which is the whole change: this used to be a
+            // successful boot and a silently nullable column.
+            const before = [posts({ subtitle: { name: "Subtitle", type: "string" } })];
+            const after = [posts({
+                subtitle: { name: "Subtitle", type: "string" },
+                author: { name: "Author", type: "string", validation: { required: true } }
+            })];
+
+            await expect(driver.admin.planSchemaChange!(before, after))
+                .rejects.toThrow(/already holds rows/);
+            expect(await columnsOf("posts")).not.toHaveProperty("author");
+        }, 180_000);
+
+        it("drops NOT NULL when the property stops being required", async () => {
+            await admin.query(
+                `CREATE TABLE public.strict (id VARCHAR(255) PRIMARY KEY, label VARCHAR(255) NOT NULL);`
+            );
+            await admin.query(`INSERT INTO public.strict (id, label) VALUES ('1', 'set');`);
+
+            const strict = (required: boolean) => ({
+                slug: "strict",
+                name: "Strict",
+                table: "strict",
+                properties: {
+                    id: { name: "ID", type: "string", isId: true },
+                    label: {
+                        name: "Label",
+                        type: "string",
+                        ...(required ? { validation: { required: true } } : {})
+                    }
+                }
+            }) as never;
+
+            expect((await columnsOf("strict")).label).toBe("NO");
+
+            const result = await applyThrough([strict(true)] as never[], [strict(false)] as never[]);
+
+            expect(result.applied).toBe(true);
+            // Loosening cannot fail and cannot lose data: the row is still
+            // there, and the column now accepts what the config says it does.
+            expect((await columnsOf("strict")).label).toBe("YES");
+            await admin.query(`INSERT INTO public.strict (id) VALUES ('2')`);
+            const { rows } = await admin.query("SELECT id, label FROM public.strict ORDER BY id");
+            expect(rows).toEqual([{ id: "1", label: "set" }, { id: "2", label: null }]);
+        }, 180_000);
+
+        it("sets NOT NULL when an empty table's property becomes required", async () => {
+            await admin.query(
+                `CREATE TABLE public.tightening (id VARCHAR(255) PRIMARY KEY, code VARCHAR(255));`
+            );
+            const tightening = (required: boolean) => ({
+                slug: "tightening",
+                name: "Tightening",
+                table: "tightening",
+                properties: {
+                    id: { name: "ID", type: "string", isId: true },
+                    code: {
+                        name: "Code",
+                        type: "string",
+                        ...(required ? { validation: { required: true } } : {})
+                    }
+                }
+            }) as never;
+
+            expect((await columnsOf("tightening")).code).toBe("YES");
+
+            const result = await applyThrough(
+                [tightening(false)] as never[],
+                [tightening(true)] as never[]
+            );
+
+            expect(result.applied).toBe(true);
+            expect((await columnsOf("tightening")).code).toBe("NO");
+        }, 180_000);
+    });
 });

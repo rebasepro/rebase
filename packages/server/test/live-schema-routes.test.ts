@@ -53,7 +53,21 @@ const blockedPlan = (): SchemaChangePlan => okPlan({
     }
 });
 
-function harness(over: Partial<LiveSchemaRoutesConfig> & { plan?: SchemaChangePlan } = {}) {
+/**
+ * Who is asking.
+ *
+ * In production the admin gate has run before any of this and `user` is always
+ * set. A harness that left it undefined would be exercising a request that
+ * cannot happen, and would hide the thing worth pinning: these routes refuse a
+ * credential the admin gate lets straight through.
+ */
+const PERSON = { uid: "u_1", roles: ["admin"], displayName: "Ada", email: "ada@example.com" };
+const API_KEY = { uid: "api-key:7c3f", roles: ["admin", "service"] };
+
+function harness(over: Partial<LiveSchemaRoutesConfig> & {
+    plan?: SchemaChangePlan;
+    user?: unknown;
+} = {}) {
     const events: string[] = [];
     const executed: string[] = [];
 
@@ -83,6 +97,13 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & { plan?: SchemaChangePl
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
+    // Stands in for the admin gate. Before `route`, or it never runs — Hono
+    // collects matching handlers in registration order.
+    const user = "user" in over ? over.user : PERSON;
+    app.use("/*", async (c, next) => {
+        if (user) c.set("user", user as never);
+        await next();
+    });
     app.route("/api/schema", createLiveSchemaRoutes(config));
 
     const post = (path: string, body: unknown) => app.fetch(new Request(`http://localhost/api/schema${path}`, {
@@ -251,5 +272,103 @@ describe("input validation", () => {
         const res = await post("/apply", body);
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+    });
+});
+
+/**
+ * Applying is a second privilege, and the admin gate in front of these routes
+ * only answers the first.
+ *
+ * The failure with consequences is a machine applying: an API key sitting in a
+ * CI environment variable that can rewrite the project's source and push a
+ * commit to its default branch, under a name that identifies nobody.
+ */
+describe("who may apply", () => {
+    it("lets a person apply", async () => {
+        const { post, events } = harness({ user: PERSON });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(200);
+        expect(events).toContain("commit");
+    });
+
+    it("lets an API key plan", async () => {
+        // Planning has no side effects, and a CI job asking whether a proposed
+        // change is applicable is a good use of this API.
+        const { post, events } = harness({ user: API_KEY });
+        const res = await post("/plan", change);
+        expect(res.status).toBe(200);
+        expect(events).toEqual(["plan"]);
+    });
+
+    it("refuses an API key applying, and writes nothing at all", async () => {
+        const { post, events } = harness({ user: API_KEY });
+        const res = await post("/apply", change);
+
+        expect(res.status).toBe(403);
+        expect(await res.json()).toMatchObject({
+            error: { code: "SCHEMA_EDIT_REQUIRES_A_PERSON" }
+        });
+        // Refused before the source is rewritten, not after. `writeSource`
+        // writes to disk outside the repository's checks, so a late refusal
+        // leaves a rewritten file behind and reports that nothing happened.
+        expect(events).toEqual([]);
+    });
+
+    it("refuses the service key applying", async () => {
+        const { post, events } = harness({ user: { uid: "service", roles: ["admin"] } });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(403);
+        expect(events).toEqual([]);
+    });
+
+    it("lets a machine apply when the project has said so", async () => {
+        const { post, events } = harness({
+            user: API_KEY,
+            policy: { allowMachineApply: true }
+        });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(200);
+        expect(events).toContain("commit");
+    });
+
+    it("refuses a caller with no identity at all", async () => {
+        // Cannot happen in production — the admin gate runs first. Checked
+        // anyway: a capability function that trusts its caller to have checked
+        // is one refactor away from granting everything.
+        const { post } = harness({ user: undefined });
+        expect((await post("/plan", change)).status).toBe(403);
+        expect((await post("/apply", change)).status).toBe(403);
+    });
+
+    it("reports the caller's own capabilities on /status", async () => {
+        // So the panel can grey out the button *and say why*, rather than
+        // letting somebody read a plan, decide, press, and only then be refused.
+        const { post: _post } = harness({ user: API_KEY });
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", API_KEY as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts")],
+            getAdmin: () => ({
+                planSchemaChange: async () => okPlan(),
+                executeSql: async () => ({ rows: [] })
+            } as unknown as DatabaseAdmin),
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => {},
+                commit: async () => "abc"
+            }),
+            writeSource: async () => []
+        }));
+
+        const res = await app.fetch(new Request("http://localhost/api/schema/status"));
+        expect(await res.json()).toMatchObject({
+            enabled: true,
+            canPlan: true,
+            canApply: false,
+            applyRefusedCode: "SCHEMA_EDIT_REQUIRES_A_PERSON"
+        });
     });
 });

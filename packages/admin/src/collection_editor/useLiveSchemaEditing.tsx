@@ -199,6 +199,9 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
             onConfirm={onConfirm}
             onSourceOnly={writeSourceOnly ? onSourceOnly : undefined}
             onClose={onClose}
+            applyRefusedBecause={
+                status && !status.canApply ? status.applyRefusedBecause : undefined
+            }
         />
     );
 

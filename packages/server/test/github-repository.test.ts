@@ -58,9 +58,7 @@ function stubGitHub(over: Record<string, unknown> = {}) {
 
 const makeRepo = (stub: ReturnType<typeof stubGitHub>, author = { name: "Panel", email: "p@r.pro" }) =>
     createGitHubRepository({
-        appId: "4681389",
-        privateKey,
-        installationId: "99",
+        auth: { kind: "app", appId: "4681389", privateKey, installationId: "99" },
         owner: "rebasepro",
         repo: "customer-project",
         branch: "main",
@@ -169,9 +167,7 @@ describe("committing", () => {
         // Built directly: `makeRepo` has a default author, and passing
         // `undefined` would take it rather than omit it.
         const repo = createGitHubRepository({
-            appId: "4681389",
-            privateKey,
-            installationId: "99",
+            auth: { kind: "app", appId: "4681389", privateKey, installationId: "99" },
             owner: "rebasepro",
             repo: "customer-project",
             branch: "main",

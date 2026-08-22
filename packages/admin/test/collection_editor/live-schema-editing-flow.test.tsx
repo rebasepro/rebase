@@ -66,7 +66,9 @@ const change = { collectionId: "posts", collection: { name: "Posts" } };
 
 function fakeClient(over: Partial<LiveSchemaClient> = {}): LiveSchemaClient {
     return {
-        status: jest.fn(async () => ({ enabled: true, canPlan: true, repository: "/repo" })),
+        status: jest.fn(async () => ({
+            enabled: true, canPlan: true, canApply: true, repository: "/repo"
+        })),
         plan: jest.fn(async () => SAFE_PLAN),
         apply: jest.fn(async () => APPLIED),
         ...over
@@ -232,5 +234,44 @@ describe("reviewing a schema change", () => {
 
         await waitFor(() => expect(screen.getByText("the working tree is dirty")).toBeTruthy());
         expect(settled).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * A caller who may preview but not apply.
+ *
+ * The signed-in-with-an-API-key case. The refusal has to arrive while they are
+ * deciding, not after: reading a plan, agreeing to it, pressing the button and
+ * *then* being told is the one ordering that wastes their attention entirely.
+ */
+describe("when the caller may not apply", () => {
+    const readOnly = () => fakeClient({
+        status: jest.fn(async () => ({
+            enabled: true,
+            canPlan: true,
+            canApply: false,
+            applyRefusedBecause: "This request is authenticated with an API key."
+        })) as never
+    });
+
+    it("shows the plan, says why, and disables the button", async () => {
+        render(<Harness client={readOnly()} onSettled={jest.fn()}/>);
+        await start();
+
+        await waitFor(() => expect(
+            screen.getByText("You can preview this change, but not apply it")
+        ).toBeTruthy());
+        expect(screen.getByText(/authenticated with an API key/)).toBeTruthy();
+        expect(screen.getByText("Commit and apply").closest("button")?.disabled).toBe(true);
+    });
+
+    it("still plans, because previewing has no side effects", async () => {
+        const client = readOnly();
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(client.plan).toHaveBeenCalled();
+        expect(client.apply).not.toHaveBeenCalled();
     });
 });

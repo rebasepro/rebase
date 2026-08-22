@@ -68,6 +68,14 @@ export interface SchemaChangeDialogProps {
      */
     onSourceOnly?: () => void;
     onClose: () => void;
+    /**
+     * Why this caller may preview but not apply, when that is the case.
+     *
+     * A person signed in with an API key, most often. Shown next to a disabled
+     * button so the refusal arrives while they are deciding rather than after
+     * they have decided.
+     */
+    applyRefusedBecause?: string;
 }
 
 type Verdict = LiveSchemaPlan["verdict"];
@@ -203,7 +211,8 @@ export function SchemaChangeDialog({
     applyError,
     onConfirm,
     onSourceOnly,
-    onClose
+    onClose,
+    applyRefusedBecause
 }: SchemaChangeDialogProps) {
 
     const verdict = plan?.verdict;
@@ -303,6 +312,15 @@ export function SchemaChangeDialog({
 
                         <WithheldConstraints constraints={plan.withheldConstraints ?? []}/>
 
+                        {applyRefusedBecause && (
+                            <Alert color="info">
+                                <Typography variant="body2" className="font-medium mb-1">
+                                    You can preview this change, but not apply it
+                                </Typography>
+                                <Typography variant="body2">{applyRefusedBecause}</Typography>
+                            </Alert>
+                        )}
+
                         <Details summary="SQL that will run" count={plan.statements.length}>
                             <div className={codeBlock}>{plan.statements.join("\n")}</div>
                         </Details>
@@ -336,8 +354,10 @@ export function SchemaChangeDialog({
                         // re-derivation from the verdicts on screen:
                         // `applySchemaChange` re-checks it before it writes
                         // anything, so a button that disagreed would only
-                        // produce the same refusal one click later.
-                        disabled={!plan?.applicable || applying}
+                        // produce the same refusal one click later. The same
+                        // goes for the permission — `/apply` checks it too, and
+                        // this only saves somebody the round trip.
+                        disabled={!plan?.applicable || applying || Boolean(applyRefusedBecause)}
                     >
                         {applying ? "Applying…" : "Commit and apply"}
                     </Button>

@@ -44,6 +44,12 @@ import {
     UnapplicableChangeError,
     type SchemaEditRepository
 } from "../schema-edit/apply-schema-change";
+import {
+    classifyPrincipal,
+    machineCommitAuthor,
+    schemaEditCapabilities,
+    type SchemaEditPolicy
+} from "../schema-edit/schema-edit-permissions";
 
 export interface LiveSchemaRoutesConfig {
     /**
@@ -66,6 +72,13 @@ export interface LiveSchemaRoutesConfig {
      * and that needs `ts-morph`, which is an optional dependency.
      */
     writeSource?: (change: ProposedChange) => Promise<{ path: string; contents: string }[]>;
+    /**
+     * Who may apply a change, as opposed to preview one.
+     *
+     * See `schema-edit-permissions.ts`. The short version: applying writes a
+     * commit, a commit needs an author, and a credential is not an author.
+     */
+    policy?: SchemaEditPolicy;
 }
 
 /** What the panel posts: one collection, in the shape it should end up. */
@@ -181,7 +194,22 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                     "no source to edit."
             });
         }
-        return c.json({ enabled: true, canPlan: true, repository: repository.root });
+        // The caller's own capabilities, not just the server's. A person who
+        // may preview but not apply should see that before they read a plan and
+        // decide — being refused at the moment of pressing the button is the
+        // worst time to learn it.
+        const capabilities = schemaEditCapabilities(
+            classifyPrincipal(c.get("user")),
+            config.policy
+        );
+        return c.json({
+            enabled: true,
+            canPlan: capabilities.plan,
+            canApply: capabilities.apply,
+            applyRefusedBecause: capabilities.reason,
+            applyRefusedCode: capabilities.code,
+            repository: repository.root
+        });
     });
 
     /** The admin, or a refusal naming what is missing rather than a 500. */
@@ -218,6 +246,22 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     router.post("/plan", async (c) => {
         const change = parseProposed(await c.req.json());
         const admin = requirePlanner();
+
+        // Checked even though planning has no side effects, and even though the
+        // admin gate has already run. A capability function that trusts its
+        // caller to have checked is one refactor away from granting everything,
+        // and this is the cheap half of making that impossible.
+        const capabilities = schemaEditCapabilities(
+            classifyPrincipal(c.get("user")),
+            config.policy
+        );
+        if (!capabilities.plan) {
+            throw ApiError.forbidden(
+                capabilities.reason ?? "This caller may not plan schema changes.",
+                capabilities.code ?? "FORBIDDEN"
+            );
+        }
+
         const before = config.getCollections();
         const after = proposedCollections(before, change);
 
@@ -240,10 +284,28 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     router.post("/apply", async (c) => {
         const change = parseProposed(await c.req.json());
         const admin = requirePlanner();
+
+        // Applying is the second privilege, and the admin gate in front of this
+        // route only answered the first. See `schema-edit-permissions.ts`:
+        // a commit needs an author, and a credential is not one.
+        const principal = classifyPrincipal(c.get("user"));
+        const capabilities = schemaEditCapabilities(principal, config.policy);
+        if (!capabilities.apply) {
+            throw ApiError.forbidden(
+                capabilities.reason ?? "This caller may not apply schema changes.",
+                capabilities.code ?? "FORBIDDEN"
+            );
+        }
+
         // Attributed to whoever pressed the button. A schema change with an
         // author and a diff in the project's history is the thing neither
-        // competitor gives you; an anonymous one is just a commit.
-        const repository = requireRepository(commitAuthor(c.get("user")));
+        // competitor gives you; an anonymous one is just a commit. A machine
+        // that has been allowed to apply is named as a machine, so that reading
+        // `git log` a month from now still distinguishes the two.
+        const author = principal.kind === "machine"
+            ? machineCommitAuthor(principal)
+            : commitAuthor(c.get("user"));
+        const repository = requireRepository(author);
 
         const before = config.getCollections();
         const after = proposedCollections(before, change);

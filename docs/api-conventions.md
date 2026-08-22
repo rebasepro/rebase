@@ -28,7 +28,7 @@ to it.
 | Mixed | `/meta` | Per route, documented at the route |
 
 **An admin-only surface lives under `/admin`.** No exceptions that are not
-listed in §6. This is the rule the codebase most recently broke and the one most
+listed in §7. This is the rule the codebase most recently broke and the one most
 worth keeping: `/api/cron` looked like a data-plane path and was an admin
 surface, and the only way to know was to read `init.ts`.
 
@@ -109,7 +109,43 @@ repository and refusing to preview would be a worse answer than the truth.
   it takes a body. `plan` and `apply` are the pattern: anything with more than
   one possible verdict should be inspectable before it is done.
 
-## 6. The exceptions, and why
+## 6. Admin is not one privilege
+
+`/admin/**` means "an admin may call this". It does not mean every admin may do
+everything the surface offers, and one surface already needs the distinction.
+
+Live schema editing splits into two capabilities:
+
+| Capability | What it does | Who |
+|---|---|---|
+| `plan` | Reads the collections and the catalogue, answers what a change would do. No side effects. | Anyone through the admin gate |
+| `apply` | Commits to the repository, then runs the DDL. | A **person** |
+
+The split is not between roles, it is between a person and a machine. Applying
+writes a commit, the commit carries an author, and the author is the point — a
+schema change with an author and a diff in the project's history is the thing
+worth having. A service key has no author. `api-key:7c3f…` has no author.
+Letting either write to the project's source produces exactly the unattributable
+history the feature exists to replace, using the credential most likely to be
+sitting in a CI environment variable.
+
+So machines plan and do not apply. `liveSchema.allowMachineApply` (or
+`REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`) turns it on for a deployment that
+genuinely wants an automated schema change, and the commit is then attributed to
+the credential by name — `Rebase API key (7c3f)` — so that reading `git log` a
+month later still distinguishes a change somebody made from one a pipeline made.
+
+**A surface with capabilities reports them on `/status`**, per caller, not just
+per server: `canPlan`, `canApply`, and `applyRefusedBecause` when the answer is
+no. A UI can then disable the control *and say why*, instead of letting somebody
+read a plan, decide, press, and only then be refused.
+
+Where a lesser privilege is genuinely needed, it belongs in a capability check
+like this one — not in `ADMINISTRATIVE_ROLES`, which is the list that decides
+whether somebody is an admin at all, and which has been widened by accident
+before (`packages/server/src/auth/admin-roles.ts`).
+
+## 7. The exceptions, and why
 
 **`/api/meta`** is mixed rather than admin. `/meta/contract` is admin-gated —
 it is a full map of the schema, including tables no security rule would expose.
@@ -123,10 +159,10 @@ admin-only siblings — user management, roles, password resets — live under
 
 **The client SDK still calls the legacy paths.** `@rebasepro/client` defaults
 `cronPath` to `/cron`, not `/admin/cron`. An SDK that moved first would break
-against every server already deployed, and the alias in §7 means the old path
+against every server already deployed, and the alias in §8 means the old path
 works indefinitely. The SDK moves at a major, together with the aliases.
 
-## 7. Moving a surface that has shipped
+## 8. Moving a surface that has shipped
 
 Use `mountWithLegacyAlias` (`src/api/mount.ts`). It serves the same router at
 both paths, so the two cannot drift — one set of handlers, one gate.
