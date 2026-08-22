@@ -26,7 +26,8 @@ import {
     MANAGED_SERVER_MAX_CONNECTIONS,
     PGLITE_EXTENSION_NAMES
 } from "./constraints";
-import { clearState, dataDir, writeState } from "./state";
+import { NotificationProxy } from "./notification-proxy";
+import { clearState, dataDir, findFreePort, writeState } from "./state";
 
 /** Shut down after this long with nothing connected. */
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60_000;
@@ -137,9 +138,15 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
     const extensions = await loadExtensions();
     const db = (await PGlite.create({ dataDir: directory, extensions })) as { close(): Promise<void> };
 
+    // The socket server listens privately; clients reach it through the
+    // notification proxy on `args.port`. Realtime does not work otherwise —
+    // PGlite is one session, so a NotificationResponse is handed to whichever
+    // socket is reading rather than to the one that issued LISTEN. See
+    // `notification-proxy.ts` for the measurements.
+    const upstreamPort = await findFreePort();
     const server = new PGLiteSocketServer({
         db,
-        port: args.port,
+        port: upstreamPort,
         host: "127.0.0.1",
         // Above the client pool limit so a second *non-transactional* client is
         // refused with a connection error rather than deadlocking the
@@ -148,6 +155,15 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
         maxConnections: MANAGED_SERVER_MAX_CONNECTIONS
     });
     await server.start();
+
+    const proxy = new NotificationProxy({
+        listenPort: args.port,
+        upstreamPort,
+        onNotification: (channel, _payload, copies) => {
+            if (copies > 0) process.stdout.write(`dev-db: relayed notification on ${channel} to ${copies} client(s)\n`);
+        }
+    });
+    await proxy.start();
 
     // "Idle" means nothing is connected to the *database*. An earlier version
     // tracked identity pings instead, which meant a daemon serving queries
@@ -178,6 +194,9 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
         // should conclude "not running" and start a fresh daemon, rather than
         // connect to a socket that is closing under it.
         clearState(args.projectRoot);
+        try {
+            await proxy.stop();
+        } catch { /* already down */ }
         try {
             await server.stop();
         } catch { /* already down */ }

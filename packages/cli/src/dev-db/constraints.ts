@@ -42,13 +42,16 @@
  *    role-switched RLS transaction all pass; with a pool of 5 the same script
  *    hangs indefinitely.
  *
- * 5. **LISTEN/NOTIFY does not cross the socket, and says nothing about it.**
- *    A dedicated client can `LISTEN`, a pooled client can `NOTIFY`, both report
- *    success, and the notification is never delivered — the same for
- *    `pg_notify` fired from a trigger. Since the realtime engine is built on
- *    LISTEN/NOTIFY-based CDC, realtime cannot work against a managed PGlite
- *    database. It must be *reported*, never silently degraded; see
- *    {@link MANAGED_LIMITATIONS}.
+ * 5. **LISTEN/NOTIFY needed repairing, and now works.** A notification is an
+ *    asynchronous message with no request to answer, and the multiplexer hands
+ *    it to whichever socket is reading rather than to the one that issued
+ *    `LISTEN` — so a dedicated listener connection, which is exactly how the
+ *    realtime engine works, received nothing while the *writer* received
+ *    notifications it never asked for. `notification-proxy.ts` corrects that by
+ *    copying every `NotificationResponse` frame to every client, which for a
+ *    single-session database is simply the truth. Realtime therefore works
+ *    against the managed database, with no change to the server: it does
+ *    ordinary `LISTEN` over ordinary libpq.
  */
 
 /**
@@ -98,13 +101,6 @@ export interface ManagedLimitation {
  * database at all.
  */
 export const MANAGED_LIMITATIONS: readonly ManagedLimitation[] = [
-    {
-        id: "realtime",
-        summary:
-            "Realtime subscriptions, presence and broadcast are unavailable: LISTEN/NOTIFY " +
-            "is not delivered across the PGlite socket, so change events never fire.",
-        remedy: "Run against a real Postgres for realtime work: rebase dev --docker"
-    },
     {
         id: "concurrency",
         summary:
