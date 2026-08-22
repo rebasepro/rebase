@@ -171,6 +171,11 @@ export * from "./email";
 // =============================================================================
 export * from "./storage";
 
+// Declarative storage access control. It compiles to a plain
+// `StorageAuthorize`, so a project can build one and pass it either way.
+export { compileStoragePolicies, resolveStorageAccessControl, StoragePolicyError } from "./storage/policies";
+export type { StoragePolicy, StoragePolicyContext, StoragePolicyPredicate } from "./storage/policies";
+
 // The scheduled RLS audit. The scanner itself is not re-exported — it is
 // supplied by the caller, so this package never depends on it.
 export { createRlsAudit, summarize as summarizeRlsScan } from "./rls-audit";

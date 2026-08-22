@@ -17,6 +17,7 @@ class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, start
 class RawHtml { toString, value }
 class S3StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
 class SMTPEmailService { isConfigured, send, verifyConnection }
+class StoragePolicyError
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
@@ -51,6 +52,7 @@ function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }
 function cleanupDevPortFile
+function compileStoragePolicies
 function createAppleProvider
 function createBackupRoutes
 function createBitbucketProvider
@@ -163,6 +165,7 @@ function resolveEmailBranding { appName, logoUrl }
 function resolveEmailLinkBase
 function resolveEmailOptions
 function resolveRequireAuth
+function resolveStorageAccessControl
 function resolveStorageBackend
 function resolveStorageSources
 function runFromBundle
@@ -260,7 +263,7 @@ interface QueryOptions { fields, include, limit, logical, offset, orderBy, vecto
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
-interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, logging, maxBodySize, ownership, provisionSchema, provisioningDriverResult, rateLimit, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePublicRead, storageSources, surfaces }
+interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, functionsSelection, functionsTimeoutMs, functionsUpstream, history, jobs, logging, maxBodySize, ownership, provisionSchema, provisioningDriverResult, rateLimit, rlsAudit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePolicies, storagePublicRead, storageSources, surfaces }
 interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, driver, driverRegistry, healthCheck, history, jobQueue, realtimeService, realtimeServices, setCollectionCallbacks, shutdown, storageController, storageRegistry }
 interface RebaseFunctionContext { rebase }
 interface RecoveryCode { id, uid, usedAt }
@@ -284,6 +287,8 @@ interface StorageAuthorizeContext { bucket, data, key, operation, storageId, use
 interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
 interface StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
+interface StoragePolicy { allow, operations, path }
+interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
 interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, publicRead, registry, requireAuth, sources }
 interface TokenRepository { createMagicLinkToken, createPasswordResetToken, createRefreshToken, deleteAllPasswordResetTokensForUser, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteRefreshToken, deleteRefreshTokenById, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getTokensValidAfter, listRefreshTokensForUser, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setTokensValidAfter }
@@ -323,6 +328,7 @@ type RlsSeverity
 type SqlExec
 type StorageAuthorize
 type StorageOperation
+type StoragePolicyPredicate
 type UnknownKeyPolicy
 type UserInvitationTemplateFunction
 type WelcomeEmailTemplateFunction

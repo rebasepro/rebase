@@ -5935,6 +5935,41 @@ Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `ST
 
 ### Per-Object Authorization
 
+#### Policies
+
+The declarative form. A list of path patterns, read without running anything:
+
+```ts
+storagePolicies: [
+    { path: "public/**", operations: ["read"], allow: "public" },
+    { path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }
+]
+```
+
+**A key matched by no policy is refused.** Every widening is an explicit line,
+and a mistake denies rather than grants.
+
+Patterns match **by segment, never by substring** — `public/**` does not match
+`publicity/secret.png`:
+
+| Pattern | Matches |
+|---|---|
+| `avatars/logo.png` | that key exactly |
+| `users/*/avatar.png` | exactly one segment where `*` is |
+| `users/:uid/**` | one captured segment, then the rest — including nothing |
+
+`**` is only legal as the final segment. `:name` captures one segment and never
+spans a `/`; captures arrive as `params` on the predicate.
+
+`allow` is `"public"` (anyone), `"authenticated"` (any caller with a uid), or a
+predicate receiving the captured params, the user, the operation and the bucket.
+`operations` defaults to all four — `read`, `write`, `delete`, `list`.
+
+Policies satisfy the production boot guard on their own, and a malformed pattern
+fails the boot rather than the first upload.
+
+#### The hook
+
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
 
 :::caution[Storage will not boot in production without one]
