@@ -4782,6 +4782,59 @@ hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
 :::
 
+#### Bot protection
+
+Rate limiting bounds one caller. A thousand addresses sending one request each
+never touch a per-IP window — and `/auth/register`, `/auth/forgot-password` and
+`/auth/magic-link` all send mail, so the bill for an unprotected form is paid in
+reputation on your sending domain.
+
+```ts
+auth: {
+    captcha: {
+        enabled: true,
+        provider: "turnstile",              // or "hcaptcha"
+        secret: process.env.CAPTCHA_SECRET
+    }
+}
+```
+
+Or from the environment, which is what a managed deployment has:
+
+```bash
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET=...
+CAPTCHA_ROUTES=register,forgotPassword,magicLink   # optional; this is the default
+```
+
+The client sends the widget's token as `captchaToken` in the JSON body, or in
+the widget's own `cf-turnstile-response` / `h-captcha-response` header. Both are
+accepted; set `tokenField` to use a different body key.
+
+**`login` is not protected by default.** A challenge on every sign-in taxes every
+real user, and credential stuffing is what the rate limiter and account lockout
+are for. Add it to `routes` if you want it.
+
+##### It fails closed
+
+If the provider cannot be reached, verification fails and the request is
+refused. An attacker able to cause that outage could otherwise switch the
+protection off, which is the one thing a challenge must not allow.
+
+The cost is that a provider outage blocks sign-ups. That is loud, visible, and
+undone by removing one config key — a better failure than a silent one noticed
+when the mail domain gets blocklisted.
+
+##### A misconfiguration fails the boot
+
+`enabled: true` with no provider, an unknown provider, or no secret all refuse to
+start. A challenge that is silently absent while the config says it is there is
+the one failure this cannot have.
+
+The caller is told only that the challenge failed — never whether the token was
+absent, malformed, already used, or unverifiable. Which one it was goes to the
+log, because telling a script tells it how to get closer.
+
 #### Branding the default emails
 
 The built-in password-reset, verification, invitation, welcome and magic-link
