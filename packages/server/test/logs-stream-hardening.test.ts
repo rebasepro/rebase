@@ -405,39 +405,71 @@ describe("log stream under load", () => {
     });
 
     it("leaves no gap between the snapshot and the first append", async () => {
-        // Comfortably inside the cap, so a gap here can only be the handshake
-        // race and not the drop path (which is covered above, and which has to be
-        // ruled out for "no gap" to mean anything).
-        const TOTAL = 400;
+        // Every count here is chosen, and every wait is for *data* rather than
+        // for a duration. The previous version stopped the writer once two
+        // append frames had arrived — two 20ms flush windows — and then asserted
+        // that more than twenty entries had been produced in that time. On an
+        // idle machine `setImmediate` spins thousands of times in 40ms; on a
+        // loaded one it managed twelve, and the test failed on its own
+        // precondition while the invariant it exists to prove was intact.
+        //
+        // So nothing below infers "enough happened" from elapsed time.
+        const BEFORE = 10;   // in the snapshot
+        const AFTER = 40;    // in the appends — the floor, and it is a count we picked
+        const CAP = 120;     // keeps the total under the snapshot's 200-entry limit
         const app = buildApp({ flushMs: 20,
             heartbeatMs: 10_000,
             maxPending: 10_000 });
 
-        // Log continuously across the handshake, so anything logged between
-        // "read the backlog" and "subscribe" would fall down the crack a
-        // two-request client has.
         let written = 0;
+        const write = () => addLog("info", "api", `race ${written++}`);
+
+        for (let i = 0; i < BEFORE; i++) write();
+
+        // Keep logging *across* the handshake: anything written between reading
+        // the backlog and subscribing would fall down the crack a two-request
+        // client has, and this is the only window in which that can happen.
+        // Bounded by CAP so a fast machine cannot overrun the snapshot limit and
+        // turn an exact assertion into an approximate one.
         let writing = true;
         const writer = (async () => {
-            while (writing && written < TOTAL) {
-                addLog("info", "api", `race ${written++}`);
+            while (writing && written < CAP - AFTER) {
+                write();
                 await new Promise(resolve => setImmediate(resolve));
             }
         })();
 
         const tail = await openTail(app);
-        await tail.until(() => tail.frames.filter(f => f.event === "append").length >= 2);
         writing = false;
         await writer;
-        await tail.drain(300); // let what is still in flight arrive
+
+        // A known number after the handshake, so the floor below is guaranteed
+        // by construction rather than by how many the machine got through.
+        for (let i = 0; i < AFTER; i++) write();
+
+        // Wait for the last entry to *arrive*, not for a window to elapse. A
+        // timeout here fails loudly instead of asserting on partial data, which
+        // is what `drain(300)` used to do.
+        const last = `race ${written - 1}`;
+        const arrived = await tail.until(
+            () => [...tail.entriesOf("snapshot"), ...tail.entriesOf("append")]
+                .some(entry => entry.message === last),
+            5000
+        );
+        expect(arrived).toBe(true);
 
         const seen = [...tail.entriesOf("snapshot"), ...tail.entriesOf("append")]
             .map(e => Number(e.id.slice("log_".length)));
 
-        expect(seen.length).toBeGreaterThan(20);
-        expect(new Set(seen).size).toBe(seen.length); // no entry twice
+        // Exactly once each, and every one of them: the subscription is taken
+        // before the backlog is read, with nothing awaited between, so an entry
+        // can be in neither only if there is a gap and in both only if there is
+        // an overlap. Asserting the exact count catches both, where a floor of
+        // twenty caught neither.
+        expect(seen.length).toBe(written);
+        expect(seen.length).toBeGreaterThanOrEqual(BEFORE + AFTER);
+        expect(new Set(seen).size).toBe(seen.length);
         for (let i = 1; i < seen.length; i++) {
-            // Contiguous: every id between the first and last is accounted for.
             expect(seen[i]).toBe(seen[i - 1] + 1);
         }
     });
