@@ -16,6 +16,7 @@ import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
+import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
@@ -638,9 +639,37 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             c.header("Content-Type", served.contentType);
             if (served.attachment) c.header("Content-Disposition", "attachment");
 
+            // Advertised before the conditional check so a 304 carries it too:
+            // a client revalidating a cached media file still needs to know it
+            // may seek once it has one.
+            c.header("Accept-Ranges", "bytes");
+
             // Checked after the headers are set and before the file is read:
             // the whole point is not to read or send the body.
             if (isNotModified(c, validators)) return c.body(null, 304);
+
+            // Conditional first, then range — the order RFC 9110 requires.
+            const localRange = parseRange(c.req.header("range"), localStat.size);
+            if (localRange.kind === "unsatisfiable") {
+                c.header("Content-Range", unsatisfiableContentRange(localStat.size));
+                return c.body(null, 416);
+            }
+
+            if (localRange.kind === "range") {
+                const { start, end, length } = localRange.range;
+                // Only the requested slice leaves the disk. Reading the whole
+                // file to answer a range would give up the reason ranges exist.
+                const handle = await fsp.open(absolutePath, "r");
+                try {
+                    const buffer = Buffer.alloc(length);
+                    await handle.read(buffer, 0, length, start);
+                    c.header("Content-Range", contentRange(localRange.range, localStat.size));
+                    c.header("Content-Length", String(length));
+                    return c.body(new Uint8Array(buffer), 206);
+                } finally {
+                    await handle.close();
+                }
+            }
 
             const fileContent = await fsp.readFile(absolutePath);
             return c.body(new Uint8Array(fileContent));
@@ -679,9 +708,29 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         const remoteValidators = objectValidators(fileObject.size, fileObject.lastModified);
         applyCacheHeaders(c, remoteValidators, cachePolicy(OBJECT_MAX_AGE));
+        c.header("Accept-Ranges", "bytes");
         if (isNotModified(c, remoteValidators)) return c.body(null, 304);
 
+        const remoteRange = parseRange(c.req.header("range"), fileObject.size);
+        if (remoteRange.kind === "unsatisfiable") {
+            c.header("Content-Range", unsatisfiableContentRange(fileObject.size));
+            return c.body(null, 416);
+        }
+
         const buf = await fileObject.arrayBuffer();
+
+        if (remoteRange.kind === "range") {
+            const { start, end, length } = remoteRange.range;
+            // The whole object still comes from the remote store — a
+            // `StorageController` has no ranged read — so this saves the
+            // response body, not the upstream fetch. Worth it anyway: it is what
+            // makes a player seek instead of restarting, and it is the half of
+            // the cost that is on the user's connection.
+            c.header("Content-Range", contentRange(remoteRange.range, fileObject.size));
+            c.header("Content-Length", String(length));
+            return c.body(new Uint8Array(buf.slice(start, end + 1)), 206);
+        }
+
         return c.body(new Uint8Array(buf));
     });
 
