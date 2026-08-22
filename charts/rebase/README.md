@@ -50,10 +50,16 @@ have to remember:
 - `REBASE_RATE_LIMIT_STORE=sql` as soon as a second process serves HTTP
 
 Those are the settings whose failure mode is silence. A wrong `REBASE_ROLE`
-serves no HTTP while `/health` still answers, so readiness passes and every
-request 404s; a missing `REBASE_MIGRATE_ON_BOOT` is a crash loop whose reason is
-in a log nobody is watching. The chart knows all of them from the values it was
-given, so it writes them, and `config.env` cannot override them.
+serves no HTTP while `/livez` and `/health` both still answer — they answer on
+every role — so startup, liveness and readiness all pass, the rollout reports
+success, and every request 404s. A missing `REBASE_MIGRATE_ON_BOOT` is a crash
+loop whose reason is in a log nobody is watching.
+
+The chart knows all of them from the values it was given, so it writes them, and
+setting one through `config.env` is **refused** at render rather than ignored.
+Ignoring would have been the quieter bug: unsplit, the chart writes no
+`REBASE_ROLE` of its own, so an operator's would have been the only one and would
+have taken effect.
 
 ### Splitting cron from job execution
 

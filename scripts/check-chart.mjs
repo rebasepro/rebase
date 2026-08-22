@@ -227,6 +227,111 @@ if (!strict.ok) {
     }
 }
 
+// ── 2f. parity with the runtime's pod contract ───────────────────────────────
+/**
+ * The chart cannot import TypeScript, so this is where it is held to the
+ * contract the control plane gets by importing it.
+ *
+ * Only the parts that are statements about the *runtime* are compared. The
+ * chart and the control plane legitimately differ on resources, scheduling,
+ * where the environment comes from and what the container is called — those are
+ * different jobs producing different manifests. What is compared here is what
+ * a deployment cannot get wrong without producing a cluster that looks healthy.
+ */
+const contractSrc = fs.readFileSync(
+    path.join(ROOT, "packages/server/src/deploy/pod-contract.ts"), "utf-8");
+
+/** Read a `export const NAME = "value"` / `= 5` out of the contract. */
+function contractValue(name) {
+    const m = contractSrc.match(new RegExp(`export const ${name}\\s*=\\s*([^;\n]+)`));
+    return m ? m[1].trim().replace(/^["']|["']$/g, "") : undefined;
+}
+
+/** The probe → path map, read out of RUNTIME_PROBE_PATHS. */
+function contractProbePaths() {
+    const block = contractSrc.slice(contractSrc.indexOf("RUNTIME_PROBE_PATHS = {"));
+    const body = block.slice(0, block.indexOf("}"));
+    const out = {};
+    for (const m of body.matchAll(/(\w+):\s*(RUNTIME_\w+)/g)) {
+        out[m[1]] = contractValue(m[2]);
+    }
+    return out;
+}
+
+/** Probe → path as the chart actually renders it, for one Deployment. */
+function probesOf(yaml, deploymentName) {
+    const doc = yaml.split(/^---$/m).find(d =>
+        /^kind:\s*Deployment\s*$/m.test(d) && new RegExp(`name:\\s*${deploymentName}\\s*$`, "m").test(d));
+    if (!doc) return {};
+    const out = {};
+    for (const m of doc.matchAll(/(liveness|readiness|startup)Probe:\s*\n\s+httpGet:\s*\n\s+path:\s*(\S+)/g)) {
+        out[m[1]] = m[2];
+    }
+    return out;
+}
+
+const CONTRACT_PROBES = contractProbePaths();
+check("contract", Object.keys(CONTRACT_PROBES).length === 3,
+    `could not read RUNTIME_PROBE_PATHS out of pod-contract.ts (got ${JSON.stringify(CONTRACT_PROBES)}) — ` +
+    "this check is vacuous until it parses, so it fails rather than passing empty");
+
+if (single.ok) {
+    const probes = probesOf(single.out, "rebase-rebase-api");
+    for (const [probe, wanted] of Object.entries(CONTRACT_PROBES)) {
+        check("contract", probes[probe] === wanted,
+            `the ${probe} probe targets ${probes[probe] ?? "(none)"}, and pod-contract.ts says ${wanted}. ` +
+            "Liveness and startup must not depend on the database: /health opens every configured " +
+            "driver and answers 503, so a database blip on liveness is a restart loop and on startup " +
+            "is a pod that never starts.");
+    }
+
+    const drain = contractValue("RUNTIME_PRESTOP_DRAIN_SECONDS");
+    check("contract", /preStop:/.test(single.out),
+        "no preStop hook is rendered — kubelet signals the pod and removes its endpoint concurrently, " +
+        "so without one the ingress keeps routing to a process that has stopped accepting");
+    check("contract", new RegExp(`sleep ${drain}`).test(single.out),
+        `the preStop drain is not the contract's ${drain}s`);
+}
+
+if (split.ok) {
+    // Every unit, not just the api: a worker that restart-loops on a database
+    // blip is the same bug in a process nobody is watching.
+    for (const unit of ["api", "functions", "worker"]) {
+        const probes = probesOf(split.out, `rebase-rebase-${unit}`);
+        for (const [probe, wanted] of Object.entries(CONTRACT_PROBES)) {
+            check("contract", probes[probe] === wanted,
+                `${unit}'s ${probe} probe targets ${probes[probe] ?? "(none)"}, contract says ${wanted}`);
+        }
+    }
+}
+
+/**
+ * The refusal list and the contract list must be the same set.
+ *
+ * A variable the runtime treats as topology but the chart does not refuse is
+ * settable through `config.env`; one the chart refuses but the runtime no
+ * longer reads is a refusal for nothing. Both directions are checked, because
+ * only the first is dangerous and only the second is likely.
+ */
+const validateSrc = fs.readFileSync(
+    path.join(CHART, "templates/_validate.tpl"), "utf-8");
+const chartTopology = new Set(
+    (validateSrc.match(/\$topologyEnv := list ([^\n]+)/)?.[1] ?? "")
+        .match(/"([A-Z_][A-Z0-9_]*)"/g)?.map(q => q.replace(/"/g, "")) ?? []);
+const contractTopology = new Set(
+    (contractSrc.slice(contractSrc.indexOf("TOPOLOGY_ENV_VARS = ["))
+        .split("]")[0].match(/"([A-Z_][A-Z0-9_]*)"/g) ?? []).map(q => q.replace(/"/g, "")));
+
+check("contract", contractTopology.size > 0,
+    "could not read TOPOLOGY_ENV_VARS out of pod-contract.ts");
+const notRefused = [...contractTopology].filter(v => !chartTopology.has(v));
+const refusedForNothing = [...chartTopology].filter(v => !contractTopology.has(v));
+check("contract", notRefused.length === 0,
+    `_validate.tpl does not refuse ${notRefused.join(", ")} in config.env, and pod-contract.ts calls ` +
+    "it a topology variable — so an operator can set it and the chart will not stop them");
+check("contract", refusedForNothing.length === 0,
+    `_validate.tpl refuses ${refusedForNothing.join(", ")}, which pod-contract.ts no longer lists`);
+
 // ── 3. every refusal is reachable ────────────────────────────────────────────
 
 /**
@@ -266,6 +371,7 @@ const REFUSAL_CASES = [
         "--set", "sharedState.rateLimitStore=memory"
     ]],
     ["rate limit store nonsense", ["--set", "sharedState.rateLimitStore=redis"]],
+    ["topology variable in config.env", ["--set", "config.env.REBASE_ROLE=worker"]],
     ["static app with no name", ["--set-json", 'staticApps=[{"path":"/x","image":{"repository":"e/x"}}]']],
     ["static app with no path", ["--set-json", 'staticApps=[{"name":"x","image":{"repository":"e/x"}}]']],
     ["static app path without a slash", ["--set-json", 'staticApps=[{"name":"x","path":"x","image":{"repository":"e/x"}}]']],

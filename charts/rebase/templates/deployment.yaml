@@ -98,13 +98,25 @@ spec:
             {{- include "rebase.roleEnv" (dict "root" $root "role" $unit.role) | nindent 12 }}
           volumeMounts:
             {{- include "rebase.bundleVolumeMounts" $root | nindent 12 }}
-          {{/* /health answers on EVERY role, including a worker that serves no
-               other HTTP at all. That is what makes it usable as a probe here,
-               and also why a probe passing proves only that the process is
-               alive — not that it serves anything. */}}
+          {{/* Both endpoints answer on EVERY role, including a worker that
+               serves no other HTTP at all — so a probe passing proves the
+               process is alive, never that it serves anything.
+
+               Which endpoint goes on which probe is not a preference. `/livez`
+               is dependency-free; `/health` opens every configured database and
+               answers 503 when one is unreachable. Liveness RESTARTS the
+               container, so putting it on /health turns a database blip into a
+               cluster-wide restart loop that clears when the database returns
+               and reads, in the logs, like the application crashed. Readiness
+               only removes the pod from its Service, which is exactly right
+               when the database is gone.
+
+               The runtime states this at its own `/livez` registration, and
+               `packages/server/src/deploy/pod-contract.ts` is the copy that
+               scripts/check-chart.mjs holds this file to. */}}
           livenessProbe:
             httpGet:
-              path: /health
+              path: /livez
               port: {{ $root.Values.service.port }}
             initialDelaySeconds: 10
             periodSeconds: 20
@@ -119,15 +131,29 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
           {{/* A bundle install plus a schema check can take longer than a
-               liveness probe's patience on a cold database. The startup probe
-               is what stops that from being an endless restart loop that never
-               reaches a first successful boot. */}}
+               liveness probe's patience, and the startup probe is what stops
+               that from being a restart loop that never reaches a first boot.
+               It is on /livez for the same reason liveness is: startup gates
+               when the other probes begin, so requiring the database here makes
+               a cold database indistinguishable from a broken image — the pod
+               never starts, liveness never runs, and nothing in the output
+               mentions a database. */}}
           startupProbe:
             httpGet:
-              path: /health
+              path: /livez
               port: {{ $root.Values.service.port }}
             periodSeconds: 5
             failureThreshold: 60
+          {{/* Kubelet sends SIGTERM and removes the pod from its Service
+               CONCURRENTLY. The runtime drains on SIGTERM — it finishes what is
+               in flight — but it cannot stop new requests arriving while the
+               endpoint removal propagates, so without this the ingress is still
+               routing to a process that has stopped accepting. The sleep is the
+               only thing that orders the two. */}}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ $root.Values.preStopDrainSeconds }}"]
           resources:
             {{- toYaml $unit.resources | nindent 12 }}
 {{- end }}

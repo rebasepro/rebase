@@ -37,6 +37,34 @@ failed `helm install` and has one screen to work from.
   {{- fail "bundle.mode=image means the bundle is baked into image.repository, but that is still the stock runtime image (rebasepro/server), which contains no project. Build one FROM rebasepro/server with `COPY dist-bundle /bundle` and set image.repository to it — or use bundle.mode=url." }}
 {{- end }}
 
+{{/* ── Topology variables in config.env ─────────────────────────────────── */}}
+{{/*
+Who decides the topology.
+
+`config.env` is the operator's own environment for the project, and it is
+rendered into the same `env` list the chart writes its topology decisions into.
+Under `split` the chart's entry is written after the operator's and Kubernetes
+takes the last one, so theirs silently does nothing. Unsplit — the default —
+the chart writes no REBASE_ROLE at all, so theirs is the only one and it takes
+effect.
+
+That second case is why this refuses instead of ignoring. `REBASE_ROLE=worker`
+on the single pod produces a deployment that serves no HTTP, and because
+`/livez` and `/health` both answer on every role, the startup, liveness and
+readiness probes all pass and the rollout reports success. Every request 404s.
+The cloud shipped exactly this failure before pinning the same list.
+
+Kept in step with `TOPOLOGY_ENV_VARS` in
+`packages/server/src/deploy/pod-contract.ts` by `scripts/check-chart.mjs`,
+which cannot import TypeScript and so compares the two lists as text.
+*/}}
+{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_MIGRATE_ON_BOOT" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
+{{- range $name, $value := .Values.config.env }}
+  {{- if has $name $topologyEnv }}
+    {{- fail (printf "config.env sets %s, which decides this release's topology and is the chart's to own. Set here it either does nothing (under split, the chart's value is written last and wins) or takes effect unsupervised (unsplit, where nothing overrides it) — and a wrong topology passes every probe, because /livez and /health answer on every role. Use `split` and the api/functions/worker blocks instead." $name) }}
+  {{- end }}
+{{- end }}
+
 {{/* ── Topology ─────────────────────────────────────────────────────────── */}}
 {{- if and (not .Values.split) (or .Values.functions.enabled .Values.worker.enabled) }}
   {{- fail "functions.enabled / worker.enabled do nothing while split=false — one process already serves everything. Set split=true to run them separately, or turn them off." }}

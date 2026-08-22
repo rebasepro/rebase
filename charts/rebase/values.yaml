@@ -33,9 +33,11 @@ image:
 #   mode: image  — you built an image FROM rebasepro/server with the bundle
 #                  baked in (COPY dist-bundle /bundle). Set image.repository to
 #                  yours. Nothing else to configure; this is the sturdiest.
-#   mode: url    — the stock image, with an init container fetching a tarball
-#                  at every pod start. Good for a control plane; needs the URL
-#                  to stay reachable for the life of the deployment.
+#   mode: url    — the stock image, and the runtime fetches the tarball itself
+#                  at every pod start (REBASE_BUNDLE_URL). No init container is
+#                  involved. Good for a control plane; needs the URL to stay
+#                  reachable for the life of the deployment, not just the first
+#                  boot — every restart, eviction and scale-out re-fetches.
 bundle:
   mode: image
   path: /bundle
@@ -55,8 +57,15 @@ config:
   # Origins your frontend is served from. Required in production; "*" is
   # refused by the runtime because the API sends credentials.
   corsOrigins: ""
-  # Extra environment for every unit. Topology variables set here are ignored:
-  # the chart owns them, and a value that cannot apply is worse than no value.
+  # Extra environment for every unit.
+  #
+  # Topology variables are REFUSED here rather than ignored — the chart owns
+  # them, and one set here either does nothing (split, where the chart writes
+  # its own value after yours and wins) or takes effect and should not
+  # (unsplit, where nothing overrides it). The second is the dangerous half:
+  # REBASE_ROLE=worker gives a pod that serves no HTTP, and because /livez and
+  # /health both answer on every role, every probe passes and the rollout
+  # reports success. Use `split` and the per-unit blocks instead.
   env: {}
 
 existingSecret: ""
@@ -160,6 +169,14 @@ worker:
 #       tag: "1.4.0"
 #     replicas: 1
 staticApps: []
+
+# ─── Termination ───────────────────────────────────────────────────────────
+#
+# Seconds the pod keeps answering after Kubernetes decides to remove it, before
+# SIGTERM. Kubelet signals the pod and removes it from its Service at the same
+# time, so this is what gives the ingress time to stop routing to a process that
+# is about to stop accepting. Zero disables it and reintroduces the race.
+preStopDrainSeconds: 5
 
 # ─── Schema ────────────────────────────────────────────────────────────────
 #
