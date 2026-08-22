@@ -93,35 +93,6 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      # The scaffolded collection files, compiled once per preset as `rebase init`
-      # lays them out, plus a probe that adds what a user adds first: a custom
-      # component with an image inside it, attached by a lazy import thunk. Nothing
-      # else checks them fast: the only thing that compiled them was the CMS init
-      # e2e, inside a Docker build ~15 minutes in, so a template carrying a stale
-      # collection shape stayed invisible until the very last gate.
-      - name: Init template typecheck
-        run: pnpm run check:templates
-
-      # `rebase eject` is the one command that hands a user server code to run,
-      # and it was in NO job here and no end-to-end test: `packages/cli/templates/`
-      # sits outside the CLI's tsconfig `rootDir`, so the entrypoint, Dockerfile
-      # and compose file it writes had never been compiled, built or booted by
-      # anything in this repository. Four HIGH defects shipped in that gap and
-      # were found by reading — a headless entrypoint importing files
-      # `--headless` deletes, a `serveSPA` path wrong by two directory levels, a
-      # Dockerfile copying neither `frontend` nor `rebase.json`, and crons never
-      # compiled nor passed.
-      #
-      # This materializes a scaffolded project, runs the real command into it and
-      # compiles what it emits, once per flavour, then checks the Dockerfile
-      # against the project on disk. It does NOT build the image or boot it —
-      # that needs an install against a lockfile no scaffold has yet, and belongs
-      # in the e2e lane. Seconds, no network, no database.
-      - name: Ejected project typecheck
-        run: pnpm run check:eject
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
       # The scaffold hands every new project a compose file naming a container
       # image. 0.13.0 shipped with that image published nowhere, so the first
       # command in the file failed with "repository does not exist" — and nothing
@@ -232,6 +203,44 @@ jobs:
 
       - name: Build packages
         run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # Moved after the build, for the same reason the API-surface check is:
+      # these compile a *scaffolded project*, which resolves `@rebasepro/*`
+      # through node_modules and its `exports` map. `@rebasepro/server/functions`
+      # points at `dist/functions/index.d.ts`, so before the build it resolves to
+      # nothing and the baas preset fails TS2307 — which is what every pull
+      # request started doing the moment the portable functions entry point
+      # landed. A developer's checkout has a stale `dist` lying around and so
+      # never saw it; CI has none.
+
+      # The scaffolded collection files, compiled once per preset as `rebase init`
+      # lays them out, plus a probe that adds what a user adds first: a custom
+      # component with an image inside it, attached by a lazy import thunk. Nothing
+      # else checks them fast: the only thing that compiled them was the CMS init
+      # e2e, inside a Docker build ~15 minutes in, so a template carrying a stale
+      # collection shape stayed invisible until the very last gate.
+      - name: Init template typecheck
+        run: pnpm run check:templates
+
+      # `rebase eject` is the one command that hands a user server code to run,
+      # and it was in NO job here and no end-to-end test: `packages/cli/templates/`
+      # sits outside the CLI's tsconfig `rootDir`, so the entrypoint, Dockerfile
+      # and compose file it writes had never been compiled, built or booted by
+      # anything in this repository. Four HIGH defects shipped in that gap and
+      # were found by reading — a headless entrypoint importing files
+      # `--headless` deletes, a `serveSPA` path wrong by two directory levels, a
+      # Dockerfile copying neither `frontend` nor `rebase.json`, and crons never
+      # compiled nor passed.
+      #
+      # This materializes a scaffolded project, runs the real command into it and
+      # compiles what it emits, once per flavour, then checks the Dockerfile
+      # against the project on disk. It does NOT build the image or boot it —
+      # that needs an install against a lockfile no scaffold has yet, and belongs
+      # in the e2e lane. Seconds, no network, no database.
+      - name: Ejected project typecheck
+        run: pnpm run check:eject
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
