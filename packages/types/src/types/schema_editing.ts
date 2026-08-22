@@ -66,8 +66,11 @@ export interface SchemaChangeFile {
 }
 
 /**
- * Everything a change needs written and run, computed without touching a disk,
- * a database or a network.
+ * Everything a change needs written and run.
+ *
+ * Computed without touching a disk or a network. The database is *read* — what
+ * a change means depends on what is already there, and a plan that guessed
+ * would be guessing about whether the statements it returns will be accepted.
  */
 export interface SchemaChangePlan {
     /** Every file the commit writes — collection source and generated artifacts. */
@@ -77,6 +80,28 @@ export interface SchemaChangePlan {
     classified: ClassifiedSchemaChanges;
     /** A commit message describing the change rather than announcing one. */
     message: string;
+    /**
+     * Constraints the configuration asks for that these statements do not
+     * carry, and why.
+     *
+     * Almost always empty. When it is not, it is the part the person confirming
+     * needs to read: the change will apply, and the database will still not
+     * enforce something the configuration says — a required property over a
+     * table that already holds rows with no value for it. Optional so a plan
+     * from an engine that does not distinguish these cases stays valid.
+     */
+    withheldConstraints?: WithheldSchemaConstraint[];
+}
+
+/** A constraint a plan asks for and does not apply. */
+export interface WithheldSchemaConstraint {
+    /** `schema.table.column`. */
+    target: string;
+    kind: "not-null";
+    /** What is in the way, naming the obstacle rather than the rule. */
+    reason: string;
+    /** What would make it applicable. */
+    remedy: string;
 }
 
 /**

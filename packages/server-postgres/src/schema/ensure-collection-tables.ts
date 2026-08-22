@@ -1013,6 +1013,27 @@ function vectorExtensionHint(message: string): string {
 }
 
 /**
+ * Read what the database looks like, for the schemas a set of collections
+ * lives in.
+ *
+ * The same read `ensureCollectionTables` does at boot, exposed on its own for
+ * the callers that want to *plan* against a real database without changing it —
+ * the live schema editor, which has to tell somebody what a change would do
+ * before they agree to it.
+ */
+export async function readSchemaFactsFor(
+    client: Queryable,
+    collections: CollectionConfig[]
+): Promise<ExistingSchema> {
+    const relational = relationalCollections(collections);
+    const schemas = Array.from(new Set([
+        ...relational.map(schemaOf),
+        ...planJunctionTables(relational).map(junction => junction.schema)
+    ]));
+    return readExistingSchema(client, schemas);
+}
+
+/**
  * Bring the database up to date. Returns what it did.
  *
  * Each statement runs on its own rather than in one transaction: they are all
