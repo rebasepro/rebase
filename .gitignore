@@ -58,6 +58,7 @@ report.**.json
 /website/.firebase/
 app/frontend/debug_trace**
 .rebase-dev-port
+.rebase-dev-secrets.json
 .rebase/
 .test-npmrc
 packages/forms/.yarn/
