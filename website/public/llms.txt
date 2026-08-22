@@ -5803,6 +5803,27 @@ Nothing is ever marked `immutable`. A storage key can be overwritten — writing
 to an existing key is an ordinary operation — so a promise never to revalidate
 would make a replaced file invisible until the window lapsed.
 
+#### Seeking in audio and video
+
+Every object response carries `Accept-Ranges: bytes`, and a `Range` request is
+answered with `206 Partial Content` and a `Content-Range`. Without it a browser
+will not offer to seek in a media element served from here — and Safari refuses
+to play a `<video>` whose first response is not a `206` — so for media this is
+the difference between a working player and a broken one.
+
+- One range per request: `bytes=0-499`, `bytes=500-`, `bytes=-500`. That is what
+  browsers send for playback.
+- Multiple ranges in one header are answered with the whole object and a `200`,
+  which is always legal. Nothing that matters sends them.
+- A range starting past the end is a `416` with `Content-Range: bytes */<size>`,
+  not a silent whole-file response.
+- Revalidation wins over a range: a request carrying both `If-None-Match` and
+  `Range` gets the `304`.
+
+On local storage only the requested slice is read from disk. On S3 and GCS the
+object is still fetched whole — a `StorageController` has no ranged read — so the
+saving is on the response, not upstream.
+
 #### Putting a CDN in front
 
 Because public objects are `public` with a `stale-while-revalidate` window and a
