@@ -114,6 +114,19 @@ export async function entry(args: string[]) {
     const effectiveSubcommand = parsedArgs["--help"] && !subcommand ? "--help" : subcommand;
 
     switch (command) {
+        // Hidden: the managed development database's own process, spawned by
+        // `ensureManagedDatabase` re-invoking this CLI. Not in
+        // `namespacedCommands` and not in the help, because it is never typed
+        // by a person — it exists so the daemon resolves the same way from
+        // `src` under tsx and from a bundled `dist`.
+        case "__dev-db-daemon": {
+            const { parseDaemonArgs, runDaemon } = await import("./dev-db/daemon-entry");
+            await runDaemon(parseDaemonArgs(args));
+            // Deliberately no `break`-and-return: the daemon owns this process
+            // from here and exits through its own signal handlers.
+            return;
+        }
+
         case "init":
             await createRebaseApp(args);
             break;
