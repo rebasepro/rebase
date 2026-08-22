@@ -5,6 +5,7 @@ import { getSubcollections } from "@rebasepro/common";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import { DEFAULT_API_PATH } from "@rebasepro/app";
+import { useLiveSchemaEditing } from "./useLiveSchemaEditing";
 
 /**
  * What the backend said about its schema editor, and how sure we are.
@@ -172,6 +173,41 @@ export function useLocalCollectionsConfigController(
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editorUrl, forcedReadOnly, authKey]);
 
+    // ── Live schema editing ───────────────────────────────────────────
+    // The same edit, against a backend that can also change the database and
+    // commit the result. When it is available, a save is planned and shown
+    // before anything happens; when it is not, this is inert and writes go
+    // straight to the source-only editor exactly as before.
+    const liveSchema = useLiveSchemaEditing({
+        baseUrl: `${String(clientBaseUrl).replace(/\/$/, "")}${clientApiPath}/admin/schema`,
+        getAuthToken: resolveToken,
+        authKey,
+        // The fallback the dialog offers when a change cannot be applied —
+        // removing a property, most often, which the ensure path has no way to
+        // carry out. Writing the source and leaving the database alone is what
+        // the editor did before any of this existed.
+        writeSourceOnly: async ({ collectionId, collection }) => {
+            await request("/collection/save", { collectionId, collectionData: collection });
+        }
+    });
+
+    /**
+     * Perform a write, through the live editor when there is one.
+     *
+     * `sourceOnly` is the write this controller has always done. It stays the
+     * whole behaviour on a backend that cannot edit its schema — a bundle
+     * deployment, a non-Postgres driver, a version too old to be asked — so
+     * nothing about the editor depends on the feature being there.
+     */
+    const write = async (
+        collectionId: string,
+        collection: Record<string, unknown>,
+        sourceOnly: () => Promise<void>
+    ): Promise<void> => {
+        if (!liveSchema.status?.enabled) return sourceOnly();
+        await liveSchema.reviewChange({ collectionId, collection });
+    };
+
     const readOnly = forcedReadOnly
         ?? (availability.state === "known" ? !availability.enabled : buildModeGuess());
 
@@ -179,24 +215,42 @@ export function useLocalCollectionsConfigController(
         ? availability.reason
         : "Collections can only be edited against a backend running the schema editor, which is off in production.";
 
+    const findCollection = (id: string): AdminCollection | undefined =>
+        parsedCollections.find(c => (c as AdminCollection & { id?: string }).id === id || c.slug === id);
+
+    /**
+     * The whole collection as it should end up.
+     *
+     * Live editing computes the proposed state by replacing one collection in
+     * the set, so it needs all of it: handed a patch, it would read every
+     * property the patch does not mention as a removal and refuse the change.
+     * A collection this does not recognise is a new one, and the patch is the
+     * whole of it.
+     */
+    const wholeCollection = (id: string, patch: Record<string, unknown>): Record<string, unknown> => {
+        const current = findCollection(id) as Record<string, unknown> | undefined;
+        return current ? { ...current, ...patch } : patch;
+    };
+
     return useMemo(() => ({
         loading: false,
         readOnly,
         readOnlyReason,
         collections: parsedCollections,
+        dialog: liveSchema.dialog,
         getCollection: (id: string) => {
-            const found = parsedCollections.find(c => (c as AdminCollection & { id?: string }).id === id || c.slug === id);
+            const found = findCollection(id);
             if (found) return found;
             throw Error(`Collection ${id} not found in local mode`);
         },
 
         saveCollection: async ({ id, collectionData }: SaveCollectionParams) => {
-            await request("/collection/save", { collectionId: id,
-collectionData });
+            await write(id, collectionData as unknown as Record<string, unknown>, () =>
+                request("/collection/save", { collectionId: id, collectionData }));
         },
         updateCollection: async ({ id, collectionData }: UpdateCollectionParams) => {
-            await request("/collection/save", { collectionId: id,
-collectionData });
+            await write(id, wholeCollection(id, collectionData as Record<string, unknown>), () =>
+                request("/collection/save", { collectionId: id, collectionData }));
         },
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
             await request("/collection/delete", { collectionId: id });
@@ -207,14 +261,30 @@ collectionData });
         // mention — `securityRules` first, which then falls back to the
         // directory default and widens who can read the collection.
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
-            await request("/property/save", { collectionId: path,
+            // Assembled into the whole collection before it is planned. This is
+            // the write that most often *is* a schema change — adding a field
+            // to a collection is adding a column — and the one whose payload
+            // says least about it on its own.
+            const current = findCollection(path) as Record<string, unknown> | undefined;
+            const properties = {
+                ...(current?.properties as Record<string, unknown> | undefined ?? {}),
+                [propertyKey]: property
+            };
+            const proposed = wholeCollection(path, {
+                properties,
+                ...(newPropertiesOrder ? { propertiesOrder: newPropertiesOrder } : {})
+            });
+
+            await write(path, proposed, async () => {
+                await request("/property/save", { collectionId: path,
 propertyKey,
 propertyConfig: property });
-            if (newPropertiesOrder) {
-                await request("/collection/save", { collectionId: path,
+                if (newPropertiesOrder) {
+                    await request("/collection/save", { collectionId: path,
 collectionData: { propertiesOrder: newPropertiesOrder },
 partial: true });
-            }
+                }
+            });
         },
         deleteProperty: async ({ path, propertyKey, newPropertiesOrder }: DeletePropertyParams) => {
             await request("/property/delete", { collectionId: path,
@@ -238,5 +308,17 @@ partial: true });
 
         navigationEntries: [],
         saveNavigationEntries: async () => { }
-    }), [clientOrUrl, parsedCollections, readOnly, readOnlyReason, options?.getAuthToken]);
+        // `liveSchema.dialog` and `liveSchema.status` both change as the flow
+        // runs — a plan arrives, a dialog opens — and a controller memoised
+        // without them would keep handing back a closed dialog and a stale
+        // answer about whether the backend can edit its schema at all.
+    }), [
+        clientOrUrl,
+        parsedCollections,
+        readOnly,
+        readOnlyReason,
+        options?.getAuthToken,
+        liveSchema.dialog,
+        liveSchema.status
+    ]);
 }

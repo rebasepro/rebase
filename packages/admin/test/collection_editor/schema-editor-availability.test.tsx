@@ -144,17 +144,45 @@ describe("collection editing follows the backend, not the bundle", () => {
         } as unknown as Response));
         global.fetch = fetchMock as unknown as typeof fetch;
 
+        // Counted per URL rather than in total: the controller now probes two
+        // surfaces — the source-only editor and live schema editing — and a
+        // bare call count would pass or fail on how many features exist rather
+        // than on whether this one re-asks.
+        const probes = () => fetchMock.mock.calls
+            .filter(([url]) => String(url).endsWith("/schema-editor/status"))
+            .length;
+
         const { rerender } = renderHook(
             ({ authKey }: { authKey: string | null }) =>
                 useLocalCollectionsConfigController(client, [], { authKey }),
             { initialProps: { authKey: null as string | null } }
         );
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(probes()).toBe(1));
 
         rerender({ authKey: "user-1" });
 
-        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(probes()).toBe(2));
+    });
+
+    it("asks live schema editing whether it is available, too", async () => {
+        const fetchMock = jest.fn(async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({ enabled: false, canPlan: false }),
+            text: async () => "{}"
+        } as unknown as Response));
+        global.fetch = fetchMock as unknown as typeof fetch;
+
+        renderHook(() => useLocalCollectionsConfigController(
+            { baseUrl: "https://api.example.com", apiPath: "/backend" },
+            []
+        ));
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+            "https://api.example.com/backend/admin/schema/status",
+            expect.anything()
+        ));
     });
 
     it("stays usable when the backend is unreachable", async () => {

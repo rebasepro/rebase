@@ -113,6 +113,8 @@ export * from "./data_export";
 // Collection editor — moved from @rebasepro/studio (admin-dependent visual schema editor)
 export * from "./collection_editor";
 export * from "./collection_editor/liveSchemaClient";
+export * from "./collection_editor/useLiveSchemaEditing";
+export * from "./collection_editor/ui/collection_editor/SchemaChangeDialog";
 
 
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";

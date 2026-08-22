@@ -1,24 +1,32 @@
 /**
  * The panel's client for live schema editing.
  *
- * Two calls, mirroring the routes: ask what a change would do, then do it. They
- * are deliberately separate here as well as on the server, because a UI that
- * could only try-and-see would be asking somebody to discover that their change
- * is refused by pressing a button on a live database.
+ * Three calls, mirroring the routes: ask whether this backend can do it, ask
+ * what a change would do, then do it. `plan` and `apply` are deliberately
+ * separate here as well as on the server, because a UI that could only
+ * try-and-see would be asking somebody to discover that their change is refused
+ * by pressing a button on a live database.
  *
- * ## Why this is not wired into the editor's save path
+ * ## Partial payloads are the caller's problem, not this module's
  *
- * The collection editor's existing saves go to the source-only schema editor,
- * and some of them post *partial* payloads — `saveProperty` follows up with a
- * one-key `collection/save` carrying `partial: true`. Live editing needs the
- * whole collection, because it computes the proposed state by replacing one
- * collection in the set: handed a partial, it would read every unmentioned
- * property as a removal and refuse the change.
+ * Every call takes the **whole** collection. Live editing computes the proposed
+ * state by replacing one collection in the set, so a patch would read as a set
+ * of removals — every property it does not mention — and be refused.
  *
- * Reconciling that is a UI change with a confirmation step in it, not a
- * substitution. So this is the client that change will use, and the existing
- * save path is untouched until there is something to show the verdict in.
+ * The editor's own save path posts partials (`saveProperty` follows up with a
+ * one-key `collection/save` carrying `partial: true`), so
+ * `useLocalCollectionsConfigController` assembles the whole collection before
+ * it gets here. Accepting a patch and merging it in this module would put that
+ * reconstruction one layer away from the collections it needs to read.
  */
+
+/** A constraint the change asks for that the statements will not carry. */
+export interface WithheldConstraint {
+    target: string;
+    kind: "not-null";
+    reason: string;
+    remedy: string;
+}
 
 /** What the server says a change would do. Mirrors `SchemaChangePlan`. */
 export interface LiveSchemaPlan {
@@ -35,6 +43,14 @@ export interface LiveSchemaPlan {
     statements: string[];
     files: string[];
     message: string;
+    /**
+     * Applicable, and still not fully enforced.
+     *
+     * Not a refusal, so it does not belong in `changes` — but it is the one
+     * thing on a plan somebody might want to stop and read, so the dialog gives
+     * it its own place rather than another bullet in the list.
+     */
+    withheldConstraints: WithheldConstraint[];
 }
 
 export interface LiveSchemaResult {
@@ -43,6 +59,23 @@ export interface LiveSchemaResult {
     committed: { sha: string; branch: string; files: string[] };
     statements: string[];
     summary: string;
+    withheldConstraints: WithheldConstraint[];
+}
+
+/**
+ * Whether this backend can edit its schema, and what is missing when it cannot.
+ *
+ * `canPlan` is separate from `enabled` deliberately: previewing a change needs
+ * no repository, so a deployment running from a bundle can still show somebody
+ * exactly what their change would do. Greying out the preview as well would be
+ * a worse answer than the truth.
+ */
+export interface LiveSchemaStatus {
+    enabled: boolean;
+    canPlan: boolean;
+    repository?: string;
+    code?: string;
+    reason?: string;
 }
 
 /**
@@ -123,6 +156,49 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
     };
 
     return {
+        /**
+         * Whether this backend can edit its schema.
+         *
+         * Never throws. Every way of failing to get an answer — a backend too
+         * old to have the endpoint, an unreachable one, a session that is not
+         * an admin — means the same thing to a caller deciding whether to offer
+         * the control, and turning that into an exception each caller has to
+         * catch would only produce four copies of this `catch`.
+         */
+        status: async (): Promise<LiveSchemaStatus> => {
+            try {
+                const token = await options.getAuthToken?.();
+                const response = await doFetch(`${base}/status`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                });
+                const body = await response.json().catch(() => ({})) as
+                    Partial<LiveSchemaStatus> & { error?: { code?: string; message?: string } };
+
+                if (response.ok) {
+                    return {
+                        enabled: body.enabled === true,
+                        canPlan: body.canPlan === true,
+                        repository: body.repository,
+                        code: body.code,
+                        reason: body.reason
+                    };
+                }
+                return {
+                    enabled: false,
+                    canPlan: false,
+                    code: body.error?.code,
+                    reason: body.error?.message
+                        ?? `The backend refused to say whether its schema is editable (HTTP ${response.status}).`
+                };
+            } catch (err) {
+                return {
+                    enabled: false,
+                    canPlan: false,
+                    reason: err instanceof Error ? err.message : "The backend could not be reached."
+                };
+            }
+        },
+
         /** What the change would do. No side effects. */
         plan: (change: ProposedCollectionChange) => post<LiveSchemaPlan>("/plan", change),
 
@@ -130,6 +206,9 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
         apply: (change: ProposedCollectionChange) => post<LiveSchemaResult>("/apply", change)
     };
 }
+
+/** The client's shape, for the hook and the tests that fake it. */
+export type LiveSchemaClient = ReturnType<typeof createLiveSchemaClient>;
 
 /**
  * Whether an error means live editing is unavailable here, rather than that the
