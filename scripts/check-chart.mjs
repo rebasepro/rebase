@@ -280,6 +280,43 @@ if (imageMode.ok) {
         "a scratch volume is mounted for a bundle that is already in the image");
 }
 
+// ── 2e4. every unit that answers a request knows how far away the caller is ──
+/**
+ * `TRUSTED_PROXY_HOPS` was the one topology variable this gate did not assert,
+ * and it was the one the chart never set on the api.
+ *
+ * Unset, the runtime reads 0, ignores X-Forwarded-For, and keys every rate limit
+ * on the socket address it sees — which behind an ingress is the ingress. One
+ * caller then exhausts the shared bucket for everyone, the auth limiters
+ * included, and the only sign is a single warning line logged once. The
+ * `functions` unit had always been given it, with a comment saying "same as the
+ * api".
+ */
+for (const [label, rendered, units] of [
+    ["unsplit", single, ["api"]],
+    ["split", split, ["api", "functions"]],
+]) {
+    if (!rendered.ok) continue;
+    for (const unit of units) {
+        const env = envOf(rendered.out, `rebase-rebase-${unit}`) ?? {};
+        check("proxy hops", env.TRUSTED_PROXY_HOPS === "1",
+            `${label}/${unit} got TRUSTED_PROXY_HOPS=${env.TRUSTED_PROXY_HOPS ?? "(unset)"} behind the ` +
+            "chart's own ingress. Unset or 0 means X-Forwarded-For is ignored and every caller " +
+            "shares one rate-limit bucket, including the auth limiters.");
+    }
+}
+
+// With no ingress of the chart's own there is nothing to trust, and saying so
+// explicitly is what stops a copied values file from trusting a header nobody
+// is stripping — which lets a caller forge its own address.
+const noIngress = render(["--set", "ingress.enabled=false"]);
+if (noIngress.ok) {
+    const env = envOf(noIngress.out, "rebase-rebase-api") ?? {};
+    check("proxy hops", env.TRUSTED_PROXY_HOPS === "0",
+        `with ingress.enabled=false the api got TRUSTED_PROXY_HOPS=${env.TRUSTED_PROXY_HOPS ?? "(unset)"}; ` +
+        "trusting a hop that no longer exists lets a client set its own X-Forwarded-For");
+}
+
 // ── 2f. parity with the runtime's pod contract ───────────────────────────────
 /**
  * The chart cannot import TypeScript, so this is where it is held to the

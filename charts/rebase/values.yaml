@@ -245,6 +245,14 @@ ingress:
   enabled: true
   className: nginx
   host: ""
+  # Proxies between a caller and the runtime. Unset, the chart uses 1 while the
+  # ingress below is enabled and 0 when it is not — which is what makes
+  # X-Forwarded-For trustworthy and rate limits per-caller rather than per-pod.
+  # Raise it if something of yours sits in front of the ingress: a CDN, a cloud
+  # load balancer, another reverse proxy. Too low and every client shares one
+  # bucket; too high and a client can forge its own address by sending the
+  # header itself.
+  trustedProxyHops: null
   # Extra hosts answering the same paths.
   extraHosts: []
   annotations: {}

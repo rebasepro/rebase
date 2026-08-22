@@ -216,6 +216,28 @@ both have an opinion is one where the failure is invisible.
 - name: REBASE_MIGRATE_ON_BOOT
   value: "none"
 {{- end }}
+{{/*
+How many proxies stand between a caller and this process.
+
+Left unset the runtime reads 0, which means it IGNORES X-Forwarded-For and keys
+every rate limit on the socket address it sees — the ingress controller. One
+caller then exhausts the shared bucket for everyone, including the auth limiter,
+and the only sign is a single warning line the runtime logs once.
+
+The `functions` unit below has always been given this, with a comment saying
+"same as the api". The api was never given it. A default install renders an
+ingress and no hops, so every self-hosted deployment counted every client as one
+client.
+
+The chart knows about the ingress it renders, and about nothing in front of it —
+so this is `ingress.trustedProxyHops`, defaulting to 1 when the chart's own
+ingress is enabled and 0 when it is not. An operator fronting the ingress with a
+CDN or a cloud load balancer of their own raises it, because only they can know.
+*/}}
+{{- if or (eq $role "api") (eq $role "all") }}
+- name: TRUSTED_PROXY_HOPS
+  value: {{ (default (ternary 1 0 $root.Values.ingress.enabled) $root.Values.ingress.trustedProxyHops) | quote }}
+{{- end }}
 {{- if eq $role "functions" }}
 {{- with $root.Values.functions.only }}
 - name: REBASE_FUNCTIONS_ONLY
