@@ -78,7 +78,12 @@ const CHART_IMAGE_DEFAULT = "charts/rebase/values.yaml";
  * asserting a publisher for it would be asserting something about Docker Inc.
  * Anything NOT matched by this list is ours to publish.
  */
-const THIRD_PARTY = [/^postgres:/, /^redis:/, /^minio\//, /^alpine:/, /^node:/, /^busybox:/];
+// `pgvector/pgvector` is the official Postgres image with the `vector`
+// extension built in, published by the pgvector project. It is the only entry
+// here with an org prefix, which is what makes it worth a note: the heuristic
+// everywhere else is that a bare name is somebody else's and `org/name` is ours,
+// and this is the case that breaks it.
+const THIRD_PARTY = [/^postgres:/, /^pgvector\//, /^redis:/, /^minio\//, /^alpine:/, /^node:/, /^busybox:/];
 
 /** Workflows that run without a human typing a command. */
 function automatedWorkflows() {
