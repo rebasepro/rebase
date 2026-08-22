@@ -131,6 +131,59 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
 
+    /**
+     * Whether this backend can edit its schema, and what is missing when it
+     * cannot.
+     *
+     * Every optional surface in this API answers `GET …/status` — see
+     * `docs/api-conventions.md`. The panel asks before it offers the control,
+     * because the alternative is a button that looks available and fails on
+     * press with a refusal the person could have been told about up front.
+     *
+     * Ordered by how fundamental the obstacle is: a driver that cannot plan is
+     * a different conversation from a missing dependency, which is a different
+     * conversation from a deployment with no source. Reporting the first one
+     * that applies is what keeps the message actionable.
+     */
+    router.get("/status", (c) => {
+        const admin = config.getAdmin();
+        const repository = config.getRepository();
+
+        if (!isSchemaEditingAdmin(admin)) {
+            return c.json({
+                enabled: false,
+                canPlan: false,
+                code: "SCHEMA_EDITING_UNSUPPORTED",
+                reason: "This backend's driver cannot plan schema changes. Live editing is " +
+                    "available on Postgres."
+            });
+        }
+        if (!config.writeSource) {
+            return c.json({
+                enabled: false,
+                canPlan: true,
+                code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                reason: "Rewriting collection source needs `ts-morph`, which is not installed " +
+                    "on this server. Run `pnpm add -D ts-morph@28.0.0` to enable it."
+            });
+        }
+        if (!repository) {
+            return c.json({
+                enabled: false,
+                // `plan` needs no repository, and saying so is the difference
+                // between a panel that greys out the preview and one that can
+                // still show somebody exactly what their change would do.
+                canPlan: true,
+                code: "SCHEMA_EDITING_NO_REPOSITORY",
+                reason: "There is no repository to commit to. Live schema editing writes the " +
+                    "change to your project's source before applying it, so it needs the project " +
+                    "mounted — a deployment running from a built bundle has compiled output and " +
+                    "no source to edit."
+            });
+        }
+        return c.json({ enabled: true, canPlan: true, repository: repository.root });
+    });
+
     /** The admin, or a refusal naming what is missing rather than a 500. */
     const requirePlanner = () => {
         const admin = config.getAdmin();
@@ -175,7 +228,12 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             changes: plan.classified.changes,
             statements: plan.statements,
             files: plan.files.map(file => file.path),
-            message: plan.message
+            message: plan.message,
+            // A change can be applicable and still leave something the config
+            // asks for unenforced. That is not a refusal, so it does not belong
+            // in `changes` — but it is the one thing on this response somebody
+            // might want to stop and read.
+            withheldConstraints: plan.withheldConstraints ?? []
         });
     });
 
@@ -226,7 +284,11 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             });
 
             logger.info(`[schema-edit] ${result.summary}`);
-            return c.json(result);
+            // Carried onto the result as well as the plan: whoever reads the
+            // outcome may not be whoever read the preview, and "applied" with a
+            // constraint quietly missing is exactly the state this feature
+            // exists to stop being invisible.
+            return c.json({ ...result, withheldConstraints: plan.withheldConstraints ?? [] });
         } catch (err) {
             if (err instanceof UnapplicableChangeError) {
                 throw ApiError.badRequest(err.message, "SCHEMA_CHANGE_UNAPPLICABLE", {

@@ -64,6 +64,9 @@ const bootstrapper = {
     }
 } as never;
 
+/** Long enough for the boot-time length check, and constant so tests can send it. */
+const SERVICE_KEY = "test-service-key-for-live-schema-mounting-0123456789";
+
 async function boot(collectionsDir: string | undefined) {
     const app = new Hono();
     const backend = await initializeRebaseBackend({
@@ -73,7 +76,7 @@ async function boot(collectionsDir: string | undefined) {
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         ...(collectionsDir ? { collectionsDir } : {}),
-        auth: { requireAuth: false, jwtSecret: JWT_SECRET }
+        auth: { requireAuth: false, jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
     } as never);
     return {
         app,
@@ -82,7 +85,7 @@ async function boot(collectionsDir: string | undefined) {
 }
 
 const post = (app: Hono, body: unknown) =>
-    app.fetch(new Request("http://localhost/api/schema/plan", {
+    app.fetch(new Request("http://localhost/api/admin/schema/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
@@ -111,11 +114,26 @@ describe("live schema editing, as mounted", () => {
         }
     });
 
-    it("is absent when there is no collectionsDir to edit", async () => {
+    it("says why, rather than 401ing, when there is no collectionsDir to edit", async () => {
+        // The surface lives under `/api/admin`, and the gate in front of that
+        // answers 401 to anything unmounted below it. An operator who forgot
+        // `collectionsDir` would read that as a credential problem and go and
+        // check their token. So the surface mounts either way and refuses in
+        // its own words — the same posture the schema editor beside it takes.
         const { app, stop } = await boot(undefined);
         try {
             const res = await post(app, { collectionId: "posts", collection: {} });
-            expect(res.status).toBe(404);
+            expect(res.status).toBe(401);
+
+            // Past the gate, the refusal names the actual obstacle.
+            const authed = await app.fetch(new Request(
+                "http://localhost/api/admin/schema/status",
+                { headers: { authorization: `Bearer ${SERVICE_KEY}` } }
+            ));
+            expect(authed.status).toBe(501);
+            expect(await authed.json()).toMatchObject({
+                error: { code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR" }
+            });
         } finally {
             stop();
         }
