@@ -656,7 +656,9 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             }
 
             if (localRange.kind === "range") {
-                const { start, end, length } = localRange.range;
+                // `end` is not read here: a positioned read takes an offset and a
+                // length, and `contentRange` renders the range from the spec itself.
+                const { start, length } = localRange.range;
                 // Only the requested slice leaves the disk. Reading the whole
                 // file to answer a range would give up the reason ranges exist.
                 const handle = await fsp.open(absolutePath, "r");
