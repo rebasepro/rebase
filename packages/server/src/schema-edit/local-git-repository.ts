@@ -24,7 +24,7 @@ import { promisify } from "node:util";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SchemaEditRepository } from "./apply-schema-change";
-import type { SchemaCommitFile } from "./generate-schema-commit";
+import type { SchemaChangeFile } from "@rebasepro/types";
 
 const run = promisify(execFile);
 
@@ -65,6 +65,23 @@ async function git(root: string, args: string[]): Promise<string> {
             ? ((err as { stderr?: string }).stderr?.trim() || err.message)
             : String(err);
         throw new GitCommandError(args[0] ?? "", detail);
+    }
+}
+
+/**
+ * The top of the working tree containing `startDir`, or undefined.
+ *
+ * Resolved by asking git rather than by walking for a `.git`, because a
+ * worktree's `.git` is a file and a submodule's is neither where nor what a
+ * naive walk expects.
+ */
+export async function findRepositoryRoot(startDir: string): Promise<string | undefined> {
+    try {
+        const out = await git(startDir, ["rev-parse", "--show-toplevel"]);
+        const root = out.trim();
+        return root.length > 0 ? root : undefined;
+    } catch {
+        return undefined;
     }
 }
 
@@ -112,7 +129,7 @@ export function createLocalGitRepository(options: LocalGitOptions): SchemaEditRe
             return paths;
         },
 
-        async writeFiles(files: SchemaCommitFile[]): Promise<void> {
+        async writeFiles(files: SchemaChangeFile[]): Promise<void> {
             for (const file of files) {
                 const absolute = path.resolve(root, file.path);
                 // Refuse to write outside the tree. The paths come from the

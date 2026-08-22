@@ -40,6 +40,7 @@ import { logger } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { classifyTable, detectJunctionTables } from "./utils/table-classification";
+import { generateSchemaCommit } from "./schema/generate-schema-commit";
 
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
@@ -119,6 +120,16 @@ export class PostgresBackendDriver implements DataDriver {
             fetchCurrentDatabase: () => this.fetchCurrentDatabase(),
             fetchUnmappedTables: (...args: Parameters<NonNullable<DatabaseAdmin["fetchUnmappedTables"]>>) => this.fetchUnmappedTables(...args),
             fetchTableMetadata: (...args: Parameters<NonNullable<DatabaseAdmin["fetchTableMetadata"]>>) => this.fetchTableMetadata(...args),
+            // Planning a schema change is engine-specific — it renders DDL, a
+            // Drizzle schema and the declarative SQL artifacts — so it lives
+            // here and the server detects it structurally, the same way it
+            // detects SQL. Planning only: applying is `executeSql` above, and
+            // committing belongs to whatever holds the repository.
+            planSchemaChange: async (before, after, options) => generateSchemaCommit({
+                before: before as CollectionConfig[],
+                after: after as CollectionConfig[],
+                paths: options?.paths
+            }),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),

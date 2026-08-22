@@ -37,52 +37,28 @@
  * somebody wrote and read. `needs-migration` says exactly that, and naming the
  * change is more useful than attempting it.
  */
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type {
+    CollectionConfig,
+    Property,
+    SchemaChange,
+    SchemaChangeKind,
+    SchemaChangeVerdict,
+    ClassifiedSchemaChanges
+} from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 import { resolveColumnName } from "./generate-postgres-ddl-logic";
 
 /**
- * - `safe` — the ensure path expresses it, and the result matches the config.
- * - `diverges` — the ensure path applies something, but the database will not
- *   match what the config declares, and nothing reports it.
- * - `needs-migration` — the ensure path cannot express it at all.
+ * The vocabulary lives in `@rebasepro/types` so that `@rebasepro/server`, which
+ * cannot import this package, can still describe a change. Re-exported here
+ * under the names this module has always used.
  */
-export type ChangeVerdict = "safe" | "diverges" | "needs-migration";
+export type ChangeVerdict = SchemaChangeVerdict;
+export type ChangeKind = SchemaChangeKind;
+export type { SchemaChange };
+export type ClassifiedChanges = ClassifiedSchemaChanges;
 
-export type ChangeKind =
-    | "add-collection"
-    | "remove-collection"
-    | "add-property"
-    | "remove-property"
-    | "change-property-type"
-    | "rename-column"
-    | "add-enum-value"
-    | "remove-enum-value"
-    | "change-required"
-    | "change-primary-key";
-
-export interface SchemaChange {
-    kind: ChangeKind;
-    verdict: ChangeVerdict;
-    /** Collection slug. */
-    collection: string;
-    /** Property name, where the change is to one. */
-    property?: string;
-    /** One line, specific: what changed and what it will do. */
-    detail: string;
-    /** What the operator should do instead, when the verdict is not `safe`. */
-    remedy?: string;
-}
-
-export interface ClassifiedChanges {
-    changes: SchemaChange[];
-    /** The worst verdict present, or `safe` for an empty diff. */
-    verdict: ChangeVerdict;
-    /** True when every change is `safe` — the only case an editor may apply unattended. */
-    applicable: boolean;
-}
-
-const VERDICT_RANK: Record<ChangeVerdict, number> = {
+const VERDICT_RANK: Record<SchemaChangeVerdict, number> = {
     safe: 0,
     diverges: 1,
     "needs-migration": 2

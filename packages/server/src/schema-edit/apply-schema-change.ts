@@ -27,13 +27,11 @@
  * testing here is the ordering and what happens when half of it fails, and both
  * are impossible to exercise against real infrastructure on demand.
  */
-import type { CollectionConfig } from "@rebasepro/types";
-import {
-    generateSchemaCommit,
-    type SchemaCommitFile,
-    type SchemaCommitPaths
-} from "./generate-schema-commit";
-import type { ClassifiedChanges } from "./classify-change";
+import type {
+    SchemaChangeFile,
+    SchemaChangePlan,
+    ClassifiedSchemaChanges
+} from "@rebasepro/types";
 
 /** The working tree the commit lands in. */
 export interface SchemaEditRepository {
@@ -49,7 +47,7 @@ export interface SchemaEditRepository {
      */
     dirtyPaths(): Promise<string[]>;
     /** Write every file, creating directories as needed. */
-    writeFiles(files: SchemaCommitFile[]): Promise<void>;
+    writeFiles(files: SchemaChangeFile[]): Promise<void>;
     /** Stage exactly these paths and commit them. Returns the new sha. */
     commit(paths: string[], message: string): Promise<string>;
 }
@@ -58,10 +56,14 @@ export interface SchemaEditRepository {
 export type SchemaEditApply = (statements: string[]) => Promise<void>;
 
 export interface SchemaEditInput {
-    before: CollectionConfig[];
-    after: CollectionConfig[];
-    sourceFiles?: SchemaCommitFile[];
-    paths?: Partial<SchemaCommitPaths>;
+    /**
+     * What to write and run, from `admin.planSchemaChange`.
+     *
+     * Taken as a plan rather than as collections because planning is
+     * engine-specific and this module is not: it commits files and runs
+     * statements, and does not care which database rendered them.
+     */
+    plan: SchemaChangePlan;
     repository: SchemaEditRepository;
     apply: SchemaEditApply;
 }
@@ -77,9 +79,23 @@ export interface SchemaEditResult {
     /** Why the apply did not run, when it did not. Never a reason to fail. */
     applyError?: string;
     statements: string[];
-    classified: ClassifiedChanges;
+    classified: ClassifiedSchemaChanges;
     /** What to tell the person who pressed the button. */
     summary: string;
+}
+
+/**
+ * The plan says the change is not applicable.
+ *
+ * Re-checked here rather than trusted from the planner: this module is the one
+ * that writes and runs things, so the guarantee belongs where the consequence
+ * is. A caller that built a plan by hand cannot route around it.
+ */
+export class UnapplicableChangeError extends Error {
+    constructor(message: string, readonly classified: ClassifiedSchemaChanges) {
+        super(message);
+        this.name = "UnapplicableChangeError";
+    }
 }
 
 export class DirtyWorkingTreeError extends Error {
@@ -101,12 +117,18 @@ export class DirtyWorkingTreeError extends Error {
  * every outcome is a result.
  */
 export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaEditResult> {
-    const commit = await generateSchemaCommit({
-        before: input.before,
-        after: input.after,
-        sourceFiles: input.sourceFiles,
-        paths: input.paths
-    });
+    const commit = input.plan;
+
+    if (!commit.classified.applicable) {
+        const blocking = commit.classified.changes.filter(change => change.verdict !== "safe");
+        throw new UnapplicableChangeError(
+            "This change cannot be applied to a running database:\n" +
+            blocking.map(change =>
+                `  • ${change.detail}${change.remedy ? `\n    ${change.remedy}` : ""}`
+            ).join("\n"),
+            commit.classified
+        );
+    }
 
     const paths = commit.files.map(file => file.path);
 

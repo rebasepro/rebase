@@ -14,22 +14,49 @@
  * apply-before-commit, so it is asserted directly by recording the order the
  * two collaborators were called in.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { SchemaChangePlan, SchemaChange } from "@rebasepro/types";
 import {
     applySchemaChange,
     DirtyWorkingTreeError,
+    UnapplicableChangeError,
     type SchemaEditRepository
-} from "../src/schema/apply-schema-change";
-import { SchemaCommitError } from "../src/schema/generate-schema-commit";
+} from "../src/schema-edit/apply-schema-change";
 
-const collection = (slug: string, properties: Record<string, unknown> = {}): CollectionConfig =>
-    ({
-        slug,
-        name: slug,
-        properties: { id: { type: "string", name: "Id", isId: true }, ...properties }
-    }) as unknown as CollectionConfig;
+/**
+ * A plan, built by hand.
+ *
+ * The planner lives in the driver package, which this one cannot import — and
+ * that separation is the point: this module commits files and runs statements
+ * without knowing which database rendered them, so its tests should not know
+ * either.
+ */
+const plan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
+    files: [
+        { path: "backend/src/schema.generated.ts", contents: "export const schema = 1;" },
+        { path: "drizzle/schema.sql", contents: "CREATE TABLE posts ();" },
+        { path: "drizzle/policies.sql", contents: "" },
+        { path: "drizzle/search.sql", contents: "" }
+    ],
+    statements: ['ALTER TABLE "public"."posts" ADD COLUMN IF NOT EXISTS "subtitle" TEXT;'],
+    classified: { changes: [], verdict: "safe", applicable: true },
+    message: "feat(schema): add subtitle to posts",
+    ...over
+});
 
-const str = (over: Record<string, unknown> = {}) => ({ type: "string", name: "S", ...over });
+const blocked = (detail: string, remedy?: string): SchemaChangePlan => plan({
+    classified: {
+        changes: [{
+            kind: "remove-property",
+            verdict: "needs-migration",
+            collection: "posts",
+            property: "subtitle",
+            detail,
+            remedy
+        } as SchemaChange],
+        verdict: "needs-migration",
+        applicable: false
+    }
+});
 
 /** A repository that records what happened to it. */
 function fakeRepository(over: Partial<SchemaEditRepository> = {}) {
@@ -58,8 +85,7 @@ describe("the happy path", () => {
         const applied: string[][] = [];
 
         const result = await applySchemaChange({
-            before: [collection("posts")],
-            after: [collection("posts", { subtitle: str() })],
+            plan: plan(),
             repository: repo,
             apply: async (statements) => { calls.push("apply"); applied.push(statements); }
         });
@@ -75,9 +101,7 @@ describe("the happy path", () => {
     it("commits the source files the caller supplied, alongside the generated ones", async () => {
         const { repo, written } = fakeRepository();
         await applySchemaChange({
-            before: [],
-            after: [collection("posts")],
-            sourceFiles: [{ path: "config/collections/posts.ts", contents: "export const posts = {};" }],
+            plan: plan({ files: [{ path: "config/collections/posts.ts", contents: "export const posts = {};" }, ...plan().files] }),
             repository: repo,
             apply: async () => undefined
         });
@@ -91,8 +115,7 @@ describe("the happy path", () => {
             commit: async (paths) => { staged = paths; return "sha"; }
         });
         await applySchemaChange({
-            before: [],
-            after: [collection("posts")],
+            plan: plan(),
             repository: repo,
             apply: async () => undefined
         });
@@ -105,12 +128,10 @@ describe("the happy path", () => {
     });
 
     it("skips the apply when the change needs no DDL, and still reports success", async () => {
-        const same = [collection("posts", { title: str() })];
-        const { repo, calls } = fakeRepository();
+                const { repo, calls } = fakeRepository();
 
         const result = await applySchemaChange({
-            before: same,
-            after: same,
+            plan: plan({ statements: [] }),
             repository: repo,
             apply: async () => { calls.push("apply"); }
         });
@@ -126,11 +147,10 @@ describe("nothing happens when the change is refused", () => {
         const { repo, calls } = fakeRepository();
 
         await expect(applySchemaChange({
-            before: [collection("posts", { subtitle: str() })],
-            after: [collection("posts", {})],
+            plan: blocked("\"subtitle\" was removed, which would drop column \"subtitle\" and its data.", "Remove it in a migration you have read."),
             repository: repo,
             apply: async () => { calls.push("apply"); }
-        })).rejects.toThrow(SchemaCommitError);
+        })).rejects.toThrow(UnapplicableChangeError);
 
         expect(calls).toEqual([]);
     });
@@ -141,8 +161,7 @@ describe("nothing happens when the change is refused", () => {
         });
 
         await expect(applySchemaChange({
-            before: [],
-            after: [collection("posts")],
+            plan: plan(),
             repository: repo,
             apply: async () => { calls.push("apply"); }
         })).rejects.toThrow(DirtyWorkingTreeError);
@@ -156,8 +175,7 @@ describe("nothing happens when the change is refused", () => {
         });
 
         const err = await applySchemaChange({
-            before: [],
-            after: [collection("posts")],
+            plan: plan(),
             repository: repo,
             apply: async () => undefined
         }).catch(e => e as DirtyWorkingTreeError);
@@ -171,8 +189,7 @@ describe("nothing happens when the change is refused", () => {
             dirtyPaths: async () => ["src/app.tsx", "README.md"]
         });
         await applySchemaChange({
-            before: [],
-            after: [collection("posts")],
+            plan: plan(),
             repository: repo,
             apply: async () => { calls.push("apply"); }
         });
@@ -185,8 +202,7 @@ describe("a failed apply is a state, not an error", () => {
         const { repo } = fakeRepository();
 
         const result = await applySchemaChange({
-            before: [collection("posts")],
-            after: [collection("posts", { subtitle: str() })],
+            plan: plan(),
             repository: repo,
             apply: async () => { throw new Error("connection refused"); }
         });
@@ -200,8 +216,7 @@ describe("a failed apply is a state, not an error", () => {
     it("keeps the statements on the result, so the failure can be diagnosed", async () => {
         const { repo } = fakeRepository();
         const result = await applySchemaChange({
-            before: [collection("posts")],
-            after: [collection("posts", { subtitle: str() })],
+            plan: plan(),
             repository: repo,
             apply: async () => { throw new Error("nope"); }
         });
@@ -217,8 +232,7 @@ describe("a failed commit means nothing ran", () => {
         });
 
         await expect(applySchemaChange({
-            before: [collection("posts")],
-            after: [collection("posts", { subtitle: str() })],
+            plan: plan(),
             repository: repo,
             apply: async () => { calls.push("apply"); }
         })).rejects.toThrow("hook rejected");

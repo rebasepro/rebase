@@ -17,7 +17,7 @@ import {
     createLocalGitRepository,
     isGitRepository,
     GitCommandError
-} from "../src/schema/local-git-repository";
+} from "../src/schema-edit/local-git-repository";
 
 const AUTHOR = { name: "Panel", email: "panel@rebase.pro" };
 

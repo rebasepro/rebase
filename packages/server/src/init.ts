@@ -49,6 +49,10 @@ import { resolveStorageAccessControl } from "./storage/policies";
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
+import { createLiveSchemaRoutes } from "./api/live-schema-routes";
+import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
+import nodePath from "node:path";
+import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import type { CaptchaConfig } from "./auth/captcha";
 import {
@@ -1625,6 +1629,61 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     message: schemaEditorOff!.message
                 }
             }, 501));
+        }
+
+        // ── Live schema editing ───────────────────────────────────────────
+        // Not gated on NODE_ENV, unlike the source-only editor above. The
+        // question is not whether this is production, it is whether there is a
+        // repository to commit to: a deployment running from a built bundle has
+        // compiled output and no source, and answers a refusal that says so.
+        //
+        // Mounted whenever a `collectionsDir` exists; the routes themselves
+        // decide what is possible, so the reason a change is refused arrives as
+        // a message rather than as a missing endpoint.
+        if (config.collectionsDir) {
+            const collectionsDir = config.collectionsDir;
+            // Resolved once, at boot. A deployment either has a working tree or
+            // it does not, and asking git on every request would be a process
+            // spawn per keystroke in the panel.
+            const repositoryRoot = await findRepositoryRoot(collectionsDir);
+            const liveSchemaRouter = new Hono<HonoEnv>();
+            applyAdminGate(liveSchemaRouter, "Live schema editing");
+
+            liveSchemaRouter.route("/", createLiveSchemaRoutes({
+                getCollections: () => collectionRegistry.getRawCollections(),
+                getAdmin: () => defaultDriver.admin,
+                getRepository: (author) => {
+                    if (!repositoryRoot) return undefined;
+                    return createLocalGitRepository({ root: repositoryRoot, author });
+                },
+                writeSource: async (change) => {
+                    if (!schemaEditorRoutes) {
+                        throw new Error(
+                            "The AST schema editor is unavailable, so the collection source cannot be " +
+                            "rewritten. Install `ts-morph` to enable it."
+                        );
+                    }
+                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                    const editor = new AstSchemaEditor(collectionsDir);
+                    await editor.saveCollection(change.collectionId, change.collection, { partial: false });
+
+                    // Read back what it wrote. The editor resolves
+                    // `<collectionsDir>/<id>.ts`, and the commit needs the
+                    // contents rather than a promise that a file changed.
+                    const file = nodePath.join(collectionsDir, `${change.collectionId}.ts`);
+                    const contents = await nodeFs.readFile(file, "utf8");
+                    return [{
+                        path: nodePath.relative(repositoryRoot!, file),
+                        contents
+                    }];
+                }
+            }));
+
+            config.app.route(`${basePath}/schema`, liveSchemaRouter);
+            logger.debug("Live schema editing mounted", {
+                path: `${basePath}/schema`,
+                repository: repositoryRoot ?? "(none — refusals only)"
+            });
         }
 
         config.app.route(`${basePath}/schema-editor`, schemaEditorRouter);
