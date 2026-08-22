@@ -40,10 +40,23 @@ image:
 #                  boot — every restart, eviction and scale-out re-fetches.
 bundle:
   mode: image
+  # Where the bundle lives in the container. Under mode=image that is where you
+  # COPYed it; under mode=url it is where the runtime unpacks what it fetched,
+  # and an emptyDir is mounted there for it.
   path: /bundle
   url: ""
   # Optional bearer token for a private bundle URL. Prefer existingSecret.
   token: ""
+  # mode=url only. The runtime unpacks the tarball and installs the project's
+  # declared dependencies, which holds three copies of the tree at once — the
+  # archive, npm's cache and the extracted node_modules. Unset, GKE Autopilot
+  # grants 1Gi and a real dependency tree exhausts it partway through the
+  # install; npm does not error and the pod is not evicted, it simply stops.
+  # Vendor node_modules into the bundle at build time and this can come down.
+  ephemeralStorage: 6Gi
+  # Optional cap on the emptyDir itself. Left empty the volume is bounded only
+  # by the node, which is the kinder default for a single-tenant install.
+  sizeLimit: ""
 
 # ─── Required configuration ────────────────────────────────────────────────
 #

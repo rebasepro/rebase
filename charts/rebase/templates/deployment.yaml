@@ -155,5 +155,16 @@ spec:
               exec:
                 command: ["/bin/sh", "-c", "sleep {{ $root.Values.preStopDrainSeconds }}"]
           resources:
+            {{- if eq $root.Values.bundle.mode "url" }}
+            {{/* Merged into the unit's own resources rather than replacing them.
+                 Unset, GKE Autopilot grants 1Gi of ephemeral storage and a real
+                 dependency tree exhausts it mid-install — npm then neither
+                 errors nor gets evicted, it just stops. */}}
+            {{- $withStorage := deepCopy $unit.resources }}
+            {{- $_ := set $withStorage "requests" (merge (dict "ephemeral-storage" $root.Values.bundle.ephemeralStorage) (default (dict) $withStorage.requests)) }}
+            {{- $_ := set $withStorage "limits" (merge (dict "ephemeral-storage" $root.Values.bundle.ephemeralStorage) (default (dict) $withStorage.limits)) }}
+            {{- toYaml $withStorage | nindent 12 }}
+            {{- else }}
             {{- toYaml $unit.resources | nindent 12 }}
+            {{- end }}
 {{- end }}

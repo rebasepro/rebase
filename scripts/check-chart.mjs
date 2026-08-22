@@ -227,6 +227,59 @@ if (!strict.ok) {
     }
 }
 
+// ── 2e2. bundle.mode=url — the path that had never worked ────────────────────
+/**
+ * A documented topology that nothing exercised, and it was broken end to end.
+ *
+ * The runtime's fetch looked for a marker file no bundle has ever carried, so
+ * every `mode: url` install rejected its own bundle as "not a Rebase bundle".
+ * `helm lint` and a render cannot see that — but they can see the four things
+ * the working version needs, which is what this checks.
+ */
+const urlMode = render([
+    "--set", "bundle.mode=url",
+    "--set", "bundle.url=https://control-plane.example/bundles/p1"
+]);
+if (!urlMode.ok) {
+    problems.push(`the url-bundle topology does not render:\n${urlMode.out}`);
+} else {
+    const env = envOf(urlMode.out, "rebase-rebase-api") ?? {};
+    check("bundle url", env.REBASE_BUNDLE_URL === "https://control-plane.example/bundles/p1",
+        "REBASE_BUNDLE_URL is not set, so the runtime has no bundle to fetch");
+    check("bundle url", !("REBASE_BUNDLE" in env),
+        "REBASE_BUNDLE is set alongside a URL — it means \"already on disk\" and wins, " +
+        "so the fetch would be skipped and the runtime would boot against an empty directory");
+    check("bundle url", Boolean(env.REBASE_BUNDLE_FETCH_DIR),
+        "REBASE_BUNDLE_FETCH_DIR is not set, so the bundle unpacks into the container's " +
+        "writable layer instead of the volume sized for it");
+
+    const doc = urlMode.out.split(/^---$/m).find(d =>
+        /^kind:\s*Deployment\s*$/m.test(d) && /name:\s*rebase-rebase-api\s*$/m.test(d)) ?? "";
+    const mount = doc.match(/- name: bundle-scratch\n\s+mountPath: "?([^"\n]+)"?/)?.[1];
+    check("bundle url", mount === env.REBASE_BUNDLE_FETCH_DIR,
+        `the bundle volume is mounted at ${mount ?? "(nowhere)"} but the runtime is told to ` +
+        `unpack into ${env.REBASE_BUNDLE_FETCH_DIR} — the install would land on the ` +
+        "container's writable layer and exhaust it");
+    check("bundle url", /emptyDir: \{\}|emptyDir:\n\s+sizeLimit:/.test(doc),
+        "the bundle volume renders `emptyDir:` with nothing under it, which parses as null " +
+        "and is rejected by the API server");
+    check("bundle url", /ephemeral-storage:/.test(doc),
+        "no ephemeral-storage is reserved — Autopilot grants 1Gi by default and a real " +
+        "dependency tree exhausts it mid-install, where npm neither errors nor is evicted");
+}
+
+// 2e3. mode=image must NOT carry any of that.
+const imageMode = render([]);
+if (imageMode.ok) {
+    const env = envOf(imageMode.out, "rebase-rebase-api") ?? {};
+    check("bundle image", !env.REBASE_BUNDLE_URL && !env.REBASE_BUNDLE_FETCH_DIR,
+        "a baked-image bundle is being told to fetch one");
+    check("bundle image", Boolean(env.REBASE_BUNDLE),
+        "REBASE_BUNDLE is not set, so the runtime would look for a bundle in its working directory");
+    check("bundle image", !/bundle-scratch/.test(imageMode.out),
+        "a scratch volume is mounted for a bundle that is already in the image");
+}
+
 // ── 2f. parity with the runtime's pod contract ───────────────────────────────
 /**
  * The chart cannot import TypeScript, so this is where it is held to the

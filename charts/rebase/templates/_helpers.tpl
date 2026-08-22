@@ -165,6 +165,14 @@ is what lets one Deployment carry a different build than its siblings.
      releasable without the others. Absent, it fetches the release's. */}}
 - name: REBASE_BUNDLE_URL
   value: {{ default .Values.bundle.url $unit.bundleUrl | quote }}
+{{/* Unpack into the volume above rather than the container's writable layer.
+     The runtime fetches, unpacks and installs the bundle's dependencies itself,
+     and an install holds three copies of the tree at once — the archive, npm's
+     cache and the extracted node_modules — so this is the one place in a pod's
+     life that needs real disk. REBASE_BUNDLE is deliberately NOT set: it means
+     "already on disk" and would skip the fetch entirely. */}}
+- name: REBASE_BUNDLE_FETCH_DIR
+  value: {{ .Values.bundle.path | quote }}
 {{- if .Values.bundle.token }}
 - name: REBASE_BUNDLE_TOKEN
   valueFrom:
@@ -262,16 +270,36 @@ explicit path always wins over a URL. So what this mounts is writable scratch at
 project with real dependencies, and a node whose ephemeral storage fills up
 evicts pods for reasons that read as unrelated.
 */}}
+{{/*
+The volume a fetched bundle is unpacked into.
+
+Only `mode: url` has one. Under `mode: image` the bundle is already in the image
+at `bundle.path` and nothing is written at runtime.
+
+An emptyDir rather than a PVC: the tree is derived entirely from a tarball the
+runtime can fetch again, so it belongs to the pod's lifetime. It survives a
+container restart within the pod, though, which is deliberate — the runtime
+reuses an unpacked tree it finds, so a restart costs a manifest check instead of
+a download and an `npm ci`.
+*/}}
 {{- define "rebase.bundleVolumes" -}}
 {{- if eq .Values.bundle.mode "url" }}
+{{- if .Values.bundle.sizeLimit }}
+- name: bundle-scratch
+  emptyDir:
+    sizeLimit: {{ .Values.bundle.sizeLimit }}
+{{- else }}
+{{/* `emptyDir:` with nothing under it parses as null, not as an empty object,
+     and the API server rejects the volume. */}}
 - name: bundle-scratch
   emptyDir: {}
+{{- end }}
 {{- end }}
 {{- end -}}
 
 {{- define "rebase.bundleVolumeMounts" -}}
 {{- if eq .Values.bundle.mode "url" }}
 - name: bundle-scratch
-  mountPath: /tmp
+  mountPath: {{ .Values.bundle.path | quote }}
 {{- end }}
 {{- end -}}
