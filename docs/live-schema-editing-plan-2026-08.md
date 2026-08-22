@@ -146,28 +146,75 @@ That is a real, separable piece of work and it should be planned as one:
 - scope, rotation, and revocation;
 - the equivalent for GitLab and plain git, or an explicit decision not to.
 
-Until it exists, the editor cannot be enabled in production for any project. This
-is the dependency that decides when #5 can ship, more than the DDL work does.
+Until it exists, **Cloud** cannot have this. A self-hoster running from source
+can: their repository is on the same machine as the server, so the commit is a
+local `git commit` with nothing to authenticate — see the deployment table below.
+
+So this is the dependency that decides when Cloud gets #5, not when #5 works at
+all. That is worth separating in the planning: the mechanism can ship, and be
+used, while the credential path is still being built.
 
 ---
 
-## When no repository is linked
+## Which deployments this works on
 
-A self-hoster running a bundle from `docker run` has no repository. Make this
-explicit rather than clever:
+The dividing line is **not** cloud versus self-host. It is whether the running
+server has the collection source on disk, and by that measure self-hosting gets
+there sooner than Cloud does.
 
-- **repository linked** → commit, then apply;
-- **no repository** → the editor stays off, exactly as it is today, and the error
-  says how to link one.
+| Shape | Source present | Repository | Works |
+|---|---|---|---|
+| `rebase dev` on a developer's machine | yes | local git | yes, no credentials |
+| Self-host with the project mounted | yes | local git | yes, no credentials |
+| Self-host from a built bundle | no | none | no — see below |
+| Rebase Cloud | no (uploaded as a tarball, built away) | remote, on GitHub | needs the credential path |
 
-One model, one code path. The tempting alternative — "apply to the database only
-when there is no repo" — quietly reintroduces a second source of truth and needs
-its own ownership and drift rules for a case that is not the main one. Not worth
-two models.
+The commit is a `git commit` in a working tree. Where that tree is on the same
+machine as the server — a laptop, or a self-hosted box with the project mounted —
+there is nothing to authenticate and nothing to fetch. **Cloud is the hard case
+precisely because the repository is somewhere else**: the tenant runs a bundle,
+the source arrived as a tarball, and GitHub is a third party that needs a token.
 
-This keeps the binding rule intact: the capability ships in OSS, its interface is
-the same everywhere, and Cloud's contribution is making the linking easy rather
-than being the only place it works.
+So the ordering of work is the opposite of the intuition. A self-hoster running
+from source can have this before any credential plumbing exists at all; Cloud
+cannot have it until that plumbing does.
+
+### The bundle path stays immutable, deliberately
+
+The documented default for self-hosting is `rebase build` → `dist-bundle` →
+`docker run`, and [`boot.ts`](../packages/server/src/boot/boot.ts) hard-codes
+`schemaEditor: false` there. Its comment is right: a bundle is compiled output,
+so there is nothing for an editor to write.
+
+That does not change. A build artifact you can edit in place is a worse idea than
+one you cannot, and the alternative — reconstructing collection source inside a
+container from compiled output so it can be edited and committed — is a second
+schema-editing path built to serve the one deployment shape that exists to be
+immutable.
+
+What it means in practice: **running from source is the documented way for a
+self-hoster to get the schema editor**, and that belongs in the self-hosting
+docs rather than being discovered. A project mounted into the container has its
+`collectionsDir` and its `.git`, which is everything this needs.
+
+### What is refused, and why it is not a fallback
+
+With no source and no repository — the bundle case — the editor stays off,
+exactly as it is today, and the error says how to get it: mount the project, or
+use `rebase dev`.
+
+The tempting alternative is "apply to the database only, when there is no repo".
+That quietly reintroduces a second source of truth and needs its own ownership
+and drift rules, for the deployment shape least able to reason about them. One
+model is worth more than covering that case.
+
+### The binding rule holds
+
+The whole mechanism — the schema service, commit generation, the live apply —
+lives in `@rebasepro/server`. A self-hoster gets the same code Cloud runs, with
+*less* setup, because their repository is already on the machine. Cloud's
+contribution is the remote-repository credential path: a better implementation of
+the same interface, not the only implementation of a different one.
 
 ---
 
@@ -211,15 +258,21 @@ Each stage is useful on its own, which matters for a project this size.
    by asserting a fresh database built from the result matches the one the change
    describes. This is the bulk of the work and it can be finished before any
    credential exists.
-3. **The git write path.** App/token, storage, branch selection, rebase retry,
-   PR fallback.
+3. **Commit to a local working tree.** `rebase dev` and a self-host running from
+   mounted source both have one, so this needs no credentials and no network —
+   and it makes the feature usable end to end for those two shapes. Branch
+   selection and rebase-on-stale live here.
 4. **Live apply.** Reuse the existing ensure/migration machinery rather than a
    new DDL path, so there is exactly one thing that changes a schema.
-5. **Panel UX.** The two-phase status, the refusal messages from stage 1, the
+5. **The remote write path.** App/token, storage, PR fallback for protected
+   branches. **This is the Cloud-only stage** — everything above ships without it.
+6. **Panel UX.** The two-phase status, the refusal messages from stage 1, the
    forward-only warning.
 
-Stages 1 and 2 have no dependency on the credential work and carry most of the
-risk. They are where to start.
+Stages 1 and 2 have no dependency on anything and carry most of the risk; they
+are where to start. Stages 3 and 4 complete the feature for every deployment that
+has its source on disk, which is a shippable product on its own. Stage 5 is what
+Cloud additionally needs.
 
 ---
 
@@ -231,3 +284,7 @@ risk. They are where to start.
 - GitHub App or per-project token — the App is better hygiene and more setup.
 - Is a PR-only mode (never commit directly, always open a PR) the safer default
   for every project rather than a fallback for protected branches?
+- Should self-hosting from mounted source become a documented, first-class
+  deployment shape rather than the thing you do instead of a bundle? It is the
+  only self-host shape this feature works in, and today the docs lead with the
+  bundle.
