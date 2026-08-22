@@ -11779,16 +11779,39 @@ searches embeddings, it does not compute them.
 #### What you have to provide
 
 - **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that
-  type comes from the `vector` extension. Rebase does not install it — an
-  extension needs a server image that carries it and a role allowed to create
-  it. The scaffold's `postgres:18-alpine` does **not** ship pgvector; use an
-  image that does (for example `pgvector/pgvector:pg18`) and run
-  `CREATE EXTENSION vector;` once. Without it the first boot fails, naming this.
-- **An index, if you want one.** Rebase creates no HNSW or IVFFlat index, so
-  every `vectorSearch` computes the distance for every row and sorts: exact
-  results, sequential cost. Create the index yourself in a migration
-  (`CREATE INDEX … USING hnsw (embedding vector_cosine_ops)`) if your table is
-  large enough to need one.
+  type comes from the `vector` extension. The scaffold's database image
+  (`pgvector/pgvector:pg18`) ships it, so a project created by `rebase init`
+  needs nothing here. Pointed at a database someone else provisioned, you need
+  an image that carries the extension and a role allowed to run
+  `CREATE EXTENSION vector;` once — Rebase does not install extensions on your
+  behalf. Without it the first boot fails, naming this.
+
+#### The index
+
+Every vector column gets an HNSW index for cosine distance, created with the
+table and reported at boot. Cosine because that is what `vectorSearch` measures
+with unless you pass `distance` — an index serves exactly one operator, so a
+`l2` query against a cosine index quietly goes back to scanning.
+
+Tune it, or turn it off, on the property:
+
+```ts
+embedding: {
+    type: "vector",
+    dimensions: 1536,
+    // Defaults: one HNSW index, cosine. Any of these may be omitted.
+    index: {
+        method: "hnsw",              // or "ivfflat"
+        distance: ["cosine", "l2"],  // one index each
+        m: 24,                       // hnsw
+        efConstruction: 128          // hnsw
+    }
+}
+```
+
+`index: false` keeps the exact scan on purpose. Above 2000 dimensions pgvector
+cannot build either index type, so the column is created and left unindexed, and
+the boot says so — `vectorSearch` still answers, as an exact scan.
 
 `vectorSearch` is a query, not a subscription: `.listen()` on one is refused
 rather than served as a plain listing, because nothing recomputes distances on a
@@ -15254,7 +15277,7 @@ The generated project already includes a working `docker-compose.yml` (Postgres 
 ```yaml title="docker-compose.yml (generated — abridged)"
 services:
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
@@ -15452,7 +15475,7 @@ A minimal `docker-compose.yml`:
 ```yaml
 services:
   db:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
