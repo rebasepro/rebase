@@ -13,6 +13,7 @@ import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
 import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
+import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
@@ -30,6 +31,14 @@ import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cook
  */
 export interface AuthModuleConfig {
     authRepo: AuthRepository;
+    /**
+     * Bot protection. Off unless `enabled`.
+     *
+     * Rate limiting bounds one caller; a botnet of a thousand addresses sending
+     * one request each never touches a per-IP window, and `/register` and
+     * `/forgot-password` both send mail. See `captcha.ts`.
+     */
+    captcha?: CaptchaConfig;
     emailService?: EmailService;
     emailConfig?: EmailConfig;
     /** Allow new user registration (default: false). */
@@ -170,6 +179,12 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
             "Use the POST /admin/bootstrap endpoint to promote the initial administrator."
         );
     }
+
+    // Built here rather than per request: `resolveCaptchaVerifier` throws on a
+    // configuration that is enabled but unusable, and that has to fail the boot.
+    // A challenge that silently is not there is the one failure mode this
+    // feature cannot have.
+    const captcha = buildCaptchaMiddlewares(config.captcha);
 
     const router = new Hono<HonoEnv>();
 
@@ -364,7 +379,7 @@ refreshToken };
      * POST /auth/register
      * Create a new account with email/password
      */
-    router.post("/register", defaultAuthLimiter, async (c) => {
+    router.post("/register", defaultAuthLimiter, ...(captcha.register ? [captcha.register] : []), async (c) => {
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
         // Hard kill switch — blocks registration regardless of allowRegistration,
@@ -471,7 +486,7 @@ displayName: user.displayName });
      * POST /auth/login
      * Login with email/password
      */
-    router.post("/login", defaultAuthLimiter, async (c) => {
+    router.post("/login", defaultAuthLimiter, ...(captcha.login ? [captcha.login] : []), async (c) => {
         const { email, password } = parseBody(loginSchema, await c.req.json());
 
         // Call beforeLogin hook if provided (throw to reject)
@@ -761,7 +776,7 @@ displayName: user.displayName });
      * POST /auth/forgot-password
      * Request password reset email
      */
-    router.post("/forgot-password", strictAuthLimiter, async (c) => {
+    router.post("/forgot-password", strictAuthLimiter, ...(captcha.forgotPassword ? [captcha.forgotPassword] : []), async (c) => {
         const { email } = parseBody(forgotPasswordSchema, await c.req.json());
 
         // Check if email service is configured
@@ -1229,7 +1244,8 @@ aal: sessionAal };
             parseBody,
             buildAuthResponse,
             createSessionAndTokens,
-            applyTransformHook
+            applyTransformHook,
+            captchaMiddleware: captcha.magicLink
         });
     }
 

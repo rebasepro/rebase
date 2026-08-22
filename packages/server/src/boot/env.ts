@@ -91,6 +91,14 @@ const bootEnvExtension = z.object({
     // ── Auth ─────────────────────────────────────────────────────────────────
     AUTH_REQUIRE: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     AUTH_ALLOW_USER_LOOKUP: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * Bot protection. Enabled by setting both — a provider without a secret
+     * cannot verify anything, and is refused at boot rather than ignored.
+     */
+    CAPTCHA_PROVIDER: z.enum(["turnstile", "hcaptcha", ""]).optional(),
+    CAPTCHA_SECRET: z.string().optional(),
+    /** Comma-separated: register, login, forgotPassword, magicLink. */
+    CAPTCHA_ROUTES: z.string().optional(),
     AUTH_COOKIE_SAME_SITE: z.enum(["Strict", "Lax", "None", ""]).optional(),
     AUTH_DEFAULT_ROLE: z.string().optional(),
     GITHUB_CLIENT_ID: z.string().optional(),

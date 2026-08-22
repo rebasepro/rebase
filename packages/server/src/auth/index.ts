@@ -52,6 +52,24 @@ export type { AuthModuleConfig, CookieAuthConfig } from "./routes";
 
 export { mountMagicLinkRoutes } from "./magic-link-routes";
 
+// Bot protection. The verifier is injectable, so no provider SDK enters this
+// package's dependency graph — the built-in one is a form post.
+export {
+    buildCaptchaMiddlewares,
+    createCaptchaMiddleware,
+    createHttpCaptchaVerifier,
+    resolveCaptchaVerifier,
+    DEFAULT_CAPTCHA_ROUTES
+} from "./captcha";
+export type {
+    CaptchaConfig,
+    CaptchaProvider,
+    CaptchaRoute,
+    CaptchaVerifier,
+    CaptchaVerifyRequest,
+    CaptchaVerifyResult
+} from "./captcha";
+
 export { createResetPasswordRoute } from "./reset-password-admin";
 export type { ResetPasswordRouteConfig } from "./reset-password-admin";
 

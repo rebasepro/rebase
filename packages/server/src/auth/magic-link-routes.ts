@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { AuthModuleConfig } from "./routes";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
@@ -42,8 +43,14 @@ export function mountMagicLinkRoutes(deps: {
         request: Request,
         uid: string
     ) => Promise<AuthResponsePayload>;
+    /**
+     * Built by the caller so a misconfiguration fails the boot once, rather
+     * than being resolved again here. Absent when captcha is off, or when
+     * `magicLink` is not among the protected routes.
+     */
+    captchaMiddleware?: MiddlewareHandler<HonoEnv>;
 }) {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = deps;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, captchaMiddleware } = deps;
     const { authRepo, emailService, emailConfig } = config;
 
     const magicLinkSchema = z.object({
@@ -62,7 +69,7 @@ export function mountMagicLinkRoutes(deps: {
      * POST /auth/magic-link
      * Request a magic link email
      */
-    router.post("/magic-link", strictAuthLimiter, async (c) => {
+    router.post("/magic-link", strictAuthLimiter, ...(captchaMiddleware ? [captchaMiddleware] : []), async (c) => {
         const { email } = parseBody(magicLinkSchema, await c.req.json());
 
         // Require email service
