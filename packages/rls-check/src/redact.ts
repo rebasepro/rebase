@@ -267,3 +267,26 @@ export function redactSecrets(text: string, connectionString?: string): string {
 
     return out;
 }
+
+/**
+ * Is this endpoint a local proxy or tunnel rather than the database itself?
+ *
+ * Matters for diagnosis: cloud-sql-proxy, an SSH -L forward and a local pooler
+ * all accept the TCP connection and then hang up when *their* upstream auth
+ * fails, which reaches the client as a bare ECONNRESET. Advice about TLS is
+ * wrong there — the proxy terminates TLS itself, and the real cause is only in
+ * its log.
+ *
+ * Takes the display form produced by `formatEndpoint`, so `host`, `host:port`
+ * and `[::1]:5432` all work.
+ */
+export function isLoopbackEndpoint(endpoint: string): boolean {
+    const { host } = splitHostPort(endpoint.trim());
+    const bare = host.replace(/^\[|]$/g, "").toLowerCase();
+
+    if (bare === "localhost" || bare.endsWith(".localhost")) return true;
+    // The whole 127.0.0.0/8 block is loopback, not just 127.0.0.1.
+    if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(bare)) return true;
+
+    return bare === "::1" || bare === "0:0:0:0:0:0:0:1";
+}

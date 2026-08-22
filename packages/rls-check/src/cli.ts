@@ -24,7 +24,7 @@ import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
 import { introspectWithDiagnostics } from "./introspect";
-import { formatEndpoint, parseConnectionString, redactSecrets } from "./redact";
+import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
 import { SEVERITIES } from "./types";
@@ -484,10 +484,19 @@ export function explainError(
                 "Packets are being dropped rather than refused, which almost always means a firewall or an IP allowlist. Add this machine's address to the database's allowed list."
             );
         case "ECONNRESET":
-            return friendly(
-                `${at} closed the connection before the handshake finished.`,
-                "Most often TLS. Try appending ?sslmode=require to the connection string; managed providers reject plaintext."
-            );
+            // A loopback endpoint is a proxy or tunnel, never the database: it
+            // accepted the TCP connection and then hung up because its own
+            // upstream auth failed. sslmode cannot help — the proxy terminates
+            // TLS itself — and the reason is only in the proxy's log.
+            return isLoopbackEndpoint(at)
+                ? friendly(
+                      `A local proxy or tunnel on ${at} closed the connection before the handshake finished.`,
+                      "Something is listening on that port and hung up — cloud-sql-proxy, an SSH -L forward or a local pooler. The real cause is in its log, not in your TLS mode."
+                  )
+                : friendly(
+                      `${at} closed the connection before the handshake finished.`,
+                      "Most often TLS. Try appending ?sslmode=require to the connection string; managed providers reject plaintext."
+                  );
         case "EPROTO":
         case "DEPTH_ZERO_SELF_SIGNED_CERT":
         case "SELF_SIGNED_CERT_IN_CHAIN":
@@ -530,10 +539,17 @@ export function explainError(
         case "08006":
         case "08001":
         case "08004":
-            return friendly(
-                `Could not establish a connection to ${at}.`,
-                "Check the host, port and TLS mode. Managed providers usually need ?sslmode=require."
-            );
+            // Same trap as ECONNRESET above: on loopback there is no TLS mode
+            // to get wrong, because the thing that refused you is a proxy.
+            return isLoopbackEndpoint(at)
+                ? friendly(
+                      `Could not establish a connection through the local proxy or tunnel on ${at}.`,
+                      "The port answered but the session never came up. That is the proxy's upstream failing, not your TLS mode — its log has the reason."
+                  )
+                : friendly(
+                      `Could not establish a connection to ${at}.`,
+                      "Check the host, port and TLS mode. Managed providers usually need ?sslmode=require."
+                  );
         default:
             break;
     }

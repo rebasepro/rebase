@@ -17,7 +17,13 @@ import {
     resolveConnection,
     runCli,
     type CliIo, exitCodeFor } from "./cli";
-import { formatEndpoint, parseConnectionString, redactConnectionString, redactSecrets } from "./redact";
+import {
+    formatEndpoint,
+    isLoopbackEndpoint,
+    parseConnectionString,
+    redactConnectionString,
+    redactSecrets
+} from "./redact";
 import {
     exceedsThreshold,
     formatTarget,
@@ -203,6 +209,23 @@ describe("redaction", () => {
         expect(formatEndpoint(parseConnectionString("postgres://u:p@host/db"))).toBe("host");
         expect(formatEndpoint(parseConnectionString("postgres://u:p@host:5433/db"))).toBe("host:5433");
         expect(formatEndpoint(null)).toBe("unknown host");
+    });
+
+    it("tells a loopback endpoint from a remote one", () => {
+        expect(isLoopbackEndpoint("127.0.0.1:5434")).toBe(true);
+        expect(isLoopbackEndpoint("127.0.0.1")).toBe(true);
+        expect(isLoopbackEndpoint("127.9.9.9:5432")).toBe(true);
+        expect(isLoopbackEndpoint("localhost")).toBe(true);
+        expect(isLoopbackEndpoint("db.localhost:5432")).toBe(true);
+        expect(isLoopbackEndpoint("[::1]:5432")).toBe(true);
+        expect(isLoopbackEndpoint(formatEndpoint(parseConnectionString("postgres://u:p@[::1]:5432/db")))).toBe(true);
+
+        expect(isLoopbackEndpoint("db.abcdefghijkl.supabase.co:5432")).toBe(false);
+        expect(isLoopbackEndpoint("10.0.0.1:5432")).toBe(false);
+        // Not loopback despite the digits: a real host that merely starts with 127.
+        expect(isLoopbackEndpoint("127.example.com")).toBe(false);
+        expect(isLoopbackEndpoint("notlocalhost")).toBe(false);
+        expect(isLoopbackEndpoint("unknown host")).toBe(false);
     });
 });
 
@@ -520,6 +543,41 @@ describe("explainError", () => {
         expect(explain("28000").headline).toContain("refused the connection");
         expect(explain("57014").hint).toContain("--timeout");
         expect(explain("42501").headline).toContain("not allowed to read the catalogs");
+    });
+
+    // Every code a connection dying mid-handshake arrives as: the driver's
+    // errno, and the SQLSTATE class the server uses. All of them used to reach
+    // for TLS unconditionally.
+    const HANDSHAKE_CODES = ["ECONNRESET", "08006", "08001", "08004"];
+
+    const explainAt = (code: string, endpoint: string) =>
+        explainError(Object.assign(new Error("connection failed"), { code }), { ...context, endpoint });
+
+    it("suggests TLS when the handshake dies against a remote host", () => {
+        for (const code of HANDSHAKE_CODES) {
+            const explained = explainAt(code, "db.abcdefghijkl.supabase.co:5432");
+
+            expect(explained.hint, code).toContain("sslmode=require");
+            expect(explained.headline, code).not.toContain("proxy");
+        }
+    });
+
+    it("blames the proxy, not TLS, when the handshake dies against a loopback endpoint", () => {
+        // cloud-sql-proxy, an SSH -L forward or a local pooler: it accepted the
+        // connection and then failed its own upstream auth. Telling the user to
+        // set sslmode here sends them somewhere the fix is not — the proxy
+        // terminates TLS itself, so there is no mode of ours to get wrong.
+        for (const code of HANDSHAKE_CODES) {
+            for (const endpoint of ["127.0.0.1:5434", "localhost:5432", "[::1]:5432"]) {
+                const explained = explainAt(code, endpoint);
+                const where = `${code} at ${endpoint}`;
+
+                expect(explained.headline, where).toContain("local proxy or tunnel");
+                expect(explained.headline, where).toContain(endpoint);
+                expect(explained.hint, where).toContain("log");
+                expect(explained.hint, where).not.toContain("sslmode");
+            }
+        }
     });
 
     it("recognises TLS failures from the message when there is no code", () => {
