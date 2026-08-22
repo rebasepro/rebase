@@ -13,6 +13,7 @@
  * which differs between the subdirectory layouts (Claude, Gemini) and the flat
  * ones (Cursor, Windsurf).
  */
+import { execFileSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -22,7 +23,8 @@ import { installForAgent, loadSkills, rewriteAssetLinks } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bundle in this repository — `packages/cli/src/commands` → root. */
-const BUNDLE_SKILLS = path.resolve(HERE, "../../../../rebase-agent-skills/skills");
+const BUNDLE_ROOT = path.resolve(HERE, "../../../../rebase-agent-skills");
+const BUNDLE_SKILLS = path.join(BUNDLE_ROOT, "skills");
 
 /** Where each agent's rule file lands, and what a relative link resolves against. */
 const LAYOUTS = {
@@ -121,5 +123,135 @@ describe("the bundle in this repository", () => {
             }
         }
         expect(missing).toEqual([]);
+    });
+});
+
+/**
+ * What an npm consumer receives, as opposed to what a workspace checkout has.
+ *
+ * Every test above this point reads the bundle through the filesystem, which in
+ * this repository is the source directory itself. That is not what a user
+ * installs. `@rebasepro/agent-skills` publishes `files: ["skills/"]`, so
+ * anything a skill grows *outside* that directory — and any edit to `files`
+ * itself — is dropped at pack time while every assertion above stays green.
+ *
+ * This is a bug class the repository has already paid for once, in
+ * `@rebasepro/client-postgres`: `files` did not list `src`, the package
+ * published without the file its own `bin` pointed at, and nothing failed until
+ * a stranger installed it. The installer reads `SKILL.md` and every asset
+ * beside it, so those are exactly the files the tarball has to contain.
+ */
+describe("the published tarball", () => {
+    /** Paths `npm pack` would ship, relative to the package root. */
+    function packedFiles(): Set<string> {
+        const out = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+            cwd: BUNDLE_ROOT,
+            encoding: "utf-8",
+            stdio: ["ignore", "pipe", "ignore"]
+        });
+        const [entry] = JSON.parse(out) as { files: { path: string }[] }[];
+        return new Set(entry.files.map(f => f.path.split(path.sep).join("/")));
+    }
+
+    it("contains every file the installer reads", { timeout: 60_000 }, () => {
+        const packed = packedFiles();
+        const skills = loadSkills(BUNDLE_SKILLS);
+        expect(skills.length).toBeGreaterThan(0);
+
+        const missing: string[] = [];
+        for (const skill of skills) {
+            const wanted = ["SKILL.md", ...skill.assets];
+            for (const rel of wanted) {
+                const posix = `skills/${skill.name}/${rel.split(path.sep).join("/")}`;
+                if (!packed.has(posix)) missing.push(posix);
+            }
+        }
+        expect(missing).toEqual([]);
+    });
+});
+
+/**
+ * The package's own export map, against the paths it promises.
+ *
+ * `exports` said `"./skills": "./skills/"` — a trailing-slash directory export.
+ * Node deprecated that form (DEP0166) and never let it reach a file: resolving
+ * `@rebasepro/agent-skills/skills/rebase-basics/SKILL.md` threw
+ * `ERR_PACKAGE_PATH_NOT_EXPORTED`, so the one thing the subpath existed to do
+ * was the one thing it could not do. The CLI installer never noticed, because
+ * it resolves `package.json` and joins `skills` onto the directory — which is
+ * why this needs its own test rather than falling out of an install.
+ */
+describe("the package export map", () => {
+    const manifest = JSON.parse(
+        fs.readFileSync(path.join(BUNDLE_ROOT, "package.json"), "utf-8")
+    ) as { exports: Record<string, string> };
+
+    it("has no trailing-slash directory export", () => {
+        const deprecated = Object.entries(manifest.exports)
+            .filter(([, target]) => target.endsWith("/"))
+            .map(([subpath]) => subpath);
+        expect(deprecated).toEqual([]);
+    });
+
+    it("resolves a real SKILL.md through the package specifier", async () => {
+        const skills = loadSkills(BUNDLE_SKILLS);
+        const name = skills[0].name;
+        const resolved = import.meta.resolve(`@rebasepro/agent-skills/skills/${name}/SKILL.md`);
+        expect(fs.existsSync(fileURLToPath(resolved))).toBe(true);
+    });
+
+    it("still resolves the package.json the installer locates the bundle by", () => {
+        const resolved = import.meta.resolve("@rebasepro/agent-skills/package.json");
+        expect(fs.existsSync(fileURLToPath(resolved))).toBe(true);
+    });
+});
+
+/**
+ * Skill frontmatter, which is how an agent addresses a skill at all.
+ *
+ * Claude Code and the Gemini CLI register a skill under the `name` in its
+ * frontmatter, while the installer writes it to a directory named after the
+ * *source directory*. When those disagree the skill installs, reports success,
+ * and is then invoked — or not — under a name that does not match where it
+ * lives. `description` is the only thing an agent reads before deciding whether
+ * to load a skill, so an empty one makes the skill dead weight.
+ */
+describe("skill frontmatter", () => {
+    /** The frontmatter keys, tolerant of `key: |` block scalars. */
+    function frontmatter(content: string): Record<string, string> {
+        const match = /^---\n([\s\S]*?)\n---/.exec(content);
+        if (!match) return {};
+        const fields: Record<string, string> = {};
+        let key: string | null = null;
+        for (const line of match[1].split("\n")) {
+            const start = /^([A-Za-z][\w-]*):[ \t]*(.*)$/.exec(line);
+            if (start) {
+                key = start[1];
+                fields[key] = start[2] === "|" || start[2] === ">" ? "" : start[2].trim();
+            } else if (key && line.trim()) {
+                fields[key] = `${fields[key]} ${line.trim()}`.trim();
+            }
+        }
+        return fields;
+    }
+
+    const skills = loadSkills(BUNDLE_SKILLS);
+
+    it("finds the bundle", () => {
+        expect(skills.length).toBeGreaterThan(0);
+    });
+
+    it("names every skill after the directory it installs into", () => {
+        const mismatched = skills
+            .filter(s => frontmatter(s.content).name !== s.name)
+            .map(s => `${s.name}: name=${JSON.stringify(frontmatter(s.content).name)}`);
+        expect(mismatched).toEqual([]);
+    });
+
+    it("gives every skill a description an agent can select on", () => {
+        const empty = skills
+            .filter(s => (frontmatter(s.content).description ?? "").length < 20)
+            .map(s => s.name);
+        expect(empty).toEqual([]);
     });
 });
