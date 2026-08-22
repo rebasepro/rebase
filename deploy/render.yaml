@@ -1,0 +1,71 @@
+# Render blueprint for a Rebase project.
+#
+# Copy to the repository root as `render.yaml`, then either point Render at the
+# repo or use a "Deploy to Render" button:
+#
+#   https://render.com/deploy?repo=https://github.com/<you>/<your-project>
+#
+# One web service and one managed Postgres. The service builds the project into
+# a bundle and starts the runtime on it.
+
+services:
+  - type: web
+    name: rebase
+    runtime: node
+    plan: starter
+    # `rebase build` emits dist-bundle/; `rebase start` boots the runtime on it.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    # Liveness, not readiness: /health answers before the first database
+    # round-trip, so a database blip does not make Render recycle a healthy
+    # process.
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rebase-db
+          property: connectionString
+      # Generated once by Render and never printed. Rotating JWT_SECRET signs
+      # every existing session out; rotating REBASE_SERVICE_KEY invalidates
+      # anything authenticating with it.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REBASE_SERVICE_KEY
+        generateValue: true
+      # The backend refuses to boot in production without an allowed origin.
+      # RENDER_EXTERNAL_URL is this service's own public URL.
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: rebase
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: rebase
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: NODE_ENV
+        value: production
+      # Uploads. Leave storage unset and /storage answers 501; set S3 to enable
+      # it. The one thing you must not do is leave it `local` in production —
+      # the container filesystem is wiped on every deploy, so the runtime
+      # refuses rather than losing files quietly.
+      # - key: STORAGE_TYPE
+      #   value: s3
+      # - key: S3_BUCKET
+      #   sync: false
+      # - key: S3_REGION
+      #   sync: false
+      # - key: S3_ACCESS_KEY_ID
+      #   sync: false
+      # - key: S3_SECRET_ACCESS_KEY
+      #   sync: false
+      #
+      # If the project stores no uploads at all, say so explicitly instead:
+      # - key: FORCE_LOCAL_STORAGE
+      #   value: "true"
+
+databases:
+  - name: rebase-db
+    plan: basic-256mb
+    postgresMajorVersion: "18"

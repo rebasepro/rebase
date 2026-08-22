@@ -1,0 +1,51 @@
+# Fly.io configuration for a Rebase project.
+#
+# Copy to the repository root as `fly.toml`, then:
+#
+#   fly launch --no-deploy          # creates the app, keeps this file
+#   fly postgres create             # or attach an existing cluster
+#   fly postgres attach <cluster>   # sets DATABASE_URL for you
+#   fly secrets set JWT_SECRET=$(openssl rand -hex 32) \
+#                  REBASE_SERVICE_KEY=$(openssl rand -hex 32)
+#   fly secrets set CORS_ORIGINS=https://<app>.fly.dev FRONTEND_URL=https://<app>.fly.dev
+#   fly deploy
+#
+# Secrets are set from the command line rather than declared here on purpose:
+# this file is committed, and a secret in a committed file is not a secret.
+
+app = "rebase"
+primary_region = "cdg"
+
+[build]
+  builder = "paketobuildpacks/builder:base"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  # Uploads: the container filesystem does not survive a restart, so a `local`
+  # storage backend in production is silent data loss and the runtime refuses
+  # it. Either configure S3-compatible storage as secrets, or — if the project
+  # stores no uploads — say so:
+  # FORCE_LOCAL_STORAGE = "true"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Not zero. Boot provisions the schema and applies RLS, so a cold start is
+  # measurably slower than a warm one; scaling to zero makes every first request
+  # after an idle period pay for it.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
