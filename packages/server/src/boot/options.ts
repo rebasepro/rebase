@@ -2,6 +2,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { RebaseAuthConfig } from "../init";
 import type { EmailConfig } from "../email";
 import { createDevEmailSink } from "../email/dev-sink";
+import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
 
@@ -73,6 +74,30 @@ pass: env.SMTP_PASS ?? "" }
 }
 
 /**
+ * Bot protection from the environment, or `undefined` when it is not configured.
+ *
+ * Both halves are required together. A provider with no secret cannot verify
+ * anything, so it is left off here and `resolveCaptchaVerifier` refuses the boot
+ * if something else turns it on — the one failure this feature must not have is
+ * being silently absent while the config says otherwise.
+ */
+export function resolveCaptchaOptions(env: RebaseBootEnv): CaptchaConfig | undefined {
+    if (!env.CAPTCHA_PROVIDER || !env.CAPTCHA_SECRET) return undefined;
+
+    const routes = env.CAPTCHA_ROUTES
+        ?.split(",")
+        .map(part => part.trim())
+        .filter(Boolean) as CaptchaRoute[] | undefined;
+
+    return {
+        enabled: true,
+        provider: env.CAPTCHA_PROVIDER,
+        secret: env.CAPTCHA_SECRET,
+        ...(routes?.length ? { routes } : {})
+    };
+}
+
+/**
  * Build the auth configuration from the environment and the bundle's users
  * collection.
  *
@@ -101,6 +126,7 @@ export function resolveAuthOptions(
         disableSelfRegistration: env.DISABLE_SELF_REGISTRATION,
         allowAnonymous: env.ALLOW_ANONYMOUS,
         allowUserLookup: env.AUTH_ALLOW_USER_LOOKUP,
+        captcha: resolveCaptchaOptions(env),
         email: resolveEmailOptions(env),
         // Cookie auth keeps the refresh token in an httpOnly cookie rather than
         // localStorage, putting it out of reach of XSS. Enabling it costs a

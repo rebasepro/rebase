@@ -49,6 +49,7 @@ import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
+import type { CaptchaConfig } from "./auth/captcha";
 import {
     ALL_RUNTIME_SURFACES,
     disabledSurfaces,
@@ -162,6 +163,22 @@ export interface RebaseAuthConfig {
      * by any signed-in user. Available on the client as `auth.findUserByEmail`.
      */
     allowUserLookup?: boolean;
+    /**
+     * Bot protection on the auth routes that cost something to hit.
+     *
+     * Off unless `enabled`. Rate limiting bounds one caller; a botnet of a
+     * thousand addresses sending one request each never touches a per-IP window,
+     * and `/register` and `/forgot-password` both send mail — so the bill for an
+     * unprotected form is paid in reputation on a sending domain.
+     *
+     * ```ts
+     * auth: { captcha: { enabled: true, provider: "turnstile", secret: process.env.TURNSTILE_SECRET } }
+     * ```
+     *
+     * Verification fails closed: if the provider cannot be reached, the request
+     * is refused. See `auth/captcha.ts` for why that is the safe direction.
+     */
+    captcha?: CaptchaConfig;
     /**
      * A static secret key for server-to-server / script authentication.
      *
@@ -1361,6 +1378,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 disableSelfRegistration: safeAuthConfig.disableSelfRegistration ?? false,
                 allowAnonymous: safeAuthConfig.allowAnonymous ?? false,
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
+                captcha: safeAuthConfig.captcha,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,
                 allowedRedirectUris: safeAuthConfig.allowedRedirectUris,

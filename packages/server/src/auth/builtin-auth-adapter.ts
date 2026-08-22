@@ -28,6 +28,7 @@ import { hasAdministrativeRole } from "./admin-roles";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
+import type { CaptchaConfig } from "./captcha";
 import { isAnonymousAuthOpen, isRegistrationOpen } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
@@ -79,6 +80,8 @@ export interface BuiltinAuthAdapterConfig {
     allowAnonymous?: boolean;
     /** Whether to expose the authenticated email→minimal-profile lookup route. */
     allowUserLookup?: boolean;
+    /** Bot protection for the auth routes. See `captcha.ts`. */
+    captcha?: CaptchaConfig;
     /** Default role to assign to new users. */
     defaultRole?: string;
     /** OAuth providers to register. */
@@ -113,6 +116,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         disableSelfRegistration = false,
         allowAnonymous = false,
         allowUserLookup = false,
+        captcha,
         defaultRole,
         oauthProviders = [],
         allowedRedirectUris,
@@ -247,7 +251,8 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowedRedirectUris,
                 authHooks,
                 enableMagicLink,
-                cookieAuth
+                cookieAuth,
+                captcha
             });
         },
 
