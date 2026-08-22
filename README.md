@@ -73,15 +73,15 @@ Scaffold a complete, self-hosted Rebase application connected to your database:
 pnpm dlx @rebasepro/cli init my-rebase-app
 cd my-rebase-app
 pnpm install
-```
-
-Start the database, push the schema, and launch:
-
-```bash
-docker compose up -d db
-pnpm run db:push
 pnpm run dev
 ```
+
+That is the whole first run. `rebase dev` starts the project's Postgres container
+and pushes the schema to it before starting the servers — but only when
+`DATABASE_URL` points at this machine and nothing is already listening on it. A
+database that is already running is never touched, and a `DATABASE_URL` pointing
+anywhere other than localhost is left alone entirely. Pass `--no-db` to skip all
+of it and drive `docker compose up -d db` and `rebase db push` yourself.
 
 `rebase dev` picks a free port per project rather than fixed ones, and prints the
 admin panel and API URLs it settled on. Read them from its output — they differ

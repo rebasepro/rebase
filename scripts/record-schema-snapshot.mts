@@ -112,12 +112,41 @@ function pgDump(): string {
 // `SET` preambles and `SELECT pg_catalog.set_config` pin session state that the
 // restoring client sets for itself; keeping them makes the diff between two
 // snapshots mostly noise.
+//
+// `\restrict` / `\unrestrict` have to go for a different and less obvious
+// reason. They are **psql meta-commands, not SQL** — pg_dump began wrapping its
+// output in them so that a hostile search_path cannot hijack a restore — and
+// `upgrade-e2e.test.ts` replays these files through `client.query()`, which
+// speaks only SQL. A snapshot carrying them fails to restore with
+// `syntax error at or near "\"`, and that is what has been silently stopping
+// this script from producing a usable snapshot. The pair brackets the whole
+// dump, outside any statement, so dropping the two lines leaves the recorded
+// schema exactly as it was.
+const KNOWN_META_COMMANDS = /^\\(restrict|unrestrict)\b/;
+
 const dump = pgDump()
     .split("\n")
     .filter(line => !/^(SET |SELECT pg_catalog\.set_config|--)/.test(line))
+    .filter(line => !KNOWN_META_COMMANDS.test(line))
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+// Any other meta-command would fail the same way — but later, from a test whose
+// message says "syntax error" and does not mention this file. Refuse now, with
+// the offending line in hand, rather than committing a snapshot that cannot be
+// restored. The check is deliberately narrow so a dollar-quoted function body
+// containing a backslash is not mistaken for one.
+const unknownMeta = dump.split("\n").filter(line => /^\\[a-z]+\b/i.test(line));
+if (unknownMeta.length > 0) {
+    console.error(
+        "The dump contains psql meta-commands this script does not know how to strip:\n\n" +
+        unknownMeta.map(line => `    ${line}`).join("\n") +
+        "\n\nSnapshots are replayed through a plain SQL client, which cannot execute these.\n" +
+        "Add them to KNOWN_META_COMMANDS once you have checked they are safe to drop."
+    );
+    process.exit(1);
+}
 
 if (!/CREATE TABLE/i.test(dump)) {
     console.error(
@@ -143,12 +172,20 @@ const seed = `
 INSERT INTO rebase.users (id, email, display_name, roles, email_verified)
 VALUES ('user-${stamp}', 'recorded@${stamp}.test', 'Recorded User', ARRAY['admin'], TRUE);
 
-INSERT INTO rebase.refresh_tokens (uid, token_hash, expires_at, user_agent, ip_address, created_at)
+-- session_started_at is set explicitly, and to the same instant as created_at,
+-- because the column already exists in every era this script can record from —
+-- it is added by the very migration that the older snapshots exist to test.
+-- Leaving it to its DEFAULT now() would seed a row whose session apparently
+-- began two days after its token was created, and upgrade-e2e.test.ts would
+-- read that as the migration having back-filled from NOW(). Setting it turns
+-- that assertion into the one worth making about a modern era: an existing
+-- session start survives the upgrade untouched.
+INSERT INTO rebase.refresh_tokens (uid, token_hash, expires_at, user_agent, ip_address, created_at, session_started_at)
 VALUES
     ('user-${stamp}', '${stamp}-token-a', NOW() + INTERVAL '30 days',
-     'Mozilla/5.0 (recorded)', '203.0.113.20', NOW() - INTERVAL '2 days'),
+     'Mozilla/5.0 (recorded)', '203.0.113.20', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
     ('user-${stamp}', '${stamp}-token-b', NOW() + INTERVAL '30 days',
-     'Mozilla/5.0 (recorded)', '203.0.113.21', NOW() - INTERVAL '6 hours');
+     'Mozilla/5.0 (recorded)', '203.0.113.21', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '6 hours');
 `;
 
 const header = `-- ─────────────────────────────────────────────────────────────────────────────

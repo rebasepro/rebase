@@ -33,6 +33,9 @@ import {
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
+import { ensureDevDatabase } from "../utils/dev-preflight";
+import { runDriverDbCommand } from "./db";
+import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
 
 /**
@@ -200,8 +203,61 @@ export const DEV_FLAGS = {
     // flag you have to look up every time, which is the opposite of what a short
     // flag is for. `--project` keeps `-p`; port moves here.
     "-P": "--port",
-    "-g": "--generate"
+    "-g": "--generate",
+    // Opts out of the database preflight in `ensureDevDatabase`. Named for what
+    // it withholds rather than for the mechanism: a reader reaching for this
+    // wants "leave my database alone", not "skip step one of three".
+    "--no-db": Boolean
 } as const;
+
+/**
+ * Read one variable out of the project's env file.
+ *
+ * `dotenv.parse` rather than `dotenv.config`, because this must not put the
+ * project's secrets into the CLI process's own environment — the child
+ * processes are given the env file by path and read it themselves.
+ */
+function readEnvVar(projectRoot: string, name: string): string | undefined {
+    const envFile = findEnvFile(projectRoot);
+    if (!envFile || !fs.existsSync(envFile)) return undefined;
+    try {
+        return dotenv.parse(fs.readFileSync(envFile))[name] || undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The database half of `rebase dev` starting up.
+ *
+ * Separated from `ensureDevDatabase` so that everything needing a project on
+ * disk lives here and the decision logic stays testable without one.
+ */
+async function runDatabasePreflight(options: { projectRoot: string; disabled: boolean }): Promise<void> {
+    const { projectRoot, disabled } = options;
+
+    // A project with no collection files has no schema to push — the headless
+    // BaaS mode serves whatever the database already has.
+    const collectionsDir = path.join(projectRoot, "config", "collections");
+    const hasCollections = fs.existsSync(collectionsDir)
+        && fs.readdirSync(collectionsDir).some(name => /\.(ts|js|mts|mjs)$/.test(name) && !name.startsWith("index."));
+
+    const outcome = await ensureDevDatabase({
+        projectRoot,
+        databaseUrl: readEnvVar(projectRoot, "DATABASE_URL"),
+        disabled,
+        hasCollections,
+        pushSchema: async () => {
+            // The same driver entry point `rebase db push` uses, called with the
+            // argv layout every command in this CLI receives — the full process
+            // argument vector, which the callee slices. The throwing variant:
+            // a failed push must not take the dev server down with it.
+            await runDriverDbCommand(["node", "rebase", "db", "push"]);
+        }
+    });
+
+    if (outcome.action === "started") console.log("");
+}
 
 export async function devCommand(rawArgs: string[]): Promise<void> {
     if (wantsHelp(rawArgs)) {
@@ -239,6 +295,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
     console.log("");
+
+    // Start the development database and give it a schema, when this project
+    // has one that is plainly local and plainly not running. Everything about
+    // when it declines is in `ensureDevDatabase`; the frontend-only case is
+    // decided here because there is no backend to need a database at all.
+    if (!frontendOnly) {
+        await runDatabasePreflight({
+            projectRoot,
+            disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1"
+        });
+    }
 
     const children: ResultPromise[] = [];
 
@@ -710,10 +777,19 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--frontend-only, -f")}  Only start the frontend server
   ${chalk.blue("--port, -P")}           Backend port (default: auto-detected per project)
   ${chalk.blue("--generate, -g")}        Enable automatic schema and SDK generation on startup and file changes
+  ${chalk.blue("--no-db")}               Never start the database or push the schema
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
+
+  If DATABASE_URL points at this machine and nothing is listening on it,
+  the project's docker-compose \`db\` service is started first and the
+  schema is pushed to it — so a freshly scaffolded project needs only
+  this one command. A database that is already running is never touched:
+  no schema push, no connection. A DATABASE_URL pointing anywhere other
+  than localhost is left alone entirely. Pass --no-db, or set
+  REBASE_DEV_NO_DB=1, to skip all of it.
 
   Each project automatically receives a unique default port derived
   from its directory path, preventing collisions when running multiple

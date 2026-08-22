@@ -72,12 +72,21 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
     }
 }
 
-// ── 2b. One copy of the framework, not two ───────────────────────────────────
+// ── 2b. Exactly one copy of the framework, and never zero ────────────────────
 //
-// The install above can leave a SECOND copy of a package this image already
-// ships inside `/bundle/node_modules` — `@rebasepro/server` arrives that way as
-// a transitive dependency of `@rebasepro/admin` and `@rebasepro/server-postgres`,
-// which nearly every project declares.
+// `@rebasepro/server` has to be resolvable from inside `/bundle`, because every
+// custom function and cron file begins `import { defineFunction } from
+// "@rebasepro/server"`. Node resolves that by walking up from the importing
+// file — `/bundle/backend/functions/node_modules`, `/bundle/backend/node_modules`,
+// `/bundle/node_modules` — and never reaches this image's `/app/node_modules`.
+//
+// There are two ways for that to be wrong, and this step handles both. It used
+// to handle only the first.
+//
+// TOO MANY: the install above can leave a SECOND copy inside
+// `/bundle/node_modules` — `@rebasepro/server` arrives that way as a transitive
+// dependency of `@rebasepro/admin` and `@rebasepro/server-postgres`, which many
+// projects declare.
 //
 // That is not merely wasteful, it is a silent, total breakage of custom
 // functions. Every function imports `defineFunction` from `@rebasepro/server`,
@@ -95,19 +104,48 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
 // different version was never actually running that version — it just got a
 // second, dead one alongside it.
 //
-// ONLY `@rebasepro/server`, deliberately — not every package the image happens
-// to ship. The image installs the narrow set of dependencies the runtime itself
-// needs, while the bundle's `npm install` resolved each package's FULL
-// dependency tree; redirecting a package to the image's copy therefore risks
-// pointing it at a tree that is missing something. `@rebasepro/server-postgres`
-// is the proof: the image's copy has no `chokidar`, so redirecting it took the
-// database driver down and the pod crash-looped.
+// NONE AT ALL: and this is the common case, not the exotic one. `rebase build`
+// does not declare `@rebasepro/server` in the bundle's package.json — correctly,
+// since declaring it is what produces the duplicate above — so a bundle whose
+// dependencies do not happen to drag it in transitively has no copy anywhere
+// under `/bundle`. The reference app is exactly that: four declared
+// dependencies, none of them the framework.
 //
-// `@rebasepro/server` is the one package where the redirect is both necessary
-// and provably safe — necessary because it holds the singleton, and safe
-// because this very file imports it from the image below. If the image's copy
-// could not load, the runtime would not be running at all.
-const RUNTIME_PROVIDED = ["@rebasepro/server"];
+// The old code read `lstatSync(inBundle)` and `continue`d when it threw, so
+// "absent" was silently treated as "nothing to do". The result was that EVERY
+// function and cron file failed to load with `Cannot find package
+// "@rebasepro/server"`, the routes 404'd, and the container reported itself
+// healthy — the runtime itself was fine, and only a WARNING in the boot log
+// distinguished a project whose functions worked from one where none did.
+//
+// So the link is created when it is missing, not merely repaired when it is
+// duplicated. That is what makes the contract in this file true: the image
+// supplies `@rebasepro/server` to the bundle.
+//
+// This list must match `RUNTIME_PROVIDED` in `packages/cli/src/bundle.ts`, and
+// `scripts/test/runtime-provided.test.mjs` fails if it drifts. The bundler
+// STRIPS these from the bundle's declared dependencies on the promise that the
+// image supplies them; if the two lists disagree, the bundler removes something
+// nothing then provides, and every file importing it fails to load. That is not
+// hypothetical — the lists disagreed by four packages, and the bundle's own
+// package.json is the evidence: it declares four dependencies, none of them
+// `@rebasepro/*`, while its function and cron files import them by name.
+//
+// NOT every package the image happens to ship, though. The image installs the
+// narrow set of dependencies the runtime itself needs, while a bundle's `npm
+// install` resolves each package's FULL dependency tree — so pointing a package
+// at the image's copy risks pointing it at a tree that is missing something.
+// `@rebasepro/server-postgres` is the proof and stays off both lists: the
+// image's copy long had no `chokidar`, and redirecting it took the database
+// driver down and crash-looped the pod. A project declares its own driver, and
+// the bundle installs it.
+const RUNTIME_PROVIDED = [
+    "@rebasepro/server",
+    "@rebasepro/types",
+    "@rebasepro/client",
+    "@rebasepro/common",
+    "@rebasepro/utils"
+];
 
 const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");
 
@@ -115,29 +153,40 @@ for (const pkg of RUNTIME_PROVIDED) {
     const provided = path.join(imageModules, pkg);
     const inBundle = path.join(BUNDLE, "node_modules", pkg);
 
-    // Nothing to dedupe unless the image provides it AND the bundle installed
-    // its own real copy (an existing symlink is already this fix, re-applied).
+    // Nothing to do unless the image actually provides it.
     if (!fs.existsSync(provided)) continue;
-    let stat;
+
+    let stat = null;
     try {
         stat = fs.lstatSync(inBundle);
     } catch {
-        continue;
+        // Absent. Not "nothing to do" — this is the case that breaks functions.
     }
-    if (stat.isSymbolicLink()) continue;
+
+    // Already a symlink: this fix, re-applied on a restart.
+    if (stat?.isSymbolicLink()) continue;
 
     try {
-        fs.rmSync(inBundle, { recursive: true, force: true });
+        if (stat) {
+            fs.rmSync(inBundle, { recursive: true, force: true });
+        } else {
+            // `@rebasepro` may not exist either, on a bundle that installed
+            // nothing scoped.
+            fs.mkdirSync(path.dirname(inBundle), { recursive: true });
+        }
         fs.symlinkSync(provided, inBundle, "dir");
-        log(`deduped ${pkg} → the runtime's own copy`);
+        log(stat
+            ? `deduped ${pkg} → the runtime's own copy`
+            : `linked ${pkg} → the runtime's own copy, so functions can import it`);
     } catch (err) {
-        // Non-fatal on purpose: a project with no custom functions is unaffected
-        // by the duplicate, and refusing to boot over it would turn a degraded
-        // deploy into an outage. Loud, because the degradation is subtle.
+        // Non-fatal on purpose: a project with no custom functions and no crons
+        // is unaffected, and refusing to boot over it would turn a degraded
+        // deploy into an outage. Loud, because the degradation is subtle — the
+        // process is healthy either way, and only the boot log says which.
         console.error(
-            `[entrypoint] WARNING: could not dedupe ${pkg} (${err.message}). ` +
-            "Custom functions using the `rebase` singleton may fail with " +
-            "\"server not initialized yet\"."
+            `[entrypoint] WARNING: could not link ${pkg} into the bundle (${err.message}). ` +
+            "Custom functions and cron jobs will fail to load with \"Cannot find package\", " +
+            "or — if the bundle carries its own copy — with \"server not initialized yet\"."
         );
     }
 }

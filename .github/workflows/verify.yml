@@ -482,6 +482,32 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=4096"
           ACCEPTANCE_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance
 
+      # The same recipe, but through the artifact a stranger actually runs.
+      #
+      # The step above imports the runtime by path — deliberately, so a worktree
+      # cannot verify the wrong checkout — which means it proves the code and not
+      # the container. Its own header concedes the gap: "what that adds over this
+      # script is a container and an image tag." So nothing had ever executed
+      # `docker/docker-compose.selfhost.yml`, and nothing had ever booted the
+      # published image. `check-runtime-image` asserts that image has a
+      # publisher; this asserts it runs.
+      #
+      # It builds the image from this commit, brings the compose file up on
+      # non-default ports, and fetches from OUTSIDE the container: the SPA, a
+      # 401 on an unauthenticated collection read, the collections served to a
+      # service key (which is how boot-time provisioning proves it happened),
+      # and first-run reporting that it needs setup. Then it restarts the api,
+      # because provisioning runs on every boot and the second one is where a
+      # non-idempotent step surfaces — otherwise as a crash loop on somebody's
+      # server days after they deployed.
+      #
+      # `always()` for the same reason as its neighbours.
+      - name: Self-host container acceptance
+        if: always()
+        run: pnpm run verify:selfhost:docker
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       # Every bundle shape we have ever shipped, booted on the runtime as it is
       # now. The managed tier moves projects onto new images automatically,
       # without anyone rebuilding them, and the only thing that had been standing
