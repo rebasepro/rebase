@@ -167,6 +167,28 @@ const BASE_PROPERTY_KEYS = [
 ];
 
 /** The keys each property `type` adds on top of {@link BASE_PROPERTY_KEYS}. */
+/**
+ * Keys valid at the TOP LEVEL of a property, by type.
+ *
+ * Presentation is not among them. It moved into the property's `admin` block in
+ * 0.11, and `PROPERTY_MIGRATIONS` carries a hint for every key in
+ * `ADMIN_PROPERTY_KEYS` telling an author to move it — generated from that list,
+ * so it cannot fall behind.
+ *
+ * Seven of those keys were nevertheless listed here, on the four types they used
+ * to live on: `fixedFilter`, `includeId`, `includeEntityLink` (reference and
+ * relation), `widget` (relation), `sortable`, `canAddElements` (array) and
+ * `previewProperties` (map). This allowlist is consulted first, so on exactly
+ * those types the key was accepted, the migration hint was never reached, and
+ * nothing read the value — a config written against the pre-0.11 shape booted
+ * clean with the option silently dropped, while the identical key on any other
+ * type failed with a helpful message. The inconsistency is what made it hard to
+ * see: it looked like the feature worked on the types it was documented for.
+ *
+ * The rule this file now keeps: nothing in `ADMIN_PROPERTY_KEYS` belongs in any
+ * list here. `admin-keys-are-not-top-level.test.ts` asserts it for every key and
+ * every type, so a key added to the admin block later cannot be added here too.
+ */
 const PROPERTY_KEYS_BY_TYPE: Record<string, string[]> = {
     string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url"],
     number: ["columnType", "isId", "enum"],
@@ -175,10 +197,10 @@ const PROPERTY_KEYS_BY_TYPE: Record<string, string[]> = {
     geopoint: [],
     binary: [],
     vector: ["dimensions"],
-    reference: ["isId", "path", "fixedFilter", "includeId", "includeEntityLink"],
-    relation: ["isId", "relation", "resolvedRelation", "fixedFilter", "includeId", "includeEntityLink", "widget"],
-    array: ["columnType", "of", "oneOf", "sortable", "canAddElements"],
-    map: ["columnType", "properties", "propertiesOrder", "previewProperties", "keyValue"]
+    reference: ["isId", "path"],
+    relation: ["isId", "relation", "resolvedRelation"],
+    array: ["columnType", "of", "oneOf"],
+    map: ["columnType", "properties", "propertiesOrder", "keyValue"]
 };
 
 const PROPERTY_TYPES = Object.keys(PROPERTY_KEYS_BY_TYPE);
