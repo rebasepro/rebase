@@ -23,7 +23,7 @@ function serving(over: Partial<RoleEnv> = {}): string[] {
     return ALL_RUNTIME_SURFACES.filter(surface => resolved[surface]).sort();
 }
 
-function owning(over: Partial<RoleEnv> = {}): { cronScheduler: boolean; jobWorkers: boolean } {
+function owning(over: Partial<RoleEnv> = {}): { cronScheduler: boolean; jobWorkers: boolean; rlsAudit: boolean } {
     return resolveOwnership(resolveRole(env(over)).ownership);
 }
 
@@ -31,7 +31,7 @@ describe("resolveRole — what each role is", () => {
     it("defaults to `all`, which is exactly today's process", () => {
         expect(resolveRole(env()).role).toBe("all");
         expect(serving()).toEqual([...ALL_RUNTIME_SURFACES].sort());
-        expect(owning()).toEqual({ cronScheduler: true, jobWorkers: true });
+        expect(owning()).toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: true });
         expect(resolveRole(env()).provisionSchema).toBe(true);
     });
 
@@ -42,7 +42,7 @@ describe("resolveRole — what each role is", () => {
     });
 
     it("`api` keeps cron and the job workers, so a two-service split needs no third container", () => {
-        expect(owning({ REBASE_ROLE: "api" })).toEqual({ cronScheduler: true, jobWorkers: true });
+        expect(owning({ REBASE_ROLE: "api" })).toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: true });
     });
 
     it("`functions` serves functions and nothing else", () => {
@@ -68,13 +68,13 @@ describe("resolveRole — what each role is", () => {
         // A function process is scaled by request load and replaced at will.
         // Scheduled work there would make its replica count mean something.
         expect(owning({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none" }))
-            .toEqual({ cronScheduler: false, jobWorkers: false });
+            .toEqual({ cronScheduler: false, jobWorkers: false, rlsAudit: false });
     });
 
     it("`worker` serves no HTTP surface but owns the background work", () => {
         expect(serving({ REBASE_ROLE: "worker", REBASE_MIGRATE_ON_BOOT: "none" })).toEqual([]);
         expect(owning({ REBASE_ROLE: "worker", REBASE_MIGRATE_ON_BOOT: "none" }))
-            .toEqual({ cronScheduler: true, jobWorkers: true });
+            .toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: true });
     });
 
     it("only `api` and `all` provision the schema", () => {
@@ -86,8 +86,15 @@ describe("resolveRole — what each role is", () => {
 
 describe("resolveRole — the overrides", () => {
     it("takes the cron scheduler off the api process for a three-way split", () => {
+        // `rlsAudit` stays true: naming one override must not silently move
+        // another. Turning off the audit is `REBASE_RLS_AUDIT=false`.
         expect(owning({ REBASE_ROLE: "api", REBASE_CRON_SCHEDULER: false }))
-            .toEqual({ cronScheduler: false, jobWorkers: true });
+            .toEqual({ cronScheduler: false, jobWorkers: true, rlsAudit: true });
+    });
+
+    it("takes the audit off a process without touching cron or the workers", () => {
+        expect(owning({ REBASE_ROLE: "api", REBASE_RLS_AUDIT: false }))
+            .toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: false });
     });
 
     it("lets a functions process opt back into job workers", () => {
@@ -95,12 +102,12 @@ describe("resolveRole — the overrides", () => {
         // override is only half a control, and the half that is missing is the
         // one someone eventually needs.
         expect(owning({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none", REBASE_JOB_WORKERS: true }))
-            .toEqual({ cronScheduler: false, jobWorkers: true });
+            .toEqual({ cronScheduler: false, jobWorkers: true, rlsAudit: false });
     });
 
     it("leaves the unnamed override at the role's value", () => {
         expect(owning({ REBASE_ROLE: "all", REBASE_JOB_WORKERS: false }))
-            .toEqual({ cronScheduler: true, jobWorkers: false });
+            .toEqual({ cronScheduler: true, jobWorkers: false, rlsAudit: true });
     });
 });
 

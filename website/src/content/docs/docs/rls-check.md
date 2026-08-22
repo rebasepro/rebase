@@ -127,6 +127,16 @@ it to one process:
 ownership: { rlsAudit: false }   // on every process but one
 ```
 
+or, for a runtime configured by environment:
+
+```bash
+REBASE_RLS_AUDIT=false
+```
+
+The `functions` role already owns it as `false` — that process runs no timers at
+all. Naming one ownership override never moves another: turning off cron leaves
+the audit alone, and vice versa.
+
 A process that serves the admin surface without owning the scan answers the
 endpoint honestly, saying the scan does not run there.
 

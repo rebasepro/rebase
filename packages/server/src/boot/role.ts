@@ -37,6 +37,7 @@ export interface RoleEnv {
     REBASE_ROLE?: RebaseRuntimeRole;
     REBASE_CRON_SCHEDULER?: boolean;
     REBASE_JOB_WORKERS?: boolean;
+    REBASE_RLS_AUDIT?: boolean;
     REBASE_MIGRATE_ON_BOOT?: "none" | "ensure" | "push" | "";
     REBASE_FUNCTIONS_ONLY?: string;
     REBASE_FUNCTIONS_EXCLUDE?: string;
@@ -99,7 +100,7 @@ const ROLES: Record<RebaseRuntimeRole, RoleShape> = {
             auth: false, data: false, storage: false, admin: false,
             cron: false, meta: false, realtime: false
         },
-        ownership: { cronScheduler: false, jobWorkers: false },
+        ownership: { cronScheduler: false, jobWorkers: false, rlsAudit: false },
         provisionSchema: false
     },
     worker: {
@@ -177,6 +178,10 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
     const ownership: RuntimeOwnershipOptions = { ...base.ownership };
     if (env.REBASE_CRON_SCHEDULER !== undefined) ownership.cronScheduler = env.REBASE_CRON_SCHEDULER;
     if (env.REBASE_JOB_WORKERS !== undefined) ownership.jobWorkers = env.REBASE_JOB_WORKERS;
+    // Not claim-protected, unlike the two above: every owner scans on its own
+    // timer, which is redundant rather than unsafe. A split deployment gives it
+    // to one process the same way it gives it cron.
+    if (env.REBASE_RLS_AUDIT !== undefined) ownership.rlsAudit = env.REBASE_RLS_AUDIT;
 
     return {
         role,
