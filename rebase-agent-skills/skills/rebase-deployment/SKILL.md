@@ -951,8 +951,11 @@ worker: { enabled: true }
 
 A migration Job (`migrationJob.enabled`, on by default) runs `pre-install` and
 `pre-upgrade`, so every pod boots with `REBASE_MIGRATE_ON_BOOT=none` and nothing
-on the request path owns DDL. `migrationJob.mode: push` also applies collection
-schema changes and **is destructive**; it is not the default.
+on the request path owns DDL. `ensure` is the only mode the runtime
+image accepts — it creates missing tables, columns and enum types additively.
+`push`, which also applies collection schema changes, is **refused at boot**:
+run `rebase db push` from a checkout or CI for those, where it dry-runs the
+change, refuses destructive ones without confirmation, and can back up first.
 
 The chart **refuses to render** configurations that would come up and quietly
 stop being true — several HTTP processes on a memory rate-limit store, two static

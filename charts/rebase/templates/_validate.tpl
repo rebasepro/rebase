@@ -145,8 +145,23 @@ which cannot import TypeScript and so compares the two lists as text.
   {{- fail "ingress.enabled needs ingress.host. Set ingress.enabled=false if something else fronts this release." }}
 {{- end }}
 
-{{- if not (has .Values.migrationJob.mode (list "ensure" "push")) }}
-  {{- fail (printf "migrationJob.mode=%q is not a mode. Use \"ensure\" (create what is missing) or \"push\" (also apply collection schema changes — destructive)." .Values.migrationJob.mode) }}
+{{/*
+`push` is deliberately absent. The runtime image refuses it — "not supported by
+the runtime image" — and this chart both validated it and recommended it, so a
+values file that took the recommendation produced a migration Job that failed
+four times and, with migrationJob.enabled=false, put the same value on the API
+Deployment and crash-looped every pod.
+
+The reason it is not there is not an omission to be corrected: applying
+collection schema changes at boot is destructive, and `rebase db push` from a
+checkout or CI dry-runs it, refuses destructive changes without confirmation,
+and can take a backup first. None of that is available to a pod starting at 3am.
+*/}}
+{{- if eq .Values.migrationJob.mode "push" }}
+  {{- fail "migrationJob.mode=push is refused by the runtime image, so a Job set to it fails and a release with migrationJob.enabled=false crash-loops the API instead. Use \"ensure\" — it creates missing tables, columns and enum types additively — and run `rebase db push` from a checkout or CI for a change that drops or rewrites something." }}
+{{- end }}
+{{- if not (has .Values.migrationJob.mode (list "ensure")) }}
+  {{- fail (printf "migrationJob.mode=%q is not a mode. The only one the runtime image accepts is \"ensure\", which creates what is missing." .Values.migrationJob.mode) }}
 {{- end }}
 
 {{- end -}}

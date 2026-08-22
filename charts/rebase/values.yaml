@@ -202,8 +202,11 @@ preStopDrainSeconds: 5
 # default and is what an unsplit deployment already does.
 migrationJob:
   enabled: true
-  # `ensure` creates the auth tables and anything missing. `push` will also
-  # apply collection schema changes — destructive, so it is not the default.
+  # `ensure` creates the auth tables and anything missing, additively. It is the
+  # only mode the runtime image accepts: `push` — which also applies collection
+  # schema changes — is destructive and is refused at boot, because a pod
+  # starting unattended cannot dry-run a change, refuse it, or back up first.
+  # Run `rebase db push` from a checkout or CI for those, where it does all three.
   mode: ensure
   backoffLimit: 3
   resources:

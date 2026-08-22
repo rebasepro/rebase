@@ -461,6 +461,8 @@ const REFUSAL_CASES = [
         "--set", "sharedState.rateLimitStore=memory"
     ]],
     ["rate limit store nonsense", ["--set", "sharedState.rateLimitStore=redis"]],
+    ["migration mode the image refuses", ["--set", "migrationJob.mode=push"]],
+    ["migration mode nonsense", ["--set", "migrationJob.mode=sync"]],
     ["topology variable in config.env", ["--set", "config.env.REBASE_ROLE=worker"]],
     ["static app with no name", ["--set-json", 'staticApps=[{"path":"/x","image":{"repository":"e/x"}}]']],
     ["static app with no path", ["--set-json", 'staticApps=[{"name":"x","image":{"repository":"e/x"}}]']],

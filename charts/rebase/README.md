@@ -155,8 +155,11 @@ Nothing on the request path owns DDL — the cleanest available answer to "exact
 one process provisions the schema", because it stops being a rule anyone has to
 remember.
 
-`mode: ensure` creates what is missing. `mode: push` also applies collection
-schema changes and is destructive; it is not the default.
+`mode: ensure` creates what is missing, additively, and is the only mode the
+runtime image accepts. `push` is refused at boot: applying collection schema
+changes is destructive, and `rebase db push` from a checkout or CI dry-runs the
+change, refuses destructive ones without confirmation, and can take a backup
+first — none of which a pod starting unattended can do.
 
 ## What the chart refuses to render
 
