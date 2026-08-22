@@ -212,9 +212,34 @@ A second instance sits in `common/test/collection_registry_property_gates.test.t
 which declares collections with `driver:` instead of `engine:` — so the engine
 gates it exists to test are never exercised at all.
 
+A third instance, found 2026-08-22 and the most expensive of them, is not a key
+but a **filename**. `fetch-bundle.ts` decided whether an unpacked directory was
+a bundle by looking for `rebase-bundle.json`. Nothing has ever written that file
+— the CLI writes `manifest.json` and `loadBundle` reads `manifest.json`. The only
+producer of `rebase-bundle.json` anywhere in the repository was the fixture in
+`fetch-bundle.test.ts`, which wrote the marker it then asserted on.
+
+So `REBASE_BUNDLE_URL` rejected every real bundle from the day it shipped, with
+a message blaming the bundle. It took down the Cloud Run substrate and the Helm
+chart's `bundle.mode: url` — both listed as "open" or "unreached" in later
+audits, for reasons that were really this — and Kubernetes grew a whole init
+container in shell to do the job the broken path was supposed to do. The
+duplicate implementation was the *symptom*; six tests were green throughout.
+
+The tell is scope: `bundleRootIn` and its test were the entire population of
+that filename. A name that appears only in one module and its own test, but
+describes an artifact produced *elsewhere*, has nothing holding it to reality.
+
 **Sweep:** for any fixture key, `grep` it in `packages/types/src`. Zero hits on
 a field the production code branches on is this bug. Then check whether that
 test directory is in `tsconfig.tests.json`; if not, it cannot warn you.
+
+For filenames and other cross-module identifiers, the same grep with a different
+question: does anything *write* what this reads? If the only writer is a test,
+the feature does not work. Prefer importing the constant from whoever owns the
+artifact — `fetch-bundle.ts` now takes `MANIFEST_FILENAME` from `bundle.ts`,
+which is where the loader's own definition lives, so the two cannot diverge
+again.
 
 **Fix shape:** fix the source, switch the fixtures to the real shape, and earn
 the package a line in `include` so it cannot drift again. The tail packages are

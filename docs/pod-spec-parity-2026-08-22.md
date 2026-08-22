@@ -172,15 +172,9 @@ Listed so the next person does not read them as drift:
 
 ## 4. Still open
 
-1. **Bundle delivery is three mechanisms.** Baked image; runtime self-fetch
-   (`fetch-bundle.ts`, written for Cloud Run, used by `bundle.mode=url`); init
-   container that downloads *and* `npm install`s (`buildBundleInitContainer`,
-   with the 6Gi ephemeral limit and the documented silent `epoll_wait` hang).
-   Collapsing to one is worth doing and is **not** a rename: the init container
-   installs dependencies and the self-fetch does not, so unifying means moving
-   that install into the fetch path or into the bundle build. That is the next
-   piece of real work, and it would delete the failure mode that is hardest to
-   diagnose in the whole managed path.
+1. ~~**Bundle delivery is three mechanisms.**~~ **DONE** — see §5. Collapsing
+   them turned up the reason there were ever two: the runtime's own fetch path
+   had never worked.
 
 2. **`charts/rebase/values.yaml` describes the init container it does not have.**
    `mode: url` is documented as "an init container fetching a tarball at every
@@ -197,3 +191,75 @@ Listed so the next person does not read them as drift:
 4. **G6 is still undecided** — `rebase cloud deploy` folds the frontend into the
    backend bundle by default while intake also accepts a standalone
    `kind: static`. Untouched here; it is a decision, not a defect.
+
+
+---
+
+## 5. Bundle delivery, unified (2026-08-22, `feat/unify-bundle-delivery`)
+
+### 5.1 The reason there were two implementations
+
+`fetchBundle` looked for a marker file called **`rebase-bundle.json`** to decide
+whether what it unpacked was a bundle. Nothing has ever written that file. The
+CLI writes `manifest.json` (`bundle.ts`), `loadBundle` reads `manifest.json`, and
+the only thing in the repository that ever produced `rebase-bundle.json` was the
+fixture in `fetch-bundle.test.ts`, which wrote the marker it then asserted on.
+
+So every real bundle was rejected with *"It is not a Rebase bundle, or it was
+truncated"* — a message that blames the bundle for the reader's mistake. Proven
+by building a tarball from `rebase build`'s actual output shape and running
+`fetchBundle` against it: it threw. The name was introduced in the commit that
+added the feature (`b17249b69`), so `REBASE_BUNDLE_URL` had never worked, on any
+platform, since the day it shipped.
+
+Everything downstream follows from that:
+
+- `saas/backend/src/cloudrun/service.ts` sets `REBASE_BUNDLE_URL`. **The Cloud
+  Run substrate could not have worked.** It is listed as "open" in the
+  2026-08-18 audit's step 8; this is why.
+- The chart's `bundle.mode: url` could not have worked either.
+- Kubernetes grew an init container that did the same three jobs in shell,
+  because the supported path did not function.
+
+A fixture that invents its own subject can only ever agree with itself. That is
+the class, and it is worth a sweep: `docs/bug-classes.md`.
+
+### 5.2 What the unification changed
+
+The runtime's fetch now does everything the init container did — and the init
+container is deleted (146 lines of embedded shell and a heredoc'd Node script).
+
+| | Before | After |
+|---|---|---|
+| Marker | `rebase-bundle.json` (fictional) | `MANIFEST_FILENAME`, imported from the loader |
+| Download | `await response.arrayBuffer()` — a ~100MB bundle in RSS at boot | streamed to disk |
+| Retries | none (init container had 6) | 6, with backoff, and **no retry on 4xx** |
+| Install | never | `npm ci`/`install`, `--omit=dev --ignore-scripts`, cache dropped |
+| Where it unpacks | a fresh temp dir | `REBASE_BUNDLE_FETCH_DIR` when set — fixed, so a container restart inside a live pod reuses the tree |
+| Diagnosis on ENOSPC | silence | a logged error naming the volume |
+
+Verified end to end against real tarballs and a real `npm`, not a stub: with a
+lockfile it runs `npm ci`, without one `npm install`, `node_modules` lands in
+the bundle root, and the archive is cleaned up.
+
+### 5.3 What this trade gives up, honestly
+
+Kubernetes has no per-phase resources. An init container is how you size
+boot-time work separately from steady-state serving, and that is now gone: the
+install runs under the tier's memory limit.
+
+The init container's own comment had already called this: its 2Gi floored every
+managed pod at 2Gi fleet-wide "whatever its dials said", and it named the fix as
+*"move that install out of the init path, not shave this number."* So the floor
+lifting is the intended outcome, and given
+[[saas-unit-economics]] it is a cost win.
+
+The ephemeral storage did **not** go away — that is the resource the incident was
+actually about, and it moved onto the app container with the work
+(`withBundleStorage` merges it into the tier's block rather than replacing it).
+Memory is the open question: `npm ci --omit=dev --ignore-scripts` is disk-bound
+rather than memory-bound, which is why the failure was ENOSPC and not an
+OOMKill, but **nobody has measured its high-water mark against the smallest
+tier**. That measurement is the one thing that should happen before this reaches
+a paying tenant, and it is recorded in the code beside the constant, not only
+here.
