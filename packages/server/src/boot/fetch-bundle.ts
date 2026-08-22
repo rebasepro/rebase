@@ -1,23 +1,42 @@
 /**
- * Fetching a bundle at boot, for platforms with no init container.
+ * Fetching a bundle at boot.
  *
- * A bundle normally arrives on disk before the process starts: `rebase build`
- * writes one, a container image carries one, and on Kubernetes an init container
- * fetches one into a shared volume before the runtime container runs. All three
- * mean `runFromBundle` can assume the files are already there.
+ * A bundle arrives one of two ways: already on disk (`rebase build` wrote one,
+ * or a container image carries one at `/bundle`), or over HTTP from a stable
+ * URL. This is the second, and it is now the *only* mechanism for fetching one
+ * — Kubernetes deployments used to run a separate init container that did the
+ * same three jobs into a shared volume, and it was deleted in favour of this.
  *
- * Serverless platforms have no init container. Cloud Run starts one container
- * and nothing else, so the choice is between baking a per-tenant image — a build
- * on every deploy and an image per tenant to garbage-collect — or fetching at
- * boot. This is the second.
+ * ## Why there was a second implementation, and why it is gone
+ *
+ * The init container existed because this path could not actually be used: it
+ * looked for a marker file called `rebase-bundle.json` that nothing has ever
+ * written — the CLI writes `manifest.json` — so every real bundle was rejected
+ * as "not a Rebase bundle". The only thing that ever produced the file it
+ * wanted was its own test. So `REBASE_BUNDLE_URL` had never worked against a
+ * bundle from `rebase build`, on Cloud Run or under the Helm chart's
+ * `bundle.mode: url`, and Kubernetes grew an init container instead.
+ *
+ * That init container is where the worst failure in the managed path lived. It
+ * held three copies of the dependency tree at once (archive, npm cache,
+ * extracted `node_modules`), and above its ephemeral-storage grant `npm
+ * install` neither errored nor got evicted — it went to sleep in `epoll_wait`
+ * and stayed there, with no log line, no event and no exit code anywhere. The
+ * only symptom was the control plane reporting that the deploy did not become
+ * ready.
+ *
+ * Doing the work here instead does not make dependency installation need less
+ * disk. What it changes is that the work happens inside a process that has a
+ * logger, so running out of room is reported as running out of room.
  *
  * ## Every start, not just the first
  *
- * The fetch has to be cheap and repeatable because it runs on *every* cold
- * start: a scale-from-zero, an instance recycled after an hour idle, a new
- * revision. That is also why the platform's bundle URL is deliberately a stable
- * endpoint rather than a signed expiring one — an instance starting for the
- * first time in three days needs the same URL to work.
+ * The fetch has to be cheap and repeatable because it runs on *every* start: a
+ * scale-from-zero, an instance recycled after an hour idle, a node drain, an
+ * eviction, a new revision. That is also why the platform's bundle URL is
+ * deliberately a stable endpoint rather than a signed expiring one — a pod
+ * rescheduled at 3am needs the same URL to work, and a URL that had expired
+ * would mean a tenant stays down until a human triggers a fresh deploy.
  *
  * ## It refuses rather than half-unpacking
  *
@@ -32,8 +51,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { logger } from "../utils/logger";
+import { MANIFEST_FILENAME } from "./bundle";
 
 const run = promisify(execFile);
 
@@ -41,6 +65,22 @@ const run = promisify(execFile);
 export const BUNDLE_URL_ENV = "REBASE_BUNDLE_URL";
 /** Bearer token for that fetch. Does not expire — see the module note. */
 export const BUNDLE_TOKEN_ENV = "REBASE_BUNDLE_TOKEN";
+/**
+ * Where a fetched bundle is unpacked. Defaults to a fresh temp directory.
+ *
+ * A platform sets this to a volume it sized on purpose, because the unpack and
+ * the dependency install are the two things in a pod's life that need real
+ * disk. Left unset the bundle lands under the OS temp directory, which on a
+ * container is the writable layer and on Cloud Run is a tmpfs — fine for a
+ * small bundle, and the thing to change first when one is not.
+ *
+ * It is deliberately a *fixed* directory when set, not a fresh one per boot: a
+ * container that restarts inside a live pod finds the tree it already unpacked
+ * and installed, so a restart costs a manifest check rather than a download and
+ * an `npm ci`. `REBASE_BUNDLE` is still the one that means "a bundle is already
+ * here, do not fetch at all" — this only says where to put one.
+ */
+export const BUNDLE_FETCH_DIR_ENV = "REBASE_BUNDLE_FETCH_DIR";
 
 export interface FetchBundleOptions {
     url: string;
@@ -51,8 +91,29 @@ export interface FetchBundleOptions {
     fetchImpl?: typeof fetch;
     /** Injected for tests. */
     extract?: (tarball: string, destination: string) => Promise<void>;
-    /** How long the download may take before it is abandoned. */
+    /** How long a single download attempt may take before it is abandoned. */
     timeoutMs?: number;
+    /**
+     * How many times to try the download.
+     *
+     * A pod starting during a control-plane rollout, or racing its own DNS, gets
+     * one transient failure and would otherwise CrashLoop on it — and a
+     * CrashLoop re-runs the whole boot, so the retry is cheaper than the restart
+     * it replaces.
+     */
+    attempts?: number;
+    /** Delay between attempts. */
+    retryDelayMs?: number;
+    /**
+     * Install the bundle's declared dependencies after unpacking.
+     *
+     * On by default: a bundle that declares dependencies and has none installed
+     * cannot boot, and this is the only step between the two. Turned off for a
+     * bundle that was vendored at build time, and by tests.
+     */
+    installDependencies?: boolean;
+    /** Injected for tests. */
+    installImpl?: (bundleRoot: string) => Promise<void>;
 }
 
 /**
@@ -82,14 +143,72 @@ async function extractWithTar(tarball: string, destination: string): Promise<voi
  * refuse. Writing the whole tarball first means a truncated download is caught
  * by `tar` as a corrupt archive, which is an error.
  */
-export async function fetchBundle(options: FetchBundleOptions): Promise<string> {
-    const fetchImpl = options.fetchImpl ?? fetch;
-    const extract = options.extract ?? extractWithTar;
+/**
+ * Install the bundle's declared dependencies, in place.
+ *
+ * `npm ci` when a lockfile is present and `npm install` otherwise — a bundle
+ * that shipped a lockfile gets a reproducible install, one that did not still
+ * boots.
+ *
+ * `--ignore-scripts` is not optional. The runtime image's entrypoint refuses to
+ * run lifecycle scripts, and an install that ran them here would void that
+ * guarantee at every pod start, executing arbitrary code from the dependency
+ * tree before the process this is meant to be booting exists.
+ *
+ * The npm cache is dropped afterwards because it is, at that point, a
+ * byte-for-byte duplicate of the tree beside it and nothing reads it again —
+ * the runtime never installs twice in one process. Keeping it doubles the
+ * high-water mark on a disk that is usually the binding constraint.
+ */
+export async function installBundleDependencies(
+    bundleRoot: string,
+    exec: (cmd: string, args: string[], opts: object) => Promise<unknown> = run
+): Promise<void> {
+    if (!fs.existsSync(path.join(bundleRoot, "package.json"))) return;
+    if (fs.existsSync(path.join(bundleRoot, "node_modules"))) {
+        // Vendored at build time, or a retry after a partial boot. Either way
+        // installing over it is slower and no safer.
+        logger.debug("Bundle already carries node_modules; skipping install");
+        return;
+    }
 
-    const destination = options.destination
-        ?? fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bundle-"));
-    fs.mkdirSync(destination, { recursive: true });
+    const hasLockfile = fs.existsSync(path.join(bundleRoot, "package-lock.json"));
+    const args = hasLockfile
+        ? ["ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"]
+        : ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"];
 
+    logger.info("Installing bundle dependencies", { command: `npm ${args[0]}`, cwd: bundleRoot });
+    const started = Date.now();
+    try {
+        await exec("npm", args, { cwd: bundleRoot, maxBuffer: 32 * 1024 * 1024 });
+    } catch (error: unknown) {
+        // The one failure worth naming. Out of disk, npm does not reliably
+        // error — in an init container it used to hang in `epoll_wait` with no
+        // output at all, which is why this ran there and could not be
+        // diagnosed. Here there is a process with a logger, so say it.
+        const detail = error instanceof Error ? error.message : String(error);
+        const outOfSpace = /ENOSPC|no space left/i.test(detail);
+        throw new Error(
+            `Installing the bundle's dependencies failed: ${detail}` +
+            (outOfSpace
+                ? " — the volume ran out of space. An install needs room for the archive, npm's " +
+                  "cache and the extracted tree at once; raise the pod's ephemeral-storage " +
+                  "request, or vendor node_modules into the bundle at build time."
+                : "")
+        );
+    }
+    logger.info("Bundle dependencies installed", { ms: Date.now() - started });
+
+    // Cosmetic — a pod that cannot clean its cache still boots.
+    await exec("npm", ["cache", "clean", "--force"], { cwd: bundleRoot }).catch(() => undefined);
+}
+
+/** One download attempt, streamed to `destination`. */
+async function downloadTo(
+    tarball: string,
+    options: FetchBundleOptions,
+    fetchImpl: typeof fetch
+): Promise<void> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 60_000);
 
@@ -99,11 +218,6 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
             headers: options.token ? { authorization: `Bearer ${options.token}` } : {},
             signal: controller.signal
         });
-    } catch (error: unknown) {
-        throw new Error(
-            `Could not download the bundle from ${options.url}: ` +
-                (error instanceof Error ? error.message : String(error))
-        );
     } finally {
         clearTimeout(timer);
     }
@@ -111,40 +225,99 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
     if (!response.ok) {
         // The status is the diagnosis: 401/403 is a bad or missing token, 404 is
         // a bundle that was garbage-collected out from under a running service.
+        throw new Error(`${response.status} ${response.statusText}`);
+    }
+    if (!response.body) throw new Error("empty response body");
+
+    // Streamed, not buffered. A bundle may be ~100 MB and the process's memory
+    // limit is sized for serving requests, not for holding its own artifact —
+    // `await response.arrayBuffer()` put the whole archive in RSS at the moment
+    // of boot, which is the worst moment to need it.
+    await pipeline(Readable.fromWeb(response.body as never), createWriteStream(tarball));
+
+    const { size } = fs.statSync(tarball);
+    if (size === 0) throw new Error("the bundle is empty");
+}
+
+/**
+ * Download, unpack and prepare a bundle, returning the directory it landed in.
+ *
+ * Downloads to a file rather than streaming into `tar`, deliberately. A stream
+ * that dies mid-transfer leaves `tar` having successfully extracted a prefix of
+ * the archive and exiting 0 — the half-unpacked bundle this module exists to
+ * refuse. Writing the whole tarball first means a truncated download is caught
+ * by `tar` as a corrupt archive, which is an error.
+ */
+export async function fetchBundle(options: FetchBundleOptions): Promise<string> {
+    const fetchImpl = options.fetchImpl ?? fetch;
+    const extract = options.extract ?? extractWithTar;
+    const attempts = Math.max(1, options.attempts ?? 6);
+    const retryDelayMs = options.retryDelayMs ?? 3000;
+
+    const destination = options.destination
+        ?? fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bundle-"));
+    fs.mkdirSync(destination, { recursive: true });
+
+    const tarball = path.join(destination, "bundle.tar.gz");
+
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            await downloadTo(tarball, options, fetchImpl);
+            lastError = undefined;
+            break;
+        } catch (error: unknown) {
+            lastError = error;
+            const detail = error instanceof Error ? error.message : String(error);
+            // A 401/403/404 will not become a 200 by waiting. Retrying them
+            // turns a clear failure into a slow one, and the pod spends its
+            // startup budget confirming a credential is still wrong.
+            const permanent = /^4\d\d /.test(detail);
+            if (permanent || attempt === attempts) break;
+            logger.warn("Bundle download failed; retrying", {
+                attempt, of: attempts, error: detail
+            });
+            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        }
+    }
+
+    if (lastError) {
+        fs.rmSync(tarball, { force: true });
         throw new Error(
-            `Could not download the bundle from ${options.url}: ${response.status} ${response.statusText}`
+            `Could not download the bundle from ${options.url}: ` +
+                (lastError instanceof Error ? lastError.message : String(lastError))
         );
     }
 
-    const tarball = path.join(destination, "bundle.tar.gz");
-    const body = Buffer.from(await response.arrayBuffer());
-    if (body.length === 0) {
-        throw new Error(`The bundle at ${options.url} is empty.`);
-    }
-    fs.writeFileSync(tarball, body);
-
+    const { size } = fs.statSync(tarball);
     try {
         await extract(tarball, destination);
     } catch (error: unknown) {
         throw new Error(
             `The bundle downloaded from ${options.url} could not be unpacked ` +
-                `(${body.length} bytes): ` + (error instanceof Error ? error.message : String(error))
+                `(${size} bytes): ` + (error instanceof Error ? error.message : String(error))
         );
     } finally {
-        // The archive is dead weight in an instance whose memory-backed temp
-        // directory counts against its limit, and a Cloud Run instance's /tmp is
-        // a tmpfs — leaving it there costs real memory for the life of the
-        // instance.
+        // The archive is dead weight in an instance whose temp directory counts
+        // against a limit — a Cloud Run instance's /tmp is a tmpfs, and a pod's
+        // emptyDir counts against its ephemeral-storage grant. Leaving it there
+        // costs the size of the bundle for the life of the instance, and it is
+        // the first of the three copies an install has to fit beside.
         fs.rmSync(tarball, { force: true });
     }
 
     const root = bundleRootIn(destination);
     if (!root) {
         throw new Error(
-            `The bundle downloaded from ${options.url} unpacked without a rebase-bundle.json. ` +
+            `The bundle downloaded from ${options.url} unpacked without a ${MANIFEST_FILENAME}. ` +
                 `It is not a Rebase bundle, or it was truncated.`
         );
     }
+
+    if (options.installDependencies ?? true) {
+        await (options.installImpl ?? installBundleDependencies)(root);
+    }
+
     return root;
 }
 
@@ -157,12 +330,12 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
  * files, and both are things a build script does.
  */
 export function bundleRootIn(directory: string): string | null {
-    if (fs.existsSync(path.join(directory, "rebase-bundle.json"))) return directory;
+    if (fs.existsSync(path.join(directory, MANIFEST_FILENAME))) return directory;
 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         const nested = path.join(directory, entry.name);
-        if (fs.existsSync(path.join(nested, "rebase-bundle.json"))) return nested;
+        if (fs.existsSync(path.join(nested, MANIFEST_FILENAME))) return nested;
     }
     return null;
 }

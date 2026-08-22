@@ -37,7 +37,7 @@ import { resolveDataSources, resolveStorageSources } from "./sources";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
-import { fetchBundle, shouldFetchBundle, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV } from "./fetch-bundle.js";
+import { fetchBundle, shouldFetchBundle, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 
 /** A running runtime, and the handle to stop it. */
@@ -123,7 +123,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const fetchedDir = !options.bundleDir && !options.bundle && shouldFetchBundle()
         ? await fetchBundle({
             url: process.env[BUNDLE_URL_ENV]!,
-            token: process.env[BUNDLE_TOKEN_ENV]
+            token: process.env[BUNDLE_TOKEN_ENV],
+            destination: process.env[BUNDLE_FETCH_DIR_ENV] || undefined
         })
         : undefined;
 

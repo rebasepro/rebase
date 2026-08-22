@@ -15,9 +15,11 @@ import {
     fetchBundle,
     shouldFetchBundle,
     bundleRootIn,
+    installBundleDependencies,
     BUNDLE_URL_ENV,
     BUNDLE_TOKEN_ENV
 } from "./fetch-bundle";
+import { MANIFEST_FILENAME, loadBundle } from "./bundle";
 
 let scratch: string;
 
@@ -30,24 +32,29 @@ afterEach(() => {
 
 const URL_ = "https://control-plane.internal/bundles/p1/b1";
 
-/** A fetch that returns the given bytes. */
+/**
+ * A fetch that returns the given bytes as a real `Response`.
+ *
+ * Real, not a shape with an `arrayBuffer` method: the download is streamed
+ * through `response.body`, and a stub carrying only `arrayBuffer` would pass
+ * while the production path — which never calls it — was broken. That is not
+ * hypothetical, it is what the previous version of this helper was.
+ */
 const okFetch = (body: Uint8Array, capture?: (init: RequestInit) => void) =>
     (async (_url: string, init: RequestInit) => {
         capture?.(init);
-        return {
-            ok: true,
-            status: 200,
-            statusText: "OK",
-            arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength)
-        } as unknown as Response;
+        return new Response(body as unknown as BodyInit, { status: 200, statusText: "OK" });
     }) as unknown as typeof fetch;
 
 /** An extractor that writes a manifest, standing in for a real tarball. */
 const extractManifest = (nested?: string) => async (_tarball: string, destination: string) => {
     const target = nested ? path.join(destination, nested) : destination;
     fs.mkdirSync(target, { recursive: true });
-    fs.writeFileSync(path.join(target, "rebase-bundle.json"), JSON.stringify({ kind: "backend" }));
+    fs.writeFileSync(path.join(target, MANIFEST_FILENAME), JSON.stringify({ kind: "backend" }));
 };
+
+/** Never install in a unit test — npm is not a dependency of this suite. */
+const noInstall = { installDependencies: false as const };
 
 describe("shouldFetchBundle", () => {
     it("fetches when given a URL and nothing on disk", () => {
@@ -76,10 +83,11 @@ describe("fetchBundle", () => {
             url: URL_,
             destination: scratch,
             fetchImpl: okFetch(new Uint8Array([1, 2, 3])),
-            extract: extractManifest()
+            extract: extractManifest(),
+            ...noInstall
         });
         expect(root).toBe(scratch);
-        expect(fs.existsSync(path.join(root, "rebase-bundle.json"))).toBe(true);
+        expect(fs.existsSync(path.join(root, MANIFEST_FILENAME))).toBe(true);
     });
 
     it("sends the bearer token when it has one", async () => {
@@ -92,7 +100,8 @@ describe("fetchBundle", () => {
             token: "svc-key",
             destination: scratch,
             fetchImpl: okFetch(new Uint8Array([1]), (i) => { init = i; }),
-            extract: extractManifest()
+            extract: extractManifest(),
+            ...noInstall
         });
         expect((init?.headers as Record<string, string>)?.authorization).toBe("Bearer svc-key");
     });
@@ -103,7 +112,8 @@ describe("fetchBundle", () => {
             url: URL_,
             destination: scratch,
             fetchImpl: okFetch(new Uint8Array([1]), (i) => { init = i; }),
-            extract: extractManifest()
+            extract: extractManifest(),
+            ...noInstall
         });
         expect((init?.headers as Record<string, string>)?.authorization).toBeUndefined();
     });
@@ -115,7 +125,8 @@ describe("fetchBundle", () => {
             url: URL_,
             destination: scratch,
             fetchImpl: okFetch(new Uint8Array([1, 2, 3])),
-            extract: extractManifest()
+            extract: extractManifest(),
+            ...noInstall
         });
         expect(fs.existsSync(path.join(scratch, "bundle.tar.gz"))).toBe(false);
     });
@@ -134,7 +145,8 @@ describe("fetchBundle", () => {
 
     it("refuses an empty response", async () => {
         await expect(fetchBundle({
-            url: URL_, destination: scratch, fetchImpl: okFetch(new Uint8Array([]))
+            url: URL_, destination: scratch, attempts: 1,
+            fetchImpl: okFetch(new Uint8Array([])), ...noInstall
         })).rejects.toThrow(/empty/);
     });
 
@@ -158,18 +170,22 @@ describe("fetchBundle", () => {
             destination: scratch,
             fetchImpl: okFetch(new Uint8Array([1, 2, 3])),
             extract: async (_t, d) => { fs.writeFileSync(path.join(d, "readme.txt"), "hi"); }
-        })).rejects.toThrow(/without a rebase-bundle\.json/);
+        })).rejects.toThrow(/without a manifest\.json/);
     });
 
     it("names the URL in every failure", async () => {
         // A cold start that fails in a serverless container leaves one log line
         // and no shell to investigate from. It has to say which URL.
         const cases: (() => Promise<unknown>)[] = [
-            () => fetchBundle({ url: URL_, destination: scratch, fetchImpl: okFetch(new Uint8Array([])) }),
             () => fetchBundle({
-                url: URL_, destination: scratch,
+                url: URL_, destination: scratch, attempts: 1,
+                fetchImpl: okFetch(new Uint8Array([])), ...noInstall
+            }),
+            () => fetchBundle({
+                url: URL_, destination: scratch, attempts: 1,
                 fetchImpl: okFetch(new Uint8Array([1])),
-                extract: async () => { throw new Error("boom"); }
+                extract: async () => { throw new Error("boom"); },
+                ...noInstall
             })
         ];
         for (const run of cases) {
@@ -179,14 +195,15 @@ describe("fetchBundle", () => {
 
     it("reports a network failure rather than leaking an abort", async () => {
         const failing = (async () => { throw new Error("ECONNREFUSED"); }) as unknown as typeof fetch;
-        await expect(fetchBundle({ url: URL_, destination: scratch, fetchImpl: failing }))
-            .rejects.toThrow(/Could not download the bundle.*ECONNREFUSED/s);
+        await expect(fetchBundle({
+            url: URL_, destination: scratch, attempts: 1, fetchImpl: failing, ...noInstall
+        })).rejects.toThrow(/Could not download the bundle.*ECONNREFUSED/s);
     });
 });
 
 describe("bundleRootIn", () => {
     it("finds a manifest at the top level", () => {
-        fs.writeFileSync(path.join(scratch, "rebase-bundle.json"), "{}");
+        fs.writeFileSync(path.join(scratch, MANIFEST_FILENAME), "{}");
         expect(bundleRootIn(scratch)).toBe(scratch);
     });
 
@@ -197,7 +214,7 @@ describe("bundleRootIn", () => {
         // build script does.
         const nested = path.join(scratch, "dist-bundle");
         fs.mkdirSync(nested);
-        fs.writeFileSync(path.join(nested, "rebase-bundle.json"), "{}");
+        fs.writeFileSync(path.join(nested, MANIFEST_FILENAME), "{}");
         expect(bundleRootIn(scratch)).toBe(nested);
     });
 
@@ -213,7 +230,7 @@ describe("bundleRootIn", () => {
         // fixture.
         const deep = path.join(scratch, "a", "b");
         fs.mkdirSync(deep, { recursive: true });
-        fs.writeFileSync(path.join(deep, "rebase-bundle.json"), "{}");
+        fs.writeFileSync(path.join(deep, MANIFEST_FILENAME), "{}");
         expect(bundleRootIn(scratch)).toBeNull();
     });
 });
@@ -225,5 +242,227 @@ describe("the environment contract", () => {
         // produces a container that boots with no bundle and no explanation.
         expect(BUNDLE_URL_ENV).toBe("REBASE_BUNDLE_URL");
         expect(BUNDLE_TOKEN_ENV).toBe("REBASE_BUNDLE_TOKEN");
+    });
+});
+
+describe("the marker this looks for is the one bundles carry", () => {
+    /**
+     * The test that was missing, and the reason this whole path was dead.
+     *
+     * `bundleRootIn` looked for `rebase-bundle.json`. Nothing writes that file —
+     * the CLI writes `manifest.json` and `loadBundle` reads `manifest.json`. The
+     * only thing that ever produced it was the fixture in this suite, which
+     * wrote the marker it then asserted on. So every test passed and every real
+     * download was rejected as "not a Rebase bundle", on Cloud Run and under the
+     * chart's `bundle.mode: url` alike.
+     *
+     * A fixture that invents its own subject can only ever agree with itself.
+     * These tie the name to the loader instead.
+     */
+    it("accepts a directory the bundle loader would accept", () => {
+        fs.writeFileSync(
+            path.join(scratch, MANIFEST_FILENAME),
+            JSON.stringify({ format: 2, kind: "backend", app: "backend" })
+        );
+        expect(bundleRootIn(scratch)).toBe(scratch);
+        // The loader is the authority on what a bundle is; if it stops reading
+        // this file, finding it here means nothing.
+        expect(() => loadBundle(scratch)).not.toThrow(new RegExp(`No ${MANIFEST_FILENAME} found`));
+    });
+
+    it("rejects the name that was looked for and never written", () => {
+        fs.writeFileSync(path.join(scratch, "rebase-bundle.json"), "{}");
+        expect(bundleRootIn(scratch)).toBeNull();
+    });
+});
+
+describe("fetchBundle retries", () => {
+    /** Fails `failures` times, then succeeds. */
+    const flaky = (failures: number, body = new Uint8Array([1, 2, 3])) => {
+        let calls = 0;
+        const impl = (async () => {
+            calls++;
+            if (calls <= failures) throw new Error("ECONNRESET");
+            return new Response(body as unknown as BodyInit, { status: 200, statusText: "OK" });
+        }) as unknown as typeof fetch;
+        return { impl, calls: () => calls };
+    };
+
+    it("survives a transient failure rather than crash-looping on it", async () => {
+        // A pod starting during a control-plane rollout gets one refused
+        // connection. Without a retry the container exits, and a restart re-runs
+        // the entire boot — strictly more expensive than waiting three seconds.
+        const f = flaky(2);
+        const root = await fetchBundle({
+            url: URL_, destination: scratch, retryDelayMs: 1,
+            fetchImpl: f.impl, extract: extractManifest(), ...noInstall
+        });
+        expect(root).toBe(scratch);
+        expect(f.calls()).toBe(3);
+    });
+
+    it("gives up after the last attempt", async () => {
+        const f = flaky(99);
+        await expect(fetchBundle({
+            url: URL_, destination: scratch, attempts: 3, retryDelayMs: 1,
+            fetchImpl: f.impl, extract: extractManifest(), ...noInstall
+        })).rejects.toThrow(/Could not download the bundle/);
+        expect(f.calls()).toBe(3);
+    });
+
+    it("does not retry a 403, which will not become a 200 by waiting", async () => {
+        // A bad token spends the pod's whole startup budget confirming it is
+        // still bad, and the eventual message is the same one the first attempt
+        // had. Worse, on a startup probe that budget is what stands between a
+        // clear failure and a CrashLoop with a misleading cause.
+        let calls = 0;
+        const denied = (async () => {
+            calls++;
+            return new Response(null, { status: 403, statusText: "Forbidden" });
+        }) as unknown as typeof fetch;
+
+        await expect(fetchBundle({
+            url: URL_, destination: scratch, retryDelayMs: 1,
+            fetchImpl: denied, extract: extractManifest(), ...noInstall
+        })).rejects.toThrow(/403/);
+        expect(calls).toBe(1);
+    });
+});
+
+describe("fetchBundle installs the bundle's dependencies", () => {
+    it("installs when the bundle declares them and has none", async () => {
+        const installed: string[] = [];
+        await fetchBundle({
+            url: URL_, destination: scratch,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: async (_t, d) => {
+                fs.writeFileSync(path.join(d, MANIFEST_FILENAME), "{}");
+                fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ dependencies: { x: "1" } }));
+            },
+            installImpl: async (root) => { installed.push(root); }
+        });
+        expect(installed).toEqual([scratch]);
+    });
+
+    it("is skipped entirely when asked", async () => {
+        // What a vendored bundle wants: node_modules is already in the tarball,
+        // and reinstalling over it is slower and no safer.
+        const installed: string[] = [];
+        await fetchBundle({
+            url: URL_, destination: scratch,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: extractManifest(),
+            installDependencies: false,
+            installImpl: async (root) => { installed.push(root); }
+        });
+        expect(installed).toEqual([]);
+    });
+
+    it("installs into the nested root, not the directory above it", async () => {
+        // The tarball shape varies; installing beside the bundle rather than in
+        // it produces a node_modules the runtime cannot resolve through.
+        const installed: string[] = [];
+        await fetchBundle({
+            url: URL_, destination: scratch,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: extractManifest("dist-bundle"),
+            installImpl: async (root) => { installed.push(root); }
+        });
+        expect(installed).toEqual([path.join(scratch, "dist-bundle")]);
+    });
+
+    it("fails the boot when the install fails", async () => {
+        // Booting on a bundle whose dependencies are missing surfaces as an
+        // import error deep in a request, long after the cause.
+        await expect(fetchBundle({
+            url: URL_, destination: scratch,
+            fetchImpl: okFetch(new Uint8Array([1])),
+            extract: extractManifest(),
+            installImpl: async () => { throw new Error("ENOSPC: no space left on device"); }
+        })).rejects.toThrow(/ENOSPC/);
+    });
+});
+
+describe("installBundleDependencies", () => {
+    /**
+     * These carry over from a suite that asserted on a shell script embedded in
+     * a Kubernetes init container. The container is gone; the decisions it
+     * encoded are not, and they are the kind that fail silently — an install
+     * that runs lifecycle scripts, or one that reinstalls over a vendored tree.
+     */
+    const calls: { cmd: string; args: string[]; cwd?: string }[] = [];
+    const exec = async (cmd: string, args: string[], opts: object) => {
+        calls.push({ cmd, args, cwd: (opts as { cwd?: string }).cwd });
+        return undefined;
+    };
+    beforeEach(() => { calls.length = 0; });
+
+    const bundle = (files: Record<string, string>) => {
+        for (const [name, body] of Object.entries(files)) {
+            fs.writeFileSync(path.join(scratch, name), body);
+        }
+        return scratch;
+    };
+
+    it("does nothing when the bundle declares no dependencies", () => {
+        // A project using only what the runtime already provides. Common, and
+        // an npm call there is pure latency on every cold start.
+        return installBundleDependencies(bundle({}), exec).then(() => {
+            expect(calls).toEqual([]);
+        });
+    });
+
+    it("uses npm ci when a lockfile is present", async () => {
+        await installBundleDependencies(
+            bundle({ "package.json": "{}", "package-lock.json": "{}" }), exec);
+        expect(calls[0].args[0]).toBe("ci");
+    });
+
+    it("falls back to npm install without one, rather than refusing to boot", async () => {
+        await installBundleDependencies(bundle({ "package.json": "{}" }), exec);
+        expect(calls[0].args[0]).toBe("install");
+    });
+
+    it("never runs lifecycle scripts", async () => {
+        // The runtime image's entrypoint refuses to run them. An install that
+        // ran them here would void that at every pod start, executing arbitrary
+        // code from the dependency tree before the process it is booting exists.
+        await installBundleDependencies(bundle({ "package.json": "{}" }), exec);
+        expect(calls[0].args).toContain("--ignore-scripts");
+        expect(calls[0].args).toContain("--omit=dev");
+    });
+
+    it("installs in the bundle, not wherever the process happens to be", async () => {
+        await installBundleDependencies(bundle({ "package.json": "{}" }), exec);
+        expect(calls[0].cwd).toBe(scratch);
+    });
+
+    it("skips a bundle that already carries node_modules", async () => {
+        // Vendored at build time, or a container restarting inside a live pod
+        // onto a volume it already populated. Installing over it is slower and
+        // no safer.
+        fs.mkdirSync(path.join(scratch, "node_modules"));
+        await installBundleDependencies(bundle({ "package.json": "{}" }), exec);
+        expect(calls).toEqual([]);
+    });
+
+    it("drops the npm cache, which is a duplicate of the tree beside it", async () => {
+        await installBundleDependencies(bundle({ "package.json": "{}" }), exec);
+        expect(calls.at(-1)!.args).toEqual(["cache", "clean", "--force"]);
+    });
+
+    it("says so when the volume ran out of room", async () => {
+        // The failure this whole change is about. In an init container it
+        // produced no output at all — npm slept in epoll_wait and the only
+        // symptom was a deploy that never became ready.
+        const failing = async () => { throw new Error("ENOSPC: no space left on device"); };
+        await expect(installBundleDependencies(bundle({ "package.json": "{}" }), failing))
+            .rejects.toThrow(/ran out of space/);
+    });
+
+    it("still fails loudly for an ordinary install error", async () => {
+        const failing = async () => { throw new Error("404 Not Found - GET registry/foo"); };
+        await expect(installBundleDependencies(bundle({ "package.json": "{}" }), failing))
+            .rejects.toThrow(/404 Not Found/);
     });
 });
