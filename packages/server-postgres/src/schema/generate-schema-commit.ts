@@ -44,7 +44,12 @@ import {
     generatePostgresSearchDdl
 } from "./generate-postgres-ddl-logic";
 import { generateSchema } from "./generate-drizzle-schema-logic";
-import { planCollectionSchemaEnsure } from "./ensure-collection-tables";
+import {
+    planCollectionSchemaEnsure,
+    type EnsureOptions,
+    type ExistingSchema,
+    type WithheldConstraint
+} from "./ensure-collection-tables";
 import { classifyCollectionChanges, type ClassifiedChanges } from "./classify-change";
 
 /** Where each generated artifact lives in a scaffolded project. */
@@ -81,6 +86,16 @@ export interface SchemaCommitInput {
      */
     sourceFiles?: SchemaCommitFile[];
     paths?: Partial<SchemaCommitPaths>;
+    /**
+     * What the database this change is destined for actually has.
+     *
+     * Supplied by the live editor, which read it a moment ago; omitted by the
+     * pure callers, which have no database. It decides two things a plan cannot
+     * know from the collections alone — whether a table holds rows, and which
+     * values an enum type already carries — and both are the difference between
+     * a statement that applies and one that is rejected.
+     */
+    existing?: ExistingSchema;
 }
 
 export interface SchemaCommit {
@@ -96,6 +111,12 @@ export interface SchemaCommit {
     classified: ClassifiedChanges;
     /** A commit message describing the change in the terms a reader wants. */
     message: string;
+    /**
+     * Constraints this change asks for that the statements do not carry, and
+     * why. Empty for almost every change; when it is not, it is the thing the
+     * person confirming needs to read before they confirm.
+     */
+    withheldConstraints: WithheldConstraint[];
 }
 
 export class SchemaCommitError extends Error {
@@ -111,14 +132,36 @@ const nothing = () => ({ tables: new Map<string, Set<string>>(), enums: new Set<
 /**
  * The statements that take `before` to `after`.
  *
- * Both sides are planned against an empty database and the difference is taken
- * by exact statement text. That works because the planner is deterministic: the
- * same collections in the same order produce the same strings, so anything
- * present in the second plan and absent from the first is what the change adds.
+ * Both sides are planned against the *same* database and the difference is
+ * taken by exact statement text. That works because the planner is
+ * deterministic: the same collections against the same schema produce the same
+ * strings, so anything in the second plan and absent from the first is what
+ * this change adds — and nothing else. Planning both sides is what keeps
+ * pre-existing drift, which belongs to neither side of the edit, out of the
+ * statements this change gets credited with.
+ *
+ * ## Why `existing` matters more than it looks
+ *
+ * Planned against `nothing()`, every table reads as one this plan is creating,
+ * and the planner is then free to attach constraints that only hold on a table
+ * with no rows: a new required property comes out as
+ * `ADD COLUMN "x" TEXT NOT NULL`, which is right for a fresh table and fails
+ * against a live one holding rows. Those statements would be generated,
+ * committed, and then rejected by the very database they were written for.
+ *
+ * So a caller holding a real database passes it, and gets statements that
+ * describe that database. `nothing()` stays the default for the pure uses —
+ * generating a commit for inspection, and the tests that compare two plans —
+ * where there is no database to describe.
  */
-export function additiveStatements(before: CollectionConfig[], after: CollectionConfig[]): string[] {
-    const previous = new Set(planCollectionSchemaEnsure(before, nothing()).statements);
-    return planCollectionSchemaEnsure(after, nothing()).statements
+export function additiveStatements(
+    before: CollectionConfig[],
+    after: CollectionConfig[],
+    existing: ExistingSchema = nothing(),
+    options: EnsureOptions = {}
+): string[] {
+    const previous = new Set(planCollectionSchemaEnsure(before, existing, options).statements);
+    return planCollectionSchemaEnsure(after, existing, options).statements
         .filter(statement => !previous.has(statement));
 }
 
@@ -156,7 +199,12 @@ export function commitMessage(classified: ClassifiedChanges): string {
  */
 export async function generateSchemaCommit(input: SchemaCommitInput): Promise<SchemaCommit> {
     const paths = { ...DEFAULT_COMMIT_PATHS, ...input.paths };
-    const classified = classifyCollectionChanges(input.before, input.after);
+    const existing = input.existing ?? nothing();
+    // `converge` because every statement this produces is shown to somebody
+    // before it runs. See `ConstraintPolicy` for why the unattended boot does
+    // not get the same latitude.
+    const options: EnsureOptions = { constraints: "converge" };
+    const classified = classifyCollectionChanges(input.before, input.after, input.existing);
 
     if (!classified.applicable) {
         const blocking = classified.changes.filter(change => change.verdict !== "safe");
@@ -183,10 +231,19 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
         { path: paths.searchFile, contents: search }
     ];
 
+    // The `after` plan against the real database is what will actually run;
+    // its withheld constraints are what this change asks for and does not get.
+    // Taken from `after` alone rather than differenced against `before`,
+    // because a constraint that was already unenforceable is still something
+    // the person confirming this change should see named.
+    const withheldConstraints = planCollectionSchemaEnsure(input.after, existing, options)
+        .withheldConstraints;
+
     return {
         files: [...(input.sourceFiles ?? []), ...generated],
-        statements: additiveStatements(input.before, input.after),
+        statements: additiveStatements(input.before, input.after, existing, options),
         classified,
-        message: commitMessage(classified)
+        message: commitMessage(classified),
+        withheldConstraints
     };
 }

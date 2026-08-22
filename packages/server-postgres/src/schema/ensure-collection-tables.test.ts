@@ -196,6 +196,124 @@ describe("planning an additive schema ensure", () => {
     });
 });
 
+/**
+ * The three changes the ensure path used to apply *partly* while reporting
+ * success. Each one left a database that did not match its own configuration,
+ * and nothing anywhere said so — which is what made them worth more than the
+ * refusals beside them.
+ */
+describe("constraints the configuration asks for", () => {
+    const required = {
+        name: "Authors",
+        slug: "authors",
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            name: { name: "Name", type: "string", validation: { required: true } }
+        }
+    } as unknown as CollectionConfig;
+
+    const optional = {
+        ...required,
+        properties: {
+            ...(required as unknown as { properties: Record<string, unknown> }).properties,
+            name: { name: "Name", type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    it("adds NOT NULL when the existing table is empty", () => {
+        const plan = planCollectionSchemaEnsure([required], {
+            tables: new Map([["public.authors", new Set(["id"])]]),
+            enums: new Set(),
+            populatedTables: new Set()
+        });
+        const add = plan.actions.find(a => a.target === "public.authors.name");
+        expect(add!.sql).toContain("NOT NULL");
+        expect(plan.withheldConstraints).toEqual([]);
+    });
+
+    it("withholds NOT NULL when the table holds rows, and says so", () => {
+        const plan = planCollectionSchemaEnsure([required], {
+            tables: new Map([["public.authors", new Set(["id"])]]),
+            enums: new Set(),
+            populatedTables: new Set(["public.authors"])
+        });
+        const add = plan.actions.find(a => a.target === "public.authors.name");
+        expect(add!.sql).not.toContain("NOT NULL");
+        // The whole point: withheld is no longer the same as unmentioned.
+        expect(plan.withheldConstraints).toHaveLength(1);
+        expect(plan.withheldConstraints[0]).toMatchObject({
+            target: "public.authors.name",
+            kind: "not-null"
+        });
+    });
+
+    it("assumes rows when the caller does not know whether the table is empty", () => {
+        // A hand-built ExistingSchema carries no `populatedTables`. Reading that
+        // as "empty" would emit a NOT NULL checked against live data and abort
+        // the boot, so absent has to mean populated.
+        const plan = planCollectionSchemaEnsure([required], {
+            tables: new Map([["public.authors", new Set(["id"])]]),
+            enums: new Set()
+        });
+        expect(plan.actions.find(a => a.target === "public.authors.name")!.sql)
+            .not.toContain("NOT NULL");
+        expect(plan.withheldConstraints).toHaveLength(1);
+    });
+
+    it("leaves an existing column's constraints alone at boot", () => {
+        // `additive` is the boot default. A database adopted by introspection
+        // carries NOT NULL on columns the generated collection leaves optional,
+        // and converging those unasked would drop constraints nobody edited.
+        const plan = planCollectionSchemaEnsure([optional], {
+            tables: new Map([["public.authors", new Set(["id", "name"])]]),
+            enums: new Set(),
+            notNullColumns: new Set(["public.authors.name"]),
+            populatedTables: new Set()
+        });
+        expect(plan.actions).toEqual([]);
+    });
+
+    it("drops NOT NULL when a reviewed change relaxes the property", () => {
+        const plan = planCollectionSchemaEnsure([optional], {
+            tables: new Map([["public.authors", new Set(["id", "name"])]]),
+            enums: new Set(),
+            notNullColumns: new Set(["public.authors.name"]),
+            populatedTables: new Set(["public.authors"])
+        }, { constraints: "converge" });
+        expect(plan.actions).toEqual([{
+            kind: "drop-not-null",
+            target: "public.authors.name",
+            sql: `ALTER TABLE "public"."authors" ALTER COLUMN "name" DROP NOT NULL;`
+        }]);
+    });
+
+    it("sets NOT NULL on an existing empty column when the change is reviewed", () => {
+        const plan = planCollectionSchemaEnsure([required], {
+            tables: new Map([["public.authors", new Set(["id", "name"])]]),
+            enums: new Set(),
+            notNullColumns: new Set(),
+            populatedTables: new Set()
+        }, { constraints: "converge" });
+        expect(plan.actions).toEqual([{
+            kind: "set-not-null",
+            target: "public.authors.name",
+            sql: `ALTER TABLE "public"."authors" ALTER COLUMN "name" SET NOT NULL;`
+        }]);
+    });
+
+    it("refuses to set NOT NULL on a populated column, even when reviewed", () => {
+        const plan = planCollectionSchemaEnsure([required], {
+            tables: new Map([["public.authors", new Set(["id", "name"])]]),
+            enums: new Set(),
+            notNullColumns: new Set(),
+            populatedTables: new Set(["public.authors"])
+        }, { constraints: "converge" });
+        expect(plan.actions).toEqual([]);
+        expect(plan.withheldConstraints).toHaveLength(1);
+        expect(plan.withheldConstraints[0].remedy).toMatch(/Backfill/);
+    });
+});
+
 describe("applying the plan", () => {
     function fakeClient(): { client: Queryable; executed: string[] } {
         const executed: string[] = [];
@@ -236,7 +354,20 @@ describe("applying the plan", () => {
                         rows: ["id", "title", "views", "status"].map(c => ({
                             table_schema: "public",
                             table_name: "posts",
-                            column_name: c
+                            column_name: c,
+                            is_nullable: "YES"
+                        })) as unknown as T[]
+                    };
+                }
+                // Before the `pg_type` arm: the enum *values* query joins
+                // pg_type too, and answering it with the type-name rows would
+                // describe a type whose only value is `undefined`.
+                if (sql.includes("pg_enum")) {
+                    return {
+                        rows: ["draft", "published"].map(value => ({
+                            schema: "public",
+                            name: "posts_status",
+                            value
                         })) as unknown as T[]
                     };
                 }
@@ -248,6 +379,42 @@ describe("applying the plan", () => {
         };
         const plan = await ensureCollectionTables(client, [posts]);
         expect(plan.actions).toEqual([]);
+    });
+
+    it("adds an enum value the existing type is missing", async () => {
+        // The bug this covers: the type exists, so the whole type was skipped by
+        // name, the boot reported success, and the first row using the new value
+        // was rejected by a type that had never heard of it.
+        const client: Queryable = {
+            async query<T>(sql: string): Promise<{ rows: T[] }> {
+                if (sql.includes("information_schema.columns")) {
+                    return {
+                        rows: ["id", "title", "views", "status"].map(c => ({
+                            table_schema: "public",
+                            table_name: "posts",
+                            column_name: c,
+                            is_nullable: "YES"
+                        })) as unknown as T[]
+                    };
+                }
+                if (sql.includes("pg_enum")) {
+                    // "published" is missing from the type.
+                    return {
+                        rows: [{ schema: "public", name: "posts_status", value: "draft" }] as unknown as T[]
+                    };
+                }
+                if (sql.includes("pg_type")) {
+                    return { rows: [{ schema: "public", name: "posts_status" }] as unknown as T[] };
+                }
+                return { rows: [] as T[] };
+            }
+        };
+        const plan = await ensureCollectionTables(client, [posts]);
+        expect(plan.actions).toEqual([{
+            kind: "add-enum-value",
+            target: "public.posts_status.published",
+            sql: `ALTER TYPE "public"."posts_status" ADD VALUE IF NOT EXISTS 'published';`
+        }]);
     });
 });
 

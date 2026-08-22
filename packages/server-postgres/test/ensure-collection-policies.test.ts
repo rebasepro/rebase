@@ -83,6 +83,13 @@ function fakeDb(present: string[], failOn?: RegExp): { queryable: Queryable; ran
             // Column comments — where a generated search column's fingerprint
             // lives. A catalogue read, like the three above, not DDL.
             if (/pg_description/i.test(text)) return { rows: [] };
+            // Enum values, the table list, and the row-existence probe behind
+            // the NOT NULL decision. Catalogue reads too: `ran` is the record of
+            // what this path *changed*, and the assertions below read it as
+            // such.
+            if (/pg_enum/i.test(text)) return { rows: [] };
+            if (/pg_class/i.test(text)) return { rows: [] };
+            if (/EXISTS\(SELECT 1 FROM/i.test(text)) return { rows: [] };
             ran.push(text);
             if (failOn && failOn.test(text)) throw new Error("boom");
             return { rows: [] };

@@ -103,14 +103,55 @@ const physicalShapeOf = (prop: Property): string => JSON.stringify([
 ]);
 
 /**
+ * Facts about the database a change is destined for.
+ *
+ * Three of the verdicts below cannot be reached from the collections alone:
+ * whether a NOT NULL can be added comes down to whether the table holds rows,
+ * and whether an enum value will land comes down to which values the type
+ * already has. Without these, the classifier answers conservatively — the
+ * change *may* diverge — which is the right answer for a caller that has no
+ * database to look at, and the wrong one to show somebody staring at theirs.
+ */
+export interface SchemaFacts {
+    /** `schema.table` → columns. */
+    tables: Map<string, Set<string>>;
+    /** Tables known to hold at least one row. */
+    populatedTables?: Set<string>;
+    /** `schema.table.column` for every column the database marks NOT NULL. */
+    notNullColumns?: Set<string>;
+    /** `schema.typename` → the values that type currently holds. */
+    enumValues?: Map<string, string[]>;
+}
+
+/** Whether the table behind a collection exists and is empty. */
+const tableIsEmpty = (collection: CollectionConfig, facts?: SchemaFacts): boolean => {
+    if (!facts?.populatedTables) return false;
+    const key = qualifiedTable(collection);
+    // A table the database does not have yet is one this change creates, and a
+    // table being created has no rows to check a constraint against.
+    if (!facts.tables.has(key)) return true;
+    return !facts.populatedTables.has(key);
+};
+
+const qualifiedTable = (collection: CollectionConfig): string => {
+    const schema = (collection as { schema?: string }).schema ?? "public";
+    return `${schema}.${getTableName(collection)}`;
+};
+
+/**
  * Classify the difference between two collection sets.
  *
  * `before` is what the running database was built from; `after` is what the
  * editor is proposing. Order within each array is irrelevant.
+ *
+ * `facts` is what the database actually looks like. Supplied by the live
+ * editor; omitted by callers reasoning about collections in the abstract, who
+ * get the conservative reading.
  */
 export function classifyCollectionChanges(
     before: CollectionConfig[],
-    after: CollectionConfig[]
+    after: CollectionConfig[],
+    facts?: SchemaFacts
 ): ClassifiedChanges {
     const previous = bySlug(before);
     const next = bySlug(after);
@@ -126,7 +167,7 @@ export function classifyCollectionChanges(
             });
             continue;
         }
-        classifyProperties(previous.get(slug)!, collection, changes);
+        classifyProperties(previous.get(slug)!, collection, changes, facts);
     }
 
     for (const [slug, collection] of previous) {
@@ -155,46 +196,56 @@ export function classifyCollectionChanges(
 function classifyProperties(
     before: CollectionConfig,
     after: CollectionConfig,
-    changes: SchemaChange[]
+    changes: SchemaChange[],
+    facts?: SchemaFacts
 ): void {
     const slug = after.slug ?? "";
     const previous = propertiesOf(before);
     const next = propertiesOf(after);
+    const empty = tableIsEmpty(after, facts);
 
     for (const [name, prop] of Object.entries(next)) {
         const old = previous[name];
 
         if (!old) {
-            // The collection already exists, so the table does too. `ensure`
-            // withholds constraints on an existing table — see its own comment
-            // about `SET NOT NULL` being checked against live rows.
-            if (isRequired(prop)) {
+            // A NOT NULL is checked against rows that are already there, so
+            // whether this is safe is a question about the data, not about the
+            // configuration. On an empty table the constraint cannot fail and
+            // the ensure path applies it; on a populated one it is withheld and
+            // the column arrives nullable, which is a database that disagrees
+            // with its own config — still worth refusing, now for a reason the
+            // reader can act on.
+            if (isRequired(prop) && !empty) {
                 changes.push({
                     kind: "add-property",
                     verdict: "diverges",
                     collection: slug,
                     property: name,
                     detail:
-                        `"${name}" is required, but adding a column to the existing table ` +
-                        `"${getTableName(after)}" withholds NOT NULL — it is checked against rows ` +
-                        "that are already there. The column will be nullable.",
+                        `"${name}" is required, but "${getTableName(after)}" already holds rows, so ` +
+                        "NOT NULL would be checked against data that has no value for it yet. The " +
+                        "column would arrive nullable.",
                     remedy:
-                        "Add it optional, backfill every row, then add NOT NULL in a migration. " +
-                        "Or accept a nullable column and enforce the requirement in validation only."
+                        "Add it optional, backfill every row, then make it required — the editor " +
+                        "will apply the constraint once no row violates it."
                 });
             } else {
+                const column = resolveColumnName(name, prop);
                 changes.push({
                     kind: "add-property",
                     verdict: "safe",
                     collection: slug,
                     property: name,
-                    detail: `New optional property "${name}" — adds column "${resolveColumnName(name, prop)}".`
+                    detail: isRequired(prop)
+                        ? `New required property "${name}" — adds column "${column}" NOT NULL, ` +
+                          `which "${getTableName(after)}" can take because it holds no rows.`
+                        : `New optional property "${name}" — adds column "${column}".`
                 });
             }
             continue;
         }
 
-        classifyProperty(slug, after, name, old, prop, changes);
+        classifyProperty(slug, after, name, old, prop, changes, facts);
     }
 
     for (const [name, prop] of Object.entries(previous)) {
@@ -220,7 +271,8 @@ function classifyProperty(
     name: string,
     before: Property,
     after: Property,
-    changes: SchemaChange[]
+    changes: SchemaChange[],
+    facts?: SchemaFacts
 ): void {
     const beforeColumn = resolveColumnName(name, before);
     const afterColumn = resolveColumnName(name, after);
@@ -265,35 +317,49 @@ function classifyProperty(
     }
 
     if (!isRequired(before) && isRequired(after)) {
-        changes.push({
-            kind: "change-required",
-            verdict: "diverges",
-            collection: slug,
-            property: name,
-            detail:
-                `"${name}" became required, but the ensure path never adds NOT NULL to an existing ` +
-                "column. The database will keep accepting nulls.",
-            remedy: "Backfill the column, then add NOT NULL in a migration."
-        });
+        // Tightening. `SET NOT NULL` scans the table, so this comes down to
+        // whether anything in it is null — which on an empty table is nothing.
+        const empty = tableIsEmpty(collection, facts);
+        changes.push(empty
+            ? {
+                kind: "change-required",
+                verdict: "safe",
+                collection: slug,
+                property: name,
+                detail:
+                    `"${name}" became required — sets NOT NULL on "${afterColumn}", which ` +
+                    `"${getTableName(collection)}" can take because it holds no rows.`
+            }
+            : {
+                kind: "change-required",
+                verdict: "diverges",
+                collection: slug,
+                property: name,
+                detail:
+                    `"${name}" became required, but "${getTableName(collection)}" holds rows and ` +
+                    "SET NOT NULL is checked against every one of them. The database would keep " +
+                    "accepting nulls.",
+                remedy:
+                    `Backfill first — UPDATE the rows where "${afterColumn}" IS NULL — then apply ` +
+                    "this again."
+            });
     }
 
     if (isRequired(before) && !isRequired(after)) {
-        // Relaxing is safe in the config, and the database simply keeps a
-        // constraint the config no longer asks for. Worth naming, since the
-        // reader will wonder.
+        // Relaxing. `DROP NOT NULL` cannot fail and cannot lose data, so this is
+        // safe on any table; the editor plans it because a reviewed change is
+        // the one context in which touching an existing column's constraints is
+        // something somebody asked for.
         changes.push({
             kind: "change-required",
-            verdict: "diverges",
+            verdict: "safe",
             collection: slug,
             property: name,
-            detail:
-                `"${name}" is no longer required, but an existing NOT NULL is not dropped. ` +
-                "Writes omitting it will still fail.",
-            remedy: "Drop the constraint in a migration if you want the column to accept nulls."
+            detail: `"${name}" is no longer required — drops NOT NULL from "${afterColumn}".`
         });
     }
 
-    classifyEnum(slug, collection, name, before, after, changes);
+    classifyEnum(slug, collection, name, before, after, changes, facts);
 }
 
 function classifyEnum(
@@ -302,7 +368,8 @@ function classifyEnum(
     name: string,
     before: Property,
     after: Property,
-    changes: SchemaChange[]
+    changes: SchemaChange[],
+    facts?: SchemaFacts
 ): void {
     const oldValues = enumValuesOf(before);
     const newValues = enumValuesOf(after);
@@ -312,17 +379,30 @@ function classifyEnum(
     const removed = oldValues.filter(value => !newValues.includes(value));
 
     if (added.length > 0) {
-        changes.push({
-            kind: "add-enum-value",
-            verdict: "diverges",
-            collection: slug,
-            property: name,
-            detail:
-                `"${name}" gains ${added.map(v => `"${v}"`).join(", ")}, but the ensure path skips an ` +
-                "enum type it already sees. The value never reaches the database and the first row " +
-                "using it is rejected.",
-            remedy: "ALTER TYPE … ADD VALUE in a migration. It cannot run inside a transaction block."
-        });
+        // `ADD VALUE` is additive, idempotent with IF NOT EXISTS, and needs no
+        // table scan, so the ensure path now carries it — but only when it can
+        // see which values the type already has. A caller with no database
+        // cannot know that, and for them this is still the change that silently
+        // does not land.
+        const seesTheType = facts?.enumValues !== undefined;
+        changes.push(seesTheType
+            ? {
+                kind: "add-enum-value",
+                verdict: "safe",
+                collection: slug,
+                property: name,
+                detail: `"${name}" gains ${added.map(v => `"${v}"`).join(", ")} — ALTER TYPE … ADD VALUE.`
+            }
+            : {
+                kind: "add-enum-value",
+                verdict: "diverges",
+                collection: slug,
+                property: name,
+                detail:
+                    `"${name}" gains ${added.map(v => `"${v}"`).join(", ")}, and the values this ` +
+                    "type already has are not known here, so whether they would land cannot be said.",
+                remedy: "Plan this against the database it is destined for."
+            });
     }
 
     if (removed.length > 0) {

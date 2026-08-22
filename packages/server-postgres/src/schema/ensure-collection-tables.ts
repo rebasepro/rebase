@@ -101,11 +101,57 @@ export interface ExistingSchema {
      * and reports nothing as drifted.
      */
     columnComments?: Map<string, string>;
+    /**
+     * `schema.typename` → the values that type currently holds, in order.
+     *
+     * Without this, an enum type that already exists is skipped whole and a
+     * value added to it never reaches the database — the type is there, so
+     * nothing plans anything, and the first row using the new value is rejected
+     * by a constraint nobody changed. Absent is read as "the values are
+     * unknown", which keeps the old skip-by-name behaviour rather than guessing.
+     */
+    enumValues?: Map<string, string[]>;
+    /** `schema.table.column` for every column the database marks NOT NULL. */
+    notNullColumns?: Set<string>;
+    /**
+     * Tables known to hold at least one row.
+     *
+     * The only thing that decides whether a NOT NULL can be added without
+     * reading the data: on an empty table the constraint cannot fail, on a
+     * populated one it is checked against every existing row. Absent is read as
+     * "assume populated", which is the conservative direction — it withholds a
+     * constraint rather than attempting one that aborts the boot.
+     */
+    populatedTables?: Set<string>;
+}
+
+/**
+ * How far the planner may go in making the database's constraints match the
+ * configuration.
+ *
+ * - `additive` — the boot default. Columns, tables, indexes and enum values are
+ *   created; no existing column's constraints are touched. Unattended boots run
+ *   against customer data with nobody reading a diff, and a database adopted by
+ *   introspection legitimately carries NOT NULL on columns the generated
+ *   collection leaves optional (`introspect-db-logic` withholds `required` from
+ *   a column with a default or a trigger behind it). Converging there would
+ *   strip real constraints on first boot.
+ * - `converge` — the live schema editor. Every statement is planned, shown to
+ *   the person making the change, and applied only once they confirm it. That
+ *   is the context in which changing an existing column's constraints is a
+ *   reviewed act rather than a surprise.
+ */
+export type ConstraintPolicy = "additive" | "converge";
+
+export interface EnsureOptions {
+    /** Defaults to `additive`. See {@link ConstraintPolicy}. */
+    constraints?: ConstraintPolicy;
 }
 
 export interface EnsureAction {
     kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column"
-        | "create-extension" | "create-function" | "create-index" | "comment-column";
+        | "create-extension" | "create-function" | "create-index" | "comment-column"
+        | "add-enum-value" | "set-not-null" | "drop-not-null";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -150,6 +196,33 @@ export interface EnsurePlan {
      * about the running system says which one you got.
      */
     vectorIndexSkipped: SkippedVectorIndex[];
+    /**
+     * Constraints the configuration asks for that this plan is not applying,
+     * and why.
+     *
+     * This is the half of the feature that matters most. Every one of these was
+     * previously withheld in silence: a required property arrived nullable, and
+     * the only evidence was a database that disagreed with its own
+     * configuration. Reporting them is what lets boot warn, the live editor
+     * refuse, and the doctor explain — three surfaces that until now had nothing
+     * to read.
+     */
+    withheldConstraints: WithheldConstraint[];
+}
+
+/** A constraint the configuration asks for that the planner is not applying. */
+export interface WithheldConstraint {
+    /** `schema.table.column`. */
+    target: string;
+    kind: "not-null";
+    /**
+     * Why, in a sentence that names the obstacle rather than the rule. The
+     * reader is looking at a column that is nullable when they asked for
+     * required, and needs to know what to do about it.
+     */
+    reason: string;
+    /** What would make it applicable. */
+    remedy: string;
 }
 
 /**
@@ -250,8 +323,11 @@ function requiredEnums(collection: CollectionConfig): { name: string; values: st
  */
 export function planCollectionSchemaEnsure(
     allCollections: CollectionConfig[],
-    existing: ExistingSchema
+    existing: ExistingSchema,
+    options: EnsureOptions = {}
 ): EnsurePlan {
+    const constraintPolicy: ConstraintPolicy = options.constraints ?? "additive";
+    const withheldConstraints: WithheldConstraint[] = [];
     // Boot receives every collection the bundle declares, including the ones
     // served by another engine entirely. Creating a Postgres table for a
     // Firestore collection is not a harmless extra: the app keeps reading
@@ -269,7 +345,35 @@ export function planCollectionSchemaEnsure(
     //    skipped by name rather than guarded in SQL.
     for (const collection of collections) {
         for (const { name, values } of requiredEnums(collection)) {
-            if (existing.enums.has(name) || plannedEnums.has(name)) continue;
+            if (existing.enums.has(name) || plannedEnums.has(name)) {
+                // The type is there, but that says nothing about its *values*.
+                // Skipping the whole type by name is what made an added enum
+                // value vanish: nothing was planned, the boot reported success,
+                // and the first row using the value was rejected by a type that
+                // had never heard of it. `ADD VALUE` is the one alteration
+                // Postgres offers here, it is purely additive, and it is
+                // idempotent with `IF NOT EXISTS`.
+                //
+                // `enumValues` absent means the caller built the schema by hand
+                // and does not know the values; skip by name as before rather
+                // than plan against a guess.
+                const current = existing.enumValues?.get(name);
+                if (!current || plannedEnums.has(name)) continue;
+                const [schema, typeName] = name.split(".");
+                for (const value of values) {
+                    if (current.includes(value)) continue;
+                    actions.push({
+                        kind: "add-enum-value",
+                        target: `${name}.${value}`,
+                        // Not inside a transaction with any use of the value:
+                        // Postgres refuses to read a value added by the
+                        // transaction still adding it. The applier runs these
+                        // one statement at a time, which is what makes it legal.
+                        sql: `ALTER TYPE "${schema}"."${typeName}" ADD VALUE IF NOT EXISTS ${quoteSqlLiteral(value)};`
+                    });
+                }
+                continue;
+            }
             plannedEnums.add(name);
             const [schema, typeName] = name.split(".");
             actions.push({
@@ -457,11 +561,93 @@ export function planCollectionSchemaEnsure(
             // safe on a live table, and a column added without it would take the
             // value the application forgot to send rather than `now()`.
             const autoValue = (p as { autoValue?: string }).autoValue;
-            if (p.type === "date" && (autoValue === "on_create" || autoValue === "on_update")) {
-                definition += " DEFAULT now()";
+            const hasDefault = p.type === "date" && (autoValue === "on_create" || autoValue === "on_update");
+            if (hasDefault) definition += " DEFAULT now()";
+
+            const required = p.validation?.required === true;
+            const columnKey = `${key}.${column}`;
+            const columnExists = existing.tables.get(key)?.has(column) === true;
+
+            // A NOT NULL is safe exactly when it cannot fail against rows that
+            // are already there, and there are three ways to know that:
+            //
+            //  - the table is being created by this plan (no rows yet);
+            //  - the table exists and is empty;
+            //  - the column arrives with a DEFAULT, which Postgres backfills
+            //    into every existing row as part of ADD COLUMN.
+            //
+            // Anything else is checked against live data and can abort the boot,
+            // which is why it used to be withheld — correctly. What was wrong was
+            // withholding it in *silence*: the config said required, the column
+            // came out nullable, and nothing anywhere said so.
+            // `populatedTables` absent means the caller does not know, and not
+            // knowing has to read as "assume rows" — the other direction emits a
+            // NOT NULL that is checked against live data and aborts the boot.
+            // Written as an explicit `!== undefined` because the optional-chain
+            // form (`!existing.populatedTables?.has(key)`) quietly says *empty*
+            // when the fact is missing, which is the wrong way to be wrong.
+            const tableIsEmpty = existing.populatedTables !== undefined
+                && existing.tables.has(key)
+                && !existing.populatedTables.has(key);
+            const notNullIsSafe = fresh || tableIsEmpty || hasDefault;
+
+            if (required && !columnExists) {
+                if (notNullIsSafe) {
+                    definition += " NOT NULL";
+                } else {
+                    withheldConstraints.push({
+                        target: columnKey,
+                        kind: "not-null",
+                        reason:
+                            `"${column}" is required, but "${key}" already holds rows and the column ` +
+                            "has no default to backfill them with, so NOT NULL would be checked " +
+                            "against data that does not have a value yet.",
+                        remedy:
+                            "Backfill the column, then add the constraint — or give the property a " +
+                            "default so every existing row gets one."
+                    });
+                }
             }
-            if (fresh && p.validation?.required) definition += " NOT NULL";
             addColumn(key, schema, table, column, definition);
+
+            // The column is already there and only its constraint differs. Two
+            // directions, and they are not equally safe — see `ConstraintPolicy`
+            // for why neither runs at an unattended boot.
+            if (columnExists && constraintPolicy === "converge") {
+                const isNotNull = existing.notNullColumns?.has(columnKey) === true;
+                if (required && !isNotNull) {
+                    if (tableIsEmpty) {
+                        actions.push({
+                            kind: "set-not-null",
+                            target: columnKey,
+                            sql: `ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${column}" SET NOT NULL;`
+                        });
+                    } else {
+                        withheldConstraints.push({
+                            target: columnKey,
+                            kind: "not-null",
+                            reason:
+                                `"${column}" became required, but "${key}" holds rows and any of them ` +
+                                "with no value would make SET NOT NULL fail.",
+                            remedy:
+                                "Backfill the column first — `UPDATE … SET \"" + column +
+                                "\" = … WHERE \"" + column + "\" IS NULL` — then apply this again."
+                        });
+                    }
+                }
+                if (!required && isNotNull) {
+                    // Loosening never fails and never loses data. It is here
+                    // rather than at boot because a database adopted by
+                    // introspection carries NOT NULL on columns the generated
+                    // collection deliberately leaves optional, and converging
+                    // those unasked would drop constraints nobody edited.
+                    actions.push({
+                        kind: "drop-not-null",
+                        target: columnKey,
+                        sql: `ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${column}" DROP NOT NULL;`
+                    });
+                }
+            }
         }
 
         // The auth columns the collection never mentions. The scaffold's users
@@ -626,7 +812,15 @@ export function planCollectionSchemaEnsure(
         vectorIndexSkipped.push(...plan.skipped);
     }
 
-    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys, searchDrift, searchAdopted, vectorIndexSkipped };
+    return {
+        actions,
+        statements: actions.map(a => a.sql),
+        legacyForeignKeys,
+        searchDrift,
+        searchAdopted,
+        vectorIndexSkipped,
+        withheldConstraints
+    };
 }
 
 /** Read what the database has, for the schemas the collections live in. */
@@ -642,12 +836,14 @@ export async function readExistingSchema(
         .map(schema => `'${assertSafeIdentifier(schema, "schema name")}'`)
         .join(", ");
 
+    const notNullColumns = new Set<string>();
     const { rows: columns } = await client.query<{
         table_schema: string;
         table_name: string;
         column_name: string;
+        is_nullable: string;
     }>(
-        `SELECT table_schema, table_name, column_name
+        `SELECT table_schema, table_name, column_name, is_nullable
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -655,6 +851,64 @@ export async function readExistingSchema(
         const key = `${row.table_schema}.${row.table_name}`;
         if (!tables.has(key)) tables.set(key, new Set());
         tables.get(key)!.add(row.column_name);
+        if (row.is_nullable === "NO") notNullColumns.add(`${key}.${row.column_name}`);
+    }
+
+    // Which tables hold rows. This is the only fact that decides whether a
+    // NOT NULL can be added without reading the data, so it is worth a query.
+    //
+    // `reltuples` would be cheaper and is wrong for this: it is a planner
+    // estimate, it is -1 on a table that has never been analyzed, and a table
+    // that was full an hour ago still reads as full after a DELETE. A wrong
+    // "empty" here means a boot that aborts on a constraint violation, so the
+    // estimate is not good enough. `EXISTS … LIMIT 1` stops at the first row,
+    // which makes the true cost one page read per table.
+    //
+    // Restricted to ordinary and partitioned tables: `information_schema.columns`
+    // also lists views and materialized views, and probing those runs whatever
+    // query defines them.
+    const populatedTables = new Set<string>();
+    const { rows: realTables } = await client.query<{ schema: string; name: string }>(
+        `SELECT n.nspname AS schema, c.relname AS name
+         FROM pg_class c
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         WHERE c.relkind IN ('r', 'p') AND n.nspname IN (${inList})`
+    );
+    if (realTables.length > 0) {
+        const probes = realTables.map(row => {
+            const schema = assertSafeIdentifier(row.schema, "schema name");
+            const table = assertSafeIdentifier(row.name, "table name");
+            return `SELECT ${quoteSqlLiteral(`${schema}.${table}`)} AS key, ` +
+                `EXISTS(SELECT 1 FROM "${schema}"."${table}" LIMIT 1) AS populated`;
+        });
+        const { rows: populationRows } = await client.query<{ key: string; populated: boolean }>(
+            probes.join(" UNION ALL ")
+        );
+        for (const row of populationRows) {
+            if (row.populated) populatedTables.add(row.key);
+        }
+    }
+
+    const enumValues = new Map<string, string[]>();
+    const { rows: enumValueRows } = await client.query<{
+        schema: string;
+        name: string;
+        value: string;
+    }>(
+        // Ordered by `enumsortorder`, not by label: an enum's order is part of
+        // its meaning (it is what `<` compares), and reading it back sorted
+        // alphabetically would make a correct type look drifted.
+        `SELECT n.nspname AS schema, t.typname AS name, e.enumlabel AS value
+         FROM pg_enum e
+         JOIN pg_type t ON e.enumtypid = t.oid
+         JOIN pg_namespace n ON t.typnamespace = n.oid
+         WHERE n.nspname IN (${inList})
+         ORDER BY t.typname, e.enumsortorder`
+    );
+    for (const row of enumValueRows) {
+        const key = `${row.schema}.${row.name}`;
+        if (!enumValues.has(key)) enumValues.set(key, []);
+        enumValues.get(key)!.push(row.value);
     }
 
     const { rows: enumRows } = await client.query<{ schema: string; name: string }>(
@@ -703,7 +957,7 @@ export async function readExistingSchema(
         columnComments.set(`${row.schema}.${row.table}.${row.column}`, row.comment);
     }
 
-    return { tables, enums, constraints, columnComments };
+    return { tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables };
 }
 
 /**
@@ -832,6 +1086,18 @@ export async function ensureCollectionTables(
     // learns which one they have is if the boot says so.
     for (const skip of plan.vectorIndexSkipped) {
         const message = `No ANN index on "${skip.table}"."${skip.column}": ${skip.reason}`;
+        logger.warn(`[schema] ${message}`);
+        log?.(message);
+    }
+
+    // Said once per column, every boot, because the alternative is what this
+    // whole feature exists to end: a column the configuration calls required,
+    // sitting there nullable, with every surface reporting success. The boot
+    // does not fail over it — the column is usable and the data is intact — but
+    // it stops being invisible.
+    for (const withheld of plan.withheldConstraints) {
+        const message =
+            `No NOT NULL on "${withheld.target}": ${withheld.reason} ${withheld.remedy}`;
         logger.warn(`[schema] ${message}`);
         log?.(message);
     }
