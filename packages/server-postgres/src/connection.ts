@@ -31,6 +31,40 @@ export interface PostgresPoolConfig {
     searchPath?: string | false;
 }
 
+/**
+ * Ceiling on pool size, from the environment.
+ *
+ * Exists for the managed development database. PGlite is a single session
+ * behind a multiplexing socket server, and two pooled clients holding
+ * overlapping transactions deadlock there — which a request-per-transaction
+ * server produces the moment two requests overlap. One connection turns that
+ * deadlock into ordinary queueing.
+ *
+ * A ceiling rather than a value, so it constrains every pool in the process
+ * without any of them having to know why. Ignored when unset or unparseable,
+ * because a malformed limit must not silently serialize a production server.
+ */
+export function poolMaxCeiling(env: NodeJS.ProcessEnv = process.env): number | null {
+    const raw = env.REBASE_DB_POOL_MAX;
+    if (typeof raw !== "string") return null;
+
+    // Plain decimal digits only. `Number` would also accept `1e3`, `0x10` and
+    // ` 4 ` — none of which anyone writes on purpose in a config value, and all
+    // of which would mean this silently did something other than it appears to.
+    if (!/^[0-9]+$/.test(raw.trim())) return null;
+
+    const parsed = Number(raw.trim());
+
+    return parsed >= 1 ? parsed : null;
+}
+
+/** Apply {@link poolMaxCeiling} to a requested pool size. */
+export function cappedPoolMax(requested: number, env: NodeJS.ProcessEnv = process.env): number {
+    const ceiling = poolMaxCeiling(env);
+
+    return ceiling === null ? requested : Math.min(requested, ceiling);
+}
+
 const DEFAULT_POOL: Required<PostgresPoolConfig> = {
     max: 20,
     searchPath: "public",
@@ -182,7 +216,7 @@ export function createPostgresDatabaseConnection(
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
-        max: opts.max,
+        max: cappedPoolMax(opts.max),
         idleTimeoutMillis: opts.idleTimeoutMillis,
         connectionTimeoutMillis: opts.connectionTimeoutMillis,
         query_timeout: opts.queryTimeout,
@@ -234,7 +268,7 @@ export function createDirectDatabaseConnection(
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
-        max: opts.max,
+        max: cappedPoolMax(opts.max),
         idleTimeoutMillis: opts.idleTimeoutMillis,
         connectionTimeoutMillis: opts.connectionTimeoutMillis,
         query_timeout: opts.queryTimeout,
@@ -275,7 +309,7 @@ export function createReadReplicaConnection(
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
-        max: opts.max,
+        max: cappedPoolMax(opts.max),
         idleTimeoutMillis: opts.idleTimeoutMillis,
         connectionTimeoutMillis: opts.connectionTimeoutMillis,
         query_timeout: opts.queryTimeout,
