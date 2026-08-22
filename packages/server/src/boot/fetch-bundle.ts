@@ -166,8 +166,16 @@ export async function installBundleDependencies(
 ): Promise<void> {
     if (!fs.existsSync(path.join(bundleRoot, "package.json"))) return;
     if (fs.existsSync(path.join(bundleRoot, "node_modules"))) {
-        // Vendored at build time, or a retry after a partial boot. Either way
-        // installing over it is slower and no safer.
+        // Vendored at build time, or already installed by an earlier start of
+        // this same pod. Either way installing over it is slower and no safer.
+        //
+        // This is only sound because a failed install deletes what it wrote
+        // (below). Measured 2026-08-22: an install OOMKilled partway leaves a
+        // node_modules holding 124 of 156 packages — indistinguishable from a
+        // complete one to a directory check. Without the cleanup, the restart
+        // that follows skips the install, the runtime boots on a tree missing a
+        // third of its dependencies, and the failure surfaces as an import
+        // error deep inside a request.
         logger.debug("Bundle already carries node_modules; skipping install");
         return;
     }
@@ -182,6 +190,13 @@ export async function installBundleDependencies(
     try {
         await exec("npm", args, { cwd: bundleRoot, maxBuffer: 32 * 1024 * 1024 });
     } catch (error: unknown) {
+        // Leave nothing behind that a later boot would mistake for a finished
+        // install. npm writes packages as it goes, so anything that stops it —
+        // an OOMKill, a full disk, a registry 500 — leaves a partial tree, and
+        // the check at the top of this function cannot tell one from a vendored
+        // one. Deleting it is what makes that check safe.
+        fs.rmSync(path.join(bundleRoot, "node_modules"), { recursive: true, force: true });
+
         // The one failure worth naming. Out of disk, npm does not reliably
         // error — in an init container it used to hang in `epoll_wait` with no
         // output at all, which is why this ran there and could not be

@@ -257,9 +257,53 @@ lifting is the intended outcome, and given
 The ephemeral storage did **not** go away — that is the resource the incident was
 actually about, and it moved onto the app container with the work
 (`withBundleStorage` merges it into the tier's block rather than replacing it).
-Memory is the open question: `npm ci --omit=dev --ignore-scripts` is disk-bound
-rather than memory-bound, which is why the failure was ENOSPC and not an
-OOMKill, but **nobody has measured its high-water mark against the smallest
-tier**. That measurement is the one thing that should happen before this reaches
-a paying tenant, and it is recorded in the code beside the constant, not only
-here.
+
+### 5.4 The memory question, measured
+
+`node:22-slim` under cgroup v2, `npm install --omit=dev --ignore-scripts`, peak
+read from `memory.peak` after the run:
+
+| bundle | packages | tree | peak @2Gi | peak @512Mi | peak @256Mi | @128Mi |
+|---|---|---|---|---|---|---|
+| real (`dist-bundle-acceptance`) | 35 | 23 MiB | 608 MiB | 86 MiB | — | — |
+| heavy (14 deps incl. googleapis) | 156 | 289 MiB | 681 MiB | 196 MiB | 198 MiB | **OOMKill** |
+| pathological (25 deps, a frontend's worth) | 458 | 591 MiB | 294 MiB | — | — | — |
+
+**The 2Gi column is the misleading one.** npm's peak scales with what it is
+given — V8 sizes its heap from the cgroup limit — so measuring at the limit
+measures generosity, not requirement. The same install that peaks at 608 MiB
+with 2Gi available completes having peaked at 86 MiB with 512Mi available. The
+real number is the one that stops moving under pressure: **~200 MiB**, with the
+floor between 128Mi and 256Mi.
+
+**The smallest tier's memory limit is 2Gi and cannot be dialled lower.**
+`DEFAULT_DIALS.compute` is `res("250m", "512Mi", "2", "2Gi")`, and
+`dialledResources` derives limits as request × the burst ratio it started with
+(4), over a request floored at `AUTOPILOT_POD_FLOOR`'s 512Mi. So the minimum
+limit any tenant can reach is 512Mi × 4 = 2Gi.
+
+So: **~10x headroom, at every tier that exists.** The concern is closed, and the
+init container's 2Gi turns out to have been buying nothing the app container did
+not already have. Even the *request* — 512Mi, the number that governs eviction
+under node pressure rather than OOMKill — sits above the measured requirement.
+
+Disk behaved as the incident described: the pathological bundle peaked at
+**724 MiB** across the extracted tree and npm's cache together. That is 12% of
+the 6Gi reservation, and 72% of the 1Gi Autopilot grants when it is unset —
+which is what made a slightly larger project fail, silently.
+
+### 5.5 What the measurement found that was not the question
+
+At 128Mi the heavy install is OOMKilled, and it leaves `node_modules` holding
+**124 of its 156 packages**. A directory check cannot tell that from a finished
+install — and `installBundleDependencies` skipped when `node_modules` existed,
+as did the init container's `[ ! -d node_modules ]` before it, over a volume
+that also survives a container restart.
+
+So the sequence was: install killed → container restarts → tree looks present →
+install skipped → the runtime boots against a bundle missing a third of its
+dependencies, and fails as an import error deep inside a request.
+
+Fixed by deleting what a failed install wrote, which is what makes the skip
+sound. A vendored tree is still left alone. Both directions are tested, and the
+cleanup is mutation-tested.

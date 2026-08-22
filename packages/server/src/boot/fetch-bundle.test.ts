@@ -466,3 +466,49 @@ describe("installBundleDependencies", () => {
             .rejects.toThrow(/404 Not Found/);
     });
 });
+
+describe("a failed install leaves nothing a later boot would trust", () => {
+    /**
+     * Measured, not imagined. An `npm install` OOMKilled partway through leaves
+     * `node_modules` holding 124 of 156 packages — a directory check cannot tell
+     * that from a finished install, and the skip at the top of
+     * `installBundleDependencies` would take it. The runtime would then boot on
+     * a tree missing a third of its dependencies and fail as an import error
+     * deep inside a request, an hour of debugging away from the cause.
+     *
+     * The init container this replaced had the same `[ ! -d node_modules ]`
+     * check and the same hole, and its volume also survived the restart.
+     */
+    it("removes a partial tree when the install fails", async () => {
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}");
+        const partial = async () => {
+            fs.mkdirSync(path.join(scratch, "node_modules", "half-a-package"), { recursive: true });
+            throw new Error("Killed");
+        };
+        await expect(installBundleDependencies(scratch, partial)).rejects.toThrow(/Killed/);
+        expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(false);
+    });
+
+    it("so the next attempt installs rather than skipping", async () => {
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}");
+        const failOnce = async () => {
+            fs.mkdirSync(path.join(scratch, "node_modules"), { recursive: true });
+            throw new Error("ENOSPC: no space left on device");
+        };
+        await expect(installBundleDependencies(scratch, failOnce)).rejects.toThrow();
+
+        const second: string[] = [];
+        await installBundleDependencies(scratch, async (_c, args) => { second.push(args[0]); });
+        expect(second[0]).toMatch(/^(ci|install)$/);
+    });
+
+    it("still leaves a vendored tree alone", async () => {
+        // The cleanup must not turn "skip a complete tree" into "never skip".
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}");
+        fs.mkdirSync(path.join(scratch, "node_modules", "vendored"), { recursive: true });
+        const calls: string[] = [];
+        await installBundleDependencies(scratch, async (c) => { calls.push(c); });
+        expect(calls).toEqual([]);
+        expect(fs.existsSync(path.join(scratch, "node_modules", "vendored"))).toBe(true);
+    });
+});
