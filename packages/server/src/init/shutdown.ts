@@ -8,6 +8,8 @@ interface ShutdownConfig {
     cronScheduler?: { stop(): void };
     /** Structural, for the same no-circular-imports reason as the backend below. */
     jobQueue?: { stop(): Promise<void> };
+    /** Structural, same reason. */
+    rlsAudit?: { stop(): void };
     realtimeServices: Record<string, RealtimeProvider>;
 }
 
@@ -132,6 +134,12 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 if (config.cronScheduler) {
                     config.cronScheduler.stop();
                     logger.info("Cron scheduler stopped");
+                }
+
+                // 1a. Stop the audit timer. Nothing waits on it: a scan in
+                // flight is a read-only query that ends with the connection.
+                if (config.rlsAudit) {
+                    config.rlsAudit.stop();
                 }
 
                 // 1b. Stop claiming jobs, and wait for the ones in flight.

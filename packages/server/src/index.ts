@@ -171,6 +171,19 @@ export * from "./email";
 // =============================================================================
 export * from "./storage";
 
+// The scheduled RLS audit. The scanner itself is not re-exported — it is
+// supplied by the caller, so this package never depends on it.
+export { createRlsAudit, summarize as summarizeRlsScan } from "./rls-audit";
+export type {
+    RlsAudit,
+    RlsAuditConfig,
+    RlsAuditStatus,
+    RlsScanner,
+    RlsScanResult,
+    RlsScanFinding,
+    RlsSeverity
+} from "./rls-audit";
+
 // =============================================================================
 // Entity History
 // =============================================================================

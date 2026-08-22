@@ -48,6 +48,7 @@ import { initializeStorage, assertStorageAccessControlConfigured } from "./init/
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
+import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import {
     ALL_RUNTIME_SURFACES,
     disabledSurfaces,
@@ -635,6 +636,19 @@ export interface RebaseBackendConfig {
 
     /** Runtime version reported by the contract endpoint. Informational. */
     runtimeVersion?: string;
+
+    /**
+     * Periodic row-level-security audit of the database this server uses.
+     *
+     * Off unless `enabled` is set. `@rebasepro/rls-check` is thorough and
+     * read-only, and the reason nobody runs it is that it is a command — so this
+     * runs it on a timer and serves the result at `GET /api/admin/rls-audit`.
+     *
+     * Needs the optional peer `@rebasepro/rls-check`, which is not a hard
+     * dependency because it carries a Postgres driver and this package is
+     * engine-agnostic.
+     */
+    rlsAudit?: RlsAuditConfig;
 }
 
 /**
@@ -2238,6 +2252,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // Assigned further down, once the rest of the boot has settled; the admin
+    // route below closes over this binding rather than its value.
+    let rlsAudit: RlsAudit | undefined;
+
     // 6b. Mount Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
     // rebuild. Only enabled when BACKUP_DESTINATION is set.
@@ -2256,6 +2274,28 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }));
         config.app.route(`${basePath}/admin/backups`, backupRouter);
         logger.debug("Backup admin routes mounted", { path: `${basePath}/admin/backups` });
+    }
+
+    // 6b-ii. The scheduled RLS audit's latest result.
+    //
+    // Declared here and assigned below: the handler reads through the binding at
+    // request time, so the order of mounting and starting does not matter, and
+    // the route can sit with the other admin surfaces where it belongs.
+    if (surfaces.admin) {
+        const rlsAuditRouter = new Hono<HonoEnv>();
+        applyAdminGate(rlsAuditRouter, "RLS audit");
+        rlsAuditRouter.get("/", (c) => c.json(
+            rlsAudit
+                ? rlsAudit.status()
+                : {
+                    enabled: false,
+                    reason: config.rlsAudit?.enabled
+                        ? "This process serves the admin surface but does not own the RLS audit."
+                        : "The scheduled RLS audit is off. Set `rlsAudit.enabled` to turn it on."
+                }
+        ));
+        config.app.route(`${basePath}/admin/rls-audit`, rlsAuditRouter);
+        logger.debug("RLS audit admin routes mounted", { path: `${basePath}/admin/rls-audit` });
     }
 
     // 6c. Mount Logs routes (for the Studio Logs Explorer). Request logs expose
@@ -2361,11 +2401,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         authSchemaCheck ? () => authSchemaCheck.call(authConfigResult) : undefined
     );
 
+    // ── Scheduled RLS audit ───────────────────────────────────────────────
+    // Owned rather than served: `surfaces.admin` decides whether the *result*
+    // is readable over HTTP, `ownership.rlsAudit` whether this process is the
+    // one that runs the scan. A process that serves the surface without owning
+    // the scan reports "not run here", which is the truth.
+    if (config.rlsAudit?.enabled && ownership.rlsAudit) {
+        rlsAudit = createRlsAudit(config.rlsAudit);
+        rlsAudit.start();
+    }
+
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = createShutdown({
         server: config.server,
         cronScheduler,
         jobQueue,
+        rlsAudit,
         realtimeServices
     });
 
