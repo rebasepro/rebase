@@ -21,6 +21,9 @@ export { SMTPEmailService, createEmailService } from "./smtp-email-service";
 // tag the defaults use — not its own escaping.
 export { html, raw, escapeHtml, RawHtml } from "./html";
 
+export { createDevEmailSink, extractLinks } from "./dev-sink";
+export type { DevEmailSink, CapturedEmail } from "./dev-sink";
+
 export { resolveEmailLinkBase, assertEmailLinkBases } from "./link-base";
 export type { EmailLinkKind } from "./link-base";
 
