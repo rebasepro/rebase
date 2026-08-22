@@ -2,7 +2,6 @@ import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import chokidar from "chokidar";
 import {
     generatePostgresDdl,
     generatePostgresPoliciesDdl,
@@ -77,7 +76,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
     }
 };
 
-const main = () => {
+const main = async () => {
     const collectionsFilePathArg = process.argv.find(arg => arg.startsWith("--collections="));
     const collectionsFilePath = collectionsFilePathArg ? collectionsFilePathArg.split("=")[1] : process.argv[2];
 
@@ -96,6 +95,18 @@ const main = () => {
 
     if (watch) {
         out(`Watching for changes in ${resolvedPath}...`);
+        /**
+         * `chokidar` is imported lazily, inside the branch that watches.
+ *
+         * It is a file watcher used by `--watch`, and this module is re-exported from
+         * the package index — so a static import made a dev-time convenience a hard
+         * runtime dependency of the database driver. The runtime image deliberately
+         * ships the driver but prunes CLI-only dependencies, so loading it there failed
+         * with `Cannot find package 'chokidar'` and the pod could not reach Postgres at
+         * all. Found by booting the built image; every unit test was green, because
+         * nothing in the suite loads the package the way a container does.
+         */
+        const { default: chokidar } = await import("chokidar");
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,
             ignoreInitial: false
