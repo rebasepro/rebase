@@ -84,6 +84,13 @@ async function boot(collectionsDir: string | undefined) {
     };
 }
 
+/**
+ * These boot a whole backend, and jest's default 5s is not a timeout for that —
+ * it is a coin flip once the suites run in parallel. See the same constant in
+ * `schema-editor-availability.test.ts`.
+ */
+const BOOTS_A_BACKEND = 30_000;
+
 const post = (app: Hono, body: unknown) =>
     app.fetch(new Request("http://localhost/api/admin/schema/plan", {
         method: "POST",
@@ -112,7 +119,7 @@ describe("live schema editing, as mounted", () => {
             stop();
             fs.rmSync(dir, { recursive: true, force: true });
         }
-    });
+    }, BOOTS_A_BACKEND);
 
     it("says why, rather than 401ing, when there is no collectionsDir to edit", async () => {
         // The surface lives under `/api/admin`, and the gate in front of that
@@ -137,7 +144,7 @@ describe("live schema editing, as mounted", () => {
         } finally {
             stop();
         }
-    });
+    }, BOOTS_A_BACKEND);
 
     it("stays mounted under NODE_ENV=production, unlike the source-only editor", async () => {
         const previous = process.env.NODE_ENV;
@@ -162,5 +169,5 @@ describe("live schema editing, as mounted", () => {
             else process.env.NODE_ENV = previous;
             fs.rmSync(dir, { recursive: true, force: true });
         }
-    });
+    }, BOOTS_A_BACKEND);
 });

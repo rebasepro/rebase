@@ -108,6 +108,18 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
+/**
+ * Every test here boots a whole backend, and jest's default 5s is not a timeout
+ * for that — it is a coin flip.
+ *
+ * Suites run in parallel, so a boot that takes under a second on its own takes
+ * several while a dozen others are booting beside it. The symptom was a suite
+ * that passed on its own, passed under `--runInBand`, and failed at random in a
+ * full run — read as a flaky feature rather than as a timeout that was never
+ * appropriate for what these tests do. Naming the real cost is the fix.
+ */
+const BOOTS_A_BACKEND = 30_000;
+
 async function boot(config: Record<string, unknown> = {}): Promise<Hono> {
     const app = new Hono();
     await initializeRebaseBackend({
@@ -152,7 +164,7 @@ describe("the schema editor is admin-only", () => {
 
         expect(res.status).toBe(401);
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
-    });
+    }, BOOTS_A_BACKEND);
 
     it("refuses a signed-in non-admin with 403", async () => {
         const app = await boot({ collectionsDir });
@@ -160,13 +172,13 @@ describe("the schema editor is admin-only", () => {
         const res = await save(app, { headers: { authorization: `Bearer ${generateAccessToken("editor-1", ["editor"])}` } });
 
         expect(res.status).toBe(403);
-    });
+    }, BOOTS_A_BACKEND);
 
     it("gates the status endpoint too — a non-admin gets no answer about it", async () => {
         const app = await boot({ collectionsDir });
 
         expect((await app.request("/api/schema-editor/status")).status).toBe(401);
-    });
+    }, BOOTS_A_BACKEND);
 
     it("lets an admin through to the editor", async () => {
         const app = await boot({ collectionsDir });
@@ -175,7 +187,7 @@ describe("the schema editor is admin-only", () => {
 
         expect(res.status).toBe(200);
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toContain("Renamed");
-    });
+    }, BOOTS_A_BACKEND);
 });
 
 describe("when the editor can write, it says so", () => {
@@ -183,7 +195,7 @@ describe("when the editor can write, it says so", () => {
         const app = await boot({ collectionsDir });
 
         expect(await status(app)).toEqual({ enabled: true });
-    });
+    }, BOOTS_A_BACKEND);
 });
 
 describe("when the editor cannot write, it says why", () => {
@@ -257,7 +269,7 @@ describe("when the editor cannot write, it says why", () => {
 
         expect(warn.mock.calls.flat().join(" ")).toMatch(/no collectionsDir/);
         expect((await status(app)).code).toBe("SCHEMA_EDITOR_NO_COLLECTIONS_DIR");
-    });
+    }, BOOTS_A_BACKEND);
 
     it("leaves the collection file untouched", async () => {
         process.env.NODE_ENV = "production";
@@ -267,5 +279,5 @@ describe("when the editor cannot write, it says why", () => {
         await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
 
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
-    });
+    }, BOOTS_A_BACKEND);
 });
