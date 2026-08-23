@@ -1,5 +1,6 @@
 import type { EffectiveRoleController } from "@rebasepro/types";
 import { useCallback, useState, useMemo } from "react";
+import { readStoredString, removeStoredString, writeStoredString } from "../util/local_storage";
 ;
 
 /**
@@ -10,16 +11,14 @@ import { useCallback, useState, useMemo } from "react";
  */
 export function useBuildEffectiveRoleController(): EffectiveRoleController {
 
-    const savedRole = typeof window !== "undefined" ? localStorage.getItem("rebase-effective-role") : null;
+    const savedRole = readStoredString("rebase-effective-role");
     const [effectiveRole, setEffectiveRole] = useState<string | null>(savedRole ?? null);
 
     const setRoleInternal = useCallback((newRole: string | null) => {
-        if (typeof window !== "undefined") {
-            if (newRole) {
-                localStorage.setItem("rebase-effective-role", newRole);
-            } else {
-                localStorage.removeItem("rebase-effective-role");
-            }
+        if (newRole) {
+            writeStoredString("rebase-effective-role", newRole);
+        } else {
+            removeStoredString("rebase-effective-role");
         }
         setEffectiveRole(newRole);
     }, []);

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { AdminModeController } from "./useAdminModeController";
+import { readStoredString, writeStoredString } from "../util/local_storage";
 
 /**
  * Use this hook to build an admin mode controller that determines
@@ -7,13 +8,11 @@ import type { AdminModeController } from "./useAdminModeController";
  */
 export function useBuildAdminModeController(): AdminModeController {
 
-    const savedMode = typeof window !== "undefined" ? localStorage.getItem("rebase-admin-mode") as "content" | "studio" | "settings" | null : null;
+    const savedMode = readStoredString("rebase-admin-mode") as "content" | "studio" | "settings" | null;
     const [mode, setMode] = useState<"content" | "studio" | "settings">(savedMode ?? "content");
 
     const setModeInternal = useCallback((newMode: "content" | "studio" | "settings") => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("rebase-admin-mode", newMode);
-        }
+        writeStoredString("rebase-admin-mode", newMode);
         setMode(newMode);
     }, []);
 

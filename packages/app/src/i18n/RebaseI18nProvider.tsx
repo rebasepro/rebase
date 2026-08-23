@@ -9,6 +9,7 @@ import { it } from "../locales/it";
 import { hi } from "../locales/hi";
 import { pt } from "../locales/pt";
 import { RebaseTranslations } from "@rebasepro/admin-types";
+import { readStoredString, writeStoredString } from "../util/local_storage";
 
 const REBASE_NS = "rebase_core";
 
@@ -59,10 +60,8 @@ export function RebaseI18nProvider({
         const resources = buildResources(translations);
 
         let initialLocale = locale;
-        if (typeof window !== "undefined") {
-            const stored = localStorage.getItem(REBASE_LOCALE_STORAGE_KEY);
-            if (stored) initialLocale = stored;
-        }
+        const stored = readStoredString(REBASE_LOCALE_STORAGE_KEY);
+        if (stored) initialLocale = stored;
 
         instance
             .use(initReactI18next)
@@ -82,7 +81,7 @@ export function RebaseI18nProvider({
 
         instance.on("languageChanged", (lng) => {
             if (typeof window !== "undefined") {
-                localStorage.setItem(REBASE_LOCALE_STORAGE_KEY, lng);
+                writeStoredString(REBASE_LOCALE_STORAGE_KEY, lng);
             }
         });
 
@@ -93,7 +92,7 @@ export function RebaseI18nProvider({
     // ONLY if the user hasn't explicitly set a preference
     useEffect(() => {
         if (i18nRef.current && i18nRef.current.language !== locale) {
-            const hasUserPreference = typeof window !== "undefined" && Boolean(localStorage.getItem(REBASE_LOCALE_STORAGE_KEY));
+            const hasUserPreference = Boolean(readStoredString(REBASE_LOCALE_STORAGE_KEY));
             if (!hasUserPreference) {
                 i18nRef.current.changeLanguage(locale);
             }

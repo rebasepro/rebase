@@ -10,3 +10,4 @@ export * from "./useStorageUploadController";
 export * from "./previews";
 export * from "./enums";
 export * from "./constants";
+export * from "./local_storage";
