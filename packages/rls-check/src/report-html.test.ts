@@ -39,7 +39,7 @@ function finding(overrides: Partial<Finding> = {}): Finding {
 
 function result(overrides: Partial<ScanResult> = {}): ScanResult {
     return {
-        diagnostics: { degraded: [], tlsVerificationDisabled: false, excludedSchemas: [] },
+        diagnostics: { degraded: [], tlsVerificationDisabled: false, excludedSchemas: [], unrecognizedGrantees: [] },
         scannedAt: "2026-07-26T09:00:00.000Z",
         database: { host: "db.abcdefghijkl.supabase.co", name: "postgres" },
         serverVersion: "PostgreSQL 15.6 on aarch64-unknown-linux-gnu",
@@ -115,7 +115,8 @@ describe("hostile content from the scanned database", () => {
             diagnostics: {
                 degraded: [{ what: `read ${PAYLOAD}`, error: `error ${PAYLOAD}` }],
                 tlsVerificationDisabled: false,
-                excludedSchemas: []
+                excludedSchemas: [],
+                unrecognizedGrantees: []
             }
         }, { ...OPTIONS, endpoint: `endpoint${PAYLOAD}` });
 
@@ -204,7 +205,8 @@ describe("caveats", () => {
             diagnostics: {
                 degraded: [{ what: "role_table_grants", error: "permission denied" }],
                 tlsVerificationDisabled: false,
-                excludedSchemas: []
+                excludedSchemas: [],
+                unrecognizedGrantees: []
             }
         });
 
@@ -219,7 +221,8 @@ describe("caveats", () => {
             diagnostics: {
                 degraded: [{ what: "pg_policies", error: "timeout" }],
                 tlsVerificationDisabled: false,
-                excludedSchemas: []
+                excludedSchemas: [],
+                unrecognizedGrantees: []
             }
         });
 
