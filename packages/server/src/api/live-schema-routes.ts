@@ -33,7 +33,8 @@ import {
     isSchemaEditingAdmin,
     isSQLAdmin,
     type CollectionConfig,
-    type DatabaseAdmin
+    type DatabaseAdmin,
+    type SchemaCommitPaths
 } from "@rebasepro/types";
 import { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
@@ -79,6 +80,17 @@ export interface LiveSchemaRoutesConfig {
      * change's own edit as somebody else's work in progress and refuses.
      */
     sourcePathsFor?: (change: ProposedChange) => string[];
+    /**
+     * Where this project's generated artifacts belong, relative to the
+     * repository.
+     *
+     * Absent for a project that *is* the repository, which is what the defaults
+     * describe. Present for one in a subdirectory, where the defaults would
+     * write `backend/` and `drizzle/` beside `.git` and leave the project's real
+     * generated files untouched — committing a source change alongside a stale
+     * schema, which is the failure committing the whole change exists to avoid.
+     */
+    commitPaths?: Partial<SchemaCommitPaths>;
     /**
      * Who may apply a change, as opposed to preview one.
      *
@@ -291,7 +303,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         const before = config.getCollections();
         const after = proposedCollections(before, change);
 
-        const plan = await admin.planSchemaChange(before, after);
+        const plan = await admin.planSchemaChange(before, after, { paths: config.commitPaths });
         return c.json({
             applicable: plan.classified.applicable,
             verdict: plan.classified.verdict,
@@ -341,7 +353,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         // a change that turns out to be unapplicable must be refused *first* —
         // otherwise a rejected edit still leaves a rewritten collection file
         // behind, and the refusal reads as "nothing happened" when something did.
-        const plan = await admin.planSchemaChange(before, after);
+        const plan = await admin.planSchemaChange(before, after, { paths: config.commitPaths });
         if (!plan.classified.applicable) {
             const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
             throw ApiError.badRequest(

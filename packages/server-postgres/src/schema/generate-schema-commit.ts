@@ -37,7 +37,7 @@
  * migration this module cannot make valid would be worse than handing the
  * statements to a caller who knows which kind of project it is.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import { DEFAULT_COMMIT_PATHS, type CollectionConfig, type SchemaCommitPaths } from "@rebasepro/types";
 import {
     generatePostgresDdl,
     generatePostgresPoliciesDdl,
@@ -52,22 +52,12 @@ import {
 } from "./ensure-collection-tables";
 import { classifyCollectionChanges, type ClassifiedChanges } from "./classify-change";
 
-/** Where each generated artifact lives in a scaffolded project. */
-export interface SchemaCommitPaths {
-    /** Drizzle schema, imported by the backend. */
-    schemaFile: string;
-    /** Declarative DDL, what `db push` applies and Atlas diffs against. */
-    ddlFile: string;
-    policiesFile: string;
-    searchFile: string;
-}
-
-export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
-    schemaFile: "backend/src/schema.generated.ts",
-    ddlFile: "drizzle/schema.sql",
-    policiesFile: "drizzle/policies.sql",
-    searchFile: "drizzle/search.sql"
-};
+/**
+ * Re-exported from the shared kernel. `@rebasepro/server` derives these for a
+ * project in a subdirectory and cannot import a driver to do it, so the shape
+ * and the defaults live in `@rebasepro/types`.
+ */
+export { DEFAULT_COMMIT_PATHS, type SchemaCommitPaths } from "@rebasepro/types";
 
 export interface SchemaCommitFile {
     path: string;

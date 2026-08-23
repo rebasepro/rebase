@@ -4802,6 +4802,13 @@ artifacts, and a stale one breaks the next deploy:
 - `backend/src/schema.generated.ts` — the Drizzle schema
 - `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
+Those paths are relative to your **project**, not to your repository. When the
+two are the same — a `rebase init` project, which is the usual case — there is
+nothing to think about. When your project sits in a subdirectory of a larger
+repository, the paths are prefixed with it, found by walking up from your
+collections directory to the nearest `rebase.json`. A project with no
+`rebase.json` keeps the plain paths.
+
 The commit message describes the change rather than announcing one, and is
 attributed to the admin who made it. A schema change with an author and a diff
 in your project's history is something neither Firebase nor Supabase gives you —

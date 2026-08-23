@@ -51,6 +51,7 @@ import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { createLiveSchemaRoutes } from "./api/live-schema-routes";
 import { mountWithLegacyAlias } from "./api/mount";
+import { commitPathsFor } from "./schema-edit/project-root";
 import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
 
 /**
@@ -1694,7 +1695,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             const liveSchemaRouter = new Hono<HonoEnv>();
             applyAdminGate(liveSchemaRouter, "Live schema editing");
 
+            // Correct for a project in a subdirectory: the generated-artifact
+            // paths are relative to the *project*, and the repository resolves
+            // them against its own root. Those coincide only in a scaffold.
+            const commitPaths = repositoryRoot
+                ? commitPathsFor(collectionsDir, repositoryRoot)
+                : undefined;
+            if (commitPaths) {
+                logger.debug("Live schema editing commit paths relocated", { commitPaths });
+            }
+
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
+                commitPaths,
                 // Off unless the project says otherwise. An automated schema
                 // change is a legitimate thing to want and a poor default:
                 // the credential that would make it is the one most likely to
