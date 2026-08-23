@@ -13,26 +13,37 @@ trata sobre cómo obtiene su configuración cada fuente con nombre.
 Dos pasos: **declarar** las fuentes en tu paquete de configuración, luego **configurar**
 cada una con variables de entorno derivadas de su clave.
 
-## Declaración de fuentes
+## Declarar los recursos
 
-Exporta `dataSources` y `storageSources` desde el archivo `index.ts` de tu paquete de configuración.
-Se comparten con el frontend, el cual utiliza las mismas declaraciones para decidir
-si se comunica con una fuente a través de la API de Rebase o directamente.
+Todo lo que un proyecto necesita y tiene nombre — una base de datos, un bucket,
+un topic — se **declara con un constructor**, en `config/resources.ts`. Una
+sola regla, sea cual sea el tipo: no hay un segundo sitio donde mirar.
 
 ```ts
-// config/index.ts
-import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+// config/resources.ts
+import { bucket, database, topic } from "@rebasepro/types";
 
-export const dataSources: DataSourceDefinition[] = [
-    { key: "(default)", engine: "postgres" },
-    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
-];
+/** La base de datos del proyecto. Lee DATABASE_URL, como siempre. */
+export const main = database();
 
-export const storageSources: StorageSourceDefinition[] = [
-    { key: "(default)", engine: "local", transport: "server" },
-    { key: "media", engine: "s3", transport: "server", label: "Public media" }
-];
+/** Una segunda. Lee DATABASE_URL__ANALYTICS. */
+export const analytics = database("analytics", { label: "Analytics warehouse" });
+
+/** Un bucket. Lee S3_BUCKET__MEDIA. */
+export const media = bucket("media", { engine: "s3", label: "Public media" });
+
+/** Un topic, entregado a través de la cola de trabajos duradera. */
+export const signups = topic<{ userId: string }>("signups");
 ```
+
+`rebase resources` enumera lo que un proyecto declara, `--write` regenera
+`rebase.resources.json` y `--check` falla si ese fichero está obsoleto. Ese
+fichero se **genera** y se versiona: es lo que un host lee para decidir qué
+aprovisionar *antes* de ejecutar nada.
+
+Un motor desconocido se rechaza en el punto de llamada, no más tarde. Para uno
+que esta build no conoce se escribe `custom:` — por ejemplo
+`bucket("objects", { engine: "custom:minio" })`.
 
 Luego, apunta una colección a una de ellas:
 

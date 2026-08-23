@@ -13,26 +13,38 @@ comment chaque source nommée obtient sa configuration.
 Deux étapes : **déclarer** les sources dans votre package de configuration, puis **configurer**
 chacune d'elles avec des variables d'environnement dérivées de sa clé.
 
-## Declaring sources
+## Déclarer les ressources
 
-Exportez `dataSources` et `storageSources` depuis le fichier `index.ts` de votre package de configuration.
-Elles sont partagées avec le frontend, qui utilise ces mêmes déclarations pour décider
-s'il communique avec une source via l'API Rebase ou directement.
+Tout ce dont un projet a besoin et qui porte un nom — une base de données, un
+bucket, un topic — se **déclare avec un constructeur**, dans
+`config/resources.ts`. Une seule règle, quel que soit le type : il n'y a pas de
+second endroit où chercher.
 
 ```ts
-// config/index.ts
-import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+// config/resources.ts
+import { bucket, database, topic } from "@rebasepro/types";
 
-export const dataSources: DataSourceDefinition[] = [
-    { key: "(default)", engine: "postgres" },
-    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
-];
+/** La base de données du projet. Lit DATABASE_URL, comme auparavant. */
+export const main = database();
 
-export const storageSources: StorageSourceDefinition[] = [
-    { key: "(default)", engine: "local", transport: "server" },
-    { key: "media", engine: "s3", transport: "server", label: "Public media" }
-];
+/** Une seconde. Lit DATABASE_URL__ANALYTICS. */
+export const analytics = database("analytics", { label: "Analytics warehouse" });
+
+/** Un bucket. Lit S3_BUCKET__MEDIA. */
+export const media = bucket("media", { engine: "s3", label: "Public media" });
+
+/** Un topic, distribué via la file de tâches durable. */
+export const signups = topic<{ userId: string }>("signups");
 ```
+
+`rebase resources` liste ce qu'un projet déclare, `--write` régénère
+`rebase.resources.json` et `--check` échoue si ce fichier est périmé. Ce fichier
+est **généré** et versionné : c'est ce qu'un hôte lit pour décider quoi
+provisionner *avant* d'exécuter quoi que ce soit.
+
+Un moteur inconnu est refusé à l'endroit de l'appel, et non plus tard. Pour un
+moteur que cette build ne connaît pas, on écrit `custom:` — par exemple
+`bucket("objects", { engine: "custom:minio" })`.
 
 Pointer ensuite une collection vers l'une d'elles :
 
