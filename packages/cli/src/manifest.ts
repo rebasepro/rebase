@@ -28,7 +28,7 @@ import {
 import { MANIFEST_FILENAME } from "./utils/project";
 
 /** Runtime range written into new manifests. */
-export const CURRENT_RUNTIME_RANGE = "^1";
+export const CURRENT_RUNTIME_RANGE = "^2";
 
 /** Conventional locations, matching what `rebase init` scaffolds. */
 export const DEFAULT_CONFIG_DIR = "config";

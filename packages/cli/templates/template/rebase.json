@@ -1,6 +1,6 @@
 {
     "$schema": "https://rebase.pro/schemas/rebase.json",
-    "rebase": "^1",
+    "rebase": "^2",
     "apps": {
         "backend": {
             "type": "backend",
