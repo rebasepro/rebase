@@ -65,8 +65,22 @@ interface PendingChange {
 }
 
 export interface LiveSchemaEditing {
-    /** `undefined` until the backend has answered. */
+    /** `undefined` until the backend has answered. For rendering. */
     status?: LiveSchemaStatus;
+    /**
+     * The same answer, for deciding.
+     *
+     * `status` is undefined for one round trip after mount, and a caller that
+     * read it to choose a code path would take the "not available" branch for
+     * that window — so a save issued quickly after a page load would silently
+     * skip the confirmation and write source only, while the same save a second
+     * later would not. Timing-dependent behaviour with no visible difference is
+     * the worst shape this could have.
+     *
+     * Resolves once, cached; never rejects, because every way of failing to get
+     * an answer means the same thing to whoever is deciding.
+     */
+    ready: () => Promise<LiveSchemaStatus>;
     /**
      * Plan the change, show it, and settle when the person has decided.
      *
@@ -106,13 +120,27 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
     const [applying, setApplying] = useState(false);
     const [applyError, setApplyError] = useState<string | undefined>();
 
+    // The in-flight probe, so `ready()` can await the same one the effect
+    // started rather than issuing a second. Keyed by client+authKey the same way
+    // the effect is: a sign-in changes the answer, so it has to be re-asked.
+    const probe = useRef<{ key: unknown[]; promise: Promise<LiveSchemaStatus> }>();
+
+    const ready = useCallback((): Promise<LiveSchemaStatus> => {
+        const key = [client, authKey];
+        const current = probe.current;
+        if (!current || current.key[0] !== key[0] || current.key[1] !== key[1]) {
+            probe.current = { key, promise: client.status() };
+        }
+        return probe.current!.promise;
+    }, [client, authKey]);
+
     useEffect(() => {
         let cancelled = false;
-        void client.status().then(answer => {
+        void ready().then(answer => {
             if (!cancelled) setStatus(answer);
         });
         return () => { cancelled = true; };
-    }, [client, authKey]);
+    }, [ready]);
 
     const clear = useCallback(() => {
         setPending(undefined);
@@ -205,5 +233,5 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         />
     );
 
-    return { status, reviewChange, dialog };
+    return { status, ready, reviewChange, dialog };
 }

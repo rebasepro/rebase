@@ -275,3 +275,59 @@ describe("when the caller may not apply", () => {
         expect(client.apply).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * The window between mount and the backend's first answer.
+ *
+ * `status` is undefined for one round trip. A caller that read it to choose a
+ * code path would take the "not available" branch for that window — so a save
+ * issued quickly after a page load would skip the confirmation and write source
+ * only, while the same save a second later would open a dialog. Nothing on
+ * screen would distinguish the two.
+ */
+describe("before the backend has answered", () => {
+    it("waits for the answer rather than assuming there is none", async () => {
+        let answer: (s: unknown) => void = () => {};
+        const client = fakeClient({
+            status: jest.fn(() => new Promise(resolve => { answer = resolve; })) as never
+        });
+
+        const Waiter = () => {
+            const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client });
+            return (
+                <div>
+                    <button onClick={() => { void live.ready().then(s => {
+                        (globalThis as Record<string, unknown>).__answered = s;
+                    }); }}>ask</button>
+                    {live.dialog}
+                </div>
+            );
+        };
+        render(<Waiter/>);
+
+        // Asked while the probe is still in flight.
+        await act(async () => { screen.getByText("ask").click(); });
+        expect((globalThis as Record<string, unknown>).__answered).toBeUndefined();
+
+        await act(async () => {
+            answer({ enabled: true, canPlan: true, canApply: true });
+        });
+
+        await waitFor(() => expect(
+            (globalThis as Record<string, unknown>).__answered
+        ).toMatchObject({ enabled: true }));
+    });
+
+    it("asks the backend once, however many callers want the answer", async () => {
+        const client = fakeClient();
+        const Many = () => {
+            const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client });
+            return <button onClick={() => { void live.ready(); void live.ready(); }}>ask</button>;
+        };
+        render(<Many/>);
+        await act(async () => { screen.getByText("ask").click(); });
+
+        // The effect's probe and both explicit asks share one request.
+        expect(client.status).toHaveBeenCalledTimes(1);
+    });
+});

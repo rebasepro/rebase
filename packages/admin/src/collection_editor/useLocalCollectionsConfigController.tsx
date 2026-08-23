@@ -204,7 +204,13 @@ export function useLocalCollectionsConfigController(
         collection: Record<string, unknown>,
         sourceOnly: () => Promise<void>
     ): Promise<void> => {
-        if (!liveSchema.status?.enabled) return sourceOnly();
+        // `ready()`, not `status` — the rendered status is undefined for one
+        // round trip after mount, so reading it here would send a save issued
+        // in that window down the source-only path with no confirmation, while
+        // the same save a second later would open a dialog. One round trip is
+        // cheap; behaviour that depends on how fast somebody clicked is not.
+        const available = await liveSchema.ready();
+        if (!available.enabled) return sourceOnly();
         await liveSchema.reviewChange({ collectionId, collection });
     };
 
