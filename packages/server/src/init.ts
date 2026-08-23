@@ -13,7 +13,8 @@ import {
     InitializedDriver,
     isSQLAdmin,
     RealtimeProvider,
-    SecurityRule
+    SecurityRule,
+    buildResourceGraph
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
@@ -400,7 +401,7 @@ export interface RebaseBackendConfig {
      * still owns their schema/registry but does **not** generate server data
      * routes for them. Server-mediated sources (the default) need no entry.
      */
-    dataSources?: DataSourceDefinition[];
+
 
     /**
      * Database bootstrappers.
@@ -452,7 +453,7 @@ export interface RebaseBackendConfig {
      * only need explicit entries for "direct" transport sources (e.g.
      * external storage) that the backend does not proxy.
      */
-    storageSources?: import("@rebasepro/types").StorageSourceDefinition[];
+
 
     /**
      * Per-object access control for storage — the analogue of a collection's
@@ -729,6 +730,13 @@ export interface RebaseBackendConfig {
  * drivers can reach `resolveRequireAuth` without importing this entry point.
  */
 import { isAuthAdapter, resolveRequireAuth } from "./auth/require-auth";
+import {
+    assertNoReplacedResourceConfig,
+    graphToDataSources,
+    graphToStorageSources,
+    graphTopics
+} from "./boot/resource-adapters.js";
+import { installTopicRuntime, topicJobHandlers } from "./topics/runtime.js";
 export { isAuthAdapter } from "./auth/require-auth";
 
 /**
@@ -861,6 +869,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         configureLogLevel();
     }
 
+    // Before anything reads the config: a project still declaring resources the
+    // old way is refused here rather than booted with them ignored. First
+    // statement of substance on purpose — after this line, `config` is known not
+    // to carry a declaration nothing will honour.
+    assertNoReplacedResourceConfig(config as unknown as Record<string, unknown>);
+
+    // The graph replaces both. Read once here so everything below sees one
+    // answer: the registry is populated by the config module's own
+    // declarations, which have already been evaluated by the time a backend is
+    // being initialised with them.
+    const resourceGraph = buildResourceGraph();
+    const declaredDataSources = graphToDataSources(resourceGraph);
+    const declaredStorageSources = graphToStorageSources(resourceGraph);
+
     logger.debug("Initializing Rebase Backend");
 
     // One floating promise in application code — a fire-and-forget call in a
@@ -897,7 +919,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // Declared data sources — drives engine resolution (capabilities) and the
     // server-vs-direct transport distinction. Set before collections register
     // so normalization can resolve each collection's engine.
-    const dataSourceRegistry = createDataSourceRegistry(config.dataSources);
+    const dataSourceRegistry = createDataSourceRegistry(
+        declaredDataSources.length > 0 ? declaredDataSources : undefined
+    );
     collectionRegistry.setDataSources(dataSourceRegistry);
 
     // Global lifecycle callbacks — applied to every collection, on all data paths.
@@ -978,7 +1002,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const provisionable = collectionsStoredBy(
         activeCollections,
         { engine: provisionTarget.engine },
-        (config.dataSources ?? []).map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
+        declaredDataSources.map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
     );
     logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
 
@@ -1823,7 +1847,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const storageRoutes = createStorageRoutes({
             controller: storageController,
             registry: storageRegistry,
-            sources: config.storageSources,
+            sources: declaredStorageSources.length > 0 ? declaredStorageSources : undefined,
             requireAuth: resolveRequireAuth(config.auth),
             publicRead: config.storagePublicRead === true,
             authAdapter,
@@ -2425,6 +2449,29 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     //
     // After cron on purpose: both create tables in `rebase`, and cron's
     // bootstrap is the older and better-exercised of the two.
+    //
+    // A project that declares a topic gets the queue whether or not it asked
+    // for one. Topics are delivered as job rows, so `jobs.enabled: false` with
+    // a topic declared is a backend where every publish throws — and requiring
+    // somebody to turn on a subsystem they never named, to make a feature they
+    // did name work, is the kind of second step this model exists to remove.
+    const declaredTopics = graphTopics(buildResourceGraph());
+    const topicTasks = declaredTopics.length > 0 ? topicJobHandlers() : {};
+    if (declaredTopics.length > 0) {
+        config = {
+            ...config,
+            jobs: {
+                ...config.jobs,
+                enabled: true,
+                tasks: { ...(config.jobs?.tasks ?? {}), ...topicTasks }
+            }
+        };
+        logger.debug(
+            `[topics] ${declaredTopics.length} topic(s), ${Object.keys(topicTasks).length} subscription(s) ` +
+            "wired onto the job queue"
+        );
+    }
+
     let jobQueue: import("./jobs").JobQueue | undefined;
     if (config.jobs?.enabled) {
         const { createJobStore, createJobQueue } = await import("./jobs");
@@ -2433,6 +2480,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (store) {
             await store.ensureTable();
             jobQueue = createJobQueue(store, config.jobs);
+            // Topics publish through the queue, in every process — enqueueing is
+            // a write, so an api pod that runs no workers still publishes. The
+            // handlers only *run* where the workers do, which is the same split
+            // the queue already makes.
+            if (declaredTopics.length > 0) {
+                installTopicRuntime({ queue: jobQueue, topics: declaredTopics });
+            }
             // Constructed either way, started only where this process owns the
             // workers: `rebase.jobs.enqueue` must keep working in a process that
             // runs none of them. Enqueueing is a write to a table; running is a
@@ -2445,6 +2499,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     tasks: Object.keys(config.jobs.tasks ?? {}).length
                 });
             }
+        } else if (declaredTopics.length > 0) {
+            // A warning would be wrong here. Webhooks have an in-memory
+            // fallback; topics have none, so every publish would throw at the
+            // first event — in production, at whatever hour the first one
+            // arrives. A driver that cannot carry the queue cannot carry
+            // topics, and the honest place to say so is boot.
+            throw new Error(
+                `This project declares ${declaredTopics.length} topic(s) — ` +
+                `${declaredTopics.map(t => t.key).join(", ")} — but the durable job queue is not ` +
+                "available on this database driver, and topics are delivered as job rows.\n\n" +
+                "Use a driver that supports the job queue, or remove the topic declarations. " +
+                "Refusing to boot rather than starting a backend where every publish throws."
+            );
         } else {
             // `createJobStore` already said why. What it cannot say is what the
             // caller should expect instead, which depends on who asked.

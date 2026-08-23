@@ -379,7 +379,7 @@ message: "name is reserved" });
         byPath.set(at, name);
     }
 
-    const storage = validateStorageSources(raw.storage, issues);
+    const storage = refuseStorageBlock(raw.storage, issues);
 
     // Carried rather than dropped. This key is the only repository-wide privacy
     // control the CLI honours, and a key that does not survive a parse does not
@@ -418,80 +418,29 @@ message: "name is reserved" });
 }
 
 /**
- * Validate the `storage` block — which buckets this project uses.
+ * Refuse a hand-written `storage` block.
  *
- * Absent means one default source, so `undefined` is a valid answer and not an
- * issue. Everything else is checked strictly, because each key here becomes the
- * suffix of a set of environment variables: a key that cannot become a variable
- * name, or two keys that become the *same* one, are failures worth catching
- * while someone is looking at the file rather than at a tenant serving one
- * bucket's files with another's credentials.
+ * Buckets are declared in config code now — `bucket("media")` — and the graph
+ * is generated from those declarations into `rebase.resources.json`. Two homes
+ * for one concept is what this replaced, and the reason it had to go is that
+ * the runtime *merged* them: a bucket declared in both had one engine kept and
+ * the other silently discarded.
+ *
+ * Refused rather than ignored. A key that still parses and no longer does
+ * anything is the same failure wearing a nicer hat — the author sees valid
+ * JSON, the platform sees a bucket, and the runtime has neither.
  */
-function validateStorageSources(
-    raw: unknown,
-    issues: ManifestValidationIssue[]
-): DeclaredStorageSources | undefined {
+function refuseStorageBlock(raw: unknown, issues: ManifestValidationIssue[]): undefined {
     if (raw === undefined) return undefined;
-    if (!isRecord(raw)) {
-        issues.push({ path: "storage",
-message: "must be an object keyed by storage source name" });
-        return undefined;
-    }
-
-    const sources: DeclaredStorageSources = {};
-    for (const [key, value] of Object.entries(raw)) {
-        if (!isRecord(value)) {
-            issues.push({ path: `storage.${key}`,
-message: "must be an object" });
-            continue;
-        }
-        if (typeof value.engine !== "string" || value.engine.trim() === "") {
-            issues.push({
-                path: `storage.${key}.engine`,
-                message: 'is required, e.g. "s3", "gcs" or "local"'
-            });
-            continue;
-        }
-        if (value.transport !== undefined && value.transport !== "server" && value.transport !== "direct") {
-            issues.push({
-                path: `storage.${key}.transport`,
-                message: 'must be "server" or "direct"'
-            });
-            continue;
-        }
-        if (value.label !== undefined && typeof value.label !== "string") {
-            issues.push({ path: `storage.${key}.label`,
-message: "must be a string" });
-            continue;
-        }
-        try {
-            storageEnvSuffix(key);
-        } catch {
-            issues.push({
-                path: `storage.${key}`,
-                message: "name cannot become an environment variable suffix — " +
-                    "use a name containing at least one letter or digit"
-            });
-            continue;
-        }
-        sources[key] = {
-            engine: value.engine,
-            ...(value.transport !== undefined ? { transport: value.transport } : {}),
-            ...(value.label !== undefined ? { label: value.label as string } : {})
-        };
-    }
-
-    const collision = findStorageSuffixCollision(Object.keys(sources));
-    if (collision) {
-        issues.push({
-            path: `storage.${collision.b}`,
-            message: "maps to the same environment variable suffix " +
-                `("${collision.suffix || "(none)"}") as "${collision.a}", so the two would read ` +
-                "each other's configuration — rename one of them"
-        });
-    }
-
-    return Object.keys(sources).length > 0 ? sources : undefined;
+    issues.push({
+        path: "storage",
+        message:
+            "is no longer read. Declare each bucket in your config's resources.ts — " +
+            'bucket("media", { engine: "s3" }) — then run `rebase resources --write`, ' +
+            "which generates rebase.resources.json. Refused rather than ignored: this " +
+            "block used to be merged with the code's declarations and silently win."
+    });
+    return undefined;
 }
 
 /**
