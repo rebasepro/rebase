@@ -245,3 +245,28 @@ export function asUnavailable(err: unknown): LiveSchemaUnavailable | undefined {
     const reason = UNAVAILABLE[err.code];
     return reason ? { reason, message: err.message } : undefined;
 }
+
+/** The person closed the dialog without applying. Not an error; an answer. */
+export class SchemaChangeCancelled extends Error {
+    constructor() {
+        super("The schema change was not applied.");
+        this.name = "SchemaChangeCancelled";
+    }
+}
+
+/**
+ * Was this rejection the person saying no?
+ *
+ * A save has to *reject* when it is cancelled — resolving would leave the form
+ * believing it saved. But a caller that treats every rejection as a failure
+ * then reports the user's own choice back to them as an error, which is what
+ * the collection editor did: a console error and a red snackbar reading "Error
+ * persisting collection: The schema change was not applied."
+ *
+ * Matched by name rather than `instanceof`, which is unreliable the moment two
+ * copies of this module end up in one bundle — the class is then a different
+ * identity and every check silently answers false.
+ */
+export function isSchemaChangeCancelled(err: unknown): boolean {
+    return err instanceof Error && err.name === "SchemaChangeCancelled";
+}

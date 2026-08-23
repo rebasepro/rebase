@@ -2,25 +2,25 @@
     "targets": {
         "app/frontend/dist": {
             "chunks": {
-                "rebase-core": 1925583,
-                "form": 377256,
-                "index": 232118,
+                "rebase-core": 1950782,
+                "form": 384032,
+                "index": 239392,
                 "vendor-react-dom": 178377,
                 "vendor-prism": 85065,
                 "vendor-zod": 65982,
-                "useHistory": 58540,
+                "useHistory": 58668,
                 "vendor-datefns": 19559,
                 "export": 7933,
-                "serializable_utils": 7598,
+                "serializable_utils": 7696,
                 "import": 6244,
+                "useCollectionsConfigController": 1811,
                 "rolldown-runtime": 1084,
                 "vendor-dnd": 451,
                 "vendor-react-router": 281,
-                "useCollectionsConfigController": 261,
                 "get_import_inference_type": 258
             },
-            "totalBytes": 2966590,
-            "totalGzipBytes": 868565
+            "totalBytes": 3007615,
+            "totalGzipBytes": 883027
         }
     }
 }

@@ -9,11 +9,12 @@
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
     useLiveSchemaEditing,
-    SchemaChangeCancelled
+    SchemaChangeCancelled,
+    isSchemaChangeCancelled
 } from "../../src/collection_editor/useLiveSchemaEditing";
 import type {
     LiveSchemaClient,
@@ -329,5 +330,109 @@ describe("before the backend has answered", () => {
 
         // The effect's probe and both explicit asks share one request.
         expect(client.status).toHaveBeenCalledTimes(1);
+    });
+});
+
+/**
+ * Cancelling is an answer, and callers have to be able to tell it apart.
+ *
+ * A save must *reject* when it is cancelled — resolving would leave the form
+ * believing it saved. But the collection editor caught every rejection the same
+ * way, so cancelling produced a console error and a red snackbar reading "Error
+ * persisting collection: The schema change was not applied": the person's own
+ * choice, reported back to them as a fault.
+ */
+describe("telling a cancellation from a failure", () => {
+    it("recognises the cancellation", () => {
+        expect(isSchemaChangeCancelled(new SchemaChangeCancelled())).toBe(true);
+    });
+
+    it("does not swallow a real failure", () => {
+        expect(isSchemaChangeCancelled(new Error("the working tree is dirty"))).toBe(false);
+        expect(isSchemaChangeCancelled("cancelled")).toBe(false);
+        expect(isSchemaChangeCancelled(undefined)).toBe(false);
+    });
+
+    it("recognises one thrown by another copy of this module", () => {
+        // Matched by name, not `instanceof`: two copies of the package in one
+        // bundle give the class two identities, and an `instanceof` check then
+        // answers false for a cancellation that is real. The editor would go
+        // back to reporting it as an error, which is the bug this guards.
+        const fromElsewhere = new Error("The schema change was not applied.");
+        fromElsewhere.name = "SchemaChangeCancelled";
+        expect(isSchemaChangeCancelled(fromElsewhere)).toBe(true);
+    });
+});
+
+
+/**
+ * Two ways the dialog could settle a caller wrongly.
+ *
+ * Both are about a promise and a running operation disagreeing, which is the
+ * failure this whole feature exists to make impossible.
+ */
+describe("settling the caller correctly", () => {
+    it("settles the first review when a second replaces it", async () => {
+        // A double-clicked save. `setPending` overwrote `resolve`/`reject` with
+        // nobody left holding them, so the first promise never settled and the
+        // editor's save simply never returned.
+        const client = fakeClient();
+        const settled: string[] = [];
+
+        const Twice = () => {
+            const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client });
+            return (
+                <div>
+                    <button onClick={() => {
+                        live.reviewChange({ collectionId: "a", collection: {} })
+                            .then(() => settled.push("a:resolved"), () => settled.push("a:rejected"));
+                        live.reviewChange({ collectionId: "b", collection: {} })
+                            .then(() => settled.push("b:resolved"), () => settled.push("b:rejected"));
+                    }}>start</button>
+                    {live.dialog}
+                </div>
+            );
+        };
+        render(<Twice/>);
+        await act(async () => { screen.getByText("start").click(); });
+
+        await waitFor(() => expect(settled).toContain("a:rejected"));
+        // The second is still open and waiting to be decided.
+        expect(settled).not.toContain("b:resolved");
+        expect(settled).not.toContain("b:rejected");
+    });
+
+    it("does not report a cancellation while the apply is still running", async () => {
+        // Escape and the backdrop both reach `onClose`, and only the Cancel
+        // *button* was disabled while applying. Closing mid-apply rejected the
+        // caller as cancelled while the commit and DDL carried on — telling
+        // somebody nothing happened while something did.
+        let finishApply: (r: LiveSchemaResult) => void = () => {};
+        const client = fakeClient({
+            apply: jest.fn(() => new Promise(resolve => { finishApply = resolve; })) as never
+        });
+        const settled = jest.fn();
+        render(<Harness client={client} onSettled={settled}/>);
+
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        await act(async () => { screen.getByText("Commit and apply").click(); });
+
+        // Mid-apply. The Cancel *button* is disabled — but Escape does not go
+        // through the button, it goes through the dialog's own dismiss. That is
+        // the path that was unguarded, so that is the one to press.
+        expect(screen.getByText("Cancel").closest("button")?.disabled).toBe(true);
+        await act(async () => {
+            fireEvent.keyDown(document.activeElement ?? document.body, {
+                key: "Escape", code: "Escape", keyCode: 27
+            });
+        });
+
+        // Nothing settled: the apply is still running and has not been answered.
+        expect(settled).not.toHaveBeenCalled();
+
+        await act(async () => { finishApply(APPLIED); });
+        await waitFor(() => expect(settled).toHaveBeenCalledWith("resolved"));
+        expect(settled).not.toHaveBeenCalledWith("rejected", expect.anything());
     });
 });

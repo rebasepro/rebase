@@ -202,16 +202,35 @@ not whether it is production.
 | `rebase dev` on your machine | yes |
 | Self-host with the project mounted | yes |
 | Self-host from a built bundle | no — nothing to edit |
-| Rebase Cloud | with a connected repository |
+| Rebase Cloud | **not yet** — see below |
 
 A bundle is compiled output. There is no collection source in it, so the routes
 answer `SCHEMA_EDITING_NO_REPOSITORY` and say why. **Running from source is how
 a self-hosted deployment gets the schema editor.**
 
+### Rebase Cloud
+
+A Cloud tenant runs a built bundle, so its source is not on the machine — it
+lives in your repository. Committing there needs no working tree: the Git Data
+API creates a blob, a tree and a commit and moves a ref in four calls, and
+`createGitHubRepository` implements exactly that, against a GitHub App or a
+token.
+
+**It is not connected yet.** The backend is written and tested, including
+against a real repository, but nothing constructs it: a Cloud tenant currently
+gets the same `SCHEMA_EDITING_NO_REPOSITORY` refusal as any other bundle
+deployment. What remains is plumbing — storing an installation per project,
+reading the app key at boot, and choosing that backend when there is no working
+tree.
+
+Until then, edit your collections in your editor and deploy, or run the project
+from source.
+
 On a machine that has the repository, the commit is a plain `git commit` —
 nothing to authenticate, no token, no network. Cloud is the harder case, because
-the repository is elsewhere; there it commits through a GitHub App using the Git
-Data API, with no clone.
+the repository is elsewhere: it *would* commit through a GitHub App using the
+Git Data API, with no clone, and that backend exists — but see
+[Rebase Cloud](#rebase-cloud) above, it is not connected yet.
 
 Two things that make it safe to run against a repository somebody else is
 working in:

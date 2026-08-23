@@ -119,10 +119,29 @@ export function commitAuthor(user: unknown): { name: string; email: string } | u
     };
 }
 
+/**
+ * What a collection id may contain.
+ *
+ * The same alphabet the AST editor sanitises to, stated at the boundary
+ * instead. The id becomes a *filename* — `<collectionsDir>/<id>.ts` — in two
+ * places, and only one of them checked it: the editor refuses a traversal when
+ * it writes, but the caller derives the same path first, to hand the dirty
+ * check the paths it is about to touch. A refusal that arrives one layer in is
+ * a refusal that the layer above already acted on.
+ */
+const SAFE_COLLECTION_ID = /^[A-Za-z0-9_-]+$/;
+
 const parseProposed = (body: unknown): ProposedChange => {
     const candidate = body as Partial<ProposedChange> | undefined;
     if (!candidate?.collectionId || typeof candidate.collectionId !== "string") {
         throw ApiError.badRequest("`collectionId` is required.", "INVALID_CHANGE");
+    }
+    if (!SAFE_COLLECTION_ID.test(candidate.collectionId)) {
+        throw ApiError.badRequest(
+            `"${candidate.collectionId}" is not a usable collection id. It becomes a filename, so ` +
+            "it may contain only letters, numbers, underscores and hyphens.",
+            "INVALID_CHANGE"
+        );
     }
     if (!candidate.collection || typeof candidate.collection !== "object") {
         throw ApiError.badRequest("`collection` is required.", "INVALID_CHANGE");

@@ -556,3 +556,47 @@ describe("when the source cannot be rewritten", () => {
         });
     });
 });
+
+
+/**
+ * The id becomes a filename, so the boundary is where it gets checked.
+ *
+ * `<collectionsDir>/<id>.ts` is derived in two places: the AST editor, which
+ * sanitises before it writes, and the caller, which derives the same path
+ * *first* so the dirty check knows what is about to be touched. Only the editor
+ * checked. A refusal that arrives one layer in is a refusal the layer above has
+ * already acted on.
+ */
+describe("the collection id", () => {
+    it.each([
+        ["a parent traversal", "../../../etc/passwd"],
+        ["a nested path", "nested/collection"],
+        ["an absolute path", "/etc/passwd"],
+        ["a null byte", "posts\u0000.ts"],
+        ["a space", "my collection"],
+        ["only whitespace", "   "],
+        ["a dot", "."]
+    ])("refuses %s", async (_label, collectionId) => {
+        const { post, events } = harness();
+        const res = await post("/apply", { collectionId, collection: { name: "X" } });
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+        // Refused before anything is planned, let alone written.
+        expect(events).toEqual([]);
+    });
+
+    it("refuses it on /plan too, which also derives the path", async () => {
+        const { post } = harness();
+        const res = await post("/plan", { collectionId: "../escape", collection: {} });
+        expect(res.status).toBe(400);
+    });
+
+    it("accepts the ids a scaffold actually produces", async () => {
+        for (const id of ["posts", "blog_posts", "order-items", "Products2"]) {
+            const { post } = harness();
+            const res = await post("/plan", { collectionId: id, collection: { name: id } });
+            expect(res.status).toBe(200);
+        }
+    });
+});
