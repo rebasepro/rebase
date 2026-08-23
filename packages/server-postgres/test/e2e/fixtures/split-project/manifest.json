@@ -1,9 +1,9 @@
 {
   "bundleFormat": 2,
   "runtime": {
-    "range": "^1",
+    "range": "^2",
     "builtAgainst": "source",
-    "contract": 1
+    "contract": 2
   },
   "schemaVersion": "",
   "app": "backend",
