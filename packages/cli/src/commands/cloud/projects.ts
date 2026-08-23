@@ -394,6 +394,37 @@ export function resolveProjectArg(rawArgs: string[], action: "info" | "delete"):
     return positionals[0] || requireProjectRef(rawArgs);
 }
 
+/** What `capacity` reports for a project's database, when it reports anything. */
+interface DatabaseCapacity {
+    usedMb: number;
+    limitMb: number;
+    usedFraction: number | null;
+    locked: boolean;
+    state: "locked" | "warning" | "ok";
+    detail: string;
+}
+
+/**
+ * A project's database capacity, or null.
+ *
+ * Swallows every failure on purpose. This decorates `status`; a control plane
+ * that predates the `capacity` function 404s here, and an older CLI talking to a
+ * newer one must still print the project. Losing the capacity line is a missing
+ * nicety — failing the whole command over it would be the bug.
+ */
+async function fetchCapacity(client: CloudClient, projectId: string): Promise<DatabaseCapacity | null> {
+    try {
+        const res = await client.functions.invoke<{ database?: DatabaseCapacity | null }>(
+            "capacity",
+            undefined,
+            { method: "GET", path: projectId }
+        );
+        return res?.database ?? null;
+    } catch {
+        return null;
+    }
+}
+
 export async function projectInfo(rawArgs: string[], projectRef: string): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     try {
@@ -401,10 +432,11 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
         const p = (await client.data.collection("projects").findById(projectId)) as unknown as ProjectRow | undefined;
         if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
 
-        const [db, lastDeploy, baseDomain] = await Promise.all([
+        const [db, lastDeploy, baseDomain, capacity] = await Promise.all([
             firstRow(client, "databases", projectId),
             latestDeployment(client, projectId),
-            fetchTenantBaseDomain(client, url)
+            fetchTenantBaseDomain(client, url),
+            fetchCapacity(client, projectId)
         ]);
 
         emit(
@@ -421,8 +453,28 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
                     ["Region", p.region],
                     ["Organization", p.organization !== undefined ? String(p.organization) : undefined],
                     ["Database", db ? `${db.type} (${colorStatus(db.connectionStatus as string)})` : "none"],
+                    // Only when there is a ceiling to report against. A project
+                    // on a dedicated database has none, and printing "0 MB / 0 MB"
+                    // for it would read as full.
+                    ["Storage", capacity && capacity.limitMb > 0
+                        ? `${capacity.usedMb} MB / ${capacity.limitMb} MB${
+                            capacity.usedFraction !== null ? ` (${(capacity.usedFraction * 100).toFixed(0)}%)` : ""
+                        }`
+                        : undefined],
                     ["Last deploy", lastDeploy ? `${colorStatus(lastDeploy.status)} · ${fmtDate(lastDeploy.createdAt)}` : "never"]
                 ]);
+                // The whole point of the feature: a tenant hitting the ceiling
+                // used to find out because their app stopped answering. Say it
+                // here, where they already look, and say what happens next.
+                if (capacity && capacity.state !== "ok") {
+                    console.log("");
+                    console.log(
+                        capacity.state === "locked"
+                            ? `  ${chalk.red.bold("✗ Database locked — over its storage limit")}`
+                            : `  ${chalk.yellow.bold("⚠ Database approaching its storage limit")}`
+                    );
+                    console.log(`  ${chalk.gray(capacity.detail)}`);
+                }
                 console.log("");
             },
             {
@@ -438,7 +490,8 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
                 status: p.status ?? null,
                 org: p.organization !== undefined ? String(p.organization) : null,
                 database: db ? { type: db.type ?? null,
-connectionStatus: db.connectionStatus ?? null } : null,
+connectionStatus: db.connectionStatus ?? null,
+capacity: capacity ?? null } : null,
                 lastDeploy: lastDeploy
                     ? { id: String(lastDeploy.id),
 status: lastDeploy.status ?? null,

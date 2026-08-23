@@ -188,6 +188,9 @@ npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
+  --role <name>          Treat this role as one an untrusted caller arrives as, in
+                         addition to anon, authenticated, web_anon and rebase_user.
+                         Repeatable or comma-separated.
   --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
                          critical, or none to never fail. Default: high.
   --only <id>            Run only these checks. Repeatable or comma-separated.
@@ -293,6 +296,7 @@ Being clear about this is the point of the tool. It is a **static audit of the c
 - **It does not execute queries as other roles.** It never connects as `anon`, never sets a JWT claim, and never tries to read a row it should not be able to read. Everything it reports is inferred from what the catalogs say, not observed.
 - **It cannot prove a policy is correct.** Deciding whether `owner_id = auth.uid()` is the right rule for your application requires knowing your application. `rls-check` can only tell you that certain *shapes* are wrong — a policy that is always true, a view that runs as its owner, a table with RLS switched off.
 - **A clean report is not a security certification.** It means these fourteen checks found nothing. It does not mean your authorization model is sound, your API layer enforces what it should, or your data is safe.
+- **It recognises app roles by name, and yours may not be one of them.** Every check reports a table as exposed only when a role an untrusted caller can arrive as holds privileges on it. Out of the box that means `PUBLIC`, Supabase's `anon` and `authenticated`, PostgREST's `web_anon`, and Rebase's `rebase_user`. If your application connects as `app_user`, `api` or anything else, name it — `--role app_user` — or the checks have nothing to gate on. A scan that finds a write-holding role it cannot account for says so in a `Note` rather than printing a clean report.
 - **It does not model your API layer.** Whether a table is actually reachable depends on PostgREST, your server, or your gateway. Findings say "if this table is exposed over an API" when reachability depends on something outside the database — believe that qualifier.
 - **It does not see what your connection sees.** Almost every connection string handed to a tool like this belongs to a superuser or a table owner, which RLS cannot constrain. That is what lets it read the true catalog; it also means the findings describe what *other* roles get. The report says so, prominently, every time it applies.
 - **Heuristic checks produce false positives by design.** Junction-table inference and unqualified-column detection match a shape, not a proof. They are reported in a separate section for exactly that reason.

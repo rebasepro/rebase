@@ -267,6 +267,7 @@ export const en = {
   "security.desc":
     "Row-level security written in the same TypeScript file as the collection, compiled into real Postgres policies. Granular per collection, per field, per role — and enforced by the database itself, not by middleware someone has to remember to call.",
   "security.link": "Explore Rebase Studio",
+  "security.postLink": "Read: your backend's security should not depend on remembering to check",
   "opensource.badge": "Open source",
   "opensource.title": "Your code. Your infra.<br/>Zero lock-in.",
   "opensource.desc":

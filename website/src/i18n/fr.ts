@@ -175,6 +175,7 @@ export const fr = {
   "security.title": "Écrit en TypeScript. Appliqué par Postgres.",
   "security.desc": "Row-level security définie directement dans votre schéma TypeScript. Permissions granulaires par collection, par champ, par rôle. Pas de politiques SQL écrites à la main — juste du code propre, versionné.",
   "security.link": "Explorer Rebase Studio",
+  "security.postLink": "À lire : la sécurité de votre backend ne devrait pas dépendre d’une vérification qu’on oublie",
   "opensource.badge": "Open source",
   "opensource.title": "Votre code. Votre infra.<br/>Zéro lock-in.",
   "opensource.desc": "Licence MIT. Auto-hébergez sur Docker, Railway, Fly ou bare metal. Vos données restent dans votre Postgres — pas de dépendance fournisseur, pas de surprises, pas de tarification par utilisateur.",

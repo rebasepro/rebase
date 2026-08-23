@@ -24,7 +24,7 @@ import { readFileSync } from "node:fs";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { runCli, scan, type CliIo } from "../../src/index";
+import { renderReport, runCli, scan, type CliIo } from "../../src/index";
 import type { Finding, ScanResult } from "../../src/types";
 import {
     applySql,
@@ -263,6 +263,84 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         const skipped = await scan({ connectionString: container.connectionString, skip: ["rls-disabled"] });
         expect(skipped.findings.some((finding) => finding.id === "rls-disabled")).toBe(false);
         expect(skipped.stats.checksRun).toBe(full.stats.checksRun - 1);
+    });
+
+    // -----------------------------------------------------------------------
+    // Roles the tool does not know by name
+    //
+    // The exposed-role set is recognised by name, which is the one place this
+    // scanner is not framework-agnostic. These four assertions are the whole
+    // contract around that: silence is never the same as a pass.
+    // -----------------------------------------------------------------------
+
+    it("does not report a table exposed only to an unrecognised role", () => {
+        // Not a bug — a guess. The scan has no evidence that anything arrives
+        // as `app_user`, and inventing a critical for every service account
+        // would flag half of every real database.
+        expect(full.findings.some((finding) => objectName(finding) === "custom_role_table")).toBe(false);
+    });
+
+    it("names the unrecognised role instead of reporting a clean database", async () => {
+        // The actual fix. Without this the run above is indistinguishable from
+        // a database that is genuinely locked down.
+        expect(full.diagnostics.unrecognizedGrantees).toContain("app_user");
+
+        const rendered = renderReport(full, { color: false, quiet: false, failOn: "high", width: 100 });
+        expect(rendered).toContain("app_user");
+        expect(rendered).toContain("--role");
+    });
+
+    it("finds the table once the role is named", async () => {
+        const scoped = await scan({
+            connectionString: container.connectionString,
+            roles: ["app_user"]
+        });
+
+        const hits = scoped.findings.filter(
+            (finding) => finding.id === "rls-disabled" && objectName(finding) === "custom_role_table"
+        );
+        expect(hits.length, "naming the app role must expose the table the default scan missed").toBe(1);
+
+        // Named explicitly, the role is no longer unexplained.
+        expect(scoped.diagnostics.unrecognizedGrantees).not.toContain("app_user");
+    });
+
+    it("adds to the recognised roles rather than replacing them", async () => {
+        // A union, not an override: passing --role on a Supabase database must
+        // not stop the scan reasoning about `anon`. The safe direction for a
+        // wrong guess is more coverage, never less.
+        const scoped = await scan({
+            connectionString: container.connectionString,
+            roles: ["app_user"]
+        });
+
+        for (const { id, object } of EXPECTED) {
+            const stillFound = scoped.findings.some(
+                (finding) => finding.id === id && objectName(finding) === object
+            );
+            expect(stillFound, `--role dropped the default finding ${id} on ${object}`).toBe(true);
+        }
+    });
+
+    it("honours --role from the command line", async () => {
+        const out: string[] = [];
+        const io: CliIo = {
+            stdout: (text) => out.push(text),
+            stderr: () => {},
+            env: {},
+            cwd: process.cwd(),
+            isTty: false,
+            columns: 88
+        };
+
+        await runCli([container.connectionString, "--json", "--role", "app_user"], io);
+        const parsed = JSON.parse(out.join("")) as ScanResult;
+
+        expect(
+            parsed.findings.some(
+                (finding) => finding.id === "rls-disabled" && objectName(finding) === "custom_role_table"
+            )
+        ).toBe(true);
     });
 
     // -----------------------------------------------------------------------

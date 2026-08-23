@@ -180,7 +180,9 @@ export interface DbSnapshot {
     /**
      * Roles that are plausibly reachable by an untrusted caller: Supabase's
      * `anon` / `authenticated`, PostgREST's `web_anon`, Rebase's `rebase_user`,
-     * plus `PUBLIC`. Checks use this to decide whether an exposure is real.
+     * plus `PUBLIC` — and anything named with `--role`. Checks use this to
+     * decide whether an exposure is real, so a stack whose app role is not on
+     * that list must name it or the checks have nothing to gate on.
      */
     exposedRoles: string[];
     /** Detected platform, which changes the wording of several findings. */
@@ -243,5 +245,12 @@ export interface ScanResult {
         tlsVerificationDisabled: boolean;
         /** Schemas left out of the scan, and why. */
         excludedSchemas: { schema: string; reason: "system" | "platform" | "not-requested" }[];
+        /**
+         * Roles holding write privileges that the scan neither recognises as
+         * exposed nor can explain as trusted. Non-empty means the exposed-role
+         * set may be incomplete, and every check gates on that set — so this is
+         * the difference between "clean" and "clean as far as I could tell".
+         */
+        unrecognizedGrantees: string[];
     };
 }

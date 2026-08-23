@@ -277,6 +277,16 @@ export function renderReport(result: ScanResult, options: RenderOptions): string
         out.push("");
     }
 
+    // Also survives --quiet, and for the sharpest version of the same reason:
+    // every check gates on a grant to an exposed role, and the exposed set is
+    // recognised by name. A database served by a role this tool has never heard
+    // of produces no findings at all — a green report on an open database.
+    const unrecognized = result.diagnostics?.unrecognizedGrantees ?? [];
+    if (unrecognized.length > 0) {
+        out.push(...renderUnrecognizedRolesCaveat(unrecognized, style, width));
+        out.push("");
+    }
+
     if (certain.length === 0 && heuristic.length === 0) {
         out.push(degraded.length > 0
             // Not "no findings": the scan did not finish looking.
@@ -358,6 +368,37 @@ function renderPrivilegeCaveat(style: Style, width: number): string[] {
             "a table owner, or a role with BYPASSRLS. That is why it can read the true catalog, " +
             "and it is also why nothing below describes what this connection experiences. " +
             "The findings are about what OTHER roles get.",
+        width - 8
+    );
+
+    const out: string[] = [];
+    out.push(`${style.yellow("Note")}  ${body[0] ?? ""}`);
+    for (const line of body.slice(1)) out.push(`      ${line}`);
+
+    return out;
+}
+
+/**
+ * The caveat that keeps a false negative from reading as a pass.
+ *
+ * Deliberately not a finding: the scan has no evidence that any of these roles
+ * is reachable, and inventing a critical for every service account would be the
+ * mirror of the bug it exists to prevent. It is a caveat with an exact remedy —
+ * one flag, named roles — so the reader can convert it into real coverage.
+ */
+function renderUnrecognizedRolesCaveat(roles: string[], style: Style, width: number): string[] {
+    const shown = roles.slice(0, 6);
+    const rest = roles.length - shown.length;
+    const list = shown.map((r) => `"${r}"`).join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+
+    const body = wrap(
+        `${list} ${plural(roles.length, "holds", "hold")} write privileges here, and ` +
+            "this scan does not know whether requests arrive as " +
+            `${plural(roles.length, "it", "them")}. The checks only report a table as exposed when an ` +
+            "exposed role can reach it, so anything served through " +
+            `${plural(roles.length, "this role", "these roles")} was NOT assessed. If your ` +
+            "application connects as one of them, re-run naming it — " +
+            `for example: --role ${shown[0] ?? "app_user"}`,
         width - 8
     );
 

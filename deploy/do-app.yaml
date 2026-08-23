@@ -1,0 +1,65 @@
+# DigitalOcean App Platform spec for a Rebase project.
+#
+# Copy to the repository root as `.do/app.yaml` — App Platform only looks there.
+# Then either point the control panel at the repo, or use a deploy button:
+#
+#   https://cloud.digitalocean.com/apps/new?repo=https://github.com/<you>/<your-project>/tree/main
+#
+# Replace `<you>/<your-project>` below with the repository this deploys.
+
+name: rebase
+region: fra
+
+services:
+  - name: rebase
+    github:
+      repo: <you>/<your-project>
+      branch: main
+      deploy_on_push: true
+    build_command: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    run_command: pnpm start
+    environment_slug: node-js
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8080
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 20
+      period_seconds: 30
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${rebase-db.DATABASE_URL}
+      # SECRET-scoped values are encrypted at rest and never returned by the
+      # API. Generate them yourself — App Platform has no generator — and paste
+      # them in once:  openssl rand -hex 32
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: CHANGE_ME_openssl_rand_hex_32
+      - key: REBASE_SERVICE_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: CHANGE_ME_openssl_rand_hex_32
+      # The backend refuses to boot in production without an allowed origin.
+      # APP_URL is this app's own public URL.
+      - key: CORS_ORIGINS
+        scope: RUN_TIME
+        value: ${APP_URL}
+      - key: FRONTEND_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
+      # Uploads. See deploy/README.md — `local` storage in production is
+      # refused, because the container filesystem is wiped on every deploy.
+      # - key: STORAGE_TYPE
+      #   scope: RUN_TIME
+      #   value: s3
+
+databases:
+  - name: rebase-db
+    engine: PG
+    version: "18"
+    production: false

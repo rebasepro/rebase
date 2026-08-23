@@ -232,10 +232,26 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 {t("security.title")}
                             </h2>
                             <p class="mt-5 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("security.desc")}</p>
-                            <a href={translatePath("/studio")} class="accent-link mt-8">
-                                {t("security.link")}
-                                <ArrowRight size={15} />
-                            </a>
+                            <div class="mt-8 flex flex-col items-start gap-3">
+                                <a href={translatePath("/studio")} class="accent-link">
+                                    {t("security.link")}
+                                    <ArrowRight size={15} />
+                                </a>
+                                <!-- The argument behind the demo above. The section
+                                     shows RLS being edited; this is why it is generated
+                                     rather than hand-written in the first place. -->
+                                <a
+                                    href={translatePath("/blog/2026-08-23-security-that-does-not-depend-on-remembering")}
+                                    class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
+                                >
+                                    <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
+                                        Blog
+                                    </span>
+                                    <span class="max-w-[34rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
+                                        {t("security.postLink")}
+                                    </span>
+                                </a>
+                            </div>
                         </div>
                         <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
                             <div class="frame">

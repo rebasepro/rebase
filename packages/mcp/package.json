@@ -1,6 +1,7 @@
 {
   "name": "@rebasepro/mcp",
   "version": "0.16.0",
+    "mcpName": "io.github.rebasepro/rebase",
   "license": "MIT",
   "description": "Model Context Protocol Server for Rebase — exposes schema, DB, document, and user management tools to AI assistants.",
   "main": "dist/index.js",

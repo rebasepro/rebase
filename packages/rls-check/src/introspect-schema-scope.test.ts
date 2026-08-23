@@ -18,6 +18,7 @@ import type { IntrospectDiagnostics } from "./introspect";
 const diagnostics = (): IntrospectDiagnostics => ({
     tlsVerificationDisabled: false,
     excludedSchemas: [],
+    unrecognizedGrantees: [],
     degraded: []
 });
 
