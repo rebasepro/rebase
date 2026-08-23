@@ -1649,9 +1649,18 @@ roles });
             const pm = detectPackageManager(projectDir);
             const { command: runCmd, args: runArgs } = getRunCommand(pm);
             devProcess = spawn(resolvePackageManagerBinary(runCmd, projectDir), [...runArgs, "dev"], {
-                cwd: resolve(projectDir, "app"),
+                cwd: findDevDir(),
                 shell: false,
                 env: { ...process.env }
+            });
+            // Without this, a spawn failure — a missing directory, a package
+            // manager that is not installed — is an unhandled 'error' event.
+            // It throws outside this handler's try/catch, and it does not fail
+            // the tool call: it kills the MCP server, so the agent loses every
+            // Rebase tool rather than one of them.
+            devProcess.on("error", (err: Error) => {
+                appendDevLog(`\n[dev server could not start: ${err.message}]`);
+                devProcess = null;
             });
             devProcess.stdout?.on("data", (d: Buffer) => appendDevLog(d.toString()));
             devProcess.stderr?.on("data", (d: Buffer) => appendDevLog(d.toString()));
@@ -1699,6 +1708,43 @@ roles });
 
 // ── Resources ───────────────────────────────────────────────────────────────
 
+/**
+ * Where a project's backend lives, across the two layouts that exist.
+ *
+ * A `rebase init` project has `backend/` at its root. This monorepo nests
+ * everything under `app/`. Three separate places already handled both by trying
+ * candidates — `detectPackageManager`, `readEnvVarFromProject`,
+ * `findCollectionsDir` — and three others assumed the monorepo's shape and were
+ * simply absent for every scaffolded project.
+ *
+ * `null` when neither exists, like `findCollectionsDir`. Returning a plausible
+ * path instead would be worse in two ways: a caller cannot tell a discovery
+ * from a guess, and neither can a test — a first version of this returned the
+ * scaffold's path as a fallback, and deleting the scaffold candidate entirely
+ * left every test green.
+ */
+export function findBackendDir(projectDir: string = getProjectDir()): string | null {
+    for (const candidate of [resolve(projectDir, "backend"), resolve(projectDir, "app", "backend")]) {
+        if (existsSync(candidate)) return candidate;
+    }
+    return null;
+}
+
+/**
+ * Where `pnpm dev` should run, across the same two layouts.
+ *
+ * This was `resolve(projectDir, "app")` unconditionally, which for every
+ * scaffolded project is a directory that does not exist — and `spawn` reports
+ * that asynchronously, on an `'error'` event nobody had subscribed to, so the
+ * ENOENT was thrown outside the surrounding try/catch and took the whole MCP
+ * server down. The agent lost the Rebase connection entirely rather than one
+ * tool call.
+ */
+export function findDevDir(projectDir: string = getProjectDir()): string {
+    const nested = resolve(projectDir, "app");
+    return existsSync(nested) ? nested : projectDir;
+}
+
 function findCollectionsDir(): string | null {
     const projectDir = getProjectDir();
     const candidates = [
@@ -1732,8 +1778,9 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 
     // Generated schema
     const projectDir = getProjectDir();
-    const schemaPath = resolve(projectDir, "app", "backend", "src", "schema.generated.ts");
-    if (existsSync(schemaPath)) {
+    const backendDir = findBackendDir();
+    const schemaPath = backendDir && resolve(backendDir, "src", "schema.generated.ts");
+    if (schemaPath && existsSync(schemaPath)) {
         resources.push({
             uri: "rebase://schema",
             name: "Generated Drizzle Schema",
@@ -1750,9 +1797,19 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const projectDir = getProjectDir();
 
     if (uri === "rebase://schema") {
-        const schemaPath = resolve(projectDir, "app", "backend", "src", "schema.generated.ts");
+        const backendDir = findBackendDir();
+        if (!backendDir) {
+            throw new Error(
+                "No backend directory found. Looked for `backend/` and `app/backend/` under " +
+                `${getProjectDir()}.`
+            );
+        }
+        const schemaPath = resolve(backendDir, "src", "schema.generated.ts");
         if (!existsSync(schemaPath)) {
-            throw new Error("Generated schema not found. Run `rebase schema generate` first.");
+            // Naming the path matters: the previous message advised running a
+            // command the user had usually already run, because it was looking
+            // in a directory their project does not have.
+            throw new Error(`Generated schema not found at ${schemaPath}. Run \`rebase schema generate\` first.`);
         }
         return {
             contents: [{
