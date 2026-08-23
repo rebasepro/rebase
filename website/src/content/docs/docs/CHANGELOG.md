@@ -23,6 +23,34 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 - **`rebase build` records what each function needs from its host.** The bundle manifest gains a `functions` array — name, file, and whether the function's own source reaches a Node built-in or a package that needs one. Purely descriptive: nothing fails, and a function that opens a file or runs raw SQL is a fine function. It is recorded because the name is already the function's identity everywhere (`/api/functions/<name>`, the `functions/<name>` API-key permission, `REBASE_FUNCTIONS_ONLY`), and a host that wants to know what is in a bundle should not have to boot it to find out.
 
+- **Live schema editing, from the collection editor to the database.** A running backend can now plan a schema change, show what it would do, and apply it only once somebody agrees. `planSchemaChange` reads the live catalogue before it plans, because whether a `NOT NULL` can be added is a question about rows and whether an enum value will land is a question about the type — neither is answerable from the collections alone. The editor's save path shows the verdict in a sentence, then each change with its remedy, and does nothing until confirmed.
+
+  Applying is a **second** privilege, not the same one that opens the editor: it alters the database and it writes a commit into the project's repository under somebody's name, and an admin credential is not an author. For deployments with no working tree — a Cloud tenant runs a built bundle and its repository lives elsewhere — the commit goes through GitHub's Git Data API instead of `git`.
+
+- **A managed development database, so `rebase dev` needs no Postgres.** Getting a project running was `docker compose up -d db`, then `db push`, then `dev` — three steps, each a place to bounce, plus a compose file the developer then maintains. `rebase dev` now starts the database and pushes the schema itself. The managed database is PGlite behind a multiplexing socket server, and `db pull`, the schema flows and the rest of the CLI were wired through to meet it.
+
+  Realtime was the one thing it could not do, and it failed in the worst way available: every query succeeded, `LISTEN` returned cleanly, and change events simply never arrived. It now works through a notification proxy.
+
+- **`REBASE_DB_POOL_MAX`, a ceiling every pool honours.** The managed database is a single session, where two pooled clients holding overlapping transactions deadlock rather than error.
+
+- **The RLS audit runs on a schedule, and the backend serves what it found.** Also `rls-check --html`: the text report is written for a terminal, and the person who has to act on it is usually not the person who ran the scan. A `--fail-on` exit code stops a pipeline; it does not survive being forwarded to whoever owns the database.
+
+- **`rls-check --role`, because a check can only gate on a role it knows about.** Every check reports a table as exposed only when a role an untrusted caller can arrive as holds privileges on it, and that set was hardcoded to `PUBLIC`, `anon`, `authenticated`, `web_anon` and `rebase_user`. A stack whose app role is called `app_user` gave every check nothing to gate on, so the scan printed a clean report for a database it had not cleared. The report now also lists `unrecognizedGrantees` — write-holding roles it can neither recognise as exposed nor explain as trusted — so it says "clean as far as I could tell" rather than "clean".
+
+- **Storage: byte-range requests and per-object access control.** Media can be seeked, and who may read an object is declared rather than coded.
+
+- **Bot protection on the auth endpoints that cost something to hit**, development secrets that survive a restart, and auth email captured in development instead of refused.
+
+- **An ANN index for every vector column**, with pgvector shipped in the scaffolded database image.
+
+- **A pod contract the chart and the control plane both answer to.** Probe paths, shutdown budgets, the bundle mount and the set of topology variables a deployer owns now live in one place that both pod builders read, instead of two hand-written lists that had already disagreed.
+
+- **`rebase cloud resources` is priced, with no plan left to name**, and `rebase cloud projects info` prints a Storage line — plus a warning or a lockout notice when the project is near or past its limit. The shared pools already enforced a per-tenant disk ceiling by setting `CONNECTION LIMIT 0`; the tenant's first signal used to be their database refusing connections, with no number anywhere that would have warned them.
+
+- **One-click deploy blueprints, an MCP registry manifest, and the security post.**
+
+- **The eight documentation pages every locale was missing are translated**, with validation of what the model returns, and the landing page has a translation script of its own — the marketing pages read no markdown, so nothing had ever translated them.
+
 ### Changed
 
 - **A vendored tree too large to upload is not vendored.** The control plane refuses a bundle over 100 MB, and vendoring is the one thing that can push a bundle near it — so a build that crossed the line shipped a bundle whose deploy would be rejected, with the remedy (`--no-vendor`) only discoverable by knowing that had happened. Past 200 MB on disk the tree is now thrown away and the bundle ships unvendored: 40–60s of cold start, and a deploy that works. `--vendor` keeps it regardless, for a deploy that builds from source and never uploads the tree at all.
@@ -70,6 +98,54 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   Fixed by appending the extension the declarations always needed — `./init` → `./init.js`, and `./auth` → `./auth/index.js` where the target is a directory, resolved against the filesystem rather than guessed. This is not a trade: TypeScript maps a `./x.js` specifier onto `./x.d.ts` under `node10`, `bundler` and `nodenext` alike, so nothing that worked before stops working. The rewrite runs as a build step in all twenty-one published packages.
 
   Nothing in this repository could have caught it, and that is the more interesting half. `pnpm typecheck`, the docs verifier and the template checks all map `@rebasepro/*` onto **source**; the API-surface gate reads a single `.d.ts` in isolation. Every gate looked at something other than the artifact a stranger installs. `pnpm check:dts` now looks at that: it installs each built package into a throwaway directory by symlink, imports it, and asks the type checker whether the result is `any` — a question that needs no knowledge of any package's API, and so keeps working as they change. It runs in CI after the build.
+
+- **`bundle.mode: url` had never worked, and three independent things blocked it.** The runtime's fetch looked for a `rebase-bundle.json` that nothing has ever written — the CLI writes `manifest.json` — so no unpacked directory was ever recognised as a bundle; the entrypoint exited 1 before `@rebasepro/server` was imported; and the chart rendered a pod missing what the working path expects. Removing any one of them changed nothing, which is how the mode stayed dead while being documented, validated by the gate, and offered in the values file.
+
+- **The runtime image stripped four packages it never supplied.** `packages/cli/src/bundle.ts` removes five `@rebasepro/*` packages from a bundle's declared dependencies on the grounds that the image supplies them; `docker/entrypoint.mjs` supplied one. Custom functions and cron jobs therefore failed to load with `Cannot find package`, the routes 404'd, and the container reported itself healthy — only a boot-log warning separated a deployment whose code ran from one where none of it did. The entrypoint's dedupe step also only *repaired* a duplicate and never *provided* a missing copy, which is the common case.
+
+  The same gap was then live on the fetch path, which does its own stitch after the download and carried a one-package list of its own. All three lists are now checked against each other.
+
+- **The published image could not load its own Postgres driver.** The driver's barrel eagerly imported a file watcher used by exactly one `--watch` branch of a CLI, and the image's hand-maintained dependency list does not include it — so `@rebasepro/server-postgres` failed to load entirely and every `/api/data/*` route 500'd behind a green container. Found by a new acceptance run that builds the image from source, brings the documented compose file up, and asserts from outside the container.
+
+- **A static app dropped requests on every rollout**, and a killed bundle install left a tree the next boot mistook for a finished one — at a 128Mi limit npm is OOMKilled holding 124 of 156 packages, which is indistinguishable from success unless something records completion.
+
+- **The chart's probes contradicted the runtime, and the api counted every caller as one caller.** `TRUSTED_PROXY_HOPS` was set on the functions unit and never on the api, so a default install ignored `X-Forwarded-For` and keyed every rate limit to the ingress. The chart also stopped offering `migrationJob.mode: push`, which the image refuses outright.
+
+- **`REBASE_RLS_AUDIT` was a topology variable the pod contract did not claim.** The runtime reads it to decide which process owns the RLS audit scan, beside `REBASE_CRON_SCHEDULER` and `REBASE_JOB_WORKERS`, but it was never added to the list a deployer owns — so a tenant could set it to `false` and stop their own audit with no error anywhere.
+
+- **Two auth gaps on the WebSocket path.** `ADMIN_ONLY_TYPES` held nine strings while the handler answers ten privileged verbs; the tenth ran `SELECT DISTINCT unnest(roles)` over the users table ungated.
+
+- **A storage key containing `#`, `%` or an encoded slash addressed the wrong object.** Every storage URL interpolated the key raw and the server decodes what it receives.
+
+- **Three ways a legal database name generated a file that will not parse.** A hyphenated collection slug, a search column with a hyphen, and a table name legal in Postgres each produced a JavaScript identifier that is not one. The same file already defined `quote`, `propKey` and `member` with docblocks explaining exactly this; they were applied in some positions and not others.
+
+- **Seven presentation keys were accepted at boot and then ignored.** `fixedFilter`, `includeId`, `includeEntityLink`, `widget`, `sortable`, `canAddElements` and `previewProperties` were still listed as top-level keys on the four property types they used to live on, so on exactly those types the key was accepted, the migration hint was never reached, and nothing read the value — while the identical key on any other type failed with a helpful message.
+
+- **The history prune could delete below `maxEntries`.** It decided how many rows to drop and which rows to drop in two separate reads, and the prune runs unawaited once per write — so two in flight both counted three rows, both decided to drop one, and the second re-read and took a row that was never surplus. Silent data loss, worst exactly where history matters: a record being written concurrently.
+
+- **Reading a UI preference could crash the whole render.** Four call sites guarded `localStorage` with `typeof window !== "undefined"` and then used the bare global, which answers "am I in a browser" rather than "can I read storage". Safari in private mode, a blocked cookie policy and a sandboxed iframe all throw on the property *access*, so a user in that state got a blank admin panel instead of the default theme.
+
+- **`rebase cloud billing` and `resources` never printed a price.** Both called `invoke("pricing/quote", …)`, and `invoke` URL-encodes the function name, so the slash became `%2F` and the route 404'd — every time, since the commands shipped.
+
+- **`pg` was imported at runtime and declared dev-only**, so `rebase db pull --anonymize` would fail in a published CLI under pnpm's isolated layout while resolving fine in this workspace.
+
+- **The realtime `vectorSearch` refusal existed and could not fire**, `clearFilter` reset to `defaultFilter` so a collection defining one could never clear its filters, and the admin decided from whether an answer had arrived rather than from the answer — a save in the first round trip after mount silently took the unconfirmed branch.
+
+- **A dead local proxy is not a TLS problem.** `rls-check` translated every `ECONNRESET` into advice about `sslmode=require`, which is right for a managed provider and actively misleading for a loopback proxy that has died.
+
+- **The agent-skills subpath could never reach a skill** — `exports` declared a trailing-slash directory export that Node has deprecated and cannot resolve a file through — and a scaffolded project had no schema resource, because two helpers assumed this monorepo's `app/` layout.
+
+- **"Cancelled deployment null" was the fix reported as a bug**, the auth bootstrap probe swallowed its own failure and answered "already set up" in silence, and `rebase dev` announced the database twice during start-up.
+
+- **Storage delivery**: a replaced image no longer serves its old rendition, private objects are no longer marked public, `Content-Length` is declared so a player can work out what to seek to, and cacheable responses say so.
+
+- **The snapshot recorder produced snapshots that could not restore**, which is why the upgrade gate had decayed to two hand-written files while 0.14, 0.15 and 0.16 shipped without one.
+
+- **`frameworkVersion` meant two different things** — the framework the runtime image ships, and the framework a bundle installed — so `cloud status` and `cloud deployments` read as contradicting each other.
+
+- **The schema dialog is no longer downloaded before login**, 14 kB of eager JavaScript for a dialog that only opens when somebody edits a collection.
+
+- **Two documentation routes only non-English readers reach were dead**, 124 landing strings whose English had moved on are resynced, and `--refresh-stale` stopped reporting ten keys that were already correct.
 
 ## [0.16.0] - 2026-08-20
 
