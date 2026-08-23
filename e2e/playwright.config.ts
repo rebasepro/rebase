@@ -2,7 +2,20 @@ import { defineConfig, devices } from "@playwright/test";
 import { execSync } from "node:child_process";
 import path from "node:path";
 
-export const PORT = 5173;
+/**
+ * The frontend port.
+ *
+ * Not 5173, for the same reason API_PORT is not 3001: it is the conventional
+ * one, so it is the likeliest to already belong to another project on a
+ * developer's machine — and Vite hands it to the first asker, so a suite that
+ * took it would either fail to bind or, worse, adopt somebody else's dev server
+ * and test their code. `globalSetup` has a check for exactly that; moving off
+ * the default is what stops it firing in the ordinary case.
+ *
+ * Overridable, because a machine can have anything on any port:
+ *   REBASE_E2E_PORT=5399 npx playwright test -c e2e/playwright.config.ts
+ */
+export const PORT = Number(process.env.REBASE_E2E_PORT ?? 5399);
 
 /**
  * The API port, pinned.
@@ -16,7 +29,7 @@ export const PORT = 5173;
  * Pinning it lets globalSetup wait for the backend too. Not 3001 — that is the
  * conventional port and the likeliest to be occupied by another project.
  */
-export const API_PORT = 3199;
+export const API_PORT = Number(process.env.REBASE_E2E_API_PORT ?? 3199);
 
 /**
  * Did *this* run start the dev server, or adopt one that was already there?
@@ -59,6 +72,7 @@ export default defineConfig({
   webServer: {
     // `rebase dev` direct, rather than the root `dev` script, so --port reaches it.
     command: `pnpm exec rebase dev --port ${API_PORT}`,
+    env: { ...process.env, REBASE_FRONTEND_PORT: String(PORT) } as Record<string, string>,
     cwd: path.resolve(__dirname, "../app"),
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI
