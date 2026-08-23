@@ -228,8 +228,9 @@ from source.
 
 On a machine that has the repository, the commit is a plain `git commit` —
 nothing to authenticate, no token, no network. Cloud is the harder case, because
-the repository is elsewhere; there it commits through a GitHub App using the Git
-Data API, with no clone.
+the repository is elsewhere: it *would* commit through a GitHub App using the
+Git Data API, with no clone, and that backend exists — but see
+[Rebase Cloud](#rebase-cloud) above, it is not connected yet.
 
 Two things that make it safe to run against a repository somebody else is
 working in:
