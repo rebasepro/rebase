@@ -1777,7 +1777,6 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
     }
 
     // Generated schema
-    const projectDir = getProjectDir();
     const backendDir = findBackendDir();
     const schemaPath = backendDir && resolve(backendDir, "src", "schema.generated.ts");
     if (schemaPath && existsSync(schemaPath)) {
@@ -1794,7 +1793,6 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
 
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const { uri } = request.params;
-    const projectDir = getProjectDir();
 
     if (uri === "rebase://schema") {
         const backendDir = findBackendDir();
