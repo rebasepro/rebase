@@ -10,6 +10,7 @@ import {
     loadManifest,
     ManifestError,
     resolveBackendPaths,
+    selectDeployApp,
     synthesizeManifest,
     validateManifest,
     writeManifest
@@ -659,6 +660,62 @@ describe("writeManifest preserves the whole file", () => {
         );
 
         expect(() => loadManifest(scratch)).toThrow(ManifestError);
+    });
+});
+
+describe("selectDeployApp", () => {
+    const manifest = (apps: Record<string, unknown>) =>
+        validateManifest({ rebase: "^1",
+apps }).manifest!;
+
+    const BACKEND = { type: "backend",
+runtime: "managed" };
+    const STATIC = (path: string) =>
+        ({ type: "static",
+root: "frontend",
+output: "frontend/dist",
+path });
+
+    it("takes the backend when nothing is named", () => {
+        const m = manifest({ backend: BACKEND,
+web: STATIC("/") });
+        expect(selectDeployApp(m).name).toBe("backend");
+    });
+
+    it("takes the only app in a repository that has no backend", () => {
+        // The whole point: a repository holding just an admin panel is an
+        // ordinary thing, not a repository with a missing backend.
+        const m = manifest({ admin: STATIC("/admin") });
+        expect(selectDeployApp(m).name).toBe("admin");
+        expect(selectDeployApp(m).app.type).toBe("static");
+    });
+
+    it("takes the app that was named", () => {
+        const m = manifest({ backend: BACKEND,
+admin: STATIC("/admin") });
+        expect(selectDeployApp(m, "admin").name).toBe("admin");
+    });
+
+    it("refuses a name this repository does not declare, and lists what it has", () => {
+        // Guessing past a typo would deploy the wrong app to a live project.
+        const m = manifest({ backend: BACKEND,
+admin: STATIC("/admin") });
+        expect(() => selectDeployApp(m, "adminn")).toThrow(/no app named "adminn"/);
+        expect(() => selectDeployApp(m, "adminn")).toThrow(/backend, admin/);
+    });
+
+    it("refuses to guess between several static apps", () => {
+        // Picking one would publish somebody's admin panel at their marketing
+        // domain, and the failure would look like a build problem.
+        const m = manifest({ web: STATIC("/"),
+admin: STATIC("/admin") });
+        expect(() => selectDeployApp(m)).toThrow(/no obvious one to deploy/);
+        expect(() => selectDeployApp(m)).toThrow(/web, admin/);
+    });
+
+    it("says so when there is nothing to deploy at all", () => {
+        expect(() => selectDeployApp({ rebase: "^1",
+apps: {} })).toThrow(/no apps/);
     });
 });
 

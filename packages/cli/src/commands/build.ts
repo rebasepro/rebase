@@ -291,19 +291,19 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
  * a backend bundle, so a frontend or admin app deploys through the identical
  * path and runs on the identical image, just serving files instead of an API.
  */
-async function buildAssetApp(
+export async function buildAssetApp(
     projectRoot: string,
     name: string,
     app: RebaseAppConfig,
     runtimeRange: string,
     outOverride?: string
-): Promise<void> {
+): Promise<string | undefined> {
     const asset = app as RebaseStaticAppConfig;
     const basePath = asset.path ?? "/";
 
     if (!asset.build) {
         console.log(chalk.dim("  no build command declared — skipping"));
-        return;
+        return undefined;
     }
 
     try {
@@ -320,7 +320,7 @@ async function buildAssetApp(
 
     if (!asset.output) {
         console.log(chalk.yellow("  no output directory declared — built, but nothing to bundle"));
-        return;
+        return undefined;
     }
 
     const outputPath = path.join(projectRoot, asset.output);
@@ -362,6 +362,7 @@ async function buildAssetApp(
         chalk.green(`  ✓ static bundle → ${rel}/`) +
         chalk.dim(` (${result.fileCount} file(s) → served at ${basePath})`)
     );
+    return result.outDir;
 }
 
 /** The pre-manifest behaviour: build every workspace package. */
