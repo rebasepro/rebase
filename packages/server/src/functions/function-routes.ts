@@ -16,7 +16,13 @@ import { LoadedFunction } from "./function-loader";
  */
 export function createFunctionRoutes(
     functions: LoadedFunction[],
-    skipped = 0
+    skipped = 0,
+    /**
+     * Where this router is mounted, so the listing can report a path a caller
+     * can actually request. It used to hardcode `/functions/<name>`, which is
+     * wrong under every `basePath` including the default `/api`.
+     */
+    mountPath = "/functions"
 ): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
@@ -25,7 +31,7 @@ export function createFunctionRoutes(
         return c.json({
             functions: functions.map((fn) => ({
                 name: fn.name,
-                endpoint: `/functions/${fn.name}`
+                endpoint: `${mountPath}/${fn.name}`
             })),
             ...(skipped > 0 && {
                 skipped,

@@ -2302,7 +2302,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length);
+        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length, `${basePath}/functions`);
         functionsRouter.route("/", fnRoutes);
         config.app.route(`${basePath}/functions`, functionsRouter);
 
