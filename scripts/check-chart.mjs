@@ -365,6 +365,34 @@ check("contract", Object.keys(CONTRACT_PROBES).length === 3,
     `could not read RUNTIME_PROBE_PATHS out of pod-contract.ts (got ${JSON.stringify(CONTRACT_PROBES)}) — ` +
     "this check is vacuous until it parses, so it fails rather than passing empty");
 
+/**
+ * Every Deployment the render produced, by name.
+ *
+ * Enumerated rather than listed: the drain check below was written against
+ * three hardcoded unit names, and the static-app Deployment — added later, and
+ * the one actually serving the page a person is looking at — was not among
+ * them, so it shipped with no preStop hook at all. A workload added after this
+ * is covered the day it is added.
+ */
+function deploymentNames(yaml) {
+    return [...yaml.matchAll(/^kind:\s*Deployment\s*$[\s\S]*?^\s*name:\s*(\S+)\s*$/gm)]
+        .map(m => m[1]);
+}
+
+/** Every rendered Deployment must drain before SIGTERM, whatever it serves. */
+function checkDrain(label, rendered) {
+    if (!rendered.ok) return;
+    const drain = contractValue("RUNTIME_PRESTOP_DRAIN_SECONDS");
+    for (const name of deploymentNames(rendered.out)) {
+        const doc = rendered.out.split(/^---$/m).find(d =>
+            /^kind:\s*Deployment\s*$/m.test(d) && new RegExp(`name:\\s*${name}\\s*$`, "m").test(d)) ?? "";
+        check("contract", new RegExp(`preStop[\\s\\S]*?sleep ${drain}`).test(doc),
+            `${label}/${name} has no preStop drain. Kubelet signals the pod and removes its ` +
+            "endpoint concurrently, so without one the ingress keeps routing to a process that " +
+            "has stopped accepting, and in-flight responses are truncated at exit.");
+    }
+}
+
 if (single.ok) {
     const probes = probesOf(single.out, "rebase-rebase-api");
     for (const [probe, wanted] of Object.entries(CONTRACT_PROBES)) {
@@ -375,13 +403,13 @@ if (single.ok) {
             "is a pod that never starts.");
     }
 
-    const drain = contractValue("RUNTIME_PRESTOP_DRAIN_SECONDS");
-    check("contract", /preStop:/.test(single.out),
-        "no preStop hook is rendered — kubelet signals the pod and removes its endpoint concurrently, " +
-        "so without one the ingress keeps routing to a process that has stopped accepting");
-    check("contract", new RegExp(`sleep ${drain}`).test(single.out),
-        `the preStop drain is not the contract's ${drain}s`);
 }
+
+// Every topology, every workload in it — including the static apps, which are
+// the reason this enumerates instead of listing.
+checkDrain("unsplit", single);
+checkDrain("split", split);
+checkDrain("static", withStatic);
 
 if (split.ok) {
     // Every unit, not just the api: a worker that restart-loops on a database

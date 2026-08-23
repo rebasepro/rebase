@@ -592,12 +592,30 @@ async function bootStaticApp(
         }
     }
 
-    // No backend and no data sources exist for a static app; the stub keeps the
-    // returned shape uniform so callers (and shutdown) do not special-case it.
-    const noopBackend = { shutdown: async () => {} } as unknown as RebaseBackendInstance;
+    // No backend and no data sources exist for a static app, but the HTTP server
+    // is real and something has to close it.
+    //
+    // The stub used to be `shutdown: async () => {}`, and `installShutdownHandlers`
+    // drains by calling exactly that — so SIGTERM ran an empty drain and exited
+    // with the server still accepting. Every in-flight response was truncated at
+    // process exit, and every response that arrived during the seconds it takes
+    // an endpoint removal to propagate was truncated too. A rollout of a static
+    // app dropped requests, and the only symptom was a connection reset on the
+    // client, which reads as a network blip.
+    const staticBackend = {
+        shutdown: async () => {
+            await new Promise<void>((resolve) => {
+                // `close` stops accepting and waits for in-flight responses.
+                // Errors are ignored deliberately: a server that was never
+                // listening (`listen: false`) rejects, and failing the shutdown
+                // over that would turn a clean exit into a force-kill.
+                server.close(() => resolve());
+            });
+        }
+    } as unknown as RebaseBackendInstance;
 
     if (options.handleSignals !== false) {
-        installShutdownHandlers(noopBackend, {
+        installShutdownHandlers(staticBackend, {
             onCleanup: async () => { if (!isProduction) cleanupDevPortFile(devRoot); }
         });
         if (!isProduction) process.on("exit", () => cleanupDevPortFile(devRoot));
@@ -617,7 +635,7 @@ async function bootStaticApp(
     return {
         app,
         server,
-        backend: noopBackend,
+        backend: staticBackend,
         bundle,
         env,
         port,
