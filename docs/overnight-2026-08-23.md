@@ -279,6 +279,44 @@ fire; and four MCP branch tools that fail authorization on every call.
 
 ---
 
+## 4d. Also fixed after the second hunt landed
+
+A cluster of one shape: **a derived name reaching an `export const` with nothing
+checking it can be declared.** Three places, none of which guarded it, in files
+where the neighbouring code guards property keys and member accesses and
+explains why in a docblock.
+
+| Where | Input | What it wrote |
+|---|---|---|
+| `getTableVarName` (common) | table `2024_archive` | `export const 2024Archive = pgTable(…)` |
+| same | table `reporting.events` | `export const reporting.events = …` |
+| the drizzle generator | `search: { column: "search-vector" }` | `,' expected` |
+| `AstSchemaEditor` | slug `my-notes` | `const my-notesCollection: …` |
+
+Each fails the build for the WHOLE collections directory, because
+`schema.generated.ts` and every collection file are imported together. The last
+is reachable from the admin panel, which reports success and then cannot parse
+the file it wrote, so it cannot fix itself. The first is reachable from
+`rebase init` against a database holding a table called `2024_archive`.
+
+Every fix is a no-op for names that already worked — asserted, not claimed — so
+touching a derived name is safe here: the only outputs that move are the ones
+that were a syntax error, and nothing can be running against those.
+
+**One reported finding did not reproduce, and the report was wrong about it.**
+The injection route through `relationName` — a `"` closing the string literal in
+a file the server imports — cannot happen: the value is derived before it reaches
+the template, so `ev"il` emits `posts_evIlId`. Verified by generating it and then
+by mutating all five escaped sites back and watching the output still parse. The
+escaping stays for consistency with the file's own convention; it is one fix,
+not five.
+
+Also fixed: the cloud CLI never printed a price, and the schema-drift gate added
+earlier in the night was declared and run by nothing until it was wired into
+saas CI.
+
+---
+
 ## 5. What this did not cover
 
 Two hunts ran. The first covered env vars, filenames, manifest keys, fields
