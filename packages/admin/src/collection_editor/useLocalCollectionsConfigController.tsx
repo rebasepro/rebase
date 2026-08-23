@@ -312,6 +312,17 @@ partial: true });
         // runs — a plan arrives, a dialog opens — and a controller memoised
         // without them would keep handing back a closed dialog and a stale
         // answer about whether the backend can edit its schema at all.
+        //
+        // `write`, `request`, `findCollection` and `wholeCollection` are
+        // rebuilt on every render, so listing them would defeat the memo
+        // entirely. Each is already covered *transitively* by what is listed:
+        // `request` closes over `editorUrl` and a ref, and `editorUrl` derives
+        // from `clientOrUrl`; `findCollection` and `wholeCollection` close over
+        // `parsedCollections`; `write` closes over `liveSchema.status` and
+        // `liveSchema.reviewChange`, and the latter is a `useCallback` keyed on
+        // a client built from `clientOrUrl`. Every input that can change is in
+        // the array under the name it actually varies with.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [
         clientOrUrl,
         parsedCollections,

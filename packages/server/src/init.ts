@@ -56,9 +56,13 @@ import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
 /**
  * Who may change this project's schema through a running backend.
  *
+ * An alias rather than its own shape: the policy is defined next to the code
+ * that enforces it, and a second declaration here would be a second place for
+ * it to drift.
+ *
  * @see `packages/server/src/schema-edit/schema-edit-permissions.ts`
  */
-export interface LiveSchemaConfig extends SchemaEditPolicy {}
+export type LiveSchemaConfig = SchemaEditPolicy;
 import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
 import nodePath from "node:path";
 import nodeFs from "node:fs/promises";
