@@ -10,7 +10,8 @@
  * Before this block, the roles were derived and only derived. `titleProperty`
  * was the single exception, and it could only ever name a property of the
  * collection: seven separate implementations read that key, disagreed about the
- * fallback, and none of them could await. The other five roles could not be
+ * fallback, and none of them could await. (It is gone now — `display.title`
+ * replaced it outright.) The other five roles could not be
  * stated at all — the image was whichever storage property came first, the
  * status whichever enum, the date whichever timestamp. Right often enough to
  * feel automatic, and wrong with no way to say so.

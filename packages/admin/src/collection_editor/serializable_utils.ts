@@ -483,7 +483,6 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.engine) result.engine = collection.engine;
     if (collection.dataSource) result.dataSource = collection.dataSource;
     if (collection.databaseId) result.databaseId = collection.databaseId;
-    if (collection.titleProperty) result.titleProperty = collection.titleProperty as string;
     if (collection.ownerId) result.ownerId = collection.ownerId;
     if (collection.metadata) result.metadata = collection.metadata;
     if (isRelationalCollectionConfig(collection) && collection.table) result.table = collection.table;

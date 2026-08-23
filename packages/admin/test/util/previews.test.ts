@@ -304,12 +304,12 @@ name: "Status" }
 // getEntityTitlePropertyKey
 // ---------------------------------------------------------------------------
 describe("getEntityTitlePropertyKey", () => {
-    it("returns explicit titleProperty when set", () => {
+    it("returns the explicit display.title when set", () => {
         const collection: CollectionConfig = {
             id: "test",
             name: "Test",
             path: "test",
-            titleProperty: "name",
+            display: { title: "name" },
             properties: {
                 name: { type: "string",
 name: "Name" } as Property,
@@ -319,7 +319,7 @@ admin: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("auto-detects first single-line text field as title", () => {
@@ -338,7 +338,7 @@ admin: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("title");
+        expect(getEntityTitlePropertyKey(collection)).toBe("title");
     });
 
     it("skips multiline text fields", () => {
@@ -355,7 +355,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("skips markdown text fields", () => {
@@ -372,7 +372,7 @@ name: "Slug" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("slug");
+        expect(getEntityTitlePropertyKey(collection)).toBe("slug");
     });
 
     it("skips storage text fields", () => {
@@ -389,7 +389,7 @@ name: "Label" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("label");
+        expect(getEntityTitlePropertyKey(collection)).toBe("label");
     });
 
     it("skips isId fields", () => {
@@ -406,7 +406,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 
     it("returns undefined when no suitable title field exists", () => {
@@ -422,7 +422,7 @@ name: "Flag" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBeUndefined();
+        expect(getEntityTitlePropertyKey(collection)).toBeUndefined();
     });
 
     it("skips hidden properties when auto-detecting title", () => {
@@ -439,7 +439,7 @@ name: "Name" } as Property
             }
         } as CollectionConfig;
 
-        expect(getEntityTitlePropertyKey(collection, fields)).toBe("name");
+        expect(getEntityTitlePropertyKey(collection)).toBe("name");
     });
 });
 

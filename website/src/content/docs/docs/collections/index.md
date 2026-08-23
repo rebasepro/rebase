@@ -380,10 +380,11 @@ Prefer a path whenever the value is on the record: a path keeps the property's
 own rendering, so an enum status stays a coloured chip and a date stays
 formatted, which a resolver returning a bare string cannot express.
 
-:::note[Renamed from `titleProperty`]
-`admin.titleProperty` is now `admin.display.title`. The same string works there,
-and the new field also takes a resolver. The old key is still read, and warns
-once per collection at startup.
+:::note[Replaced `titleProperty`]
+`admin.titleProperty` was removed in favour of `admin.display.title`. The same
+string works there, and the new field also takes a resolver. A collection still
+carrying the old key is rejected by `defineCollection` with the usual
+unknown-key error.
 :::
 
 ### Title Property Selection

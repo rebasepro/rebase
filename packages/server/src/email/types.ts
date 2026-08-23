@@ -2,9 +2,9 @@
  * Email service types and interfaces.
  *
  * The canonical `EmailService` and `EmailSendOptions` live in `@rebasepro/types`
- * so they can be used on the `RebaseClient` interface without pulling in nodemailer.
- * This file re-exports them for backward compatibility and adds server-specific
- * config types (SMTP, template functions, etc.).
+ * so they can be used on the `RebaseClient` interface without pulling in
+ * nodemailer. This module re-exports them beside the server-only config types
+ * (SMTP, template functions, …), so a backend imports one module, not two.
  */
 
 import type { EmailService, EmailSendOptions } from "@rebasepro/types";

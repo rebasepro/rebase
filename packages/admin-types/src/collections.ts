@@ -30,7 +30,7 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
      * The column order is determined by the order of `enum` values in the property.
      *
      * Left permissive on purpose, unlike the *optional* key fields on the admin
-     * block (`titleProperty`, `sort`, `propertiesOrder`, …), which are checked
+     * block (`display`, `sort`, `propertiesOrder`, …), which are checked
      * against `M`.
      *
      * This one is **required**, and that is the whole difference: a required

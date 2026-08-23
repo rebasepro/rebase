@@ -1,5 +1,4 @@
 import type { RebaseServerClient } from "../controllers/client";
-import type { RebaseSdkData } from "../controllers/data";
 
 /**
  * Cron Job type definitions for Rebase.
@@ -126,29 +125,6 @@ export interface CronJobContext {
      */
     rebase: RebaseServerClient;
 
-    /**
-     * The same object as {@link rebase}, under the name this context used
-     * before.
-     *
-     * @deprecated Use `rebase` instead. Two things made the old name a problem,
-     * and neither was cosmetic. It contradicted every other server surface,
-     * where the singleton is `rebase` — the previous docstring had to end with
-     * *"it is only named `client` here"*. And typing it as `RebaseClient`
-     * re-exposed `client.data`, the alias that {@link RebaseServerClient}
-     * deliberately `Omit`s so the RLS-bypassing plane has exactly one name and
-     * the privilege is visible at the call site. A reader who learned
-     * `client.data` here carried it to a collection callback, where
-     * `context.data` is the *user-scoped* plane — same spelling, opposite
-     * privilege.
-     *
-     * Still the full server client at runtime, and `data` still resolves, so
-     * existing cron files keep working and keep compiling. It will be removed
-     * in the next major.
-     */
-    client: RebaseServerClient & {
-        /** @deprecated Use `rebase.dataAsAdmin` — the name states the privilege. */
-        data: RebaseSdkData;
-    };
 }
 
 // =============================================================================

@@ -199,12 +199,12 @@ type: "string" }
             expect(getTitlePropertyKey(collection)).toBe("email");
         });
 
-        it("still honours the deprecated titleProperty", () => {
+        it("honours a display.title that names a later property", () => {
             const collection: AdminCollection = {
                 name: "Talents",
-                slug: "talents-legacy",
+                slug: "talents-declared",
                 table: "talents",
-                titleProperty: "email",
+                display: { title: "email" },
                 properties: {
                     full_name: { name: "Full Name",
 type: "string" },

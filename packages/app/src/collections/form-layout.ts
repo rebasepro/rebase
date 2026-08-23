@@ -18,6 +18,7 @@ import type {
     PropertySpan
 } from "@rebasepro/admin-types";
 import type { Property } from "@rebasepro/types";
+import { getDisplayPropertyKey } from "./entity-display";
 import { isHidden } from "./property_presentation";
 
 /**
@@ -278,7 +279,7 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
 }: ResolveFormLayoutParams<M>): ResolvedFormLayout {
 
     const config = collection.form;
-    const titlePropertyKey = collection.titleProperty as string | undefined;
+    const titlePropertyKey = getDisplayPropertyKey(collection, "title");
 
     const available = new Map<string, ResolvedFormField>();
     for (const key of fieldKeys) {

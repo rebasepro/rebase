@@ -35,18 +35,19 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         expect([...ADMIN_COLLECTION_KEYS]).toEqual(sorted);
     });
 
-    it("covers the 42 fields the split moved off the collection", () => {
+    it("covers the 41 fields the split moved off the collection", () => {
         // A bare count, as a tripwire. If this number changes, either a field was
         // added to the admin block (add it above too) or one was moved back out to
         // the contract — and the second is a decision, not a refactor.
-        // 40 since `display` joined; `titleProperty` is still listed because
-        // it is still read, and the schema editor has to know where to write it.
+        // 40 since `display` joined.
         // 41 since `hideFromEntityViews` split the drawer's answer from the
         // parent tab strip's; it is on the core list and sorted, so the count is
         // the only thing that was outstanding.
         // 42 since `customViews` opened the view switcher to app-supplied
         // renderings of a collection's rows.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(42);
+        // 41 again since `titleProperty` was removed — `display.title` is the
+        // only way to state it, so the schema editor has one place to write.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(41);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {
@@ -292,7 +293,7 @@ describe("admin key fields are checked against the collection's properties", () 
         const good = defineCollection({
             ...base,
             admin: {
-                titleProperty: "title",
+                display: { title: "title" },
                 sort: ["score", "desc"],
                 propertiesOrder: [
                     "title",
@@ -303,18 +304,13 @@ describe("admin key fields are checked against the collection's properties", () 
                 listProperties: ["title", "score"]
             }
         });
-        expect(good.admin?.titleProperty).toBe("title");
+        expect(good.admin?.display?.title).toBe("title");
     });
 
     // One bad key per call, deliberately. With several in one object literal,
     // overload resolution reports a single TS2769 against the *call* and the
     // per-property directives below it all read as unused — so the assertions
     // would pass for the wrong reason.
-    it("rejects a misspelled titleProperty", () => {
-        // @ts-expect-error — "titel" is not a property of this collection
-        defineCollection({ ...base, admin: { titleProperty: "titel" } });
-    });
-
     it("rejects a misspelled sort key", () => {
         // @ts-expect-error — "scoer" is not a property of this collection
         defineCollection({ ...base, admin: { sort: ["scoer", "desc"] } });

@@ -10,11 +10,7 @@ import { cls, Tooltip } from "@rebasepro/ui";
 export type DrawerNavigationItemProps = {
     icon: React.ReactElement,
     name: string,
-    /** @deprecated No longer read: the tooltip is uncontrolled. */
-    tooltipsOpen?: boolean,
     drawerOpen: boolean,
-    /** @deprecated No longer read: the tooltip is uncontrolled. */
-    adminMenuOpen?: boolean,
     url: string,
     onClick?: () => void,
     /**

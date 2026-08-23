@@ -71,8 +71,7 @@ export const ADMIN_COLLECTION_KEYS = [
     "selectionController",
     "selectionEnabled",
     "sideDialogWidth",
-    "sort",
-    "titleProperty"
+    "sort"
 ] as const;
 
 /** A key of a collection's `admin` block. @group Models */

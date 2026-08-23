@@ -4,15 +4,6 @@ import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FieldPath, FilterValues, OrderBySpec } from "../types/filter-operators";
 
 /**
- * Operator-blind filter value: whatever the column holds, a list of it, or null.
- *
- * @deprecated Superseded by {@link WhereValueFor}, which correlates the value
- * with the operator. Kept exported because it is public API and downstream code
- * annotates with it; every `where()` overload in this file uses `WhereValueFor`.
- */
-export type WhereValue<T> = T | T[] | null;
-
-/**
  * The element type of an array column, and the column's own type otherwise.
  *
  * A generated SDK emits an `array` property as `Array<X>` and a to-many

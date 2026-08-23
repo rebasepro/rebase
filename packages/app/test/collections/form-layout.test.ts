@@ -85,7 +85,7 @@ describe("resolveFormLayout — derived defaults", () => {
         price: { type: "number" },
         stock: { type: "number" },
         description: { type: "string", admin: { markdown: true } }
-    }, { titleProperty: "name" });
+    }, { display: { title: "name" } });
 
     const layout = resolveFormLayout({
         collection: products,

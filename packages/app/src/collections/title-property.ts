@@ -224,7 +224,7 @@ index });
  *
  * Returns `undefined` when that first property is anything but a
  * single-cardinality relation, or when the collection states its own
- * `titleProperty`.
+ * `display.title`.
  *
  * @group Collections
  */

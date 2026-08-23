@@ -1401,8 +1401,8 @@ the resolved one in; results are cached per record and per role. Return
 fallback. Prefer a path when the value is on the record: it keeps the property's
 own rendering (an enum stays a chip, a date stays formatted).
 
-`admin.titleProperty` is the old name of `display.title`. It is still read, and
-warns once per collection.
+`admin.titleProperty` was the old name of `display.title`. It has been removed;
+`display.title` takes the same string.
 
 ### Title Property Selection
 When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved as follows:

@@ -146,21 +146,17 @@ interface CronJobContext {
     // from "@rebasepro/server"` returns, and the same one `defineFunction`
     // hands its callback.
     rebase: RebaseServerClient;
-
-    /** @deprecated The same object, under the name this context used before. */
-    client: RebaseServerClient & { data: RebaseSdkData };
 }
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
 
-:::note[`ctx.client` is the old name for `ctx.rebase`]
-They are the same object. `client` is deprecated and will be removed in the next
-major: it contradicted every other server-side surface, where the singleton is
-`rebase`, and its type re-exposed `client.data` — the alias `RebaseServerClient`
-deliberately omits so that the privileged plane has exactly one name. A reader
-who learned `client.data` here carried it into a collection callback, where
-`context.data` is the *user-scoped* plane: same spelling, opposite privilege.
+:::note[`ctx.client` was removed]
+It was a second name for `ctx.rebase`, and its type re-exposed `client.data` —
+the alias `RebaseServerClient` deliberately omits so that the privileged plane
+has exactly one name. A reader who learned `client.data` here carried it into a
+collection callback, where `context.data` is the *user-scoped* plane: same
+spelling, opposite privilege. Use `ctx.rebase.dataAsAdmin`.
 :::
 
 ### Interacting with the database and services via `ctx.rebase`

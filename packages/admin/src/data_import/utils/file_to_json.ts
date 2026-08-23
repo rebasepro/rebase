@@ -3,9 +3,6 @@ import { mapJsonParse, unflattenObject } from "./transforms";
 import { parseCsvToObjects } from "./csv";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 
-// Re-export for backwards compat (tests import from this file)
-export { unflattenObject } from "./transforms";
-
 type ConversionResult = {
     data: object[];
     propertiesOrder: string[]

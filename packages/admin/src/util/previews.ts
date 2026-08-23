@@ -1,5 +1,5 @@
 import type { Property } from "@rebasepro/types";
-import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 import { getTitlePropertyKey, getTitlePropertyKeyForValues } from "@rebasepro/app";
 import { isPropertyBuilder } from "@rebasepro/common";
 
@@ -21,7 +21,9 @@ export { getEntityPreviewKeys } from "@rebasepro/app";
  * called. Identifiers are excluded from the property *schema* — primary keys,
  * foreign keys, UUID columns — not from the key name.
  */
-export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: AdminCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(
+    collection: AdminCollection<M>
+): string | undefined {
     return getTitlePropertyKey(collection);
 }
 

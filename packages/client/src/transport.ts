@@ -119,12 +119,13 @@ export const ANONYMOUS_SERVER_CLIENT_WARNING =
     "[rebase] This client was created outside a browser with no credential — no `token`, no auth token getter, "
     + "and no cookie auth flow — so every request runs as an anonymous caller. Row-level security will return only "
     + "publicly readable rows, which is usually nothing and occasionally the wrong thing. "
-    + "Inside a cron or function handler, use the `client` you were handed instead of building a new one: its data "
+    + "Inside a cron or function handler, use the `rebase` you were handed instead of building a new one: its data "
     + "plane is already admin-scoped. In a standalone script or job, pass the service key as `token`. "
     + "If you really do want anonymous access, pass `anonymous: true` to silence this.";
 
 /**
- * Re-export from `@rebasepro/types` for backward compatibility.
+ * Re-exported from `@rebasepro/types` so an SDK consumer can name the type of a
+ * call it is already making without a second dependency.
  *
  * Forwards the row type: without the parameter this alias flattened
  * `FindParams<M>` back to its `Record<string, unknown>` default, and `where` /

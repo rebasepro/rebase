@@ -14,49 +14,21 @@ import type {
 } from "@rebasepro/admin-types";
 
 /**
- * Collections that have already warned about a deprecated field, so a list of
- * fifty rows produces one line in the console rather than fifty.
- */
-const deprecationWarned = new Set<string>();
-
-function collectionId(collection: AdminCollection<never> | AdminCollection<any>): string {
-    return (collection.slug ?? collection.name ?? "collection") as string;
-}
-
-function warnOnce(id: string, message: string): void {
-    const key = `${id}:${message}`;
-    if (deprecationWarned.has(key)) return;
-    deprecationWarned.add(key);
-    console.warn(message);
-}
-
-/**
  * What the collection declares for a role, before deciding which form it is.
  *
- * `display.title` wins over the deprecated `titleProperty`: a collection setting
- * both is mid-migration, and the new field is the one it means.
+ * One field states it: `display[role]`. `admin.titleProperty` used to be a
+ * second way to say `display.title` and is gone — a role with two spellings is
+ * a role with two readers, and this one had grown seven.
  */
 function getDeclaredSource<M extends Record<string, unknown>>(
     collection: AdminCollection<M>,
     role: EntityDisplayRole
 ): string | EntityDisplayResolver<M, unknown> | undefined {
-
     const display = collection.display as Record<string, unknown> | undefined;
     const declared = display?.[role];
-    if (declared !== undefined) return declared as string | EntityDisplayResolver<M, unknown>;
-
-    if (role === "title" && collection.titleProperty) {
-        const id = collectionId(collection);
-        warnOnce(
-            id,
-            `[rebase] Collection "${id}" uses admin.titleProperty, which is deprecated. ` +
-            `Move it to admin.display.title — the same string works there, and display.title ` +
-            `also accepts a resolver for a title the record does not carry.`
-        );
-        return collection.titleProperty as string;
-    }
-
-    return undefined;
+    return declared === undefined
+        ? undefined
+        : declared as string | EntityDisplayResolver<M, unknown>;
 }
 
 /**
