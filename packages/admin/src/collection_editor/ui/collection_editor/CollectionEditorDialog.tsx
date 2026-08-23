@@ -37,6 +37,7 @@ import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Prope
 import { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
 import { getSubcollections, getTableName, isPropertyBuilder } from "@rebasepro/common";
 import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
+import { isSchemaChangeCancelled } from "../../liveSchemaClient";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
@@ -431,6 +432,15 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 return true;
             })
             .catch((e) => {
+                // Cancelling the schema-change review rejects, so that the form
+                // does not go on believing it saved. It is still the person's
+                // own choice, and reporting it back to them as "Error
+                // persisting collection" — in the console and in a red
+                // snackbar — describes their decision as a fault.
+                if (isSchemaChangeCancelled(e)) {
+                    setError(undefined);
+                    return false;
+                }
                 setError(e);
                 console.error(e);
                 snackbarController.open({

@@ -62,7 +62,7 @@ test.describe("Rebase Studio Features E2E", () => {
     await expect(page.getByRole("link").filter({ hasText: "Orders" }).first()).toBeVisible({ timeout: 30000 });
   });
 
-  test("visual collection editor - can create a collection and add fields", async ({ page }) => {
+  test("visual collection editor - builds a collection and previews the schema change", async ({ page }) => {
     // Go directly to the schema editing page
     await page.goto("/schema");
 
@@ -142,23 +142,48 @@ test.describe("Rebase Studio Features E2E", () => {
     await createButton.click();
 
     // Saving no longer writes straight through. A backend that can edit its own
-    // schema plans the change first and shows what it would do — the SQL, the
-    // files, the commit — and nothing happens until somebody agrees. Against a
-    // backend that cannot (a bundle deployment, a non-Postgres driver) the
-    // dialog never appears and the save completes on its own, so this waits for
-    // whichever of the two this deployment is rather than assuming.
+    // schema plans the change first and shows what it would do — the verdict,
+    // the SQL, the files it would commit — and nothing happens until somebody
+    // agrees.
+    //
+    // This test stops at the preview and cancels, deliberately. Confirming runs
+    // a real `git commit` into whatever repository the app is served from —
+    // which for `rebase dev` in `app/` is **this checkout**, so a developer
+    // running the suite locally would get generated files committed onto their
+    // current branch. The apply half is covered where it can be done safely:
+    // `packages/server-postgres/test/e2e/live-schema-editing-e2e.test.ts`
+    // drives it against a real Postgres and a repository it creates under
+    // `mkdtemp`.
+    //
+    // A backend that *cannot* edit its schema — a bundle deployment, a
+    // non-Postgres driver — shows no dialog and the save completes on its own,
+    // so this waits for whichever of the two this deployment is.
     const review = page.getByText("Review schema change");
-    const applied = page.waitForURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
-    await Promise.race([
-        review.waitFor({ state: "visible", timeout: 25000 }).then(async () => {
-            await expect(page.getByText("Ready to apply")).toBeVisible({ timeout: 10000 });
-            await page.getByRole("button", { name: "Commit and apply" }).click();
-        }),
-        applied.catch(() => undefined)
+    const savedOutright = page.waitForURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 })
+        .then(() => "saved" as const, () => undefined);
+
+    const outcome = await Promise.race([
+        review.waitFor({ state: "visible", timeout: 25000 }).then(() => "reviewed" as const),
+        savedOutright
     ]);
 
-    // Either way, the collection exists and the editor has moved to it.
-    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 30000 });
+    if (outcome === "reviewed") {
+        // The preview is the product here: it has to name what it would do,
+        // not merely appear.
+        await expect(page.getByText("Ready to apply")).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText("SQL that will run", { exact: false })).toBeVisible();
+        await expect(page.getByText("Files that will be committed", { exact: false })).toBeVisible();
+
+        await page.getByRole("button", { name: "Cancel" }).click();
+
+        // Cancelling is an answer, not a no-op: the dialog closes and the
+        // editor stays where it was, with nothing written.
+        await expect(review).toBeHidden({ timeout: 10000 });
+        await expect(page).toHaveURL(/.*schema\/new/);
+    } else {
+        // No live schema editing here, so the save went straight through.
+        await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 30000 });
+    }
   });
 
   test("sql console - can run queries, handle syntax errors, and switch roles", async ({ page }) => {

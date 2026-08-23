@@ -13,7 +13,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 
 import {
     useLiveSchemaEditing,
-    SchemaChangeCancelled
+    SchemaChangeCancelled,
+    isSchemaChangeCancelled
 } from "../../src/collection_editor/useLiveSchemaEditing";
 import type {
     LiveSchemaClient,
@@ -329,5 +330,36 @@ describe("before the backend has answered", () => {
 
         // The effect's probe and both explicit asks share one request.
         expect(client.status).toHaveBeenCalledTimes(1);
+    });
+});
+
+/**
+ * Cancelling is an answer, and callers have to be able to tell it apart.
+ *
+ * A save must *reject* when it is cancelled — resolving would leave the form
+ * believing it saved. But the collection editor caught every rejection the same
+ * way, so cancelling produced a console error and a red snackbar reading "Error
+ * persisting collection: The schema change was not applied": the person's own
+ * choice, reported back to them as a fault.
+ */
+describe("telling a cancellation from a failure", () => {
+    it("recognises the cancellation", () => {
+        expect(isSchemaChangeCancelled(new SchemaChangeCancelled())).toBe(true);
+    });
+
+    it("does not swallow a real failure", () => {
+        expect(isSchemaChangeCancelled(new Error("the working tree is dirty"))).toBe(false);
+        expect(isSchemaChangeCancelled("cancelled")).toBe(false);
+        expect(isSchemaChangeCancelled(undefined)).toBe(false);
+    });
+
+    it("recognises one thrown by another copy of this module", () => {
+        // Matched by name, not `instanceof`: two copies of the package in one
+        // bundle give the class two identities, and an `instanceof` check then
+        // answers false for a cancellation that is real. The editor would go
+        // back to reporting it as an error, which is the bug this guards.
+        const fromElsewhere = new Error("The schema change was not applied.");
+        fromElsewhere.name = "SchemaChangeCancelled";
+        expect(isSchemaChangeCancelled(fromElsewhere)).toBe(true);
     });
 });

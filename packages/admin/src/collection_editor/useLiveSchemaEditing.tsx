@@ -20,12 +20,16 @@ import { lazyChunk } from "@rebasepro/ui";
 import {
     createLiveSchemaClient,
     LiveSchemaError,
+    SchemaChangeCancelled,
     type LiveSchemaClient,
     type LiveSchemaPlan,
     type LiveSchemaResult,
     type LiveSchemaStatus,
     type ProposedCollectionChange
 } from "./liveSchemaClient";
+
+// Re-exported so the hook stays the one import a caller needs.
+export { SchemaChangeCancelled, isSchemaChangeCancelled } from "./liveSchemaClient";
 
 /**
  * Loaded when a change is actually being reviewed, not before.
@@ -40,14 +44,6 @@ const SchemaChangeDialog = lazyChunk(() =>
     import("./ui/collection_editor/SchemaChangeDialog")
         .then(m => ({ default: m.SchemaChangeDialog }))
 );
-
-/** The person closed the dialog without applying. Not an error; an answer. */
-export class SchemaChangeCancelled extends Error {
-    constructor() {
-        super("The schema change was not applied.");
-        this.name = "SchemaChangeCancelled";
-    }
-}
 
 export interface UseLiveSchemaEditingOptions {
     /** Base for the routes, e.g. `https://api.example.com/api/admin/schema`. */
