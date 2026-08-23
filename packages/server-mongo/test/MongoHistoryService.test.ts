@@ -2,6 +2,38 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { MongoClient, Db, ObjectId } from "mongodb";
 import { MongoHistoryService, findChangedFields } from "../src/services/MongoHistoryService";
 
+/**
+ * Wait for the history collection to settle at `expected` rows for an entity.
+ *
+ * `recordHistory` fire-and-forgets `pruneHistory`, so the prune completes some
+ * time after the call that triggered it resolves. These tests used to wait a
+ * flat 100 ms, which is a bet on scheduler latency: on a loaded machine the
+ * prune had not run yet and the assertion saw the pre-prune count — observed as
+ * "Expected length: 2, Received length: 3" in a CI run where every other
+ * assertion in the file passed.
+ *
+ * Polling asserts the same thing without the bet: fast when the prune is
+ * prompt, and still correct when it is not. The timeout is what fails the test
+ * if the prune genuinely never happens.
+ */
+async function historySettlesAt(
+    db: Db,
+    collectionName: string,
+    entityId: string,
+    expected: number,
+    timeoutMs = 5000
+): Promise<Record<string, unknown>[]> {
+    const deadline = Date.now() + timeoutMs;
+    let rows: Record<string, unknown>[] = [];
+    for (;;) {
+        rows = await db.collection(collectionName)
+            .find({ entity_id: entityId }).sort({ updated_at: 1 }).toArray() as unknown as Record<string, unknown>[];
+        if (rows.length === expected || Date.now() > deadline) return rows;
+        await new Promise(r => setTimeout(r, 25));
+    }
+}
+
+
 describe("MongoHistoryService", () => {
     let mongoServer: MongoMemoryServer;
     let client: MongoClient;
@@ -164,10 +196,8 @@ tableName: "users",
 values: { a: 3 },
 previousValues: { a: 2 } });
 
-            // Since it fire-and-forgets pruneHistory, we might need to wait slightly
-            await new Promise(r => setTimeout(r, 100));
-
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).sort({ updated_at: 1 }).toArray();
+            // pruneHistory is fire-and-forget: poll rather than bet on a fixed delay.
+            const history = await historySettlesAt(db, COLLECTION_NAME, id, 2);
 
             // Only the latest 2 should be kept
             expect(history).toHaveLength(2);
@@ -214,9 +244,7 @@ tableName: "users",
 values: { a: 3 },
 previousValues: { a: 2 } });
 
-            await new Promise(r => setTimeout(r, 100));
-
-            const history = await db.collection(COLLECTION_NAME).find({ entity_id: id }).sort({ updated_at: 1 }).toArray();
+            const history = await historySettlesAt(db, COLLECTION_NAME, id, 2);
 
             // The record from twoDaysAgo should be deleted
             expect(history).toHaveLength(2);
