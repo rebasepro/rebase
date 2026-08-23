@@ -133,6 +133,38 @@ export interface RebaseStaticAppConfig {
 export type RebaseAppConfig = RebaseBackendAppConfig | RebaseStaticAppConfig;
 
 /**
+ * Path prefixes the backend owns, which no static app may claim.
+ *
+ * One process — and, on the platform, one hostname — serves both the API and
+ * however many static apps a project has. Mounting is longest-path-first, so an
+ * app declaring `/api` would win against the API itself and every request to it
+ * would be answered with that app's `index.html`: a 200 carrying HTML where the
+ * caller expected JSON, from a project that looks deployed and healthy.
+ *
+ * Declared here rather than in either enforcer because both must agree. The CLI
+ * checks it so a developer finds out while editing `rebase.json`; the control
+ * plane checks it again at deploy intake, because the front door's correctness
+ * cannot rest on a check that ran in somebody else's CLI — and a repository can
+ * be deployed by a CLI older than this rule.
+ */
+export const RESERVED_BACKEND_PREFIXES = ["/api", "/health", "/healthz", "/livez", "/readyz", "/metrics"] as const;
+
+/**
+ * Whether `path` collides with a prefix the backend owns.
+ *
+ * Compares at segment boundaries, so `/api` and `/api/v2` collide while
+ * `/apidocs` does not — the same rule the router matches with, because a check
+ * that is stricter than the router rejects paths that would have worked, and one
+ * that is looser admits paths that will not.
+ */
+export function reservedPrefixFor(path: string): string | undefined {
+    const normalized = path.endsWith("/") && path !== "/" ? path.slice(0, -1) : path;
+    return RESERVED_BACKEND_PREFIXES.find(
+        reserved => normalized === reserved || normalized.startsWith(`${reserved}/`)
+    );
+}
+
+/**
  * One declared storage source, as authored in `rebase.json`.
  *
  * The key comes from the enclosing record, so this is

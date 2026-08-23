@@ -154,7 +154,8 @@
                     "type": "string",
                     "default": "/",
                     "pattern": "^/(?!.*\\.\\.)(?!.*/$).*$|^/$",
-                    "description": "Public base path this app is served under, e.g. \"/admin\". A build-time input as well as a serving concern: the app must be built for this path (Vite's `base`), or every asset 404s. Must be unique across the project's static apps.",
+                    "not": { "pattern": "^/(api|health|healthz|livez|readyz|metrics)(/|$)" },
+                    "description": "Public base path this app is served under, e.g. \"/admin\". A build-time input as well as a serving concern: the app must be built for this path (Vite's `base`), or every asset 404s. Must be unique across the project's static apps, and must not be a path the backend owns (/api, /health, /healthz, /livez, /readyz, /metrics) — mounting is longest-path-first, so an app declared there would answer the API's requests with its own index.html.",
                     "examples": ["/", "/admin"]
                 },
                 "spa": {
