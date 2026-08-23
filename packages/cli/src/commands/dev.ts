@@ -264,7 +264,8 @@ async function runDatabasePreflight(options: { projectRoot: string; disabled: bo
             // argv layout every command in this CLI receives — the full process
             // argument vector, which the callee slices. The throwing variant:
             // a failed push must not take the dev server down with it.
-            await runDriverDbCommand(["node", "rebase", "db", "push"]);
+            // Quiet: the database was resolved and announced in the banner above.
+            await runDriverDbCommand(["node", "rebase", "db", "push"], { quiet: true });
         }
     });
 

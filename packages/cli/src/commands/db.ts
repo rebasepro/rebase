@@ -132,7 +132,10 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
  * The database is resolved *here* rather than in the wrapper, so the schema
  * push `rebase dev` performs during start-up reaches the managed database too.
  */
-export async function runDriverDbCommand(rawArgs: string[]): Promise<void> {
+export async function runDriverDbCommand(
+    rawArgs: string[],
+    options: { quiet?: boolean } = {}
+): Promise<void> {
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
 
@@ -165,10 +168,15 @@ export async function runDriverDbCommand(rawArgs: string[]): Promise<void> {
     const prepared = await prepareDatabaseEnv(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
         flagDocker: rawArgs.includes("--docker"),
-        onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        onProgress: (message) => { if (!options.quiet) console.log(chalk.gray(`  ${message}`)); }
     });
     Object.assign(env, prepared.env);
-    for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
+    // Suppressed for an internal caller. `rebase dev` runs a schema push during
+    // start-up and has already said all of this in its own banner; repeating it
+    // mid-boot reads as something having gone wrong.
+    if (!options.quiet) {
+        for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
+    }
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
