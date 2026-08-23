@@ -129,6 +129,14 @@ overwrite: true },
     { from: "backend/src/env.ts",
 to: "backend/src/env.ts",
 overwrite: true },
+    // The declarations the emitted server imports. Never overwritten — a
+    // project that already declares its resources owns that file, and replacing
+    // it would silently drop every bucket and database it named. Written when
+    // absent because the entrypoint imports it unconditionally: an ejected
+    // server that cannot resolve its own resources does not start.
+    { from: "config/resources.ts",
+to: "config/resources.ts",
+overwrite: false },
     // Never overwritten: a Dockerfile someone already wrote is theirs, and so is
     // a compose file they have edited. The scaffolded `docker-compose.yml` is
     // deliberately left alone — it runs the managed shape, and going back should

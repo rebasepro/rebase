@@ -205,7 +205,10 @@ async function deployBundle(opts: {
     /** Compile without type checking, exactly as `rebase build` does. */
     skipTypeCheck?: boolean;
 }): Promise<void> {
-    const { client, url, projectId, projectRef } = opts;
+    // Nothing here reads client/url/projectId/projectRef any more: everything
+    // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
+    // takes the whole object. Destructuring them anyway is four values computed
+    // and dropped.
     const projectRoot = requireProjectRoot();
 
     let bundleDir = opts.bundleDir

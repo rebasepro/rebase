@@ -15,11 +15,14 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
-    loadDeclaredStorageSources,
     resolveStorageSources,
     logger
 } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
+import { declaredStorageSources } from "@rebasepro/types";
+// Side-effect import: declaring is what registers, so anything that dropped
+// this as "unused" would leave the backend with no buckets — silently.
+import "../../config/resources.js";
 // {{#collections}}
 import { enums, relations, tables } from "./schema.generated.js";
 // {{/collections}}
@@ -32,12 +35,11 @@ import usersCollection from "../../config/collections/users.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Which buckets this project has, read from the `storage` block of its own
-// `rebase.json`. Declared there rather than here so the platform, the console
-// and this process all read one list — a custom image ships the repository, so
-// the file it already contains is the natural place for it. Absent means one
-// default source, configured from the plain S3_*/GCS_* variables.
-const storageSources = loadDeclaredStorageSources(__dirname);
+// Which buckets this project has, read from the declarations in
+// `config/resources.ts`. One declaration site, so this process, the platform
+// and the frontend all read the same list. A project that declares none gets
+// one default source from the plain, unsuffixed S3_*/GCS_* variables.
+const storageSources = declaredStorageSources();
 
 // ─── App ─────────────────────────────────────────────────────────────
 const app: Hono<HonoEnv> = new Hono<HonoEnv>();
@@ -181,7 +183,6 @@ pass: env.SMTP_PASS! }
             storageSources,
             path.resolve(__dirname, "../../uploads")
         ),
-        storageSources,
         // Storage is not under row-level security, so this hook IS its access
         // model — the server refuses to boot in production without one, because
         // "signed in" would otherwise be the only thing between a visitor and
