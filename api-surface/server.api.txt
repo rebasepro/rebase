@@ -28,6 +28,14 @@ const DEFAULT_MAX_FILE_SIZE
 const DEFAULT_STORAGE_ID
 const DOCUMENT_MIME_TYPES
 const IMAGE_MIME_TYPES
+const RUNTIME_BUNDLE_MOUNT
+const RUNTIME_HEALTH_PATH
+const RUNTIME_LIVENESS_PATH
+const RUNTIME_MIN_TERMINATION_GRACE_SECONDS
+const RUNTIME_PRESTOP_DRAIN_SECONDS
+const RUNTIME_PROBE_PATHS { liveness, readiness, startup }
+const RUNTIME_STARTUP_BUDGET_SECONDS
+const TOPOLOGY_ENV_VARS
 const WEBHOOK_DELIVERY_TASK
 const authJwt
 const authRoles
@@ -128,6 +136,7 @@ function isDuplicateObjectRace
 function isLocalhostOrigin
 function isNodeRuntime
 function isOperationAllowed
+function isTopologyEnvVar
 function isTransformableImage
 function lazyResource
 function listBackupObjects
@@ -329,6 +338,7 @@ type SqlExec
 type StorageAuthorize
 type StorageOperation
 type StoragePolicyPredicate
+type TopologyEnvVar
 type UnknownKeyPolicy
 type UserInvitationTemplateFunction
 type WelcomeEmailTemplateFunction
