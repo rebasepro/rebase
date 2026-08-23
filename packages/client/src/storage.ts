@@ -9,6 +9,28 @@ import { Transport } from "./transport";
  *                    When set, it is forwarded to the server so the correct
  *                    `StorageController` is resolved from the registry.
  */
+/**
+ * A storage key, encoded for a URL path.
+ *
+ * Every call below interpolated the key raw, and the server decodes what it
+ * receives — so three ordinary filenames did three different wrong things:
+ *
+ *   `Invoice #12.pdf`  the `#` began the fragment, the server saw
+ *                      `default/Invoice ` and looked up a key that is not the
+ *                      file — and a scoped `?token=` after it was swallowed too
+ *   `100% done.png`    `decodeURIComponent` threw URIError → 500
+ *   `a%2Fb.png`        decoded to `a/b.png`, silently resolving a DIFFERENT
+ *                      object
+ *
+ * Per SEGMENT, because `/` is the key's own separator and must survive; every
+ * other character is encoded, including a literal `%`. Verified to round-trip
+ * through the server's decode for all of the above, plus `+`, accented
+ * characters and a trailing `%`.
+ */
+export function encodeStorageKey(key: string): string {
+    return key.split("/").map(encodeURIComponent).join("/");
+}
+
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
     const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
 
@@ -103,19 +125,19 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // token are needed — build the URL directly and cache it forever.
         if (isPublicStoragePath(filePath)) {
             const publicConfig: DownloadConfig = {
-                url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}`)
+                url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`)
             };
             urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
             return publicConfig;
         }
 
         try {
-            const result = await transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${filePath}`));
+            const result = await transport.request<{ data: DownloadMetadata }>(withStorageId(`/storage/metadata/${encodeStorageKey(filePath)}`));
 
             // Public object (server-confirmed): token-less permanent URL.
             if (result.data.public) {
                 const publicConfig: DownloadConfig = {
-                    url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}`),
+                    url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}`),
                     metadata: result.data
                 };
                 urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
@@ -133,7 +155,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                 // `withStorageId` picks `?` or `&` based on whether the token
                 // query is already present, so the URL stays valid even when
                 // there is no token.
-                url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}${tokenQuery}`),
+                url: withStorageId(`${fileUrlBase()}/storage/file/${encodeStorageKey(filePath)}${tokenQuery}`),
                 metadata: result.data
             };
 
@@ -193,7 +215,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         }
 
         try {
-            await transport.request(withStorageId(`/storage/file/${filePath}`), { method: "DELETE" });
+            await transport.request(withStorageId(`/storage/file/${encodeStorageKey(filePath)}`), { method: "DELETE" });
         } catch (e: unknown) {
             if (!(e instanceof Error && "status" in e && (e as { status: number }).status === 404)) throw e;
         }

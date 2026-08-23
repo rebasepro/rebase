@@ -45,27 +45,22 @@ import {
 } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { resolveRequireAuth } from "../../server/src/auth/require-auth";
-import { createPostgresWebSocket } from "../src/websocket";
+import { createPostgresWebSocket, ADMIN_ONLY_TYPES, PUBLIC_TYPES } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
-/**
- * Every message type the server gates behind `isAdminSession`. Kept in sync
- * with `ADMIN_ONLY_TYPES` in src/websocket.ts — the whole set is swept below so
- * that adding a privileged verb without a role check fails a test rather than
- * shipping.
+/*
+ * `ADMIN_ONLY_TYPES` is imported, not copied.
+ *
+ * This file used to declare its own list of the same nine strings, under a
+ * docblock promising that "adding a privileged verb without a role check fails
+ * a test rather than shipping". It could only ever agree with itself: when
+ * `FETCH_APPLICATION_ROLES` was added to the handler and to neither set, the
+ * copy did not notice, and the verb was reachable by any authenticated
+ * non-admin.
  */
-const ADMIN_ONLY_TYPES = [
-    "EXECUTE_SQL",
-    "FETCH_DATABASES",
-    "FETCH_ROLES",
-    "FETCH_UNMAPPED_TABLES",
-    "FETCH_TABLE_METADATA",
-    "FETCH_CURRENT_DATABASE",
-    "CREATE_BRANCH",
-    "DELETE_BRANCH",
-    "LIST_BRANCHES"
-];
 
 describe("WebSocket Server authorization", () => {
     let mockServer: Server;
@@ -246,7 +241,7 @@ describe("WebSocket Server authorization", () => {
             });
         });
 
-        it.each(ADMIN_ONLY_TYPES)("refuses %s from a signed-in non-admin", async (type) => {
+        it.each([...ADMIN_ONLY_TYPES])("refuses %s from a signed-in non-admin", async (type) => {
             const { mockWs, messageCallback } = await connectAsEditor();
 
             await send(messageCallback, {
@@ -926,5 +921,58 @@ describe("WebSocket Server list limits", () => {
             requestId: "req-count",
             payload: { count: 12345 }
         });
+    });
+});
+
+describe("every message type this server handles is in exactly one bucket", () => {
+    /**
+     * The test that had to exist, and did not.
+     *
+     * The old version asserted that nine named verbs are refused for a
+     * non-admin, from a list it typed out itself. That cannot catch the only
+     * failure that matters: a privileged verb added to the handler and to
+     * NEITHER set, which then reaches every authenticated session — and, on a
+     * deployment with `requireAuth: false`, every anonymous one.
+     *
+     * `FETCH_APPLICATION_ROLES` was exactly that. It ran
+     * `SELECT DISTINCT unnest(roles)` over the users table through the owner
+     * connection, where RLS does not apply.
+     *
+     * So the source is the subject: every `case "X":` in the handler must be
+     * classified. Adding a verb without deciding which bucket it belongs in is
+     * now a failure, and the decision is a line of code someone wrote on
+     * purpose rather than a default.
+     */
+    const source = readFileSync(
+        resolve(__dirname, "../src/websocket.ts"), "utf-8");
+
+    const handled = [...new Set(
+        [...source.matchAll(/case "([A-Z][A-Z_]+)":/g)].map(m => m[1])
+    )].sort();
+
+    it("finds the handler's message types at all", () => {
+        // Without this the sweep below passes vacuously the day the switch is
+        // refactored into a lookup table.
+        expect(handled.length).toBeGreaterThan(10);
+        expect(handled).toContain("EXECUTE_SQL");
+    });
+
+    it.each(handled)("%s is classified as admin-only or public", (type) => {
+        const admin = ADMIN_ONLY_TYPES.has(type);
+        const isPublic = PUBLIC_TYPES.has(type);
+        expect(admin || isPublic).toBe(true);
+        expect(admin && isPublic).toBe(false);
+    });
+
+    it("keeps the privileged database verbs on the admin side", () => {
+        // Named explicitly so that "classified" cannot be satisfied by moving
+        // one of these into PUBLIC_TYPES to make the sweep pass.
+        for (const type of [
+            "EXECUTE_SQL", "FETCH_DATABASES", "FETCH_ROLES", "FETCH_APPLICATION_ROLES",
+            "FETCH_UNMAPPED_TABLES", "FETCH_TABLE_METADATA", "FETCH_CURRENT_DATABASE",
+            "CREATE_BRANCH", "DELETE_BRANCH", "LIST_BRANCHES"
+        ]) {
+            expect(ADMIN_ONLY_TYPES.has(type)).toBe(true);
+        }
     });
 });

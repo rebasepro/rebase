@@ -262,18 +262,49 @@ describe("unrecognised keys", () => {
     });
 
     it("keeps a nested property's own keys apart from the collection's", () => {
-        // `propertiesOrder` and `previewProperties` are admin keys on a collection
-        // and core keys on a map. The codemod had to get this right too.
+        // `propertiesOrder` is an admin key on a COLLECTION and a core key on a
+        // map — `MapProperty` declares it — so at the top level of a map it is
+        // correct and must stay accepted.
+        //
+        // `previewProperties` is not. It is declared on `AdminMapOptions`, not
+        // on `MapProperty`, and it is in `ADMIN_PROPERTY_KEYS`. This test used
+        // to assert it was accepted here too, on the strength of a comment
+        // calling both "core keys on a map" — agreeing with the allowlist
+        // rather than with the type. The allowlist did list it, so nothing
+        // disagreed, and the consequence was that writing it here parsed clean
+        // and then nothing read it.
         const collection = valid();
         (collection.properties as Record<string, unknown>).meta = {
             name: "Meta",
             type: "map",
             properties: { a: { name: "A", type: "string" } },
-            propertiesOrder: ["a"],
-            previewProperties: ["a"]
+            propertiesOrder: ["a"]
         };
 
         expect(findCollectionConfigProblems([collection])).toEqual([]);
+    });
+
+    it("sends a map's previewProperties to the admin block, where it is read", () => {
+        const collection = valid();
+        (collection.properties as Record<string, unknown>).meta = {
+            name: "Meta",
+            type: "map",
+            properties: { a: { name: "A", type: "string" } },
+            previewProperties: ["a"]
+        };
+
+        const problems = findCollectionConfigProblems([collection]);
+        expect(problems.length).toBeGreaterThan(0);
+        expect(JSON.stringify(problems)).toContain("admin");
+
+        const nested = valid();
+        (nested.properties as Record<string, unknown>).meta = {
+            name: "Meta",
+            type: "map",
+            properties: { a: { name: "A", type: "string" } },
+            admin: { previewProperties: ["a"] }
+        };
+        expect(findCollectionConfigProblems([nested])).toEqual([]);
     });
 });
 

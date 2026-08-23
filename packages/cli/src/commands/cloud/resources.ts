@@ -944,17 +944,27 @@ permissive: true });
                     | Record<string, unknown>
                     | undefined;
                 const hasCluster = proj?.cluster_id != null || proj?.cluster != null;
+                // `path` rather than a slash in the NAME: the SDK URL-encodes
+                // the function name, so "pricing/quote" became "pricing%2Fquote"
+                // and the route 404'd — every time, since this shipped. The
+                // console's copy of this call carries the same note and gets it
+                // right.
                 const quote = await client.functions.invoke<ResourceQuote>(
-                    "pricing/quote",
+                    "pricing",
                     proj,
-                    { method: "POST" }
+                    { method: "POST", path: "quote" }
                 );
                 monthly = `€${quote.totalEur.toFixed(2)}/mo`;
                 if (hasCluster) monthly = `${monthly} — platform fee, your own cluster`;
             }
-        } catch {
-            // No linked project, or a control plane without the quote endpoint.
-            // Skip the line rather than printing a figure nobody can stand behind.
+        } catch (err: unknown) {
+            // Say which of the two it was. A bare `catch {}` reporting "a
+            // control plane without the quote endpoint" is what made a
+            // permanent 404 look like an expected condition for this command's
+            // whole life.
+            if (process.env.REBASE_DEBUG) {
+                console.error(`  (no price: ${err instanceof Error ? err.message : String(err)})`);
+            }
         }
 
         emit(
@@ -1050,9 +1060,17 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
         // without the price.
         let quote: ResourceQuote | undefined;
         try {
-            quote = await client.functions.invoke<ResourceQuote>("pricing/quote", project, { method: "POST" });
-        } catch {
-            // No quote — the dials below are still the answer to the question asked.
+            // See the note at the other call site: the name is "pricing" and the
+            // sub-path is an option, because the SDK encodes the name.
+            quote = await client.functions.invoke<ResourceQuote>(
+                "pricing", project, { method: "POST", path: "quote" });
+        } catch (err: unknown) {
+            // No quote — the dials below are still the answer to the question
+            // asked. Visible under REBASE_DEBUG, so a permanent failure cannot
+            // masquerade as a control plane that simply does not price.
+            if (process.env.REBASE_DEBUG) {
+                console.error(`  (no price: ${err instanceof Error ? err.message : String(err)})`);
+            }
         }
 
         emit(

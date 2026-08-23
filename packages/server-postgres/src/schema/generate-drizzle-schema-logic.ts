@@ -308,7 +308,12 @@ export const getDrizzleColumn = (propName: string, prop: Property, collection: C
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetIdField = pkProp.name;
-            const baseColumn = pkProp.type === "number" ? `integer("${fkColumnName}")` : (pkProp.isUuid ? `uuid("${fkColumnName}")` : `text("${fkColumnName}")`);
+            // `quote`, like every other column literal in this file: a column
+            // name only has to be quotable in Postgres, and this one is derived
+            // from a relation the author wrote.
+            const baseColumn = pkProp.type === "number"
+                ? `integer(${quote(fkColumnName)})`
+                : (pkProp.isUuid ? `uuid(${quote(fkColumnName)})` : `text(${quote(fkColumnName)})`);
 
             const onUpdate = relation.onUpdate ? `onUpdate: "${relation.onUpdate}"` : "";
             const required = prop.validation?.required;
@@ -681,10 +686,13 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             const targetId = getPrimaryKeyName(targetCollection);
 
             schemaContent += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
-            schemaContent += `    ${sourceColumn}: ${sourceColType}(\"${sourceColumn}\").notNull().references(() => ${getTableVarName(getTableName(sourceCollection))}.${sourceId}, ${refOptions}),\n`;
-            schemaContent += `    ${targetColumn}: ${targetColType}(\"${targetColumn}\").notNull().references(() => ${getTableVarName(getTableName(targetCollection))}.${targetId}, ${refOptions}),\n`;
+            // The junction block was the one place these three helpers were not
+            // applied, so a junction column containing a space or a hyphen —
+            // both legal in Postgres — produced a file that does not parse.
+            schemaContent += `    ${propKey(sourceColumn)}: ${sourceColType}(${quote(sourceColumn)}).notNull().references(() => ${member(getTableVarName(getTableName(sourceCollection)), sourceId)}, ${refOptions}),\n`;
+            schemaContent += `    ${propKey(targetColumn)}: ${targetColType}(${quote(targetColumn)}).notNull().references(() => ${member(getTableVarName(getTableName(targetCollection)), targetId)}, ${refOptions}),\n`;
             schemaContent += "}, (table) => ([\n";
-            schemaContent += `    primaryKey({ columns: [table.${sourceColumn}, table.${targetColumn}] }),\n`;
+            schemaContent += `    primaryKey({ columns: [${member("table", sourceColumn)}, ${member("table", targetColumn)}] }),\n`;
 
             // Junctions are generated tables like any other: locked by default,
             // with derived policies (reads follow the endpoints, writes follow
@@ -719,12 +727,12 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             const searchSpec = buildSearchColumnSpec(collection);
             if (searchSpec) {
                 columns.add(
-                    `    ${searchSpec.column}: customType({ dataType() { return 'tsvector'; } })("${searchSpec.column}")` +
+                    `    ${propKey(searchSpec.column)}: customType({ dataType() { return 'tsvector'; } })(${quote(searchSpec.column)})` +
                     `.generatedAlwaysAs(sql\`${searchSpec.expression}\`)`
                 );
                 if (searchSpec.fuzzy) {
                     columns.add(
-                        `    ${searchSpec.fuzzy.column}: text("${searchSpec.fuzzy.column}")` +
+                        `    ${propKey(searchSpec.fuzzy.column)}: text(${quote(searchSpec.fuzzy.column)})` +
                         `.generatedAlwaysAs(sql\`${searchSpec.fuzzy.expression}\`)`
                     );
                 }
@@ -860,11 +868,14 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                             // `fields`/`references` here is invalid and crashes
                             // `normalizeRelation` with "Cannot read properties of
                             // undefined (reading 'referencedTable')".
-                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                            // A `relationName` is authored, and a `"` in one
+                            // closed this string literal early — in a file that
+                            // is compiled and imported by the server.
+                            tableRelations.push(`    ${quote(relationKey)}: one(${targetTableVar}, {\n        relationName: ${quote(drizzleRelationName)}\n    })`);
                             break;
 
                         case "hasMany":
-                            tableRelations.push(`    "${relationKey}": many(${targetTableVar}, { relationName: \"${drizzleRelationName}\" })`);
+                            tableRelations.push(`    ${quote(relationKey)}: many(${targetTableVar}, { relationName: ${quote(drizzleRelationName)} })`);
                             break;
 
                         case "manyToMany": {
@@ -874,7 +885,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                             // junction table — unnecessary now that each side names
                             // its own.
                             const junctionTableVar = getTableVarName(rel.through.table);
-                            tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
+                            tableRelations.push(`    ${quote(relationKey)}: many(${junctionTableVar}, { relationName: ${quote(drizzleRelationName)} })`);
                             break;
                         }
 

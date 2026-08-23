@@ -85,6 +85,16 @@ spec:
               port: {{ $root.Values.service.port }}
             initialDelaySeconds: 3
             periodSeconds: 10
+          {{/* The same ordering problem the backend Deployment has: kubelet sends
+               SIGTERM and removes the pod from its Service at the same time, so
+               without this the ingress keeps routing to a process that has stopped
+               accepting. A static app is not exempt — it is the one serving the page
+               a person is looking at. */}}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep {{ $root.Values.preStopDrainSeconds }}"]
+
           resources:
             {{- toYaml (default (dict "requests" (dict "cpu" "20m" "memory" "64Mi") "limits" (dict "cpu" "500m" "memory" "256Mi")) $app.resources) | nindent 12 }}
 {{- end }}

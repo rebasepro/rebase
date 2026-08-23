@@ -215,6 +215,27 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 return null;
             }
 
+            // The same watermark read the request path does above, for the same
+            // reason. This function is what the WebSocket AUTHENTICATE handler
+            // calls, and without it `logout`, `change-password`,
+            // `reset-password` and `DELETE /auth/sessions` voided an access
+            // token for HTTP and left it working over the socket — so signing
+            // out on a stolen session closed the browser's requests and not its
+            // realtime connection.
+            //
+            // This closes the entry point. An ALREADY OPEN socket is a separate
+            // question: nothing re-checks a connection after AUTHENTICATE, so a
+            // session revoked mid-connection survives until it reconnects. That
+            // is recorded in docs/audits/32 (H3) and is a decision about socket
+            // lifetime, not a line missing from here.
+            if (await isAccessTokenRevoked(authRepository, payload)) {
+                logger.warn("[Security Audit] Refused a revoked access token", {
+                    eventType: "auth.token.revoked",
+                    uid: payload.uid
+                });
+                return null;
+            }
+
             let roles: string[] = payload.roles || [];
             try {
                 roles = await authRepository.getUserRoleIds(payload.uid);

@@ -60,6 +60,34 @@ export class AstSchemaEditor {
      * Sanitize collectionId to prevent path traversal attacks.
      * Only allows alphanumeric characters, underscores, and hyphens.
      */
+    /**
+     * The variable name the generated file binds the collection to.
+     *
+     * `sanitizeCollectionId` guards the FILENAME, and permits hyphens and a
+     * leading digit — both legal in a filename and neither legal in a
+     * JavaScript identifier. So a collection created from the admin panel as
+     * `my-notes` (the documented slug shape) or `2024 Archive` (auto-slugged to
+     * `2024_archive`) wrote:
+     *
+     *     const my-notesCollection: CollectionConfig = …      "',' expected"
+     *     const 2024_archiveCollection: CollectionConfig = …  "Numeric separators
+     *                                                          are not allowed here"
+     *
+     * The panel reported success, and the next boot failed for EVERY collection
+     * in the directory — the loader imports all of them — while the editor could
+     * no longer parse the file it had just written, so it could not fix itself.
+     *
+     * Separators camel-case rather than vanish, so `my-notes` and `my_notes`
+     * stay distinct; a leading digit is prefixed rather than stripped, so
+     * `2024_archive` stays distinct from `archive`. Byte-identical for every
+     * slug that already produced a valid identifier.
+     */
+    private static collectionVarName(safeId: string): string {
+        const camel = safeId.replace(/[-_]+([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
+        const identifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(camel) ? camel : `c${camel.replace(/^[0-9]/, (d) => d)}`;
+        return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(identifier) ? identifier : `c${identifier.replace(/[^A-Za-z0-9_$]/g, "")}`;
+    }
+
     private sanitizeCollectionId(collectionId: string): string {
         const sanitized = collectionId.replace(/[^a-zA-Z0-9_-]/g, "");
         if (!sanitized || sanitized !== collectionId) {
@@ -409,7 +437,8 @@ export class AstSchemaEditor {
             if (fs.existsSync(newFilePath)) {
                 throw new Error(`Refusing to overwrite ${newFilePath}: a file for "${collectionId}" already exists but could not be parsed.`);
             }
-            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${safeId}Collection: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeys(collectionData))};\n\nexport default ${safeId}Collection;\n`);
+            const varName = `${AstSchemaEditor.collectionVarName(safeId)}Collection`;
+            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${varName}: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeys(collectionData))};\n\nexport default ${varName};\n`);
         } else {
             // Update root level properties gracefully
 

@@ -227,6 +227,229 @@ if (!strict.ok) {
     }
 }
 
+// ── 2e2. bundle.mode=url — the path that had never worked ────────────────────
+/**
+ * A documented topology that nothing exercised, and it was broken end to end.
+ *
+ * The runtime's fetch looked for a marker file no bundle has ever carried, so
+ * every `mode: url` install rejected its own bundle as "not a Rebase bundle".
+ * `helm lint` and a render cannot see that — but they can see the four things
+ * the working version needs, which is what this checks.
+ */
+const urlMode = render([
+    "--set", "bundle.mode=url",
+    "--set", "bundle.url=https://control-plane.example/bundles/p1"
+]);
+if (!urlMode.ok) {
+    problems.push(`the url-bundle topology does not render:\n${urlMode.out}`);
+} else {
+    const env = envOf(urlMode.out, "rebase-rebase-api") ?? {};
+    check("bundle url", env.REBASE_BUNDLE_URL === "https://control-plane.example/bundles/p1",
+        "REBASE_BUNDLE_URL is not set, so the runtime has no bundle to fetch");
+    check("bundle url", !("REBASE_BUNDLE" in env),
+        "REBASE_BUNDLE is set alongside a URL — it means \"already on disk\" and wins, " +
+        "so the fetch would be skipped and the runtime would boot against an empty directory");
+    check("bundle url", Boolean(env.REBASE_BUNDLE_FETCH_DIR),
+        "REBASE_BUNDLE_FETCH_DIR is not set, so the bundle unpacks into the container's " +
+        "writable layer instead of the volume sized for it");
+
+    const doc = urlMode.out.split(/^---$/m).find(d =>
+        /^kind:\s*Deployment\s*$/m.test(d) && /name:\s*rebase-rebase-api\s*$/m.test(d)) ?? "";
+    const mount = doc.match(/- name: bundle-scratch\n\s+mountPath: "?([^"\n]+)"?/)?.[1];
+    check("bundle url", mount === env.REBASE_BUNDLE_FETCH_DIR,
+        `the bundle volume is mounted at ${mount ?? "(nowhere)"} but the runtime is told to ` +
+        `unpack into ${env.REBASE_BUNDLE_FETCH_DIR} — the install would land on the ` +
+        "container's writable layer and exhaust it");
+    check("bundle url", /emptyDir: \{\}|emptyDir:\n\s+sizeLimit:/.test(doc),
+        "the bundle volume renders `emptyDir:` with nothing under it, which parses as null " +
+        "and is rejected by the API server");
+    check("bundle url", /ephemeral-storage:/.test(doc),
+        "no ephemeral-storage is reserved — Autopilot grants 1Gi by default and a real " +
+        "dependency tree exhausts it mid-install, where npm neither errors nor is evicted");
+}
+
+// 2e3. mode=image must NOT carry any of that.
+const imageMode = render([]);
+if (imageMode.ok) {
+    const env = envOf(imageMode.out, "rebase-rebase-api") ?? {};
+    check("bundle image", !env.REBASE_BUNDLE_URL && !env.REBASE_BUNDLE_FETCH_DIR,
+        "a baked-image bundle is being told to fetch one");
+    check("bundle image", Boolean(env.REBASE_BUNDLE),
+        "REBASE_BUNDLE is not set, so the runtime would look for a bundle in its working directory");
+    check("bundle image", !/bundle-scratch/.test(imageMode.out),
+        "a scratch volume is mounted for a bundle that is already in the image");
+}
+
+// ── 2e4. every unit that answers a request knows how far away the caller is ──
+/**
+ * `TRUSTED_PROXY_HOPS` was the one topology variable this gate did not assert,
+ * and it was the one the chart never set on the api.
+ *
+ * Unset, the runtime reads 0, ignores X-Forwarded-For, and keys every rate limit
+ * on the socket address it sees — which behind an ingress is the ingress. One
+ * caller then exhausts the shared bucket for everyone, the auth limiters
+ * included, and the only sign is a single warning line logged once. The
+ * `functions` unit had always been given it, with a comment saying "same as the
+ * api".
+ */
+for (const [label, rendered, units] of [
+    ["unsplit", single, ["api"]],
+    ["split", split, ["api", "functions"]],
+]) {
+    if (!rendered.ok) continue;
+    for (const unit of units) {
+        const env = envOf(rendered.out, `rebase-rebase-${unit}`) ?? {};
+        check("proxy hops", env.TRUSTED_PROXY_HOPS === "1",
+            `${label}/${unit} got TRUSTED_PROXY_HOPS=${env.TRUSTED_PROXY_HOPS ?? "(unset)"} behind the ` +
+            "chart's own ingress. Unset or 0 means X-Forwarded-For is ignored and every caller " +
+            "shares one rate-limit bucket, including the auth limiters.");
+    }
+}
+
+// With no ingress of the chart's own there is nothing to trust, and saying so
+// explicitly is what stops a copied values file from trusting a header nobody
+// is stripping — which lets a caller forge its own address.
+const noIngress = render(["--set", "ingress.enabled=false"]);
+if (noIngress.ok) {
+    const env = envOf(noIngress.out, "rebase-rebase-api") ?? {};
+    check("proxy hops", env.TRUSTED_PROXY_HOPS === "0",
+        `with ingress.enabled=false the api got TRUSTED_PROXY_HOPS=${env.TRUSTED_PROXY_HOPS ?? "(unset)"}; ` +
+        "trusting a hop that no longer exists lets a client set its own X-Forwarded-For");
+}
+
+// ── 2f. parity with the runtime's pod contract ───────────────────────────────
+/**
+ * The chart cannot import TypeScript, so this is where it is held to the
+ * contract the control plane gets by importing it.
+ *
+ * Only the parts that are statements about the *runtime* are compared. The
+ * chart and the control plane legitimately differ on resources, scheduling,
+ * where the environment comes from and what the container is called — those are
+ * different jobs producing different manifests. What is compared here is what
+ * a deployment cannot get wrong without producing a cluster that looks healthy.
+ */
+const contractSrc = fs.readFileSync(
+    path.join(ROOT, "packages/server/src/deploy/pod-contract.ts"), "utf-8");
+
+/** Read a `export const NAME = "value"` / `= 5` out of the contract. */
+function contractValue(name) {
+    const m = contractSrc.match(new RegExp(`export const ${name}\\s*=\\s*([^;\n]+)`));
+    return m ? m[1].trim().replace(/^["']|["']$/g, "") : undefined;
+}
+
+/** The probe → path map, read out of RUNTIME_PROBE_PATHS. */
+function contractProbePaths() {
+    const block = contractSrc.slice(contractSrc.indexOf("RUNTIME_PROBE_PATHS = {"));
+    const body = block.slice(0, block.indexOf("}"));
+    const out = {};
+    for (const m of body.matchAll(/(\w+):\s*(RUNTIME_\w+)/g)) {
+        out[m[1]] = contractValue(m[2]);
+    }
+    return out;
+}
+
+/** Probe → path as the chart actually renders it, for one Deployment. */
+function probesOf(yaml, deploymentName) {
+    const doc = yaml.split(/^---$/m).find(d =>
+        /^kind:\s*Deployment\s*$/m.test(d) && new RegExp(`name:\\s*${deploymentName}\\s*$`, "m").test(d));
+    if (!doc) return {};
+    const out = {};
+    for (const m of doc.matchAll(/(liveness|readiness|startup)Probe:\s*\n\s+httpGet:\s*\n\s+path:\s*(\S+)/g)) {
+        out[m[1]] = m[2];
+    }
+    return out;
+}
+
+const CONTRACT_PROBES = contractProbePaths();
+check("contract", Object.keys(CONTRACT_PROBES).length === 3,
+    `could not read RUNTIME_PROBE_PATHS out of pod-contract.ts (got ${JSON.stringify(CONTRACT_PROBES)}) — ` +
+    "this check is vacuous until it parses, so it fails rather than passing empty");
+
+/**
+ * Every Deployment the render produced, by name.
+ *
+ * Enumerated rather than listed: the drain check below was written against
+ * three hardcoded unit names, and the static-app Deployment — added later, and
+ * the one actually serving the page a person is looking at — was not among
+ * them, so it shipped with no preStop hook at all. A workload added after this
+ * is covered the day it is added.
+ */
+function deploymentNames(yaml) {
+    return [...yaml.matchAll(/^kind:\s*Deployment\s*$[\s\S]*?^\s*name:\s*(\S+)\s*$/gm)]
+        .map(m => m[1]);
+}
+
+/** Every rendered Deployment must drain before SIGTERM, whatever it serves. */
+function checkDrain(label, rendered) {
+    if (!rendered.ok) return;
+    const drain = contractValue("RUNTIME_PRESTOP_DRAIN_SECONDS");
+    for (const name of deploymentNames(rendered.out)) {
+        const doc = rendered.out.split(/^---$/m).find(d =>
+            /^kind:\s*Deployment\s*$/m.test(d) && new RegExp(`name:\\s*${name}\\s*$`, "m").test(d)) ?? "";
+        check("contract", new RegExp(`preStop[\\s\\S]*?sleep ${drain}`).test(doc),
+            `${label}/${name} has no preStop drain. Kubelet signals the pod and removes its ` +
+            "endpoint concurrently, so without one the ingress keeps routing to a process that " +
+            "has stopped accepting, and in-flight responses are truncated at exit.");
+    }
+}
+
+if (single.ok) {
+    const probes = probesOf(single.out, "rebase-rebase-api");
+    for (const [probe, wanted] of Object.entries(CONTRACT_PROBES)) {
+        check("contract", probes[probe] === wanted,
+            `the ${probe} probe targets ${probes[probe] ?? "(none)"}, and pod-contract.ts says ${wanted}. ` +
+            "Liveness and startup must not depend on the database: /health opens every configured " +
+            "driver and answers 503, so a database blip on liveness is a restart loop and on startup " +
+            "is a pod that never starts.");
+    }
+
+}
+
+// Every topology, every workload in it — including the static apps, which are
+// the reason this enumerates instead of listing.
+checkDrain("unsplit", single);
+checkDrain("split", split);
+checkDrain("static", withStatic);
+
+if (split.ok) {
+    // Every unit, not just the api: a worker that restart-loops on a database
+    // blip is the same bug in a process nobody is watching.
+    for (const unit of ["api", "functions", "worker"]) {
+        const probes = probesOf(split.out, `rebase-rebase-${unit}`);
+        for (const [probe, wanted] of Object.entries(CONTRACT_PROBES)) {
+            check("contract", probes[probe] === wanted,
+                `${unit}'s ${probe} probe targets ${probes[probe] ?? "(none)"}, contract says ${wanted}`);
+        }
+    }
+}
+
+/**
+ * The refusal list and the contract list must be the same set.
+ *
+ * A variable the runtime treats as topology but the chart does not refuse is
+ * settable through `config.env`; one the chart refuses but the runtime no
+ * longer reads is a refusal for nothing. Both directions are checked, because
+ * only the first is dangerous and only the second is likely.
+ */
+const validateSrc = fs.readFileSync(
+    path.join(CHART, "templates/_validate.tpl"), "utf-8");
+const chartTopology = new Set(
+    (validateSrc.match(/\$topologyEnv := list ([^\n]+)/)?.[1] ?? "")
+        .match(/"([A-Z_][A-Z0-9_]*)"/g)?.map(q => q.replace(/"/g, "")) ?? []);
+const contractTopology = new Set(
+    (contractSrc.slice(contractSrc.indexOf("TOPOLOGY_ENV_VARS = ["))
+        .split("]")[0].match(/"([A-Z_][A-Z0-9_]*)"/g) ?? []).map(q => q.replace(/"/g, "")));
+
+check("contract", contractTopology.size > 0,
+    "could not read TOPOLOGY_ENV_VARS out of pod-contract.ts");
+const notRefused = [...contractTopology].filter(v => !chartTopology.has(v));
+const refusedForNothing = [...chartTopology].filter(v => !contractTopology.has(v));
+check("contract", notRefused.length === 0,
+    `_validate.tpl does not refuse ${notRefused.join(", ")} in config.env, and pod-contract.ts calls ` +
+    "it a topology variable — so an operator can set it and the chart will not stop them");
+check("contract", refusedForNothing.length === 0,
+    `_validate.tpl refuses ${refusedForNothing.join(", ")}, which pod-contract.ts no longer lists`);
+
 // ── 3. every refusal is reachable ────────────────────────────────────────────
 
 /**
@@ -266,6 +489,9 @@ const REFUSAL_CASES = [
         "--set", "sharedState.rateLimitStore=memory"
     ]],
     ["rate limit store nonsense", ["--set", "sharedState.rateLimitStore=redis"]],
+    ["migration mode the image refuses", ["--set", "migrationJob.mode=push"]],
+    ["migration mode nonsense", ["--set", "migrationJob.mode=sync"]],
+    ["topology variable in config.env", ["--set", "config.env.REBASE_ROLE=worker"]],
     ["static app with no name", ["--set-json", 'staticApps=[{"path":"/x","image":{"repository":"e/x"}}]']],
     ["static app with no path", ["--set-json", 'staticApps=[{"name":"x","image":{"repository":"e/x"}}]']],
     ["static app path without a slash", ["--set-json", 'staticApps=[{"name":"x","path":"x","image":{"repository":"e/x"}}]']],

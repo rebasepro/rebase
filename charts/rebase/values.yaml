@@ -33,15 +33,30 @@ image:
 #   mode: image  — you built an image FROM rebasepro/server with the bundle
 #                  baked in (COPY dist-bundle /bundle). Set image.repository to
 #                  yours. Nothing else to configure; this is the sturdiest.
-#   mode: url    — the stock image, with an init container fetching a tarball
-#                  at every pod start. Good for a control plane; needs the URL
-#                  to stay reachable for the life of the deployment.
+#   mode: url    — the stock image, and the runtime fetches the tarball itself
+#                  at every pod start (REBASE_BUNDLE_URL). No init container is
+#                  involved. Good for a control plane; needs the URL to stay
+#                  reachable for the life of the deployment, not just the first
+#                  boot — every restart, eviction and scale-out re-fetches.
 bundle:
   mode: image
+  # Where the bundle lives in the container. Under mode=image that is where you
+  # COPYed it; under mode=url it is where the runtime unpacks what it fetched,
+  # and an emptyDir is mounted there for it.
   path: /bundle
   url: ""
   # Optional bearer token for a private bundle URL. Prefer existingSecret.
   token: ""
+  # mode=url only. The runtime unpacks the tarball and installs the project's
+  # declared dependencies, which holds three copies of the tree at once — the
+  # archive, npm's cache and the extracted node_modules. Unset, GKE Autopilot
+  # grants 1Gi and a real dependency tree exhausts it partway through the
+  # install; npm does not error and the pod is not evicted, it simply stops.
+  # Vendor node_modules into the bundle at build time and this can come down.
+  ephemeralStorage: 6Gi
+  # Optional cap on the emptyDir itself. Left empty the volume is bounded only
+  # by the node, which is the kinder default for a single-tenant install.
+  sizeLimit: ""
 
 # ─── Required configuration ────────────────────────────────────────────────
 #
@@ -55,8 +70,15 @@ config:
   # Origins your frontend is served from. Required in production; "*" is
   # refused by the runtime because the API sends credentials.
   corsOrigins: ""
-  # Extra environment for every unit. Topology variables set here are ignored:
-  # the chart owns them, and a value that cannot apply is worse than no value.
+  # Extra environment for every unit.
+  #
+  # Topology variables are REFUSED here rather than ignored — the chart owns
+  # them, and one set here either does nothing (split, where the chart writes
+  # its own value after yours and wins) or takes effect and should not
+  # (unsplit, where nothing overrides it). The second is the dangerous half:
+  # REBASE_ROLE=worker gives a pod that serves no HTTP, and because /livez and
+  # /health both answer on every role, every probe passes and the rollout
+  # reports success. Use `split` and the per-unit blocks instead.
   env: {}
 
 existingSecret: ""
@@ -161,6 +183,14 @@ worker:
 #     replicas: 1
 staticApps: []
 
+# ─── Termination ───────────────────────────────────────────────────────────
+#
+# Seconds the pod keeps answering after Kubernetes decides to remove it, before
+# SIGTERM. Kubelet signals the pod and removes it from its Service at the same
+# time, so this is what gives the ingress time to stop routing to a process that
+# is about to stop accepting. Zero disables it and reintroduces the race.
+preStopDrainSeconds: 5
+
 # ─── Schema ────────────────────────────────────────────────────────────────
 #
 # Exactly one thing provisions the schema. With this enabled it is a Job that
@@ -172,8 +202,11 @@ staticApps: []
 # default and is what an unsplit deployment already does.
 migrationJob:
   enabled: true
-  # `ensure` creates the auth tables and anything missing. `push` will also
-  # apply collection schema changes — destructive, so it is not the default.
+  # `ensure` creates the auth tables and anything missing, additively. It is the
+  # only mode the runtime image accepts: `push` — which also applies collection
+  # schema changes — is destructive and is refused at boot, because a pod
+  # starting unattended cannot dry-run a change, refuse it, or back up first.
+  # Run `rebase db push` from a checkout or CI for those, where it does all three.
   mode: ensure
   backoffLimit: 3
   resources:
@@ -215,6 +248,14 @@ ingress:
   enabled: true
   className: nginx
   host: ""
+  # Proxies between a caller and the runtime. Unset, the chart uses 1 while the
+  # ingress below is enabled and 0 when it is not — which is what makes
+  # X-Forwarded-For trustworthy and rate limits per-caller rather than per-pod.
+  # Raise it if something of yours sits in front of the ingress: a CDN, a cloud
+  # load balancer, another reverse proxy. Too low and every client shares one
+  # bucket; too high and a client can forge its own address by sending the
+  # header itself.
+  trustedProxyHops: null
   # Extra hosts answering the same paths.
   extraHosts: []
   annotations: {}

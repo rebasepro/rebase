@@ -119,6 +119,17 @@ jobs:
       - name: Helm chart renders and refuses
         run: pnpm run check:chart
 
+      # The gate every other one could not be. `check:chart` reads a rendered
+      # manifest, `check:runtime-image` reads tags — and a manifest that is
+      # entirely correct still produced a container that refused to start,
+      # because an image ENV and an entrypoint guard defeated it from inside.
+      # Nothing had ever executed docker/entrypoint.mjs or booted the image;
+      # `bundle.mode=url` shipped dead and stayed dead as a result. This builds
+      # the image and starts it against a real Postgres, both ways a bundle can
+      # arrive, and checks it still refuses when given neither.
+      - name: Runtime image boots, both ways a bundle can arrive
+        run: pnpm run check:runtime-image:boots
+
       # Renames leak where a codemod cannot see them: a bare name in an array,
       # a .astro file, an extensionless .env.example, a Tailwind @source path.
       - name: Package name guard

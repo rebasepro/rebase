@@ -435,7 +435,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // back in a different order from the same query fetched.
                     orderBy: normalizeOrderBy(params?.orderBy),
                     searchString: params?.searchString,
-                    searchExplain: params?.searchExplain
+                    searchExplain: params?.searchExplain,
+                    // Forwarded so the SERVER can refuse it. `realtimeService`
+                    // rejects a subscription carrying `vectorSearch` — a
+                    // subscription is re-run on every matching write and
+                    // nothing there computes distances — and the docs promise
+                    // that refusal. Both producers hand-list their fields and
+                    // both omitted this one, so the guard could not fire and
+                    // `.vectorSearch(…).listen()` returned an ordinary
+                    // `id DESC` listing with no `_distance` and no error.
+                    vectorSearch: params?.vectorSearch
                 },
                 (incomingRows: Record<string, unknown>[]) => {
                     const currentUpdateId = ++lastUpdateId;

@@ -392,3 +392,22 @@ export type { MetricSurface, MetricsHandle } from "./metrics";
 export { createContractRoutes } from "./api/contract-routes";
 export type { ContractRoutesConfig } from "./api/contract-routes";
 
+
+// =============================================================================
+// Deployment contract
+// =============================================================================
+// What the chart and the control plane must agree on about the pod. Exported so
+// the control plane conforms by construction; the chart is held to it by
+// `scripts/check-chart.mjs`, which cannot import TypeScript.
+export {
+    RUNTIME_HEALTH_PATH,
+    RUNTIME_LIVENESS_PATH,
+    RUNTIME_PROBE_PATHS,
+    TOPOLOGY_ENV_VARS,
+    isTopologyEnvVar,
+    RUNTIME_PRESTOP_DRAIN_SECONDS,
+    RUNTIME_STARTUP_BUDGET_SECONDS,
+    RUNTIME_MIN_TERMINATION_GRACE_SECONDS,
+    RUNTIME_BUNDLE_MOUNT
+} from "./deploy/pod-contract";
+export type { TopologyEnvVar } from "./deploy/pod-contract";

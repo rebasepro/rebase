@@ -109,9 +109,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends tini ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Where the image keeps its own copy of the framework. The runtime collapses a
+# bundle's duplicate `@rebasepro/server` onto this one after installing the
+# bundle's dependencies — a second copy is a different module instance, so every
+# custom function would resolve a framework whose singleton was never
+# initialised and throw "server not initialized yet" on every request.
 ENV NODE_ENV=production \
-    REBASE_BUNDLE=/bundle \
-    PORT=8080
+    PORT=8080 \
+    REBASE_RUNTIME_MODULES=/app/node_modules
 
 WORKDIR /app
 

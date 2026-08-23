@@ -13,7 +13,9 @@ import {
     gatedToolTargets,
     resolveCliDatabaseUrl,
     READ_ONLY_TOOLS,
-    LOCAL_ONLY_TOOLS
+    LOCAL_ONLY_TOOLS,
+    findBackendDir,
+    findDevDir
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
@@ -999,5 +1001,56 @@ describe("untrusted-data marking", () => {
         });
         expect(result.content[0].text).not.toContain("<<<UNTRUSTED_DATA");
         expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+    });
+});
+
+describe("the two project layouts", () => {
+    /**
+     * `rebase init` puts `backend/` at the project root; this monorepo nests
+     * everything under `app/`. Three helpers already tried both. Three other
+     * places assumed the monorepo's shape, and for every scaffolded project the
+     * consequence was not a bad answer but no answer: `rebase://schema` was
+     * silently absent from `resources/list`, and `rebase_dev_start` spawned into
+     * a directory that does not exist.
+     */
+    // The project directory is passed in rather than set through the
+    // environment: `ENV_PROJECT_DIR` is read once at module load, so a test
+    // that sets the variable in `beforeEach` changes nothing and asserts
+    // against whatever directory the suite happened to start in.
+    let root: string;
+
+    beforeEach(() => { root = mkdtempSync(join(tmpdir(), "rebase-layout-")); });
+    afterEach(() => { rmSync(root, { recursive: true, force: true }); });
+
+    it("finds a scaffolded project's backend at the root", () => {
+        mkdirSync(join(root, "backend", "src"), { recursive: true });
+        expect(findBackendDir(root)).toBe(resolve(root, "backend"));
+    });
+
+    it("finds this monorepo's backend under app/", () => {
+        mkdirSync(join(root, "app", "backend", "src"), { recursive: true });
+        expect(findBackendDir(root)).toBe(resolve(root, "app", "backend"));
+    });
+
+    it("returns null when neither layout is there, rather than a plausible path", () => {
+        // A path that was guessed reads exactly like one that was found, to a
+        // caller and to a test. Returning null is what lets the schema resource
+        // say which directories it looked in.
+        expect(findBackendDir(root)).toBeNull();
+    });
+
+    it("prefers the scaffolded layout when both exist", () => {
+        mkdirSync(join(root, "backend", "src"), { recursive: true });
+        mkdirSync(join(root, "app", "backend", "src"), { recursive: true });
+        expect(findBackendDir(root)).toBe(resolve(root, "backend"));
+    });
+
+    it("runs dev at the project root when there is no app/ directory", () => {
+        expect(findDevDir(root)).toBe(root);
+    });
+
+    it("runs dev in app/ when there is one", () => {
+        mkdirSync(join(root, "app"), { recursive: true });
+        expect(findDevDir(root)).toBe(resolve(root, "app"));
     });
 });

@@ -49,7 +49,15 @@ export interface LoadedStaticApp {
     spa: boolean;
 }
 
-const MANIFEST_FILENAME = "manifest.json";
+/**
+ * The file that makes a directory a bundle.
+ *
+ * Exported because `fetch-bundle.ts` has to recognise the same thing after
+ * unpacking, and when it had its own idea of the name — `rebase-bundle.json`,
+ * which nothing has ever written — every download was rejected as "not a Rebase
+ * bundle". A marker with two spellings is a marker with none.
+ */
+export const MANIFEST_FILENAME = "manifest.json";
 
 /**
  * Bring a format-1 manifest up to the shape the rest of this runtime expects.
