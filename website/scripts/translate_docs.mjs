@@ -146,6 +146,45 @@ ${content}
     }
 }
 
+/**
+ * Rejects output Astro would refuse to load.
+ *
+ * The model occasionally opens the file with an empty fence — `---\n---\ntitle:
+ * …` — which makes the real frontmatter part of the body and the entry fails
+ * the content-collection schema with `title: Required`. Nothing here caught
+ * that: the file was written, the run reported ✅, and the break only surfaced
+ * later as a build error naming the *collection*, not the translator.
+ *
+ * Throwing instead lets the retry in the caller have another go, and a file
+ * that never validates is simply not written — the missing translation falls
+ * back to English, which is the intended behaviour anyway.
+ */
+function assertValidFrontmatter(text, sourceContent, label) {
+    if (!sourceContent.startsWith('---')) return;   // source has no frontmatter; nothing to check
+
+    if (!text.startsWith('---\n')) {
+        throw new Error(`${label}: output does not open with a frontmatter fence`);
+    }
+    const match = text.match(/^---\n([\s\S]*?)\n?---\n/);
+    if (!match) {
+        throw new Error(`${label}: frontmatter fence is never closed`);
+    }
+    if (match[1].trim() === '') {
+        throw new Error(`${label}: empty frontmatter block — the model doubled the opening ---`);
+    }
+    if (/^title:/m.test(sourceContent) && !/^title:\s*\S/m.test(match[1])) {
+        throw new Error(`${label}: frontmatter has no title, but the English source does`);
+    }
+
+    // Fence parity: a dropped or invented ``` silently swallows the rest of the page.
+    const fenceCount = (s) => (s.match(/^```/gm) || []).length;
+    if (fenceCount(text) !== fenceCount(sourceContent)) {
+        throw new Error(
+            `${label}: ${fenceCount(text)} code fences against the source's ${fenceCount(sourceContent)}`
+        );
+    }
+}
+
 async function main() {
     console.log('Starting translation process...');
     console.log(`Target languages: ${TARGET_LANGUAGES.join(', ')}`);
@@ -178,18 +217,37 @@ async function main() {
             try {
                 // Ensure target directory exists
                 await fs.mkdir(targetDir, { recursive: true });
-                
-                // Call Gemini
-                const translatedContent = await translateWithGemini(content, lang);
-                
+
+                // Call Gemini. Validate before writing — a file that fails the
+                // content-collection schema breaks the whole build, so two extra
+                // attempts here are cheaper than a red build nobody traces back
+                // to this script.
+                const label = `[${lang}] ${relativePath}`;
+                let translatedContent = null;
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    const candidate = await translateWithGemini(content, lang);
+                    try {
+                        assertValidFrontmatter(candidate, content, label);
+                        translatedContent = candidate;
+                        break;
+                    } catch (invalid) {
+                        console.warn(`  ⚠ attempt ${attempt}/3 rejected — ${invalid.message}`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                }
+                if (!translatedContent) {
+                    console.error(`❌ ${label}: no valid output after 3 attempts, leaving untranslated`);
+                    continue;
+                }
+
                 // Write translated file
                 await fs.writeFile(targetFilePath, translatedContent, 'utf-8');
                 console.log(`✅ Saved: ${targetFilePath}`);
-                
+
                 // Add a small delay to avoid hitting rate limits
                 await new Promise(resolve => setTimeout(resolve, 2000));
             } catch (error) {
-                console.error(`❌ Failed to translate [${lang}] ${relativePath}`);
+                console.error(`❌ Failed to translate [${lang}] ${relativePath}: ${error.message}`);
                 // Stop or continue depending on preference; here we continue to the next one
             }
         }
