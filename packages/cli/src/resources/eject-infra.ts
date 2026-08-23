@@ -18,8 +18,8 @@
  * everyone that inlining is normal.
  */
 import {
+    envBasesForResource,
     resourceEnvSuffix,
-    resourceKind,
     type ResourceGraph
 } from "@rebasepro/types";
 
@@ -46,10 +46,12 @@ export function buildInfraConfig(graph: ResourceGraph): EjectedInfraConfig {
     const resources: EjectedInfraConfig["resources"] = {};
 
     for (const declaration of graph.resources) {
-        const spec = resourceKind(declaration.kind);
         const suffix = resourceEnvSuffix(declaration.key);
         const entry: Record<string, { $env: string }> = {};
-        for (const base of spec?.envBases ?? []) {
+        // Only the variables this engine actually uses. A `local` bucket does
+        // not need an S3 endpoint, and writing one anyway produces a file whose
+        // irrelevant keys train the reader to skim it.
+        for (const base of envBasesForResource(declaration)) {
             entry[base] = { $env: `${base}${suffix}` };
         }
         resources[idOf(declaration.kind, declaration.key)] = entry;

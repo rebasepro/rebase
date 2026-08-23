@@ -26,6 +26,7 @@
  */
 
 import type { StorageSourceDefinition } from "./storage_source";
+import type { ResourceGraph } from "./resources";
 
 /**
  * Which kind of thing an app is.
@@ -446,17 +447,27 @@ export interface RebaseBundleManifest {
         /** Whether the config package exports a `storageAuthorize` hook. */
         authorize: boolean;
         /**
-         * Every storage source this bundle expects, resolved at build time from
-         * `rebase.json`'s `storage` block merged with any `storageSources` the
-         * config package exports.
+         * Buckets, on bundles built before {@link RebaseBundleManifest.resources}.
          *
-         * Recorded so the runtime does not have to import user code to learn its
-         * own topology, and so a host can tell — from the artifact alone, before
-         * starting anything — which buckets need configuring. Absent on bundles
-         * built before this field existed, which means one default source.
+         * No longer written. A host reads `resources`, which carries every kind
+         * in one list; this stays declared so a control plane can keep reading
+         * the bundles a project shipped before it was rebuilt.
          */
         sources?: StorageSourceDefinition[];
     };
+    /**
+     * Everything the project declares it needs — databases, buckets, topics,
+     * and whatever kind is registered next.
+     *
+     * Recorded so a host can tell, from the artifact alone and before starting
+     * anything, what a deploy will need provisioned. That question used to be
+     * answerable for buckets and for nothing else, because buckets were the
+     * only kind written into an artifact — which is how a project's databases
+     * became invisible to the platform that runs them.
+     *
+     * Absent on bundles built before this field existed.
+     */
+    resources?: ResourceGraph;
     deps: {
         /** Runtime dependencies of user code, as declared. */
         declared: Record<string, string>;

@@ -29,6 +29,9 @@ registerResourceKind({
     // ceiling is per-source because one source can be a single-session PGlite
     // and another a real server.
     envBases: ["DATABASE_URL", "REBASE_DRIVER", "REBASE_DB_POOL_MAX"],
+    // No per-engine narrowing: every engine binds from the same three, and the
+    // driver package that differs between them is named by REBASE_DRIVER either
+    // way.
     optionKeys: ["databaseId", "migrations"],
     // A backend without a database is not a backend, so one exists whether or
     // not a project says so.
@@ -68,6 +71,13 @@ registerResourceKind({
     engines: ["local", "s3", "gcs", "azure", "firebase"],
     defaultEngine: "local",
     envBases: ["S3_BUCKET", "GCS_BUCKET", "STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+    envBasesByEngine: {
+        local: ["STORAGE_BUCKET"],
+        s3: ["S3_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_PUBLIC_URL"],
+        gcs: ["GCS_BUCKET", "STORAGE_PUBLIC_URL"],
+        azure: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+        firebase: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]
+    },
     optionKeys: ["publicRead", "prefix"],
     // Storage is genuinely optional: plenty of projects store nothing.
     implicitDefault: false

@@ -40,6 +40,24 @@ describe("what it writes", () => {
             .toEqual({ $env: "DATABASE_URL" });
     });
 
+    it("writes only the variables the declared engine uses", () => {
+        // A `local` bucket does not need an S3 endpoint. Four variables of
+        // which three are noise produces a file people learn to skim.
+        bucket("uploads");                          // local, the default
+        bucket("media", { engine: "s3" });
+        const config = buildInfraConfig(buildResourceGraph());
+        expect(Object.keys(config.resources["bucket:uploads"])).toEqual(["STORAGE_BUCKET"]);
+        expect(Object.keys(config.resources["bucket:media"]))
+            .toEqual(["S3_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_PUBLIC_URL"]);
+    });
+
+    it("falls back to every base for an engine it has never heard of", () => {
+        // Guessing narrow would silently omit the one variable it needs.
+        bucket("weird", { engine: "custom:minio" });
+        expect(Object.keys(buildInfraConfig(buildResourceGraph()).resources["bucket:weird"]))
+            .toEqual(["S3_BUCKET", "GCS_BUCKET", "STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]);
+    });
+
     it("never inlines a value, because this file ends up in a config repo", () => {
         database("main");
         bucket("media", { engine: "s3" });

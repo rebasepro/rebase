@@ -67,6 +67,20 @@ export interface ResourceKindSpec {
      * so a single-resource project configured the obvious way declares nothing.
      */
     envBases: readonly string[];
+    /**
+     * The subset of `envBases` that matters for a given engine.
+     *
+     * The binder reads every base and takes whichever is set — harmless, and it
+     * keeps binding tolerant. A GENERATOR cannot be that relaxed: `rebase eject
+     * infra` writing S3_BUCKET, GCS_BUCKET, STORAGE_BUCKET and
+     * STORAGE_PUBLIC_URL for a `local` bucket hands somebody four variables of
+     * which three are noise, and a config file full of irrelevant keys is one
+     * nobody reads carefully.
+     *
+     * Keyed by engine; an engine with no entry falls back to all of them, which
+     * is the honest answer for one this package has never heard of.
+     */
+    envBasesByEngine?: Readonly<Record<string, readonly string[]>>;
     /** Option keys this kind accepts beyond the common ones, for validation. */
     optionKeys?: readonly string[];
     /**
@@ -338,4 +352,17 @@ export function buildResourceGraph(): ResourceGraph {
         (a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key)
     );
     return { version: RESOURCE_GRAPH_VERSION, resources };
+}
+
+/**
+ * The environment variables worth writing for a resource, given its engine.
+ *
+ * Falls back to every base the kind reads when the engine is unknown — a
+ * `custom:` engine gets the full list rather than an empty one, because
+ * guessing narrow would silently omit the variable it actually needs.
+ */
+export function envBasesForResource(declaration: ResourceDeclaration): readonly string[] {
+    const spec = resourceKind(declaration.kind);
+    if (!spec) return [];
+    return spec.envBasesByEngine?.[declaration.engine] ?? spec.envBases;
 }
