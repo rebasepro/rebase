@@ -214,6 +214,71 @@ context conflict with the vector-index work.
 
 ---
 
+## 4c. The second hunt: 22 verified, 21 distinct
+
+Six lanes — HTTP routes, realtime wire names, generated identifiers, schema
+drift, permission strings, i18n and product claims. Two lanes converged on the
+same verb independently, which is a signal about the socket's authorization
+surface rather than a duplicate.
+
+**Fixed tonight, both security:**
+
+- **`FETCH_APPLICATION_ROLES` was not gated.** Ten privileged socket verbs, nine
+  in `ADMIN_ONLY_TYPES`. The tenth enumerated every role in the users table
+  through the owner connection, where RLS does not apply — reachable by any
+  authenticated non-admin, and by an anonymous socket under `requireAuth:
+  false`. The test that exists to prevent this held a hand-typed copy of the
+  same nine strings.
+- **A revoked access token still authenticated a socket.** `verifyRequest` reads
+  the revocation watermark; `verifyToken` — what the AUTHENTICATE handler calls
+  — did not. Signing out closed a stolen session's HTTP requests and left its
+  realtime connection working.
+
+Both now have tests that read the source instead of a copy of it. The
+**already-open** socket is a separate question and is *not* fixed: nothing
+re-checks a connection after AUTHENTICATE, so a session revoked mid-connection
+survives until it reconnects (docs/audits/32, H3). That is a decision about
+socket lifetime.
+
+**Also fixed:** the cloud CLI never printed a price (`invoke("pricing/quote")`
+— the SDK encodes the name, so the slash 404'd, and a bare `catch {}` blamed
+"a control plane without the quote endpoint"), and the schema-drift gate I added
+last night was declared and run by nothing.
+
+**Claims that need your words, not a patch** — four are security or residency
+representations:
+
+- **SSH tunnelling.** The wizard sells "Proxy database connections through an
+  encrypted SSH bastion behind your firewall", collects host/port/user,
+  generates and stores an encrypted keypair, and asks the customer to install
+  the public key. The only code that opens a tunnel is the "Test connection"
+  button; deploy, backup, restore and the connection-string reveal all use the
+  raw connection string, and the tenant image has no SSH client. Build it or
+  delete the toggle.
+- **The public security page.** "Each project gets its own CloudNativePG cluster
+  in its own namespace" is false for the shipped default (`databaseMode:
+  "shared"`). The neighbouring isolation claim is *true but attributed to the
+  wrong mechanism* — pg_hba `sameuser` plus per-database roles, while the
+  NetworkPolicy opens 5432 to the whole shared namespace.
+- **"Located in Frankfurt/EU"** — production provisions into `europe-west1`,
+  which is Belgium. Two strings, one wizard step after a field that prints the
+  true region.
+- **Backup retention and window** — the same dials from §4.3, now with the
+  detail that `backup_30_days: "30 Days (Compliance SLA)"` is an orphaned locale
+  string for a picker that renders nowhere.
+
+**Left for you, ordered by consequence** (full detail in the run's report):
+storage object keys interpolated unencoded and decoded twice, so `Invoice
+#12.pdf` resolves the wrong object and `100% done.png` 500s; BaaS introspection
+publishing camelCase keys over snake_case tables, so an introspected project
+contradicts the SDK it generated in the same boot; the schema generator writing
+`const 2024_archiveCollection` with no identifier guard, which bricks a whole
+collections directory from a documented flow; `include` accepted by `.listen()`
+and discarded; `vectorSearch` on `.listen()` where the guard exists and cannot
+fire; and four MCP branch tools that fail authorization on every call.
+
+---
+
 ## 5. What this did not cover
 
 Two hunts ran. The first covered env vars, filenames, manifest keys, fields
