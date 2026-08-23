@@ -141,21 +141,36 @@ export class MongoHistoryService {
         const collection = this.db.collection("__rebase_history");
 
         // 1. Enforce maxEntries
-        const count = await collection.countDocuments({ entity_id: id,
-table_name: tableName });
-        if (count > this.retention.maxEntries) {
-            const toDelete = count - this.retention.maxEntries;
-            const oldestEntries = await collection
-                .find({ entity_id: id,
+        //
+        // One read decides both WHICH rows go and HOW MANY. It used to be two:
+        // countDocuments gave a quantity, and a second find(...).limit(quantity)
+        // chose the victims. recordHistory fires this without awaiting it, so a
+        // row updated twice in quick succession runs two prunes at once — and
+        // the quantity from one snapshot was applied to another. Both observe
+        // three rows and decide "drop one"; the first deletes the oldest, the
+        // second re-reads, now sees a different oldest, and deletes that too.
+        // Two rows go where one should have, and the history falls BELOW
+        // maxEntries. Observed as "Expected length: 2, Received length: 1".
+        //
+        // Sorting newest-first and skipping maxEntries names the survivors by
+        // position instead, so every _id returned was genuinely surplus at a
+        // single consistent read. A concurrent prune that already removed some
+        // of them makes the delete a no-op; a concurrent insert is simply not
+        // in this snapshot, and the prune that insert fires deals with it.
+        //
+        // _id breaks ties on updated_at. Two writes inside the same millisecond
+        // are otherwise ordered arbitrarily, and an unstable sort under skip()
+        // can hand back a row that is not surplus at all.
+        const surplus = await collection
+            .find({ entity_id: id,
 table_name: tableName })
-                .sort({ updated_at: 1 })
-                .limit(toDelete)
-                .toArray();
+            .sort({ updated_at: -1,
+_id: -1 })
+            .skip(this.retention.maxEntries)
+            .toArray();
 
-            if (oldestEntries.length > 0) {
-                const idsToDelete = oldestEntries.map(entry => entry._id);
-                await collection.deleteMany({ _id: { $in: idsToDelete } });
-            }
+        if (surplus.length > 0) {
+            await collection.deleteMany({ _id: { $in: surplus.map(entry => entry._id) } });
         }
 
         // 2. Enforce ttlDays

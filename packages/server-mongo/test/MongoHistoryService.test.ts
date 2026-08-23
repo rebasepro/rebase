@@ -169,6 +169,86 @@ age: 30 }
     });
 
     describe("pruneHistory", () => {
+        /**
+         * Two prunes, interleaved at the point the old code broke.
+         *
+         * recordHistory fires pruneHistory without awaiting it, so a row
+         * written twice in quick succession has two prunes in flight. The old
+         * implementation read twice: countDocuments for HOW MANY, then
+         * find().limit(that many) for WHICH. Between those two reads the other
+         * prune could finish, so the quantity from one snapshot was applied to
+         * a different one — the second prune deleted a row that was never
+         * surplus and the history fell BELOW maxEntries. Silent data loss:
+         * nothing errors, the rows are just gone.
+         *
+         * Firing writes concurrently does NOT reproduce it — verified: the
+         * naive version of this test passes against the broken code, because
+         * the two reads happen to stay adjacent. The interleaving has to be
+         * forced, so the first prune's find is held open while the second runs
+         * to completion.
+         *
+         * Under the fixed single-read prune the held prune resumes, re-reads,
+         * sees nothing surplus and deletes nothing. Under the old one it
+         * deletes "the oldest", which by then is a row that must survive.
+         */
+        it("does not prune below maxEntries when two prunes interleave", async () => {
+            const id = new ObjectId().toString();
+            const base = Date.now();
+            await db.collection(COLLECTION_NAME).insertMany([1, 2, 3].map(n => ({
+                _id: new ObjectId(),
+                action: "update",
+                entity_id: id,
+                table_name: "users",
+                values: { a: n },
+                updated_at: new Date(base + n * 1000)
+            })) as never);
+
+            const real = db.collection(COLLECTION_NAME);
+            let releaseGate!: () => void;
+            let announceReached!: () => void;
+            const gate = new Promise<void>(r => { releaseGate = r; });
+            const reachedFind = new Promise<void>(r => { announceReached = r; });
+            let firstFind = true;
+
+            // Only the FIRST find is held; the second prune runs unimpeded.
+            const gatedDb = {
+                collection: () => new Proxy(real, {
+                    get(target, prop, receiver) {
+                        const value = Reflect.get(target, prop, receiver);
+                        if (prop === "find" && firstFind) {
+                            firstFind = false;
+                            return (...args: unknown[]) => {
+                                announceReached();
+                                const cursor = (value as (...a: unknown[]) => unknown).apply(target, args) as Record<string, unknown>;
+                                const toArray = cursor.toArray as () => Promise<unknown[]>;
+                                cursor.toArray = async () => { await gate; return toArray.call(cursor); };
+                                return cursor;
+                            };
+                        }
+                        return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+                    }
+                })
+            } as unknown as Db;
+
+            const held = new MongoHistoryService(gatedDb, { maxEntries: 2, ttlDays: 30 });
+            const plain = new MongoHistoryService(db, { maxEntries: 2, ttlDays: 30 });
+
+            // Reaches into the private prune on purpose: recordHistory would
+            // insert a row and change the very count under test.
+            const first = (held as unknown as { pruneHistory(i: string, t: string): Promise<void> })
+                .pruneHistory(id, "users");
+            await reachedFind;
+            await (plain as unknown as { pruneHistory(i: string, t: string): Promise<void> })
+                .pruneHistory(id, "users");
+            releaseGate();
+            await first;
+
+            const rows = await db.collection(COLLECTION_NAME)
+                .find({ entity_id: id }).sort({ updated_at: 1 }).toArray();
+            expect(rows).toHaveLength(2);
+            expect(rows.map(r => (r.values as { a: number }).a)).toEqual([2, 3]);
+        });
+
         it("should prune entries based on maxEntries config", async () => {
             const customHistoryService = new MongoHistoryService(db, {
                 maxEntries: 2,
