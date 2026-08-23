@@ -63,7 +63,12 @@ function run(command: string, args: string[], options: { cwd?: string; env?: Nod
 const envFile = path.join(os.tmpdir(), `rebase-selfhost-verify-${process.pid}.env`);
 const secret = (): string => crypto.randomBytes(32).toString("hex");
 let composeUp = false;
-let stubs: string | undefined;
+// Created up front rather than at its point of use: `teardown` is registered
+// as an exit handler below and removes it, and an early exit (no Docker
+// Compose, a failed image build) fires that handler before the stub tree
+// would otherwise exist. Declaring it here keeps that reference valid on
+// every path — a `const` at the point of use is a TDZ error in the handler.
+const stubs = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-docker-verify-"));
 
 function compose(args: string[], quiet = false) {
     return run("docker", ["compose", "-p", PROJECT, "-f", COMPOSE_FILE, "--env-file", envFile, ...args], { quiet });
@@ -78,7 +83,7 @@ function teardown(): void {
         compose(["down", "-v", "--remove-orphans"], true);
     }
     fs.rmSync(envFile, { force: true });
-    if (typeof stubs === "string") fs.rmSync(stubs, { recursive: true, force: true });
+    fs.rmSync(stubs, { recursive: true, force: true });
 }
 
 process.on("exit", teardown);
@@ -148,7 +153,6 @@ if (failures > 0) process.exit(1);
 // Without this the bundle is backend-only and `GET /` correctly answers 404 —
 // so asserting a 200 against it would have been asserting the wrong thing.
 const { foldFrontendIntoBundle } = await import(`${ROOT}/packages/cli/src/fold-static.ts`);
-stubs = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-docker-verify-"));
 fs.mkdirSync(path.join(stubs, "site", "assets"), { recursive: true });
 fs.writeFileSync(
     path.join(stubs, "site", "index.html"),
