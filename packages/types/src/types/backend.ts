@@ -4,6 +4,7 @@ import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
 import type { ChannelBusSetting } from "./channel_bus";
+import type { SchemaEditingAdmin } from "./schema_editing";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -564,7 +565,23 @@ export interface BranchAdmin {
  *
  * @group Admin
  */
-export type DatabaseAdmin = Partial<SQLAdmin> & Partial<DocumentAdmin> & Partial<SchemaAdmin> & Partial<BranchAdmin>;
+export type DatabaseAdmin = Partial<SQLAdmin> & Partial<DocumentAdmin> & Partial<SchemaAdmin>
+    & Partial<BranchAdmin> & Partial<SchemaEditingAdmin>;
+
+/**
+ * Type guard: can this admin plan a live schema change?
+ *
+ * Planning is engine-specific — it renders DDL, a Drizzle schema and the
+ * declarative SQL artifacts — so the implementation lives in the driver
+ * package. The server detects the capability structurally, exactly as it does
+ * for SQL, rather than importing an engine it is supposed to know nothing
+ * about.
+ *
+ * @group Admin
+ */
+export function isSchemaEditingAdmin(admin: DatabaseAdmin | undefined): admin is SchemaEditingAdmin {
+    return !!admin && typeof (admin as SchemaEditingAdmin).planSchemaChange === "function";
+}
 
 /**
  * Type guard: does this admin support SQL operations?

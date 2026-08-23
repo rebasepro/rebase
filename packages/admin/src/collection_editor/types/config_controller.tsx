@@ -1,3 +1,4 @@
+import type React from "react";
 import { Property } from "@rebasepro/types";
 import { NavigationGroupMapping, AdminCollection } from "@rebasepro/admin-types";
 
@@ -56,6 +57,16 @@ export interface CollectionsConfigController {
     navigationEntries: NavigationGroupMapping[];
     saveNavigationEntries: (entries: NavigationGroupMapping[]) => Promise<void>;
 
+    /**
+     * UI this controller needs on screen in order to do its job.
+     *
+     * A controller whose writes require a confirmation has to be able to ask,
+     * and a hook cannot render. `ConfigControllerProvider` renders this beside
+     * its children, so the confirmation belongs to whoever supplied the
+     * controller rather than to every consumer of it. Optional: most
+     * controllers write without asking anybody.
+     */
+    dialog?: React.ReactNode;
 }
 
 export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
