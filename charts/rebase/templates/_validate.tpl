@@ -58,7 +58,7 @@ Kept in step with `TOPOLOGY_ENV_VARS` in
 `packages/server/src/deploy/pod-contract.ts` by `scripts/check-chart.mjs`,
 which cannot import TypeScript and so compares the two lists as text.
 */}}
-{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_MIGRATE_ON_BOOT" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
+{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_RLS_AUDIT" "REBASE_MIGRATE_ON_BOOT" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
 {{- range $name, $value := .Values.config.env }}
   {{- if has $name $topologyEnv }}
     {{- fail (printf "config.env sets %s, which decides this release's topology and is the chart's to own. Set here it either does nothing (under split, the chart's value is written last and wins) or takes effect unsupervised (unsplit, where nothing overrides it) — and a wrong topology passes every probe, because /livez and /health answer on every role. Use `split` and the api/functions/worker blocks instead." $name) }}
