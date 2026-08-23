@@ -401,59 +401,88 @@ h6 {
     clip-path: polygon(50% 0%, 78% 10%, 98% 40%, 90% 75%, 62% 100%, 32% 92%, 6% 62%, 10% 22%);
 }
 
-/* Subtle scroll-based animations */
-@keyframes fadeInUp {
+/* ── Reveal choreography ─────────────────────────────────────────────────────
+   One entrance for the whole site, ported from the camberi landing page:
+   content rises 14px out of a 6px blur and settles on an exponential ease.
+   The blur is the part that carries it — a 40px slide with a linear-ish fade
+   reads as a box moving, while an unblur reads as the page pulling into focus,
+   so the eye lands on the words instead of tracking the thing they arrived in.
+
+   Each variant runs as two or three parallel animations rather than one. That
+   is what lets opacity, movement and the unblur keep their own durations
+   (0.75s / 0.9s / 0.75s), the way camberi's transition-based version does.
+   Single-valued animation-* properties cycle across the whole name list, so one
+   `animation-delay` still offsets all of them together.
+
+   No keyframe names a `to`, and the fill is `backwards`: the entrance ends on
+   the element's own style rather than on a frame held forever. That is what
+   keeps `filter` at `none` afterwards — any non-none filter, `blur(0px)`
+   included, holds a stacking context and a fixed-position containing block open
+   for the life of the page, on every one of the ~100 elements this runs on. The
+   old `to { transform: translateY(0) }` did exactly that, and overwrote any
+   transform utility on the element as well. */
+@keyframes revealFade {
     from {
         opacity: 0;
-        transform: translateY(40px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
     }
 }
 
-@keyframes fadeIn {
+@keyframes revealRise {
     from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
+        transform: translate3d(0, 14px, 0);
     }
 }
 
-@keyframes scaleIn {
+/* 0.96, not the 0.92 this used to scale from: over a 14px rise and an unblur,
+   a deeper scale is the one motion left that the reader sees travelling. */
+@keyframes revealScale {
     from {
-        opacity: 0;
-        transform: scale(0.92);
+        transform: scale(0.96);
     }
-    to {
-        opacity: 1;
-        transform: scale(1);
+}
+
+@keyframes revealUnblur {
+    from {
+        filter: blur(6px);
     }
 }
 
 /* Animation utility classes */
 .animate-on-scroll {
     opacity: 0;
-    animation-fill-mode: forwards;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    animation-play-state: paused;
 }
 
-.animate-on-scroll.fade-in-up {
-    animation-name: fadeInUp;
-    animation-duration: 0.4s;
+/* The reveal is declared by `in-view`/`animate-immediate` — it is never
+   declared up front and paused. A CSS animation that is `paused` from the start
+   is not resumed when the play-state flips: unless it fills forwards, Chrome
+   drops it on the spot and the element snaps to its end state with no motion at
+   all. That is invisible in review, because the end state is exactly what the
+   entrance was going to land on anyway.
+
+   `animation-fill-mode: backwards` covers the delay utilities below, holding the
+   0% frame instead of flashing the element in and yanking it back out. */
+.animate-on-scroll:is(.in-view, .animate-immediate) {
+    opacity: 1;
+    animation-fill-mode: backwards;
+    /* ease-out-expo: hard arrival, long settle. Most of the distance is covered
+       in the first quarter of the duration, which is why 0.75s here still feels
+       quicker off the mark than the 0.4s ease-in-out it replaces. */
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.animate-on-scroll.fade-in {
-    animation-name: fadeIn;
-    animation-duration: 0.5s;
+.animate-on-scroll:is(.in-view, .animate-immediate).fade-in-up {
+    animation-name: revealFade, revealRise, revealUnblur;
+    animation-duration: 0.75s, 0.9s, 0.75s;
 }
 
-.animate-on-scroll.scale-in {
-    animation-name: scaleIn;
-    animation-duration: 0.4s;
+.animate-on-scroll:is(.in-view, .animate-immediate).fade-in {
+    animation-name: revealFade, revealUnblur;
+    animation-duration: 0.75s, 0.75s;
+}
+
+.animate-on-scroll:is(.in-view, .animate-immediate).scale-in {
+    animation-name: revealFade, revealScale, revealUnblur;
+    animation-duration: 0.75s, 0.9s, 0.75s;
 }
 
 /* Staggered animation delays */
@@ -481,27 +510,24 @@ h6 {
     animation-delay: 0.5s;
 }
 
-/* When element is in view */
-.animate-on-scroll.in-view {
-    animation-play-state: running;
-}
-
 /* Above-the-fold elements are in the viewport by definition, so gating them on
    the IntersectionObserver buys nothing and costs everything: `opacity: 0` holds
    the hero blank until page-effects.ts has been fetched, parsed and run, which
-   pushed LCP out to ~8s on a throttled phone. These start playing on the first
-   frame, with no JS in the path. Pair it with `animate-on-scroll` so the
-   observer can still no-op over them harmlessly. */
-.animate-on-scroll.animate-immediate {
-    animation-play-state: running;
-}
+   pushed LCP out to ~8s on a throttled phone. `animate-immediate` reveals them
+   off the stylesheet alone, on the first frame, with no JS in the path. Pair it
+   with `animate-on-scroll` so the observer can still no-op over them harmlessly:
+   adding `in-view` later selects the identical declarations, so nothing
+   restarts. */
 
-/* Reduce motion for accessibility */
+/* Reduce motion for accessibility. `!important` on the reset, because the
+   variant rules above carry a class more than this selector does and would
+   otherwise keep their `animation-name` — the block has to beat them, not tie. */
 @media (prefers-reduced-motion: reduce) {
     .animate-on-scroll {
-        animation: none;
+        animation: none !important;
         opacity: 1;
         transform: none;
+        filter: none;
     }
 }
 
