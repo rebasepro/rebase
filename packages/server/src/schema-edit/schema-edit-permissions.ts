@@ -100,6 +100,39 @@ export function classifyPrincipal(user: unknown): SchemaEditPrincipal {
     };
 }
 
+/**
+ * A repository that is not on this machine.
+ *
+ * Configured by a deployment running built output — every Cloud tenant, and any
+ * self-host serving a bundle. Without it, live schema editing needs the source
+ * on disk and refuses when there is none.
+ */
+export interface RemoteRepositoryConfig {
+    kind: "github";
+    owner: string;
+    repo: string;
+    /** Defaults to `main`. */
+    branch?: string;
+    /**
+     * Where the collection **source** lives in that repository, repo-relative.
+     * Defaults to `config/collections`.
+     *
+     * Not derivable from the running bundle, whose collections directory holds
+     * compiled output — a different directory with different files.
+     */
+    collectionsPath?: string;
+    /**
+     * A GitHub App installation, or a token.
+     *
+     * The app is for a control plane holding one key across many projects; the
+     * token is for a single self-hoster who would otherwise have to stand one
+     * up to let their own server commit to their own repository.
+     */
+    auth:
+        | { kind: "app"; appId: string; privateKey: string; installationId: string }
+        | { kind: "token"; token: string };
+}
+
 export interface SchemaEditPolicy {
     /**
      * Let a service key or an API key commit a schema change.

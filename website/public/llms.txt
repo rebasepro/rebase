@@ -4802,6 +4802,13 @@ artifacts, and a stale one breaks the next deploy:
 - `backend/src/schema.generated.ts` — the Drizzle schema
 - `drizzle/schema.sql`, `drizzle/policies.sql`, `drizzle/search.sql`
 
+Those paths are relative to your **project**, not to your repository. When the
+two are the same — a `rebase init` project, which is the usual case — there is
+nothing to think about. When your project sits in a subdirectory of a larger
+repository, the paths are prefixed with it, found by walking up from your
+collections directory to the nearest `rebase.json`. A project with no
+`rebase.json` keeps the plain paths.
+
 The commit message describes the change rather than announcing one, and is
 attributed to the admin who made it. A schema change with an author and a diff
 in your project's history is something neither Firebase nor Supabase gives you —
@@ -4886,36 +4893,64 @@ not whether it is production.
 |---|---|
 | `rebase dev` on your machine | yes |
 | Self-host with the project mounted | yes |
-| Self-host from a built bundle | no — nothing to edit |
-| Rebase Cloud | **not yet** — see below |
+| Self-host from a built bundle | yes, with `liveSchema.repository` |
+| Rebase Cloud, or any bundle | yes, with `liveSchema.repository` |
 
-A bundle is compiled output. There is no collection source in it, so the routes
-answer `SCHEMA_EDITING_NO_REPOSITORY` and say why. **Running from source is how
-a self-hosted deployment gets the schema editor.**
+A bundle is compiled output, so there is no collection source in it. Configure
+`liveSchema.repository` and the source is fetched from your repository instead;
+without it the routes answer `SCHEMA_EDITING_NO_REPOSITORY` and say why.
 
-#### Rebase Cloud
+#### A deployment with no source on disk
 
-A Cloud tenant runs a built bundle, so its source is not on the machine — it
-lives in your repository. Committing there needs no working tree: the Git Data
-API creates a blob, a tree and a commit and moves a ref in four calls, and
-`createGitHubRepository` implements exactly that, against a GitHub App or a
-token.
+A bundle is compiled output — every Cloud tenant, and any self-host serving a
+build. There is no collection source for the editor to rewrite, so point it at
+the repository the source actually lives in:
 
-**It is not connected yet.** The backend is written and tested, including
-against a real repository, but nothing constructs it: a Cloud tenant currently
-gets the same `SCHEMA_EDITING_NO_REPOSITORY` refusal as any other bundle
-deployment. What remains is plumbing — storing an installation per project,
-reading the app key at boot, and choosing that backend when there is no working
-tree.
+```typescript no-verify
+initializeRebaseBackend({
+    // …the rest of your config
+    liveSchema: {
+        repository: {
+            kind: "github",
+            owner: "acme",
+            repo: "storefront",
+            branch: "main",
+            // Where the collection source lives in that repository.
+            // Defaults to "config/collections".
+            collectionsPath: "config/collections",
+            auth: { kind: "token", token: process.env.GITHUB_TOKEN! }
+        }
+    }
+})
+```
 
-Until then, edit your collections in your editor and deploy, or run the project
-from source.
+The change is then read from the repository, rewritten with the same editor that
+runs locally, and committed back through the Git Data API — a blob, a tree, a
+commit and a ref update. Nothing is cloned and nothing is left on disk.
+
+`auth` takes a token or a GitHub App installation:
+
+```typescript no-verify
+auth: {
+    kind: "app",
+    appId: "123456",
+    privateKey: process.env.GITHUB_APP_PRIVATE_KEY!,
+    installationId: "987654"
+}
+```
+
+Use the token for a single project committing to a repository you already own —
+standing up an App so your own server can commit to it is a lot of ceremony for
+a one-line credential. Use the App for a control plane holding one key across
+many projects, which is what Rebase Cloud does: one App, an installation per
+project, and no per-customer secret to rotate.
+
+The token needs `contents: read and write` on that repository, and nothing else.
 
 On a machine that has the repository, the commit is a plain `git commit` —
-nothing to authenticate, no token, no network. Cloud is the harder case, because
-the repository is elsewhere: it *would* commit through a GitHub App using the
-Git Data API, with no clone, and that backend exists — but see
-[Rebase Cloud](#rebase-cloud) above, it is not connected yet.
+nothing to authenticate, no token, no network. A deployment without one commits
+through the Git Data API instead, with no clone — see
+[A deployment with no source on disk](#a-deployment-with-no-source-on-disk).
 
 Two things that make it safe to run against a repository somebody else is
 working in:

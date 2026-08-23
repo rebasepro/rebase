@@ -50,6 +50,19 @@ export interface SchemaEditRepository {
     writeFiles(files: SchemaChangeFile[]): Promise<void>;
     /** Stage exactly these paths and commit them. Returns the new sha. */
     commit(paths: string[], message: string): Promise<string>;
+    /**
+     * The current contents of one file, or `undefined` when it does not exist.
+     *
+     * Needed by a deployment whose source is not on the machine. The AST editor
+     * rewrites a collection *file*, so a bundle — which ships compiled output —
+     * has nothing for it to open; the file has to come from the repository
+     * first. A missing file is not an error: a new collection has no source yet,
+     * and the editor creates one.
+     *
+     * Optional. A local working tree could implement it and does not need to:
+     * the file is already on the disk the editor reads.
+     */
+    readFile?(path: string): Promise<string | undefined>;
 }
 
 /** Runs the DDL. Separate from the repository so neither knows about the other. */

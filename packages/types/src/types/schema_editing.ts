@@ -59,6 +59,31 @@ export interface ClassifiedSchemaChanges {
     applicable: boolean;
 }
 
+/**
+ * Where a project's generated schema artifacts live, relative to the **project**
+ * root — which is the repository root only when the project is the whole
+ * repository.
+ *
+ * Here rather than in the Postgres package because it is a contract, not an
+ * engine detail: `@rebasepro/server` has to derive these for a project in a
+ * subdirectory, and it cannot import a driver to do it.
+ */
+export interface SchemaCommitPaths {
+    /** Drizzle schema, imported by the backend. */
+    schemaFile: string;
+    /** Declarative DDL, what `db push` applies and Atlas diffs against. */
+    ddlFile: string;
+    policiesFile: string;
+    searchFile: string;
+}
+
+export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
+    schemaFile: "backend/src/schema.generated.ts",
+    ddlFile: "drizzle/schema.sql",
+    policiesFile: "drizzle/policies.sql",
+    searchFile: "drizzle/search.sql"
+};
+
 /** One file the commit writes, as content rather than as a path on a disk. */
 export interface SchemaChangeFile {
     path: string;
@@ -124,6 +149,6 @@ export interface SchemaEditingAdmin {
     planSchemaChange(
         before: unknown[],
         after: unknown[],
-        options?: { paths?: Partial<Record<"schemaFile" | "ddlFile" | "policiesFile" | "searchFile", string>> }
+        options?: { paths?: Partial<SchemaCommitPaths> }
     ): Promise<SchemaChangePlan>;
 }

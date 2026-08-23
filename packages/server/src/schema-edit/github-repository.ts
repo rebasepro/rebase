@@ -199,6 +199,45 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
             staged = files;
         },
 
+        /**
+         * One file's current contents, read from the branch this commits onto.
+         *
+         * `undefined` for a file that is not there — a collection being created
+         * has no source yet — and that is a normal answer rather than a
+         * failure. Anything else is surfaced: a 403 from a token without
+         * `contents:read` must not be mistaken for an empty repository, or the
+         * editor would rewrite from nothing and the commit would delete
+         * somebody's collection.
+         */
+        async readFile(filePath: string): Promise<string | undefined> {
+            const auth = await bearer();
+            const response = await doFetch(
+                `${GITHUB_API}/repos/${owner}/${repo}/contents/${filePath.split("/").map(encodeURIComponent).join("/")}` +
+                `?ref=${encodeURIComponent(branch)}`,
+                {
+                    headers: {
+                        accept: "application/vnd.github+json",
+                        "x-github-api-version": "2022-11-28",
+                        authorization: `Bearer ${auth}`
+                    }
+                }
+            );
+            if (response.status === 404) return undefined;
+            if (!response.ok) {
+                throw new GitHubApiError(
+                    response.status,
+                    `/repos/${owner}/${repo}/contents/${filePath}`,
+                    (await response.text()).slice(0, 400)
+                );
+            }
+            const body = await response.json() as { content?: string; encoding?: string };
+            if (typeof body.content !== "string") return undefined;
+            // The contents API answers base64 for a file and something else for
+            // a directory or a symlink; only the first is a collection source.
+            if (body.encoding && body.encoding !== "base64") return undefined;
+            return Buffer.from(body.content, "base64").toString("utf8");
+        },
+
         async commit(paths: string[], message: string): Promise<string> {
             if (staged.length === 0) throw new Error("Refusing to commit with nothing staged.");
 
