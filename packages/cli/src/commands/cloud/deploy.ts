@@ -33,8 +33,9 @@ import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declaredAppsFrom } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
 import { foldFrontendIntoBundle } from "../../fold-static";
-import { loadManifest, findBackendApp } from "../../manifest";
+import { loadManifest, findBackendApp, resolveBackendPaths } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
+import { deriveResourceGraph } from "../../resources/derive";
 
 interface Deployment {
     id: string | number;
@@ -218,12 +219,24 @@ async function deployBundle(opts: {
             );
         }
         progress(chalk.gray("  Building bundle..."));
+        // Same derivation `rebase build` does, and fatal for the same reason: a
+        // bundle whose manifest is missing a bucket the code declares deploys
+        // into a tenant with nothing provisioned for it.
+        const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph({
+            configDir: path.join(projectRoot, resolveBackendPaths(backend!.app, projectRoot).config)
+        });
+        if (resourceIssues.length > 0) {
+            throw new Error(
+                `${resourceIssues.length} problem(s) in the declared resources:\n` +
+                resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n")
+            );
+        }
         const result = await buildBundle({
             projectRoot,
             appName: backend!.name,
             app: backend!.app,
             runtimeRange: loaded.manifest.rebase,
-            storage: loaded.manifest.storage,
+            resources: resourceGraph,
             skipTypeCheck: opts.skipTypeCheck,
             log: (m: string) => progress(chalk.gray(m))
         });

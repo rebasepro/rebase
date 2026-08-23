@@ -19,7 +19,6 @@ import fs from "fs";
 import path from "path";
 import {
     findStorageSuffixCollision,
-    storageEnvSuffix,
     type DeclaredStorageSources,
     type ManagedCompatibility,
     type RebaseAppConfig,
@@ -379,7 +378,7 @@ message: "name is reserved" });
         byPath.set(at, name);
     }
 
-    const storage = refuseStorageBlock(raw.storage, issues);
+    refuseStorageBlock(raw.storage, issues);
 
     // Carried rather than dropped. This key is the only repository-wide privacy
     // control the CLI honours, and a key that does not survive a parse does not
@@ -410,7 +409,6 @@ message: "name is reserved" });
             $schema: typeof raw.$schema === "string" ? raw.$schema : undefined,
             rebase: raw.rebase as string,
             apps,
-            ...(storage ? { storage } : {}),
             ...(telemetry !== undefined ? { telemetry } : {})
         },
         issues
@@ -593,14 +591,12 @@ export function writeManifest(projectRoot: string, manifest: RebaseProjectManife
     const schema = manifest.$schema
         ?? (typeof existing.$schema === "string" ? existing.$schema : undefined)
         ?? "https://rebase.pro/schemas/rebase.json";
-    const storage = manifest.storage ?? (isRecord(existing.storage) ? existing.storage : undefined);
     const telemetry = manifest.telemetry ?? (typeof existing.telemetry === "boolean" ? existing.telemetry : undefined);
 
     const ordered = {
         $schema: schema,
         rebase: manifest.rebase,
         apps: manifest.apps,
-        ...(storage ? { storage } : {}),
         ...(telemetry !== undefined ? { telemetry } : {}),
         ...carried
     };
