@@ -73,6 +73,13 @@ export interface LiveSchemaRoutesConfig {
      */
     writeSource?: (change: ProposedChange) => Promise<{ path: string; contents: string }[]>;
     /**
+     * Which paths {@link writeSource} will touch, without touching them.
+     *
+     * The dirty-tree check needs them *before* the write, or it reads the
+     * change's own edit as somebody else's work in progress and refuses.
+     */
+    sourcePathsFor?: (change: ProposedChange) => string[];
+    /**
      * Who may apply a change, as opposed to preview one.
      *
      * See `schema-edit-permissions.ts`. The short version: applying writes a
@@ -326,13 +333,19 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             );
         }
 
-        const sourceFiles = config.writeSource ? await config.writeSource(change) : [];
-        const withSource = { ...plan, files: [...sourceFiles, ...plan.files] };
-
         try {
             const result = await applySchemaChange({
-                plan: withSource,
+                plan,
                 repository,
+                // Handed down rather than called here. Writing the source first
+                // and passing the files over is what made every change fail:
+                // the AST editor writes through the filesystem, so by the time
+                // the dirty-tree check ran, the tree was dirty *because of this
+                // change*, and it refused on the evidence of its own edit.
+                sourcePaths: config.sourcePathsFor?.(change) ?? [],
+                writeSource: config.writeSource
+                    ? () => config.writeSource!(change)
+                    : undefined,
                 apply: async (statements) => {
                     const sql = config.getAdmin();
                     if (!isSQLAdmin(sql)) {
@@ -360,7 +373,19 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             if (err instanceof DirtyWorkingTreeError) {
                 throw ApiError.conflict(err.message, "SCHEMA_EDIT_DIRTY_TREE");
             }
-            throw err;
+            // Anything else that goes wrong between the check and the commit —
+            // the AST editor refusing a file it cannot parse, git refusing the
+            // commit, a path outside the repository — is a refusal of *this
+            // change*, not a broken server. A 500 tells the person nothing and
+            // reads as an outage; the message is the useful part and it is
+            // already on the error.
+            //
+            // Deliberately below the two specific cases above, so neither is
+            // flattened into this one.
+            throw ApiError.badRequest(
+                err instanceof Error ? err.message : String(err),
+                "SCHEMA_CHANGE_FAILED"
+            );
         }
     });
 

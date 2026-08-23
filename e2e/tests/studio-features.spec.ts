@@ -30,11 +30,31 @@ test.describe("Rebase Studio Features E2E", () => {
       }
     });
 
-    // Fail on any failed API request
+    // Fail on any failed API request — carrying the body, not just the status.
+    //
+    // This server answers `{error:{code,message}}` on every refusal, and the
+    // message is written for whoever has to act on it. Throwing the status
+    // alone discards exactly that: "returned status 500" is indistinguishable
+    // between a missing dependency, a refused commit and a real crash, and the
+    // server's own log is not always in the CI artifact to fall back on.
     page.on("response", response => {
-      if (response.url().includes("/api/") && response.status() >= 400) {
-        throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
-      }
+      if (!response.url().includes("/api/") || response.status() < 400) return;
+      // `void`: the handler cannot be async — Playwright does not await it —
+      // so the body is read on its own and thrown from there.
+      void response.text().then(
+        body => {
+          throw new Error(
+            `API Request failed: ${response.url()} returned status ${response.status()}` +
+            `\n  body: ${body.slice(0, 600)}`
+          );
+        },
+        () => {
+          throw new Error(
+            `API Request failed: ${response.url()} returned status ${response.status()} ` +
+            "(body unavailable)"
+          );
+        }
+      );
     });
 
     await page.goto("/");
@@ -121,8 +141,24 @@ test.describe("Rebase Studio Features E2E", () => {
     await expect(createButton).toBeEnabled();
     await createButton.click();
 
-    // Wait for the success navigation indicating the collection has saved
-    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
+    // Saving no longer writes straight through. A backend that can edit its own
+    // schema plans the change first and shows what it would do — the SQL, the
+    // files, the commit — and nothing happens until somebody agrees. Against a
+    // backend that cannot (a bundle deployment, a non-Postgres driver) the
+    // dialog never appears and the save completes on its own, so this waits for
+    // whichever of the two this deployment is rather than assuming.
+    const review = page.getByText("Review schema change");
+    const applied = page.waitForURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
+    await Promise.race([
+        review.waitFor({ state: "visible", timeout: 25000 }).then(async () => {
+            await expect(page.getByText("Ready to apply")).toBeVisible({ timeout: 10000 });
+            await page.getByRole("button", { name: "Commit and apply" }).click();
+        }),
+        applied.catch(() => undefined)
+    ]);
+
+    // Either way, the collection exists and the editor has moved to it.
+    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 30000 });
   });
 
   test("sql console - can run queries, handle syntax errors, and switch roles", async ({ page }) => {

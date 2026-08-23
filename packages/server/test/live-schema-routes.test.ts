@@ -372,3 +372,187 @@ describe("who may apply", () => {
         });
     });
 });
+
+/**
+ * The dirty-tree check must not see this change's own edit.
+ *
+ * `writeSource` goes through the filesystem, not through the repository, so
+ * ordering is the whole correctness argument. Written first, the tree is dirty
+ * *because of this change* by the time the check runs — and since
+ * `git status --porcelain` reports untracked files too, a new collection's
+ * source file is always untracked and the change is always refused. The file is
+ * left behind either way, so the retry finds a dirty tree as well.
+ *
+ * That is not a hypothetical: it was the behaviour, and it meant `/apply` could
+ * never succeed through its own HTTP surface. Every existing test missed it
+ * because they hand `applySchemaChange` a set of files that is already written,
+ * which is precisely the shape that cannot reproduce it.
+ */
+describe("writing the source without tripping the dirty check", () => {
+    /**
+     * A repository whose `dirtyPaths` answers what a real `git status` would:
+     * nothing at first, and the source file once it has been written.
+     */
+    function withRealisticDirtiness(over: { alreadyDirty?: string[] } = {}) {
+        const events: string[] = [];
+        const onDisk = new Set<string>(over.alreadyDirty ?? []);
+        const SOURCE = "config/collections/posts.ts";
+
+        const repository: SchemaEditRepository = {
+            root: "/tmp/project",
+            currentBranch: async () => "main",
+            dirtyPaths: async () => {
+                events.push(`dirty-check(${[...onDisk].join(",") || "clean"})`);
+                return [...onDisk];
+            },
+            writeFiles: async () => { events.push("write-generated"); },
+            commit: async () => { events.push("commit"); return "abc123def456"; }
+        };
+
+        const admin = {
+            planSchemaChange: async () => { events.push("plan"); return okPlan(); },
+            executeSql: async () => { events.push("sql"); return { rows: [] }; }
+        } as unknown as DatabaseAdmin;
+
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts", { title: { type: "string" } })],
+            getAdmin: () => admin,
+            getRepository: () => repository,
+            sourcePathsFor: () => [SOURCE],
+            writeSource: async () => {
+                // What the AST editor does: touch the disk. From here on a real
+                // `git status` reports this path.
+                events.push("write-source");
+                onDisk.add(SOURCE);
+                return [{ path: SOURCE, contents: "export const posts = {};" }];
+            }
+        }));
+
+        return {
+            events,
+            post: (body: unknown) => app.fetch(new Request("http://localhost/api/schema/apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            }))
+        };
+    }
+
+    it("applies, rather than refusing on the file it just wrote", async () => {
+        const { post, events } = withRealisticDirtiness();
+        const res = await post(change);
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({ applied: true });
+        // The check runs while the tree is still clean, and only then is the
+        // source written.
+        expect(events.indexOf("dirty-check(clean)")).toBeLessThan(events.indexOf("write-source"));
+        expect(events).toContain("commit");
+    });
+
+    it("commits the source it wrote, not just the generated files", async () => {
+        let committed: string[] = [];
+        const { post } = withRealisticDirtiness();
+        const res = await post(change);
+        committed = ((await res.json()) as { committed: { files: string[] } }).committed.files;
+
+        expect(committed).toContain("config/collections/posts.ts");
+        expect(committed).toContain("drizzle/schema.sql");
+    });
+
+    it("still refuses when somebody else's work is in the way", async () => {
+        // The check has to keep doing its job: a half-finished edit to a file
+        // this commit would sweep up is exactly what it exists to catch.
+        const { post, events } = withRealisticDirtiness({
+            alreadyDirty: ["config/collections/posts.ts"]
+        });
+        const res = await post(change);
+
+        expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDIT_DIRTY_TREE" } });
+        // And nothing was written, so the refusal leaves the tree as it found it.
+        expect(events).not.toContain("write-source");
+        expect(events).not.toContain("commit");
+    });
+});
+
+/**
+ * A capability that is absent should say so, not die when it is used.
+ *
+ * `writeSource` used to be a function that existed and threw when the AST
+ * editor was unavailable. `/status` can only see whether the field is *set*, so
+ * it answered `enabled: true`, the panel offered the control, and `/apply` came
+ * back 500 the moment somebody confirmed — after they had read a plan and
+ * agreed to it.
+ */
+describe("when the source cannot be rewritten", () => {
+    const withoutWriteSource = () => {
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts")],
+            getAdmin: () => ({
+                planSchemaChange: async () => okPlan(),
+                executeSql: async () => ({ rows: [] })
+            } as unknown as DatabaseAdmin),
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => {},
+                commit: async () => "abc123def456"
+            })
+            // writeSource deliberately absent.
+        }));
+        return app;
+    };
+
+    it("reports itself unavailable rather than enabled", async () => {
+        const res = await withoutWriteSource().fetch(
+            new Request("http://localhost/api/schema/status")
+        );
+        expect(await res.json()).toMatchObject({
+            enabled: false,
+            code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+            // Planning needs no source rewrite, so it is still on offer.
+            canPlan: true
+        });
+    });
+
+    it("turns a failure between the check and the commit into a refusal, not a 500", async () => {
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts")],
+            getAdmin: () => ({
+                planSchemaChange: async () => okPlan(),
+                executeSql: async () => ({ rows: [] })
+            } as unknown as DatabaseAdmin),
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => {},
+                commit: async () => "abc"
+            }),
+            sourcePathsFor: () => ["config/collections/posts.ts"],
+            writeSource: async () => { throw new Error("posts.ts could not be parsed"); }
+        }));
+
+        const res = await app.fetch(new Request("http://localhost/api/schema/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(change)
+        }));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+            error: { code: "SCHEMA_CHANGE_FAILED", message: "posts.ts could not be parsed" }
+        });
+    });
+});
