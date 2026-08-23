@@ -2063,10 +2063,11 @@ Prefer a path whenever the value is on the record: a path keeps the property's
 own rendering, so an enum status stays a coloured chip and a date stays
 formatted, which a resolver returning a bare string cannot express.
 
-:::note[Renamed from `titleProperty`]
-`admin.titleProperty` is now `admin.display.title`. The same string works there,
-and the new field also takes a resolver. The old key is still read, and warns
-once per collection at startup.
+:::note[Replaced `titleProperty`]
+`admin.titleProperty` was removed in favour of `admin.display.title`. The same
+string works there, and the new field also takes a resolver. A collection still
+carrying the old key is rejected by `defineCollection` with the usual
+unknown-key error.
 :::
 
 #### Title Property Selection
@@ -3104,15 +3105,15 @@ GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
 GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
 GET    /api/data/authors/a-1/posts/p-1
 POST   /api/data/authors/a-1/posts          create under this parent
-PUT    /api/data/authors/a-1/posts/p-1      update; will not reparent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
 DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
 ```
 
 The parent segment is enforced, not decorative. Addressing a row that is not under
-that parent returns `404`, and `PUT` never moves a row from one parent to another —
+that parent returns `404`, and `PATCH` never moves a row from one parent to another —
 set the foreign key explicitly if that is what you want.
 
-For a many-to-many, `PUT parent/id/child/childId` is *set membership*: it links the
+For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
 row if it is not linked yet, and is idempotent. That is how you attach a row that
 already exists.
 
@@ -4044,7 +4045,7 @@ After initialization, these routes are mounted:
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/collections` | Collection metadata endpoint |
-| `/api/data/:slug` | CRUD operations per collection (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
@@ -4173,7 +4174,6 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
-| `PUT` | `/api/data/:slug/:id` | Update a entity |
 | `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 
 #### Query Parameters
@@ -4246,7 +4246,6 @@ For each collection, the following endpoints are generated:
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a entity |
 | `PATCH` | `/api/data/:slug/:id` | Update a entity (partial — only the properties you send are written) |
-| `PUT` | `/api/data/:slug/:id` | Same handler as `PATCH`, kept because every shipped SDK sends it |
 | `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
@@ -4260,7 +4259,7 @@ Nested relations are accessible via URL paths:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
+PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
@@ -4501,7 +4500,7 @@ GET /api/data/products?fields=id,name,price
 
 ### Lifecycle Hook Pipeline
 
-Every REST mutation operation (`POST`, `PUT`, `DELETE`) runs through a strict, sequential hook execution pipeline:
+Every REST mutation operation (`POST`, `PATCH`, `DELETE`) runs through a strict, sequential hook execution pipeline:
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
@@ -5069,7 +5068,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated) |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
-| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `emailServiceEnabled`, `magicLinkEnabled`, `anonymousLoginEnabled`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
+| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
@@ -5510,7 +5509,7 @@ const clerkAuthAdapter = createCustomAuthAdapter({
     capabilities: {
         hasBuiltInAuthRoutes: false, // Login is managed by Clerk UI
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         profileUpdate: false,
         sessionManagement: false
@@ -5589,13 +5588,14 @@ const myOauthAdapter: AuthAdapter = {
     getCapabilities: () => ({
         hasBuiltInAuthRoutes: true,
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         adminPasswordReset: false,
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,
         magicLink: false,
+        anonymousLogin: false,
         enabledProviders: []
     }),
     createAuthRoutes: () => {
@@ -7172,21 +7172,17 @@ interface CronJobContext {
     // from "@rebasepro/server"` returns, and the same one `defineFunction`
     // hands its callback.
     rebase: RebaseServerClient;
-
-    /** @deprecated The same object, under the name this context used before. */
-    client: RebaseServerClient & { data: RebaseSdkData };
 }
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
 
-:::note[`ctx.client` is the old name for `ctx.rebase`]
-They are the same object. `client` is deprecated and will be removed in the next
-major: it contradicted every other server-side surface, where the singleton is
-`rebase`, and its type re-exposed `client.data` — the alias `RebaseServerClient`
-deliberately omits so that the privileged plane has exactly one name. A reader
-who learned `client.data` here carried it into a collection callback, where
-`context.data` is the *user-scoped* plane: same spelling, opposite privilege.
+:::note[`ctx.client` was removed]
+It was a second name for `ctx.rebase`, and its type re-exposed `client.data` —
+the alias `RebaseServerClient` deliberately omits so that the privileged plane
+has exactly one name. A reader who learned `client.data` here carried it into a
+collection callback, where `context.data` is the *user-scoped* plane: same
+spelling, opposite privilege. Use `ctx.rebase.dataAsAdmin`.
 :::
 
 #### Interacting with the database and services via `ctx.rebase`
@@ -12479,12 +12475,18 @@ Query the backend's authentication configuration:
 ```typescript
 const config = await client.auth.getAuthConfig();
 // {
-//   needsSetup: boolean,
-//   registrationEnabled: boolean,
-//   emailServiceEnabled?: boolean,
-//   passwordReset?: boolean,
-//   emailVerification?: boolean,
-//   enabledProviders: string[]
+//   hasBuiltInAuthRoutes: boolean,
+//   emailPasswordLogin: boolean,
+//   registrationEnabled: boolean,   // open right now, bootstrap window included
+//   passwordReset: boolean,         // needs an email service
+//   adminPasswordReset: boolean,
+//   sessionManagement: boolean,
+//   profileUpdate: boolean,
+//   emailVerification: boolean,
+//   magicLink: boolean,
+//   anonymousLogin: boolean,
+//   enabledProviders: string[],
+//   needsSetup: boolean
 // }
 ```
 
@@ -15081,7 +15083,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 #### Write Flow
 1. User edits a entity in the form
 2. `beforeSave` callbacks run (validation, transformation)
-3. Client SDK sends `PUT /api/data/:slug/:id`
+3. Client SDK sends `PATCH /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`
 5. `afterSave` callbacks run (side effects)
 6. `NOTIFY` broadcast triggers WebSocket update to all clients

@@ -24,6 +24,38 @@
 
   The ceiling assumes a pessimistic 2× floor on compression, because the limit is on the *compressed* upload while this measures the tree on disk. The warning below it now says which quantity is which — "201 MB, close to the 100 MB upload limit" was two different numbers described as one, and read as nonsense.
 
+- **`GET /api/auth/config` answers one question once, from one handler.** Two handlers claimed that path: `init.ts` registers it directly and only afterwards mounts the auth router, so the router's copy never ran — and the two returned different payloads, one reporting `emailServiceEnabled` and `magicLinkEnabled` where the live one reported `passwordReset` and `magicLink`. A fix aimed at the wrong copy therefore changed nothing, which had already happened once. The router's copy is gone, the payload is assembled in one function, and the surviving route is rate-limited like the rest of the unauthenticated auth surface — it counts users on every call.
+
+  In the payload itself, `registration` and `registrationEnabled` were the same boolean under two names, both advertised. `registrationEnabled` is the only one now, and it is required rather than optional: it says whether self-registration is open *right now*, first-user bootstrap window included. `anonymousLogin` is required for the same reason. `AuthConfig` in `@rebasepro/client` and `AuthConfigResponse` in `@rebasepro/app` are aliases of `AuthAdapterCapabilities` instead of near-copies of it — the SDK's copy listed an `emailServiceEnabled` flag no backend has ever sent, and marked as optional fields every backend always sends. A test pins the exact key set, because the drift that started this was a field *name*, and no per-field assertion can see one.
+
+- **`PATCH` is the update verb for the data API.** `PUT` was mounted on the same handler and the generated OpenAPI spec described the operation twice — once as `patch`, once as `put` marked `deprecated` — so a client generated from the spec had to choose, and the verb it chose meant "replace" for a handler that merges. The `PUT` route is gone and the SDK's `update()` sends `PATCH`, which is what the spec has advertised since 0.14. `updateMany` was already on `PATCH`.
+
+### Removed
+
+Nothing below was deprecated in the usual sense of "still works, please stop". Each was a second name for something that already had one, and every one of them is gone. There is no compatibility mode.
+
+- **`admin.titleProperty`** → `admin.display.title`. The same string works there, and `display.title` also takes a resolver. The old key had grown seven readers that disagreed about the fallback; a collection still carrying it is now rejected at boot, by name, with the replacement in the message — silence here would mean a title that reverts to the derived one with nothing to explain why.
+
+- **`ctx.client` in a cron handler** → `ctx.rebase`. Its type re-exposed `client.data`, the alias `RebaseServerClient` omits on purpose so that the privileged plane is spelled `dataAsAdmin` on every server surface. A reader who learned `client.data` in a cron carried it into a collection callback, where `context.data` is the *user-scoped* plane: same spelling, opposite privilege.
+
+- **`userId` as an identity spelling.** `AuthResult` advertised `uid` or `userId` from a custom validator, and the middleware had already half-removed it — the normalisation read `("uid" in r ? r.uid : undefined) || ("uid" in r ? r.uid : undefined)`, the same clause twice — so the documented `userId` had stopped working there while `getUser()` and the JWT verifier still honoured it. `uid` everywhere.
+
+- **`RENAMED_SLOTS`**, the rewrite that quietly redirected the retired `collection.insights` and `home.card.insight` slot names, and the console warning beside it.
+
+- **`WhereValue<T>`**, superseded by the operator-correlated `WhereValueFor`.
+
+- **`tooltipsOpen` and `adminMenuOpen`** on both drawer components, **`error` and `padding`** on `RelationSelector`, and the ignored second parameter of `getEntityTitlePropertyKey` — all declared, all documented, none of them read.
+
+- **`isBootstrapCompleted` / `setBootstrapCompleted`** on the auth route module and the admin users route. No caller ever supplied them; the bootstrap gate is "does this backend already have an admin", asked of the rows.
+
+- **The websocket client's `subscriptions` map** and the "legacy subscription handling" branch that read it. Nothing ever wrote to it.
+
+- **Three modules that only forwarded exports**: `@rebasepro/types/controllers/database_admin` (already exported from `types/backend`), `server-postgres/utils/table-classification` (from `@rebasepro/common`), and the `unflattenObject` re-export in the admin's `file_to_json`.
+
+- **`rebase build --legacy` and `rebase start --legacy`** are now `--workspace`. The mode is supported, not retired, and the name said otherwise.
+
+- **`UploadFileResult.storageUrl` is required.** Every controller returns one — S3, GCS and local alike — so the `??` fallback behind it was dead code.
+
 ### Fixed
 
 - **The published types were `any` for anyone using modern Node module resolution.** Every package here is `"type": "module"`, and `tsc` writes relative specifiers into `.d.ts` exactly as the source wrote them — extensionless, because the source is compiled by a bundler. Under `moduleResolution: "nodenext"` (or `"node16"`) an extensionless relative specifier inside an ESM declaration file is an error, and TypeScript's response is the part that matters: it does not fail at the consumer's import. It resolves the package, discards every declaration it could not follow, and types the whole import `any`.

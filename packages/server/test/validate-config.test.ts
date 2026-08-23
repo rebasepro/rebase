@@ -42,11 +42,21 @@ describe("a current-era config", () => {
         expect(findCollectionConfigProblems([valid()])).toEqual([]);
     });
 
-    it("does not look inside the admin block", () => {
+    it("does not look inside the admin block for keys it simply does not know", () => {
         // The block belongs to @rebasepro/admin-types, which the server may not
         // import. Guessing at its contents here would reject keys the panel adds.
         const collection = { ...valid(), admin: { icon: "Article", somethingTheAdminAdded: true } };
         expect(findCollectionConfigProblems([collection])).toEqual([]);
+    });
+
+    it("does name a key the admin block used to have", () => {
+        // The one exception, and the reason it is an exception: nothing reads
+        // `admin.titleProperty` any more, so leaving it silent means a title
+        // that reverts to the derived one with no way to tell why.
+        const collection = { ...valid(), admin: { icon: "Article", titleProperty: "name" } };
+        const [problem] = errors([collection]);
+        expect(problem.path).toBe("posts.admin.titleProperty");
+        expect(problem.message).toContain("admin.display.title");
     });
 });
 

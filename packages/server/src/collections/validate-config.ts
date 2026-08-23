@@ -234,11 +234,23 @@ interface Migration {
     codemod?: string;
 }
 
+/**
+ * Keys that no longer exist *inside* the `admin` block.
+ *
+ * Checked by name, not by completeness — see `checkCollection`.
+ */
+const ADMIN_BLOCK_MIGRATIONS: Record<string, Migration> = {
+    titleProperty: {
+        fix: "`titleProperty` was replaced by `admin.display.title` — the same string works there, and `display.title` also takes a resolver for a title the record does not carry"
+    }
+};
+
 /** Collection-level keys that no longer exist at the top level. */
 const COLLECTION_MIGRATIONS: Record<string, Migration> = {
     editable: {
         fix: "`editable` was removed in 0.10 — collections are editable by default. Delete it, or use `admin.disableDefaultActions` to take actions away"
-    }
+    },
+    ...ADMIN_BLOCK_MIGRATIONS
 };
 
 for (const key of ADMIN_COLLECTION_KEYS) {
@@ -534,6 +546,17 @@ function checkCollection(
         }
 
         collect.unknown(`${at}.${key}`, key, "collection");
+    }
+
+    // Only the keys that were *removed* from the block, never the ones it does
+    // not recognise: the block belongs to `@rebasepro/admin-types` and the panel
+    // adds to it, so a completeness check here would reject valid config. A
+    // removal is different — nothing will read the key again, and a title that
+    // silently reverts to the derived one is the failure this prevents.
+    if (isPlainObject(collection.admin)) {
+        for (const [key, migration] of Object.entries(ADMIN_BLOCK_MIGRATIONS)) {
+            if (key in collection.admin) collect.migrated(`${at}.admin.${key}`, key, migration);
+        }
     }
 
     if (isPlainObject(collection.properties)) {
