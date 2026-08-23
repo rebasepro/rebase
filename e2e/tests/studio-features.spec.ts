@@ -30,11 +30,31 @@ test.describe("Rebase Studio Features E2E", () => {
       }
     });
 
-    // Fail on any failed API request
+    // Fail on any failed API request — carrying the body, not just the status.
+    //
+    // This server answers `{error:{code,message}}` on every refusal, and the
+    // message is written for whoever has to act on it. Throwing the status
+    // alone discards exactly that: "returned status 500" is indistinguishable
+    // between a missing dependency, a refused commit and a real crash, and the
+    // server's own log is not always in the CI artifact to fall back on.
     page.on("response", response => {
-      if (response.url().includes("/api/") && response.status() >= 400) {
-        throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
-      }
+      if (!response.url().includes("/api/") || response.status() < 400) return;
+      // `void`: the handler cannot be async — Playwright does not await it —
+      // so the body is read on its own and thrown from there.
+      void response.text().then(
+        body => {
+          throw new Error(
+            `API Request failed: ${response.url()} returned status ${response.status()}` +
+            `\n  body: ${body.slice(0, 600)}`
+          );
+        },
+        () => {
+          throw new Error(
+            `API Request failed: ${response.url()} returned status ${response.status()} ` +
+            "(body unavailable)"
+          );
+        }
+      );
     });
 
     await page.goto("/");
