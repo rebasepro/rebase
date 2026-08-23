@@ -21,10 +21,7 @@ This application consists of three main parts:
 ### Installation
 
 ```bash
-# Install all dependencies
-pnpm install
-
-# Or install individually
+# Install dependencies
 pnpm install
 ```
 
