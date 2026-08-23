@@ -71,7 +71,7 @@ export interface LoginViewProps {
 
     /**
      * Prevent users from creating new accounts.
-     * If not set, checks `authController.capabilities.registration`.
+     * If not set, checks `authController.capabilities.registrationEnabled`.
      */
     disableSignupScreen?: boolean;
 
@@ -130,7 +130,7 @@ export interface LoginViewProps {
 
     /**
      * Whether registration is enabled.
-     * If not set, derived from `authController.capabilities.registration`.
+     * If not set, derived from `authController.capabilities.registrationEnabled`.
      */
     registrationEnabled?: boolean;
 
@@ -296,7 +296,7 @@ export function LoginView({
     const isBootstrapMode = needsSetup
         ?? ("needsSetup" in authController && !!(authController as { needsSetup?: boolean }).needsSetup)
         ?? false;
-    const canRegister = registrationEnabled ?? caps.registration ?? false;
+    const canRegister = registrationEnabled ?? caps.registrationEnabled ?? false;
     // Every OAuth button needs BOTH halves: a client id here and the matching
     // provider configured on the backend. `enabledProviders` is always an array
     // (the controller defaults it to `[]`), so a missing entry means "the

@@ -29,7 +29,7 @@ import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import type { CaptchaConfig } from "./captcha";
-import { isAnonymousAuthOpen, isRegistrationOpen } from "./registration-policy";
+import { buildBuiltinAuthCapabilities } from "./capabilities";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
@@ -335,43 +335,18 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 // If the check fails, assume not in setup mode
             }
 
-            const enabledProviders = oauthProviders.map((p) => p.id);
-
-            // This is what `GET /auth/config` actually returns: init.ts
-            // registers that path directly, before mounting the auth router, so
-            // Hono resolves it here and never reaches the session-routes copy.
-            // Both go through the shared predicate now, precisely because the
-            // copy that was easy to overlook is the one that was live.
-            const registrationAllowed = isRegistrationOpen({
-                disableSelfRegistration,
+            // `buildBuiltinAuthCapabilities` is the only place this payload is
+            // assembled, so `GET /auth/config` cannot drift from what the auth
+            // routes enforce — see `capabilities.ts`.
+            return buildBuiltinAuthCapabilities({
+                needsSetup,
                 allowRegistration,
-                needsSetup
-            });
-            const anonymousAllowed = isAnonymousAuthOpen({
+                disableSelfRegistration,
                 allowAnonymous,
-                disableSelfRegistration
+                enableMagicLink,
+                emailConfigured: !!emailService?.isConfigured(),
+                enabledProviders: oauthProviders.map((p) => p.id)
             });
-
-            return {
-                hasBuiltInAuthRoutes: true,
-                emailPasswordLogin: true,
-                registration: registrationAllowed,
-                registrationEnabled: registrationAllowed,
-                passwordReset: !!emailService?.isConfigured(),
-                // Always available: createAdminRoutes() unconditionally mounts the
-                // reset-password route, which falls back to returning a one-time
-                // temporary password when no email service is configured.
-                adminPasswordReset: true,
-                sessionManagement: true,
-                profileUpdate: true,
-                emailVerification: !!emailService?.isConfigured(),
-                magicLink: enableMagicLink && !!emailService?.isConfigured(),
-                // Anonymous auth was reachable and undiscoverable: no key turned
-                // it off and no capability announced it was on.
-                anonymousLogin: anonymousAllowed,
-                enabledProviders,
-                needsSetup
-            };
         }
     };
 

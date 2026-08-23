@@ -696,7 +696,7 @@ All auth endpoints are mounted under `/api/auth`. Admin endpoints are under `/ap
 | `POST` | `/auth/forgot-password` | strict | No | Request password reset email. Body: `{ email }`. Always returns success (security). |
 | `POST` | `/auth/reset-password` | strict | No | Reset password with token. Body: `{ token, password }`. Invalidates all sessions. |
 | `GET` | `/auth/verify-email` | — | No | Verify email. Query: `?token=<token>`. |
-| `GET` | `/auth/config` | default | No | Get auth capabilities for frontend: `{ needsSetup, registrationEnabled, emailServiceEnabled, enabledProviders }`. |
+| `GET` | `/auth/config` | default | No | Get auth capabilities for frontend: `{ needsSetup, registrationEnabled, passwordReset, emailVerification, magicLink, anonymousLogin, enabledProviders, … }`. |
 
 ### Authenticated Endpoints
 
@@ -1097,7 +1097,7 @@ const auth = createCustomAuthAdapter({
   // Optional: override default capabilities
   capabilities: {
     emailPasswordLogin: false,
-    registration: false,
+    registrationEnabled: false,
     enabledProviders: ["google"],
   },
 
@@ -1127,15 +1127,17 @@ The frontend reads these from `GET /api/auth/config` to dynamically show/hide UI
 interface AuthAdapterCapabilities {
   hasBuiltInAuthRoutes: boolean;    // true for built-in, false for external
   emailPasswordLogin: boolean;
-  registration: boolean;
-  passwordReset: boolean;
+  registrationEnabled: boolean;     // open right now — bootstrap window included
+  passwordReset: boolean;           // needs an email service
+  adminPasswordReset: boolean;      // admin resets someone else's password
   sessionManagement: boolean;
   profileUpdate: boolean;
   emailVerification: boolean;
+  magicLink: boolean;
+  anonymousLogin: boolean;          // POST /auth/anonymous is open
   enabledProviders: string[];       // e.g. ["google", "github"]
   externalLoginUrl?: string;        // Redirect URL for external auth
   needsSetup?: boolean;             // true when no users exist
-  registrationEnabled?: boolean;
 }
 ```
 

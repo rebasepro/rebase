@@ -9,7 +9,8 @@ import type { User } from "@rebasepro/types";
 export interface AuthCapabilities {
     emailPasswordLogin?: boolean;
     googleLogin?: boolean;
-    registration?: boolean;
+    /** Self-registration is open right now — the wire's `registrationEnabled`. */
+    registrationEnabled?: boolean;
     /** Self-service password reset (emailing a reset link) is available. */
     passwordReset?: boolean;
     /**

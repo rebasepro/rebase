@@ -10,6 +10,7 @@
  */
 
 import { RebaseApiError } from "@rebasepro/types";
+import type { AuthAdapterCapabilities } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "../hooks/ApiConfigContext";
 
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -59,28 +60,14 @@ async function fetchWithHandling(input: RequestInfo | URL, init?: RequestInit): 
 }
 
 /**
- * Auth config response from the backend
+ * What `GET /api/auth/config` answers.
+ *
+ * The wire contract is declared once, in `@rebasepro/types`, and re-exported
+ * here under the name this module uses. Three near-copies of it used to exist —
+ * this one listed an `emailServiceEnabled` flag no backend sends, and marked as
+ * optional fields every backend always returns.
  */
-export interface AuthConfigResponse {
-    /** True when there are no users in the system and first user setup is needed */
-    needsSetup: boolean;
-    /** Whether new user registration is enabled */
-    registrationEnabled: boolean;
-    /** Whether email service is configured */
-    emailServiceEnabled?: boolean;
-    /** Whether the self-service password reset flow (email link) is supported */
-    passwordReset?: boolean;
-    /**
-     * Whether an admin can reset another user's password, i.e. the adapter
-     * mounts `POST /admin/users/:userId/reset-password`. Absent on backends
-     * predating this field, which the frontend treats as supported.
-     */
-    adminPasswordReset?: boolean;
-    /** Whether email verification is supported */
-    emailVerification?: boolean;
-    /** Complete list of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
-    enabledProviders: string[];
-}
+export type AuthConfigResponse = AuthAdapterCapabilities;
 
 /**
  * Cache container for `fetchAuthConfig` — holds both the inflight promise

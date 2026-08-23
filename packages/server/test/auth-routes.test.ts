@@ -75,7 +75,7 @@ collectionPermissions: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; disableSelfRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean>; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
+function createApp(opts: { allowRegistration?: boolean; disableSelfRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -190,9 +190,6 @@ emailVerified: false };
         ]
     };
 
-    if (opts.isBootstrapCompleted) {
-        config.isBootstrapCompleted = opts.isBootstrapCompleted;
-    }
 
     if (opts.cookieAuth) {
         config.cookieAuth = opts.cookieAuth as AuthModuleConfig["cookieAuth"];
@@ -1534,75 +1531,6 @@ verified: true });
             expect(res.status).toBe(404);
             expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
                 .not.toHaveBeenCalled();
-        });
-    });
-
-    // ── Auth Config ─────────────────────────────────────────────────────
-    describe("GET /auth/config", () => {
-        it("returns needsSetup=true when isBootstrapCompleted returns false", async () => {
-            const app = createApp({ isBootstrapCompleted: async () => false });
-
-            const res = await app.request("/auth/config");
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.needsSetup).toBe(true);
-            expect(body.registrationEnabled).toBe(true); // always true when needsSetup
-        });
-
-        it("returns needsSetup=false when isBootstrapCompleted returns true", async () => {
-            const app = createApp({ allowRegistration: false,
-isBootstrapCompleted: async () => true });
-
-            const res = await app.request("/auth/config");
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.needsSetup).toBe(false);
-            expect(body.registrationEnabled).toBe(false);
-        });
-
-        it("falls back to user-count check when no isBootstrapCompleted callback", async () => {
-            const app = createApp();
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
-
-            const res = await app.request("/auth/config");
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.needsSetup).toBe(true);
-            expect(body.registrationEnabled).toBe(true);
-        });
-
-        it("returns correct flags when users exist and no callback", async () => {
-            const app = createApp({ allowRegistration: false,
-withEmail: false });
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
-
-            const res = await app.request("/auth/config");
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.needsSetup).toBe(false);
-            expect(body.registrationEnabled).toBe(false);
-            expect(body.enabledProviders).toEqual([]);
-        });
-
-        it("reports Google enabled when configured", async () => {
-            const app = createApp();
-            mockAuthRepo.listUsers.mockResolvedValueOnce([mockUser()]);
-
-            const res = await app.request("/auth/config");
-            const body = await res.json() as any;
-            expect(body.enabledProviders).toContain("google");
-        });
-
-        it("does not advertise registration when disableSelfRegistration is set", async () => {
-            // Otherwise the UI is sent to a form whose POST can only 403 —
-            // the exact dead end the bootstrap exception exists to prevent.
-            const app = createApp({ disableSelfRegistration: true,
-isBootstrapCompleted: async () => false });
-
-            const res = await app.request("/auth/config");
-            const body = await res.json() as any;
-            expect(body.needsSetup).toBe(true);
-            expect(body.registrationEnabled).toBe(false);
         });
     });
 

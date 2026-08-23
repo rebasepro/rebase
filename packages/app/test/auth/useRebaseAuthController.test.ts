@@ -496,7 +496,7 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
                 await Promise.resolve();
             });
 
-            expect(result.current.capabilities?.registration).toBe(true);
+            expect(result.current.capabilities?.registrationEnabled).toBe(true);
             expect(result.current.capabilities?.passwordReset).toBe(true);
             expect(result.current.capabilities?.emailVerification).toBe(true);
             expect(result.current.capabilities?.googleLogin).toBe(true);

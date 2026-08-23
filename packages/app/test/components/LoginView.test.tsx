@@ -62,7 +62,7 @@ describe("LoginView Component", () => {
     beforeEach(() => {
         mockAuthController = {
             capabilities: {
-                registration: true,
+                registrationEnabled: true,
                 passwordReset: true
             },
             authProviderError: null,

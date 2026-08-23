@@ -325,13 +325,16 @@ export function useRebaseAuthController(
         setAuthProviderError,
         extra,
         setExtra,
+        // `authConfig` is null until `GET /auth/config` lands, so each fallback
+        // is what to assume *while it is still in flight* — not a stand-in for a
+        // backend that might omit the field. The backend always sends all of them.
         capabilities: {
             emailPasswordLogin: true,
             googleLogin: !!(props.googleClientId),
-            registration: authConfig?.registrationEnabled ?? false,
+            registrationEnabled: authConfig?.registrationEnabled ?? false,
             passwordReset: authConfig?.passwordReset ?? false,
-            // Defaults to true so backends predating this field keep showing the
-            // action. Adapters that don't support it report `false` explicitly.
+            // True while loading: the admin UI's "Reset Password" action is worth
+            // showing optimistically and hiding once a backend says it cannot.
             adminPasswordReset: authConfig?.adminPasswordReset ?? true,
             sessionManagement: true,
             profileUpdate: true,

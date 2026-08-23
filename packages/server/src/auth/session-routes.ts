@@ -12,7 +12,7 @@ import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie } from "./cookie-utils";
-import { isAnonymousAuthOpen, isRegistrationOpen } from "./registration-policy";
+import { isAnonymousAuthOpen } from "./registration-policy";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
 
@@ -84,8 +84,6 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
     const findUserSchema = z.object({
         email: z.string().email("Invalid email address").max(255)
     });
-
-    const isEmailConfigured = () => !!(config.emailService && config.emailService.isConfigured());
 
     /**
      * POST /auth/logout
@@ -322,61 +320,6 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 roles: result.roles.map((r) => r.id),
                 metadata: result.user.metadata ?? {}
             }
-        });
-    });
-
-    /**
-     * GET /auth/config
-     * Get public auth configuration.
-     *
-     * ⚠️ SHADOWED on a backend booted through `initializeRebaseBackend`.
-     * `init.ts` registers `${basePath}/auth/config` directly and only mounts
-     * this router afterwards, so Hono resolves that registration first and this
-     * handler never runs. The live implementation is `getCapabilities()` in
-     * `builtin-auth-adapter.ts`.
-     *
-     * Both return `needsSetup` and `registrationEnabled`, so the response shape
-     * cannot tell them apart — which is how a fix for the empty-database dead
-     * end was once applied here, to no effect, while the live copy kept
-     * advertising the wrong answer. `bootstrap-e2e.test.ts` pins which handler
-     * actually answers.
-     *
-     * It is kept because this router is also mounted standalone (tests, and any
-     * embedder that wires `createAuthRoutes` without init.ts). If you change the
-     * registration rule, change it in `registration-policy.ts` — both callers
-     * read it from there, so neither can drift again.
-     */
-    router.get("/config", defaultAuthLimiter, async (c) => {
-        let needsSetup: boolean;
-        if (config.isBootstrapCompleted) {
-            needsSetup = !(await config.isBootstrapCompleted());
-        } else {
-            const allUsers = await authRepo.listUsers();
-            needsSetup = allUsers.length === 0;
-        }
-
-        // Shared with the POST /auth/register gate and with getCapabilities(),
-        // so what is advertised here and what is enforced there cannot drift.
-        // Advertising anything else sends the UI to a form that can only 403.
-        const registrationAllowed = isRegistrationOpen({
-            disableSelfRegistration: config.disableSelfRegistration,
-            allowRegistration: config.allowRegistration,
-            needsSetup
-        });
-        const enabledProviders = (config.oauthProviders || []).map((p) => p.id);
-
-        return c.json({
-            needsSetup,
-            registrationEnabled: registrationAllowed,
-            emailServiceEnabled: isEmailConfigured(),
-            magicLinkEnabled: !!config.enableMagicLink && isEmailConfigured(),
-            // A capability that exists and is not in the capability surface is
-            // how a client ends up calling a route it cannot discover is off.
-            anonymousLoginEnabled: isAnonymousAuthOpen({
-                allowAnonymous: config.allowAnonymous,
-                disableSelfRegistration: config.disableSelfRegistration
-            }),
-            enabledProviders
         });
     });
 

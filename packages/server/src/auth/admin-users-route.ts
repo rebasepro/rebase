@@ -32,8 +32,6 @@ export interface AdminUsersRouteConfig {
     serviceKey?: string;
     authHooks?: AuthHooks;
     collectionAuthConfig?: AuthCollectionConfig;
-    isBootstrapCompleted?: () => Promise<boolean>;
-    setBootstrapCompleted?: () => Promise<void>;
 }
 
 /** Upper bound for `GET /users?ids=…`, so one request can't fan out unbounded. */
@@ -82,13 +80,10 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        if (config.isBootstrapCompleted) {
-            const alreadyDone = await config.isBootstrapCompleted();
-            if (alreadyDone) {
-                throw ApiError.forbidden("Bootstrap has already been completed.", "BOOTSTRAP_COMPLETED");
-            }
-        }
-
+        // The gate is "does this backend already have an admin", asked of the
+        // database below. There used to be a pair of `isBootstrapCompleted` /
+        // `setBootstrapCompleted` hooks in front of it that no caller ever
+        // supplied — a flag-shaped answer to a question the rows already answer.
         const users = await authRepo.listUsers();
         let hasAdmin = false;
 
@@ -174,10 +169,6 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
             eventType: "auth.bootstrap.success",
             uid
         });
-
-        if (config.setBootstrapCompleted) {
-            await config.setBootstrapCompleted();
-        }
 
         return c.json({
             success: true,
