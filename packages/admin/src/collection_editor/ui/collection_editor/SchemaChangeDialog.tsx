@@ -54,6 +54,14 @@ export interface SchemaChangeDialogProps {
     applyError?: string;
     onConfirm: () => void;
     /**
+     * Ask again, when planning failed.
+     *
+     * A dropped connection should cost a click, not the whole wizard. The form
+     * is already filled in, and making somebody redo it for a transient failure
+     * teaches them to distrust the preview rather than the network.
+     */
+    onRetry?: () => void;
+    /**
      * Write the collection source and leave the database alone.
      *
      * Offered only when the change is refused, and it is what keeps the editor
@@ -76,11 +84,28 @@ export interface SchemaChangeDialogProps {
      * they have decided.
      */
     applyRefusedBecause?: string;
+    /**
+     * Where a confirmation would land — `owner/repo` and a branch.
+     *
+     * On screen before the button, not in the receipt after it. A commit is
+     * going somewhere, and which branch it is going to is the one fact somebody
+     * cannot recover from being wrong about.
+     */
+    target?: { repository?: string; branch?: string };
 }
 
 type Verdict = LiveSchemaPlan["verdict"];
 
 /** What the verdict means, in the words the reader needs rather than the enum's. */
+/**
+ * What the verdict means, in the words the reader needs rather than the enum's.
+ *
+ * `safe` is written twice because the two cases are genuinely different, and
+ * saying "can be made against the running database" when nothing will be run is
+ * the kind of small lie that teaches people to stop reading. A document
+ * database has no table to alter, and a change that needs no DDL on a
+ * relational one is in the same position: the commit *is* the change.
+ */
 const VERDICT_COPY: Record<Verdict, { title: string; body: string; color: "info" | "warning" | "error" }> = {
     safe: {
         title: "Ready to apply",
@@ -136,6 +161,42 @@ function Details({ summary, count, children }: {
     );
 }
 
+/**
+ * What still has to happen after this lands.
+ *
+ * Above the evidence and below the changes, because it is not a refusal and not
+ * a detail: the change will apply, and something outside this dialog still has
+ * to be done or a later environment will differ from this one.
+ */
+function FollowUp({ items }: { items: string[] }) {
+    if (items.length === 0) return null;
+    return (
+        <Alert color="info">
+            <Typography variant="body2" className="font-medium mb-1">
+                {items.length === 1 ? "One thing to do afterwards" : "To do afterwards"}
+            </Typography>
+            <ul className="space-y-2">
+                {items.map(item => (
+                    <li key={item} className="text-sm">{item}</li>
+                ))}
+            </ul>
+        </Alert>
+    );
+}
+
+/**
+ * The destination, short enough to read at a glance.
+ *
+ * A remote repository already reports itself as `owner/repo`, which is exactly
+ * what somebody recognises. A local one reports an absolute path, and the
+ * leading directories are the part nobody needs: what matters is which
+ * checkout, and its name says that.
+ */
+function repositoryLabel(repository: string): string {
+    if (!repository.startsWith("/")) return repository;
+    return repository.split("/").filter(Boolean).pop() ?? repository;
+}
+
 function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[] }) {
     if (constraints.length === 0) return null;
     return (
@@ -188,6 +249,7 @@ function Applied({ result }: { result: LiveSchemaResult }) {
             )}
 
             <WithheldConstraints constraints={result.withheldConstraints ?? []}/>
+            <FollowUp items={result.followUp ?? []}/>
 
             <div>
                 <Typography variant="label" color="secondary">Committed</Typography>
@@ -210,13 +272,37 @@ export function SchemaChangeDialog({
     applying,
     applyError,
     onConfirm,
+    onRetry,
     onSourceOnly,
     onClose,
-    applyRefusedBecause
+    applyRefusedBecause,
+    target
 }: SchemaChangeDialogProps) {
 
     const verdict = plan?.verdict;
-    const copy = verdict ? VERDICT_COPY[verdict] : undefined;
+    const statements = plan?.statements.length ?? 0;
+
+    // "Commit" only when we positively know there is nothing to apply: a plan
+    // that is going ahead and has no statements. A *refused* plan also has none
+    // — because it will not run — and labelling that button "Commit" would be
+    // describing the change it is refusing to make. Unknown reads as the fuller
+    // action, which is the safer way to be wrong about a label.
+    const commitOnly = Boolean(plan?.applicable) && statements === 0;
+
+    // Described from the plan rather than from an assumption about the engine.
+    // A document database runs nothing; so does a relational change that only
+    // moves source. Both are a commit, and calling either one "apply" would be
+    // describing something that does not happen.
+    const copy = verdict === "safe" && commitOnly
+        ? {
+            title: "Ready to commit",
+            body: "This changes what your project declares. Nothing runs against the database — " +
+                "there is no schema change to make.",
+            color: "info" as const
+        }
+        : verdict
+            ? VERDICT_COPY[verdict]
+            : undefined;
 
     return (
         <Dialog open={open} onOpenChange={value => { if (!value) onClose(); }} maxWidth="3xl">
@@ -265,8 +351,8 @@ export function SchemaChangeDialog({
 
                         {plan.changes.length === 0 && (
                             <Typography variant="body2" color="secondary">
-                                Nothing about the database changes. The collection source is still
-                                rewritten and committed.
+                                Nothing here changes the shape of your data. The collection source
+                                is still rewritten and committed.
                             </Typography>
                         )}
 
@@ -311,6 +397,7 @@ export function SchemaChangeDialog({
                         )}
 
                         <WithheldConstraints constraints={plan.withheldConstraints ?? []}/>
+                        <FollowUp items={plan.followUp ?? []}/>
 
                         {applyRefusedBecause && (
                             <Alert color="info">
@@ -321,7 +408,7 @@ export function SchemaChangeDialog({
                             </Alert>
                         )}
 
-                        <Details summary="SQL that will run" count={plan.statements.length}>
+                        <Details summary="Statements that will run" count={plan.statements.length}>
                             <div className={codeBlock}>{plan.statements.join("\n")}</div>
                         </Details>
 
@@ -337,9 +424,22 @@ export function SchemaChangeDialog({
             </DialogContent>
 
             <DialogActions>
+                {!result && target?.repository && (
+                    <span className={cls(
+                        monospace,
+                        "mr-auto text-text-secondary dark:text-text-secondary-dark truncate"
+                    )}>
+                        → {repositoryLabel(target.repository)}{target.branch ? ` · ${target.branch}` : ""}
+                    </span>
+                )}
                 <Button variant="text" onClick={onClose} disabled={applying}>
                     {result ? "Close" : "Cancel"}
                 </Button>
+                {!result && planError && onRetry && (
+                    <Button variant="outlined" onClick={onRetry}>
+                        Try again
+                    </Button>
+                )}
                 {!result && plan && !plan.applicable && onSourceOnly && (
                     <Button variant="outlined" onClick={onSourceOnly} disabled={applying}>
                         Edit source only
@@ -359,7 +459,9 @@ export function SchemaChangeDialog({
                         // this only saves somebody the round trip.
                         disabled={!plan?.applicable || applying || Boolean(applyRefusedBecause)}
                     >
-                        {applying ? "Applying…" : "Commit and apply"}
+                        {applying
+                            ? (commitOnly ? "Committing…" : "Applying…")
+                            : (commitOnly ? "Commit" : "Commit and apply")}
                     </Button>
                 )}
             </DialogActions>

@@ -38,6 +38,13 @@ on:
 jobs:
   image:
     runs-on: ubuntu-latest
+    # Two successful runs to go on, both near 10 minutes — a thin sample for a
+    # job whose cost is dominated by a linux/amd64,linux/arm64 build. The arm64
+    # half runs under emulation, so a cold layer cache is legitimately several
+    # times a warm one, and this is the job most likely to be slow for real
+    # rather than hung. Sized against that, not against the two runs: it is here
+    # to end a six-hour hang, not to police a slow build.
+    timeout-minutes: 60
     concurrency:
       group: runtime-image-${{ inputs.version }}
       cancel-in-progress: false

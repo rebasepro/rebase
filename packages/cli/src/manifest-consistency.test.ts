@@ -22,6 +22,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+import { RESERVED_BACKEND_PREFIXES } from "@rebasepro/types";
+import { buildableApps, validateManifest } from "./manifest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
@@ -51,9 +53,76 @@ function backendOf(dir: string): Backend | undefined {
     );
 }
 
+/** The parsed file, so a test can look at more than the backend app. */
+function manifestOf(dir: string): Record<string, unknown> | undefined {
+    const file = path.join(dir, "rebase.json");
+    if (!fs.existsSync(file)) return undefined;
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
 describe.each(MANIFESTS)("$name", ({ dir }) => {
     const backend = backendOf(dir);
     const has = (relative: string): boolean => fs.existsSync(path.join(dir, relative));
+
+    // The gap every other test in this file was built around: they read these
+    // manifests and compared them to their neighbours, but nothing ever put one
+    // through the validator the CLI uses. So a manifest could ship declaring a
+    // path the router reserves, or a field validation rejects, and the first
+    // person to find out would be a developer running `rebase build` on a
+    // freshly scaffolded project.
+    it("passes the validator the CLI runs on it", () => {
+        const raw = manifestOf(dir);
+        expect(raw).toBeDefined();
+        const { manifest, issues } = validateManifest(raw);
+        expect(issues).toEqual([]);
+        expect(manifest).toBeDefined();
+    });
+
+    it("declares only paths that exist for the apps it ships", () => {
+        // `output` is a build artifact and legitimately absent from a checkout.
+        // `root` is the source directory, and a manifest naming one that is not
+        // there produces a build command run against nothing.
+        const raw = manifestOf(dir);
+        const { manifest } = validateManifest(raw);
+        if (!manifest) return;
+
+        const missing: string[] = [];
+        for (const { name, app } of buildableApps(manifest)) {
+            if (app.type !== "static") continue;
+            if (!has(app.root)) missing.push(`apps.${name}.root → ${app.root}`);
+        }
+        expect(missing).toEqual([]);
+    });
+
+    // The failure this prevents has no error message: an app built with Vite's
+    // default `base: "/"` and served under a prefix loads index.html and 404s
+    // every asset. `rebase build` asserts the emitted HTML honours
+    // REBASE_APP_BASE, but only for someone who runs it — a shipped config that
+    // ignores the variable is a blank page waiting for the first project that
+    // moves its app off the root.
+    it("builds every static app for the path it is served at", () => {
+        const raw = manifestOf(dir);
+        const { manifest } = validateManifest(raw);
+        if (!manifest) return;
+
+        const ignored: string[] = [];
+        for (const { name, app } of buildableApps(manifest)) {
+            if (app.type !== "static") continue;
+            const config = path.join(dir, app.root, "vite.config.ts");
+            if (!fs.existsSync(config)) continue;
+            // Comments stripped first. Both shipped configs EXPLAIN the variable
+            // in a comment above the line that reads it, so a plain substring
+            // search stays green when the code underneath stops using it — a
+            // guard that passes on the exact mutation it exists to catch.
+            const code = fs.readFileSync(config, "utf8")
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .replace(/\/\/.*$/gm, "");
+            if (!code.includes("REBASE_APP_BASE")) {
+                ignored.push(`apps.${name} → ${path.relative(repoRoot, config)}`);
+            }
+        }
+        expect(ignored).toEqual([]);
+    });
 
     it("declares a runtime at all", () => {
         // Undefined would mean the manifest predates the field, which validation
@@ -207,5 +276,49 @@ describe("rebase.json — the schema and the type agree", () => {
         // nothing.
         const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
         expect(schema.additionalProperties).toBe(false);
+    });
+});
+
+/**
+ * The reserved-path rule is enforced in three places and must be the same rule.
+ *
+ * `RESERVED_BACKEND_PREFIXES` in `@rebasepro/types` is what the CLI validates
+ * against and what the router orders its mounts by. The published JSON Schema is
+ * what a developer's editor checks — a separate artifact, maintained by hand,
+ * and the one that decides whether `"path": "/api"` shows up as a red squiggle
+ * or as a deploy that answers the API with an index.html.
+ *
+ * Neither is wrong on its own when they drift, which is the whole reason this
+ * file exists.
+ */
+describe("rebase.json — the reserved paths agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+
+    function schemaReservedPattern(): string {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        return schema.$defs?.staticApp?.properties?.path?.not?.pattern ?? "";
+    }
+
+    it("refuses in the schema exactly what the type reserves", () => {
+        const names = RESERVED_BACKEND_PREFIXES.map(p => p.slice(1)).join("|");
+        expect(schemaReservedPattern()).toBe(`^/(${names})(/|$)`);
+    });
+
+    it("rejects a reserved path and accepts a lookalike, by that pattern", () => {
+        // Asserting the pattern's BEHAVIOUR, not just its text: a regex that
+        // matches the expected string and the wrong set of paths would pass the
+        // check above and still let `/api` through an editor.
+        const re = new RegExp(schemaReservedPattern());
+        for (const reserved of RESERVED_BACKEND_PREFIXES) {
+            expect({ path: reserved,
+rejected: re.test(reserved) }).toEqual({ path: reserved,
+rejected: true });
+            expect(re.test(`${reserved}/v2`)).toBe(true);
+        }
+        for (const allowed of ["/", "/admin", "/apidocs", "/healthy-living", "/metricsss"]) {
+            expect({ path: allowed,
+rejected: re.test(allowed) }).toEqual({ path: allowed,
+rejected: false });
+        }
     });
 });

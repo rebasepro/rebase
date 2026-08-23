@@ -32,10 +32,12 @@ import {
 import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declaredAppsFrom } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
+import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
-import { loadManifest, findBackendApp, resolveBackendPaths } from "../../manifest";
+import { loadManifest, findBackendApp, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { deriveResourceGraph } from "../../resources/derive";
+import type { RebaseAppConfig, RebaseBackendAppConfig } from "@rebasepro/types";
 
 interface Deployment {
     id: string | number;
@@ -198,6 +200,8 @@ async function deployBundle(opts: {
     projectRef: string;
     bundleDir?: string;
     message?: string;
+    /** Which app to deploy, when this repository declares more than one. */
+    appName?: string;
     /** Compile without type checking, exactly as `rebase build` does. */
     skipTypeCheck?: boolean;
 }): Promise<void> {
@@ -211,19 +215,56 @@ async function deployBundle(opts: {
     // Build the bundle unless the caller pointed at a prebuilt one.
     if (!opts.bundleDir) {
         const loaded = loadManifest(projectRoot);
-        const backend = findBackendApp(loaded.manifest);
-        if (!backend) {
-            fail(
-                "This repository declares no backend app to deploy as a bundle.",
-                "A managed deploy runs the backend; declare one in rebase.json, or deploy from the backend's repository."
-            );
+
+        // Which app, decided once and by the manifest. A repository declares
+        // apps and a project owns them, so a repository holding only an admin
+        // panel is an ordinary thing rather than a repository with a missing
+        // backend — which is what this used to call it, refusing the deploy.
+        let target: { name: string; app: RebaseAppConfig };
+        try {
+            target = selectDeployApp(loaded.manifest, opts.appName);
+        } catch (err) {
+            fail(err instanceof Error ? err.message : String(err));
+            return;
         }
+
+        if (target.app.type === "static") {
+            // A static app deploys through the identical path — upload, trigger,
+            // same endpoint — and differs only in what it builds and in the
+            // `kind` its manifest carries. The control plane routes on that.
+            progress(chalk.gray(`  Building static app "${target.name}"...`));
+            const staticDir = await buildAssetApp(
+                projectRoot,
+                target.name,
+                target.app,
+                loaded.manifest.rebase
+            );
+            if (!staticDir) {
+                fail(
+                    `App "${target.name}" produced no bundle.`,
+                    "A static app needs both a `build` command and an `output` directory in rebase.json."
+                );
+                return;
+            }
+            bundleDir = staticDir;
+            await uploadAndTrigger({ ...opts,
+bundleDir,
+appName: target.name });
+            return;
+        }
+
         progress(chalk.gray("  Building bundle..."));
+        // `target` is decided above, by the manifest. Naming it `backend` here
+        // is what the rest of this block reads.
+        const backend = { name: target.name,
+app: target.app as RebaseBackendAppConfig };
+
         // Same derivation `rebase build` does, and fatal for the same reason: a
         // bundle whose manifest is missing a bucket the code declares deploys
-        // into a tenant with nothing provisioned for it.
+        // into a tenant with nothing provisioned for it. After `backend` on
+        // purpose — the config directory it reads comes from that app.
         const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph({
-            configDir: path.join(projectRoot, resolveBackendPaths(backend!.app, projectRoot).config)
+            configDir: path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config)
         });
         if (resourceIssues.length > 0) {
             throw new Error(
@@ -233,8 +274,8 @@ async function deployBundle(opts: {
         }
         const result = await buildBundle({
             projectRoot,
-            appName: backend!.name,
-            app: backend!.app,
+            appName: backend.name,
+            app: backend.app,
             runtimeRange: loaded.manifest.rebase,
             resources: resourceGraph,
             skipTypeCheck: opts.skipTypeCheck,
@@ -268,6 +309,30 @@ async function deployBundle(opts: {
         }
     }
 
+    await uploadAndTrigger({ ...opts,
+bundleDir });
+}
+
+/**
+ * Pack a built bundle, upload it, and trigger the deploy.
+ *
+ * Shared by every managed deploy, whichever kind of app produced the bundle: a
+ * backend and a static app differ in what is built and in the `kind` their
+ * manifest carries, and in nothing after that. Keeping one tail is what makes
+ * that true rather than nearly true — the folding step was once missing from
+ * one of two callers producing the same artifact, and the deploy shipped a
+ * bundle with no site in it.
+ */
+async function uploadAndTrigger(opts: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    projectRef: string;
+    bundleDir: string;
+    message?: string;
+    appName?: string;
+}): Promise<void> {
+    const { client, url, projectId, projectRef, bundleDir } = opts;
     const manifest = readBundleManifest(bundleDir);
 
     // Native modules cannot run on the managed runtime — the server rejects them
@@ -321,6 +386,7 @@ async function deployBundle(opts: {
     const body = bundleDeployBody({ projectId,
 bundleId,
 manifest,
+app: opts.appName,
 message: opts.message,
 declaredApps });
 
@@ -627,12 +693,26 @@ async function readDeployContext(
  * where a broken manifest gets reported, and a deploy refusing on one before it
  * has even said what it is doing would be the wrong place to find out.
  */
-function declaresManagedRuntime(): boolean {
+function declaresManagedRuntime(appName?: string): boolean {
     try {
         const projectRoot = findProjectRoot();
         if (!projectRoot) return false;
-        const backend = findBackendApp(loadManifest(projectRoot).manifest);
-        return backend?.app.runtime === "managed";
+        const manifest = loadManifest(projectRoot).manifest;
+
+        // A static app has no runtime to declare and never builds an image. It
+        // is always a bundle deploy, so it takes this branch on its own — which
+        // is what lets a repository with no backend at all reach the platform.
+        if (appName) {
+            const app = manifest.apps[appName];
+            if (app?.type === "static") return true;
+            if (app?.type === "backend") return app.runtime === "managed";
+        }
+
+        const backend = findBackendApp(manifest);
+        // A repository declaring no backend has nothing that could be a source
+        // build, so its apps are bundles by construction.
+        if (!backend) return Object.keys(manifest.apps).length > 0;
+        return backend.app.runtime === "managed";
     } catch {
         return false;
     }
@@ -674,7 +754,13 @@ permissive: true }
     // `--source` and `--bundle-dir` are explicit acts and still route away from
     // here — though on a project the platform *runs* as managed, routing away
     // is now where `ejectRefusal` stops them without `--force`.
-    const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime();
+    // `rebase cloud deploy <app>` — which app of the project this repository is
+    // shipping. Positional because it is the subject of the sentence, not an
+    // option: a repository holding only an admin panel deploys it by name, and a
+    // repository with one backend keeps saying nothing at all.
+    const appName = args._?.[0];
+
+    const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime(appName);
     if (args["--bundle"] || declaredManaged) {
         if (args["--bundle"] && args["--source"]) {
             fail("--bundle and --source cannot be combined: one is a managed bundle, the other a source build.");
@@ -689,6 +775,7 @@ permissive: true }
             projectRef,
             bundleDir: args["--bundle-dir"],
             message: args["--message"],
+            appName,
             skipTypeCheck: args["--skip-type-check"] === true
         });
         return;

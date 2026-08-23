@@ -106,7 +106,12 @@ describe("saving through the controller", () => {
 
         // Once the answer arrives it plans, and the dialog opens rather than
         // the save completing on its own.
-        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        //
+        // Asserted on the title rather than the verdict line: what this test is
+        // about is that the review was *entered*, and the verdict wording
+        // legitimately differs between a change that runs DDL and one that only
+        // commits.
+        await waitFor(() => expect(screen.getByText("Review schema change")).toBeTruthy());
         expect(calls.some(u => u.endsWith("/api/admin/schema/plan"))).toBe(true);
         expect(calls.some(u => u.endsWith("/collection/save"))).toBe(false);
         expect(settled).not.toHaveBeenCalled();

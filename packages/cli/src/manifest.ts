@@ -19,6 +19,7 @@ import fs from "fs";
 import path from "path";
 import {
     findStorageSuffixCollision,
+    reservedPrefixFor,
     type DeclaredStorageSources,
     type ManagedCompatibility,
     type RebaseAppConfig,
@@ -104,6 +105,18 @@ function checkAppPath(
         issues.push({
             path: fieldPath,
             message: 'must not end with a slash — write "/admin", not "/admin/"'
+        });
+        return undefined;
+    }
+    // Mounting is longest-path-first, so an app at `/api` outranks the API and
+    // every request to it is answered with that app's index.html — a 200 of HTML
+    // where the caller wanted JSON, from a deployment that looks healthy.
+    const reserved = reservedPrefixFor(value);
+    if (reserved) {
+        issues.push({
+            path: fieldPath,
+            message: `cannot be "${reserved}" or nest under it — the backend serves that path, ` +
+                "and an app mounted there would answer the API's requests with its own index.html"
         });
         return undefined;
     }
@@ -617,6 +630,61 @@ export function findBackendApp(
 app: app as RebaseBackendAppConfig };
     }
     return undefined;
+}
+
+/**
+ * The app a deploy targets: the one named, or the obvious one.
+ *
+ * A repository declares apps; a project owns them. So "which app" is a question
+ * a multi-repo setup asks routinely and a single-app repository should never
+ * have to answer — hence the fallbacks, in the order that makes each of them
+ * unambiguous:
+ *
+ * - A name, when one is given. Wrong names fail loudly, listing what is there;
+ *   guessing past a typo would deploy the wrong app to a live project.
+ * - The backend, when this repository declares one. It is the app whose deploy
+ *   people mean when they do not say, and it is what every existing invocation
+ *   already did.
+ * - The only app, when there is exactly one. This is what makes a static-only
+ *   repository — an admin panel, a marketing site — deploy with no argument.
+ * - Otherwise a refusal that lists the choices. A repository with two static
+ *   apps and no backend has no obvious default, and picking one would publish
+ *   somebody's admin panel at their marketing domain.
+ */
+export function selectDeployApp(
+    manifest: RebaseProjectManifest,
+    requested?: string
+): { name: string; app: RebaseAppConfig } {
+    const entries = Object.entries(manifest.apps).map(([name, app]) => ({ name,
+app }));
+
+    if (requested) {
+        const match = entries.find(entry => entry.name === requested);
+        if (!match) {
+            const known = entries.map(e => e.name).join(", ") || "none";
+            throw new ManifestError(
+                `This repository declares no app named "${requested}". It declares: ${known}.`
+            );
+        }
+        return match;
+    }
+
+    const backend = findBackendApp(manifest);
+    if (backend) return { name: backend.name,
+app: backend.app };
+
+    if (entries.length === 1) return entries[0];
+
+    if (entries.length === 0) {
+        throw new ManifestError(
+            `${MANIFEST_FILENAME} declares no apps, so there is nothing to deploy.`
+        );
+    }
+
+    throw new ManifestError(
+        "This repository declares several apps and no backend, so there is no obvious one to deploy. " +
+        `Name one: ${entries.map(e => e.name).join(", ")}.`
+    );
 }
 
 /** Apps that produce build output, in the order they should be built. */

@@ -1,188 +1,139 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://rebase.pro/schemas/rebase.json",
-  "title": "Rebase project manifest",
-  "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only \u2014 collections, security rules, hooks and functions stay in TypeScript.",
-  "type": "object",
-  "required": [
-    "rebase",
-    "apps"
-  ],
-  "additionalProperties": false,
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "description": "URL of this schema, for editor completion."
-    },
-    "rebase": {
-      "type": "string",
-      "description": "Runtime contract major this project targets, as a semver range (e.g. \"^1\"). The platform upgrades patches and minors underneath a project; it never crosses a major. Named \"rebase\" so that \"runtime\" means exactly one thing \u2014 who owns the backend process.",
-      "minLength": 1,
-      "examples": [
-        "^1",
-        "~1.4",
-        "1.4.2"
-      ]
-    },
-    "apps": {
-      "type": "object",
-      "description": "Apps this repository contributes, keyed by name. The key is the app's identity within the project.",
-      "propertyNames": {
-        "pattern": "^[a-z0-9][a-z0-9-]*$",
-        "description": "Lowercase alphanumeric with dashes \u2014 the name appears in URLs."
-      },
-      "additionalProperties": {
-        "oneOf": [
-          {
-            "$ref": "#/$defs/backendApp"
-          },
-          {
-            "$ref": "#/$defs/staticApp"
-          }
-        ]
-      }
-    },
-    "telemetry": {
-      "type": "boolean",
-      "description": "Repository-wide opt-out from anonymous CLI usage sharing. Only `false` does anything: it suppresses sharing for everyone who clones this repository, overriding each developer's own opt-in. `true` is deliberately ignored \u2014 this file is committed, so a `true` here would answer a privacy question on behalf of every colleague who later clones the repo. Individuals opt in with `rebase telemetry enable`."
-    }
-  },
-  "$defs": {
-    "relativePath": {
-      "type": "string",
-      "minLength": 1,
-      "pattern": "^(?!/)(?!\\.\\./).*",
-      "description": "A path relative to the directory holding rebase.json."
-    },
-    "backendApp": {
-      "type": "object",
-      "description": "The collections, hooks and functions that define the project's API. Exactly one per project.",
-      "required": [
-        "type",
-        "runtime"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "backend"
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://rebase.pro/schemas/rebase.json",
+    "title": "Rebase project manifest",
+    "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only — collections, security rules, hooks and functions stay in TypeScript.",
+    "type": "object",
+    "required": ["rebase", "apps"],
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "URL of this schema, for editor completion."
         },
-        "runtime": {
-          "enum": [
-            "managed",
-            "custom"
-          ],
-          "description": "Who owns the process. \"managed\": the platform runtime image boots this project's bundle. \"custom\": this repository builds its own image and entrypoint. Independent of where it runs \u2014 both run on Rebase Cloud and both self-host."
+        "rebase": {
+            "type": "string",
+            "description": "Runtime contract major this project targets, as a semver range (e.g. \"^1\"). The platform upgrades patches and minors underneath a project; it never crosses a major. Named \"rebase\" so that \"runtime\" means exactly one thing — who owns the backend process.",
+            "minLength": 1,
+            "examples": ["^1", "~1.4", "1.4.2"]
         },
-        "config": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Directory of the config package. Default \"config\". When it exists, collections come from code; when it does not, they are introspected from the live database at boot."
-        },
-        "functions": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Directory of server functions. Default \"backend/functions\"."
-        },
-        "crons": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Directory of cron job definitions. Default \"backend/crons\"."
-        },
-        "schema": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\"."
-        },
-        "usersCollection": {
-          "type": "string",
-          "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
-        },
-        "dockerfile": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Custom runtime only. Dockerfile path. Default \"Dockerfile\"."
-        },
-        "context": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Custom runtime only. Build context. Default \".\"."
-        },
-        "port": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 65535,
-          "description": "Custom runtime only. Port the container listens on. Default 8080."
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "runtime": {
-                "const": "managed"
-              }
+        "apps": {
+            "type": "object",
+            "description": "Apps this repository contributes, keyed by name. The key is the app's identity within the project.",
+            "propertyNames": {
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "Lowercase alphanumeric with dashes — the name appears in URLs."
             },
-            "required": [
-              "runtime"
-            ]
-          },
-          "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "dockerfile"
-                  ]
-                },
-                {
-                  "required": [
-                    "context"
-                  ]
-                },
-                {
-                  "required": [
-                    "port"
-                  ]
-                }
-              ]
+            "additionalProperties": {
+                "oneOf": [
+                    { "$ref": "#/$defs/backendApp" },
+                    { "$ref": "#/$defs/staticApp" }
+                ]
             }
-          }
+        },
+        "telemetry": {
+            "type": "boolean",
+            "description": "Repository-wide opt-out from anonymous CLI usage sharing. Only `false` does anything: it suppresses sharing for everyone who clones this repository, overriding each developer's own opt-in. `true` is deliberately ignored — this file is committed, so a `true` here would answer a privacy question on behalf of every colleague who later clones the repo. Individuals opt in with `rebase telemetry enable`."
         }
-      ]
     },
-    "staticApp": {
-      "type": "object",
-      "description": "A pre-built client bundle \u2014 an SPA or static site \u2014 served at its declared path. The admin panel is one of these.",
-      "required": [
-        "type",
-        "root",
-        "output"
-      ],
-      "additionalProperties": false,
-      "properties": {
-        "type": {
-          "const": "static"
+    "$defs": {
+        "relativePath": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!\\.\\./).*",
+            "description": "A path relative to the directory holding rebase.json."
         },
-        "root": {
-          "$ref": "#/$defs/relativePath"
+        "backendApp": {
+            "type": "object",
+            "description": "The collections, hooks and functions that define the project's API. Exactly one per project.",
+            "required": ["type", "runtime"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "backend" },
+                "runtime": {
+                    "enum": ["managed", "custom"],
+                    "description": "Who owns the process. \"managed\": the platform runtime image boots this project's bundle. \"custom\": this repository builds its own image and entrypoint. Independent of where it runs — both run on Rebase Cloud and both self-host."
+                },
+                "config": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of the config package. Default \"config\". When it exists, collections come from code; when it does not, they are introspected from the live database at boot."
+                },
+                "functions": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of server functions. Default \"backend/functions\"."
+                },
+                "crons": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of cron job definitions. Default \"backend/crons\"."
+                },
+                "schema": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\"."
+                },
+                "usersCollection": {
+                    "type": "string",
+                    "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
+                },
+                "dockerfile": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Custom runtime only. Dockerfile path. Default \"Dockerfile\"."
+                },
+                "context": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Custom runtime only. Build context. Default \".\"."
+                },
+                "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Custom runtime only. Port the container listens on. Default 8080."
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": { "runtime": { "const": "managed" } },
+                        "required": ["runtime"]
+                    },
+                    "then": {
+                        "not": {
+                            "anyOf": [
+                                { "required": ["dockerfile"] },
+                                { "required": ["context"] },
+                                { "required": ["port"] }
+                            ]
+                        }
+                    }
+                }
+            ]
         },
-        "build": {
-          "type": "string",
-          "description": "Command producing `output`. Run from the repository root, with REBASE_APP_BASE set from `path`."
-        },
-        "output": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "path": {
-          "type": "string",
-          "default": "/",
-          "pattern": "^/(?!.*\\.\\.)(?!.*/$).*$|^/$",
-          "description": "Public base path this app is served under, e.g. \"/admin\". A build-time input as well as a serving concern: the app must be built for this path (Vite's `base`), or every asset 404s. Must be unique across the project's static apps.",
-          "examples": [
-            "/",
-            "/admin"
-          ]
-        },
-        "spa": {
-          "type": "boolean",
-          "default": true,
-          "description": "Serve index.html for unmatched paths under `path` (client-side routing)."
+        "staticApp": {
+            "type": "object",
+            "description": "A pre-built client bundle — an SPA or static site — served at its declared path. The admin panel is one of these.",
+            "required": ["type", "root", "output"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "static" },
+                "root": { "$ref": "#/$defs/relativePath" },
+                "build": {
+                    "type": "string",
+                    "description": "Command producing `output`. Run from the repository root, with REBASE_APP_BASE set from `path`."
+                },
+                "output": { "$ref": "#/$defs/relativePath" },
+                "path": {
+                    "type": "string",
+                    "default": "/",
+                    "pattern": "^/(?!.*\\.\\.)(?!.*/$).*$|^/$",
+                    "not": { "pattern": "^/(api|health|healthz|livez|readyz|metrics)(/|$)" },
+                    "description": "Public base path this app is served under, e.g. \"/admin\". A build-time input as well as a serving concern: the app must be built for this path (Vite's `base`), or every asset 404s. Must be unique across the project's static apps, and must not be a path the backend owns (/api, /health, /healthz, /livez, /readyz, /metrics) — mounting is longest-path-first, so an app declared there would answer the API's requests with its own index.html.",
+                    "examples": ["/", "/admin"]
+                },
+                "spa": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Serve index.html for unmatched paths under `path` (client-side routing)."
+                }
+            }
         }
-      }
     }
-  }
 }

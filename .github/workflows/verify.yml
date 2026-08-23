@@ -27,6 +27,11 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    # Runs to completion in 8-14 minutes. The ceiling is here because GitHub's
+    # default is six hours: a step that hangs rather than fails held the runner
+    # (and the merge behind it) all afternoon, reporting "pending" the whole way.
+    # Roughly 2x the slowest observed run, so a genuine slowdown still passes.
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -330,6 +335,10 @@ jobs:
   e2e:
     needs: checks
     runs-on: ubuntu-latest
+    # 14-17 minutes observed. Higher than `checks` because it boots a real
+    # Postgres, scaffolds a project and installs it — the steps most able to
+    # wait forever on something. See the note above.
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4

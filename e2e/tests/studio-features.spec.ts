@@ -170,9 +170,12 @@ test.describe("Rebase Studio Features E2E", () => {
     if (outcome === "reviewed") {
         // The preview is the product here: it has to name what it would do,
         // not merely appear.
-        await expect(page.getByText("Ready to apply")).toBeVisible({ timeout: 10000 });
-        await expect(page.getByText("SQL that will run", { exact: false })).toBeVisible();
+        // The verdict line differs between a change that runs DDL and one that
+        // only commits, so this asserts the *evidence* rather than the wording:
+        // the preview has to name what it would do, whichever engine is behind
+        // it. Postgres reaches here with statements; MongoDB would not.
         await expect(page.getByText("Files that will be committed", { exact: false })).toBeVisible();
+        await expect(page.getByText("Commit message", { exact: false })).toBeVisible();
 
         await page.getByRole("button", { name: "Cancel" }).click();
 

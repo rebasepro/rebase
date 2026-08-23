@@ -157,6 +157,40 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         return () => { cancelled = true; };
     }, [ready]);
 
+    /**
+     * Ask what the change would do, and ignore an answer that arrives late.
+     *
+     * Separate from `reviewChange` so it can be issued *again* without starting
+     * a new review: a plan that failed on a dropped connection should cost a
+     * click, not the whole wizard — the person has already filled in the form,
+     * and making them do it twice for a transient failure is the kind of thing
+     * that teaches people to distrust the preview.
+     */
+    const requestPlan = useCallback(async (change: ProposedCollectionChange) => {
+        // Identifies the review a response belongs to. A plan that arrives after
+        // its review was replaced must not be shown: the dialog would describe
+        // the *previous* change while the reader believes it describes this one.
+        const token = ++reviewToken.current;
+        try {
+            const answer = await client.plan(change);
+            if (token === reviewToken.current) setPlan(answer);
+        } catch (err: unknown) {
+            if (token !== reviewToken.current) return;
+            setPlanError(
+                err instanceof LiveSchemaError || err instanceof Error
+                    ? err.message
+                    : String(err)
+            );
+        }
+    }, [client]);
+
+    const onRetry = useCallback(() => {
+        if (!pending) return;
+        setPlanError(undefined);
+        setPlan(undefined);
+        void requestPlan(pending.change);
+    }, [pending, requestPlan]);
+
     const clear = useCallback(() => {
         setPending(undefined);
         setPlan(undefined);
@@ -183,26 +217,17 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
             // describe the *previous* change while the reader believes it
             // describes this one, and the SQL on screen would be for something
             // they are not confirming.
-            const token = ++reviewToken.current;
             setPlan(undefined);
             setPlanError(undefined);
             setResult(undefined);
             setApplyError(undefined);
             setApplying(false);
 
-            void client.plan(change).then(
-                answer => { if (token === reviewToken.current) setPlan(answer); },
-                (err: unknown) => {
-                    if (token !== reviewToken.current) return;
-                    setPlanError(
-                        err instanceof LiveSchemaError || err instanceof Error
-                            ? err.message
-                            : String(err)
-                    );
-                }
-            );
+            void requestPlan(change);
         });
-    }, [client]);
+        // `client` is not listed: this no longer touches it directly, and
+        // `requestPlan` already carries that dependency.
+    }, [requestPlan]);
 
     const onConfirm = useCallback(() => {
         if (!pending) return;
@@ -271,11 +296,16 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
                     applying={applying}
                     applyError={applyError}
                     onConfirm={onConfirm}
+                    onRetry={planError ? onRetry : undefined}
                     onSourceOnly={writeSourceOnly ? onSourceOnly : undefined}
                     onClose={onClose}
                     applyRefusedBecause={
                         status && !status.canApply ? status.applyRefusedBecause : undefined
                     }
+                    target={status && {
+                        repository: status.repository,
+                        branch: status.branch
+                    }}
                 />
             </Suspense>
         )
