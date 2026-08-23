@@ -7,6 +7,13 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+> **Breaking: runtime contract v2.** Resources are declared in config now, and a
+> bundle built against v1 will not boot on a v2 runtime — deliberately, because
+> the managed tier moves projects onto new images without rebuilding them and a
+> silent acceptance would crash-loop a fleet. Rebuild with `rebase build`, or
+> stay on a v1 image until you do. Operators: the control plane must ship its
+> `SUPPORTED_RUNTIME_CONTRACT` raise BEFORE a v2 runtime is released.
+
 ### Added
 
 - **Custom functions have their own entry point: `@rebasepro/server/functions`.** `import { defineFunction } from "@rebasepro/server"` reaches the whole framework — the boot sequence, the collection loader, the backup routes, the SPA server, `@hono/node-server`, `ws`, `jsonwebtoken`, Drizzle. On Node that costs a little start-up time and nothing else, which is why it stood. It also meant a function file could only ever resolve inside a Node process, however portable the function's own code was — and since that import line is in every function file, every template and every documentation page, it is not a thing that can be changed later without breaking everyone who wrote one.
@@ -51,6 +58,77 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 - **The eight documentation pages every locale was missing are translated**, with validation of what the model returns, and the landing page has a translation script of its own — the marketing pages read no markdown, so nothing had ever translated them.
 
+- **Resources are declared, not configured — and there is one way to do it.** A
+  database, a bucket and a topic are all spelled the same way, in the project's
+  own config:
+
+  ```ts
+  // config/resources.ts
+  export const main    = database();
+  export const media   = bucket("media", { engine: "s3" });
+  export const signups = topic<{ userId: string }>("signups");
+  ```
+
+  Before this, storage topology was hand-written into `rebase.json` while
+  database topology lived in TypeScript, and the boundary between them was a
+  fact about what the control plane could read before a build — a platform
+  implementation detail a developer had no way to derive. Worse, a bucket could
+  be declared in *both*, and the runtime merged them: one engine was kept and
+  the other silently discarded. A declaration accepted and then ignored, which
+  is the class this release removed everywhere it appeared.
+
+  Kinds are **registered**, not hardcoded, because the cost of adding one is
+  exactly why the last two ended up in different homes — a new kind needed a
+  manifest schema edit, a validator edit and a switch statement, so the cheapest
+  thing was always to bolt it onto whichever home was nearest. `cache`, `queue`
+  or `search` now need none of that. Each kind owns its engine list and
+  `custom:<id>` is always accepted, which fixes `engine` having been a free
+  string: `"s2"` used to pass every check and fail far from the typo.
+
+- **`rebase resources`** lists what a project declares; `--write` regenerates
+  `rebase.resources.json` and `--check` fails on drift. That file is generated
+  and committed, and it is what a host reads to decide what to provision
+  *before* running anything — which is how a console can say "wants a `media`
+  bucket, has none" on a first deploy, and how a `custom` runtime (which emits
+  no bundle manifest) is visible to the platform at all.
+
+- **Binding is separate from declaration, and identical everywhere.** An
+  infrastructure config file is read first, then environment variables on the
+  existing `<BASE>__<KEY>` convention, then — in development only — local
+  provisioning. A declared bucket becomes a real directory on a laptop, so
+  `bucket("media")` plus `rebase dev` is enough to upload a file; never in
+  production or on the managed runtime, where an invented bucket would write
+  uploads to a filesystem that vanishes on the next rollout.
+
+  The cloud is not a fourth mechanism: the control plane binds the same
+  `<BASE>__<KEY>` variables a self-hoster sets, so a managed tenant runs exactly
+  the code path a self-hoster runs.
+
+- **`rebase eject infra`** writes `rebase.infra.json` — the environment path
+  spelled out, one entry per resource, each pointing at the variable the binder
+  was already reading, so nothing changes until you edit it. Values are
+  `{"$env": "..."}` pointers rather than literals, so the file can live in a
+  config repository without carrying secrets. It joins `rebase eject`, which
+  hands over the process: one rung for the addresses, one for the code.
+
+- **Topics, delivered through the durable job queue.** Publishing writes one
+  row *per subscription*, so each subscriber retries on its own schedule and a
+  broken one neither blocks the others nor makes them run again. Delivery is
+  at-least-once and says so — `at-most-once` is refused at declaration rather
+  than quietly given the other guarantee. A publish inside a transaction that
+  rolls back never happened. Declaring a topic turns the job queue on by itself,
+  and a driver that cannot carry the queue refuses to boot rather than starting
+  a backend where every publish throws.
+
+- **The managed tier provisions what a project declares, and charges for it.** A
+  second database is created on the project's own pool, owned by the same role,
+  and billed as a second shared-database line. The disk quota moved from
+  per-database to per-project for it: the ceiling used to be keyed on `datname`,
+  so five declared databases would have held five full quotas against a volume
+  sized to budget one each — the pool would have run out of space with nothing
+  naming the cause. Sizes and allowances are both summed per project now, so a
+  second database brings its own space rather than splitting the first one's.
+
 ### Changed
 
 - **A vendored tree too large to upload is not vendored.** The control plane refuses a bundle over 100 MB, and vendoring is the one thing that can push a bundle near it — so a build that crossed the line shipped a bundle whose deploy would be rejected, with the remedy (`--no-vendor`) only discoverable by knowing that had happened. Past 200 MB on disk the tree is now thrown away and the bundle ships unvendored: 40–60s of cold start, and a deploy that works. `--vendor` keeps it regardless, for a deploy that builds from source and never uploads the tree at all.
@@ -88,6 +166,17 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 - **`rebase build --legacy` and `rebase start --legacy`** are now `--workspace`. The mode is supported, not retired, and the name said otherwise.
 
 - **`UploadFileResult.storageUrl` is required.** Every controller returns one — S3, GCS and local alike — so the `??` fallback behind it was dead code.
+
+- **`dataSources` and `storageSources` on `RebaseBackendConfig`**, and the
+  `storage` block in `rebase.json`. All three were ways to declare a resource
+  somewhere other than a declaration. Each is refused at boot, by name, with the
+  replacement in the message — not ignored, because a key that still parses and
+  no longer does anything is the failure this replaced.
+
+  `<Rebase dataSources>` and `<Rebase storageSources>` are unaffected: those are
+  props on the React provider, a different surface. Hand them
+  `declaredDataSources()` and `declaredStorageSources()` so the list is not
+  written twice.
 
 ### Fixed
 
