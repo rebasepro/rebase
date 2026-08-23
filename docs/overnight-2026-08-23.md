@@ -317,6 +317,30 @@ saas CI.
 
 ---
 
+## 4e. Last three
+
+- **A storage key with a `#`, a `%` or an encoded slash addressed the wrong
+  object.** Keys were interpolated raw and the server decodes what it receives.
+  Measured against a real Hono route: `Invoice #12.pdf` arrived as
+  `default/Invoice ` (and swallowed the scoped `?token=` with the fragment),
+  `100% done.png` threw URIError → 500, and `a%2Fb.png` decoded to `a/b.png` —
+  **a different object, silently.** Encoded per segment now, so the key's own
+  `/` survives. I expected `%25` to break the round trip and it does not; that
+  check is a test rather than a belief.
+- **The `vectorSearch` refusal could not fire.** `realtimeService` rejects a
+  subscription carrying it and the docs promise that, but both producers
+  hand-list their fields and both omitted it — so `.vectorSearch(…).listen()`
+  returned an ordinary `id DESC` listing with no `_distance` and no error, and
+  through `observe()` overwrote a correct snapshot with it.
+- **A hyphenated slug from the admin panel wrote a file that will not parse** —
+  see §4d.
+
+Two of the three are the same shape as the socket-authorization bug: a
+hand-listed field set where everything present is right and everything absent is
+invisible. That is worth watching for the next time one of these lists grows.
+
+---
+
 ## 5. What this did not cover
 
 Two hunts ran. The first covered env vars, filenames, manifest keys, fields
