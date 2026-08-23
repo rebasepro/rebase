@@ -30,7 +30,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 /** The `@rebasepro/*` entries of a `RUNTIME_PROVIDED` declaration, by source text. */
 function runtimeProvided(file) {
     const source = fs.readFileSync(path.join(ROOT, file), "utf8");
-    const match = source.match(/RUNTIME_PROVIDED\s*=\s*(?:new Set\()?\[([\s\S]*?)\]/);
+    const match = source.match(/RUNTIME_PROVIDED(?:_PACKAGES)?\s*=\s*(?:new Set\()?\[([\s\S]*?)\]/);
     assert.ok(match, `${file} declares no RUNTIME_PROVIDED array`);
     return match[1]
         .split(",")
@@ -40,6 +40,7 @@ function runtimeProvided(file) {
 
 const fromBundler = runtimeProvided("packages/cli/src/bundle.ts");
 const fromEntrypoint = runtimeProvided("docker/entrypoint.mjs");
+const fromFetchPath = runtimeProvided("packages/server/src/boot/fetch-bundle.ts");
 
 test("both files actually declare some @rebasepro packages", () => {
     // Guards the parser itself: a regex that silently matched nothing would make
@@ -83,4 +84,31 @@ test("the image ships every package the entrypoint promises to link", () => {
             + "so the link would point at nothing."
         );
     }
+});
+
+// ── The fetch path ───────────────────────────────────────────────────────────
+//
+// A bundle can arrive two ways, and only one of them goes through
+// entrypoint.mjs. When the runtime fetches its own bundle, the entrypoint's
+// loop is skipped (it would dedupe an empty directory — the download has not
+// happened yet) and `dedupeRuntimePackages` in
+// `packages/server/src/boot/fetch-bundle.ts` does the same stitch afterwards.
+//
+// So that file is a THIRD copy of this contract, and it was written before the
+// four-package fix landed: the bundler stripped five and it supplied one. The
+// tests above could not see it, which is the only reason it survived.
+
+test("the fetch path declares some @rebasepro packages", () => {
+    assert.ok(fromFetchPath.length > 0, "parsed nothing out of fetch-bundle.ts");
+});
+
+test("the fetch path supplies exactly what the entrypoint does", () => {
+    assert.deepEqual(
+        [...fromFetchPath].sort(),
+        [...fromEntrypoint].sort(),
+        "docker/entrypoint.mjs and packages/server/src/boot/fetch-bundle.ts stitch the same "
+        + "packages into a bundle, one for a baked-in bundle and one for a fetched one. They "
+        + "disagree, so the same project would get different packages depending on how its "
+        + "bundle arrived."
+    );
 });

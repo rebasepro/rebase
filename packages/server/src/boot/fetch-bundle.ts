@@ -274,7 +274,29 @@ function imageModulesDir(): string | undefined {
     return process.env[RUNTIME_MODULES_ENV] || undefined;
 }
 
-export const RUNTIME_PROVIDED_PACKAGES = ["@rebasepro/server"] as const;
+/**
+ * The packages the runtime image supplies to a fetched bundle.
+ *
+ * Must match `RUNTIME_PROVIDED` in `packages/cli/src/bundle.ts` and in
+ * `docker/entrypoint.mjs`; `scripts/test/runtime-provided.test.mjs` fails if any
+ * of the three drift. The bundler STRIPS these from a bundle's declared
+ * dependencies on the promise that the image supplies them, so a shorter list
+ * here means the builder removed a dependency that nothing then provides, and
+ * every function and cron importing it fails to load with `Cannot find package`
+ * behind a container that reports itself healthy.
+ *
+ * This list carried only `@rebasepro/server` while the bundler stripped five —
+ * the same four-package gap that broke the non-fetch path, reproduced on the
+ * fetch path because this list was written before that fix and no gate watched
+ * this file.
+ */
+export const RUNTIME_PROVIDED_PACKAGES = [
+    "@rebasepro/server",
+    "@rebasepro/types",
+    "@rebasepro/client",
+    "@rebasepro/common",
+    "@rebasepro/utils"
+] as const;
 
 /**
  * Collapse a duplicate framework copy in the bundle onto the image's.
