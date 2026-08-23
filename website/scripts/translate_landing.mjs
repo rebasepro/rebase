@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
@@ -11,17 +12,28 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
  * new section on the home page adds keys to `en.ts` and silently falls back to
  * English in every other locale until they are filled in here.
  *
- * Only MISSING keys are translated. A key already present in a target locale is
- * never re-sent — hand edits to the translations survive, and a re-run after a
- * partial failure resumes rather than restarting.
+ * Two modes:
+ *
+ *   (default)         translate keys MISSING from a locale. A key already
+ *                     present is never re-sent, so hand edits survive and a
+ *                     re-run resumes after a partial failure.
+ *
+ *   --refresh-stale   also re-translate keys that are present but STALE — the
+ *                     English was rewritten after the translation was made.
+ *                     This overwrites existing copy, so it is opt-in.
+ *
+ * Add --dry-run to either mode to list the work without calling the API.
  */
 
+const REFRESH_STALE = process.argv.includes('--refresh-stale');
+const DRY_RUN = process.argv.includes('--dry-run');
+
 const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
+if (!apiKey && !DRY_RUN) {
     console.error('Error: GEMINI_API_KEY environment variable is missing.');
     process.exit(1);
 }
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenerativeAI(apiKey ?? 'dry-run');
 const model = genAI.getGenerativeModel({
     model: 'gemini-3.7-flash',
     generationConfig: {
@@ -72,6 +84,56 @@ async function loadLocale(lang) {
 }
 
 /**
+ * Keys whose English was rewritten AFTER the locale's value was last written.
+ *
+ * A stale key is present in every locale with a plausible-looking translation,
+ * so no key diff and no read of the files can see it — only their histories
+ * can. `de76b857b` is the case this exists for: it rewrote 36 strings in
+ * `en.ts` and touched no locale file, leaving 30 keys saying something the
+ * English page had stopped saying, in all three languages at once.
+ *
+ * The walk replays every commit that touched `src/i18n/`, recording for each
+ * (locale, key) the index of the commit where its value last changed. English
+ * moving later than the translation is the definition of stale.
+ */
+function findStaleKeys(langs) {
+    const repo = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8' }).trim();
+    const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf-8', maxBuffer: 1 << 28 });
+
+    const commits = git('log', '--format=%h\t%ad\t%s', '--date=short', '--reverse', '--', 'website/src/i18n/')
+        .trim().split('\n').filter(Boolean)
+        .map((line) => { const [hash, date, ...rest] = line.split('\t'); return { hash, date, subject: rest.join('\t') }; });
+
+    const all = [SOURCE_LANG, ...langs];
+    const lastChanged = Object.fromEntries(all.map((l) => [l, {}]));
+    const seen = Object.fromEntries(all.map((l) => [l, {}]));
+
+    commits.forEach((commit, index) => {
+        for (const lang of all) {
+            let source;
+            try { source = git('show', `${commit.hash}:website/src/i18n/${lang}.ts`); } catch { continue; }
+            let obj;
+            try { obj = new Function(source.replace(/export\s+const\s+\w+\s*=/, 'return'))(); } catch { continue; }
+            for (const [key, value] of Object.entries(obj)) {
+                if (seen[lang][key] !== value) { lastChanged[lang][key] = index; seen[lang][key] = value; }
+            }
+        }
+    });
+
+    const stale = {};
+    for (const lang of langs) {
+        stale[lang] = [];
+        for (const key of Object.keys(seen[SOURCE_LANG])) {
+            const enAt = lastChanged[SOURCE_LANG][key];
+            const locAt = lastChanged[lang][key];
+            if (locAt === undefined || enAt === undefined) continue;  // never translated → the missing-key path owns it
+            if (enAt > locAt) stale[lang].push({ key, blame: commits[enAt] });
+        }
+    }
+    return { stale, commits };
+}
+
+/**
  * Renders one entry the way Prettier already formatted the file: on a single
  * line when it fits in 80 columns, otherwise with the value on its own line.
  */
@@ -81,8 +143,16 @@ function formatEntry(key, value) {
     return `  ${JSON.stringify(key)}:\n    ${JSON.stringify(value)},`;
 }
 
-async function translateBatch(entries, targetLang) {
+async function translateBatch(entries, targetLang, previous = null) {
     const payload = Object.fromEntries(entries);
+
+    // When refreshing a stale key there is already a translation of the OLD
+    // English. It is wrong about the content but right about the vocabulary the
+    // rest of the file uses, so it goes in as terminology context — dropping it
+    // makes the refreshed strings drift away from their neighbours.
+    const previousBlock = previous
+        ? `\nFor terminology and register only, here is the OUTDATED ${LANG_NAMES[targetLang]} translation of an EARLIER version of these strings. The English has since changed, so the MEANING below is wrong and must not be reused. Match its vocabulary and tone; translate the new English faithfully.\n\n${JSON.stringify(previous, null, 2)}\n`
+        : '';
 
     const prompt = `You are a professional translator localising the marketing website of Rebase, an open-source Postgres backend and admin panel for developers.
 
@@ -97,7 +167,7 @@ STRICT RULES:
 6. These are UI strings — buttons, badges, nav labels, headings. Keep them about as short as the English. A nav label must stay a nav label, not become a sentence.
 7. Preserve the typography: em dashes stay em dashes, and use the target language's own quotation marks.
 8. Return ONLY the JSON object.
-
+${previousBlock}
 JSON to translate:
 ${JSON.stringify(payload, null, 2)}`;
 
@@ -167,6 +237,30 @@ async function insertEntries(lang, orderedKeys, translations, englishKeys) {
 }
 
 /**
+ * Rewrites the value of keys that already exist, leaving their position alone.
+ *
+ * Refreshing a stale key must not move it: the locale files are reviewed
+ * against `en.ts` line by line, and a reordering diff would bury the one thing
+ * that actually changed.
+ */
+async function replaceEntries(lang, keys, translations) {
+    const file = localeFile(lang);
+    let source = await fs.readFile(file, 'utf-8');
+
+    for (const key of keys) {
+        const keyToken = `\n  ${JSON.stringify(key)}:`;
+        const start = source.indexOf(keyToken);
+        const end = findEntryEnd(source, key);
+        if (start === -1 || end === -1) {
+            throw new Error(`Cannot locate entry "${key}" in ${lang}.ts to replace`);
+        }
+        source = source.slice(0, start + 1) + formatEntry(key, translations[key]) + source.slice(end);
+    }
+
+    await fs.writeFile(file, source, 'utf-8');
+}
+
+/**
  * Offset just past the trailing comma of `key`'s entry, or -1 when absent.
  *
  * Entries wrap, so the end of the entry is not the end of the key's line. The
@@ -198,50 +292,92 @@ function findEntryEnd(source, key) {
     return -1;
 }
 
+/** Runs one set of keys through the model in batches. Returns null on failure. */
+async function translateKeys(lang, keys, english, previousValues) {
+    const translations = {};
+    for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+        const slice = keys.slice(i, i + BATCH_SIZE);
+        const batch = slice.map((key) => [key, english[key]]);
+        const previous = previousValues
+            ? Object.fromEntries(slice.map((key) => [key, previousValues[key]]))
+            : null;
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const batchCount = Math.ceil(keys.length / BATCH_SIZE);
+        console.log(`  batch ${batchNumber}/${batchCount} (${batch.length} keys)...`);
+
+        try {
+            Object.assign(translations, await translateBatch(batch, lang, previous));
+        } catch (error) {
+            console.error(`  ❌ [${lang}] batch ${batchNumber} failed: ${error.message}`);
+            console.error('  Nothing written for this locale; re-run to retry.');
+            return null;
+        }
+
+        // Stay under the free-tier rate limit.
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    return translations;
+}
+
 async function main() {
     const english = await loadLocale(SOURCE_LANG);
     const englishKeys = Object.keys(english);
     console.log(`Source: ${SOURCE_LANG}.ts — ${englishKeys.length} keys`);
 
+    let staleByLang = {};
+    if (REFRESH_STALE) {
+        console.log('Replaying src/i18n history to find stale keys...');
+        ({ stale: staleByLang } = findStaleKeys(TARGET_LANGUAGES));
+    }
+
     for (const lang of TARGET_LANGUAGES) {
         const existing = await loadLocale(lang);
         const missingKeys = englishKeys.filter((key) => !(key in existing));
 
-        const stale = Object.keys(existing).filter((key) => !(key in english));
-        if (stale.length) {
+        const orphaned = Object.keys(existing).filter((key) => !(key in english));
+        if (orphaned.length) {
             console.warn(
-                `⚠ [${lang}] ${stale.length} key(s) not in en.ts (removed upstream?): ${stale.join(', ')}`
+                `⚠ [${lang}] ${orphaned.length} key(s) not in en.ts (removed upstream?): ${orphaned.join(', ')}`
             );
         }
 
-        if (missingKeys.length === 0) {
+        // Only refresh keys the model has not just written in this same run.
+        const staleKeys = (staleByLang[lang] ?? [])
+            .filter(({ key }) => key in existing && key in english)
+            .map(({ key }) => key);
+
+        if (REFRESH_STALE && staleKeys.length) {
+            console.log(`\n[${lang}] ${staleKeys.length} stale key(s) — English changed after the translation:`);
+            for (const { key, blame } of staleByLang[lang]) {
+                if (staleKeys.includes(key)) console.log(`    ${key}  (en last changed in ${blame.hash} ${blame.date})`);
+            }
+        }
+
+        if (missingKeys.length === 0 && staleKeys.length === 0) {
             console.log(`✔ [${lang}] up to date (${Object.keys(existing).length} keys)`);
             continue;
         }
 
-        console.log(`\n[${lang}] ${missingKeys.length} missing key(s) to translate`);
-
-        const translations = {};
-        for (let i = 0; i < missingKeys.length; i += BATCH_SIZE) {
-            const batch = missingKeys.slice(i, i + BATCH_SIZE).map((key) => [key, english[key]]);
-            const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-            const batchCount = Math.ceil(missingKeys.length / BATCH_SIZE);
-            console.log(`  Translating batch ${batchNumber}/${batchCount} (${batch.length} keys)...`);
-
-            try {
-                Object.assign(translations, await translateBatch(batch, lang));
-            } catch (error) {
-                console.error(`  ❌ [${lang}] batch ${batchNumber} failed: ${error.message}`);
-                console.error('  Nothing written for this locale; re-run to retry.');
-                return;
-            }
-
-            // Stay under the free-tier rate limit.
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (DRY_RUN) {
+            console.log(`[${lang}] dry run — ${missingKeys.length} missing, ${staleKeys.length} stale; nothing written`);
+            continue;
         }
 
-        await insertEntries(lang, missingKeys, translations, englishKeys);
-        console.log(`✅ [${lang}] wrote ${missingKeys.length} key(s) to ${lang}.ts`);
+        if (missingKeys.length) {
+            console.log(`\n[${lang}] translating ${missingKeys.length} missing key(s)`);
+            const translations = await translateKeys(lang, missingKeys, english, null);
+            if (!translations) return;
+            await insertEntries(lang, missingKeys, translations, englishKeys);
+            console.log(`✅ [${lang}] inserted ${missingKeys.length} key(s)`);
+        }
+
+        if (staleKeys.length) {
+            console.log(`\n[${lang}] refreshing ${staleKeys.length} stale key(s)`);
+            const translations = await translateKeys(lang, staleKeys, english, existing);
+            if (!translations) return;
+            await replaceEntries(lang, staleKeys, translations);
+            console.log(`✅ [${lang}] refreshed ${staleKeys.length} key(s)`);
+        }
     }
 
     console.log('\nDone. Run `npx astro build` to verify the locale files still parse.');
