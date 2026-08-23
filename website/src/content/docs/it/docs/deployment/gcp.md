@@ -66,7 +66,7 @@ Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `
 Poiché le istanze di Cloud Run sono strettamente stateless ed effimere, non è possibile utilizzare lo storage su disco locale per gli upload di file di Rebase.
 
 1.  Vai a **Google Cloud Storage** e crea un nuovo bucket privato nella regione UE scelta.
-2.  Segui la [Documentazione di Rebase Storage](/docs/storage) per configurare Rebase in modo che utilizzi l'API compatibile con S3 fornita da Google Cloud Storage invece del filesystem locale.
+2.  Segui la [Documentazione di Rebase Storage](/docs/backend/storage) per configurare Rebase in modo che utilizzi l'API compatibile con S3 fornita da Google Cloud Storage invece del filesystem locale.
 
 La tua istanza Rebase è ora completamente serverless e altamente scalabile nativamente all'interno dell'UE!
 ---

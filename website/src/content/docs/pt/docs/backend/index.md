@@ -170,8 +170,8 @@ Se a inicialização falhar (por exemplo, erro de conexão à base de dados), o 
 
 ## Próximos Passos
 
--   **[Autenticação](/docs/auth)** — JWT, Google OAuth, gestão de utilizadores
--   **[Armazenamento](/docs/storage)** — Armazenamento de ficheiros local e S3
+-   **[Autenticação](/docs/backend/authentication)** — JWT, Google OAuth, gestão de utilizadores
+-   **[Armazenamento](/docs/backend/storage)** — Armazenamento de ficheiros local e S3
 -   **[Callbacks de Entidade](/docs/collections/callbacks)** — Hooks de ciclo de vida e API `context.data`
 -   **[Histórico de Entidade](/docs/backend/history)** — Trilha de auditoria
 -   **[Funções Personalizadas](/docs/backend/custom-functions)** — Adicionar endpoints de API personalizados

@@ -170,8 +170,8 @@ Si l'initialisation échoue (par exemple, erreur de connexion à la base de donn
 
 ## Prochaines étapes
 
-- **[Authentification](/docs/auth)** — JWT, Google OAuth, gestion des utilisateurs
-- **[Stockage](/docs/storage)** — Stockage de fichiers local et S3
+- **[Authentification](/docs/backend/authentication)** — JWT, Google OAuth, gestion des utilisateurs
+- **[Stockage](/docs/backend/storage)** — Stockage de fichiers local et S3
 - **[Callbacks d'entité](/docs/collections/callbacks)** — Hooks de cycle de vie et API `context.data`
 - **[Historique des entités](/docs/backend/history)** — Piste d'audit
 - **[Fonctions personnalisées](/docs/backend/custom-functions)** — Ajouter des points d'extrémité API personnalisés

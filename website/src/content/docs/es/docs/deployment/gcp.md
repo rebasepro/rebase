@@ -64,7 +64,7 @@ Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate`
 Dado que las instancias de Cloud Run son estrictamente sin estado y efímeras, no puedes usar el almacenamiento en disco local para las cargas de archivos de Rebase.
 
 1. Navega a **Google Cloud Storage** y crea un nuevo bucket privado en tu región de la UE elegida.
-2. Sigue la [Documentación de Almacenamiento de Rebase](/docs/storage) para configurar Rebase para usar la API compatible con S3 proporcionada por Google Cloud Storage en lugar del sistema de archivos local.
+2. Sigue la [Documentación de Almacenamiento de Rebase](/docs/backend/storage) para configurar Rebase para usar la API compatible con S3 proporcionada por Google Cloud Storage en lugar del sistema de archivos local.
 
 ¡Tu instancia de Rebase ahora es completamente sin servidor y altamente escalable de forma nativa dentro de la UE!
 
