@@ -54,6 +54,14 @@ export interface SchemaChangeDialogProps {
     applyError?: string;
     onConfirm: () => void;
     /**
+     * Ask again, when planning failed.
+     *
+     * A dropped connection should cost a click, not the whole wizard. The form
+     * is already filled in, and making somebody redo it for a transient failure
+     * teaches them to distrust the preview rather than the network.
+     */
+    onRetry?: () => void;
+    /**
      * Write the collection source and leave the database alone.
      *
      * Offered only when the change is refused, and it is what keeps the editor
@@ -264,6 +272,7 @@ export function SchemaChangeDialog({
     applying,
     applyError,
     onConfirm,
+    onRetry,
     onSourceOnly,
     onClose,
     applyRefusedBecause,
@@ -426,6 +435,11 @@ export function SchemaChangeDialog({
                 <Button variant="text" onClick={onClose} disabled={applying}>
                     {result ? "Close" : "Cancel"}
                 </Button>
+                {!result && planError && onRetry && (
+                    <Button variant="outlined" onClick={onRetry}>
+                        Try again
+                    </Button>
+                )}
                 {!result && plan && !plan.applicable && onSourceOnly && (
                     <Button variant="outlined" onClick={onSourceOnly} disabled={applying}>
                         Edit source only

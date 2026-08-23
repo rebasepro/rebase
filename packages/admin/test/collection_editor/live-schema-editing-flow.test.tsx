@@ -545,3 +545,39 @@ describe("the destination label", () => {
         expect(screen.queryByText(/Users\/someone/)).toBeNull();
     });
 });
+
+
+describe("when planning fails", () => {
+    it("offers to try again without losing the form", async () => {
+        // A dropped connection should cost a click. The person has already
+        // filled the wizard in; making them redo it teaches them to distrust
+        // the preview rather than the network.
+        let attempt = 0;
+        const client = fakeClient({
+            plan: jest.fn(async () => {
+                attempt += 1;
+                if (attempt === 1) throw new Error("backend unreachable");
+                return SAFE_PLAN;
+            }) as never
+        });
+        const settled = jest.fn();
+        render(<Harness client={client} onSettled={settled}/>);
+
+        await start();
+        await waitFor(() => expect(screen.getByText("backend unreachable")).toBeTruthy());
+
+        await act(async () => { screen.getByText("Try again").click(); });
+
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(client.plan).toHaveBeenCalledTimes(2);
+        // Still the same review — nothing was settled behind the person's back.
+        expect(settled).not.toHaveBeenCalled();
+    });
+
+    it("does not offer it when there is nothing wrong", async () => {
+        render(<Harness client={fakeClient()} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(screen.queryByText("Try again")).toBeNull();
+    });
+});
