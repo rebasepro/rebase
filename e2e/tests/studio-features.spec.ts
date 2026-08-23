@@ -121,8 +121,24 @@ test.describe("Rebase Studio Features E2E", () => {
     await expect(createButton).toBeEnabled();
     await createButton.click();
 
-    // Wait for the success navigation indicating the collection has saved
-    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
+    // Saving no longer writes straight through. A backend that can edit its own
+    // schema plans the change first and shows what it would do — the SQL, the
+    // files, the commit — and nothing happens until somebody agrees. Against a
+    // backend that cannot (a bundle deployment, a non-Postgres driver) the
+    // dialog never appears and the save completes on its own, so this waits for
+    // whichever of the two this deployment is rather than assuming.
+    const review = page.getByText("Review schema change");
+    const applied = page.waitForURL(/.*schema\/e_2_e_test_collection/, { timeout: 25000 });
+    await Promise.race([
+        review.waitFor({ state: "visible", timeout: 25000 }).then(async () => {
+            await expect(page.getByText("Ready to apply")).toBeVisible({ timeout: 10000 });
+            await page.getByRole("button", { name: "Commit and apply" }).click();
+        }),
+        applied.catch(() => undefined)
+    ]);
+
+    // Either way, the collection exists and the editor has moved to it.
+    await expect(page).toHaveURL(/.*schema\/e_2_e_test_collection/, { timeout: 30000 });
   });
 
   test("sql console - can run queries, handle syntax errors, and switch roles", async ({ page }) => {

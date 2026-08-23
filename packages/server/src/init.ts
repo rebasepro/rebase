@@ -1729,7 +1729,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         path: nodePath.relative(repositoryRoot!, file),
                         contents
                     }];
-                }
+                },
+                // The same path `writeSource` resolves, derived without writing
+                // anything — the dirty-tree check has to know it before the
+                // edit, or it sees this change's own file and refuses.
+                sourcePathsFor: (change) => repositoryRoot
+                    ? [nodePath.relative(
+                        repositoryRoot,
+                        nodePath.join(collectionsDir, `${change.collectionId}.ts`)
+                    )]
+                    : []
             }));
 
             // Admin-only, so it lives under `/api/admin` — see

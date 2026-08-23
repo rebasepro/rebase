@@ -66,6 +66,34 @@ export interface SchemaEditInput {
     plan: SchemaChangePlan;
     repository: SchemaEditRepository;
     apply: SchemaEditApply;
+    /**
+     * Rewrite the collection source, returning the files it touched.
+     *
+     * Called from **inside** this module, after the dirty-tree check and before
+     * the commit. It has to be: the AST editor writes through the filesystem
+     * rather than through {@link SchemaEditRepository}, so a caller that wrote
+     * first and handed the files over would already have made the tree dirty,
+     * and the check below would refuse the change on the evidence of its own
+     * edit.
+     *
+     * That is not hypothetical — it is what `/apply` did. Every change was
+     * refused with a dirty tree, because `git status --porcelain` reports
+     * untracked files too and a new collection's source file is always
+     * untracked. The rewritten file was left behind either way, so the retry
+     * found a dirty tree as well and the surface could never succeed.
+     *
+     * Optional: a caller holding the contents already, with no disk to write
+     * them through, puts them on `plan.files` and omits this.
+     */
+    writeSource?: () => Promise<SchemaChangeFile[]>;
+    /**
+     * The paths {@link writeSource} is going to touch.
+     *
+     * Needed *before* it runs so they can join the dirty check — the point of
+     * which is to read the tree before this change has touched it. The caller
+     * can derive them (`<collectionsDir>/<id>.ts`) without writing anything.
+     */
+    sourcePaths?: string[];
 }
 
 export interface SchemaEditResult {
@@ -130,15 +158,29 @@ export async function applySchemaChange(input: SchemaEditInput): Promise<SchemaE
         );
     }
 
-    const paths = commit.files.map(file => file.path);
+    // Every path this change will touch, including the ones `writeSource` is
+    // about to create. Assembled before it runs, because the check below is
+    // about what somebody *else* left in the tree.
+    const plannedPaths = [
+        ...commit.files.map(file => file.path),
+        ...(input.sourcePaths ?? [])
+    ];
 
     // Checked before anything is written, so a refusal leaves the tree exactly
-    // as it was found.
-    const dirty = (await input.repository.dirtyPaths()).filter(path => paths.includes(path));
+    // as it was found — and so this cannot refuse on the evidence of its own
+    // edit, which is what happened when the source was written first.
+    const dirty = (await input.repository.dirtyPaths()).filter(path => plannedPaths.includes(path));
     if (dirty.length > 0) throw new DirtyWorkingTreeError(dirty);
 
     const branch = await input.repository.currentBranch();
-    await input.repository.writeFiles(commit.files);
+
+    // Now the tree may be touched. The AST editor writes through the
+    // filesystem, so this is the first moment at which doing so is safe.
+    const written = input.writeSource ? await input.writeSource() : [];
+    const files = [...written, ...commit.files];
+    const paths = files.map(file => file.path);
+
+    await input.repository.writeFiles(files);
     const sha = await input.repository.commit(paths, commit.message);
 
     const committed = { sha, branch, files: paths };
