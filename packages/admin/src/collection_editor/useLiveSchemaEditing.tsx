@@ -14,7 +14,8 @@
  * `before`. Rejecting with {@link SchemaChangeCancelled} is how "the person
  * said no" reaches the caller as an outcome rather than as silence.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazyChunk } from "@rebasepro/ui";
 
 import {
     createLiveSchemaClient,
@@ -25,7 +26,20 @@ import {
     type LiveSchemaStatus,
     type ProposedCollectionChange
 } from "./liveSchemaClient";
-import { SchemaChangeDialog } from "./ui/collection_editor/SchemaChangeDialog";
+
+/**
+ * Loaded when a change is actually being reviewed, not before.
+ *
+ * This hook is reached from the collections config controller, which is
+ * constructed on every admin boot — so a static import would put the dialog and
+ * the `@rebasepro/ui` surface it draws on into the **eager** bundle: everything
+ * a browser downloads before the login screen paints. It cost 14 kB there, for
+ * a dialog most sessions never open. The bundle budget caught it.
+ */
+const SchemaChangeDialog = lazyChunk(() =>
+    import("./ui/collection_editor/SchemaChangeDialog")
+        .then(m => ({ default: m.SchemaChangeDialog }))
+);
 
 /** The person closed the dialog without applying. Not an error; an answer. */
 export class SchemaChangeCancelled extends Error {
@@ -217,23 +231,31 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         if (settle && !result) settle.reject(new SchemaChangeCancelled());
     }, [pending, result, clear]);
 
-    const dialog = (
-        <SchemaChangeDialog
-            open={Boolean(pending) || Boolean(result)}
-            collectionId={pending?.change.collectionId ?? ""}
-            plan={plan}
-            planError={planError}
-            result={result}
-            applying={applying}
-            applyError={applyError}
-            onConfirm={onConfirm}
-            onSourceOnly={writeSourceOnly ? onSourceOnly : undefined}
-            onClose={onClose}
-            applyRefusedBecause={
-                status && !status.canApply ? status.applyRefusedBecause : undefined
-            }
-        />
-    );
+    // Not even a Suspense boundary until there is something to review — the
+    // chunk is fetched by the first `reviewChange`, and an admin session that
+    // never edits a collection never pays for it.
+    const open = Boolean(pending) || Boolean(result);
+    const dialog = open
+        ? (
+            <Suspense fallback={null}>
+                <SchemaChangeDialog
+                    open={open}
+                    collectionId={pending?.change.collectionId ?? ""}
+                    plan={plan}
+                    planError={planError}
+                    result={result}
+                    applying={applying}
+                    applyError={applyError}
+                    onConfirm={onConfirm}
+                    onSourceOnly={writeSourceOnly ? onSourceOnly : undefined}
+                    onClose={onClose}
+                    applyRefusedBecause={
+                        status && !status.canApply ? status.applyRefusedBecause : undefined
+                    }
+                />
+            </Suspense>
+        )
+        : null;
 
     return { status, ready, reviewChange, dialog };
 }
