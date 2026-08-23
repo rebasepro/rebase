@@ -14,6 +14,8 @@ import {
     bucket,
     declareResource,
     declaredResources,
+    declaredDataSources,
+    declaredStorageSources,
     declaredSubscriptions,
     findEnvSuffixCollision,
     isResourceHandle,
@@ -196,5 +198,44 @@ describe("topics", () => {
         const signups = topic<{ id: string }>("signups");
         await signups.publish({ id: "1" });
         expect(sent).toEqual([["signups", { id: "1" }]]);
+    });
+});
+
+describe("handing declarations to the frontend", () => {
+    it("gives the provider the same list the backend uses", () => {
+        // Otherwise the list gets written a second time, by hand, next to the
+        // declarations — the two-homes problem this model removed everywhere
+        // else, reappearing at the frontend boundary.
+        database("analytics", { label: "Warehouse" });
+        bucket("media", { engine: "s3", transport: "direct" });
+        expect(declaredDataSources()).toEqual([
+            { key: "analytics", engine: "postgres", transport: "server", label: "Warehouse" }
+        ]);
+        expect(declaredStorageSources()).toEqual([
+            { key: "media", engine: "s3", transport: "direct" }
+        ]);
+    });
+
+    it("keeps the kinds apart", () => {
+        database("main");
+        bucket("media");
+        topic("signups");
+        expect(declaredDataSources()).toHaveLength(1);
+        expect(declaredStorageSources()).toHaveLength(1);
+    });
+
+    it("is empty rather than undefined for a project declaring none", () => {
+        expect(declaredDataSources()).toEqual([]);
+        expect(declaredStorageSources()).toEqual([]);
+    });
+
+    it("carries transport, which is what the frontend actually branches on", () => {
+        // `direct` means the browser talks to the source itself. Getting this
+        // wrong makes the client either bypass a backend it should use, or
+        // route through one that serves no endpoint for it.
+        bucket("cdn", { transport: "direct" });
+        bucket("uploads");
+        expect(declaredStorageSources().map(s => [s.key, s.transport]))
+            .toEqual([["cdn", "direct"], ["uploads", "server"]]);
     });
 });

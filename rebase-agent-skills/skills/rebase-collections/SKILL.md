@@ -160,7 +160,7 @@ export default productsCollection;
 | `description` | `string` | — | Description shown in the UI (supports Markdown) |
 | `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
 | `admin.group` | `string` | `"Views"` | Sidebar group heading |
-| `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a backend registered on `<Rebase dataSources>` / `initializeRebaseBackend({ dataSources })`. See **Data sources & multiple backends** below. |
+| `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. See **Data sources & multiple backends** below. |
 | `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
@@ -323,10 +323,13 @@ client and only need a backend bootstrapper.
 
 ```ts no-verify
 // Backend — multiple engines in one instance (Postgres + MongoDB)
+// config/resources.ts — declare direct/custom sources so the backend skips
+// server routes for them:
+//   export const analytics = database("analytics", {
+//       engine: "firestore", transport: "direct"
+//   });
 initializeRebaseBackend({
   bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
-  // Declare direct/custom sources so the backend skips server routes for them:
-  dataSources: [{ key: "analytics", engine: "firestore", transport: "direct" }],
   collections: [
     { slug: "products" },                  // → Postgres (default)
     { slug: "orders", driver: "mongodb" }  // → MongoDB
@@ -339,7 +342,7 @@ references, board, import/export, and `context.data` all hit the right backend
 with no per-collection wiring. The data-source key matches the backend
 bootstrapper id/type (e.g. `"mongodb"`). RLS is applied per-engine where
 supported. The deprecated `drivers={{ key: driver }}` prop is a shorthand for a
-single `direct` `dataSources` entry.
+single `direct` database declaration.
 
 > **Migration note:** collection-level `driver` is deprecated in favor of
 > `dataSource`. It still works (and provides the engine hint), so existing

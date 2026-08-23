@@ -14,9 +14,11 @@
 import {
     DEFAULT_RESOURCE_KEY,
     declareResource,
+    declaredResources,
     registerResourceKind,
     type DeclareOptions,
-    type ResourceHandle
+    type ResourceHandle,
+    type ResourceTransport
 } from "./resources";
 
 // ── database ─────────────────────────────────────────────────────────────────
@@ -263,4 +265,45 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
             });
         }
     } as TopicHandle<T>;
+}
+
+// ── Handing declarations to the frontend ─────────────────────────────────────
+
+/**
+ * The declared databases, in the shape `<Rebase dataSources>` takes.
+ *
+ * The frontend needs to know which sources exist and how they are reached — a
+ * `direct`-transport source is one the browser talks to itself — and it imports
+ * the same config package the backend does. Without these it would mean writing
+ * the list a second time, by hand, next to the declarations, which is precisely
+ * the two-homes problem this model removed everywhere else.
+ *
+ * ```tsx
+ * import "../config/resources";                 // registers them
+ * import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
+ *
+ * <Rebase dataSources={declaredDataSources()} storageSources={declaredStorageSources()} />
+ * ```
+ *
+ * The import is what registers them, so a bundler that drops an unused module
+ * would leave this empty — hence the side-effect import above rather than a
+ * bare re-export.
+ */
+export function declaredDataSources(): { key: string; engine: string; transport: ResourceTransport; label?: string }[] {
+    return declaredResources("database").map(r => ({
+        key: r.key,
+        engine: r.engine,
+        transport: r.transport,
+        ...(r.label !== undefined ? { label: r.label } : {})
+    }));
+}
+
+/** The declared buckets, in the shape `<Rebase storageSources>` takes. */
+export function declaredStorageSources(): { key: string; engine: string; transport: ResourceTransport; label?: string }[] {
+    return declaredResources("bucket").map(r => ({
+        key: r.key,
+        engine: r.engine,
+        transport: r.transport,
+        ...(r.label !== undefined ? { label: r.label } : {})
+    }));
 }

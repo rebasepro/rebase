@@ -521,7 +521,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |
 | `bootstrappers` | `BackendBootstrapper[]` | `[]` | Database bootstrappers. Use one per engine for multiple engines in a single instance (e.g. Postgres + MongoDB); mark one `isDefault` |
-| `dataSources` | `DataSourceDefinition[]` | `[]` | Declared data sources (`key`, `engine`, `transport`). Drives capabilities and the server-vs-direct distinction. Collections on a `direct`/`custom` transport are client-only — the backend skips data routes for them. Server engines need no entry |
+| ~~`dataSources`~~ | — | — | **Removed.** Declare each one with `database("<key>")` in `config/resources.ts`. The backend reads the declarations; passing this key is refused at boot, by name, with the replacement in the message. Collections on a `direct`/`custom` transport are still client-only — the backend skips data routes for them |
 | `auth` | `RebaseAuthConfig \| AuthAdapter` | — | Authentication config or pluggable adapter |
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, ...>` | — | File storage configuration. Supports `"local"`, `"s3"`, and `"gcs"` (GCS/Firebase Storage) backends. Use `Record<string, StorageController>` for multi-backend setups with named sources |
 | `history` | `HistoryConfig` (`boolean \| { retention?: number }`) | `true` | Entity history / audit log. `retention` is in days |
@@ -534,7 +534,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection. Same type as per-collection `callbacks`, and fires on **every** data path (REST, realtime/WebSocket, server-side `rebase.dataAsAdmin`). Order: global → collection → property |
 | `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table with RLS disabled carries no authorization model, and every authenticated request runs as `rebase_user`, so serving one hands every row to every logged-in user. Excluded tables are logged with the SQL to protect them. `"serve"` serves them anyway; only sensible when every caller is already trusted |
 | `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode |
-| `storageSources` | `StorageSourceDefinition[]` | — | Named storage backends for multi-source setups. Each has a `key` that collection properties point at via `StorageConfig.storageSource` |
+| ~~`storageSources`~~ | — | — | **Removed.** Declare each one with `bucket("<key>")` in `config/resources.ts`. Collection properties still point at it by key via `StorageConfig.storageSource`. (The `<Rebase storageSources>` *prop* is unrelated and still exists — pass `declaredStorageSources()`) |
 | `logging` | `{ level?: "error" \| "warn" \| "info" \| "debug" }` | `"info"` | Log level configuration |
 | `storageAuthorize` | `StorageAuthorize` | — | **Per-object access control**, the storage analogue of RLS. Without one, any authenticated user can read, overwrite, delete or list any key they can name — and `GET /storage/list?prefix=` means they need not guess. See the boot guard below |
 | `storagePublicRead` | `boolean` | `false` | Serve stored objects to unauthenticated readers |
