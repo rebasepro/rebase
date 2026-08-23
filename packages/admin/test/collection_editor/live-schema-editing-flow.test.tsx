@@ -9,7 +9,7 @@
  */
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
     useLiveSchemaEditing,
@@ -361,5 +361,78 @@ describe("telling a cancellation from a failure", () => {
         const fromElsewhere = new Error("The schema change was not applied.");
         fromElsewhere.name = "SchemaChangeCancelled";
         expect(isSchemaChangeCancelled(fromElsewhere)).toBe(true);
+    });
+});
+
+
+/**
+ * Two ways the dialog could settle a caller wrongly.
+ *
+ * Both are about a promise and a running operation disagreeing, which is the
+ * failure this whole feature exists to make impossible.
+ */
+describe("settling the caller correctly", () => {
+    it("settles the first review when a second replaces it", async () => {
+        // A double-clicked save. `setPending` overwrote `resolve`/`reject` with
+        // nobody left holding them, so the first promise never settled and the
+        // editor's save simply never returned.
+        const client = fakeClient();
+        const settled: string[] = [];
+
+        const Twice = () => {
+            const live = useLiveSchemaEditing({ baseUrl: "/api/admin/schema", client });
+            return (
+                <div>
+                    <button onClick={() => {
+                        live.reviewChange({ collectionId: "a", collection: {} })
+                            .then(() => settled.push("a:resolved"), () => settled.push("a:rejected"));
+                        live.reviewChange({ collectionId: "b", collection: {} })
+                            .then(() => settled.push("b:resolved"), () => settled.push("b:rejected"));
+                    }}>start</button>
+                    {live.dialog}
+                </div>
+            );
+        };
+        render(<Twice/>);
+        await act(async () => { screen.getByText("start").click(); });
+
+        await waitFor(() => expect(settled).toContain("a:rejected"));
+        // The second is still open and waiting to be decided.
+        expect(settled).not.toContain("b:resolved");
+        expect(settled).not.toContain("b:rejected");
+    });
+
+    it("does not report a cancellation while the apply is still running", async () => {
+        // Escape and the backdrop both reach `onClose`, and only the Cancel
+        // *button* was disabled while applying. Closing mid-apply rejected the
+        // caller as cancelled while the commit and DDL carried on — telling
+        // somebody nothing happened while something did.
+        let finishApply: (r: LiveSchemaResult) => void = () => {};
+        const client = fakeClient({
+            apply: jest.fn(() => new Promise(resolve => { finishApply = resolve; })) as never
+        });
+        const settled = jest.fn();
+        render(<Harness client={client} onSettled={settled}/>);
+
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        await act(async () => { screen.getByText("Commit and apply").click(); });
+
+        // Mid-apply. The Cancel *button* is disabled — but Escape does not go
+        // through the button, it goes through the dialog's own dismiss. That is
+        // the path that was unguarded, so that is the one to press.
+        expect(screen.getByText("Cancel").closest("button")?.disabled).toBe(true);
+        await act(async () => {
+            fireEvent.keyDown(document.activeElement ?? document.body, {
+                key: "Escape", code: "Escape", keyCode: 27
+            });
+        });
+
+        // Nothing settled: the apply is still running and has not been answered.
+        expect(settled).not.toHaveBeenCalled();
+
+        await act(async () => { finishApply(APPLIED); });
+        await waitFor(() => expect(settled).toHaveBeenCalledWith("resolved"));
+        expect(settled).not.toHaveBeenCalledWith("rejected", expect.anything());
     });
 });

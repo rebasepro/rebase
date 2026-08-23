@@ -137,6 +137,9 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
     // overload, and omitting it is an error rather than a default.
     const probe = useRef<{ key: unknown[]; promise: Promise<LiveSchemaStatus> } | undefined>(undefined);
 
+    /** Which review a plan response belongs to. See `reviewChange`. */
+    const reviewToken = useRef(0);
+
     const ready = useCallback((): Promise<LiveSchemaStatus> => {
         const key = [client, authKey];
         const current = probe.current;
@@ -165,20 +168,38 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
 
     const reviewChange = useCallback((change: ProposedCollectionChange) => {
         return new Promise<void>((resolve, reject) => {
+            // A second review while one is open — a double-clicked save —
+            // replaces the pending one, and the one it replaces has to be
+            // settled. `setPending` used to overwrite `resolve`/`reject` with
+            // nobody left holding them, so the first caller's promise never
+            // settled at all and the editor's save simply never returned.
+            setPending(previous => {
+                previous?.reject(new SchemaChangeCancelled());
+                return { change, resolve, reject };
+            });
+
+            // Identifies the review a response belongs to. A plan that arrives
+            // after its review was replaced must not be shown: the dialog would
+            // describe the *previous* change while the reader believes it
+            // describes this one, and the SQL on screen would be for something
+            // they are not confirming.
+            const token = ++reviewToken.current;
             setPlan(undefined);
             setPlanError(undefined);
             setResult(undefined);
             setApplyError(undefined);
             setApplying(false);
-            setPending({ change, resolve, reject });
 
             void client.plan(change).then(
-                answer => setPlan(answer),
-                (err: unknown) => setPlanError(
-                    err instanceof LiveSchemaError || err instanceof Error
-                        ? err.message
-                        : String(err)
-                )
+                answer => { if (token === reviewToken.current) setPlan(answer); },
+                (err: unknown) => {
+                    if (token !== reviewToken.current) return;
+                    setPlanError(
+                        err instanceof LiveSchemaError || err instanceof Error
+                            ? err.message
+                            : String(err)
+                    );
+                }
             );
         });
     }, [client]);
@@ -220,12 +241,19 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
     }, [pending, writeSourceOnly, clear]);
 
     const onClose = useCallback(() => {
+        // Escape and the backdrop reach this too, and the Cancel *button* is the
+        // only one of the three that was disabled while applying. Closing
+        // mid-apply rejected the caller as cancelled while the commit and the
+        // DDL carried on — reporting that nothing happened while something did,
+        // which is the exact failure this whole feature exists to end.
+        if (applying) return;
+
         const settle = pending;
         clear();
         // A dialog showing a result has already resolved; closing it is not a
         // cancellation of anything.
         if (settle && !result) settle.reject(new SchemaChangeCancelled());
-    }, [pending, result, clear]);
+    }, [applying, pending, result, clear]);
 
     // Not even a Suspense boundary until there is something to review — the
     // chunk is fetched by the first `reviewChange`, and an admin session that
