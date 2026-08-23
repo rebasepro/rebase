@@ -51,6 +51,15 @@ export interface LiveSchemaPlan {
      * it its own place rather than another bullet in the list.
      */
     withheldConstraints: WithheldConstraint[];
+    /**
+     * What still has to happen after this lands.
+     *
+     * Empty almost always. The case it exists for: a project that replays
+     * versioned migrations, where applying here changes *this* database and
+     * commits `drizzle/schema.sql`, but writes no migration — so the next
+     * environment built from migrations would not have the change.
+     */
+    followUp?: string[];
 }
 
 export interface LiveSchemaResult {
@@ -60,6 +69,7 @@ export interface LiveSchemaResult {
     statements: string[];
     summary: string;
     withheldConstraints: WithheldConstraint[];
+    followUp?: string[];
 }
 
 /**
@@ -86,6 +96,8 @@ export interface LiveSchemaStatus {
     applyRefusedBecause?: string;
     applyRefusedCode?: string;
     repository?: string;
+    /** The branch a commit would land on. */
+    branch?: string;
     code?: string;
     reason?: string;
 }
@@ -199,6 +211,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
                         applyRefusedBecause: body.applyRefusedBecause,
                         applyRefusedCode: body.applyRefusedCode,
                         repository: body.repository,
+                        branch: body.branch,
                         code: body.code,
                         reason: body.reason
                     };

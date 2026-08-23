@@ -436,3 +436,148 @@ describe("settling the caller correctly", () => {
         expect(settled).not.toHaveBeenCalledWith("rejected", expect.anything());
     });
 });
+
+
+/**
+ * The dialog says what will happen, not what usually happens.
+ *
+ * A document database has no table to alter, and a relational change that only
+ * moves source runs nothing either. Both are a commit — and calling either one
+ * "apply" describes something that does not occur. The engine is never asked;
+ * the plan is.
+ */
+describe("a change that runs nothing", () => {
+    const noStatements = () => fakeClient({
+        plan: jest.fn(async () => ({
+            ...SAFE_PLAN,
+            statements: [],
+            changes: [{
+                kind: "add-property",
+                verdict: "safe" as const,
+                collection: "posts",
+                property: "subtitle",
+                detail: 'New property "subtitle". Existing documents do not have it.'
+            }]
+        })) as never
+    });
+
+    it("offers to commit, not to apply", async () => {
+        render(<Harness client={noStatements()} onSettled={jest.fn()}/>);
+        await start();
+
+        await waitFor(() => expect(screen.getByText("Ready to commit")).toBeTruthy());
+        expect(screen.getByText("Commit")).toBeTruthy();
+        expect(screen.queryByText("Commit and apply")).toBeNull();
+    });
+
+    it("does not claim anything runs against the database", async () => {
+        render(<Harness client={noStatements()} onSettled={jest.fn()}/>);
+        await start();
+
+        await waitFor(() => expect(screen.getByText("Ready to commit")).toBeTruthy());
+        expect(screen.getByText(/Nothing runs against the database/)).toBeTruthy();
+        // And no empty "Statements (0)" disclosure to click into.
+        expect(screen.queryByText(/Statements that will run/)).toBeNull();
+    });
+
+    it("still says apply when there is DDL", async () => {
+        render(<Harness client={fakeClient()} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(screen.getByText("Commit and apply")).toBeTruthy();
+    });
+});
+
+describe("where the commit lands", () => {
+    it("is on screen before the button, not only in the receipt", async () => {
+        // A commit is going somewhere, and which branch it is going to is the
+        // one fact somebody cannot recover from being wrong about.
+        const client = fakeClient({
+            status: jest.fn(async () => ({
+                enabled: true, canPlan: true, canApply: true,
+                repository: "acme/storefront", branch: "main"
+            })) as never
+        });
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+
+        await waitFor(() => expect(screen.getByText(/acme\/storefront/)).toBeTruthy());
+        expect(screen.getByText(/main/)).toBeTruthy();
+    });
+
+    it("says nothing when the backend did not say", async () => {
+        const client = fakeClient({
+            status: jest.fn(async () => ({ enabled: true, canPlan: true, canApply: true })) as never
+        });
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(screen.queryByText(/→/)).toBeNull();
+    });
+});
+
+
+describe("the destination label", () => {
+    it("shows a remote repository as owner/repo", async () => {
+        const client = fakeClient({
+            status: jest.fn(async () => ({
+                enabled: true, canPlan: true, canApply: true,
+                repository: "acme/storefront", branch: "main"
+            })) as never
+        });
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText(/acme\/storefront · main/)).toBeTruthy());
+    });
+
+    it("shows a local checkout by name, not by path", async () => {
+        // The leading directories are the part nobody needs; which checkout is
+        // the part they do.
+        const client = fakeClient({
+            status: jest.fn(async () => ({
+                enabled: true, canPlan: true, canApply: true,
+                repository: "/Users/someone/work/storefront", branch: "main"
+            })) as never
+        });
+        render(<Harness client={client} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText(/storefront · main/)).toBeTruthy());
+        expect(screen.queryByText(/Users\/someone/)).toBeNull();
+    });
+});
+
+
+describe("when planning fails", () => {
+    it("offers to try again without losing the form", async () => {
+        // A dropped connection should cost a click. The person has already
+        // filled the wizard in; making them redo it teaches them to distrust
+        // the preview rather than the network.
+        let attempt = 0;
+        const client = fakeClient({
+            plan: jest.fn(async () => {
+                attempt += 1;
+                if (attempt === 1) throw new Error("backend unreachable");
+                return SAFE_PLAN;
+            }) as never
+        });
+        const settled = jest.fn();
+        render(<Harness client={client} onSettled={settled}/>);
+
+        await start();
+        await waitFor(() => expect(screen.getByText("backend unreachable")).toBeTruthy());
+
+        await act(async () => { screen.getByText("Try again").click(); });
+
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(client.plan).toHaveBeenCalledTimes(2);
+        // Still the same review — nothing was settled behind the person's back.
+        expect(settled).not.toHaveBeenCalled();
+    });
+
+    it("does not offer it when there is nothing wrong", async () => {
+        render(<Harness client={fakeClient()} onSettled={jest.fn()}/>);
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        expect(screen.queryByText("Try again")).toBeNull();
+    });
+});
