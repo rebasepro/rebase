@@ -2,12 +2,14 @@
 
 ## [Unreleased]
 
-> **Breaking: runtime contract v2.** Resources are declared in config now, and a
-> bundle built against v1 will not boot on a v2 runtime — deliberately, because
-> the managed tier moves projects onto new images without rebuilding them and a
-> silent acceptance would crash-loop a fleet. Rebuild with `rebase build`, or
-> stay on a v1 image until you do. Operators: the control plane must ship its
-> `SUPPORTED_RUNTIME_CONTRACT` raise BEFORE a v2 runtime is released.
+> **Breaking: resources are declared, not configured.** `RebaseBackendConfig`'s
+> `dataSources` and `storageSources` are gone; declare them in `rebase.json` and
+> the config package. A bundle built before this will not boot on a current
+> runtime — rebuild it with `rebase build`.
+>
+> The runtime contract stays at **1**. Pre-release, a breaking change is just a
+> change: there is no population of old bundles to protect, so a major would buy
+> nothing and invalidate the `rebase` range in every manifest and template.
 
 ### Added
 

@@ -331,7 +331,7 @@ export const BUNDLE_FORMAT_VERSION = 2;
  * runtime first turns every deploy into a rejected intake blaming the tenant's
  * bundle.
  */
-export const RUNTIME_CONTRACT_VERSION = 2;
+export const RUNTIME_CONTRACT_VERSION = 1;
 
 /** Where the runtime finds each part of the bundle. Paths are bundle-relative. */
 export interface RebaseBundleEntrypoints {
