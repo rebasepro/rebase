@@ -781,6 +781,9 @@ importers:
       jiti:
         specifier: ^2.7.0
         version: 2.7.0
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
     devDependencies:
       '@types/node':
         specifier: ^26.1.2
@@ -788,9 +791,6 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
