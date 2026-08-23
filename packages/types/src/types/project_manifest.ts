@@ -179,27 +179,20 @@ export interface RebaseProjectManifest {
      */
     apps: Record<string, RebaseAppConfig>;
     /**
-     * Storage sources this project uses, keyed by source key.
+     * Buckets are NOT declared here any more.
      *
-     * **Topology only — never credentials.** Which buckets exist is a property of
-     * the project and belongs in the repository; how to reach each one is a
-     * property of the deployment and lives in the environment, read per source
-     * from `<BASE>__<KEY>` (`S3_BUCKET__MEDIA` for a source keyed `media`). The
-     * default source takes no suffix, so a single-bucket project configured with
-     * plain `S3_BUCKET` keeps working having declared nothing at all.
+     * They were, and the runtime merged this block with the declarations in
+     * config code — a bucket named in both had one engine kept and the other
+     * silently discarded. Two homes for one concept, with a merge to decide
+     * between them, is the shape this whole model replaced.
      *
-     * Declared here rather than only in the config package because this file is
-     * the one artifact a host can read *before* running a build. That is what
-     * lets a console show "this project wants a `media` bucket, and it has none"
-     * on a project's first deploy, and it is why the managed and custom runtimes
-     * can present the same list — a custom build emits no bundle manifest, so a
-     * declaration that lived only in compiled config would leave every custom
-     * project invisible.
-     *
-     * Omitted entirely means one default source, which is the overwhelmingly
-     * common project and must not be required to say so.
+     * `bucket("media", { engine: "s3" })` in the project's config declares one
+     * now, and `rebase resources --write` generates `rebase.resources.json`,
+     * which is what a host reads before a build. A `storage` block left in this
+     * file is refused by the validator, by name, with the replacement in the
+     * message — not ignored, because a key that still parses and does nothing
+     * is the failure this removed.
      */
-    storage?: Record<string, RebaseStorageSourceConfig>;
     /**
      * Repository-wide opt-out from anonymous CLI usage sharing.
      *

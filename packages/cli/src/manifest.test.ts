@@ -535,12 +535,6 @@ describe("writeManifest preserves the whole file", () => {
                 runtime: "managed" as const
             }
         },
-        storage: {
-            media: {
-                engine: "s3",
-                label: "Media"
-            }
-        },
         telemetry: false
     };
 
@@ -554,7 +548,7 @@ describe("writeManifest preserves the whole file", () => {
         expect(loadManifest(scratch).manifest).toEqual(full);
     });
 
-    it("keeps the telemetry opt-out and the storage block a rewrite did not model", () => {
+    it("keeps the telemetry opt-out a rewrite did not model", () => {
         // `rebase apps init --force` writes a *synthesized* manifest: it cannot
         // know either key, because both are authored rather than inferred.
         fs.writeFileSync(
@@ -576,7 +570,6 @@ describe("writeManifest preserves the whole file", () => {
 
         const after = loadManifest(scratch).manifest;
         expect(after.telemetry).toBe(false);
-        expect(after.storage).toEqual(full.storage);
         expect(after.apps.backend).toMatchObject({ runtime: "custom" });
     });
 
