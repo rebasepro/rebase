@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -68,6 +69,37 @@ const SOURCE_LANG = 'en';
 const BATCH_SIZE = 10;
 
 const localeFile = (lang) => path.join(I18N_DIR, `${lang}.ts`);
+
+/**
+ * Keys a refresh re-translated and got the same answer back for.
+ *
+ * The staleness walk reads value *changes*, so a key whose correct translation
+ * is unchanged by an English edit — `nav.ai` survived "AI and agents" becoming
+ * "AI & agents" — never records a change and stays flagged after every run.
+ * Left alone that turns into ten permanent false positives, which is how a
+ * check stops being read. Recording the English value it was confirmed against
+ * clears it, and re-flags it the moment that English moves again.
+ */
+const CHECKPOINT_FILE = path.join(I18N_DIR, '.translation-checkpoint.json');
+const fingerprint = (value) => createHash('sha1').update(value).digest('hex').slice(0, 12);
+
+async function loadCheckpoint() {
+    try {
+        return JSON.parse(await fs.readFile(CHECKPOINT_FILE, 'utf-8'));
+    } catch {
+        return {};
+    }
+}
+
+async function saveCheckpoint(checkpoint) {
+    const ordered = Object.fromEntries(
+        Object.keys(checkpoint).sort().map((lang) => [
+            lang,
+            Object.fromEntries(Object.keys(checkpoint[lang]).sort().map((k) => [k, checkpoint[lang][k]])),
+        ])
+    );
+    await fs.writeFile(CHECKPOINT_FILE, JSON.stringify(ordered, null, 2) + '\n', 'utf-8');
+}
 
 /**
  * Reads a locale module without a TypeScript loader.
@@ -324,10 +356,21 @@ async function main() {
     const englishKeys = Object.keys(english);
     console.log(`Source: ${SOURCE_LANG}.ts — ${englishKeys.length} keys`);
 
+    const checkpoint = await loadCheckpoint();
+    let checkpointDirty = false;
+
     let staleByLang = {};
     if (REFRESH_STALE) {
         console.log('Replaying src/i18n history to find stale keys...');
         ({ stale: staleByLang } = findStaleKeys(TARGET_LANGUAGES));
+
+        // Drop anything a previous run confirmed against this exact English.
+        for (const lang of TARGET_LANGUAGES) {
+            const checked = checkpoint[lang] ?? {};
+            staleByLang[lang] = staleByLang[lang].filter(
+                ({ key }) => checked[key] !== fingerprint(english[key])
+            );
+        }
     }
 
     for (const lang of TARGET_LANGUAGES) {
@@ -353,6 +396,7 @@ async function main() {
             }
         }
 
+
         if (missingKeys.length === 0 && staleKeys.length === 0) {
             console.log(`✔ [${lang}] up to date (${Object.keys(existing).length} keys)`);
             continue;
@@ -375,9 +419,26 @@ async function main() {
             console.log(`\n[${lang}] refreshing ${staleKeys.length} stale key(s)`);
             const translations = await translateKeys(lang, staleKeys, english, existing);
             if (!translations) return;
-            await replaceEntries(lang, staleKeys, translations);
-            console.log(`✅ [${lang}] refreshed ${staleKeys.length} key(s)`);
+
+            const rewritten = staleKeys.filter((key) => translations[key] !== existing[key]);
+            const confirmed = staleKeys.filter((key) => translations[key] === existing[key]);
+
+            if (rewritten.length) await replaceEntries(lang, rewritten, translations);
+            if (confirmed.length) {
+                checkpoint[lang] ??= {};
+                for (const key of confirmed) checkpoint[lang][key] = fingerprint(english[key]);
+                checkpointDirty = true;
+            }
+            console.log(
+                `✅ [${lang}] rewrote ${rewritten.length} key(s)` +
+                (confirmed.length ? `, confirmed ${confirmed.length} already correct` : '')
+            );
         }
+    }
+
+    if (checkpointDirty) {
+        await saveCheckpoint(checkpoint);
+        console.log(`\nCheckpoint updated: ${path.relative(process.cwd(), CHECKPOINT_FILE)}`);
     }
 
     console.log('\nDone. Run `npx astro build` to verify the locale files still parse.');
