@@ -231,19 +231,22 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
         { path: paths.searchFile, contents: search }
     ];
 
-    // The `after` plan against the real database is what will actually run;
-    // its withheld constraints are what this change asks for and does not get.
-    // Taken from `after` alone rather than differenced against `before`,
-    // because a constraint that was already unenforceable is still something
-    // the person confirming this change should see named.
-    const withheldConstraints = planCollectionSchemaEnsure(input.after, existing, options)
-        .withheldConstraints;
+    // Both sides planned once, here, rather than through `additiveStatements` —
+    // which would plan `after` a second time for the withheld constraints. The
+    // planner is pure, so a second call is only wasted work rather than a
+    // correctness problem, but this runs on every `/plan` keystroke in the panel.
+    const previous = planCollectionSchemaEnsure(input.before, existing, options);
+    const next = planCollectionSchemaEnsure(input.after, existing, options);
+    const already = new Set(previous.statements);
 
     return {
         files: [...(input.sourceFiles ?? []), ...generated],
-        statements: additiveStatements(input.before, input.after, existing, options),
+        statements: next.statements.filter(statement => !already.has(statement)),
         classified,
         message: commitMessage(classified),
-        withheldConstraints
+        // From the `after` plan alone rather than differenced against `before`:
+        // a constraint that was already unenforceable is still something the
+        // person confirming this change should see named.
+        withheldConstraints: next.withheldConstraints
     };
 }

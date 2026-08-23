@@ -123,7 +123,9 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
     // The in-flight probe, so `ready()` can await the same one the effect
     // started rather than issuing a second. Keyed by client+authKey the same way
     // the effect is: a sign-in changes the answer, so it has to be re-asked.
-    const probe = useRef<{ key: unknown[]; promise: Promise<LiveSchemaStatus> }>();
+    // `undefined` passed explicitly: React 19's `useRef` takes no zero-argument
+    // overload, and omitting it is an error rather than a default.
+    const probe = useRef<{ key: unknown[]; promise: Promise<LiveSchemaStatus> } | undefined>(undefined);
 
     const ready = useCallback((): Promise<LiveSchemaStatus> => {
         const key = [client, authKey];
