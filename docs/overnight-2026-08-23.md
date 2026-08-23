@@ -180,6 +180,40 @@ permanent storage that any org member can create without deploying.
 
 ---
 
+## 4b. Another session was working on the same files
+
+`main` moved overnight and a trial merge conflicts in four files. This is not a
+problem to resolve blind — it is information.
+
+**The same bug was found twice, independently.** `27238a597 fix(selfhost): the
+published image could not load its own driver` is the chokidar fix, same
+diagnosis and same remedy (lazy import), reached from the other direction: they
+built `verify:selfhost:docker`, which runs the compose recipe the way a stranger
+runs it, and it found the same thing on its first run. It also found a database
+restart-loop the compose file has had since the postgres 17 → 18 bump. So my
+`757019e9d` is redundant — take theirs.
+
+**Their gate and mine are complements, not duplicates.**
+`verify:selfhost:docker` exercises the documented compose recipe end to end from
+outside the container. `check:runtime-image:boots` exercises the image's two
+bundle-delivery modes against a real Postgres, including `bundle.mode=url`, which
+the compose recipe does not use. Both are worth having; neither subsumes the
+other.
+
+**The collision found a real gap in my work.** `b0a97a1f3` changed the
+entrypoint's dedupe so it LINKS the framework in when the bundle has none, rather
+than only repairing a duplicate — because absent is the common case, and without
+it every custom function fails to load while the pod reports healthy. I had
+lifted that step into the runtime *with the flaw*, and the fetch path would have
+reproduced it. Fixed in `9d8eb54f5`, mutation-tested.
+
+Conflicting files, for whoever integrates: `docker/entrypoint.mjs`,
+`packages/server-postgres/src/schema/generate-{drizzle-schema,postgres-ddl}.ts`,
+`packages/server/src/collections/validate-config.ts`. The last is an ordinary
+context conflict with the vector-index work.
+
+---
+
 ## 5. What this did not cover
 
 Two hunts ran. The first covered env vars, filenames, manifest keys, fields
