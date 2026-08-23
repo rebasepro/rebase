@@ -20,72 +20,52 @@ const base = { rebase: "^1",
 apps: { backend: { type: "backend",
 runtime: "managed" } } };
 
+/**
+ * The `storage` block is gone.
+ *
+ * It used to be validated here in detail — engine required, transport a closed
+ * set, two keys never allowed to collapse onto one environment variable suffix.
+ * All of that is still enforced, at the declaration instead: `bucket("media",
+ * { engine: "s3" })` refuses an unknown engine at the call site, and
+ * `rebase resources` reports a suffix collision with both keys named.
+ *
+ * What is left to test here is that the block is REFUSED rather than ignored.
+ * A key that still parses and quietly does nothing is the failure this whole
+ * change removes — and it is the specific failure this block had, because the
+ * runtime used to merge it with the code's declarations and let it win.
+ */
 describe("rebase.json storage block", () => {
-    it("is optional — omitting it means one default source", () => {
+    it("is refused, naming the replacement", () => {
+        const { issues } = validateManifest({
+            ...base,
+            storage: { media: { engine: "s3" } }
+        });
+        expect(issues).toHaveLength(1);
+        expect(issues[0].path).toBe("storage");
+        expect(issues[0].message).toMatch(/no longer read/);
+        expect(issues[0].message).toMatch(/bucket\("media", \{ engine: "s3" \}\)/);
+        expect(issues[0].message).toMatch(/rebase resources --write/);
+    });
+
+    it("says why it is refused rather than ignored", () => {
+        const { issues } = validateManifest({ ...base, storage: { media: { engine: "s3" } } });
+        expect(issues[0].message).toMatch(/merged with the code's declarations and silently win/);
+    });
+
+    it("is refused however malformed it is, because the shape no longer matters", () => {
+        // Previously each of these produced its own targeted issue. There is
+        // nothing to validate now — the block itself is the error.
+        for (const storage of [{ media: { label: "no engine" } }, { media: { engine: "s3", transport: "sideways" } }, { "---": { engine: "s3" } }, ["media"]]) {
+            const { issues } = validateManifest({ ...base, storage });
+            expect(issues).toHaveLength(1);
+            expect(issues[0].path).toBe("storage");
+        }
+    });
+
+    it("omitting it is still the ordinary case", () => {
         const { manifest, issues } = validateManifest(base);
         expect(issues).toEqual([]);
         expect(manifest?.storage).toBeUndefined();
-    });
-
-    it("carries declared sources through validation", () => {
-        const { manifest, issues } = validateManifest({
-            ...base,
-            storage: {
-                "(default)": { engine: "s3" },
-                media: { engine: "s3",
-label: "Media" },
-                avatars: { engine: "firebase",
-transport: "direct" }
-            }
-        });
-        expect(issues).toEqual([]);
-        expect(manifest?.storage).toEqual({
-            "(default)": { engine: "s3" },
-            media: { engine: "s3",
-label: "Media" },
-            avatars: { engine: "firebase",
-transport: "direct" }
-        });
-    });
-
-    it("requires an engine", () => {
-        const { issues } = validateManifest({ ...base,
-storage: { media: { label: "Media" } } });
-        expect(issues).toHaveLength(1);
-        expect(issues[0].path).toBe("storage.media.engine");
-    });
-
-    it("rejects an unknown transport", () => {
-        const { issues } = validateManifest({
-            ...base,
-            storage: { media: { engine: "s3",
-transport: "sideways" } }
-        });
-        expect(issues[0].path).toBe("storage.media.transport");
-    });
-
-    it("rejects two keys that would read the same environment variables", () => {
-        // The whole reason this is validated at all: without it, `media_cdn`
-        // silently reads `media-cdn`'s bucket and credentials.
-        const { issues } = validateManifest({
-            ...base,
-            storage: { "media-cdn": { engine: "s3" },
-media_cdn: { engine: "s3" } }
-        });
-        expect(issues).toHaveLength(1);
-        expect(issues[0].message).toMatch(/same environment variable suffix/);
-    });
-
-    it("rejects a key that cannot become a variable name", () => {
-        const { issues } = validateManifest({ ...base,
-storage: { "---": { engine: "s3" } } });
-        expect(issues[0].path).toBe("storage.---");
-    });
-
-    it("rejects a non-object storage block", () => {
-        const { issues } = validateManifest({ ...base,
-storage: ["media"] });
-        expect(issues[0].path).toBe("storage");
     });
 });
 

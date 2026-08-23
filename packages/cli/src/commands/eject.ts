@@ -26,6 +26,7 @@ import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths, writeManifest } from "../manifest";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { ejectInfra } from "../resources/eject-infra-command";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -166,7 +167,8 @@ image: platform runtime upgrades no longer reach it, and CORS, auth wiring,
 storage and shutdown become yours to configure.
 
 ${chalk.bold("Usage")}
-  rebase eject [app]
+  rebase eject [app]           Take ownership of the server process
+  rebase eject infra           Take ownership of where resources live
 
 ${chalk.bold("Options")}
   --dry-run                    List what would change, and change nothing
@@ -199,6 +201,15 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     // Strict parsing rejects an undeclared flag rather than filing it under the
     // positionals, so the first one is the app — there is nothing to filter out.
     const requested = positionals[0];
+
+    // `infra` is the other rung of the ladder: this command hands over the
+    // process, that one hands over the addresses. Dispatched here rather than
+    // as its own top-level command so that "how do I stop the platform doing
+    // this for me" has one answer to look up.
+    if (requested === "infra") {
+        await ejectInfra(projectRoot, { dryRun, force });
+        return;
+    }
 
     let loaded;
     try {

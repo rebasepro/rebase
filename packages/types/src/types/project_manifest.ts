@@ -26,6 +26,7 @@
  */
 
 import type { StorageSourceDefinition } from "./storage_source";
+import type { ResourceGraph } from "./resources";
 
 /**
  * Which kind of thing an app is.
@@ -211,27 +212,20 @@ export interface RebaseProjectManifest {
      */
     apps: Record<string, RebaseAppConfig>;
     /**
-     * Storage sources this project uses, keyed by source key.
+     * Buckets are NOT declared here any more.
      *
-     * **Topology only — never credentials.** Which buckets exist is a property of
-     * the project and belongs in the repository; how to reach each one is a
-     * property of the deployment and lives in the environment, read per source
-     * from `<BASE>__<KEY>` (`S3_BUCKET__MEDIA` for a source keyed `media`). The
-     * default source takes no suffix, so a single-bucket project configured with
-     * plain `S3_BUCKET` keeps working having declared nothing at all.
+     * They were, and the runtime merged this block with the declarations in
+     * config code — a bucket named in both had one engine kept and the other
+     * silently discarded. Two homes for one concept, with a merge to decide
+     * between them, is the shape this whole model replaced.
      *
-     * Declared here rather than only in the config package because this file is
-     * the one artifact a host can read *before* running a build. That is what
-     * lets a console show "this project wants a `media` bucket, and it has none"
-     * on a project's first deploy, and it is why the managed and custom runtimes
-     * can present the same list — a custom build emits no bundle manifest, so a
-     * declaration that lived only in compiled config would leave every custom
-     * project invisible.
-     *
-     * Omitted entirely means one default source, which is the overwhelmingly
-     * common project and must not be required to say so.
+     * `bucket("media", { engine: "s3" })` in the project's config declares one
+     * now, and `rebase resources --write` generates `rebase.resources.json`,
+     * which is what a host reads before a build. A `storage` block left in this
+     * file is refused by the validator, by name, with the replacement in the
+     * message — not ignored, because a key that still parses and does nothing
+     * is the failure this removed.
      */
-    storage?: Record<string, RebaseStorageSourceConfig>;
     /**
      * Repository-wide opt-out from anonymous CLI usage sharing.
      *
@@ -311,8 +305,33 @@ export const BUNDLE_FORMAT_VERSION = 2;
  * any number of minors and patches while this stays put. It changes only when
  * the bundle/runtime contract breaks compatibility, and a project's
  * `manifest.runtime` range is matched against *this*.
+ *
+ * ## v2 — resources are declared, not configured
+ *
+ * `RebaseBackendConfig.dataSources` and `.storageSources` are gone. A project
+ * declares its databases and buckets with `database()` / `bucket()` in its
+ * config, and the runtime reads those declarations.
+ *
+ * This had to be a major, and the reason is the managed tier: it moves projects
+ * onto new images WITHOUT rebuilding them. A bundle built against v1 exports
+ * those keys, and a v2 runtime refuses them at boot — so without this bump, one
+ * image rollout would crash-loop every tenant that had ever declared a second
+ * database or bucket, in a wave, with the cause in a container log nobody is
+ * watching.
+ *
+ * With the bump, a v1 bundle on a v2 runtime is refused by
+ * `assertBundleCompatibility` with the remedy in the message, and the platform
+ * keeps it on a v1 image until it is rebuilt. That is the whole purpose of this
+ * number.
+ *
+ * **Release order matters and is not optional.** The control plane is the side
+ * that rejects, so it ships FIRST: raise `SUPPORTED_RUNTIME_CONTRACT` in the
+ * saas repo (it rejects only `contract >` its own, so it then accepts both),
+ * deploy that, and only then release a runtime implementing v2. Shipping the
+ * runtime first turns every deploy into a rejected intake blaming the tenant's
+ * bundle.
  */
-export const RUNTIME_CONTRACT_VERSION = 1;
+export const RUNTIME_CONTRACT_VERSION = 2;
 
 /** Where the runtime finds each part of the bundle. Paths are bundle-relative. */
 export interface RebaseBundleEntrypoints {
@@ -485,17 +504,27 @@ export interface RebaseBundleManifest {
         /** Whether the config package exports a `storageAuthorize` hook. */
         authorize: boolean;
         /**
-         * Every storage source this bundle expects, resolved at build time from
-         * `rebase.json`'s `storage` block merged with any `storageSources` the
-         * config package exports.
+         * Buckets, on bundles built before {@link RebaseBundleManifest.resources}.
          *
-         * Recorded so the runtime does not have to import user code to learn its
-         * own topology, and so a host can tell — from the artifact alone, before
-         * starting anything — which buckets need configuring. Absent on bundles
-         * built before this field existed, which means one default source.
+         * No longer written. A host reads `resources`, which carries every kind
+         * in one list; this stays declared so a control plane can keep reading
+         * the bundles a project shipped before it was rebuilt.
          */
         sources?: StorageSourceDefinition[];
     };
+    /**
+     * Everything the project declares it needs — databases, buckets, topics,
+     * and whatever kind is registered next.
+     *
+     * Recorded so a host can tell, from the artifact alone and before starting
+     * anything, what a deploy will need provisioned. That question used to be
+     * answerable for buckets and for nothing else, because buckets were the
+     * only kind written into an artifact — which is how a project's databases
+     * became invisible to the platform that runs them.
+     *
+     * Absent on bundles built before this field existed.
+     */
+    resources?: ResourceGraph;
     deps: {
         /** Runtime dependencies of user code, as declared. */
         declared: Record<string, string>;

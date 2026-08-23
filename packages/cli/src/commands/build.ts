@@ -20,7 +20,7 @@ import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
-import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
+import { buildableApps, findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import {
     buildBundle,
     buildStaticBundle,
@@ -30,6 +30,7 @@ import {
     VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
+import { deriveResourceGraph, writeResourceGraphFile } from "../resources/derive";
 
 function printHelp(): void {
     console.log(`
@@ -163,13 +164,32 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
         }
 
         if (app.type === "backend") {
+            // Derived per backend app, because each has its own config
+            // directory. Issues are fatal here rather than reported: a bundle
+            // whose manifest is missing a bucket the code declares would deploy
+            // into a tenant with nothing provisioned for it, and the first sign
+            // would be uploads failing in production.
+            const { graph: resourceGraph, issues } = await deriveResourceGraph({
+                configDir: path.join(projectRoot, resolveBackendPaths(app, projectRoot).config)
+            });
+            if (issues.length > 0) {
+                console.error(chalk.red(`\n  ✗ ${issues.length} problem(s) in the declared resources:\n`));
+                for (const issue of issues) console.error(`    ${chalk.bold(issue.path)}  ${issue.message}`);
+                console.error("");
+                process.exitCode = 1;
+                return;
+            }
+            // Written alongside the bundle so the repository records what this
+            // project needs. `rebase resources --check` is what keeps it honest.
+            writeResourceGraphFile(projectRoot, resourceGraph);
+
             const result = await buildBundle({
                 projectRoot,
                 appName: name,
                 app,
                 outDir: args["--output"],
                 runtimeRange: manifest.rebase,
-                storage: manifest.storage,
+                resources: resourceGraph,
                 skipTypeCheck: args["--skip-type-check"],
                 skipSchema: args["--skip-schema"],
                 vendor: args["--no-vendor"] ? false : (args["--vendor"] ? true : undefined)

@@ -60,7 +60,33 @@ export default defineConfig(() => ({
                 warn(warning);
             },
             output: {
-                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);',
+                /**
+                 * Prepended verbatim to EVERY chunk, which is the whole
+                 * difficulty: a banner is opaque text, so rollup's renamer
+                 * cannot see the bindings it introduces and can never
+                 * deconflict against them.
+                 *
+                 * It used to bind `process` directly — `import process from
+                 * "process"`. zod exports a function called `process`, and the
+                 * day a graph change put zod in a chunk with this banner the
+                 * output was `SyntaxError: Identifier 'process' has already
+                 * been declared`: a package that builds, passes every
+                 * structural gate, and throws the moment anything imports it.
+                 * Which chunk zod lands in is not something anyone controls,
+                 * so this was luck rather than design.
+                 *
+                 * Now nothing named `process` is declared. Node already
+                 * provides the global in ESM; the assignment is a belt for a
+                 * host that somehow does not, and `??=` means it never
+                 * overwrites a real one. `__rebaseRequire` is namespaced for
+                 * the same reason — `require` is a plausible name for bundled
+                 * CJS to declare.
+                 */
+                banner:
+                    'import { createRequire as __rebaseCreateRequire } from "module";' +
+                    ' import __rebaseProcess from "process";' +
+                    ' globalThis.process ??= __rebaseProcess;' +
+                    ' const require = __rebaseCreateRequire(import.meta.url);',
                 globals: {
                     "json-logic-js": "jsonLogic",
                     "fast-equals": "fastEquals",

@@ -267,10 +267,17 @@ spa: true });
  *
  * Raising RUNTIME_CONTRACT_VERSION additionally invalidates every project's
  * `rebase` range, so it is a major of the whole product, not a format tweak.
+ *
+ * It was raised to **2** when resources moved from configuration to
+ * declaration: `RebaseBackendConfig.dataSources` and `.storageSources` are gone,
+ * a v1 bundle exports them, and a v2 runtime refuses them at boot. The managed
+ * tier moves projects onto new images without rebuilding, so accepting them
+ * quietly would have crash-looped a fleet on one rollout. The control plane's
+ * SUPPORTED_RUNTIME_CONTRACT was raised first, per step 3 above.
  */
 describe("the version constants", () => {
     it("are what every current consumer was written against", () => {
         expect(BUNDLE_FORMAT_VERSION).toBe(2);
-        expect(RUNTIME_CONTRACT_VERSION).toBe(1);
+        expect(RUNTIME_CONTRACT_VERSION).toBe(2);
     });
 });

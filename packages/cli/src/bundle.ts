@@ -24,9 +24,8 @@ import {
     RUNTIME_CONTRACT_VERSION,
     computeSchemaVersion,
     findStorageSuffixCollision,
-    normalizeStorageSources,
     type CollectionConfig,
-    type DeclaredStorageSources,
+    type ResourceGraph,
     type NativeDependency,
     type RebaseBundleManifest,
     type RebaseBundleFunction,
@@ -57,7 +56,14 @@ export interface BuildBundleOptions {
      * Passed in rather than re-read here so `rebase.json` is parsed and validated
      * once, by the command that owns it.
      */
-    storage?: DeclaredStorageSources;
+    /**
+     * The project's resource graph, derived from its config.
+     *
+     * Recorded in the bundle manifest so a host can read what the project needs
+     * without running it — which is what lets a console show "wants a `media`
+     * bucket, has none" before a first deploy has produced anything.
+     */
+    resources?: ResourceGraph;
     /**
      * Install the declared dependencies into the bundle at build time.
      *
@@ -1082,13 +1088,21 @@ stdio: "inherit" });
     // Resolve the declared buckets now, and refuse the build if two of them would
     // read the same environment variables. Catching it here means a rename, not a
     // tenant that silently served one bucket's files from another's credentials.
-    const storageSources = normalizeStorageSources(options.storage, undefined);
+    const resourceGraph: ResourceGraph = options.resources ?? { version: 1, resources: [] };
+    const storageSources = resourceGraph.resources
+        .filter(r => r.kind === "bucket")
+        .map(r => ({
+            key: r.key,
+            engine: r.engine,
+            transport: r.transport,
+            ...(r.label !== undefined ? { label: r.label } : {})
+        }));
     const collision = findStorageSuffixCollision(storageSources.map(s => s.key));
     if (collision) {
         throw new Error(
-            `Storage sources "${collision.a}" and "${collision.b}" in rebase.json both map to the ` +
-            `environment variable suffix "${collision.suffix || "(none)"}", so they would read each ` +
-            "other's configuration. Rename one of them."
+            `Buckets "${collision.a}" and "${collision.b}" both map to the environment variable ` +
+            `suffix "${collision.suffix || "(none)"}", so they would read each other's ` +
+            "configuration. Rename one of them."
         );
     }
 
@@ -1158,9 +1172,12 @@ stdio: "inherit" });
             nativeModules: nativeModules.length > 0 ? nativeModules : undefined
         },
         storage: {
-            authorize: declaresStorageAuthorize,
-            ...(storageSources.length > 0 ? { sources: storageSources } : {})
+            // The hook, not the buckets. Those live in `resources` now, with
+            // every other kind, so a host reads one list instead of one per
+            // kind — which is what let databases and buckets drift apart.
+            authorize: declaresStorageAuthorize
         },
+        resources: resourceGraph,
         deps: { declared },
         build: {
             cli: resolveCliVersion(),

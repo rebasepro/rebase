@@ -6,13 +6,18 @@ import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
-    normalizeStorageSources,
     type CollectionConfig,
     type DataSourceDefinition,
     type InitializedDriver,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
+import { loadBundleResourceGraph } from "./resource-loading.js";
+import {
+    assertNoReplacedResourceConfig,
+    graphToDataSources,
+    graphToStorageSources
+} from "./resource-adapters.js";
 
 import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import { loadCollectionsFromDirectory } from "../collections/loader";
@@ -176,19 +181,23 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     // ── Declarations ─────────────────────────────────────────────────────────
     const configExports = await loadBundleConfigExports(bundle);
-    const dataSourceDefs: DataSourceDefinition[] | undefined = configExports.dataSources;
-    // `rebase.json` (recorded in the manifest) is authoritative; config code may
-    // add sources it does not mention — a `direct`-transport bucket reached by a
-    // provider SDK has no reason to appear in a document the platform reads for
-    // provisioning. Merging rather than choosing is what keeps the console's view
-    // and the tenant's reality the same list. A bundle built before the manifest
-    // carried sources falls through to the config exports alone.
-    const declaredStorage = normalizeStorageSources(
-        bundle.manifest.storage?.sources,
-        configExports.storageSources
-    );
+
+    // A bundle built against the old shape is refused here rather than booted
+    // with its declarations ignored. This is the path a self-hosted container
+    // and a managed tenant both take, so a silent "your buckets are gone" would
+    // surface as 500s on the storage routes and nothing else.
+    assertNoReplacedResourceConfig(configExports as unknown as Record<string, unknown>);
+
+    // One source of truth, evaluated. There is no merge left to do: the graph
+    // is built from the declarations in the project's own code, and the
+    // committed rebase.resources.json is for readers that do not run it.
+    const resourceGraph = await loadBundleResourceGraph(bundle);
+    const graphDataSources = graphToDataSources(resourceGraph);
+    const graphStorageSources = graphToStorageSources(resourceGraph);
+    const dataSourceDefs: DataSourceDefinition[] | undefined =
+        graphDataSources.length > 0 ? graphDataSources : undefined;
     const storageSourceDefs: StorageSourceDefinition[] | undefined =
-        declaredStorage.length > 0 ? declaredStorage : undefined;
+        graphStorageSources.length > 0 ? graphStorageSources : undefined;
 
     // ── Databases ────────────────────────────────────────────────────────────
     const resolvedSources = resolveDataSources(process.env, dataSourceDefs);
@@ -281,9 +290,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         functionsSelection: runtimeRole.functionsSelection,
         functionsUpstream: runtimeRole.functionsUpstream,
         bootstrappers: dataSources.map(s => s.bootstrapper),
-        dataSources: dataSourceDefs,
         storage,
-        storageSources: storageSourceDefs,
         // Per-object access control comes from the project's own code — no
         // environment variable can express "this user may read this key".
         storageAuthorize: configExports.storageAuthorize,

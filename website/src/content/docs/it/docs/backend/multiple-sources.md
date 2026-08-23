@@ -10,24 +10,37 @@ Un progetto non è limitato a un solo database e un solo bucket. Le collezioni i
 
 Due passaggi: **dichiara** le origini nel tuo pacchetto di configurazione, quindi **configura** ciascuna di esse con variabili d'ambiente derivate dalla sua chiave.
 
-## Dichiarare le origini
+## Dichiarare le risorse
 
-Esporta `dataSources` e `storageSources` dall'file `index.ts` del tuo pacchetto di configurazione. Sono condivisi con il frontend, che utilizza le stesse dichiarazioni per decidere se comunicare con un'origine tramite l'API di Rebase o direttamente.
+Ogni cosa con un nome di cui un progetto ha bisogno — un database, un bucket, un
+topic — si **dichiara con un costruttore** in `config/resources.ts`. Una sola
+regola, qualunque sia il tipo: non esiste un secondo posto in cui guardare.
 
 ```ts
-// config/index.ts
-import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+// config/resources.ts
+import { bucket, database, topic } from "@rebasepro/types";
 
-export const dataSources: DataSourceDefinition[] = [
-    { key: "(default)", engine: "postgres" },
-    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
-];
+/** Il database del progetto. Legge DATABASE_URL, come sempre. */
+export const main = database();
 
-export const storageSources: StorageSourceDefinition[] = [
-    { key: "(default)", engine: "local", transport: "server" },
-    { key: "media", engine: "s3", transport: "server", label: "Public media" }
-];
+/** Un secondo database. Legge DATABASE_URL__ANALYTICS. */
+export const analytics = database("analytics", { label: "Analytics warehouse" });
+
+/** Un bucket. Legge S3_BUCKET__MEDIA. */
+export const media = bucket("media", { engine: "s3", label: "Public media" });
+
+/** Un topic, recapitato tramite la coda di lavori durevole. */
+export const signups = topic<{ userId: string }>("signups");
 ```
+
+`rebase resources` elenca ciò che un progetto dichiara, `--write` rigenera
+`rebase.resources.json` e `--check` fallisce se quel file è obsoleto. Quel file
+è **generato** e va committato: è ciò che un host legge per decidere cosa
+approvvigionare *prima* di eseguire qualsiasi cosa.
+
+Un motore sconosciuto viene rifiutato al punto di chiamata, non più tardi. Per
+uno che questa build non conosce si usa `custom:` — ad esempio
+`bucket("objects", { engine: "custom:minio" })`.
 
 Quindi indirizza una collezione verso una di esse:
 

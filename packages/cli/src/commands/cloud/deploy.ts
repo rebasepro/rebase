@@ -34,8 +34,9 @@ import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declare
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
-import { loadManifest, findBackendApp, selectDeployApp } from "../../manifest";
+import { loadManifest, findBackendApp, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
+import { deriveResourceGraph } from "../../resources/derive";
 import type { RebaseAppConfig, RebaseBackendAppConfig } from "@rebasepro/types";
 
 interface Deployment {
@@ -253,14 +254,30 @@ appName: target.name });
         }
 
         progress(chalk.gray("  Building bundle..."));
+        // `target` is decided above, by the manifest. Naming it `backend` here
+        // is what the rest of this block reads.
         const backend = { name: target.name,
 app: target.app as RebaseBackendAppConfig };
+
+        // Same derivation `rebase build` does, and fatal for the same reason: a
+        // bundle whose manifest is missing a bucket the code declares deploys
+        // into a tenant with nothing provisioned for it. After `backend` on
+        // purpose — the config directory it reads comes from that app.
+        const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph({
+            configDir: path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config)
+        });
+        if (resourceIssues.length > 0) {
+            throw new Error(
+                `${resourceIssues.length} problem(s) in the declared resources:\n` +
+                resourceIssues.map(i => `  ${i.path}  ${i.message}`).join("\n")
+            );
+        }
         const result = await buildBundle({
             projectRoot,
             appName: backend.name,
             app: backend.app,
             runtimeRange: loaded.manifest.rebase,
-            storage: loaded.manifest.storage,
+            resources: resourceGraph,
             skipTypeCheck: opts.skipTypeCheck,
             log: (m: string) => progress(chalk.gray(m))
         });

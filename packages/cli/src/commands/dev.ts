@@ -407,6 +407,29 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         const pmCmds = getPMCommands(pm);
         const runDevCmd = pmCmds.run("dev");
 
+        /**
+         * Pin the frontend's port when asked.
+         *
+         * Vite takes 5173 and hands it to the first asker, so a machine already
+         * running one dev server gives the second either a bind failure or —
+         * worse — somebody else's app on the address you expected. The backend
+         * port has been pinnable since it had the same problem; this is the
+         * other half.
+         *
+         * npm needs `--` before script arguments and pnpm does not, which is
+         * the kind of difference that silently passes `--port` to the package
+         * manager instead of to Vite.
+         */
+        const frontendPort = process.env.REBASE_FRONTEND_PORT;
+        if (frontendPort) {
+            if (!/^\d+$/.test(frontendPort)) {
+                throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(frontendPort)}.`);
+            }
+            if (pm === "npm") runDevCmd.push("--");
+            runDevCmd.push("--port", frontendPort, "--strictPort");
+            console.log(`  ${chalk.gray("↳ frontend port")} = ${chalk.white(frontendPort)}`);
+        }
+
         const frontendChild = execa(
             runDevCmd[0],
             runDevCmd.slice(1),

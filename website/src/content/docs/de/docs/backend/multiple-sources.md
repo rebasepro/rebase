@@ -13,26 +13,38 @@ es darum, wie jede benannte Quelle ihre Konfiguration erhält.
 Zwei Schritte: **Deklarieren** Sie die Quellen in Ihrem Konfigurationspaket und **konfigurieren** Sie
 dann jede einzelne mit Umgebungsvariablen, die von ihrem Schlüssel abgeleitet werden.
 
-## Quellen deklarieren
+## Ressourcen deklarieren
 
-Exportieren Sie `dataSources` und `storageSources` aus der `index.ts` Ihres Konfigurationspakets.
-Diese werden mit dem Frontend geteilt, das dieselben Deklarationen verwendet, um zu entscheiden,
-ob es mit einer Quelle über die Rebase-API oder direkt kommuniziert.
+Alles, was ein Projekt benötigt und einen Namen hat — eine Datenbank, ein
+Bucket, ein Topic — wird **mit einem Konstruktor deklariert**, in
+`config/resources.ts`. Eine Regel, unabhängig von der Art: es gibt keine zweite
+Stelle, an der man nachsehen müsste.
 
 ```ts
-// config/index.ts
-import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+// config/resources.ts
+import { bucket, database, topic } from "@rebasepro/types";
 
-export const dataSources: DataSourceDefinition[] = [
-    { key: "(default)", engine: "postgres" },
-    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
-];
+/** Die Datenbank des Projekts. Liest DATABASE_URL, wie bisher. */
+export const main = database();
 
-export const storageSources: StorageSourceDefinition[] = [
-    { key: "(default)", engine: "local", transport: "server" },
-    { key: "media", engine: "s3", transport: "server", label: "Public media" }
-];
+/** Eine zweite. Liest DATABASE_URL__ANALYTICS. */
+export const analytics = database("analytics", { label: "Analytics warehouse" });
+
+/** Ein Bucket. Liest S3_BUCKET__MEDIA. */
+export const media = bucket("media", { engine: "s3", label: "Public media" });
+
+/** Ein Topic, zugestellt über die dauerhafte Job-Queue. */
+export const signups = topic<{ userId: string }>("signups");
 ```
+
+`rebase resources` listet auf, was ein Projekt deklariert, `--write` erzeugt
+`rebase.resources.json` neu, und `--check` schlägt fehl, wenn diese Datei
+veraltet ist. Sie wird **generiert** und eingecheckt: ein Host liest sie, um zu
+entscheiden, was bereitzustellen ist, *bevor* irgendetwas ausgeführt wird.
+
+Eine unbekannte Engine wird an der Aufrufstelle abgelehnt, nicht später. Für
+eine, die dieser Build nicht kennt, schreibt man `custom:` — etwa
+`bucket("objects", { engine: "custom:minio" })`.
 
 Richten Sie dann eine Collection auf eine davon aus:
 

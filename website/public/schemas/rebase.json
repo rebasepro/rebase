@@ -31,42 +31,12 @@
                 ]
             }
         },
-        "storage": {
-            "type": "object",
-            "description": "Storage sources this project uses, keyed by source key. Topology only — never credentials. Each source is configured from the environment as <BASE>__<KEY> (S3_BUCKET__MEDIA for a source keyed \"media\"); the default source takes no suffix. Omit entirely for a single default bucket.",
-            "propertyNames": {
-                "pattern": "^(\\(default\\)|[A-Za-z0-9][A-Za-z0-9._-]*)$",
-                "description": "Source key. Referenced by a property's storageSource, and uppercased into environment variable names."
-            },
-            "additionalProperties": { "$ref": "#/$defs/storageSource" }
-        },
         "telemetry": {
             "type": "boolean",
             "description": "Repository-wide opt-out from anonymous CLI usage sharing. Only `false` does anything: it suppresses sharing for everyone who clones this repository, overriding each developer's own opt-in. `true` is deliberately ignored — this file is committed, so a `true` here would answer a privacy question on behalf of every colleague who later clones the repo. Individuals opt in with `rebase telemetry enable`."
         }
     },
     "$defs": {
-        "storageSource": {
-            "type": "object",
-            "required": ["engine"],
-            "additionalProperties": false,
-            "properties": {
-                "engine": {
-                    "type": "string",
-                    "description": "Engine backing this source.",
-                    "examples": ["s3", "gcs", "local"]
-                },
-                "transport": {
-                    "enum": ["server", "direct"],
-                    "default": "server",
-                    "description": "How the frontend reaches it. \"server\" proxies through /api/storage; \"direct\" means a provider SDK talks to the bucket and the backend is not in the upload path."
-                },
-                "label": {
-                    "type": "string",
-                    "description": "Human-readable name, shown in the console and the admin UI."
-                }
-            }
-        },
         "relativePath": {
             "type": "string",
             "minLength": 1,

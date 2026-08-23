@@ -509,6 +509,24 @@ describe("the schema stamp", () => {
      * Ordered after the api describe above deliberately — that boot is what
      * provisions this database, and therefore what stamps it.
      */
+    /**
+     * The fixture's manifest is committed, so a contract bump silently
+     * invalidates it — and the symptom is TEN unrelated failures, every one of
+     * them reporting whatever assertion it happened to make instead of the one
+     * fact that matters: the bundle was refused before it ever booted.
+     *
+     * This asserts the fixture against the constant, so the next bump fails
+     * once, here, naming the file to edit.
+     */
+    it("declares the contract this runtime implements", async () => {
+        const { RUNTIME_CONTRACT_VERSION } = await import("@rebasepro/types");
+        const manifest = JSON.parse(
+            await fs.readFile(path.join(PROJECT_ROOT, "manifest.json"), "utf-8")
+        ) as { runtime: { contract: number } };
+
+        expect(manifest.runtime.contract).toBe(RUNTIME_CONTRACT_VERSION);
+    });
+
     it("was written by the process that provisioned", async () => {
         const stamped = await stampedSchemaVersion();
 

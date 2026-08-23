@@ -17,6 +17,8 @@ export * from "./backend";
 export * from "./schema_editing";
 export * from "./channel_bus";
 export * from "./data_source";
+export * from "./resources";
+export * from "./resource_kinds";
 export * from "./storage_source";
 export * from "./cron";
 export * from "./backup";

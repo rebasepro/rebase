@@ -634,7 +634,7 @@ The backend is configured by the object passed to `initializeRebaseBackend(confi
 | `collections` | `AnyCollectionConfig[]` | — | Collections to serve |
 | `collectionsDir` | `string` | — | Directory to auto-discover collections from |
 | `basePath` | `string` | `"/api"` | Prefix for every API route |
-| `dataSources` | `DataSourceDefinition[]` | — | Declared sources; resolves each collection's engine and transport |
+| ~~`dataSources`~~ | — | — | **Removed.** Declared with `database("<key>")` in `config/resources.ts`; the backend reads the declarations and refuses this key at boot |
 | `surfaces` | `RuntimeSurfaceOptions` | all | Which HTTP surfaces this process mounts. Omit to mount everything |
 | `ownership` | `RuntimeOwnershipOptions` | all | Which background singletons this process runs (cron scheduler, job worker) |
 | `provisionSchema` | `boolean` | `true` | Whether this process creates the collection schema and its RLS policies at boot. `false` on every process but one in a split deployment |
@@ -653,7 +653,7 @@ The backend is configured by the object passed to `initializeRebaseBackend(confi
 | Option | Type | Description |
 |--------|------|-------------|
 | `storage` | `BackendStorageConfig \| StorageController \| Record<string, …>` | One backend, or a map of them for multi-bucket setups |
-| `storageSources` | `StorageSourceDefinition[]` | Only needed for `direct`-transport sources the backend does not proxy |
+| ~~`storageSources`~~ | — | **Removed.** Declared with `bucket("<key>")` in `config/resources.ts` |
 | `storageAuthorize` | `StorageAuthorize` | Per-object access control. **In production, storage refuses to boot unless this, `storagePublicRead`, or `storageInsecureAllowAnyAuthenticated` is set** |
 | `storagePublicRead` | `boolean` | Unauthenticated reads. Writes, deletes and listing still require auth |
 | `storageInsecureAllowAnyAuthenticated` | `boolean` | Opts out of the boot guard: any signed-in user may touch any key. Single-tenant only |

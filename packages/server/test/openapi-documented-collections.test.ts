@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import { database, resetDeclaredResources } from "@rebasepro/types";
 
 /**
  * Which collections the published document describes.
@@ -54,15 +55,15 @@ const started: Booted[] = [];
 
 async function boot(): Promise<Hono> {
     const app = new Hono();
+    // Declared, not configured. `transport` lives on the declaration, so the
+    // collection still names only which source it belongs to — and the backend
+    // reads the graph these registered rather than a `dataSources` array.
+    resetDeclaredResources();
+    database();
+    database("firestore", { engine: "firestore", transport: "direct" });
     const backend = await initializeRebaseBackend({
         app: app as never,
         server: {} as never,
-        // `transport` lives on the data-source definition, so the collection
-        // declares only which source it belongs to.
-        dataSources: [
-            { key: "(default)", engine: "postgres", transport: "server" },
-            { key: "firestore", engine: "firestore", transport: "direct" }
-        ],
         collections: [collection("jobs"), collection("orders", { dataSource: "firestore" })],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
