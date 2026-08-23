@@ -33,6 +33,15 @@ import { DEFAULT_COMMIT_PATHS, type SchemaCommitPaths } from "@rebasepro/types";
  * there. `undefined` when there is none, which is a project that predates the
  * file — the caller then keeps the historical behaviour rather than guessing.
  */
+/**
+ * Where a scaffolded project keeps its collection source, project-relative.
+ *
+ * A bundle's own collections directory is compiled output, so nothing on the
+ * running machine points at this. A deployment committing to a repository states
+ * it, and this is the default it states nothing against.
+ */
+export const DEFAULT_COLLECTIONS_PATH = "config/collections";
+
 export function findProjectRoot(startDir: string, levels = 5): string | undefined {
     let dir = path.resolve(startDir);
     for (let i = 0; i <= levels; i++) {

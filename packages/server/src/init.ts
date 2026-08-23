@@ -51,8 +51,10 @@ import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { createLiveSchemaRoutes } from "./api/live-schema-routes";
 import { mountWithLegacyAlias } from "./api/mount";
-import { commitPathsFor } from "./schema-edit/project-root";
-import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
+import { commitPathsFor, DEFAULT_COLLECTIONS_PATH } from "./schema-edit/project-root";
+import { createGitHubRepository } from "./schema-edit/github-repository";
+import { rewriteRemoteCollection } from "./schema-edit/remote-source";
+import type { SchemaEditPolicy, RemoteRepositoryConfig } from "./schema-edit/schema-edit-permissions";
 
 /**
  * Who may change this project's schema through a running backend.
@@ -63,7 +65,19 @@ import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
  *
  * @see `packages/server/src/schema-edit/schema-edit-permissions.ts`
  */
-export type LiveSchemaConfig = SchemaEditPolicy;
+export interface LiveSchemaConfig extends SchemaEditPolicy {
+    /**
+     * A repository to commit to when the source is not on this machine.
+     *
+     * A bundle deployment ships compiled output, so there is nothing for the
+     * collection editor to rewrite locally. Configure this and the change is
+     * read from the repository, rewritten, and committed back through the Git
+     * Data API — no clone, no working tree.
+     *
+     * Absent, live schema editing needs the project mounted and says so.
+     */
+    repository?: RemoteRepositoryConfig;
+}
 import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
 import nodePath from "node:path";
 import nodeFs from "node:fs/promises";
@@ -1669,15 +1683,22 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // 401 to an operator whose actual problem is an unconfigured
         // `collectionsDir`. Being told the wrong thing is worse than a 404, and
         // both are worse than being told.
-        if (!config.collectionsDir) {
+        // Either footing will do. Local source is the developer's case; a
+        // configured repository is the bundle's, where the collection file is
+        // fetched, rewritten and committed back without a working tree.
+        const remoteRepo = config.liveSchema?.repository;
+        const canEditSchema = Boolean(config.collectionsDir) || Boolean(remoteRepo);
+
+        if (!canEditSchema) {
             const unconfigured = new Hono<HonoEnv>();
             applyAdminGate(unconfigured, "Live schema editing");
             unconfigured.all("/*", (c) => c.json({
                 error: {
                     code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR",
                     message: "Live schema editing needs `collectionsDir` — the directory holding " +
-                        "this project's collection definitions — and this server was started " +
-                        "without one, so there is nothing for it to edit."
+                        "this project's collection definitions — or `liveSchema.repository`, a " +
+                        "repository to fetch them from. This server was started with neither, so " +
+                        "there is nothing for it to edit."
                 }
             }, 501));
             mountWithLegacyAlias(config.app, unconfigured, {
@@ -1686,21 +1707,30 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             });
         }
 
-        if (config.collectionsDir) {
+        if (canEditSchema) {
             const collectionsDir = config.collectionsDir;
             // Resolved once, at boot. A deployment either has a working tree or
             // it does not, and asking git on every request would be a process
             // spawn per keystroke in the panel.
-            const repositoryRoot = await findRepositoryRoot(collectionsDir);
+            const repositoryRoot = collectionsDir
+                ? await findRepositoryRoot(collectionsDir)
+                : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
             applyAdminGate(liveSchemaRouter, "Live schema editing");
 
             // Correct for a project in a subdirectory: the generated-artifact
             // paths are relative to the *project*, and the repository resolves
             // them against its own root. Those coincide only in a scaffold.
-            const commitPaths = repositoryRoot
-                ? commitPathsFor(collectionsDir, repositoryRoot)
-                : undefined;
+            // A remote repository states its own layout, because nothing on
+            // this machine can be walked up from to discover it.
+            const commitPaths = remoteRepo
+                ? commitPathsFor(
+                    nodePath.join("/", remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH),
+                    "/"
+                )
+                : (collectionsDir && repositoryRoot)
+                    ? commitPathsFor(collectionsDir, repositoryRoot)
+                    : undefined;
             if (commitPaths) {
                 logger.debug("Live schema editing commit paths relocated", { commitPaths });
             }
@@ -1718,6 +1748,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 getCollections: () => collectionRegistry.getRawCollections(),
                 getAdmin: () => defaultDriver.admin,
                 getRepository: (author) => {
+                    // A configured repository wins: a deployment that names one
+                    // means its source is *there*, even when a working tree
+                    // happens to exist beside the running process.
+                    if (remoteRepo) {
+                        return createGitHubRepository({
+                            auth: remoteRepo.auth,
+                            owner: remoteRepo.owner,
+                            repo: remoteRepo.repo,
+                            branch: remoteRepo.branch ?? "main",
+                            author
+                        });
+                    }
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
                 },
@@ -1732,14 +1774,53 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // control, and a caller that asks anyway gets a refusal that
                 // names the missing dependency.
                 writeSource: schemaEditorRoutes ? async (change) => {
-                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
-                    const editor = new AstSchemaEditor(collectionsDir);
-                    await editor.saveCollection(change.collectionId, change.collection, { partial: false });
+                    // Applies the edit the one way it is implemented, wherever
+                    // the file came from. `ts-morph` is what knows how to keep a
+                    // collection file's imports, comments and formatting, and a
+                    // second implementation of that for the remote case would be
+                    // a second thing to get wrong.
+                    const applyEdit = async (
+                        dir: string,
+                        collectionId: string,
+                        collection: Record<string, unknown>
+                    ) => {
+                        const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                        await new AstSchemaEditor(dir)
+                            .saveCollection(collectionId, collection, { partial: false });
+                    };
+
+                    // No source on this machine: fetch it, rewrite it in a
+                    // scratch directory, hand back the result. This is the whole
+                    // of what kept live schema editing local-only — not
+                    // authentication, not the Git Data API, but the editor
+                    // needing a file to open.
+                    if (remoteRepo) {
+                        const repository = config.liveSchema?.repository
+                            ? createGitHubRepository({
+                                auth: remoteRepo.auth,
+                                owner: remoteRepo.owner,
+                                repo: remoteRepo.repo,
+                                branch: remoteRepo.branch ?? "main"
+                            })
+                            : undefined;
+                        if (!repository) return [];
+                        return rewriteRemoteCollection(
+                            {
+                                repository,
+                                collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
+                                edit: applyEdit
+                            },
+                            change.collectionId,
+                            change.collection
+                        );
+                    }
+
+                    await applyEdit(collectionsDir!, change.collectionId, change.collection);
 
                     // Read back what it wrote. The editor resolves
                     // `<collectionsDir>/<id>.ts`, and the commit needs the
                     // contents rather than a promise that a file changed.
-                    const file = nodePath.join(collectionsDir, `${change.collectionId}.ts`);
+                    const file = nodePath.join(collectionsDir!, `${change.collectionId}.ts`);
                     const contents = await nodeFs.readFile(file, "utf8");
                     return [{
                         path: nodePath.relative(repositoryRoot!, file),
@@ -1749,12 +1830,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 // The same path `writeSource` resolves, derived without writing
                 // anything — the dirty-tree check has to know it before the
                 // edit, or it sees this change's own file and refuses.
-                sourcePathsFor: (change) => repositoryRoot
-                    ? [nodePath.relative(
+                sourcePathsFor: (change) => {
+                    if (remoteRepo) {
+                        const dir = (remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH)
+                            .replace(/\/+$/, "");
+                        return [`${dir}/${change.collectionId}.ts`];
+                    }
+                    if (!collectionsDir || !repositoryRoot) return [];
+                    return [nodePath.relative(
                         repositoryRoot,
                         nodePath.join(collectionsDir, `${change.collectionId}.ts`)
-                    )]
-                    : []
+                    )];
+                }
             }));
 
             // Admin-only, so it lives under `/api/admin` — see
