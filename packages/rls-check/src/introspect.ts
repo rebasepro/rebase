@@ -40,6 +40,14 @@ export interface ConnectOptions {
     schemas?: string[];
     /** Default 15000. Applied as statement_timeout. */
     statementTimeoutMs?: number;
+    /**
+     * Roles an untrusted caller arrives as, named by whoever runs the scan.
+     *
+     * Added to {@link CANDIDATE_EXPOSED_ROLES} rather than replacing it: a
+     * union can only widen what the checks consider, and for a security scanner
+     * the safe direction of a wrong guess is more findings, not fewer.
+     */
+    roles?: string[];
 }
 
 /**
@@ -60,6 +68,23 @@ export interface IntrospectDiagnostics {
     excludedSchemas: { schema: string; reason: "system" | "platform" | "not-requested" }[];
     /** Catalog queries that failed and the fact they cost us. */
     degraded: { what: string; error: string }[];
+    /**
+     * Roles holding DML on scanned tables that the scan does not treat as
+     * exposed, and cannot explain as trusted.
+     *
+     * The exposed-role set is a list of names this tool happens to know
+     * ({@link CANDIDATE_EXPOSED_ROLES}). A database served by a role under any
+     * other name — `app_user`, `api`, `hasura` — matches nothing, every check
+     * gates on a grant to an exposed role, and the run prints "No findings" on
+     * a wide-open database. That is a false negative, which is the one failure
+     * mode a security scanner must not have quietly.
+     *
+     * So: anything that holds DML and is neither recognised nor demonstrably
+     * privileged is reported, with the `--role` flag as the fix. The scan still
+     * cannot know whether such a role is reachable — but it can refuse to
+     * imply that it looked.
+     */
+    unrecognizedGrantees: string[];
 }
 
 export interface IntrospectResult {
@@ -107,7 +132,21 @@ const RELATION_KINDS: Record<string, PgRelationKind> = {
 
 const SCANNED_RELKINDS = ["r", "p", "v", "m", "f"];
 
-/** Roles an untrusted request plausibly arrives as. `service_role` is the trusted bypass. */
+/**
+ * Roles an untrusted request plausibly arrives as. `service_role` is the
+ * trusted bypass.
+ *
+ * These are recognised *by name*, which is the one place this tool is not
+ * framework-agnostic: it knows Supabase's pair, PostgREST's `web_anon` and
+ * Rebase's `rebase_user`, and nothing else. Every check gates on a grant to an
+ * exposed role, so a database served by `app_user` used to scan clean no
+ * matter how open it was.
+ *
+ * Two things close that hole, and neither is a guess about your schema:
+ * `--role` names the role explicitly, and `unrecognizedGranteesFor` reports
+ * write-holding roles that matched nothing here, so an unrecognised setup
+ * produces a caveat instead of a green checkmark.
+ */
 const CANDIDATE_EXPOSED_ROLES = ["anon", "authenticated", "web_anon", "rebase_user"];
 
 export async function introspect(opts: ConnectOptions): Promise<DbSnapshot> {
@@ -118,7 +157,8 @@ export async function introspectWithDiagnostics(opts: ConnectOptions): Promise<I
     const diagnostics: IntrospectDiagnostics = {
         tlsVerificationDisabled: false,
         excludedSchemas: [],
-        degraded: []
+        degraded: [],
+        unrecognizedGrantees: []
     };
 
     const { client, tlsVerificationDisabled } = await connect(opts.connectionString);
@@ -311,13 +351,22 @@ async function readSnapshot(
     const foreignKeys = await readForeignKeys(db, schemas);
     const routines = await readRoutines(db, schemas);
 
+    const exposedRoles = exposedRolesFor(roles, opts.roles);
+    diagnostics.unrecognizedGrantees = unrecognizedGranteesFor(
+        grants,
+        roles,
+        relations,
+        exposedRoles,
+        currentRole
+    );
+
     return {
         serverVersionNum,
         serverVersion,
         currentRole,
         scannerIsPrivileged: isPrivileged(currentRole, server, roles, relations),
         schemas,
-        exposedRoles: exposedRolesFor(roles),
+        exposedRoles,
         platform: detectPlatform(allSchemas, roles),
         relations,
         policies,
@@ -830,7 +879,66 @@ function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapshot["plat
  * is the *trusted* bypass identity: treating it as exposed would flag every
  * table in every Supabase project as critical, which is both useless and wrong.
  */
-function exposedRolesFor(roles: DbRole[]): string[] {
+function exposedRolesFor(roles: DbRole[], explicit?: string[]): string[] {
     const present = new Set(roles.map((r) => r.name));
-    return ["PUBLIC", ...CANDIDATE_EXPOSED_ROLES.filter((r) => present.has(r))];
+    const named = [...CANDIDATE_EXPOSED_ROLES, ...(explicit ?? [])];
+    // A role named with `--role` that does not exist is dropped here rather
+    // than carried: `effectivePrivileges` would find nothing for it anyway, and
+    // a phantom entry in `exposedRoles` reads like the scan covered something
+    // it did not. `unrecognizedGranteesFor` reports the mismatch instead.
+    return ["PUBLIC", ...new Set(named.filter((r) => present.has(r)))];
+}
+
+/**
+ * Roles that hold DML on a scanned table and are neither exposed nor trusted.
+ *
+ * "Trusted" is deliberately generous — every role this can explain is one the
+ * user does not have to think about. A grantee is explained when it is a
+ * superuser, holds BYPASSRLS (RLS is a no-op for it, so no policy this tool
+ * checks would constrain it anyway), owns the relation, is the role the scan
+ * connected as, or is platform bookkeeping (`pg_*`, `cloudsql*`, Supabase's
+ * `service_role`, which is the documented trusted bypass).
+ *
+ * What is left is the interesting set: a named role, holding write privileges,
+ * that this tool has no opinion about. It may be a service account nothing can
+ * authenticate as — `rebase_user` is NOLOGIN by design — or it may be exactly
+ * the role the API connects as. The scan cannot tell from the catalog, so it
+ * names them and lets the reader decide.
+ */
+function unrecognizedGranteesFor(
+    grants: DbGrant[],
+    roles: DbRole[],
+    relations: DbRelation[],
+    exposed: string[],
+    currentRole: string
+): string[] {
+    const exposedSet = new Set(exposed.map((r) => r.toLowerCase()));
+    const byName = new Map(roles.map((r) => [r.name.toLowerCase(), r]));
+    const owners = new Set(relations.map((r) => r.owner.toLowerCase()));
+    const writeable = new Set(["INSERT", "UPDATE", "DELETE"]);
+
+    const out = new Set<string>();
+    for (const grant of grants) {
+        const name = grant.grantee;
+        const key = name.toLowerCase();
+
+        if (exposedSet.has(key) || isPublicName(name)) continue;
+        if (key === currentRole.toLowerCase()) continue;
+        if (owners.has(key)) continue;
+        if (key.startsWith("pg_") || key.startsWith("cloudsql") || key === "service_role") continue;
+
+        const role = byName.get(key);
+        if (role?.superuser || role?.bypassRls) continue;
+
+        // SELECT alone on a reference table is a normal, deliberate grant. It is
+        // the write privileges that make an unrecognised role worth a sentence.
+        if (!grant.privileges.some((p) => writeable.has(p))) continue;
+
+        out.add(name);
+    }
+    return [...out].sort();
+}
+
+function isPublicName(name: string): boolean {
+    return name.toUpperCase() === "PUBLIC";
 }

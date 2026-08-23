@@ -49,6 +49,12 @@ export interface ScanOptions {
     connectionString: string;
     /** Restrict to these schemas. Empty or omitted means "every user schema". */
     schemas?: string[];
+    /**
+     * Additional roles an untrusted caller can arrive as, on top of the names
+     * this tool recognises. Needed by any stack whose app role is not called
+     * `anon`, `authenticated`, `web_anon` or `rebase_user`.
+     */
+    roles?: string[];
     /** Run only these check ids. */
     only?: string[];
     /** Skip these check ids. */
@@ -72,6 +78,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
     const { snapshot, diagnostics } = await introspectWithDiagnostics({
         connectionString: options.connectionString,
         schemas: options.schemas && options.schemas.length > 0 ? options.schemas : undefined,
+        roles: options.roles && options.roles.length > 0 ? options.roles : undefined,
         statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
     });
 
@@ -164,6 +171,8 @@ export interface CliOptions {
     connectionString: string | null;
     json: boolean;
     schemas: string[];
+    /** Extra roles to treat as reachable by an untrusted caller. */
+    roles: string[];
     failOn: Severity | "none";
     skip: string[];
     only: string[];
@@ -185,6 +194,7 @@ function emptyOptions(): CliOptions {
         connectionString: null,
         json: false,
         schemas: [],
+        roles: [],
         failOn: DEFAULT_FAIL_ON,
         skip: [],
         only: [],
@@ -284,6 +294,14 @@ export function parseArgs(argv: readonly string[]): ParseResult {
                 const value = takeValue();
                 if (value === null) return { ok: false, message: "--schema needs a schema name." };
                 options.schemas.push(...splitList(value));
+                break;
+            }
+            case "--role": {
+                const value = takeValue();
+                if (value === null) {
+                    return { ok: false, message: "--role needs a role name, e.g. --role app_user." };
+                }
+                options.roles.push(...splitList(value));
                 break;
             }
             case "--skip": {
@@ -602,6 +620,11 @@ $POSTGRES_URL, then DATABASE_URL in a .env file in the current directory.
 Options
   --json                 Machine-readable ScanResult on stdout, and nothing else.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
+  --role <name>          Treat this role as one an untrusted caller arrives as, in
+                         addition to anon, authenticated, web_anon and rebase_user.
+                         Name the role your application connects as — the checks
+                         only report a table as exposed when an exposed role can
+                         reach it. Repeatable or comma-separated.
   --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
                          critical, or none to never fail. Default: high.
   --only <id>            Run only these checks. Repeatable or comma-separated.
@@ -805,6 +828,7 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
             result = await scan({
                 connectionString,
                 schemas: options.schemas,
+                roles: options.roles,
                 only: options.only,
                 skip: options.skip,
                 statementTimeoutMs: options.timeoutMs

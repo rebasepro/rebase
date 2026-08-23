@@ -349,3 +349,27 @@ CREATE TABLE private_ops.vuln_audit_log (
     note  text
 );
 GRANT SELECT ON private_ops.vuln_audit_log TO anon;
+
+-- ---------------------------------------------------------------------------
+-- A database served by a role this tool does not recognise by name.
+--
+-- `custom_role_table` is exactly as open as `vuln_rls_disabled` — RLS off, full
+-- DML to a role an untrusted caller arrives as — but the role is called
+-- `app_user` rather than `anon`/`authenticated`/`web_anon`/`rebase_user`. Every
+-- check gates on a grant to an *exposed* role, so before `--role` existed this
+-- table produced nothing and the scan reported a clean database.
+--
+-- Deliberately named neither `vuln_*` nor `secure_*`: it is not a defect the
+-- default scan is expected to find, and it is not an object that must stay
+-- silent. It is the one case whose correct behaviour depends on the flag.
+-- ---------------------------------------------------------------------------
+
+CREATE ROLE app_user NOLOGIN;
+GRANT USAGE ON SCHEMA public TO app_user;
+
+CREATE TABLE public.custom_role_table (
+    id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner_id  uuid,
+    secret    text
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.custom_role_table TO app_user;

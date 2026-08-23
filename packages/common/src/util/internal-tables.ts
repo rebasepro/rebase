@@ -64,6 +64,15 @@ export const REBASE_USER_ROLE = "rebase_user";
  *
  * `atlas_schema_revisions` is Atlas's migration ledger, which lands in `rebase`
  * because `db migrate apply` passes `--revisions-schema rebase`.
+ *
+ * Every entry here must also be revoked by whatever creates it, and vice versa:
+ * the creation-time revoke fires once, on the boot that first makes the table,
+ * so it cannot help a database provisioned before that revoke existed. This
+ * list is what the boot-time sweep in `ensureAppRole` iterates, and the sweep
+ * is the only thing that can repair an already-granted table. A table revoked
+ * at creation but missing here is therefore permanently stranded on any
+ * database that predates its revoke — which is exactly what happened to
+ * `jobs`, added here after a scan of a pre-0.14 database found it.
  */
 export const REBASE_INTERNAL_TABLES: readonly string[] = [
     // auth
@@ -80,6 +89,7 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     "api_keys",
     "cron_logs",
     "cron_claims",
+    "jobs",
     "rate_limit_hits",
     "idempotency_keys",
     "entity_history",

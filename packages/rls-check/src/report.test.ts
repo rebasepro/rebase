@@ -56,7 +56,7 @@ function result(overrides: Partial<ScanResult> = {}): ScanResult {
         // care about the degraded path override it.
         diagnostics: { degraded: [],
 tlsVerificationDisabled: false,
-excludedSchemas: [] },
+excludedSchemas: [], unrecognizedGrantees: [] },
         scannedAt: "2026-07-26T09:00:00.000Z",
         database: { host: "db.abcdefghijkl.supabase.co", name: "postgres" },
         serverVersion: "PostgreSQL 15.6 on aarch64-unknown-linux-gnu",
@@ -622,7 +622,8 @@ describe("degraded scans", () => {
         diagnostics: {
             degraded: [{ what: "table grants", error: "permission denied for table pg_class" }],
             tlsVerificationDisabled: false,
-            excludedSchemas: []
+            excludedSchemas: [],
+            unrecognizedGrantees: []
         }
     });
 
@@ -665,11 +666,12 @@ describe("degraded scans", () => {
  * deleting it broke no test. It is a pure function now.
  */
 describe("exitCodeFor", () => {
-    const clean = { degraded: [], tlsVerificationDisabled: false, excludedSchemas: [] };
+    const clean = { degraded: [], tlsVerificationDisabled: false, excludedSchemas: [], unrecognizedGrantees: [] };
     const broken = {
         degraded: [{ what: "table grants", error: "permission denied" }],
         tlsVerificationDisabled: false,
-        excludedSchemas: []
+        excludedSchemas: [],
+        unrecognizedGrantees: []
     };
 
     it("is 0 for a clean scan with no findings", () => {
