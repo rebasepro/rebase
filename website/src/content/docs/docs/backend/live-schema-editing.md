@@ -175,6 +175,28 @@ refusing you after you have decided:
 }
 ```
 
+## If your project keeps versioned migrations
+
+Applying here does **not** write a migration, and cannot: a migration is Atlas's
+format with an integrity file, minted by an external binary against a throwaway
+database, and a running server has neither.
+
+What it does write is `drizzle/schema.sql` — which is exactly what
+`rebase db generate` diffs against. So the migration is one command away:
+
+```bash
+rebase db generate
+```
+
+The plan and the result both say so when your project has migrations, because
+the failure otherwise is quiet: your database has the change and your repository
+describes it, but the next environment built by replaying migrations does not,
+and nothing said anything.
+
+A project provisioned by boot-ensure — the managed runtime, and any self-host
+leaving `REBASE_MIGRATE_ON_BOOT` at its default — needs no migration at all. Its
+collections are the schema, and the next boot reconciles.
+
 ## Commit first, then apply
 
 The order matters and it is not arbitrary.

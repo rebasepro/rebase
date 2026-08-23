@@ -92,6 +92,17 @@ export interface LiveSchemaRoutesConfig {
      */
     commitPaths?: Partial<SchemaCommitPaths>;
     /**
+     * Whether this project replays versioned migrations to build an
+     * environment.
+     *
+     * If it does, applying here is not the whole job: the DDL runs against
+     * *this* database and `drizzle/schema.sql` is committed, but no migration
+     * is written — a server cannot mint one, since that needs Atlas and a
+     * throwaway database. The next environment built by replaying migrations
+     * would not have this change, and nothing would have said so.
+     */
+    usesVersionedMigrations?: () => boolean;
+    /**
      * Who may apply a change, as opposed to preview one.
      *
      * See `schema-edit-permissions.ts`. The short version: applying writes a
@@ -176,6 +187,25 @@ export function proposedCollections(
     return replaced.some(collection => collection.slug === change.collectionId)
         ? replaced
         : [...replaced, next];
+}
+
+/**
+ * What still has to happen after this change lands, if anything.
+ *
+ * Only one thing so far, and it is the one that would otherwise be silent: a
+ * project that replays migrations needs this change recorded as one, or its
+ * next environment is built without it.
+ */
+function followUpFor(config: LiveSchemaRoutesConfig, statements: string[]): string[] {
+    if (statements.length === 0) return [];
+    if (!config.usesVersionedMigrations?.()) return [];
+    return [
+        "This project keeps versioned migrations, and applying here does not write one — " +
+        "a migration needs Atlas and a throwaway database, which a running server does not " +
+        "have. `drizzle/schema.sql` has been committed and is what Atlas diffs against, so " +
+        "run `rebase db generate` to record this change. Without it, the next environment " +
+        "built by replaying migrations will not have it."
+    ];
 }
 
 export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<HonoEnv> {
@@ -315,7 +345,8 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // asks for unenforced. That is not a refusal, so it does not belong
             // in `changes` — but it is the one thing on this response somebody
             // might want to stop and read.
-            withheldConstraints: plan.withheldConstraints ?? []
+            withheldConstraints: plan.withheldConstraints ?? [],
+            followUp: followUpFor(config, plan.statements)
         });
     });
 
@@ -394,7 +425,11 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // outcome may not be whoever read the preview, and "applied" with a
             // constraint quietly missing is exactly the state this feature
             // exists to stop being invisible.
-            return c.json({ ...result, withheldConstraints: plan.withheldConstraints ?? [] });
+            return c.json({
+                ...result,
+                withheldConstraints: plan.withheldConstraints ?? [],
+                followUp: followUpFor(config, plan.statements)
+            });
         } catch (err) {
             if (err instanceof UnapplicableChangeError) {
                 throw ApiError.badRequest(err.message, "SCHEMA_CHANGE_UNAPPLICABLE", {

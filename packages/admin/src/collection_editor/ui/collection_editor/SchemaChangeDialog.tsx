@@ -136,6 +136,29 @@ function Details({ summary, count, children }: {
     );
 }
 
+/**
+ * What still has to happen after this lands.
+ *
+ * Above the evidence and below the changes, because it is not a refusal and not
+ * a detail: the change will apply, and something outside this dialog still has
+ * to be done or a later environment will differ from this one.
+ */
+function FollowUp({ items }: { items: string[] }) {
+    if (items.length === 0) return null;
+    return (
+        <Alert color="info">
+            <Typography variant="body2" className="font-medium mb-1">
+                {items.length === 1 ? "One thing to do afterwards" : "To do afterwards"}
+            </Typography>
+            <ul className="space-y-2">
+                {items.map(item => (
+                    <li key={item} className="text-sm">{item}</li>
+                ))}
+            </ul>
+        </Alert>
+    );
+}
+
 function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[] }) {
     if (constraints.length === 0) return null;
     return (
@@ -188,6 +211,7 @@ function Applied({ result }: { result: LiveSchemaResult }) {
             )}
 
             <WithheldConstraints constraints={result.withheldConstraints ?? []}/>
+            <FollowUp items={result.followUp ?? []}/>
 
             <div>
                 <Typography variant="label" color="secondary">Committed</Typography>
@@ -311,6 +335,7 @@ export function SchemaChangeDialog({
                         )}
 
                         <WithheldConstraints constraints={plan.withheldConstraints ?? []}/>
+                        <FollowUp items={plan.followUp ?? []}/>
 
                         {applyRefusedBecause && (
                             <Alert color="info">
