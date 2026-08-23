@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { HonoEnv } from "./types";
+import { ApiError, errorHandler } from "./errors";
 
 export interface LogEntry {
     id: string;
@@ -211,6 +212,15 @@ const STREAM_HEARTBEAT_MS = 25_000;
 const STREAM_MAX_PENDING = 2000;
 
 /**
+ * The largest window any of these routes will hand back.
+ *
+ * The ring buffer holds 10,000 entries, so asking for more than all of it is a
+ * mistake worth naming rather than silently clamping — and a clamped answer is
+ * indistinguishable from "that is all there is".
+ */
+const LOG_WINDOW_MAX = 10_000;
+
+/**
  * The stream's timings, injectable only so they can be tested.
  *
  * The defaults above are the contract and nothing in production passes this. A
@@ -230,6 +240,37 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
     const maxPending = timing.maxPending ?? STREAM_MAX_PENDING;
 
     const app = new Hono<HonoEnv>();
+    // Its own, like every other router here: nothing registers one on the host
+    // app — not `boot.ts`, not the scaffolded backend, not the eject template —
+    // so a router that throws without this answers Hono's default 500 in plain
+    // text, outside the `{ error: { code, message } }` envelope the rest of the
+    // API keeps to.
+    app.onError(errorHandler);
+
+    /**
+     * A window into the ring buffer, or a 400 saying why not.
+     *
+     * `parseInt` was the whole of it before, and every malformed value failed
+     * differently and silently: `?limit=abc` fell through to the default,
+     * `?limit=-5` sliced an empty window and answered 200 with no entries, and
+     * `?count=abc` made `slice(-NaN)` return the *entire* buffer. Three ways to
+     * be wrong, none of them visible to the caller. The data plane refuses the
+     * same input with a 400 — see `resolveListLimitParam`.
+     */
+    const window = (raw: string | undefined, what: string, max: number): number | undefined => {
+        if (raw === undefined || raw.trim() === "") return undefined;
+        const parsed = Number(raw.trim());
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+            throw new ApiError(
+                400,
+                "INVALID_PARAM",
+                `Invalid \`${what}\`: ${raw}. Expected a whole number between 1 and ${max}.`,
+                undefined,
+                true
+            );
+        }
+        return parsed;
+    };
 
     // GET /api/logs — Query logs
     app.get("/", (c) => {
@@ -238,8 +279,8 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
             level: query.level,
             source: query.source,
             search: query.search,
-            limit: query.limit ? parseInt(query.limit) : undefined,
-            offset: query.offset ? parseInt(query.offset) : undefined,
+            limit: window(query.limit, "limit", LOG_WINDOW_MAX),
+            offset: window(query.offset, "offset", Number.MAX_SAFE_INTEGER),
             since: query.since
         });
         return c.json(result);
@@ -247,7 +288,7 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
 
     // GET /api/logs/latest — Get latest logs (for real-time)
     app.get("/latest", (c) => {
-        const count = parseInt(c.req.query("count") || "50");
+        const count = window(c.req.query("count"), "count", LOG_WINDOW_MAX) ?? 50;
         return c.json({ entries: logBuffer.getLatest(count) });
     });
 
@@ -274,7 +315,7 @@ export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
             source: query.source,
             search: query.search
         });
-        const limit = query.limit ? parseInt(query.limit) : 200;
+        const limit = window(query.limit, "limit", LOG_WINDOW_MAX) ?? 200;
 
         // Reverse proxies buffer text responses by default, which turns a live
         // tail into nothing at all until the buffer fills. nginx (and the ingress

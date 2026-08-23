@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../api/types";
 import type { CronScheduler } from "./cron-scheduler";
 import { ApiError, errorHandler } from "../api/errors";
+import { resolveListLimitParam } from "../api/rest/query-parser";
 
 /**
  * Create admin REST routes for managing cron jobs.
@@ -62,8 +63,12 @@ job: scheduler.getJob(id) });
     // Get job logs
     router.get("/:id/logs", async (c) => {
         const id = c.req.param("id");
-        const limitStr = c.req.query("limit");
-        const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+        // Validated, not `parseInt`-ed. `?limit=abc` used to reach the store as
+        // `NaN`, where Postgres refused `LIMIT NaN`, the store swallowed the
+        // error and returned `[]` — a 200 with an empty list, which reads as
+        // "this job has never run". The data plane answers 400 for the same
+        // input; so does this now.
+        const limit = resolveListLimitParam(c.req.query("limit") ?? null, { defaultLimit: 50 });
 
         const job = scheduler.getJob(id);
         if (!job) {
