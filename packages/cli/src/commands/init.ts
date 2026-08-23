@@ -1276,7 +1276,25 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // `rebase db push` worked and this shipped broken for so long.
                 // `pinSearchPath` (the --database-url branch above) has always
                 // emitted the encoded form; this line is what disagreed.
-                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
+                // Commented out, not omitted. `rebase dev` starts a managed
+                // PostgreSQL when nothing names a database, which is what makes
+                // a fresh project one command rather than four. The compose URL
+                // stays here, one `#` away, because the alternative — a project
+                // that mentions Docker nowhere — makes switching to it a
+                // documentation lookup instead of an edit.
+                [
+                    "# DATABASE_URL is commented out on purpose.",
+                    "#",
+                    "# `rebase dev` starts a managed PostgreSQL for this project — no Docker,",
+                    "# no setup, and the data lives in .rebase/. Set this variable to use a",
+                    "# database of your own instead; it always wins over the managed one.",
+                    "#",
+                    "# To use the docker-compose Postgres that ships with this project:",
+                    "#   docker compose up -d db",
+                    "# then uncomment the line below.",
+                    `# DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`,
+                    `DATABASE_PASSWORD=${dbPassword}`
+                ].join("\n")
             );
 
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping
