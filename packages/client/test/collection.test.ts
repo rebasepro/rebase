@@ -254,7 +254,7 @@ title: "Updated" });
 
             expect(result).toEqual({ id: 1,
 title: "Updated" });
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PUT",
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", { method: "PATCH",
 body: JSON.stringify(patch) });
         });
 

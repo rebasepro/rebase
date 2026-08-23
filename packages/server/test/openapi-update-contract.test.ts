@@ -27,10 +27,12 @@ describe("openapi update contract", () => {
     const spec = generateOpenApiSpec([collection]) as any;
     const op = spec.paths["/data/users/{id}"];
 
-    it("serves patch and a deprecated put", () => {
+    it("describes the update under one verb", () => {
+        // PUT used to be listed beside PATCH, marked deprecated, pointing at the
+        // same handler — so a generator had to pick, and the one it picked meant
+        // "replace" for an operation that merges.
         expect(op.patch).toBeDefined();
-        expect(op.put).toBeDefined();
-        expect(op.put.deprecated).toBe(true);
+        expect(op.put).toBeUndefined();
     });
 
     it("uses an Update schema with no required fields", () => {

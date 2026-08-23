@@ -302,20 +302,17 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         const header = jwt.decode(token, { complete: true })?.header;
         const namedKey = resolveVerificationKey(signingKeys, header?.kid);
 
-        // `userId` is the pre-rename claim: tokens minted by an older backend
-        // are still in circulation and must keep verifying until they expire,
-        // or a deploy signs every active session out. A token with a `kid` we
-        // do not recognise falls through to the secret and fails there, which
-        // is what a retired key should do.
+        // A token with a `kid` we do not recognise falls through to the secret
+        // and fails there, which is what a retired key should do.
         const decoded = (namedKey
             ? jwt.verify(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
             : jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as { uid?: string; userId?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
+        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
         }
-        const id = decoded.uid || decoded.userId || decoded.sub;
+        const id = decoded.uid || decoded.sub;
         if (!id) {
             logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });
             return null;

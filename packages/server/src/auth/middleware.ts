@@ -26,9 +26,9 @@ export { extractBearerToken };
  * Result from a custom auth validator.
  * - `false`/`null`/`undefined` = not authenticated
  * - `true` = authenticated as default user
- * - object with `uid` (or legacy `userId`) = authenticated with user info
+ * - object with `uid` = authenticated with user info
  */
-export type AuthResult = boolean | null | undefined | { uid?: string; userId?: string; roles?: string[]; [key: string]: unknown };
+export type AuthResult = boolean | null | undefined | { uid?: string; roles?: string[]; [key: string]: unknown };
 
 /**
  * Options for creating an auth middleware via createAuthMiddleware()
@@ -336,12 +336,12 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
             try {
                 const authResult = await validator(c);
                 if (authResult && typeof authResult === "object") {
-                    // `uid` first: it is the spelling everything else uses. A
-                    // custom validator written against the older `uid` shape
-                    // still works — this is a user-supplied extension point, so
-                    // it stays tolerant of both rather than breaking on rename.
-                    const id = ("uid" in authResult ? authResult.uid : undefined)
-                        || ("uid" in authResult ? authResult.uid : undefined);
+                    // `uid`, and only `uid`: the spelling every other surface
+                    // uses. This clause used to be written twice — once for
+                    // `uid` and once, after a half-finished rename, for `uid`
+                    // again — so the `userId` the type advertised had already
+                    // stopped working here while still being documented.
+                    const id = "uid" in authResult ? authResult.uid : undefined;
                     if (id) {
                         const roles = authResult.roles || [];
                         c.set("user", { uid: id,

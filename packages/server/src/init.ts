@@ -1115,8 +1115,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             logger.debug("Using AuthAdapter", { id: authAdapter.id });
 
-            // Populate authConfigResult for backward compatibility
-            // (the return type still exposes `auth?: BootstrappedAuth`)
+            // `initializeRebaseBackend` returns `auth?: BootstrappedAuth`, so an
+            // adapter-based backend fills it from the adapter's own user
+            // management — the same field, whichever way auth was configured.
             authConfigResult = {
                 userService: authAdapter.userManagement ?? {}
             };

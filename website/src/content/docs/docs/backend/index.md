@@ -50,7 +50,7 @@ After initialization, these routes are mounted:
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/collections` | Collection metadata endpoint |
-| `/api/data/:slug` | CRUD operations per collection (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
 | `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
@@ -179,7 +179,6 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
-| `PUT` | `/api/data/:slug/:id` | Update a entity |
 | `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 
 ### Query Parameters

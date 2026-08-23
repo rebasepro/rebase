@@ -411,7 +411,7 @@ export async function uploadBackup(
         bucket: dest.bucket,
         metadata: { "rebase-backup": "1" }
     });
-    return { key, storageUrl: result.storageUrl ?? `${dest.kind}://${dest.bucket}/${key}` };
+    return { key, storageUrl: result.storageUrl };
 }
 
 /**

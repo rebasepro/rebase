@@ -143,7 +143,7 @@ name: "Bob Jr" } as any
             );
 
             const res = await app.request("/api/users/123", {
-                method: "PUT",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name: "Bob Jr" })
             });
@@ -253,7 +253,7 @@ title: "Updated" } as any
             );
 
             const res = await app.request("/authors/123/posts/456", {
-                method: "PUT",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title: "Updated" })
             });
@@ -373,7 +373,7 @@ text: "Wow" } as any
         it("PUT /authors/123/undefined → 404, no driver calls", async () => {
             const app = createFlatApp();
             const res = await app.request("/authors/123/undefined", {
-                method: "PUT",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title: "test" })
             });
@@ -481,7 +481,7 @@ title: "UUID" } as any
             // 3 segments: authors/123/posts — no id
             // PUT handler checks: if (!parsed.id) return c.notFound();
             const res = await app.request("/authors/123/posts", {
-                method: "PUT",
+                method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title: "nope" })
             });
@@ -645,19 +645,17 @@ values: savedRow },
 });
 
 /**
- * PATCH is the verb that matches what the handler does; PUT is the one every
- * shipped SDK sends.
+ * PATCH is the only update verb, and it matches what the handler does.
  *
  * The handler merges — it writes the columns in the body and leaves the rest —
- * which is what `update(id, data: Partial<M>)` means. PUT was the only route,
- * and PUT means replace, so the generated OpenAPI spec described a full
+ * which is what `update(id, data: Partial<M>)` means. PUT was the original
+ * route, and PUT means replace, so the generated OpenAPI spec described a full
  * replacement (reusing the *create* input schema, `required` fields and all)
  * for an endpoint that performs a partial one. A client generated from that
- * spec demanded fields the server does not.
- *
- * Both verbs are asserted against the same driver call because the risk in this
- * change is drift, not absence: mounting PATCH and later editing "the PUT
- * handler" would leave two endpoints claiming one behaviour and having two.
+ * spec demanded fields the server does not. PATCH was mounted beside it, then
+ * the alias was removed: the last assertion here is that PUT is really gone,
+ * because a route left mounted is a second definition of the same operation
+ * waiting to drift from the first.
  */
 describe("RestApiGenerator — update verbs", () => {
     let mockDriver: jest.Mocked<DataDriver>;
@@ -691,7 +689,7 @@ describe("RestApiGenerator — update verbs", () => {
         } as unknown as jest.Mocked<DataDriver>;
     });
 
-    it.each(["PATCH", "PUT"])("%s /api/users/123 performs the same partial write", async (method) => {
+    it.each(["PATCH"])("%s /api/users/123 performs the same partial write", async (method) => {
         const res = await app().request("/api/users/123", {
             method,
             headers: { "Content-Type": "application/json" },
@@ -711,13 +709,24 @@ describe("RestApiGenerator — update verbs", () => {
         );
     });
 
-    it.each(["PATCH", "PUT"])("%s on a missing row is a 404", async (method) => {
+    it.each(["PATCH"])("%s on a missing row is a 404", async (method) => {
         mockDriver.fetchOne.mockResolvedValue(undefined as any);
 
         const res = await app().request("/api/users/nope", {
             method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: "x" })
+        });
+
+        expect(res.status).toBe(404);
+        expect(mockDriver.save).not.toHaveBeenCalled();
+    });
+
+    it("no longer answers PUT", async () => {
+        const res = await app().request("/api/users/123", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Bob Jr" })
         });
 
         expect(res.status).toBe(404);

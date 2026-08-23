@@ -25,7 +25,6 @@ Para cada coleção, os seguintes endpoints são gerados:
 | `GET` | `/api/data/:slug/:id` | Obter uma única entidade |
 | `POST` | `/api/data/:slug` | Criar uma entidade |
 | `PATCH` | `/api/data/:slug/:id` | Atualizar uma entidade |
-| `PUT` | `/api/data/:slug/:id` | Atualizar uma entidade |
 | `DELETE` | `/api/data/:slug/:id` | Excluir uma entidade |
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
@@ -39,7 +38,7 @@ As relações aninhadas são acessíveis via caminhos de URL:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
+PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
@@ -240,7 +239,7 @@ GET /api/data/products?fields=id,name,price
 
 ## Pipeline de Hooks do Ciclo de Vida
 
-Cada operação de mutação REST (`POST`, `PUT`, `DELETE`) passa por um pipeline de execução de hooks estrito e sequencial:
+Cada operação de mutação REST (`POST`, `PATCH`, `DELETE`) passa por um pipeline de execução de hooks estrito e sequencial:
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response

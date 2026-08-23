@@ -46,7 +46,7 @@ ${chalk.bold("Options")}
                                install on every pod start instead, ~40-60s slower)
   --vendor                     Install them whatever the tree's size — for a
                                deploy that builds from source and never uploads it
-  --legacy                     Run every workspace's own build script instead
+  --workspace                  Run every workspace's own build script instead
   -h, --help                   Show this help
 
 ${chalk.bold("Examples")}
@@ -89,7 +89,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                build command — for a CI job that built the frontend in an earlier
                step. */
             "--skip-static-build": Boolean,
-            "--legacy": Boolean
+            "--workspace": Boolean
         },
         rawArgs,
         commandWords: 1,
@@ -98,7 +98,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
 
     const projectRoot = requireProjectRoot();
 
-    if (args["--legacy"]) {
+    if (args["--workspace"]) {
         await runWorkspaceBuilds(projectRoot);
         return;
     }

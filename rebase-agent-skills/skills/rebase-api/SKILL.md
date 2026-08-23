@@ -35,7 +35,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 
 ### CRUD Operations
 
-> **IMPORTANT FOR AGENTS:** There is NO `PATCH` method. Updates use `PUT` only. `POST` returns `201`, `DELETE` returns `204` (empty body).
+> **IMPORTANT FOR AGENTS:** Updates use `PATCH` — a partial write, only the properties you send. There is no `PUT`; it was an alias for the same handler and has been removed. `POST` returns `201`, `DELETE` returns `204` (empty body).
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
@@ -44,7 +44,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `GET` | `/api/data/{slug}/aggregate` | Aggregate over matching entities | `200` |
 | `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
-| `PUT` | `/api/data/{slug}/:id` | Update a entity | `200` |
+| `PATCH` | `/api/data/{slug}/:id` | Update a entity — partial, only what you send | `200` |
 | `DELETE` | `/api/data/{slug}/:id` | Delete a entity | `204` |
 
 ### Subcollection Routes
@@ -57,7 +57,7 @@ For collections with relations, Rebase generates nested routes automatically. Th
 | `GET` | `/api/data/{parent}/{parentId}/{child}/count` | Count child entities | `200` |
 | `GET` | `/api/data/{parent}/{parentId}/{child}/:id` | Get a single child entity | `200` |
 | `POST` | `/api/data/{parent}/{parentId}/{child}` | Create a child entity | `201` |
-| `PUT` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child entity | `200` |
+| `PATCH` | `/api/data/{parent}/{parentId}/{child}/:id` | Update a child entity | `200` |
 | `DELETE` | `/api/data/{parent}/{parentId}/{child}/:id` | Delete a child entity | `204` |
 
 **Example:** List all posts by author `111094`:
@@ -289,7 +289,7 @@ Returns the created entity as a flat object:
 }
 ```
 
-### Update Response (PUT — 200)
+### Update Response (PATCH — 200)
 
 Returns the updated entity as a flat object.
 
@@ -480,7 +480,7 @@ curl -X POST \
 ### Update a entity
 
 ```bash
-curl -X PUT \
+curl -X PATCH \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "Updated Widget", "price": 24.99, "status": "active"}' \

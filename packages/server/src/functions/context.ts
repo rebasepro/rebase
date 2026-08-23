@@ -83,12 +83,7 @@ export function getUser(c: CtxLike): FunctionUser | undefined {
     if (!raw || typeof raw !== "object") return undefined;
 
     const record = raw as Record<string, unknown>;
-    // `userId` is the older spelling, still accepted from custom validators —
-    // `createAuthMiddleware` normalises it on the way in, but a handler mounted
-    // outside that path may not have been through it.
-    const uid = typeof record.uid === "string"
-        ? record.uid
-        : typeof record.userId === "string" ? record.userId : undefined;
+    const uid = typeof record.uid === "string" ? record.uid : undefined;
     if (uid === undefined) return undefined;
 
     const roles = Array.isArray(record.roles)

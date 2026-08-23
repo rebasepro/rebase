@@ -25,7 +25,6 @@ Pour chaque collection, les endpoints suivants sont générés :
 | `GET` | `/api/data/:slug/:id` | Obtenir une seule entité |
 | `POST` | `/api/data/:slug` | Créer une entité |
 | `PATCH` | `/api/data/:slug/:id` | Mettre à jour une entité |
-| `PUT` | `/api/data/:slug/:id` | Mettre à jour une entité |
 | `DELETE` | `/api/data/:slug/:id` | Supprimer une entité |
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
@@ -39,7 +38,7 @@ Les relations imbriquées sont accessibles via des chemins d'URL :
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
+PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
@@ -240,7 +239,7 @@ GET /api/data/products?fields=id,name,price
 
 ## Pipeline de hooks du cycle de vie
 
-Chaque opération de mutation REST (`POST`, `PUT`, `DELETE`) passe par un pipeline d'exécution de hooks strict et séquentiel :
+Chaque opération de mutation REST (`POST`, `PATCH`, `DELETE`) passe par un pipeline d'exécution de hooks strict et séquentiel :
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response

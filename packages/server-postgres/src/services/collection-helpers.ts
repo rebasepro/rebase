@@ -217,8 +217,9 @@ isUUID });
         }
     }
 
-    // Default to 'id' if no primary keys are found and it exists in the schema
-    // This maintains backwards compatibility
+    // A collection that declares no primary key gets the implicit `id` column,
+    // which is what the schema generators emit for it — so read it back the
+    // same way rather than reporting the table as keyless.
     if (keys.length === 0 && "id" in table) {
         const idCol = table["id" as keyof typeof table] as AnyPgColumn;
         const idMeta = getColumnMeta(idCol);

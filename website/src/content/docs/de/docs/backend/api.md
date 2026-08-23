@@ -25,7 +25,6 @@ Für jede Collection werden die folgenden Endpunkte generiert:
 | `GET` | `/api/data/:slug/:id` | Eine einzelne Entität abrufen |
 | `POST` | `/api/data/:slug` | Eine Entität erstellen |
 | `PATCH` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
-| `PUT` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `DELETE` | `/api/data/:slug/:id` | Eine Entität löschen |
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
@@ -39,7 +38,7 @@ Verschachtelte Relationen sind über URL-Pfade zugänglich:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
+PATCH  /api/data/authors/42/posts/7       → update the post
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 
@@ -240,7 +239,7 @@ GET /api/data/products?fields=id,name,price
 
 ## Lifecycle-Hook-Pipeline
 
-Jede REST-Mutationsoperation (`POST`, `PUT`, `DELETE`) durchläuft eine strikte, sequenzielle Hook-Ausführungspipeline:
+Jede REST-Mutationsoperation (`POST`, `PATCH`, `DELETE`) durchläuft eine strikte, sequenzielle Hook-Ausführungspipeline:
 
 ```
 Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response

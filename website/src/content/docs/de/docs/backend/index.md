@@ -50,7 +50,7 @@ Nach der Initialisierung werden diese Routen gemountet:
 | `/api/admin/*` | Benutzer- und Rollenverwaltung (nur für Administratoren) |
 | `/api/storage/*` | Datei-Upload, -Download und -Löschung |
 | `/api/data/collections` | Endpunkt für Sammlungsmetadaten |
-| `/api/data/:slug` | CRUD-Operationen pro Sammlung (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | CRUD-Operationen pro Sammlung (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entitätsänderungshistorie (falls aktiviert) |
 | `/api/data/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (Entwicklungsmodus, wenn `enableSwagger: true`) |
@@ -128,7 +128,6 @@ Die REST-API wird automatisch aus Ihren Sammlungen generiert. Jede Sammlung erh�
 | `GET` | `/api/data/:slug` | Entitäten auflisten (mit Filter, Sortierung, Limit, Suche) |
 | `GET` | `/api/data/:slug/:id` | Eine einzelne Entität abrufen |
 | `POST` | `/api/data/:slug` | Eine neue Entität erstellen |
-| `PUT` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `DELETE` | `/api/data/:slug/:id` | Eine Entität löschen |
 
 ### Abfrageparameter

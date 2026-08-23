@@ -99,7 +99,7 @@ Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieur
 ### Flux d'écriture
 1. L'utilisateur modifie une entité dans le formulaire
 2. Les rappels `beforeSave` s'exécutent (validation, transformation)
-3. Le SDK client envoie `PUT /api/data/:slug/:id`
+3. Le SDK client envoie `PATCH /api/data/:slug/:id`
 4. Le backend sérialise les valeurs, exécute `UPDATE` de Drizzle
 5. Les rappels `afterSave` s'exécutent (effets secondaires)
 6. La diffusion `NOTIFY` déclenche la mise à jour WebSocket vers tous les clients
