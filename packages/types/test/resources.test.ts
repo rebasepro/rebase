@@ -1,0 +1,200 @@
+/**
+ * The resource graph's rules, each pinned by the failure it prevents.
+ *
+ * Most of these are refusals. That is deliberate: the model exists because the
+ * old one accepted things and then ignored them — a storage engine declared in
+ * code and silently discarded in favour of the one in JSON, an `engine` typo
+ * that passed every check and failed later. A refusal at the call site is the
+ * whole product here, so it is what the tests assert.
+ */
+import {
+    DEFAULT_RESOURCE_KEY,
+    buildResourceGraph,
+    database,
+    bucket,
+    declareResource,
+    declaredResources,
+    declaredSubscriptions,
+    findEnvSuffixCollision,
+    isResourceHandle,
+    registerResourceKind,
+    resetDeclaredResources,
+    resetDeclaredSubscriptions,
+    resourceEnvSuffix,
+    resourceKeyOf,
+    resourceKinds,
+    setTopicRuntime,
+    topic
+} from "../src";
+
+beforeEach(() => {
+    resetDeclaredResources();
+    resetDeclaredSubscriptions();
+    setTopicRuntime(null);
+});
+
+describe("declaring", () => {
+    it("gives every kind the same shape", () => {
+        database("main");
+        bucket("media");
+        topic("signups");
+        expect(declaredResources().map(r => `${r.kind}:${r.key}`).sort())
+            .toEqual(["bucket:media", "database:main", "topic:signups"]);
+    });
+
+    it("defaults the key, so a single resource need not be named", () => {
+        const db = database();
+        expect(db.key).toBe(DEFAULT_RESOURCE_KEY);
+    });
+
+    it("returns a handle that stringifies to its key, so it drops in where a key goes", () => {
+        const media = bucket("media");
+        expect(`${media}`).toBe("media");
+        expect(isResourceHandle(media)).toBe(true);
+        expect(resourceKeyOf(media)).toBe("media");
+        expect(resourceKeyOf("media")).toBe("media");
+    });
+
+    it("applies the kind's default engine", () => {
+        expect(database("main").engine).toBe("postgres");
+        expect(bucket("media").engine).toBe("local");
+    });
+
+    it("defaults transport to server, the one needing no client SDK", () => {
+        expect(bucket("media").transport).toBe("server");
+        expect(bucket("cdn", { transport: "direct" }).transport).toBe("direct");
+    });
+});
+
+describe("refusals", () => {
+    it("refuses an unknown engine, and names the escape hatch", () => {
+        // The failure this replaces: `engine` was a free string, so "s2" passed
+        // every check and surfaced far from the typo.
+        expect(() => bucket("media", { engine: "s2" }))
+            .toThrow(/Unknown bucket engine "s2".*custom:s2/s);
+    });
+
+    it("accepts an engine it has never heard of when it is spelled custom:", () => {
+        expect(bucket("media", { engine: "custom:minio" }).engine).toBe("custom:minio");
+    });
+
+    it("refuses an unknown option rather than dropping it", () => {
+        expect(() => database("main", { migrationz: "./m" } as never))
+            .toThrow(/Unknown option\(s\) on database "main": migrationz/);
+    });
+
+    it("refuses an unknown kind and lists the ones registered", () => {
+        expect(() => declareResource("queue", "work"))
+            .toThrow(/Unknown resource kind "queue".*Registered kinds: bucket, database, topic/s);
+    });
+
+    it("refuses two different declarations of one resource instead of merging", () => {
+        // This is the bug the model exists to remove: the old storage path
+        // merged rebase.json with config code and silently kept one engine.
+        bucket("media", { engine: "s3" });
+        expect(() => bucket("media", { engine: "gcs" }))
+            .toThrow(/declared twice with different configuration/);
+    });
+
+    it("allows an identical redeclaration, because a module can be evaluated twice", () => {
+        bucket("media", { engine: "s3" });
+        expect(() => bucket("media", { engine: "s3" })).not.toThrow();
+        expect(declaredResources("bucket")).toHaveLength(1);
+    });
+
+    it("refuses an empty key", () => {
+        expect(() => database("  ")).toThrow(/needs a non-empty key/);
+    });
+});
+
+describe("env suffixes", () => {
+    it("leaves the default unsuffixed, so plain DATABASE_URL keeps working", () => {
+        expect(resourceEnvSuffix(DEFAULT_RESOURCE_KEY)).toBe("");
+    });
+
+    it("uppercases and underscores everything else", () => {
+        expect(resourceEnvSuffix("analytics")).toBe("__ANALYTICS");
+        expect(resourceEnvSuffix("media-files")).toBe("__MEDIA_FILES");
+    });
+
+    it("reports two keys that collide on one suffix", () => {
+        // `media-files` and `media_files` both become __MEDIA_FILES, so one
+        // would silently read the other's configuration.
+        expect(findEnvSuffixCollision(["media-files", "media_files"]))
+            .toEqual({ a: "media-files", b: "media_files", suffix: "__MEDIA_FILES" });
+        expect(findEnvSuffixCollision(["media", "reports"])).toBeNull();
+    });
+});
+
+describe("the graph", () => {
+    it("sorts, so a regenerated manifest does not churn the diff", () => {
+        topic("signups");
+        database("main");
+        bucket("media");
+        database("analytics");
+        const graph = buildResourceGraph();
+        expect(graph.version).toBe(1);
+        expect(graph.resources.map(r => `${r.kind}:${r.key}`))
+            .toEqual(["bucket:media", "database:analytics", "database:main", "topic:signups"]);
+    });
+
+    it("records the options a kind declared", () => {
+        database("analytics", { databaseId: "reporting" });
+        const [db] = buildResourceGraph().resources;
+        expect(db.options).toEqual({ databaseId: "reporting" });
+    });
+});
+
+describe("kinds are registered, not hardcoded", () => {
+    it("accepts a kind this package never shipped", () => {
+        registerResourceKind({
+            kind: "cache",
+            engines: ["redis"],
+            defaultEngine: "redis",
+            envBases: ["REDIS_URL"]
+        });
+        expect(resourceKinds().map(k => k.kind)).toContain("cache");
+        expect(declareResource("cache", "sessions").engine).toBe("redis");
+    });
+
+    it("refuses two different definitions of one kind", () => {
+        registerResourceKind({ kind: "cache", engines: ["redis"], defaultEngine: "redis", envBases: ["REDIS_URL"] });
+        expect(() => registerResourceKind({ kind: "cache", engines: ["memcached"], defaultEngine: "memcached", envBases: [] }))
+            .toThrow(/already registered with a different definition/);
+    });
+});
+
+describe("topics", () => {
+    it("declares subscriptions by name", () => {
+        const signups = topic<{ userId: string }>("signups");
+        signups.subscription("send-welcome", async () => undefined);
+        signups.subscription("provision", async () => undefined);
+        expect(declaredSubscriptions("signups").map(s => s.name)).toEqual(["send-welcome", "provision"]);
+    });
+
+    it("refuses two subscriptions with one name", () => {
+        const signups = topic("signups");
+        signups.subscription("send-welcome", async () => undefined);
+        expect(() => signups.subscription("send-welcome", async () => undefined))
+            .toThrow(/already has a subscription named "send-welcome"/);
+    });
+
+    it("refuses at-most-once rather than quietly giving the other guarantee", () => {
+        expect(() => topic("signups", { delivery: "at-most-once" }))
+            .toThrow(/no shipped transport implements/);
+    });
+
+    it("publishing without a runtime throws, instead of resolving and dropping the event", () => {
+        const signups = topic<{ id: string }>("signups");
+        return expect(signups.publish({ id: "1" }))
+            .rejects.toThrow(/no topic runtime is installed/);
+    });
+
+    it("publishes through the installed runtime", async () => {
+        const sent: unknown[] = [];
+        setTopicRuntime({ publish: async (t, e) => { sent.push([t, e]); } });
+        const signups = topic<{ id: string }>("signups");
+        await signups.publish({ id: "1" });
+        expect(sent).toEqual([["signups", { id: "1" }]]);
+    });
+});
