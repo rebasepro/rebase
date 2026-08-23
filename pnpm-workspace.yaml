@@ -45,6 +45,15 @@ minimumReleaseAgeExclude:
   - '@firecms/neat@0.9.3-canary.20260615103956'
   - '@firecms/neat@1.0.0'
   - '@firecms/neat@1.0.1'
+  - '@electric-sql/pglite-age@0.0.7'
+  - '@electric-sql/pglite-pg_hashids@0.0.7'
+  - '@electric-sql/pglite-pg_ivm@0.0.7'
+  - '@electric-sql/pglite-pg_textsearch@0.0.8'
+  - '@electric-sql/pglite-pg_uuidv7@0.0.7'
+  - '@electric-sql/pglite-pgtap@0.0.7'
+  - '@electric-sql/pglite-pgvector@0.0.7'
+  - '@electric-sql/pglite-socket@0.2.9'
+  - '@electric-sql/pglite@0.5.6'
 # Security floors. Every entry MUST carry an upper bound: an override replaces
 # each transitive consumer's own range, so a bare ">=X" is not a floor but a
 # floating pin — the next major to publish gets dragged in on the next resolve,
