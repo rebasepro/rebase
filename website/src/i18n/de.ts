@@ -175,6 +175,7 @@ export const de = {
   "security.title": "In TypeScript geschrieben. Von Postgres erzwungen.",
   "security.desc": "Row-Level Security, direkt in deinem TypeScript-Schema definiert. Granulare Permissions pro Collection, pro Feld, pro Rolle. Keine handgeschriebenen SQL-Policies — nur sauberer Code in der Versionskontrolle.",
   "security.link": "Rebase Studio entdecken",
+  "security.postLink": "Lesen: Die Sicherheit deines Backends sollte nicht davon abhängen, dass jemand daran denkt",
   "opensource.badge": "Open-Source",
   "opensource.title": "Dein Code. Deine Infra.<br/>Null Lock-in.",
   "opensource.desc": "MIT-lizenziert. Self-hosten auf Docker, Railway, Fly oder Bare Metal. Deine Daten bleiben in deinem Postgres — kein Vendor Lock-in, keine Überraschungen, kein Per-Seat-Pricing.",
