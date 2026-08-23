@@ -302,22 +302,38 @@ export function dedupeRuntimePackages(bundleRoot: string, imageModules: string |
         const inBundle = path.join(bundleRoot, "node_modules", pkg);
         if (!fs.existsSync(provided)) continue;
 
-        let stat: fs.Stats;
+        let stat: fs.Stats | null = null;
         try {
             stat = fs.lstatSync(inBundle);
         } catch {
-            continue; // The bundle did not install its own copy. Nothing to do.
+            // ABSENT, which is the common case and not the exotic one.
+            //
+            // An earlier version treated this as "nothing to do" and returned.
+            // But `rebase build` correctly does NOT declare `@rebasepro/server`
+            // in a bundle's package.json — declaring it is what produces the
+            // duplicate this exists to collapse — so most bundles have no copy
+            // at all. Node then resolves a function's
+            // `import { defineFunction } from "@rebasepro/server"` by walking up
+            // from the importing file, never reaching the image's own
+            // node_modules, and every custom function and cron fails to load
+            // while the container reports itself healthy.
+            //
+            // So the link is CREATED when it is missing, not only repaired when
+            // it is duplicated. Same one-instance outcome, both ways in.
         }
         // An existing symlink is this fix, already applied.
-        if (stat.isSymbolicLink()) continue;
+        if (stat?.isSymbolicLink()) continue;
 
         try {
-            fs.rmSync(inBundle, { recursive: true, force: true });
+            fs.mkdirSync(path.dirname(inBundle), { recursive: true });
+            if (stat) fs.rmSync(inBundle, { recursive: true, force: true });
             fs.symlinkSync(provided, inBundle, "dir");
             deduped.push(pkg);
-            logger.info("Deduped a bundle package onto the runtime's own copy", { package: pkg });
+            logger.info(stat
+                ? "Deduped a bundle package onto the runtime's own copy"
+                : "Linked the runtime's own copy into the bundle", { package: pkg });
         } catch (error: unknown) {
-            logger.warn("Could not dedupe a bundle package; custom functions may not see the runtime", {
+            logger.warn("Could not link a bundle package; custom functions may not see the runtime", {
                 package: pkg,
                 error: error instanceof Error ? error.message : String(error)
             });

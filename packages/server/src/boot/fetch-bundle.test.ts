@@ -16,6 +16,7 @@ import {
     shouldFetchBundle,
     bundleRootIn,
     installBundleDependencies,
+    dedupeRuntimePackages,
     BUNDLE_URL_ENV,
     BUNDLE_TOKEN_ENV
 } from "./fetch-bundle";
@@ -510,5 +511,64 @@ describe("a failed install leaves nothing a later boot would trust", () => {
         await installBundleDependencies(scratch, async (c) => { calls.push(c); });
         expect(calls).toEqual([]);
         expect(fs.existsSync(path.join(scratch, "node_modules", "vendored"))).toBe(true);
+    });
+});
+
+describe("dedupeRuntimePackages", () => {
+    /**
+     * The absent case is the common one.
+     *
+     * `rebase build` correctly does not declare `@rebasepro/server` in a
+     * bundle's package.json — declaring it is what produces the duplicate this
+     * collapses — so most bundles carry no copy at all. Treating absent as
+     * "nothing to do" leaves Node resolving a function's import by walking up
+     * from the importing file, never reaching the image's node_modules, and
+     * every custom function and cron fails to load while the container reports
+     * itself healthy.
+     */
+    function imageWith(pkg: string) {
+        const image = path.join(scratch, "image-modules");
+        fs.mkdirSync(path.join(image, pkg), { recursive: true });
+        fs.writeFileSync(path.join(image, pkg, "package.json"), "{}");
+        return image;
+    }
+
+    it("links the runtime's copy into a bundle that has none", () => {
+        const image = imageWith("@rebasepro/server");
+        const bundle = path.join(scratch, "bundle");
+        fs.mkdirSync(bundle, { recursive: true });
+
+        expect(dedupeRuntimePackages(bundle, image)).toEqual(["@rebasepro/server"]);
+        const linked = path.join(bundle, "node_modules", "@rebasepro", "server");
+        expect(fs.lstatSync(linked).isSymbolicLink()).toBe(true);
+        expect(fs.realpathSync(linked)).toBe(fs.realpathSync(path.join(image, "@rebasepro/server")));
+    });
+
+    it("replaces a real duplicate with the link", () => {
+        const image = imageWith("@rebasepro/server");
+        const bundle = path.join(scratch, "bundle");
+        const dup = path.join(bundle, "node_modules", "@rebasepro", "server");
+        fs.mkdirSync(dup, { recursive: true });
+        fs.writeFileSync(path.join(dup, "package.json"), '{"version":"0.0.1"}');
+
+        expect(dedupeRuntimePackages(bundle, image)).toEqual(["@rebasepro/server"]);
+        expect(fs.lstatSync(dup).isSymbolicLink()).toBe(true);
+    });
+
+    it("leaves an existing link alone", () => {
+        const image = imageWith("@rebasepro/server");
+        const bundle = path.join(scratch, "bundle");
+        const target = path.join(bundle, "node_modules", "@rebasepro", "server");
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.symlinkSync(path.join(image, "@rebasepro/server"), target, "dir");
+
+        expect(dedupeRuntimePackages(bundle, image)).toEqual([]);
+    });
+
+    it("does nothing outside a container, where there is no image to link to", () => {
+        const bundle = path.join(scratch, "bundle");
+        fs.mkdirSync(bundle, { recursive: true });
+        expect(dedupeRuntimePackages(bundle, undefined)).toEqual([]);
+        expect(fs.existsSync(path.join(bundle, "node_modules"))).toBe(false);
     });
 });
