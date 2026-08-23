@@ -331,8 +331,15 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             try {
                 const result = await authRepository.listUsersPaginated({ limit: 1 });
                 needsSetup = result.total === 0;
-            } catch {
-                // If the check fails, assume not in setup mode
+            } catch (error) {
+                // Fail closed — an unreadable users table must not open the
+                // first-admin window — but say so. Silently answering "not in
+                // setup mode" makes a database that is merely unreachable look
+                // like a backend that has been set up already, which is the
+                // login screen a fresh deployment least wants to see.
+                logger.warn("[Auth] Could not count users for `needsSetup`; reporting the backend as already set up.", {
+                    error: error instanceof Error ? error.message : String(error)
+                });
             }
 
             // `buildBuiltinAuthCapabilities` is the only place this payload is

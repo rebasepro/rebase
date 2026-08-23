@@ -642,7 +642,7 @@ export interface RebaseBackendConfig {
      * Global lifecycle callbacks applied to every collection.
      *
      * Same type as per-collection `callbacks` — fires on **every** data path
-     * (REST API, WebSocket / realtime, server-side `rebase.data`).
+     * (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
      *
      * Execution order: global callbacks → collection callbacks → property callbacks.
      *

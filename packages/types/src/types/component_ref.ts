@@ -2,8 +2,9 @@
  * How a collection points at a UI component without the backend learning about React.
  *
  * This file is the hinge the BaaS/admin split turns on. `ComponentRef` is named
- * by `properties.ts` (`ui.Field`, `ui.Preview`, `ui.Filter`), and `properties.ts`
- * must stay in the React-free core because every backend subsystem — validation,
+ * by a property's `admin` block (`admin.Field`, `admin.Preview`, `admin.Filter`)
+ * and imported by `properties.ts`, which must stay in the React-free core
+ * because every backend subsystem — validation,
  * the drizzle schema generator, the OpenAPI generator, the SDK codegen — reads
  * property definitions. If `ComponentRef` needed `React.ComponentType`, the whole
  * property model would have to move to the admin layer with it.
