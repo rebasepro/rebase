@@ -68,8 +68,6 @@ export interface RelationSelectorProps {
     size?: "small" | "medium" | "large";
     useChips?: boolean;
     disabled?: boolean;
-    error?: boolean; // kept for backwards compatibility (could be used for styling later)
-    padding?: boolean; // legacy prop
     invisible?: boolean;
 
     relation: Relation;

@@ -50,7 +50,7 @@ Após a inicialização, estas rotas são montadas:
 | `/api/admin/*` | Gestão de utilizadores e funções (apenas para administradores) |
 | `/api/storage/*` | Upload, download e eliminação de ficheiros |
 | `/api/data/collections` | Endpoint de metadados de coleção |
-| `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações de entidade (quando ativado) |
 | `/api/data/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
@@ -128,7 +128,6 @@ A API REST é auto-gerada a partir das suas coleções. Cada coleção obtém es
 | `GET` | `/api/data/:slug` | Listar entidades (com filtro, ordenação, limite, pesquisa) |
 | `GET` | `/api/data/:slug/:id` | Obter uma única entidade |
 | `POST` | `/api/data/:slug` | Criar uma nova entidade |
-| `PUT` | `/api/data/:slug/:id` | Atualizar uma entidade |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar uma entidade |
 
 ### Parâmetros de Consulta

@@ -99,7 +99,7 @@ Wie Treiber werden auch Speicher-Backends in einer Registrierung erfasst. Sie k�
 ### Schreibfluss
 1. Der Benutzer bearbeitet eine Entität im Formular
 2. `beforeSave`-Callbacks werden ausgeführt (Validierung, Transformation)
-3. Das Client-SDK sendet `PUT /api/data/:slug/:id`
+3. Das Client-SDK sendet `PATCH /api/data/:slug/:id`
 4. Das Backend serialisiert die Werte, führt Drizzle `UPDATE` aus
 5. `afterSave`-Callbacks werden ausgeführt (Nebeneffekte)
 6. Der `NOTIFY`-Broadcast löst ein WebSocket-Update an alle Clients aus

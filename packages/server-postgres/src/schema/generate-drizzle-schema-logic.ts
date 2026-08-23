@@ -738,8 +738,9 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                 }
             }
 
-            // Backwards compatibility: if no id/primary key column is found in properties, but `id` wasn't explicitly provided
-            // We should generate a basic id column if one was completely omitted.
+            // A collection that declares no primary key gets an implicit one:
+            // `id TEXT PRIMARY KEY`. The DDL generator emits the same column,
+            // and `derivePrimaryKeys` reads it back.
             const hasIdColumn = Array.from(columns).some(col => col.includes(".primaryKey()"));
             if (!hasIdColumn) {
                 columns.add("    id: text(\"id\").primaryKey()");

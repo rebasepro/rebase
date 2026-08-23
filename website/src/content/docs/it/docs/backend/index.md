@@ -50,7 +50,7 @@ Dopo l'inizializzazione, queste rotte vengono montate:
 | `/api/admin/*` | Gestione utenti e ruoli (solo per admin) |
 | `/api/storage/*` | Caricamento, download ed eliminazione di file |
 | `/api/data/collections` | Endpoint per i metadati delle collezioni |
-| `/api/data/:slug` | Operazioni CRUD per collezione (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | Operazioni CRUD per collezione (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Cronologia delle modifiche delle entità (quando abilitata) |
 | `/api/data/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
 | `/api/data/swagger` | Swagger UI (modalità sviluppo, quando `enableSwagger: true`) |
@@ -128,7 +128,6 @@ L'API REST viene generata automaticamente dalle tue collezioni. Ogni collezione 
 | `GET` | `/api/data/:slug` | Elenca entità (con filtro, ordinamento, limite, ricerca) |
 | `GET` | `/api/data/:slug/:id` | Ottieni una singola entità |
 | `POST` | `/api/data/:slug` | Crea una nuova entità |
-| `PUT` | `/api/data/:slug/:id` | Aggiorna un'entità |
 | `DELETE` | `/api/data/:slug/:id` | Elimina un'entità |
 
 ### Parametri di Query

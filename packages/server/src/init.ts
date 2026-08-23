@@ -92,7 +92,7 @@ import { createApiKeyStore } from "./auth/api-keys/api-key-store";
 import { createApiKeyRoutes } from "./auth/api-keys/api-key-routes";
 import { createApiKeyPreAuth, createFunctionApiKeyGuard, createStorageApiKeyGuard } from "./auth/api-keys/api-key-middleware";
 import { createRequireAuth } from "./auth/middleware";
-import { createDataRateLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "./auth/rate-limiter";
+import { createDataRateLimiter, defaultAuthLimiter, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "./auth/rate-limiter";
 import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
@@ -669,7 +669,7 @@ export interface RebaseBackendConfig {
      * Global lifecycle callbacks applied to every collection.
      *
      * Same type as per-collection `callbacks` — fires on **every** data path
-     * (REST API, WebSocket / realtime, server-side `rebase.data`).
+     * (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
      *
      * Execution order: global callbacks → collection callbacks → property callbacks.
      *
@@ -1142,8 +1142,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             logger.debug("Using AuthAdapter", { id: authAdapter.id });
 
-            // Populate authConfigResult for backward compatibility
-            // (the return type still exposes `auth?: BootstrappedAuth`)
+            // `initializeRebaseBackend` returns `auth?: BootstrappedAuth`, so an
+            // adapter-based backend fills it from the adapter's own user
+            // management — the same field, whichever way auth was configured.
             authConfigResult = {
                 userService: authAdapter.userManagement ?? {}
             };
@@ -1381,7 +1382,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // ── Auth Capabilities Endpoint ───────────────────────────────────
         // Exposes adapter capabilities so the frontend knows what's available
         // (login form vs external redirect, OAuth providers, etc.)
-        config.app.get(`${basePath}/auth/config`, async (c) => {
+        //
+        // Rate-limited like the rest of the unauthenticated auth surface: it is
+        // public and it counts users on every call, so an uncapped caller can
+        // make a login screen's cheapest request the backend's busiest query.
+        // This is the *only* handler for the path — the auth router used to
+        // carry a second copy that this registration shadowed, returning a
+        // different shape.
+        config.app.get(`${basePath}/auth/config`, defaultAuthLimiter, async (c) => {
             const capabilities = await authAdapter!.getCapabilities();
             return c.json(capabilities);
         });

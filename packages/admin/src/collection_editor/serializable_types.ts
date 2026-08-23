@@ -425,7 +425,6 @@ export interface SerializableCollectionConfig {
     propertiesOrder?: string[];
     previewProperties?: string[];
     listProperties?: string[];
-    titleProperty?: string;
 
     // ── Display config ────────────────────────────────────────────────
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";

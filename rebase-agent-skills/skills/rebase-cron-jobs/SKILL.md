@@ -7,7 +7,7 @@ description: Guide for scheduling recurring background tasks with Rebase's built
 
 > **IMPORTANT FOR AGENTS**: Rebase has a **built-in cron scheduler** — do NOT install external libraries (`node-cron`, `agenda`, `bull`) or set up separate worker processes. Drop a TypeScript file in the `crons/` directory.
 
-> **IMPORTANT FOR AGENTS**: Every cron handler receives `ctx.rebase` — the server-side Rebase singleton, the same object `import { rebase } from "@rebasepro/server"` returns. `ctx.rebase.dataAsAdmin` is **THE** primary way cron jobs read/write data. Always use it in examples, never raw SQL or direct DB imports. `ctx.client` is the deprecated old name for the same object and will be removed in the next major — do not write it in new code.
+> **IMPORTANT FOR AGENTS**: Every cron handler receives `ctx.rebase` — the server-side Rebase singleton, the same object `import { rebase } from "@rebasepro/server"` returns. `ctx.rebase.dataAsAdmin` is **THE** primary way cron jobs read/write data. Always use it in examples, never raw SQL or direct DB imports. `ctx.client` was the old name for the same object and has been removed — a handler that destructures `client` no longer compiles.
 
 ## Overview
 

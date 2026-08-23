@@ -85,10 +85,14 @@ describe("identity accessors", () => {
         expect(body.authed).toBe(false);
     });
 
-    it("accepts the older `userId` spelling a custom validator may set", async () => {
-        const app = appWith({ userId: "legacy", roles: ["viewer"] });
-        app.get("/", c => c.json({ uid: getUserId(c) }));
-        expect((await (await app.request("/")).json()).uid).toBe("legacy");
+    it("reads `uid` and nothing else", async () => {
+        // `userId` used to be accepted here as an older spelling. It is not any
+        // more, and an identity that carries only it is not an identity —
+        // silently reading it back would keep a name alive that no other
+        // surface answers to.
+        const app = appWith({ userId: "legacy", roles: ["viewer"] } as never);
+        app.get("/", c => c.json({ uid: getUserId(c) ?? null }));
+        expect((await (await app.request("/")).json()).uid).toBeNull();
     });
 
     it("treats a non-object identity as anonymous rather than throwing", async () => {

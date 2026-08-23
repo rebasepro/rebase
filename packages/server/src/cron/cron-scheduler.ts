@@ -261,7 +261,7 @@ export class CronScheduler {
      * `RebaseServerClient`, not `RebaseClient`: the object `init.ts` passes is
      * the same one it registers as the singleton, so this was always the true
      * type — and the wider annotation is what let `ctx.client.data` look like a
-     * user-scoped plane inside a cron, when it is the RLS-bypassing one.
+     * user-scoped plane inside a cron, when it is the admin-scoped one.
      */
     setClient(client: RebaseServerClient): void {
         this.client = client;
@@ -722,17 +722,11 @@ reason: "already_executing" },
                 ).join(" ");
                 capturedLogs.push(line);
             },
-            // Both names, one object. `rebase` is canonical — it matches the
-            // singleton import and `defineFunction`'s context — and `client` is
-            // the deprecated alias kept so existing cron files keep running.
-            //
-            // The assertion covers only `client`'s extra `data`: the singleton
-            // carries that alias at runtime (`init.ts` assigns `data` and
-            // `dataAsAdmin` to the same plane) but `RebaseServerClient` omits it
-            // by design, so the deprecated name has to be re-stated here rather
-            // than leaking back into the canonical type.
-            rebase: this.client!,
-            client: this.client! as CronJobContext["client"]
+            // `rebase`, and only `rebase`: it matches the singleton import and
+            // `defineFunction`'s context. The old `client` alias re-exposed
+            // `client.data`, the name `RebaseServerClient` deliberately omits so
+            // that the RLS-bypassing plane is spelled `dataAsAdmin` everywhere.
+            rebase: this.client!
         };
 
         job.state = "running";

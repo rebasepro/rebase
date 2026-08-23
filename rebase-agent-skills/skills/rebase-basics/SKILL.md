@@ -254,10 +254,10 @@ Takes an optional list of app names; with none, every app in the manifest is bui
 | `--skip-schema` | | Do not regenerate the database schema from collections |
 | `--no-static` | | Do not fold the frontend assets into the backend bundle |
 | `--skip-static-build` | | Fold already-built assets without re-running the app's build |
-| `--legacy` | | Run every workspace's own `build` script instead of bundling |
+| `--workspace` | | Run every workspace's own `build` script instead of bundling |
 | `--help` | `-h` | Show build command help |
 
-> **IMPORTANT FOR AGENTS:** "Build for production" means the default (bundle) path. `--legacy` is the pre-bundle behaviour — it runs workspace build scripts and produces **no** bundle, so `rebase start` will have nothing to run. A project with no `rebase.json`, or one whose backend has been ejected, falls back to `--legacy` automatically.
+> **IMPORTANT FOR AGENTS:** "Build for production" means the default (bundle) path. `--workspace` runs each workspace's own build script and produces **no** bundle, so `rebase start` will have nothing to run. A project with no `rebase.json`, or one whose backend has been ejected, falls back to that path automatically.
 
 ```bash
 # Build every app declared in rebase.json
@@ -274,7 +274,7 @@ Runs a built bundle through the Rebase runtime — the same path the official co
 | Option | Alias | Description |
 |--------|-------|-------------|
 | `--bundle` | | Bundle directory (default: `dist-bundle`) |
-| `--legacy` | | Run the backend workspace's own `start` script |
+| `--workspace` | | Run the backend workspace's own `start` script |
 | `--help` | `-h` | Show start command help |
 
 ```bash

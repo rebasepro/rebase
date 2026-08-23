@@ -99,7 +99,7 @@ Come i driver, i backend di storage sono registrati in un registro. Puoi avere p
 ### Flusso di Scrittura
 1. L'utente modifica un'entità nel form
 2. Vengono eseguiti i callback `beforeSave` (validazione, trasformazione)
-3. L'SDK client invia `PUT /api/data/:slug/:id`
+3. L'SDK client invia `PATCH /api/data/:slug/:id`
 4. Il backend serializza i valori, esegue l'`UPDATE` di Drizzle
 5. Vengono eseguiti i callback `afterSave` (effetti collaterali)
 6. La trasmissione `NOTIFY` attiva l'aggiornamento WebSocket a tutti i client

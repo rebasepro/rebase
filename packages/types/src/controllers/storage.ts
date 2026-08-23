@@ -68,11 +68,11 @@ export interface UploadFileResult {
     /**
      * Fully qualified storage URL for the uploaded file.
      *
-     * For example: `s3://my-bucket/path/to/file.png`.
-     *
-     * This is optional for backwards compatibility.
+     * For example: `s3://my-bucket/path/to/file.png`. Every controller in the
+     * framework returns one — S3, GCS and local alike — and a caller that stores
+     * the reference needs it, so it is part of the result rather than a maybe.
      */
-    storageUrl?: string;
+    storageUrl: string;
 }
 
 /**

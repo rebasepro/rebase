@@ -300,7 +300,7 @@ export interface RebaseClient<DB = unknown> {
     /** Unified Authentication layer */
     auth: AuthClient;
 
-    /** Unified Storage layer (default storage source, backward-compatible) */
+    /** Unified Storage layer — the default storage source. */
     storage?: StorageSource;
 
     /** Registry of all named storage sources for multi-backend support */

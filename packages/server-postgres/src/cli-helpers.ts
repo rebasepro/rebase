@@ -366,8 +366,9 @@ export async function getTableExcludes(
     // own revision table. Excluding both the schema object AND its contents
     // keeps Atlas from planning a `DROP SCHEMA … CASCADE` — which on a live
     // database would take the user/auth tables with it.
-    // `atlas_schema_revisions.*` is kept for backwards-compatibility with any
-    // external revision schema.
+    // `atlas_schema_revisions.*` covers a revision table living outside the
+    // `rebase` schema — an externally managed Atlas setup — which the apply
+    // must not plan changes against either.
     //
     // `auth` stays on this list even though Rebase no longer creates it, and
     // that is the point: on a database still holding the pre-1.0 schema it must

@@ -640,14 +640,6 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                 }
             },
             patch: updateOperation(collection, schemaName, requireAuth),
-            // Same operation under the verb every published SDK already sends.
-            // Kept so existing clients keep validating; `patch` is the one to
-            // generate against.
-            put: {
-                ...updateOperation(collection, schemaName, requireAuth),
-                operationId: `update${schemaName}ViaPut`,
-                deprecated: true
-            },
             delete: {
                 tags: [collection.name],
                 summary: `Delete ${collection.singularName || collection.name}`,

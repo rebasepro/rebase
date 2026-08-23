@@ -31,7 +31,6 @@ function renderGroup(props: Record<string, unknown> = {}) {
                 collapsed={false}
                 onToggleCollapsed={() => undefined}
                 drawerOpen={true}
-                tooltipsOpen={false}
                 {...props}
             />
         </MemoryRouter>

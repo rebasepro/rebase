@@ -191,17 +191,6 @@ export type AdminCollectionOptions<
     readonly display?: EntityDisplay<PropertyPath<M>, M, USER>;
 
     /**
-     * @deprecated Moved to `display.title`, which takes the same string and also
-     * accepts a resolver. Still honoured, and warns once per collection at
-     * runtime; `display.title` wins if both are set.
-     *
-     * Kept on the type rather than only at runtime so the move shows up as a
-     * strikethrough with a working replacement beside it, instead of as a title
-     * that silently reverts to the derived one.
-     */
-    readonly titleProperty?: PropertyPath<M>;
-
-    /**
      * When editing a entity, you can choose to open the entity in a side dialog
      * or in a full screen dialog. Defaults to `full_screen`.
      */
@@ -594,7 +583,7 @@ export type AdminCollectionOptions<
  * one; a project without one has no `admin` block to check.
  *
  * `const P` captures the literal property types, which is what gives
- * `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` completion over
+ * `admin.display`, `admin.sort` and `admin.propertiesOrder` completion over
  * the collection's own property keys rather than plain `string`.
  *
  * @example
@@ -607,7 +596,7 @@ export type AdminCollectionOptions<
  *     },
  *     admin: {
  *         icon: "FileText",
- *         titleProperty: "title",     // completion: "title" | "status"
+ *         display: { title: "title" },   // completion: "title" | "status"
  *         listProperties: ["title", "status"]
  *     }
  * });

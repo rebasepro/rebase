@@ -121,8 +121,8 @@ export function resolveServedContentType(storedContentType: string): { contentTy
 
 export interface StorageRoutesConfig {
     /**
-     * Single storage controller (backward-compatible).
-     * Used as fallback when no `registry` is provided.
+     * A single storage controller, for a backend with one storage source.
+     * Used when no `registry` is provided.
      */
     controller?: StorageController;
     /**

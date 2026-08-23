@@ -50,7 +50,7 @@ Après l'initialisation, ces routes sont montées :
 | `/api/admin/*` | Gestion des utilisateurs et des rôles (réservé aux administrateurs) |
 | `/api/storage/*` | Téléchargement, téléversement et suppression de fichiers |
 | `/api/data/collections` | Point d'extrémité des métadonnées de collection |
-| `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PUT, DELETE) |
+| `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications d'entité (si activé) |
 | `/api/data/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
 | `/api/data/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
@@ -128,7 +128,6 @@ L'API REST est auto-générée à partir de vos collections. Chaque collection o
 | `GET` | `/api/data/:slug` | Lister les entités (avec filtre, tri, limite, recherche) |
 | `GET` | `/api/data/:slug/:id` | Obtenir une seule entité |
 | `POST` | `/api/data/:slug` | Créer une nouvelle entité |
-| `PUT` | `/api/data/:slug/:id` | Mettre à jour une entité |
 | `DELETE` | `/api/data/:slug/:id` | Supprimer une entité |
 
 ### Paramètres de requête

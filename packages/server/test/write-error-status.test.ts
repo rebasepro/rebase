@@ -46,7 +46,7 @@ function harness(save: () => Promise<Record<string, unknown>>) {
             body: JSON.stringify({ title: "hello" })
         }),
         put: () => app.request("/posts/1", {
-            method: "PUT",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title: "hello" })
         })

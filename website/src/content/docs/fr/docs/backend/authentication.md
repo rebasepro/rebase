@@ -474,7 +474,7 @@ const clerkAuthAdapter = createCustomAuthAdapter({
     capabilities: {
         hasBuiltInAuthRoutes: false, // Login is managed by Clerk UI
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         profileUpdate: false,
         sessionManagement: false
@@ -556,13 +556,14 @@ const myOauthAdapter: AuthAdapter = {
     getCapabilities: () => ({
         hasBuiltInAuthRoutes: true,
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         adminPasswordReset: false,
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,
         magicLink: false,
+        anonymousLogin: false,
         enabledProviders: []
     }),
     createAuthRoutes: () => {

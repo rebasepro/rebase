@@ -734,7 +734,7 @@ export const generatePostgresDdl = async (
                 indexStatements.push(`-- No ANN index on "${skip.schema}"."${skip.table}"."${skip.column}": ${skip.reason}`);
             }
 
-            // Backwards compatibility: add default id primary key if missing
+            // The implicit primary key, for a collection that declares none.
             const hasPk = columns.some(c => c.includes("PRIMARY KEY"));
             if (!hasPk) {
                 columns.unshift('  "id" TEXT PRIMARY KEY');

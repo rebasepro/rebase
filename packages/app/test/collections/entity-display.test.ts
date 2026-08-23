@@ -14,10 +14,6 @@ import {
  * a server render) has to be able to ask for only the first without accidentally
  * getting the second.
  */
-// The deprecation warning is deduped per collection *for the life of the
-// process*, which is what keeps a fifty-row list to one console line — and what
-// makes two tests sharing a slug order-dependent. Every collection built here
-// gets its own.
 let slugCounter = 0;
 
 const collection = (
@@ -65,38 +61,6 @@ describe("getDisplayResolver", () => {
     });
 });
 
-describe("the deprecated titleProperty", () => {
-
-    it("is still read when display.title is absent", () => {
-        const c = collection(undefined, { titleProperty: "name" });
-        expect(getDisplayPropertyKey(c, "title")).toBe("name");
-    });
-
-    it("loses to display.title when a collection sets both", () => {
-        // Mid-migration. The new field is the one it means.
-        const c = collection({ title: "new_key" }, { titleProperty: "old_key" });
-        expect(getDisplayPropertyKey(c, "title")).toBe("new_key");
-    });
-
-    it("warns once per collection, not once per row", () => {
-        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-        try {
-            const c = collection(undefined, { titleProperty: "name" });
-            for (let i = 0; i < 50; i++) getDisplayPropertyKey(c, "title");
-            expect(warn).toHaveBeenCalledTimes(1);
-            expect(String(warn.mock.calls[0][0])).toContain("admin.display.title");
-        } finally {
-            warn.mockRestore();
-        }
-    });
-
-    it("does not leak into any other role", () => {
-        const c = collection(undefined, { titleProperty: "name" });
-        expect(getDisplayPropertyKey(c, "subtitle")).toBeUndefined();
-        expect(getDisplayPropertyKey(c, "image")).toBeUndefined();
-    });
-});
-
 describe("hasDeclaredDisplay", () => {
 
     it("is true for either form, false for neither", () => {
@@ -105,10 +69,9 @@ describe("hasDeclaredDisplay", () => {
         expect(hasDeclaredDisplay(collection({}), "title")).toBe(false);
     });
 
-    it("counts the deprecated field, so the heuristics stand down for it too", () => {
-        // `getLeadingRelationTitleKey` asks this. A junction collection that
-        // declared a title used to keep getting the leading-relation guess.
-        const c = collection(undefined, { titleProperty: "name" });
-        expect(hasDeclaredDisplay(c, "title")).toBe(true);
+    it("is false for a role the collection says nothing about, so the heuristics run", () => {
+        // `getLeadingRelationTitleKey` asks this: a collection that declares a
+        // title must not also get the leading-relation guess.
+        expect(hasDeclaredDisplay(collection({ subtitle: "name" }), "title")).toBe(false);
     });
 });

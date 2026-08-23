@@ -83,8 +83,16 @@ export interface AuthAdapterCapabilities {
 
     /** Supports email/password login. */
     emailPasswordLogin: boolean;
-    /** Supports new user registration. */
-    registration: boolean;
+    /**
+     * Whether self-registration is open **right now**.
+     *
+     * A runtime answer, not a static feature list: the built-in adapter also
+     * reports `true` during the first-user bootstrap window (an empty user
+     * table) and `false` the moment `disableSelfRegistration` is set. Whatever
+     * this says, `POST /auth/register` does — both read the same predicate, so
+     * the UI can never be sent to a form that can only 403.
+     */
+    registrationEnabled: boolean;
     /**
      * Supports the end-user password reset flow (emailing a reset link).
      *
@@ -112,13 +120,8 @@ export interface AuthAdapterCapabilities {
     emailVerification: boolean;
     /** Supports passwordless magic link login. */
     magicLink: boolean;
-    /**
-     * Whether `POST /auth/anonymous` will mint a credential-less session.
-     *
-     * Optional so an external adapter that predates the key keeps typechecking;
-     * absent means "this adapter does not offer anonymous sign-in".
-     */
-    anonymousLogin?: boolean;
+    /** Whether `POST /auth/anonymous` will mint a credential-less session. */
+    anonymousLogin: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
     enabledProviders: string[];
 
@@ -134,9 +137,6 @@ export interface AuthAdapterCapabilities {
      * Only applicable for built-in auth.
      */
     needsSetup?: boolean;
-
-    /** Whether new user registration is enabled (may differ from `registration` capability at runtime). */
-    registrationEnabled?: boolean;
 }
 
 // ─── User Management ────────────────────────────────────────────────────────

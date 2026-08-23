@@ -205,12 +205,18 @@ Fragen Sie die Authentifizierungskonfiguration des Backends ab:
 ```typescript
 const config = await client.auth.getAuthConfig();
 // {
-//   needsSetup: boolean,
-//   registrationEnabled: boolean,
-//   emailServiceEnabled?: boolean,
-//   passwordReset?: boolean,
-//   emailVerification?: boolean,
-//   enabledProviders: string[]
+//   hasBuiltInAuthRoutes: boolean,
+//   emailPasswordLogin: boolean,
+//   registrationEnabled: boolean,   // open right now, bootstrap window included
+//   passwordReset: boolean,         // needs an email service
+//   adminPasswordReset: boolean,
+//   sessionManagement: boolean,
+//   profileUpdate: boolean,
+//   emailVerification: boolean,
+//   magicLink: boolean,
+//   anonymousLogin: boolean,
+//   enabledProviders: string[],
+//   needsSetup: boolean
 // }
 ```
 

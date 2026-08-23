@@ -421,15 +421,15 @@ GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
 GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
 GET    /api/data/authors/a-1/posts/p-1
 POST   /api/data/authors/a-1/posts          create under this parent
-PUT    /api/data/authors/a-1/posts/p-1      update; will not reparent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
 DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
 ```
 
 The parent segment is enforced, not decorative. Addressing a row that is not under
-that parent returns `404`, and `PUT` never moves a row from one parent to another —
+that parent returns `404`, and `PATCH` never moves a row from one parent to another —
 set the foreign key explicitly if that is what you want.
 
-For a many-to-many, `PUT parent/id/child/childId` is *set membership*: it links the
+For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
 row if it is not linked yet, and is idempotent. That is how you attach a row that
 already exists.
 

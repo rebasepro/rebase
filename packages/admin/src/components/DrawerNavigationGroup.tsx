@@ -28,15 +28,6 @@ export interface DrawerNavigationGroupProps {
      */
     drawerOpen: boolean;
     /**
-     * @deprecated No longer read. Entry tooltips are uncontrolled — they follow the
-     * pointer and focus, and are suppressed wherever the label is already visible.
-     */
-    tooltipsOpen?: boolean;
-    /**
-     * @deprecated No longer read. See {@link tooltipsOpen}.
-     */
-    adminMenuOpen?: boolean;
-    /**
      * Optional actions to render in the group header (e.g., "Add collection" button)
      */
     headerActions?: React.ReactNode;

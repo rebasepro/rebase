@@ -236,7 +236,7 @@ async function main(): Promise<void> {
             expectEqual((await read.json() as { label: string }).label, "Gadget", "label");
 
             const updated = await api("/sku_items/XYZ-9", {
-                method: "PUT",
+                method: "PATCH",
                 body: JSON.stringify({ label: "Gadget v2" })
             });
             expectTrue(updated.status === 200, `update: expected 200, got ${updated.status} ${await updated.text()}`);

@@ -841,15 +841,14 @@ values: entity as Record<string, unknown> },
          * gateway in front of this API would reject partial updates the server
          * would have accepted.
          *
-         * PUT stays mounted on the same handler rather than being changed or
-         * removed: every published SDK sends it, and altering its semantics to
-         * be a true replace would silently start nulling columns that callers
-         * had simply omitted for years — a data-loss change disguised as a
-         * standards fix. So PATCH is the honest name, PUT is the compatible one,
-         * and both do the documented thing.
+         * PUT was mounted on the same handler for a while so that published
+         * SDKs kept working. It is gone: two verbs for one operation meant the
+         * spec had to describe the same route twice, one of them marked
+         * deprecated, and a merge served under a verb that means replace is a
+         * contract nobody can generate against. `update()` in the SDK sends
+         * PATCH.
          */
         this.router.patch(`${basePath}/:id`, updateEntity);
-        this.router.put(`${basePath}/:id`, updateEntity);
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
@@ -1136,7 +1135,6 @@ id: parsed.id });
         };
 
         this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
-        this.router.put("/:parent/:parentId/:rest{.+}", updateNested);
 
         // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {

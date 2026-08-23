@@ -361,7 +361,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/change-password` | Change the caller's own password (authenticated) |
 | `GET` | `/api/auth/me` | The caller's own profile |
 | `PATCH` | `/api/auth/me` | Update the caller's own profile |
-| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `emailServiceEnabled`, `magicLinkEnabled`, `anonymousLoginEnabled`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
+| `GET` | `/api/auth/config` | What this backend offers a sign-in screen — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`. Unauthenticated, and computed from the same predicates the routes enforce, so what the screen advertises cannot drift from what it can do |
 | `POST` | `/api/auth/send-verification` | Send the caller an email-verification link |
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
@@ -811,7 +811,7 @@ const clerkAuthAdapter = createCustomAuthAdapter({
     capabilities: {
         hasBuiltInAuthRoutes: false, // Login is managed by Clerk UI
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         profileUpdate: false,
         sessionManagement: false
@@ -893,13 +893,14 @@ const myOauthAdapter: AuthAdapter = {
     getCapabilities: () => ({
         hasBuiltInAuthRoutes: true,
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         adminPasswordReset: false,
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,
         magicLink: false,
+        anonymousLogin: false,
         enabledProviders: []
     }),
     createAuthRoutes: () => {

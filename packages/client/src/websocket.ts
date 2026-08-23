@@ -86,11 +86,6 @@ export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
     public getAuthToken?: () => Promise<string | null>;
-    private subscriptions = new Map<string, {
-        onUpdate: (data: WebSocketMessage) => void,
-        onError?: (error: Error) => void
-    }>();
-
     private listeners = new Map<string, Set<(...args: unknown[]) => void>>();
 
     /** Channel-name → handlers, for broadcast and presence frames. */
@@ -881,23 +876,6 @@ export class RebaseWebSocketClient {
                     return;
                 }
             }
-        }
-
-        // Legacy subscription handling (for backward compatibility)
-        if (subscriptionId && this.subscriptions.has(subscriptionId)) {
-            const callback = this.subscriptions.get(subscriptionId);
-            if (!callback) {
-                throw new Error(`Subscription callback not found for subscriptionId: ${subscriptionId}`);
-            }
-            if (message.type === "ERROR" || message.error) {
-                if (callback.onError) {
-                    const { errorMessage, errorCode } = extractMessageError(message);
-                    callback.onError(new RebaseApiError(errorMessage, { code: errorCode }));
-                }
-            } else {
-                callback.onUpdate(message);
-            }
-            return;
         }
 
         // An error that matched no waiter used to fall off the end of this

@@ -246,17 +246,15 @@ describe("what /auth/config advertises is what /auth/register does", () => {
         // Compared as an object so a failure shows which side said what,
         // rather than just "expected true, got false".
         expect({
-            advertisedByRegistrationEnabled: capabilities.registrationEnabled,
-            advertisedByRegistration: capabilities.registration,
+            advertisedByConfigEndpoint: capabilities.registrationEnabled,
             acceptedByRegisterRoute: accepted
         }).toEqual({
-            advertisedByRegistrationEnabled: accepted,
-            advertisedByRegistration: accepted,
+            advertisedByConfigEndpoint: accepted,
             acceptedByRegisterRoute: accepted
         });
 
-        // And both must equal the shared rule, so neither drifted together in
-        // the same wrong direction.
+        // And it must equal the shared rule, so the two did not drift together
+        // in the same wrong direction.
         expect(accepted).toBe(isRegistrationOpen({
             disableSelfRegistration: scenario.disableSelfRegistration,
             allowRegistration: scenario.allowRegistration,

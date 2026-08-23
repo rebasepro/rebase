@@ -46,7 +46,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
     const defaultCapabilities: AuthAdapterCapabilities = {
         hasBuiltInAuthRoutes: false,
         emailPasswordLogin: false,
-        registration: false,
+        registrationEnabled: false,
         passwordReset: false,
         // Off unless the adapter's own createAdminRoutes() mounts a
         // reset-password route and opts in via `capabilities`.
@@ -55,6 +55,7 @@ export function createCustomAuthAdapter(options: CustomAuthAdapterOptions): Auth
         profileUpdate: false,
         emailVerification: false,
         magicLink: false,
+        anonymousLogin: false,
         enabledProviders: [],
         ...options.capabilities
     };

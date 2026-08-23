@@ -2,7 +2,6 @@ export * from "./collection_registry";
 export * from "./auth_state";
 
 export * from "./data";
-export * from "./database_admin";
 export * from "./data_driver";
 
 export * from "./effective_role";

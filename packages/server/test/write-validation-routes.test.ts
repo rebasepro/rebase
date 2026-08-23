@@ -84,7 +84,7 @@ label: "Widget" });
 
     it("400s an update with a typo'd field", async () => {
         const res = await createApp().fetch(new Request("http://localhost/sku_items/ABC-1", {
-            method: "PUT",
+            method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ labell: "Widget" })
         }));

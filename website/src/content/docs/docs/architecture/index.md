@@ -99,7 +99,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 ### Write Flow
 1. User edits a entity in the form
 2. `beforeSave` callbacks run (validation, transformation)
-3. Client SDK sends `PUT /api/data/:slug/:id`
+3. Client SDK sends `PATCH /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`
 5. `afterSave` callbacks run (side effects)
 6. `NOTIFY` broadcast triggers WebSocket update to all clients

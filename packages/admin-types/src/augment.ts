@@ -49,7 +49,7 @@ declare module "@rebasepro/types" {
      * missing. Written as a bare `admin?: AdminCollectionOptions`, `M` fell
      * back to its default `Record<string, unknown>`, so `Extract<keyof M,
      * string>` widened to `string` and every key-shaped field in the block —
-     * `titleProperty`, `sort`, `propertiesOrder`, `listProperties` — silently
+     * `display`, `sort`, `propertiesOrder`, `listProperties` — silently
      * accepted any string. The completion `defineCollection` advertises is
      * derived from `M`, so it never appeared: the inference was computed,
      * carried to this seam, and dropped one line short of the field that

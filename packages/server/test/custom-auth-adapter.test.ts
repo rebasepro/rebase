@@ -113,13 +113,14 @@ describe("createCustomAuthAdapter", () => {
         expect(caps).toEqual({
             hasBuiltInAuthRoutes: false,
             emailPasswordLogin: false,
-            registration: false,
+            registrationEnabled: false,
             passwordReset: false,
             adminPasswordReset: false,
             sessionManagement: false,
             profileUpdate: false,
             emailVerification: false,
             magicLink: false,
+            anonymousLogin: false,
             enabledProviders: []
         });
     });
@@ -139,11 +140,11 @@ describe("createCustomAuthAdapter", () => {
         const adapter = createCustomAuthAdapter({
             verifyRequest: async () => null,
             capabilities: { emailPasswordLogin: true,
-registration: true }
+registrationEnabled: true }
         });
         const caps = await adapter.getCapabilities!();
         expect(caps.emailPasswordLogin).toBe(true);
-        expect(caps.registration).toBe(true);
+        expect(caps.registrationEnabled).toBe(true);
         expect(caps.hasBuiltInAuthRoutes).toBe(false);
     });
 

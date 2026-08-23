@@ -71,12 +71,6 @@ export interface AuthModuleConfig {
      * verification, lifecycle hooks, etc.
      */
     authHooks?: AuthHooks;
-    /**
-     * Callback that checks if bootstrap has already been completed.
-     * Used by GET /auth/config to report `needsSetup` status.
-     * When not provided, falls back to checking if any users exist.
-     */
-    isBootstrapCompleted?: () => Promise<boolean>;
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
     /**

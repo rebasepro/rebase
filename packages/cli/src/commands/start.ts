@@ -26,7 +26,7 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   --bundle <dir>     Bundle directory (default: ${DEFAULT_BUNDLE_DIR})
-  --legacy           Run the backend workspace's own start script
+  --workspace        Run the backend workspace's own start script
   -h, --help         Show this help
 
 Build first with ${chalk.cyan("rebase build")}.
@@ -42,7 +42,7 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     const { flags: args } = parseCommandArgs({
         spec: {
             "--bundle": String,
-            "--legacy": Boolean
+            "--workspace": Boolean
         },
         rawArgs,
         commandWords: 1,
@@ -61,8 +61,8 @@ export async function startCommand(rawArgs: string[] = []): Promise<void> {
     const bundleDir = path.resolve(projectRoot, args["--bundle"] ?? DEFAULT_BUNDLE_DIR);
     const hasBundle = fs.existsSync(path.join(bundleDir, "manifest.json"));
 
-    if (args["--legacy"] || !hasBundle) {
-        if (!args["--legacy"] && !hasBundle) {
+    if (args["--workspace"] || !hasBundle) {
+        if (!args["--workspace"] && !hasBundle) {
             console.log(chalk.dim(
                 `No bundle at ${path.relative(projectRoot, bundleDir)}/ — ` +
                 "starting the backend workspace instead.\n"

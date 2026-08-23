@@ -49,6 +49,8 @@ export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
 
 export { createAuthRoutes } from "./routes";
 export type { AuthModuleConfig, CookieAuthConfig } from "./routes";
+export { buildBuiltinAuthCapabilities } from "./capabilities";
+export type { BuiltinAuthCapabilityInputs } from "./capabilities";
 
 export { mountMagicLinkRoutes } from "./magic-link-routes";
 
