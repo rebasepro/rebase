@@ -170,8 +170,8 @@ Schlägt die Initialisierung fehl (z. B. Datenbankverbindungsfehler), startet de
 
 ## Nächste Schritte
 
-- **[Authentifizierung](/docs/auth)** — JWT, Google OAuth, Benutzerverwaltung
-- **[Speicher](/docs/storage)** — Lokaler und S3-Dateispeicher
+- **[Authentifizierung](/docs/backend/authentication)** — JWT, Google OAuth, Benutzerverwaltung
+- **[Speicher](/docs/backend/storage)** — Lokaler und S3-Dateispeicher
 - **[Entitäts-Callbacks](/docs/collections/callbacks)** — Lebenszyklus-Hooks und `context.data`-API
 - **[Entitätshistorie](/docs/backend/history)** — Audit-Trail
 - **[Benutzerdefinierte Funktionen](/docs/backend/custom-functions)** — Benutzerdefinierte API-Endpunkte hinzufügen

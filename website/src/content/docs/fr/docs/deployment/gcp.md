@@ -50,7 +50,7 @@ gcloud run deploy rebase-backend \
 Étant donné que les instances Cloud Run sont strictement sans état et éphémères, vous ne pouvez pas utiliser le stockage sur disque local pour les téléchargements de fichiers Rebase.
 
 1. Accédez à **Google Cloud Storage** et créez un nouveau bucket privé dans la région de l'UE choisie.
-2. Suivez la [Documentation de stockage de Rebase](/docs/storage) pour configurer Rebase afin d'utiliser l'API compatible S3 fournie par Google Cloud Storage au lieu du système de fichiers local.
+2. Suivez la [Documentation de stockage de Rebase](/docs/backend/storage) pour configurer Rebase afin d'utiliser l'API compatible S3 fournie par Google Cloud Storage au lieu du système de fichiers local.
 
 Votre instance Rebase est maintenant entièrement sans serveur et hautement évolutive nativement au sein de l'UE !
 

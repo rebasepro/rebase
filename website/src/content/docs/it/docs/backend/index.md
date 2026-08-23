@@ -170,8 +170,8 @@ Se l'inizializzazione fallisce (ad esempio, errore di connessione al database), 
 
 ## Prossimi Passi
 
-- **[Autenticazione](/docs/auth)** — JWT, Google OAuth, gestione utenti
-- **[Archiviazione](/docs/storage)** — Archiviazione di file locali e S3
+- **[Autenticazione](/docs/backend/authentication)** — JWT, Google OAuth, gestione utenti
+- **[Archiviazione](/docs/backend/storage)** — Archiviazione di file locali e S3
 - **[Callback delle Entità](/docs/collections/callbacks)** — Hook del ciclo di vita e API `context.data`
 - **[Cronologia delle Entità](/docs/backend/history)** — Traccia di audit
 - **[Funzioni Personalizzate](/docs/backend/custom-functions)** — Aggiungi endpoint API personalizzati
