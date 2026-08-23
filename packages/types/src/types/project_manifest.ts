@@ -273,8 +273,33 @@ export const BUNDLE_FORMAT_VERSION = 2;
  * any number of minors and patches while this stays put. It changes only when
  * the bundle/runtime contract breaks compatibility, and a project's
  * `manifest.runtime` range is matched against *this*.
+ *
+ * ## v2 — resources are declared, not configured
+ *
+ * `RebaseBackendConfig.dataSources` and `.storageSources` are gone. A project
+ * declares its databases and buckets with `database()` / `bucket()` in its
+ * config, and the runtime reads those declarations.
+ *
+ * This had to be a major, and the reason is the managed tier: it moves projects
+ * onto new images WITHOUT rebuilding them. A bundle built against v1 exports
+ * those keys, and a v2 runtime refuses them at boot — so without this bump, one
+ * image rollout would crash-loop every tenant that had ever declared a second
+ * database or bucket, in a wave, with the cause in a container log nobody is
+ * watching.
+ *
+ * With the bump, a v1 bundle on a v2 runtime is refused by
+ * `assertBundleCompatibility` with the remedy in the message, and the platform
+ * keeps it on a v1 image until it is rebuilt. That is the whole purpose of this
+ * number.
+ *
+ * **Release order matters and is not optional.** The control plane is the side
+ * that rejects, so it ships FIRST: raise `SUPPORTED_RUNTIME_CONTRACT` in the
+ * saas repo (it rejects only `contract >` its own, so it then accepts both),
+ * deploy that, and only then release a runtime implementing v2. Shipping the
+ * runtime first turns every deploy into a rejected intake blaming the tenant's
+ * bundle.
  */
-export const RUNTIME_CONTRACT_VERSION = 1;
+export const RUNTIME_CONTRACT_VERSION = 2;
 
 /** Where the runtime finds each part of the bundle. Paths are bundle-relative. */
 export interface RebaseBundleEntrypoints {
