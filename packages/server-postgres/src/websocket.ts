@@ -77,17 +77,51 @@ const CHANNEL_MESSAGE_TYPES = new Set([
     "channel_history"
 ]);
 
-/** Admin-only WebSocket message types */
-const ADMIN_ONLY_TYPES = new Set([
+/**
+ * WebSocket message types that require an admin session.
+ *
+ * Exported so the test can READ it. It used to be private, and the test that
+ * exists to make "a privileged verb added without a role check" impossible held
+ * a hand-typed copy of the same nine strings — so it agreed with itself, and
+ * `FETCH_APPLICATION_ROLES` was added to neither. That verb runs
+ * `SELECT DISTINCT unnest(roles)` over the users table through `executeSql`,
+ * which is the owner connection and not subject to RLS, so any authenticated
+ * non-admin could enumerate every role in the project — and any anonymous
+ * socket could, on a deployment with `requireAuth: false`.
+ *
+ * The list is no longer the whole guarantee. `PUBLIC_TYPES` below is its
+ * counterpart, and a test asserts that every `case` this file handles appears
+ * in exactly one of the two — so a verb added to neither fails rather than
+ * defaulting to reachable.
+ */
+export const ADMIN_ONLY_TYPES = new Set([
     "EXECUTE_SQL",
     "FETCH_DATABASES",
     "FETCH_ROLES",
+    "FETCH_APPLICATION_ROLES",
     "FETCH_UNMAPPED_TABLES",
     "FETCH_TABLE_METADATA",
     "FETCH_CURRENT_DATABASE",
     "CREATE_BRANCH",
     "DELETE_BRANCH",
     "LIST_BRANCHES"
+]);
+
+/**
+ * Message types deliberately reachable by a non-admin session.
+ *
+ * Data operations, gated per row by RLS and per request by the same write
+ * checks the REST layer applies — not by this list. It exists so that "which
+ * bucket is this verb in" is a question with an answer for every verb, and
+ * adding one without answering it is a test failure.
+ */
+export const PUBLIC_TYPES = new Set([
+    "FETCH_COLLECTION",
+    "FETCH_ONE",
+    "COUNT",
+    "SAVE",
+    "DELETE",
+    "CHECK_UNIQUE_FIELD"
 ]);
 
 /**
