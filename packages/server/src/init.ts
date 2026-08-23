@@ -1709,13 +1709,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
                 },
-                writeSource: async (change) => {
-                    if (!schemaEditorRoutes) {
-                        throw new Error(
-                            "The AST schema editor is unavailable, so the collection source cannot be " +
-                            "rewritten. Install `ts-morph` to enable it."
-                        );
-                    }
+                // Absent, not throwing, when the AST editor is unavailable.
+                //
+                // A function that exists and throws made `/status` answer
+                // `enabled: true` — it can only see whether the field is set —
+                // and then `/apply` died with a 500 the moment somebody
+                // confirmed. Leaving it undefined is the same fact stated where
+                // both surfaces can read it: `/status` reports
+                // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
+                // control, and a caller that asks anyway gets a refusal that
+                // names the missing dependency.
+                writeSource: schemaEditorRoutes ? async (change) => {
                     const { AstSchemaEditor } = await import("./api/ast-schema-editor");
                     const editor = new AstSchemaEditor(collectionsDir);
                     await editor.saveCollection(change.collectionId, change.collection, { partial: false });
@@ -1729,7 +1733,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                         path: nodePath.relative(repositoryRoot!, file),
                         contents
                     }];
-                },
+                } : undefined,
                 // The same path `writeSource` resolves, derived without writing
                 // anything — the dirty-tree check has to know it before the
                 // edit, or it sees this change's own file and refuses.

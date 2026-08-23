@@ -478,3 +478,81 @@ describe("writing the source without tripping the dirty check", () => {
         expect(events).not.toContain("commit");
     });
 });
+
+/**
+ * A capability that is absent should say so, not die when it is used.
+ *
+ * `writeSource` used to be a function that existed and threw when the AST
+ * editor was unavailable. `/status` can only see whether the field is *set*, so
+ * it answered `enabled: true`, the panel offered the control, and `/apply` came
+ * back 500 the moment somebody confirmed — after they had read a plan and
+ * agreed to it.
+ */
+describe("when the source cannot be rewritten", () => {
+    const withoutWriteSource = () => {
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts")],
+            getAdmin: () => ({
+                planSchemaChange: async () => okPlan(),
+                executeSql: async () => ({ rows: [] })
+            } as unknown as DatabaseAdmin),
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => {},
+                commit: async () => "abc123def456"
+            })
+            // writeSource deliberately absent.
+        }));
+        return app;
+    };
+
+    it("reports itself unavailable rather than enabled", async () => {
+        const res = await withoutWriteSource().fetch(
+            new Request("http://localhost/api/schema/status")
+        );
+        expect(await res.json()).toMatchObject({
+            enabled: false,
+            code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+            // Planning needs no source rewrite, so it is still on offer.
+            canPlan: true
+        });
+    });
+
+    it("turns a failure between the check and the commit into a refusal, not a 500", async () => {
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("user", PERSON as never); await next(); });
+        app.route("/api/schema", createLiveSchemaRoutes({
+            getCollections: () => [collection("posts")],
+            getAdmin: () => ({
+                planSchemaChange: async () => okPlan(),
+                executeSql: async () => ({ rows: [] })
+            } as unknown as DatabaseAdmin),
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => [],
+                writeFiles: async () => {},
+                commit: async () => "abc"
+            }),
+            sourcePathsFor: () => ["config/collections/posts.ts"],
+            writeSource: async () => { throw new Error("posts.ts could not be parsed"); }
+        }));
+
+        const res = await app.fetch(new Request("http://localhost/api/schema/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(change)
+        }));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+            error: { code: "SCHEMA_CHANGE_FAILED", message: "posts.ts could not be parsed" }
+        });
+    });
+});

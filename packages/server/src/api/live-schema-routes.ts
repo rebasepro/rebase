@@ -373,7 +373,19 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             if (err instanceof DirtyWorkingTreeError) {
                 throw ApiError.conflict(err.message, "SCHEMA_EDIT_DIRTY_TREE");
             }
-            throw err;
+            // Anything else that goes wrong between the check and the commit —
+            // the AST editor refusing a file it cannot parse, git refusing the
+            // commit, a path outside the repository — is a refusal of *this
+            // change*, not a broken server. A 500 tells the person nothing and
+            // reads as an outage; the message is the useful part and it is
+            // already on the error.
+            //
+            // Deliberately below the two specific cases above, so neither is
+            // flattened into this one.
+            throw ApiError.badRequest(
+                err instanceof Error ? err.message : String(err),
+                "SCHEMA_CHANGE_FAILED"
+            );
         }
     });
 
