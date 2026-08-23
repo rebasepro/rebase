@@ -13,11 +13,13 @@ repository, then applies the DDL** — so the edit survives the next deploy,
 because the deploy is built from it.
 
 ```
-POST /api/schema/plan     what would happen, without doing it
-POST /api/schema/apply    commit, then apply
+GET  /api/admin/schema/status   whether this backend can do it, and whether you may
+POST /api/admin/schema/plan     what would happen, without doing it
+POST /api/admin/schema/apply    commit, then apply
 ```
 
-Both are admin-gated, like every other admin surface.
+All three are admin-gated, like every other `/api/admin` surface. Applying needs
+one thing more than being an admin — see [Who may apply](#who-may-apply).
 
 ## Plan before you apply
 
@@ -25,7 +27,7 @@ Both are admin-gated, like every other admin surface.
 tells you what the change means:
 
 ```bash
-curl -X POST https://your-app/api/schema/plan \
+curl -X POST https://your-app/api/admin/schema/plan \
   -H "authorization: Bearer $ADMIN_TOKEN" \
   -H "content-type: application/json" \
   -d '{"collectionId":"posts","collection":{}}'
@@ -59,14 +61,47 @@ live database.
 `diverges` is the one worth understanding, because these changes look like they
 worked:
 
-- **A required property added to an existing collection** arrives **nullable**.
-  `NOT NULL` is checked against rows that are already there, so it is withheld on
-  a table that already exists. Your config says required; the database does not
-  enforce it.
-- **A value added to an existing enum** never lands. An enum type that already
-  exists is skipped entirely, and the first row using the new value is rejected.
-- **Relaxing a required property** leaves the old `NOT NULL` in place. Writes
-  omitting it still fail.
+- **A required property added to a table that already holds rows** arrives
+  **nullable**. `NOT NULL` is checked against every row already there, and rows
+  written before the property existed have no value for it. On an **empty**
+  table there is nothing to check, so the constraint is applied and this is
+  `safe`.
+- **Making an existing property required** has the same shape: `SET NOT NULL`
+  scans the table, so it is `safe` on an empty one and `diverges` on a populated
+  one until you backfill.
+
+Two changes that used to be `diverges` are now `safe`, because the ensure path
+carries them out:
+
+- **A value added to an existing enum** lands, via
+  `ALTER TYPE … ADD VALUE IF NOT EXISTS`. It used to be skipped along with the
+  whole type, and the first row using the new value was rejected by a type that
+  had never heard of it.
+- **Relaxing a required property** drops the `NOT NULL`. It used to be left in
+  place, so writes omitting the property still failed.
+
+### Constraints that are asked for and not applied
+
+A change can be applicable and still leave something your configuration asks for
+unenforced — a required property over a populated table is the case. That is not
+a refusal, so it does not appear in `changes`; it appears in
+`withheldConstraints`, with the obstacle and what would clear it:
+
+```json
+{
+  "withheldConstraints": [
+    {
+      "target": "public.posts.author",
+      "kind": "not-null",
+      "reason": "\"author\" is required, but \"public.posts\" already holds rows …",
+      "remedy": "Backfill the column, then apply this again."
+    }
+  ]
+}
+```
+
+The boot-time ensure path reports the same thing as a warning. Until this
+existed, a withheld constraint was withheld in silence.
 
 `needs-migration` covers everything the ensure path cannot do: dropping a
 collection or a property, changing a type, renaming a column, changing a primary
@@ -86,6 +121,52 @@ The commit message describes the change rather than announcing one, and is
 attributed to the admin who made it. A schema change with an author and a diff
 in your project's history is something neither Firebase nor Supabase gives you —
 their table edits are invisible to your repository.
+
+## Who may apply
+
+Being an admin is enough to **plan**. Planning has no side effects, and a CI job
+asking whether a proposed collection change is applicable is a good use of it.
+
+Applying is a second privilege, because applying writes a commit and a commit
+carries an author:
+
+| Caller | Plan | Apply |
+|---|---|---|
+| A signed-in admin | yes | yes |
+| An API key | yes | no |
+| The server's service key | yes | no |
+
+A credential is not an author. `api-key:7c3f…` in your CI environment is not
+somebody, and letting it write to your repository produces exactly the
+unattributable history this feature exists to replace.
+
+If an automated schema change is what you want — a migration pipeline, say —
+turn it on deliberately:
+
+```typescript no-verify
+initializeRebaseBackend({
+    // …the rest of your config
+    liveSchema: { allowMachineApply: true }
+})
+```
+
+or `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. The commit is then attributed
+to the credential by name — `Rebase API key (7c3f)` — so reading `git log` a
+month later still tells you which changes a person made.
+
+`GET /api/admin/schema/status` reports what *you* may do, not only what the
+server supports, so a panel can disable the control and say why rather than
+refusing you after you have decided:
+
+```json
+{
+  "enabled": true,
+  "canPlan": true,
+  "canApply": false,
+  "applyRefusedCode": "SCHEMA_EDIT_REQUIRES_A_PERSON",
+  "applyRefusedBecause": "This request is authenticated with an API key …"
+}
+```
 
 ## Commit first, then apply
 
