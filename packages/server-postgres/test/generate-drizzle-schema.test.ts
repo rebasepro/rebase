@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
+import ts from "typescript";
 
 describe("generateDrizzleSchema", () => {
 
@@ -1685,5 +1686,53 @@ describe("the generated schema parses for names Postgres allows", () => {
 
         const schema = await generateSchema([posts, authors]);
         expect(syntaxErrors(schema)).toEqual([]);
+    });
+});
+
+describe("names that are legal in Postgres and not in JavaScript", () => {
+    /**
+     * The generated file is compiled and imported by the server, so a name that
+     * breaks the file breaks the whole collections directory rather than one
+     * collection. This file already defines `quote`, `propKey` and `member` for
+     * exactly that, with docblocks explaining why — they were applied to
+     * property keys and member accesses and not to four other blocks.
+     *
+     * `search.column` is the one that was demonstrably reachable: a hyphen is
+     * ordinary in Postgres and produced `,' expected`. The others are the same
+     * helpers applied for consistency; the injection route through
+     * `relationName` did NOT reproduce, because that value is derived before it
+     * reaches the template.
+     */
+    const parse = (source: string) => {
+        const sf = ts.createSourceFile("schema.generated.ts", source, ts.ScriptTarget.ES2022, true);
+        return (sf as unknown as { parseDiagnostics?: unknown[] }).parseDiagnostics ?? [];
+    };
+
+    const id = { name: "ID", type: "string", isId: "uuid" as const };
+
+    it("a search column containing a hyphen still generates a file that parses", async () => {
+        const out = await generateSchema([{
+            name: "Notes", singularName: "Note", slug: "notes", table: "notes",
+            properties: { id, title: { name: "Title", type: "string" } },
+            search: { column: "search-vector", fields: ["title"] }
+        }] as never, true);
+
+        expect(parse(out)).toHaveLength(0);
+        // Quoted as a key AND as the column literal, not just one of the two.
+        expect(out).toContain('"search-vector"');
+    });
+
+    it("leaves an ordinary schema byte-identical", async () => {
+        // What makes applying the helpers safe: for every name that is already
+        // an identifier, `propKey` and `member` are the identity and `quote` is
+        // the same double-quoted string that was written by hand.
+        const out = await generateSchema([{
+            name: "Items", singularName: "Item", slug: "items", table: "items",
+            properties: { id, title: { name: "Title", type: "string" } }
+        }] as never, true);
+
+        expect(parse(out)).toHaveLength(0);
+        expect(out).toContain('export const items = pgTable("items"');
+        expect(out).toContain('title: text("title")');
     });
 });
