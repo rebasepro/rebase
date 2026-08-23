@@ -92,6 +92,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },

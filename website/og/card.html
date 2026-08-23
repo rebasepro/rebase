@@ -1,0 +1,232 @@
+<meta charset="utf-8" />
+<title>Rebase — social preview card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  /* Everything scales off the viewport width, so one template renders both
+     1280x640 (GitHub social preview) and 1200x630 (og:image) without a second
+     set of numbers. 1rem = 16px at 1280 wide. */
+  html {
+    font-size: calc(100vw / 80);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    /* Ground is #08090A, not pure black — pure black kills the shadow system.
+       Light is layered radials, in the mark's own hues: blue core behind the
+       object, violet pooling bottom-right, a cyan hint above it. */
+    background:
+      radial-gradient(44% 62% at 74% 44%, rgba(0, 112, 244, 0.44) 0%, rgba(0, 112, 244, 0.14) 48%, transparent 76%),
+      radial-gradient(72% 96% at 88% 56%, rgba(0, 96, 220, 0.2) 0%, transparent 72%),
+      radial-gradient(40% 54% at 96% 96%, rgba(124, 92, 240, 0.24) 0%, transparent 72%),
+      radial-gradient(34% 46% at 82% 4%, rgba(52, 182, 217, 0.14) 0%, transparent 72%),
+      radial-gradient(56% 76% at 2% 4%, rgba(53, 154, 255, 0.1) 0%, transparent 68%),
+      #08090a;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Vignette: keeps the corners dark so the type never sits on a lifted edge. */
+  body::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(82% 92% at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.44) 100%);
+    pointer-events: none;
+  }
+
+  .stage {
+    position: absolute;
+    inset: 4.5rem;
+    z-index: 1;
+  }
+
+  /* ---- left rail ------------------------------------------------------- */
+
+  .wordmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-size: 1.875rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: #f7f8f8;
+  }
+
+  .copy {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+  }
+
+  h1 {
+    font-family: "Instrument Sans", "Inter", sans-serif;
+    font-size: 4.5rem;
+    font-weight: 500;
+    line-height: 1.04;
+    /* Headlines are one colour. The white-line/accent-line split is retired. */
+    letter-spacing: -0.028em;
+    color: #f7f8f8;
+  }
+
+  .lead {
+    margin-top: 1.5rem;
+    font-size: 1.375rem;
+    line-height: 1.45;
+    letter-spacing: -0.006em;
+    color: #b4b8bd;
+  }
+
+  .surfaces {
+    margin-top: 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #8a8f95;
+  }
+
+  .surfaces i {
+    width: 0.1875rem;
+    height: 0.1875rem;
+    border-radius: 50%;
+    background: #4a4e54;
+  }
+
+  /* ---- foot ------------------------------------------------------------ */
+
+  .foot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* One product frame: 14px radius, a single hairline, a layered shadow,
+     no gradient fill. */
+  .command {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8125rem 1.125rem;
+    border-radius: 0.875rem;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+      0 12px 28px -12px rgba(0, 0, 0, 0.8);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 1rem;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    color: #d7dade;
+    white-space: nowrap;
+  }
+
+  .command b {
+    font-weight: 400;
+    color: #82878d;
+  }
+
+  .site {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #8a8f95;
+  }
+
+  /* ---- the mark -------------------------------------------------------- */
+
+  .mark {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 22rem;
+    height: 22rem;
+    transform: translateY(-52%);
+  }
+
+  /* Light on the ground behind and below the mark — not a halo around it. */
+  .mark::before {
+    content: "";
+    position: absolute;
+    width: 38rem;
+    height: 30rem;
+    left: 50%;
+    top: 50%;
+    transform: translate(-48%, -36%);
+    background: radial-gradient(closest-side, rgba(0, 112, 244, 0.5) 0%, rgba(0, 112, 244, 0.16) 50%, transparent 78%);
+    filter: blur(3rem);
+  }
+
+  .mark img {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 1.5rem 2.25rem rgba(0, 0, 0, 0.55)) drop-shadow(0 3.25rem 4.5rem rgba(0, 0, 0, 0.45));
+  }
+</style>
+
+<!--
+  IMPECCABLE DIRECTION CONTRACT — Rebase social preview card
+  THESIS: A repo card that states the mechanism in six words and shows the mark
+  at object scale. It refuses the centred logo-over-glow OG template.
+  OWN-WORLD: #08090A ground lit by layered blue/violet radials in the mark's own
+  hues; Instrument Sans 500 display at -0.028em, one colour; Inter lead at
+  #B4B8BD; an uppercase micro surface row; one hairline 14px frame for the
+  command; JetBrains Mono for code.
+  STORY: a stranger reads what Rebase does, sees which surfaces it generates,
+  and leaves with a command they can run.
+  FIRST VIEWPORT: left rail — wordmark top, 4.5rem headline with lead and micro
+  row centred, command pill bottom-left, rebase.pro bottom-right; the faceted
+  mark at 22rem sits right, lit from behind. Everything left-aligned.
+  FORM: poster split, not a card. Extension of the committed rebase.pro world.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the
+  finish review, the verdict, and DESIGN.md.
+-->
+
+<div class="stage">
+  <div class="wordmark">Rebase</div>
+
+  <div class="copy">
+    <h1>Point it at Postgres.<br />Get a backend.</h1>
+    <p class="lead">
+      The open-source Backend-as-a-Service for Postgres.<br />Own your data, own your code.
+    </p>
+    <div class="surfaces">
+      <span>REST</span><i></i><span>Typed SDK</span><i></i><span>Auth</span><i></i><span>Storage</span><i></i
+      ><span>Realtime</span><i></i><span>Backups</span><i></i><span>RLS</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="command"><b>$</b> pnpm dlx @rebasepro/cli init</div>
+    <div class="site">rebase.pro</div>
+  </div>
+
+  <div class="mark"><img src="../public/logo.svg" alt="" /></div>
+</div>

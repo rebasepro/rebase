@@ -112,6 +112,12 @@ export * from "./data_export";
 
 // Collection editor — moved from @rebasepro/studio (admin-dependent visual schema editor)
 export * from "./collection_editor";
+export * from "./collection_editor/liveSchemaClient";
+export * from "./collection_editor/useLiveSchemaEditing";
+// `SchemaChangeDialog` is deliberately absent, like `CollectionEditorDialog`
+// and `PropertyFormDialog` beside it: re-exporting it from the barrel puts it
+// back in the eager bundle and undoes the `lazyChunk` in `useLiveSchemaEditing`.
+// Import it by path if you need the component itself.
 
 
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";

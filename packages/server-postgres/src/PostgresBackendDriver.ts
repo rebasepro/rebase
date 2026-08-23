@@ -40,6 +40,8 @@ import { logger } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { classifyTable, detectJunctionTables } from "./utils/table-classification";
+import { generateSchemaCommit } from "./schema/generate-schema-commit";
+import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
@@ -119,6 +121,26 @@ export class PostgresBackendDriver implements DataDriver {
             fetchCurrentDatabase: () => this.fetchCurrentDatabase(),
             fetchUnmappedTables: (...args: Parameters<NonNullable<DatabaseAdmin["fetchUnmappedTables"]>>) => this.fetchUnmappedTables(...args),
             fetchTableMetadata: (...args: Parameters<NonNullable<DatabaseAdmin["fetchTableMetadata"]>>) => this.fetchTableMetadata(...args),
+            // Planning a schema change is engine-specific — it renders DDL, a
+            // Drizzle schema and the declarative SQL artifacts — so it lives
+            // here and the server detects it structurally, the same way it
+            // detects SQL. Planning only: applying is `executeSql` above, and
+            // committing belongs to whatever holds the repository.
+            // Planned against what this database actually has, not against an
+            // empty one. Whether a NOT NULL can be added comes down to whether
+            // the table holds rows, and whether an enum value will land comes
+            // down to the values the type already carries — neither is knowable
+            // from the collections, and both decide whether the statements this
+            // returns are accepted or rejected by the database they name.
+            planSchemaChange: async (before, after, options) => generateSchemaCommit({
+                before: before as CollectionConfig[],
+                after: after as CollectionConfig[],
+                paths: options?.paths,
+                existing: await readSchemaFactsFor(
+                    this.schemaFactsQueryable(),
+                    after as CollectionConfig[]
+                )
+            }),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
@@ -126,6 +148,24 @@ export class PostgresBackendDriver implements DataDriver {
                 listBranches: this.branchService.listBranches.bind(this.branchService),
                 getBranchInfo: this.branchService.getBranchInfo.bind(this.branchService)
             } : {})
+        };
+    }
+
+    /**
+     * The catalogue-reading shim the schema planner wants.
+     *
+     * Text in, rows out — every statement it issues is a catalogue read keyed by
+     * schema name, and schema names are identifiers rather than bindable values,
+     * so there is nothing to parameterise. Runs on the driver's own handle, which
+     * is the connection whose privileges are already known to work.
+     */
+    private schemaFactsQueryable(): Queryable {
+        return {
+            query: async <T>(text: string): Promise<{ rows: T[] }> => {
+                const result = await this.db.execute(drizzleSql.raw(text));
+                const rows = (result as unknown as { rows?: T[] }).rows;
+                return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+            }
         };
     }
 

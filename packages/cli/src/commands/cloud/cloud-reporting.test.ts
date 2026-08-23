@@ -13,7 +13,13 @@
 import { describe, it, expect } from "vitest";
 import { describeStorageState, describeDatabaseState, describeRuntime } from "./resources";
 import { buildTimeEnvPrefix } from "./env";
-import { deploymentView, parseDeploymentsLimit, DEFAULT_DEPLOYMENTS_LIMIT, type DeploymentRow } from "./deployments";
+import {
+    deploymentView,
+    cancelView,
+    parseDeploymentsLimit,
+    DEFAULT_DEPLOYMENTS_LIMIT,
+    type DeploymentRow
+} from "./deployments";
 
 /** Colour codes are noise for these assertions. */
 // eslint-disable-next-line no-control-regex
@@ -222,5 +228,82 @@ runtimeVersion: null }));
             expect(line).toContain("not deployed yet");
             expect(line).not.toContain("your own image");
         }
+    });
+});
+
+/**
+ * `rebase cloud cancel` has two outcomes behind one `success: true`.
+ *
+ * The control plane learned to clear a project stranded at `deploying` with no
+ * deployment row behind it — the state `prospector` was wedged in for five days
+ * — and it reports that through the cancel endpoint, with `deploymentId: null`.
+ * Printing the old sentence at it produced "Cancelled deployment null": the
+ * fix for the bug, reported as a bug.
+ */
+describe("cancel reporting", () => {
+    it("names the deployment it stopped", () => {
+        const view = cancelView({ success: true, deploymentId: "dep_1", buildJobDeleted: false });
+        expect(stripAnsi(view.headline)).toBe("Cancelled deployment dep_1");
+        expect(view.json.deploymentId).toBe("dep_1");
+        expect(view.json.unstranded).toBe(false);
+    });
+
+    it("says so when the build job was deleted", () => {
+        const view = cancelView({ success: true, deploymentId: "dep_1", buildJobDeleted: true });
+        expect(view.notes.join(" ")).toContain("build job was deleted");
+        expect(view.json.buildJobDeleted).toBe(true);
+    });
+
+    it("never says it cancelled a deployment that does not exist", () => {
+        const view = cancelView({
+            success: true,
+            deploymentId: null,
+            buildJobDeleted: false,
+            unstranded: true,
+            projectStatus: "active"
+        });
+        const headline = stripAnsi(view.headline);
+        expect(headline).not.toContain("null");
+        expect(headline).toContain("No deploy was in flight");
+        expect(headline).toContain("active");
+    });
+
+    it("branches on the absent id, not on the flag a older control plane may not send", () => {
+        // The flag is the server being explicit and it is the newer half of the
+        // contract. The id is the load-bearing signal: with no id there was no
+        // deployment, whatever else the response does or does not carry.
+        const view = cancelView({ success: true, deploymentId: null, buildJobDeleted: false });
+        expect(stripAnsi(view.headline)).not.toContain("null");
+        expect(view.json.unstranded).toBe(true);
+        expect(view.json.projectStatus).toBeNull();
+    });
+
+    it("publishes the new fields to a piped run, which is where scripts read it", () => {
+        const view = cancelView({
+            success: true,
+            deploymentId: null,
+            buildJobDeleted: false,
+            unstranded: true,
+            projectStatus: "failed"
+        });
+        expect(view.json).toEqual({
+            success: true,
+            deploymentId: null,
+            buildJobDeleted: false,
+            unstranded: true,
+            projectStatus: "failed"
+        });
+    });
+
+    it("does not report an empty projectStatus as a status", () => {
+        const view = cancelView({
+            success: true,
+            deploymentId: null,
+            buildJobDeleted: false,
+            unstranded: true,
+            projectStatus: ""
+        });
+        expect(view.json.projectStatus).toBeNull();
+        expect(stripAnsi(view.headline)).toBe("No deploy was in flight — cleared this project's stuck 'deploying' status");
     });
 });

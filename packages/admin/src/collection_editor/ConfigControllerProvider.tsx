@@ -383,6 +383,11 @@ parentEntityIds,
                 <CollectionEditorContext.Provider value={collectionEditorContextValue}>
                     <CollectionEditorDialogsContext.Provider value={dialogsState}>
                         {children}
+                        {/* Rendered here rather than by each consumer: a
+                            controller that has to ask before it writes needs
+                            somewhere to ask, and this is the one component that
+                            wraps every editor surface. */}
+                        {collectionConfigController.dialog}
                     </CollectionEditorDialogsContext.Provider>
                 </CollectionEditorContext.Provider>
             </ConfigControllerContext.Provider>

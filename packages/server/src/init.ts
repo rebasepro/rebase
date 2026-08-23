@@ -49,6 +49,23 @@ import { resolveStorageAccessControl } from "./storage/policies";
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
+import { createLiveSchemaRoutes } from "./api/live-schema-routes";
+import { mountWithLegacyAlias } from "./api/mount";
+import type { SchemaEditPolicy } from "./schema-edit/schema-edit-permissions";
+
+/**
+ * Who may change this project's schema through a running backend.
+ *
+ * An alias rather than its own shape: the policy is defined next to the code
+ * that enforces it, and a second declaration here would be a second place for
+ * it to drift.
+ *
+ * @see `packages/server/src/schema-edit/schema-edit-permissions.ts`
+ */
+export type LiveSchemaConfig = SchemaEditPolicy;
+import { createLocalGitRepository, findRepositoryRoot } from "./schema-edit/local-git-repository";
+import nodePath from "node:path";
+import nodeFs from "node:fs/promises";
 import { createRlsAudit, type RlsAuditConfig, type RlsAudit } from "./rls-audit";
 import type { CaptchaConfig } from "./auth/captcha";
 import {
@@ -345,6 +362,16 @@ export interface RebaseBackendConfig {
      * `collectionsDir` to write to.
      */
     schemaEditor?: boolean;
+
+    /**
+     * Live schema editing — changing the database and committing the change.
+     *
+     * Distinct from `schemaEditor`, which only rewrites collection source.
+     * There is nothing to switch on here: the surface mounts whenever there is
+     * a `collectionsDir`, and refuses in its own words when it cannot act. What
+     * this configures is *who* may act.
+     */
+    liveSchema?: LiveSchemaConfig;
 
     /** Options that only apply when collections are derived from the database. */
     baas?: BaasOptions;
@@ -1627,14 +1654,125 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }, 501));
         }
 
-        config.app.route(`${basePath}/schema-editor`, schemaEditorRouter);
-        if (schemaEditorRoutes) {
-            logger.debug("Schema Editor mounted", { path: `${basePath}/schema-editor` });
-        } else {
-            logger.debug("Schema Editor unavailable", {
-                path: `${basePath}/schema-editor`,
-                code: schemaEditorOff!.code
+        // ── Live schema editing ───────────────────────────────────────────
+        // Not gated on NODE_ENV, unlike the source-only editor above. The
+        // question is not whether this is production, it is whether there is a
+        // repository to commit to: a deployment running from a built bundle has
+        // compiled output and no source, and answers a refusal that says so.
+        //
+        // Mounted either way; the routes themselves decide what is possible, so
+        // the reason a change is refused arrives as a message rather than as a
+        // missing endpoint. Without a `collectionsDir` the surface still
+        // answers, because it lives under `/api/admin` and an unmounted path
+        // there is caught by the admin gate in front of it — which would reply
+        // 401 to an operator whose actual problem is an unconfigured
+        // `collectionsDir`. Being told the wrong thing is worse than a 404, and
+        // both are worse than being told.
+        if (!config.collectionsDir) {
+            const unconfigured = new Hono<HonoEnv>();
+            applyAdminGate(unconfigured, "Live schema editing");
+            unconfigured.all("/*", (c) => c.json({
+                error: {
+                    code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR",
+                    message: "Live schema editing needs `collectionsDir` — the directory holding " +
+                        "this project's collection definitions — and this server was started " +
+                        "without one, so there is nothing for it to edit."
+                }
+            }, 501));
+            mountWithLegacyAlias(config.app, unconfigured, {
+                canonical: `${basePath}/admin/schema`,
+                surface: "Live schema editing (unconfigured)"
             });
+        }
+
+        if (config.collectionsDir) {
+            const collectionsDir = config.collectionsDir;
+            // Resolved once, at boot. A deployment either has a working tree or
+            // it does not, and asking git on every request would be a process
+            // spawn per keystroke in the panel.
+            const repositoryRoot = await findRepositoryRoot(collectionsDir);
+            const liveSchemaRouter = new Hono<HonoEnv>();
+            applyAdminGate(liveSchemaRouter, "Live schema editing");
+
+            liveSchemaRouter.route("/", createLiveSchemaRoutes({
+                // Off unless the project says otherwise. An automated schema
+                // change is a legitimate thing to want and a poor default:
+                // the credential that would make it is the one most likely to
+                // be sitting in a CI environment variable.
+                policy: {
+                    allowMachineApply: config.liveSchema?.allowMachineApply
+                        ?? process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY === "true"
+                },
+                getCollections: () => collectionRegistry.getRawCollections(),
+                getAdmin: () => defaultDriver.admin,
+                getRepository: (author) => {
+                    if (!repositoryRoot) return undefined;
+                    return createLocalGitRepository({ root: repositoryRoot, author });
+                },
+                // Absent, not throwing, when the AST editor is unavailable.
+                //
+                // A function that exists and throws made `/status` answer
+                // `enabled: true` — it can only see whether the field is set —
+                // and then `/apply` died with a 500 the moment somebody
+                // confirmed. Leaving it undefined is the same fact stated where
+                // both surfaces can read it: `/status` reports
+                // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
+                // control, and a caller that asks anyway gets a refusal that
+                // names the missing dependency.
+                writeSource: schemaEditorRoutes ? async (change) => {
+                    const { AstSchemaEditor } = await import("./api/ast-schema-editor");
+                    const editor = new AstSchemaEditor(collectionsDir);
+                    await editor.saveCollection(change.collectionId, change.collection, { partial: false });
+
+                    // Read back what it wrote. The editor resolves
+                    // `<collectionsDir>/<id>.ts`, and the commit needs the
+                    // contents rather than a promise that a file changed.
+                    const file = nodePath.join(collectionsDir, `${change.collectionId}.ts`);
+                    const contents = await nodeFs.readFile(file, "utf8");
+                    return [{
+                        path: nodePath.relative(repositoryRoot!, file),
+                        contents
+                    }];
+                } : undefined,
+                // The same path `writeSource` resolves, derived without writing
+                // anything — the dirty-tree check has to know it before the
+                // edit, or it sees this change's own file and refuses.
+                sourcePathsFor: (change) => repositoryRoot
+                    ? [nodePath.relative(
+                        repositoryRoot,
+                        nodePath.join(collectionsDir, `${change.collectionId}.ts`)
+                    )]
+                    : []
+            }));
+
+            // Admin-only, so it lives under `/api/admin` — see
+            // `docs/api-conventions.md`. It has never shipped anywhere else, so
+            // there is no legacy path to keep alive.
+            mountWithLegacyAlias(config.app, liveSchemaRouter, {
+                canonical: `${basePath}/admin/schema`,
+                surface: "Live schema editing"
+            });
+            logger.debug("Live schema editing repository", {
+                repository: repositoryRoot ?? "(none — refusals only)"
+            });
+        }
+
+        // A sibling of `/admin/schema`, not a child of it. Nested, every
+        // request here would first pass the live editor's `use("/*")` gate —
+        // harmless while that gate calls `next()`, and a silent hijack the
+        // moment it does not: with no auth configured it answers 501 itself,
+        // and this surface's requests would come back describing the wrong
+        // one. Siblings cannot shadow each other.
+        //
+        // `/api/schema-editor` is the shipped path and stays reachable, with a
+        // `Deprecation` header, until a major.
+        mountWithLegacyAlias(config.app, schemaEditorRouter, {
+            canonical: `${basePath}/admin/schema-editor`,
+            legacy: `${basePath}/schema-editor`,
+            surface: "Schema editor"
+        });
+        if (!schemaEditorRoutes) {
+            logger.debug("Schema Editor unavailable", { code: schemaEditorOff!.code });
         }
     }
 
@@ -2242,7 +2380,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         applyAdminGate(cronRouter, "Cron");
 
         cronRouter.route("/", createCronRoutes(cronScheduler, cronProblems.length));
-        if (surfaces.cron) config.app.route(`${basePath}/cron`, cronRouter);
+        if (surfaces.cron) {
+            mountWithLegacyAlias(config.app, cronRouter, {
+                canonical: `${basePath}/admin/cron`,
+                legacy: `${basePath}/cron`,
+                surface: "Cron"
+            });
+        }
 
         if (loadedCronJobs.length > 0 && !ownership.cronScheduler) {
             // Registered but not started. The admin surface still lists the jobs
@@ -2359,8 +2503,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         applyAdminGate(logsRouter, "Logs");
 
         logsRouter.route("/", logsRoutes);
-        config.app.route(`${basePath}/logs`, logsRouter);
-        logger.debug("Logs routes mounted", { path: `${basePath}/logs` });
+        mountWithLegacyAlias(config.app, logsRouter, {
+            canonical: `${basePath}/admin/logs`,
+            legacy: `${basePath}/logs`,
+            surface: "Logs"
+        });
     }
 
     // 6d. Mount the project contract — what lets a repository that does *not*
