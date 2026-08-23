@@ -15,7 +15,7 @@
   "exports": {
     ".": "./package.json",
     "./package.json": "./package.json",
-    "./skills": "./skills/"
+    "./skills/*": "./skills/*"
   },
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\""
