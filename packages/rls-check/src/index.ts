@@ -36,6 +36,9 @@ export {
 } from "./report";
 export type { RenderOptions } from "./report";
 
+export { renderHtml, escapeHtml } from "./report-html";
+export type { HtmlRenderOptions } from "./report-html";
+
 export { redactConnectionString, redactSecrets, parseConnectionString, formatEndpoint } from "./redact";
 export type { ConnectionTarget } from "./redact";
 

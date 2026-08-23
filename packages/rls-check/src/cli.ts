@@ -19,13 +19,14 @@
  *    on its way out.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
 import { introspectWithDiagnostics } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
+import { renderHtml } from "./report-html";
 import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
 import { SEVERITIES } from "./types";
 
@@ -170,6 +171,14 @@ function buildScanResult(
 export interface CliOptions {
     connectionString: string | null;
     json: boolean;
+    /**
+     * `--html <path>`: also write a self-contained HTML report there.
+     *
+     * "Also", not "instead": the terminal output is what a CI log keeps, and
+     * the file is what gets forwarded to whoever owns the database. Making the
+     * flag replace stdout would trade one audience for the other.
+     */
+    html: string | null;
     schemas: string[];
     /** Extra roles to treat as reachable by an untrusted caller. */
     roles: string[];
@@ -193,6 +202,7 @@ function emptyOptions(): CliOptions {
     return {
         connectionString: null,
         json: false,
+        html: null,
         schemas: [],
         roles: [],
         failOn: DEFAULT_FAIL_ON,
@@ -290,6 +300,14 @@ export function parseArgs(argv: readonly string[]): ParseResult {
             case "--colour":
                 options.color = true;
                 break;
+            case "--html": {
+                const value = takeValue();
+                if (value === null) {
+                    return { ok: false, message: "--html needs a file path, e.g. --html rls-report.html." };
+                }
+                options.html = value;
+                break;
+            }
             case "--schema": {
                 const value = takeValue();
                 if (value === null) return { ok: false, message: "--schema needs a schema name." };
@@ -635,6 +653,8 @@ $POSTGRES_URL, then DATABASE_URL in a .env file in the current directory.
 
 Options
   --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --html <path>          Also write a self-contained HTML report to <path>. One file,
+                         no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
   --role <name>          Treat this role as one an untrusted caller arrives as, in
                          addition to anon, authenticated, web_anon and rebase_user.
@@ -662,6 +682,7 @@ Examples
   npx @rebasepro/rls-check "postgresql://user:pass@db.abcdef.supabase.co:5432/postgres"
   npx @rebasepro/rls-check --schema public --schema billing --fail-on medium
   npx @rebasepro/rls-check --json > rls-report.json
+  npx @rebasepro/rls-check --html rls-report.html
 
 It is read-only: it issues SELECTs against the system catalogs, writes nothing,
 and sends nothing anywhere.
@@ -709,6 +730,11 @@ export function resolveVersion(): string {
 export interface CliIo {
     stdout(text: string): void;
     stderr(text: string): void;
+    /**
+     * Write a file, for `--html`. Injected rather than imported so the CLI
+     * tests can exercise the whole path without touching a disk.
+     */
+    writeFile?(path: string, contents: string): void;
     env: NodeJS.ProcessEnv;
     cwd: string;
     /** Whether stdout is a terminal; drives colour when nothing else decides. */
@@ -720,6 +746,7 @@ function defaultIo(): CliIo {
     return {
         stdout: (text) => process.stdout.write(text),
         stderr: (text) => process.stderr.write(text),
+        writeFile: (path, contents) => writeFileSync(path, contents, "utf8"),
         env: process.env,
         cwd: process.cwd(),
         isTty: Boolean(process.stdout.isTTY),
@@ -872,6 +899,41 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                     version
                 })
             );
+        }
+
+        // The artifact is the whole point of asking for it, so failing to write
+        // it is a failed run even though the scan itself succeeded — exit 2,
+        // the "no verdict" code, rather than letting a missing report look like
+        // a clean one. The findings are already on stdout either way.
+        if (options.html !== null) {
+            const write = io.writeFile;
+            if (!write) {
+                io.stderr(
+                    formatFriendlyError(
+                        { headline: "--html is not available: this environment cannot write files." },
+                        color
+                    )
+                );
+
+                return EXIT_ERROR;
+            }
+            try {
+                write(options.html, renderHtml(result, { failOn: options.failOn, endpoint, version }));
+                io.stderr(`Wrote ${options.html}\n`);
+            } catch (error) {
+                io.stderr(
+                    formatFriendlyError(
+                        {
+                            headline: `Could not write ${options.html}.`,
+                            hint: "Check the directory exists and is writable.",
+                            detail: redactSecrets(errorMessage(error), connectionString)
+                        },
+                        color
+                    )
+                );
+
+                return EXIT_ERROR;
+            }
         }
 
         // A degraded scan is not a clean scan. Checks whose catalogue reads
