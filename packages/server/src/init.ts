@@ -51,7 +51,11 @@ import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
 import { createLiveSchemaRoutes } from "./api/live-schema-routes";
 import { mountWithLegacyAlias } from "./api/mount";
-import { commitPathsFor, DEFAULT_COLLECTIONS_PATH } from "./schema-edit/project-root";
+import {
+    commitPathsFor,
+    usesVersionedMigrations,
+    DEFAULT_COLLECTIONS_PATH
+} from "./schema-edit/project-root";
 import { createGitHubRepository } from "./schema-edit/github-repository";
 import { rewriteRemoteCollection } from "./schema-edit/remote-source";
 import type { SchemaEditPolicy, RemoteRepositoryConfig } from "./schema-edit/schema-edit-permissions";
@@ -1737,6 +1741,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
                 commitPaths,
+                // Only answerable for a project on this machine. A deployment
+                // committing to a remote repository is a built bundle, which is
+                // provisioned by boot-ensure rather than by replaying
+                // migrations, so the question does not arise there.
+                usesVersionedMigrations: collectionsDir
+                    ? () => usesVersionedMigrations(collectionsDir)
+                    : undefined,
                 // Off unless the project says otherwise. An automated schema
                 // change is a legitimate thing to want and a poor default:
                 // the credential that would make it is the one most likely to

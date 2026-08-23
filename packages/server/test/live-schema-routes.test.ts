@@ -600,3 +600,50 @@ describe("the collection id", () => {
         }
     });
 });
+
+
+/**
+ * A project that replays migrations needs this change recorded as one.
+ *
+ * Live editing cannot write a migration: that is Atlas's format with an
+ * integrity file, minted by an external binary against a throwaway database,
+ * and a running server has neither. What it *does* write is
+ * `drizzle/schema.sql`, which is exactly what `rebase db generate` diffs
+ * against — so the migration is one command away, and the only real hazard is
+ * nobody saying so. A project that deploys by replaying migrations would build
+ * its next environment without this change, having been told it was applied.
+ */
+describe("a project that keeps versioned migrations", () => {
+    const withMigrations = (usesMigrations: boolean) => harness({
+        usesVersionedMigrations: () => usesMigrations
+    } as never);
+
+    it("says what still has to be done, on the plan", async () => {
+        const { post } = withMigrations(true);
+        const body = await (await post("/plan", change)).json() as { followUp: string[] };
+        expect(body.followUp).toHaveLength(1);
+        expect(body.followUp[0]).toContain("rebase db generate");
+    });
+
+    it("says it again on the result, where the person who applied will see it", async () => {
+        const { post } = withMigrations(true);
+        const body = await (await post("/apply", change)).json() as { followUp: string[] };
+        expect(body.followUp[0]).toContain("rebase db generate");
+    });
+
+    it("stays quiet for a project that does not keep them", async () => {
+        const { post } = withMigrations(false);
+        const body = await (await post("/plan", change)).json() as { followUp: string[] };
+        expect(body.followUp).toEqual([]);
+    });
+
+    it("stays quiet when the change needs no DDL at all", async () => {
+        // Nothing ran against the database, so there is nothing to record.
+        const { post } = harness({
+            usesVersionedMigrations: () => true,
+            plan: okPlan({ statements: [] })
+        } as never);
+        const body = await (await post("/plan", change)).json() as { followUp: string[] };
+        expect(body.followUp).toEqual([]);
+    });
+});

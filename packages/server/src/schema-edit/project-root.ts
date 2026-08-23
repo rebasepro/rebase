@@ -85,3 +85,29 @@ export function commitPathsFor(
         searchFile: relocate(DEFAULT_COMMIT_PATHS.searchFile)
     };
 }
+
+/**
+ * Does this project keep versioned migrations?
+ *
+ * It matters because live schema editing does not write one, and cannot: a
+ * migration is Atlas's format with an integrity file, minted by an external
+ * binary against a throwaway database. A server process has neither.
+ *
+ * What it *does* write is `drizzle/schema.sql`, which is exactly the input
+ * `rebase db generate` diffs against — so the migration is one command away.
+ * The hazard is nobody saying so. A project that deploys by replaying
+ * migrations would build its next environment without this change, having been
+ * told the change was applied.
+ */
+export function usesVersionedMigrations(collectionsDir: string): boolean {
+    const projectRoot = findProjectRoot(collectionsDir);
+    if (!projectRoot) return false;
+    const dir = path.join(projectRoot, "drizzle", "migrations");
+    try {
+        return fs.existsSync(dir) && fs.readdirSync(dir).some(f => f.endsWith(".sql"));
+    } catch {
+        // Unreadable is not "absent": staying quiet about a project that may
+        // replay migrations is the failure this exists to prevent.
+        return true;
+    }
+}
