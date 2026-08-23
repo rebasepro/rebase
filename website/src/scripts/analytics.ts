@@ -112,10 +112,28 @@ class Analytics {
         window.addEventListener("beforeunload", () => this.sendExitEvents());
         document.addEventListener("astro:before-swap", () => this.sendExitEvents());
 
-        // Reset on Astro page load
+        // Reset on Astro page load.
+        //
+        // `astro:page-load` fires on the initial load too, where `gtag("config")`
+        // has already sent its own automatic page_view — so counting this one as
+        // well recorded every entry page twice, inflating the marketing site
+        // against demo.rebase.pro, which reports into the same GA4 property from
+        // plain HTML and is counted once. Skip the first firing: `config` owns the
+        // initial view, this handler owns every client-side navigation after it.
+        // Same initial-load trap as the `initialized` flag in page-effects.ts.
+        //
+        // The fix belongs here rather than in `send_page_view: false` on the config
+        // call, because the two surfaces differ: Layout.astro mounts ClientRouter,
+        // starlight/Head.astro does not. On docs pages this event never fires at
+        // all, so suppressing the automatic pageview there would report nothing.
+        let initialPageLoad = true;
         document.addEventListener("astro:page-load", () => {
             this.maxScroll = 0;
             this.pageLoadTime = Date.now();
+            if (initialPageLoad) {
+                initialPageLoad = false;
+                return;
+            }
             gtag("event", "page_view", {
                 page_path: window.location.pathname,
                 page_title: document.title,
