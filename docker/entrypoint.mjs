@@ -39,7 +39,7 @@ if (FETCH_MODE) {
     // and lets it win over a URL. Reaching here means it is not on disk, so an
     // inherited value would only stop the fetch that is about to be the whole
     // point of this container.
-
+    delete process.env.REBASE_BUNDLE;
     log(`no bundle on disk; the runtime will fetch one from REBASE_BUNDLE_URL`);
 }
 

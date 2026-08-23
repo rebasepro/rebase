@@ -116,8 +116,7 @@ RUN apt-get update \
 # initialised and throw "server not initialized yet" on every request.
 ENV NODE_ENV=production \
     PORT=8080 \
-    REBASE_RUNTIME_MODULES=/app/node_modules \
-    REBASE_BUNDLE=/bundle
+    REBASE_RUNTIME_MODULES=/app/node_modules
 
 WORKDIR /app
 
