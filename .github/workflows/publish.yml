@@ -55,6 +55,14 @@ jobs:
     if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
     needs: verify-canary
     runs-on: ubuntu-latest
+    # 4 minutes median across 31 runs, 6.4 at the slowest. The ceiling exists
+    # because GitHub's default is six hours, and a step that hangs rather than
+    # fails holds the runner while the run reports "pending" — which looks
+    # exactly like slow. Deliberately ~5x the slowest observed run: this job
+    # publishes to npm, and killing it partway leaves some packages published
+    # and some not. A ceiling tight enough to do that is worse than none, so it
+    # is sized to catch a hang and nothing else.
+    timeout-minutes: 30
     concurrency:
       group: canary-publish-${{ github.ref }}
       cancel-in-progress: true
@@ -213,6 +221,13 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
     needs: verify-stable
     runs-on: ubuntu-latest
+    # Higher than publish-canary, and not because it is observed to be slower:
+    # there is exactly one successful run to measure (11.7 minutes), and it does
+    # strictly more — publishes to npm, commits and pushes a tag, then builds
+    # and pushes a multi-arch image. So both the true spread and the cost of a
+    # mistimed kill are larger here: interrupted between the npm publish and the
+    # tag, a release exists on the registry with nothing in git pointing at it.
+    timeout-minutes: 75
     concurrency:
       group: stable-publish
       cancel-in-progress: false

@@ -26,7 +26,10 @@
  * did not run.
  */
 import { describe, it, expect, beforeAll } from "@jest/globals";
+import fs from "node:fs";
+import path from "node:path";
 import { createGitHubRepository } from "../src/schema-edit/github-repository";
+import { rewriteRemoteCollection } from "../src/schema-edit/remote-source";
 
 const token = process.env.REBASE_GITHUB_E2E_TOKEN;
 const slug = process.env.REBASE_GITHUB_E2E_REPO;
@@ -149,5 +152,97 @@ suite("committing to a real repository on GitHub", () => {
         });
         await git.writeFiles([{ path: "x.txt", contents: "x" }]);
         await expect(git.commit(["x.txt"], "should not land")).rejects.toThrow(/404/);
+    }, 120_000);
+});
+
+
+/**
+ * The cloud path, end to end, without a working tree.
+ *
+ * A bundle deployment ships compiled collections, so the AST editor has nothing
+ * to open — which is the whole of why this was local-only. The chain under test
+ * is: read the source from the repository, rewrite it, commit it back. No
+ * clone, no checkout, nothing on disk but a scratch file that is removed.
+ */
+suite("editing a collection with no source on this machine", () => {
+    const collectionsPath = "config/collections";
+
+    const repository = () => createGitHubRepository({
+        auth: { kind: "token", token: token! },
+        owner,
+        repo,
+        branch: "main",
+        author: { name: "Cloud Panel", email: "cloud@rebase.pro" }
+    });
+
+    it("reads a file that is there, and answers undefined for one that is not", async () => {
+        const git = repository();
+        // README.md is created with the repository, so it is the one file that
+        // is certainly present.
+        expect(await git.readFile!("README.md")).toContain("#");
+        expect(await git.readFile!("config/collections/does-not-exist.ts")).toBeUndefined();
+    }, 120_000);
+
+    it("creates a collection that has no source yet, and commits it", async () => {
+        const git = repository();
+        const id = `cloud_new_${Date.now().toString(36)}`;
+
+        const files = await rewriteRemoteCollection(
+            {
+                repository: git,
+                collectionsPath,
+                edit: async (dir, collectionId) => {
+                    await fs.promises.writeFile(
+                        path.join(dir, `${collectionId}.ts`),
+                        `export const ${collectionId} = { name: "Cloud" };\n`,
+                        "utf8"
+                    );
+                }
+            },
+            id,
+            { name: "Cloud" }
+        );
+
+        expect(files[0].path).toBe(`${collectionsPath}/${id}.ts`);
+
+        await git.writeFiles(files);
+        const sha = await git.commit(files.map(f => f.path), `feat(schema): add ${id}`);
+        expect(sha).toMatch(/^[0-9a-f]{40}$/);
+
+        // It is really there, read back through a different endpoint.
+        expect(await repository().readFile!(`${collectionsPath}/${id}.ts`))
+            .toContain(`export const ${id}`);
+    }, 120_000);
+
+    it("rewrites an existing collection without losing what surrounds the change", async () => {
+        // The reason the editor is reused rather than reimplemented: it keeps a
+        // collection file's imports and comments. Handed an empty directory it
+        // would recreate the file from the payload and drop them.
+        const git = repository();
+        const id = `cloud_edit_${Date.now().toString(36)}`;
+        const original = `// a comment worth keeping\nexport const ${id} = { name: "One" };\n`;
+
+        await git.writeFiles([{ path: `${collectionsPath}/${id}.ts`, contents: original }]);
+        await git.commit([`${collectionsPath}/${id}.ts`], `chore: seed ${id}`);
+
+        let seen: string | undefined;
+        const files = await rewriteRemoteCollection(
+            {
+                repository: repository(),
+                collectionsPath,
+                edit: async (dir, collectionId) => {
+                    const file = path.join(dir, `${collectionId}.ts`);
+                    seen = await fs.promises.readFile(file, "utf8");
+                    await fs.promises.writeFile(file, seen.replace("One", "Two"), "utf8");
+                }
+            },
+            id,
+            { name: "Two" }
+        );
+
+        // The editor saw the real file, not an empty directory.
+        expect(seen).toBe(original);
+        expect(files[0].contents).toContain("a comment worth keeping");
+        expect(files[0].contents).toContain('name: "Two"');
     }, 120_000);
 });
