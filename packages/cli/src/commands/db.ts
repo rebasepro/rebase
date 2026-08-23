@@ -2,6 +2,9 @@
  * CLI command: rebase db <action>
  */
 import chalk from "chalk";
+import fs from "fs";
+import inquirer from "inquirer";
+import os from "os";
 import path from "path";
 import { execa } from "execa";
 import {
@@ -99,6 +102,24 @@ export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
 }
 
 /**
+/**
+ * Read `--flag value` or `--flag=value` out of the raw argv.
+ *
+ * This command forwards its arguments to the driver plugin rather than parsing
+ * them, so the two flags the CLI itself acts on are picked out by hand instead
+ * of adding a spec that would then have to strip them back out again.
+ */
+function readFlagValue(rawArgs: readonly string[], flag: string): string | null {
+    for (let index = 0; index < rawArgs.length; index += 1) {
+        const arg = rawArgs[index];
+        if (arg === flag) return rawArgs[index + 1] ?? null;
+        if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
+    }
+
+    return null;
+}
+
+/**
  * Run a database subcommand through the active driver's CLI, throwing on
  * failure instead of exiting.
  *
@@ -107,6 +128,9 @@ export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
  * to do afterwards — `rebase dev` runs a schema push during start-up and must
  * survive it failing. Exiting is therefore the wrapper's job, not this
  * function's.
+ *
+ * The database is resolved *here* rather than in the wrapper, so the schema
+ * push `rebase dev` performs during start-up reaches the managed database too.
  */
 export async function runDriverDbCommand(rawArgs: string[]): Promise<void> {
     const projectRoot = requireProjectRoot();
@@ -131,6 +155,20 @@ export async function runDriverDbCommand(rawArgs: string[]): Promise<void> {
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+
+    // Every `db` subcommand reaches Postgres through the driver plugin, which
+    // reads DATABASE_URL from this environment — so resolving the database once
+    // here covers push, generate, migrate, backup and restore alike, and any
+    // subcommand a driver adds later. When the developer has named their own
+    // database this adds nothing at all.
+    const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
+    const prepared = await prepareDatabaseEnv(projectRoot, {
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+    });
+    Object.assign(env, prepared.env);
+    for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
@@ -159,6 +197,22 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     // sit in front of it.
     void recordEvent("cli.db", { subcommand: subcommand ?? "none" }, { projectRoot });
 
+    // Handled here rather than by the driver plugin: these are about the
+    // *managed* database's process and data directory, which is a CLI concern.
+    // A project pointed at its own Postgres has nothing here to stop or reset,
+    // and is told so rather than silently doing nothing.
+    if (subcommand === "stop" || subcommand === "reset") {
+        await manageLocalDatabase(subcommand, projectRoot, rawArgs);
+
+        return;
+    }
+
+    if (subcommand === "pull") {
+        await pullIntoLocal(projectRoot, rawArgs);
+
+        return;
+    }
+
     try {
         await runDriverDbCommand(rawArgs);
     } catch (error) {
@@ -173,6 +227,176 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     }
 }
 
+/**
+ * `rebase db stop` and `rebase db reset`, for the managed database only.
+ *
+ * `reset` deletes the data directory rather than dropping schemas: "give me an
+ * empty database" is the only thing anyone means by it, and doing it by
+ * removing the directory cannot leave a half-dropped schema behind.
+ */
+async function manageLocalDatabase(
+    subcommand: "stop" | "reset",
+    projectRoot: string,
+    rawArgs: readonly string[]
+): Promise<void> {
+    const { resetManagedDatabase, stopManagedDatabase, findRunningDaemon } = await import("../dev-db/daemon");
+    const { dataDir } = await import("../dev-db/state");
+
+    if (subcommand === "stop") {
+        const stopped = await stopManagedDatabase(projectRoot);
+        console.log(stopped
+            ? chalk.green("✓ Development database stopped. Data is kept — `rebase dev` will start it again.")
+            : chalk.gray("  No development database was running."));
+
+        return;
+    }
+
+    const running = await findRunningDaemon(projectRoot);
+    const hasData = fs.existsSync(dataDir(projectRoot));
+    if (!running && !hasData) {
+        console.log(chalk.gray("  No development database to reset."));
+
+        return;
+    }
+
+    // Destructive, and the data is not backed up anywhere: it only ever existed
+    // on this machine. So it asks, unless the caller has said not to — and
+    // without a TTY there is nobody to ask, which is a refusal rather than an
+    // assumption.
+    if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+        if (!process.stdin.isTTY) {
+            console.error(chalk.red("✗ `rebase db reset` deletes the local database and cannot prompt here."));
+            console.error(chalk.yellow("  Re-run with --yes if that is what you intend."));
+            process.exit(1);
+        }
+
+        const { confirmed } = await inquirer.prompt([{
+            type: "confirm",
+            name: "confirmed",
+            message: `Delete the development database at ${dataDir(projectRoot)}? This cannot be undone.`,
+            default: false
+        }]);
+        if (!confirmed) {
+            console.log(chalk.gray("  Left alone."));
+
+            return;
+        }
+    }
+
+    await resetManagedDatabase(projectRoot);
+    console.log(chalk.green("✓ Development database deleted. `rebase dev` will create a fresh one."));
+}
+
+/**
+ * `rebase db pull --from <url>` — copy another database's contents into local
+ * development.
+ *
+ * Deliberately one-directional. There is no flag that makes this push, because
+ * a tool that can copy in both directions eventually copies in the wrong one,
+ * and the wrong one here means overwriting production with a laptop.
+ */
+async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, restoreArgs } =
+        await import("../dev-db/pull");
+    const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+
+    const source = readFlagValue(rawArgs, "--from");
+    if (!source) {
+        console.error(chalk.red("✗ `rebase db pull` needs a source: --from <connection-string>"));
+        console.error(chalk.gray("  Example: rebase db pull --from \"$PRODUCTION_DATABASE_URL\""));
+        process.exit(1);
+    }
+
+    const schemas = rawArgs.flatMap((arg, index) =>
+        arg === "--schema" && rawArgs[index + 1] ? [rawArgs[index + 1]] : []);
+    const anonymize = rawArgs.includes("--anonymize");
+
+    // Checked before anything destructive: discovering pg_dump is missing after
+    // dropping the local database would be the worst possible ordering.
+    const pgDumpVersion = await findPgDump();
+    if (!pgDumpVersion) {
+        console.error(chalk.red("✗ `pg_dump` is not on PATH, and this command cannot run without it."));
+        console.error(chalk.gray("  Install the PostgreSQL client tools, e.g. `brew install libpq`."));
+        process.exit(1);
+    }
+
+    const prepared = await prepareDatabaseEnv(projectRoot, {
+        onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+    });
+    const target = prepared.env.DATABASE_URL ?? process.env.DATABASE_URL ?? "";
+    if (!target) {
+        console.error(chalk.red("✗ No local database to pull into."));
+        process.exit(1);
+    }
+
+    const plan = { source, target, anonymize, schemas };
+
+    // Said in full, before anything happens. The target is destroyed, and where
+    // the data comes to rest on disk is the part people forget.
+    console.log("");
+    console.log(chalk.bold("  This will replace your local database."));
+    console.log(`    ${chalk.gray("From")}  ${describeTarget(source)}`);
+    console.log(`    ${chalk.gray("Into")}  ${describeTarget(target)}${prepared.dataDir ? chalk.gray(`  (${prepared.dataDir})`) : ""}`);
+    console.log(`    ${chalk.gray("Data")}  ${anonymize
+        ? "personal-looking columns will be overwritten after the copy"
+        : chalk.yellow("copied as-is, including any personal data")}`);
+    if (schemas.length > 0) console.log(`    ${chalk.gray("Schemas")}  ${schemas.join(", ")}`);
+    console.log("");
+
+    if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+        if (!process.stdin.isTTY) {
+            console.error(chalk.red("✗ This replaces the local database and cannot prompt here."));
+            console.error(chalk.yellow("  Re-run with --yes if that is what you intend."));
+            process.exit(1);
+        }
+        const { confirmed } = await inquirer.prompt([{
+            type: "confirm", name: "confirmed", message: "Continue?", default: false
+        }]);
+        if (!confirmed) {
+            console.log(chalk.gray("  Nothing was changed."));
+
+            return;
+        }
+    }
+
+    const dumpFile = path.join(os.tmpdir(), `rebase-pull-${process.pid}.dump`);
+    try {
+        console.log(chalk.gray("  Dumping…"));
+        await execa("pg_dump", [...dumpArgs(plan), "--file", dumpFile], { stdio: ["ignore", "inherit", "inherit"] });
+
+        console.log(chalk.gray("  Restoring…"));
+        // pg_restore exits non-zero for benign diagnostics (a DROP of something
+        // that was never there), so its status is not a verdict on its own —
+        // the query afterwards is.
+        await execa("pg_restore", restoreArgs(plan, dumpFile), { stdio: ["ignore", "inherit", "inherit"] })
+            .catch(() => console.log(chalk.gray("  (pg_restore reported non-fatal diagnostics)")));
+
+        if (anonymize) {
+            const { Client } = await import("pg");
+            const client = new Client({ connectionString: target });
+            await client.connect();
+            try {
+                const { rows } = await client.query<{ schema: string; table: string; column: string; dataType: string }>(
+                    `SELECT table_schema AS "schema", table_name AS "table",
+                            column_name AS "column", data_type AS "dataType"
+                       FROM information_schema.columns
+                      WHERE table_schema NOT IN ('pg_catalog','information_schema')`
+                );
+                const statements = anonymizeStatements(rows);
+                for (const statement of statements) await client.query(statement);
+                console.log(chalk.green(`  ✓ Anonymized ${statements.length} table(s).`));
+                console.log(chalk.gray("    Name-based and best-effort: a free-text column may still hold personal data."));
+            } finally {
+                await client.end();
+            }
+        }
+
+        console.log(chalk.green("✓ Local database now holds a copy of " + describeTarget(source)));
+    } finally {
+        fs.rmSync(dumpFile, { force: true });
+    }
+}
+
 function printDbHelp() {
     console.log(`
 ${chalk.bold("rebase db")} — Database management commands
@@ -182,6 +406,9 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
+  ${chalk.blue.bold("pull")}       Copy another database into local dev (--from <url>, --anonymize)
+  ${chalk.blue.bold("stop")}       Stop the managed development database (data is kept)
+  ${chalk.blue.bold("reset")}      Delete the managed development database and start over
   ${chalk.blue.bold("push")}       Apply schema directly to database (development)
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations

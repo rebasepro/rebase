@@ -16,6 +16,8 @@
  */
 import chalk from "chalk";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
+
+import { managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -195,6 +197,16 @@ export const DEV_FLAGS = {
     "--frontend-only": Boolean,
     "--port": Number,
     "--generate": Boolean,
+    /**
+     * Point this run at a database of your own, ahead of everything else.
+     *
+     * The managed development database fills a vacuum; it never redirects a
+     * project that has said which Postgres it wants. This flag is the loudest
+     * way to say it, and outranks DATABASE_URL in the environment and in .env.
+     */
+    "--database-url": String,
+    /** Use Postgres in Docker rather than the managed database. */
+    "--docker": Boolean,
     "-b": "--backend-only",
     "-f": "--frontend-only",
     // `-P` for port, not `-p`. `-p` is `--project` across all ~20 cloud
@@ -460,6 +472,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             env.DOTENV_CONFIG_PATH = envFile;
         }
 
+        // The database, before anything that needs one starts. A project with a
+        // DATABASE_URL is untouched; a project without one gets a managed
+        // Postgres started here, which is what makes `rebase dev` the only
+        // command a new project needs.
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
+            flagDocker: Boolean(args["--docker"]),
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+        Object.assign(env, prepared.env);
+
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
         // when multiple Rebase instances run simultaneously.
@@ -467,6 +490,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
+        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(prepared.description)}`);
+        // Stated on every start rather than left to be discovered. A developer
+        // who does not know requests are serialized here will read the
+        // difference as a bug in their own code.
+        for (const line of managedNotices(prepared).slice(1)) console.log(`  ${chalk.gray(line)}`);
 
         // The .env's PORT / VITE_API_URL look authoritative but are overridden in
         // dev: we derive a per-project port to avoid cross-project collisions and

@@ -23,6 +23,16 @@ export const DEV_DB_DIR = ".rebase";
 export const DATA_DIR_NAME = "pgdata";
 /** The record the daemon writes once it is accepting connections. */
 export const STATE_FILE_NAME = "pglite.json";
+/**
+ * Held by whoever is currently starting a daemon.
+ *
+ * Without it, `rebase dev` and `rebase db push` started in the same second both
+ * see no state file, both spawn, and two processes open one PGlite data
+ * directory — the exact corruption the single-daemon design exists to prevent.
+ * Observed as `ENOTEMPTY` during cleanup, which is the harmless way for it to
+ * show up; the harmful way is a damaged database.
+ */
+export const START_LOCK_NAME = "starting.lock";
 
 export interface DaemonState {
     /** TCP port the socket server is listening on, chosen when it started. */
@@ -57,6 +67,66 @@ export function dataDir(projectRoot: string): string {
 
 export function stateFile(projectRoot: string): string {
     return path.join(devDbDir(projectRoot), STATE_FILE_NAME);
+}
+
+export function startLockFile(projectRoot: string): string {
+    return path.join(devDbDir(projectRoot), START_LOCK_NAME);
+}
+
+/**
+ * Take the start lock, or report that somebody else holds it.
+ *
+ * `wx` is the whole mechanism: create-if-absent is a single atomic syscall, so
+ * exactly one of two racing processes can succeed no matter how close together
+ * they arrive.
+ *
+ * A lock older than `staleAfterMs` is broken rather than waited on — the holder
+ * may have been killed between creating it and starting anything, and a
+ * developer should never have to know this file exists in order to unstick
+ * their project.
+ */
+export function acquireStartLock(projectRoot: string, staleAfterMs: number): boolean {
+    const target = startLockFile(projectRoot);
+    fs.mkdirSync(devDbDir(projectRoot), { recursive: true });
+
+    const attempt = (): boolean => {
+        try {
+            const handle = fs.openSync(target, "wx");
+            fs.writeSync(handle, `${process.pid} ${new Date().toISOString()}\n`);
+            fs.closeSync(handle);
+
+            return true;
+        } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+
+            return false;
+        }
+    };
+
+    if (attempt()) return true;
+
+    try {
+        // Clamped at zero: a filesystem whose timestamp granularity rounds the
+        // mtime *up* reports a negative age for a lock created moments ago,
+        // and a negative age is below every threshold — so `staleAfterMs: 0`,
+        // which means "break any lock", would refuse to break one.
+        const age = Math.max(0, Date.now() - fs.statSync(target).mtimeMs);
+        if (age < staleAfterMs) return false;
+        fs.unlinkSync(target);
+    } catch {
+        // Vanished under us, which means the holder finished. Either way the
+        // next attempt is the answer.
+    }
+
+    return attempt();
+}
+
+export function releaseStartLock(projectRoot: string): void {
+    try {
+        fs.unlinkSync(startLockFile(projectRoot));
+    } catch {
+        // Already released is the desired end state.
+    }
 }
 
 /**

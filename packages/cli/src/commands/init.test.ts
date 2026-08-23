@@ -720,7 +720,7 @@ describe(".env.example", () => {
         expect(jwtMatch![1].length).toBeGreaterThanOrEqual(32);
 
         // Verify local default DB url
-        const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
+        const dbMatch = envContent.match(/^#?\s?DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
         // `rebase_app`, not `rebase`: a role named the same as a schema puts
         // that schema ahead of `public` in the default `search_path` ("$user",
@@ -830,6 +830,25 @@ describe(".env.example", () => {
         expect(envContent).not.toMatch(/^VITE_API_URL=.+$/m);
     });
 
+    it("leaves DATABASE_URL commented out, so a fresh project needs no database", async () => {
+        // The whole point of the managed development database: `rebase dev` is
+        // the only command a new project needs. An active DATABASE_URL here
+        // would send it at a Postgres that nobody has started.
+        const targetDir = await simulateInit("env-managed-default-app");
+        await configureEnvFile(targetDir);
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+
+        expect(envContent).not.toMatch(/^DATABASE_URL=/m);
+        // …but the compose URL is still there, one `#` away, so switching to it
+        // is an edit rather than a documentation lookup.
+        expect(envContent).toMatch(/^# DATABASE_URL=postgresql:\/\//m);
+        expect(envContent).toContain("docker compose up -d db");
+        // The password is still live: docker-compose.yml interpolates it into
+        // POSTGRES_PASSWORD, and omitting it shipped a stack whose password was
+        // literally "changeme".
+        expect(envContent).toMatch(/^DATABASE_PASSWORD=.+$/m);
+    });
+
     it("configureEnvFile points DATABASE_URL at 127.0.0.1, not localhost", async () => {
         /*
          * `localhost` resolves to `::1` first on macOS, so on a machine already
@@ -842,7 +861,7 @@ describe(".env.example", () => {
         await configureEnvFile(targetDir);
 
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
-        const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
+        const dbMatch = envContent.match(/^#?\s?DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
         expect(dbMatch![1]).toContain("@127.0.0.1:");
         expect(dbMatch![1]).not.toContain("@localhost:");
@@ -869,7 +888,7 @@ describe(".env.example", () => {
         await configureEnvFile(targetDir);
 
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
-        const url = envContent.match(/^DATABASE_URL=(.*)$/m)![1];
+        const url = envContent.match(/^#?\s?DATABASE_URL=(.*)$/m)![1];
 
         expect(url).toContain("search_path%3Dpublic");
         expect(url).not.toContain("search_path=public");
@@ -899,7 +918,7 @@ describe(".env.example", () => {
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
         const compose = fs.readFileSync(path.join(targetDir, "docker-compose.yml"), "utf-8");
 
-        const urlPort = envContent.match(/^DATABASE_URL=.*@127\.0\.0\.1:(\d+)\//m)?.[1];
+        const urlPort = envContent.match(/^#?\s?DATABASE_URL=.*@127\.0\.0\.1:(\d+)\//m)?.[1];
         expect(urlPort).toBeTruthy();
         expect(compose).toContain(`- "${urlPort}:5432"`);
     });
@@ -927,6 +946,8 @@ describe(".env.example", () => {
         await configureEnvFile(targetDir, customDbUrl);
 
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        // A supplied URL is written live, not commented: the developer named a
+        // database, so the managed one must not fill in for it.
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
         expect(dbMatch![1]).toContain("postgresql://user:pass@remote:5432/db");

@@ -36,7 +36,7 @@ import {
     resolveSpawn,
     stopManagedDatabase
 } from "./daemon";
-import { dataDir, readState } from "./state";
+import { acquireStartLock, dataDir, readState, releaseStartLock, startLockFile } from "./state";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /**
@@ -71,7 +71,17 @@ beforeEach(() => {
 afterEach(async () => {
     await Promise.all(pools.splice(0).map((pool) => pool.end().catch(() => undefined)));
     await stopManagedDatabase(root).catch(() => undefined);
-    fs.rmSync(root, { recursive: true, force: true });
+    // The daemon may still be flushing when it exits, and removing a Postgres
+    // data directory out from under it raises ENOTEMPTY. Retry briefly rather
+    // than failing a passing test on teardown.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+            fs.rmSync(root, { recursive: true, force: true });
+            break;
+        } catch {
+            await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+    }
 });
 
 describe("resolveSpawn", () => {
@@ -207,6 +217,36 @@ describe("one daemon per project", () => {
 
         expect(new Set([a.port, b.port, c.port]).size).toBe(1);
         expect(new Set([a.pid, b.pid, c.pid]).size).toBe(1);
+    });
+
+    it("lets only one of many concurrent callers spawn a daemon", { timeout: BOOT_TIMEOUT }, async () => {
+        // The bug this pins was real and silent: without an exclusive start
+        // lock, `rebase dev` and `rebase db push` started in the same second
+        // both saw no state file, both spawned, and two processes opened one
+        // PGlite data directory. It first showed up as ENOTEMPTY during
+        // cleanup; the harmful version is a corrupted database.
+        const results = await Promise.all(
+            Array.from({ length: 5 }, () => ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true }))
+        );
+
+        expect(new Set(results.map((r) => r.pid)).size).toBe(1);
+        expect(results.filter((r) => r.started).length).toBe(1);
+        // And the lock is not left behind for the next command to wait on.
+        expect(fs.existsSync(startLockFile(root))).toBe(false);
+    });
+
+    it("breaks a start lock left behind by a process that died", { timeout: BOOT_TIMEOUT }, async () => {
+        // A developer must never have to know this file exists to unstick their
+        // project, so a lock with nothing behind it is broken by age.
+        fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
+        expect(acquireStartLock(root, 60_000)).toBe(true);
+
+        // Zero staleness: any existing lock is expired, which is what a caller
+        // that has already waited out the timeout concludes.
+        expect(acquireStartLock(root, 0)).toBe(true);
+
+        releaseStartLock(root);
+        expect(fs.existsSync(startLockFile(root))).toBe(false);
     });
 
     it("discards a state file whose process is gone", { timeout: BOOT_TIMEOUT }, async () => {

@@ -23,6 +23,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import {
+    acquireStartLock,
     clearState,
     type DaemonState,
     dataDir,
@@ -30,6 +31,7 @@ import {
     findFreePort,
     pidRunning,
     readState,
+    releaseStartLock,
     stateFile
 } from "./state";
 
@@ -177,18 +179,29 @@ export async function ensureManagedDatabase(
     options: EnsureOptions = {}
 ): Promise<ManagedDatabase> {
     const existing = await findRunningDaemon(projectRoot);
-    if (existing) {
-        return {
-            url: managedUrl(existing.port),
-            dataDir: existing.dataDir,
-            port: existing.port,
-            pid: existing.pid,
-            started: false
-        };
-    }
+    if (existing) return adopt(existing, false);
 
     fs.mkdirSync(devDbDir(projectRoot), { recursive: true });
     ensureGitignore(projectRoot);
+
+    // Exactly one process may spawn a daemon. Without this, `rebase dev` and
+    // `rebase db push` started in the same second both see no state file, both
+    // spawn, and two processes open one PGlite data directory — the corruption
+    // the single-daemon design exists to prevent.
+    if (!acquireStartLock(projectRoot, START_TIMEOUT_MS)) {
+        const adopted = await waitForDaemon(projectRoot, START_TIMEOUT_MS);
+        if (adopted) return adopt(adopted, false);
+
+        // The holder gave up or died without publishing. Falling through to
+        // start one ourselves is better than failing: the lock is stale by now,
+        // so the next acquire will break it.
+        if (!acquireStartLock(projectRoot, 0)) {
+            throw new Error(
+                "Another process is starting the development database and did not finish.\n" +
+                `  Remove ${path.join(devDbDir(projectRoot), "starting.lock")} if nothing is running.`
+            );
+        }
+    }
 
     const port = await findFreePort();
     const token = randomBytes(16).toString("hex");
@@ -217,43 +230,65 @@ export async function ensureManagedDatabase(
     });
     child.unref();
 
-    const deadline = Date.now() + START_TIMEOUT_MS;
-    let announced = false;
+    try {
+        const deadline = Date.now() + START_TIMEOUT_MS;
+        let announced = false;
+        while (Date.now() < deadline) {
+            const state = readState(projectRoot);
+            if (state && (await isDaemonAlive(state))) return adopt(state, true);
+
+            if (!announced && !options.quiet) {
+                announced = true;
+                options.onProgress?.("Starting the development database…");
+            }
+
+            // A daemon that died on startup will never publish a state file, and
+            // waiting the full minute for that is a bad way to learn it. The log
+            // is the only place the reason exists.
+            if (child.exitCode !== null && child.exitCode !== 0) {
+                throw new Error(
+                    `The development database failed to start (exit ${child.exitCode}).\n` +
+                    `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.`
+                );
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        }
+
+        throw new Error(
+            `The development database did not start within ${Math.round(START_TIMEOUT_MS / 1000)}s.\n` +
+            `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.\n` +
+            "  To use your own Postgres instead, set DATABASE_URL or pass --database-url."
+        );
+    } finally {
+        // Released whether we succeeded, timed out or threw. A lock left behind
+        // by a crash is broken by age, but only after a full timeout — which a
+        // developer should never have to wait out.
+        releaseStartLock(projectRoot);
+    }
+}
+
+/** Shape a live state record as the caller's result. */
+function adopt(state: DaemonState, started: boolean): ManagedDatabase {
+    return {
+        url: managedUrl(state.port),
+        dataDir: state.dataDir,
+        port: state.port,
+        pid: state.pid,
+        started
+    };
+}
+
+/** Poll until another process publishes a live daemon, or give up. */
+async function waitForDaemon(projectRoot: string, timeoutMs: number): Promise<DaemonState | null> {
+    const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
         const state = readState(projectRoot);
-        if (state && (await isDaemonAlive(state))) {
-            return {
-                url: managedUrl(state.port),
-                dataDir: state.dataDir,
-                port: state.port,
-                pid: state.pid,
-                started: true
-            };
-        }
-
-        if (!announced && !options.quiet) {
-            announced = true;
-            options.onProgress?.("Starting the development database…");
-        }
-
-        // A daemon that died on startup will never publish a state file, and
-        // waiting the full minute for that is a bad way to learn it. The log is
-        // the only place the reason exists.
-        if (child.exitCode !== null && child.exitCode !== 0) {
-            throw new Error(
-                `The development database failed to start (exit ${child.exitCode}).\n` +
-                `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.`
-            );
-        }
-
+        if (state && (await isDaemonAlive(state))) return state;
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
 
-    throw new Error(
-        `The development database did not start within ${Math.round(START_TIMEOUT_MS / 1000)}s.\n` +
-        `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.\n` +
-        "  To use your own Postgres instead, set DATABASE_URL or pass --database-url."
-    );
+    return null;
 }
 
 /** Stop the daemon. Returns false when there was nothing running. */
