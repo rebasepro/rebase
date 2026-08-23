@@ -111,6 +111,58 @@ runtime: "managed" } }
         });
     });
 
+    describe("a static app may not claim a path the backend owns", () => {
+        // Mounting is longest-path-first, so an app at /api outranks the API
+        // itself: every request to it is answered with that app's index.html —
+        // a 200 of HTML where the caller wanted JSON, from a deployment that
+        // looks perfectly healthy.
+        it.each(["/api", "/api/v2", "/health", "/metrics"])("rejects %s", (appPath) => {
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    web: { type: "static",
+root: "frontend",
+output: "frontend/dist",
+path: appPath }
+                }
+            });
+            expect(issues[0].path).toBe("apps.web.path");
+            expect(issues[0].message).toMatch(/the backend serves that path/);
+        });
+
+        it("complains about the trailing slash first, which is the fixable half", () => {
+            // "/api/" is wrong twice over. The slash is the part the developer
+            // can act on without rethinking their topology, so it is the one
+            // reported — and reporting both would be two issues for one typo.
+            const { issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    web: { type: "static",
+root: "frontend",
+output: "frontend/dist",
+path: "/api/" }
+                }
+            });
+            expect(issues[0].message).toMatch(/must not end with a slash/);
+        });
+
+        it("allows a path that merely starts with the same letters", () => {
+            // The router matches at segment boundaries, and a check stricter
+            // than the router rejects paths that would have worked.
+            const { manifest, issues } = validateManifest({
+                rebase: "^1",
+                apps: {
+                    docs: { type: "static",
+root: "docs",
+output: "docs/dist",
+path: "/apidocs" }
+                }
+            });
+            expect(issues).toEqual([]);
+            expect(manifest?.apps.docs).toBeDefined();
+        });
+    });
+
     it("rejects app names that would not survive being put in a URL", () => {
         const { issues } = validateManifest({
             rebase: "^1",

@@ -19,6 +19,7 @@ import fs from "fs";
 import path from "path";
 import {
     findStorageSuffixCollision,
+    reservedPrefixFor,
     storageEnvSuffix,
     type DeclaredStorageSources,
     type ManagedCompatibility,
@@ -105,6 +106,18 @@ function checkAppPath(
         issues.push({
             path: fieldPath,
             message: 'must not end with a slash — write "/admin", not "/admin/"'
+        });
+        return undefined;
+    }
+    // Mounting is longest-path-first, so an app at `/api` outranks the API and
+    // every request to it is answered with that app's index.html — a 200 of HTML
+    // where the caller wanted JSON, from a deployment that looks healthy.
+    const reserved = reservedPrefixFor(value);
+    if (reserved) {
+        issues.push({
+            path: fieldPath,
+            message: `cannot be "${reserved}" or nest under it — the backend serves that path, ` +
+                "and an app mounted there would answer the API's requests with its own index.html"
         });
         return undefined;
     }
