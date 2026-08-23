@@ -276,6 +276,10 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
                     applyRefusedBecause={
                         status && !status.canApply ? status.applyRefusedBecause : undefined
                     }
+                    target={status && {
+                        repository: status.repository,
+                        branch: status.branch
+                    }}
                 />
             </Suspense>
         )

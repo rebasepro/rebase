@@ -4911,6 +4911,21 @@ So a failed apply is **not an error**. The response says so:
 The dividing line is whether the running server has your **source on disk** —
 not whether it is production.
 
+#### MongoDB
+
+Everything above describes Postgres, where a schema change means DDL. On MongoDB
+there is no table to alter: adding a property adds nothing, removing one removes
+nothing, and a document written yesterday is still valid tomorrow.
+
+So every change is applicable, nothing is ever refused, and the plan has no
+statements — the commit *is* the change. The panel says "Commit" rather than
+"Commit and apply", and does not claim anything ran against the database.
+
+The one thing worth reading carefully is a removal. On Postgres, removing a
+property is refused because it would drop a column. On MongoDB the field stays
+in every document that has it; your API simply stops serving it. The change says
+so rather than leaving you to assume the relational answer.
+
 | Deployment | Works |
 |---|---|
 | `rebase dev` on your machine | yes |

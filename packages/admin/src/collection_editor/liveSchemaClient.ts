@@ -96,6 +96,8 @@ export interface LiveSchemaStatus {
     applyRefusedBecause?: string;
     applyRefusedCode?: string;
     repository?: string;
+    /** The branch a commit would land on. */
+    branch?: string;
     code?: string;
     reason?: string;
 }
@@ -209,6 +211,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
                         applyRefusedBecause: body.applyRefusedBecause,
                         applyRefusedCode: body.applyRefusedCode,
                         repository: body.repository,
+                        branch: body.branch,
                         code: body.code,
                         reason: body.reason
                     };

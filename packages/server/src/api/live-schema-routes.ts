@@ -226,7 +226,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
      * conversation from a deployment with no source. Reporting the first one
      * that applies is what keeps the message actionable.
      */
-    router.get("/status", (c) => {
+    router.get("/status", async (c) => {
         const admin = config.getAdmin();
         const repository = config.getRepository();
 
@@ -270,13 +270,30 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             classifyPrincipal(c.get("user")),
             config.policy
         );
+
+        // The branch belongs here rather than on the plan, which is recomputed
+        // on every keystroke: locally this is a git call, and a panel that asked
+        // per keystroke would spawn a process per keystroke. It is also the
+        // thing somebody most needs *before* confirming — a commit is landing
+        // somewhere, and "somewhere" should be on screen rather than in the
+        // receipt afterwards.
+        let branch: string | undefined;
+        try {
+            branch = await repository.currentBranch();
+        } catch {
+            // A repository that cannot name its branch can still commit to it.
+            // Not knowing is worth less than refusing over.
+            branch = undefined;
+        }
+
         return c.json({
             enabled: true,
             canPlan: capabilities.plan,
             canApply: capabilities.apply,
             applyRefusedBecause: capabilities.reason,
             applyRefusedCode: capabilities.code,
-            repository: repository.root
+            repository: repository.root,
+            branch
         });
     });
 

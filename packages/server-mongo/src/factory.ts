@@ -13,7 +13,8 @@ import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
 import { MongoHistoryService, HistoryRetentionConfig } from "./services/MongoHistoryService";
 import { MongoDBConnection } from "./connection";
-import { BackendConfig, BackendInstance, CollectionRegistryInterface, DataRepository, RealtimeProvider, DatabaseConnection, DatabaseAdmin, DocumentAdmin, SchemaAdmin, HealthCheckResult } from "@rebasepro/types";
+import { BackendConfig, BackendInstance, CollectionRegistryInterface, DataRepository, RealtimeProvider, DatabaseConnection, DatabaseAdmin, DocumentAdmin, SchemaAdmin, SchemaEditingAdmin, HealthCheckResult } from "@rebasepro/types";
+import { planMongoSchemaChange } from "./schema/plan-schema-change";
 
 /**
  * Configuration for creating a MongoDB backend.
@@ -161,6 +162,15 @@ export function createMongoBackend(config: MongoBackendConfig): MongoBackendInst
 
     // Build admin capabilities for MongoDB
     const admin: DatabaseAdmin = {
+        // A document database has no table to alter, so a collection change is
+        // the commit and nothing else. Offered here because `isSchemaEditingAdmin`
+        // is a structural check: without this method a Mongo project was told
+        // live schema editing was *unsupported*, when it is the one place the
+        // change cannot fail.
+        planSchemaChange: async (before, after) => planMongoSchemaChange(
+            before as CollectionConfig[],
+            after as CollectionConfig[]
+        ),
         async executeAggregate(pipeline: Record<string, unknown>[]) {
             // Run aggregation on a collection — requires a target collection
             // from the pipeline's $match or $lookup stage:
@@ -201,7 +211,10 @@ foreignKeys: [],
 junctions: [],
 policies: [] };
         }
-    } satisfies DocumentAdmin & SchemaAdmin;
+        // `satisfies` narrows the literal regardless of the annotation above, so
+        // the schema-editing method has to be named here too or it reads as an
+        // excess property.
+    } satisfies DocumentAdmin & SchemaAdmin & SchemaEditingAdmin;
 
     return {
         // Abstract interface implementations
