@@ -54,10 +54,19 @@ describe("useBuildNavigationStateController", () => {
 
         rerender();
 
-        // Eventually both collections and views promise resolution finishes
+        // Eventually both collections and views promise resolution finishes.
+        //
+        // The timeout is explicit because testing-library's default is 1000ms,
+        // and that is a bet on scheduler latency rather than on the hook: this
+        // resolves two promises and re-renders, which is fast when the machine
+        // is idle and not when `pnpm -r test` has every package's workers
+        // running. Observed failing here while passing 4/4 in isolation.
+        //
+        // Nothing is weakened by waiting longer — `loading` still has to reach
+        // false, and a hook that never resolved would still fail, just later.
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
-        });
+        }, { timeout: 15_000 });
 
         expect(result.current.topLevelNavigation).toBeDefined();
         // Since both were empty, it should have 0 entries

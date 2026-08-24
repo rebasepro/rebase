@@ -19,6 +19,21 @@ import {
     GitCommandError
 } from "../src/schema-edit/local-git-repository";
 
+/**
+ * Every test here shells out to real `git` — mkdtemp, init, config, add,
+ * commit, show — several processes per case. Jest's 5s default is a bet on how
+ * quickly this machine can spawn them, and `pnpm -r test` runs every package's
+ * workers at once, so the bet is lost under exactly the conditions CI creates.
+ * Observed as "handles a path containing a space" timing out while the same
+ * test passes 3/3 on its own.
+ *
+ * Raising it does not weaken anything: what proves the behaviour is the content
+ * assertion (the committed path appears in `git show --name-only`), and that
+ * fails just as loudly whether the suite is contended or idle. A timeout is
+ * only meant to stop a hang.
+ */
+jest.setTimeout(60_000);
+
 const AUTHOR = { name: "Panel", email: "panel@rebase.pro" };
 
 function makeRepo(): string {
