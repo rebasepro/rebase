@@ -8,7 +8,7 @@ test.use({ storageState: AUTH_STATE });
 
 test.describe("Property Type Gates E2E", () => {
   test.afterAll(async () => {
-    const filePath = path.resolve(__dirname, "../../app/config/collections/e_2_e_property_gate_test.ts");
+    const filePath = path.resolve(__dirname, "../../../app/config/collections/e_2_e_property_gate_test.ts");
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);

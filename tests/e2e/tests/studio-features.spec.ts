@@ -8,7 +8,7 @@ test.use({ storageState: AUTH_STATE });
 
 test.describe("Rebase Studio Features E2E", () => {
   test.afterAll(async () => {
-    const filePath = path.resolve(__dirname, "../../app/config/collections/e_2_e_test_collection.ts");
+    const filePath = path.resolve(__dirname, "../../../app/config/collections/e_2_e_test_collection.ts");
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);

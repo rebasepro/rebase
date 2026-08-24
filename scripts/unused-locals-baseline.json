@@ -1,5 +1,5 @@
 {
-  "e2e/tests/cli-init-e2e.ts::version": 1,
+  "tests/e2e/tests/cli-init-e2e.ts::version": 1,
   "packages/admin/src/collection_editor/ui/AddKanbanColumnAction.tsx::authController": 1,
   "packages/admin/src/collection_editor/ui/AddKanbanColumnAction.tsx::customizationController": 1,
   "packages/admin/src/collection_editor/ui/collection_editor/CollectionDetailsForm.tsx::authController": 1,

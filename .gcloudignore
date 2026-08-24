@@ -15,7 +15,7 @@
 /.yarn/
 # /app/
 /website/
-/e2e/
+/tests/
 /videos/
 /playwright-report/
 /test-results/

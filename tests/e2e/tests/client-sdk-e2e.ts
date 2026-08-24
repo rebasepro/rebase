@@ -63,7 +63,7 @@ import {
  * Loaded inside `run()` rather than at module scope: these e2e scripts are
  * transpiled to CJS, where top-level await is not available.
  */
-import type { createRebaseClient as CreateRebaseClient } from "../../packages/client/src/index.js";
+import type { createRebaseClient as CreateRebaseClient } from "../../../packages/client/src/index.js";
 
 let createRebaseClient: typeof CreateRebaseClient;
 

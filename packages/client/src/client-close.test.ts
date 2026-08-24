@@ -12,7 +12,7 @@ import { createRebaseClient } from "./index";
  * an SSR request — released its socket, called `close()` exactly as documented,
  * and still hung until the token would have expired.
  *
- * Found by `e2e/tests/client-sdk-e2e.ts`, which reported every check green and
+ * Found by `tests/e2e/tests/client-sdk-e2e.ts`, which reported every check green and
  * then never exited. Pinned here rather than only there because that suite needs
  * Docker and a real Postgres, and this costs nothing.
  *

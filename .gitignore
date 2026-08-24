@@ -119,7 +119,7 @@ app/uploads/
 # it in the tree the guard resolved `react` to the real @types/react and passed while
 # proving nothing. A file importing React.ReactNode into the BaaS graph produced zero
 # errors. Anything hand-written and load-bearing needs a line here.
-!e2e/baas-typecheck/stubs/*.d.ts
+!tests/e2e/baas-typecheck/stubs/*.d.ts
 !app/config/*.d.ts
 !packages/cli/templates/template/config/*.d.ts
 # `examples/firebase` declares `*.css` here, so `import "./index.css"` typechecks.
@@ -183,8 +183,8 @@ build_output*.txt
 tsc_output*.txt
 *_results.log
 
-# Playwright signed-in session, captured per run by e2e/global-setup.ts
-e2e/.auth/
+# Playwright signed-in session, captured per run by tests/e2e/global-setup.ts
+tests/e2e/.auth/
 
 # Built project bundles (`rebase build`) and the generated tsconfig it uses.
 dist-bundle/

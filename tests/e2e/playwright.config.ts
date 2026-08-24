@@ -73,7 +73,7 @@ export default defineConfig({
     // `rebase dev` direct, rather than the root `dev` script, so --port reaches it.
     command: `pnpm exec rebase dev --port ${API_PORT}`,
     env: { ...process.env, REBASE_FRONTEND_PORT: String(PORT) } as Record<string, string>,
-    cwd: path.resolve(__dirname, "../app"),
+    cwd: path.resolve(__dirname, "../../app"),
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI
   }

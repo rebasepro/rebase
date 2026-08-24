@@ -379,7 +379,7 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E Test Suite
-        run: npx tsx e2e/tests/cli-init-e2e.ts
+        run: npx tsx tests/e2e/tests/cli-init-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           SCREENSHOT_DIR: ${{ github.workspace }}/e2e-screenshots
@@ -396,7 +396,7 @@ jobs:
       # report from being suppressed by the first.
       - name: Run BaaS E2E
         if: always()
-        run: npx tsx e2e/tests/cli-init-baas-e2e.ts
+        run: npx tsx tests/e2e/tests/cli-init-baas-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -427,7 +427,7 @@ jobs:
       # `always()` for the same reason as its neighbours.
       - name: Client SDK E2E (end-user auth, RLS, storage, realtime)
         if: always()
-        run: npx tsx e2e/tests/client-sdk-e2e.ts
+        run: npx tsx tests/e2e/tests/client-sdk-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -463,7 +463,7 @@ jobs:
           docker exec rebase-postgres createdb -U rebase rebase_admin_e2e
           (cd app && pnpm exec rebase db push --yes)
           (cd app/backend && npx tsx src/seed.ts)
-          npx playwright test -c e2e/playwright.config.ts
+          npx playwright test -c tests/e2e/playwright.config.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           # sslmode=disable: the CI Postgres container serves no TLS, and Atlas
@@ -541,7 +541,7 @@ jobs:
       # The fixtures are frozen and hand-authored, NOT built here: a fixture the
       # builder regenerates moves whenever the builder moves, which is the one
       # thing a regression corpus must not do. When one fails, the finding is
-      # that a bundle already deployed would fail — see fixtures/bundles/README.md.
+      # that a bundle already deployed would fail — see tests/fixtures/bundles/README.md.
       #
       # Two axes, not one. Besides the frozen bundle SHAPES, this now boots the
       # representative fixture once per published `@rebasepro/server-postgres`,

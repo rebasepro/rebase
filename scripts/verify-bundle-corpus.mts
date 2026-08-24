@@ -39,7 +39,7 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const CORPUS_DIR = path.join(ROOT, "fixtures", "bundles");
+const CORPUS_DIR = path.join(ROOT, "tests", "fixtures", "bundles");
 
 const DATABASE_URL = process.env.CORPUS_DATABASE_URL
     ?? `postgres://${os.userInfo().username}@localhost:5432/rebase_corpus`;

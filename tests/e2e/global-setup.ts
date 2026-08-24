@@ -53,7 +53,7 @@ export default async function globalSetup(config: FullConfig) {
     const baseURL = config.projects[0]?.use?.baseURL ?? "http://localhost:5173";
     // configFile is this directory's playwright.config.ts; rootDir is testDir.
     const e2eDir = config.configFile ? path.dirname(config.configFile) : config.rootDir;
-    const indexHtml = path.resolve(e2eDir, "../app/frontend/index.html");
+    const indexHtml = path.resolve(e2eDir, "../../app/frontend/index.html");
 
     let served: string | undefined;
     try {

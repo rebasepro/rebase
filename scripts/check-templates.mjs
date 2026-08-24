@@ -444,7 +444,7 @@ try {
                     // that `node_modules` is symlinked to. What keeps the admin layer
                     // out of this flavour is `checkBaasHasNoAdminTypes` below, and
                     // the guarantee that writing `admin` is an error is asserted by
-                    // its own program in `e2e/baas-typecheck`.
+                    // its own program in `tests/e2e/baas-typecheck`.
                     ? { ...TSCONFIG }
                     : TSCONFIG,
                 null,

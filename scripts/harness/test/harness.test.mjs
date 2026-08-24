@@ -67,7 +67,7 @@ test("blocking() distinguishes fail from warn", () => {
 
 test("test-path classification covers this repo's layouts", () => {
     assert.ok(isTestPath("packages/server/test/dev-port.test.ts"));
-    assert.ok(isTestPath("e2e/tests/cli-init-e2e.ts"));
+    assert.ok(isTestPath("tests/e2e/tests/cli-init-e2e.ts"));
     assert.ok(isTestPath("packages/app/src/__tests__/thing.tsx"));
     assert.equal(isTestPath("packages/server/src/utils/dev-port.ts"), false);
 });
