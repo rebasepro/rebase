@@ -4,6 +4,7 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import sitemap from "@astrojs/sitemap";
 import path from "node:path";
+import fs from "node:fs";
 import starlight from "@astrojs/starlight";
 import mdx from "@astrojs/mdx";
 import yaml from "@rollup/plugin-yaml";
@@ -293,7 +294,50 @@ export default defineConfig({
         },
         server: {
             fs: {
-                allow: [path.resolve(new URL(".", import.meta.url).pathname, ".."), path.resolve(new URL(".", import.meta.url).pathname, "."), path.resolve(new URL(".", import.meta.url).pathname, "../../neat")]
+                allow: [
+                    path.resolve(new URL(".", import.meta.url).pathname, ".."),
+                    path.resolve(new URL(".", import.meta.url).pathname, "."),
+                    path.resolve(new URL(".", import.meta.url).pathname, "../../neat"),
+                    // A git worktree borrows the primary checkout's install by
+                    // symlinking, so dependencies have realpaths OUTSIDE this
+                    // project root and Vite 403s them. Two distinct places, and
+                    // missing either one breaks the page in a way that looks like
+                    // deleted code rather than a resolution failure:
+                    //
+                    //   .pnpm         — third-party deps, including @astrojs/react's
+                    //                   client entry. Without it NOTHING hydrates:
+                    //                   no Neat canvases, no live demos, just
+                    //                   static HTML.
+                    //   @rebasepro/*  — the workspace packages, linked to the
+                    //                   primary's `packages/`. Without it the
+                    //                   /ui reference view 403s on
+                    //                   `packages/app/dist/index.es.js` and the
+                    //                   island renders blank with no error.
+                    //
+                    // Both no-op in the primary checkout, where the realpath is
+                    // already inside the root.
+                    ...(() => {
+                        const here = new URL(".", import.meta.url).pathname;
+                        const roots = new Set();
+                        const store = path.resolve(here, "../node_modules/.pnpm");
+                        if (fs.existsSync(store)) roots.add(fs.realpathSync(store));
+                        // Both scopes: pnpm puts the workspace links in the
+                        // IMPORTER's own node_modules (website/), not only at the
+                        // repo root, and it is the website one that carries
+                        // @rebasepro/app. Checking only the root silently allows
+                        // nothing and the 403 persists.
+                        for (const rel of ["node_modules/@rebasepro", "../node_modules/@rebasepro"]) {
+                            const scope = path.resolve(here, rel);
+                            if (!fs.existsSync(scope)) continue;
+                            for (const entry of fs.readdirSync(scope)) {
+                                try {
+                                    roots.add(path.dirname(fs.realpathSync(path.join(scope, entry))));
+                                } catch { /* dangling link — nothing to allow */ }
+                            }
+                        }
+                        return [...roots];
+                    })()
+                ]
             }
         }
     }
