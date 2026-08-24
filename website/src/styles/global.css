@@ -163,10 +163,20 @@
     pointer-events: none;
 }
 
-/* The divider variants ship at 0.55 so they can sit UNDER page copy. Here the
-   art IS the ground, so it runs at full strength. */
+/* 0.45 — quieter than the 0.55 the dividers use, not louder.
+
+   The first cut ran this at 1.0 on the reasoning that a slab's art IS its
+   ground and should therefore be at full strength. Wrong, and the reason is
+   worth keeping: these two sections also carry a detailed product demo, and at
+   full strength the canvas's faceted shards are high-frequency enough to
+   compete with it. The break has to be loud; the GROUND has to recede.
+
+   Colour identity does not come from the art's opacity — it comes from the
+   tint, which stays at 0.85. Dropping the art only removes texture, and it
+   moves contrast the safe way: less art means more near-black page ground
+   showing through, so the copy's backdrop gets darker, not lighter. */
 .chapter-slab__art canvas {
-    opacity: 1;
+    opacity: 0.45;
 }
 
 .chapter-slab__tint {
