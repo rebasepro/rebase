@@ -5,7 +5,7 @@
  * Every other gate in this repo asserts on something *rendered*: `check-chart`
  * on helm output, `managed/deployment.test.ts` on a container object,
  * `check-runtime-image` on tags and publishers. Nothing had ever executed
- * `docker/entrypoint.mjs`, and nothing had ever started the image.
+ * `infra/docker/entrypoint.mjs`, and nothing had ever started the image.
  *
  * That gap is not academic — it is why `bundle.mode=url` shipped dead and
  * stayed dead. Three independent things blocked it: the entrypoint required
@@ -114,7 +114,7 @@ execFileSync("tar", ["-czf", tarball, "-C", bundleDir, "."]);
 // ── 2. Build ─────────────────────────────────────────────────────────────────
 if (BUILD) {
     console.log(`${DIM}building ${IMAGE}…${NC}`);
-    const build = docker(["build", "-f", "docker/server.Dockerfile", "-t", IMAGE, ROOT],
+    const build = docker(["build", "-f", "infra/docker/server.Dockerfile", "-t", IMAGE, ROOT],
         { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] });
     if (build.status !== 0) {
         console.error(`${RED}the runtime image does not build:${NC}\n${build.stderr?.slice(-3000)}`);

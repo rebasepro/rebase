@@ -52,7 +52,7 @@ services:
       - key: NODE_ENV
         scope: RUN_TIME
         value: production
-      # Uploads. See deploy/README.md — `local` storage in production is
+      # Uploads. See infra/blueprints/README.md — `local` storage in production is
       # refused, because the container filesystem is wiped on every deploy.
       # - key: STORAGE_TYPE
       #   scope: RUN_TIME

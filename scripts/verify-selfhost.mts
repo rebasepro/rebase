@@ -1,7 +1,7 @@
 /**
  * The self-hosting acceptance test: one process, an API and two SPAs.
  *
- * `docker/docker-compose.selfhost.yml` is the shipped form of this — Postgres,
+ * `infra/docker/docker-compose.selfhost.yml` is the shipped form of this — Postgres,
  * plus the published runtime image with `dist-bundle` mounted at `/bundle`. What
  * that adds over this script is a container and an image tag. Everything the
  * change is actually about happens below: a real bundle built from real

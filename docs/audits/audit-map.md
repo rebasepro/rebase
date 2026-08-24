@@ -288,7 +288,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 80. **Config & env** — `server/src/env.ts`, `boot/env.ts`, `saas/backend/src/env.ts`,
     `validate-config.ts`. Fail-closed on missing/invalid, the collection-key allowlist that
     silently drops unknown keys. **done 2026-08-09** — see [audits/80-config-and-env.md](80-config-and-env.md).
-81. **Public API surface & compat policy** — `api-surface/`, `scripts/check-api-surface.mjs`,
+81. **Public API surface & compat policy** — `contracts/`, `scripts/check-api-surface.mjs`,
     `contracts/derived-names.txt`, `docs/compatibility.md`. What is public, what may change,
     what is frozen. **done 2026-08-05** (surface, [api-surface-audit-2026-08-05.md](api-surface-audit-2026-08-05.md))
     / **done 2026-08-08** (policy, see [audits/81-compat-policy.md](81-compat-policy.md))

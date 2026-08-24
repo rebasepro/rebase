@@ -278,7 +278,7 @@ function imageModulesDir(): string | undefined {
  * The packages the runtime image supplies to a fetched bundle.
  *
  * Must match `RUNTIME_PROVIDED` in `packages/cli/src/bundle.ts` and in
- * `docker/entrypoint.mjs`; `scripts/test/runtime-provided.test.mjs` fails if any
+ * `infra/docker/entrypoint.mjs`; `scripts/test/runtime-provided.test.mjs` fails if any
  * of the three drift. The bundler STRIPS these from a bundle's declared
  * dependencies on the promise that the image supplies them, so a shorter list
  * here means the builder removed a dependency that nothing then provides, and

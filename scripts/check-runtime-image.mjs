@@ -52,7 +52,7 @@ const NC = "\x1b[0m";
  */
 const USER_FACING_COMPOSE = [
     "packages/cli/templates/template/docker-compose.yml",
-    "docker/docker-compose.selfhost.yml"
+    "infra/docker/docker-compose.selfhost.yml"
 ];
 
 /**
@@ -70,8 +70,8 @@ const USER_FACING_COMPOSE = [
  * can introduce. The `--live` one asks whether that tag exists yet, which only a
  * release can answer.
  */
-const CHART = "charts/rebase/Chart.yaml";
-const CHART_IMAGE_DEFAULT = "charts/rebase/values.yaml";
+const CHART = "infra/charts/rebase/Chart.yaml";
+const CHART_IMAGE_DEFAULT = "infra/charts/rebase/values.yaml";
 
 /**
  * Images published by someone else. `postgres:18-alpine` needs no pipeline here;

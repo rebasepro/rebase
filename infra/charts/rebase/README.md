@@ -1,6 +1,6 @@
 # Rebase on Kubernetes
 
-The Kubernetes peer of [`docker/docker-compose.selfhost.yml`](../../docker/docker-compose.selfhost.yml).
+The Kubernetes peer of [`infra/docker/docker-compose.selfhost.yml`](../../docker/docker-compose.selfhost.yml).
 Same idea, same image, same bundle: the runtime is the image, your project is the
 bundle, and upgrading Rebase is a tag change.
 

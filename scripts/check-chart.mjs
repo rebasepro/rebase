@@ -31,7 +31,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const CHART = path.join(ROOT, "charts/rebase");
+const CHART = path.join(ROOT, "infra/charts/rebase");
 
 const RED = "\x1b[0;31m";
 const GREEN = "\x1b[0;32m";

@@ -329,7 +329,7 @@ of whether the ordering is right.
 ## 9. Method, and what this audit did not cover
 
 Read directly: `boot/role.ts`, `init/surfaces.ts`, `boot/boot.ts`, `serve-spa.ts`,
-`docker/docker-compose.selfhost.yml`, `MODULAR-ARCHITECTURE.md`,
+`infra/docker/docker-compose.selfhost.yml`, `MODULAR-ARCHITECTURE.md`,
 `docs/runtime-roles-plan-2026-08.md`, `docs/apps-and-runtimes.md`,
 `docs/tenancy-and-cost-plan-2026-07.md`, and in `saas/backend/src`: `utils/tenant-topology.ts`,
 `k8s/{orchestrator,resolve,client,baseline,external-backend,reconciler,topology-diff,wildcard-tls}.ts`,

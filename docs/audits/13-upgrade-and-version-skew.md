@@ -313,7 +313,7 @@ at build (a warn is enough), or amend `docs/compatibility.md:37` to say
 
 `scripts/verify-bundle-corpus.mts:154` pins `DRIVER_SKEW = ["0.10.0", "0.11.0",
 "0.12.0", "0.13.0"]` and boots each with today's `@rebasepro/server` symlinked
-over it, exactly as `docker/entrypoint.mjs` does — the single strongest gate in
+over it, exactly as `infra/docker/entrypoint.mjs` does — the single strongest gate in
 this unit, and the one that reflects what managed tenants actually run. But the
 database it boots against is created fresh (`createdb rebase_corpus` in
 `verify.yml`, and per-version isolation noted at `:350`). So the two axes never

@@ -1,7 +1,7 @@
 # One pod, two builders — what they disagreed on
 
 Status: **audit + fix**, 2026-08-22. Branch `feat/shared-pod-spec`.
-Scope: `charts/rebase`, `saas/backend/src/managed/deployment.ts`,
+Scope: `infra/charts/rebase`, `saas/backend/src/managed/deployment.ts`,
 `saas/backend/src/k8s/orchestrator.ts`, `packages/server/src/deploy`.
 
 Follows [independent-deployment-audit-2026-08-18.md](independent-deployment-audit-2026-08-18.md),
@@ -176,7 +176,7 @@ Listed so the next person does not read them as drift:
    them turned up the reason there were ever two: the runtime's own fetch path
    had never worked.
 
-2. **`charts/rebase/values.yaml` describes the init container it does not have.**
+2. **`infra/charts/rebase/values.yaml` describes the init container it does not have.**
    `mode: url` is documented as "an init container fetching a tarball at every
    pod start". There is no init container in the chart; the runtime fetches for
    itself. Fixed in this branch, noted here because it is the tell — the comment

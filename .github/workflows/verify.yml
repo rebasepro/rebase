@@ -128,7 +128,7 @@ jobs:
       # manifest, `check:runtime-image` reads tags — and a manifest that is
       # entirely correct still produced a container that refused to start,
       # because an image ENV and an entrypoint guard defeated it from inside.
-      # Nothing had ever executed docker/entrypoint.mjs or booted the image;
+      # Nothing had ever executed infra/docker/entrypoint.mjs or booted the image;
       # `bundle.mode=url` shipped dead and stayed dead as a result. This builds
       # the image and starts it against a real Postgres, both ways a bundle can
       # arrive, and checks it still refuses when given neither.
@@ -260,7 +260,7 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      # `@rebasepro/server` is the one package `docker/entrypoint.mjs` symlinks
+      # `@rebasepro/server` is the one package `infra/docker/entrypoint.mjs` symlinks
       # over a deployed bundle's own copy, so its exports move underneath tenant
       # code that is already built — during a fleet rollout nobody asked for. A
       # removed export is therefore not a compile error for anyone; it is a boot
@@ -508,7 +508,7 @@ jobs:
       # cannot verify the wrong checkout — which means it proves the code and not
       # the container. Its own header concedes the gap: "what that adds over this
       # script is a container and an image tag." So nothing had ever executed
-      # `docker/docker-compose.selfhost.yml`, and nothing had ever booted the
+      # `infra/docker/docker-compose.selfhost.yml`, and nothing had ever booted the
       # published image. `check-runtime-image` asserts that image has a
       # publisher; this asserts it runs.
       #
@@ -546,7 +546,7 @@ jobs:
       # Two axes, not one. Besides the frozen bundle SHAPES, this now boots the
       # representative fixture once per published `@rebasepro/server-postgres`,
       # with today's `@rebasepro/server` symlinked over it exactly as
-      # `docker/entrypoint.mjs` does. That pairing — new server, old driver — is
+      # `infra/docker/entrypoint.mjs` does. That pairing — new server, old driver — is
       # what every managed project actually runs, because the image supplies the
       # server and the bundle supplies the driver; it has already caused one
       # production login outage, and nothing tested it until now. Needs the

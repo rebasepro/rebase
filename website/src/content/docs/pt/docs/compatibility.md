@@ -235,7 +235,7 @@ quando é quebrado:
 | `e2e/tests/client-sdk-e2e.ts` | o fluxo do usuário final: cadastro → login → leituras com escopo de RLS → refresh → storage → realtime |
 | `pnpm check:derived-names` | todo nome de coluna, constraint, junção, enum e policy que o framework deriva — e que o boot e o `db push` os derivam de forma idêntica |
 | `pnpm rls:check` | as policies do schema gerado |
-| `pnpm check:api-surface` | toda exportação de `@rebasepro/server`, e seus membros, contra `api-surface/server.api.txt`. Este é o pacote para o qual `docker/entrypoint.mjs` cria um symlink sobre a própria cópia de um bundle implantado, portanto remover uma exportação dele não é um erro de compilação para ninguém — é uma falha de inicialização em toda a frota, durante um rollout que ninguém pediu |
+| `pnpm check:api-surface` | toda exportação de `@rebasepro/server`, e seus membros, contra `contracts/server.api.txt`. Este é o pacote para o qual `infra/docker/entrypoint.mjs` cria um symlink sobre a própria cópia de um bundle implantado, portanto remover uma exportação dele não é um erro de compilação para ninguém — é uma falha de inicialização em toda a frota, durante um rollout que ninguém pediu |
 | `pnpm test:gates` | as duas barreiras acima, sobre fixtures. O `check:api-surface` passou toda a sua existência incapaz de ver um membro desaparecer de `const rebase` |
 | `node scripts/check-release-bump.mjs` | que o nível de incremento (bump) com o qual uma versão é lançada corresponde ao que a versão fez nas baselines acima — executado por `publish.yml` antes do changelog ser carimbado |
 | CI do SaaS | o plano de controle construído contra a `main` deste repositório, em seus próprios pushes e nightly |

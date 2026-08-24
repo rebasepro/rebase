@@ -7,7 +7,7 @@ which is one day old and already stale in two places (O8 and O9 both closed the
 same day). Read that one for the *reasoning*; read this one for the *state*.
 
 Scope: `packages/server` boot/roles/surfaces, `packages/cli` build & deploy,
-`charts/rebase`, `docker/`, and `saas/backend/src/{k8s,managed,static,front-door}`.
+`infra/charts/rebase`, `docker/`, and `saas/backend/src/{k8s,managed,static,front-door}`.
 
 ---
 
@@ -36,7 +36,7 @@ the reasoning behind each one is what the fix rests on.
 |---|---|
 | 1. Publish the runtime image | **Done** — `rebasepro/server` `0.14.0`, `0.14.1`, `latest`, pushed 2026-08-16. The longest-open blocker in the repo |
 | 2. Shared rate-limit store | **Done** — `packages/server/src/auth/sql-rate-limit-store.ts` + `resolve-rate-limit-store.ts` |
-| 3. Helm chart for the self-host split | **Done** — `charts/rebase`, commit `7a4a4ddc1` |
+| 3. Helm chart for the self-host split | **Done** — `infra/charts/rebase`, commit `7a4a4ddc1` |
 | 4. Front door | **Code-complete, not deployed** — `saas/backend/src/front-door/` (5 modules, 3 test files), on saas `main` |
 | 5. Static path wired | **Code-complete, not deployed** — `saas/backend/src/static/{publish,serve,deploy-static}.ts`; intake accepts `kind: static` (`deploy-plan.ts:141`) |
 | 6. Second managed unit | **Wired, unsold** — `resolveManagedUnits` is called at `orchestrator.ts:1818`; no plan sets `split` |
@@ -77,7 +77,7 @@ its own Deployment with **its own image repository and tag**, and
 ### G1 — "Independent deploy" is isolation, not release — **ADDRESSED, option A**
 
 Every backend unit renders `image: {{ include "rebase.image" $root }}`
-(`charts/rebase/templates/deployment.yaml:87`) — one global repository and tag.
+(`infra/charts/rebase/templates/deployment.yaml:87`) — one global repository and tag.
 `bundle.url` is global too. There is no `functions.image` and no
 `functions.bundle`. So:
 
@@ -241,7 +241,7 @@ choosing Helm. Everything in §1 rows 7–9 waits behind it.
 
 ### G9 — Small and stale
 
-- ~~`docker/docker-compose.selfhost.yml:102` names `rebasepro/server:0.11.0` in a
+- ~~`infra/docker/docker-compose.selfhost.yml:102` names `rebasepro/server:0.11.0` in a
   comment~~ — **fixed**, it now uses `${REBASE_VERSION}` like the live references
   in the same file.
 - Cold start is unmeasured. A `functions` pod still boots data sources, auth and

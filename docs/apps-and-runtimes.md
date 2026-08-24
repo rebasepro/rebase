@@ -167,7 +167,7 @@ first-class", held per-checkout in `.rebase/cloud.json`.
 > the image every managed tenant runs and every self-hoster can run: the server
 > package plus an entrypoint that boots a project bundle.
 
-`docker/docker-compose.selfhost.yml` does exactly that — Postgres plus the
+`infra/docker/docker-compose.selfhost.yml` does exactly that — Postgres plus the
 published runtime with `./dist-bundle` mounted at `/bundle`, "no application
 image to build".
 
@@ -242,7 +242,7 @@ export interface RebaseBackendAppConfig {
      * - `custom`  — this repository builds its own image and entrypoint.
      *
      * Independent of *where* it runs: both run on Rebase Cloud and both
-     * self-host. See `docker/docker-compose.selfhost.yml`.
+     * self-host. See `infra/docker/docker-compose.selfhost.yml`.
      */
     runtime: "managed" | "custom";
 
@@ -910,7 +910,7 @@ tables the push created, out of the same process serving the SPAs.
 
 What it does not cover is the container itself: the published image, the volume
 mount, and the bundle's own `npm install` at first start. Worth one manual
-`docker compose -f docker/docker-compose.selfhost.yml up` before release.
+`docker compose -f infra/docker/docker-compose.selfhost.yml up` before release.
 
 One deviation from the phase boundaries: the type changes in
 `project_manifest.ts` are a single unit, so `entry.static` becoming a list and
@@ -1040,9 +1040,9 @@ land in the bundle, with correct `entry.static`. Then end-to-end:
 
 ```
 cd app && rebase build
-docker compose -f ../docker/docker-compose.selfhost.yml up -d db
+docker compose -f ../infra/docker/docker-compose.selfhost.yml up -d db
 rebase db push
-docker compose -f ../docker/docker-compose.selfhost.yml up
+docker compose -f ../infra/docker/docker-compose.selfhost.yml up
 ```
 
 `/` and `/admin` must both load in a browser, and the admin must list

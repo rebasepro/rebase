@@ -71,7 +71,7 @@ steps:
       - '$_HUB_REPO:latest'
       - '--build-arg=BUILDKIT_INLINE_CACHE=1'
       - '-f'
-      - 'docker/server.Dockerfile'
+      - 'infra/docker/server.Dockerfile'
       - '.'
 
   # The fleet tag is pushed HERE, explicitly, rather than through the `images:`

@@ -1083,7 +1083,7 @@ timeout: 10000 });
         // whenever a version simply had not been published yet — which is how it
         // failed with `pull access denied for rebasepro/server`.
         //
-        // Building from docker/server.Dockerfile is what makes Step 9 a test.
+        // Building from infra/docker/server.Dockerfile is what makes Step 9 a test.
         // Compose's default pull policy is `missing`, so a locally tagged image
         // is used as-is and no registry is contacted.
         const runtimeVersion = readEnvVar(projectPath, "REBASE_VERSION") ?? "latest";
@@ -1091,7 +1091,7 @@ timeout: 10000 });
         await execa("docker", [
             "build",
             "-t", `rebasepro/server:${runtimeVersion}`,
-            "-f", "docker/server.Dockerfile",
+            "-f", "infra/docker/server.Dockerfile",
             "."
         ], {
             cwd: rootDir,

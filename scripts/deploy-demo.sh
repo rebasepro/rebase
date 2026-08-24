@@ -73,7 +73,7 @@ if [ "$SKIP_BUILD" = false ]; then
   echo ""
 
   gcloud builds submit \
-    --config=cloudbuild.yaml \
+    --config=infra/cloudbuild.yaml \
     --project="$PROJECT" \
     .
 

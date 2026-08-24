@@ -124,7 +124,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/server.Dockerfile
+          file: infra/docker/server.Dockerfile
           # Both architectures, as the release does: a self-hoster on Apple
           # silicon otherwise gets qemu emulation, which is slow enough on first
           # boot to read as a hang.

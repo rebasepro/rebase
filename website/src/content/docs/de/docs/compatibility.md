@@ -255,7 +255,7 @@ fehlschlägt, wenn etwas bricht:
 | `e2e/tests/client-sdk-e2e.ts` | Der Endnutzer-Pfad: Registrieren → Anmelden → RLS-eingeschränkte Lesezugriffe → Aktualisieren → Storage → Realtime |
 | `pnpm check:derived-names` | Jeden Spalten-, Constraint-, Junction-, Enum- und Policy-Namen, den das Framework ableitet – und dass Boot und `db push` sie identisch ableiten |
 | `pnpm rls:check` | Die Policies des generierten Schemas |
-| `pnpm check:api-surface` | Jeden Export von `@rebasepro/server` und dessen Member gegen `api-surface/server.api.txt`. Dies ist das Paket, das `docker/entrypoint.mjs` per Symlink über die eigene Kopie eines bereitgestellten Bundles legt. Das Entfernen eines Exports führt daher bei niemandem zu einem Kompilierungsfehler – sondern zu einem flottenweiten Boot-Fehler während eines Rollouts, den niemand wollte |
+| `pnpm check:api-surface` | Jeden Export von `@rebasepro/server` und dessen Member gegen `contracts/server.api.txt`. Dies ist das Paket, das `infra/docker/entrypoint.mjs` per Symlink über die eigene Kopie eines bereitgestellten Bundles legt. Das Entfernen eines Exports führt daher bei niemandem zu einem Kompilierungsfehler – sondern zu einem flottenweiten Boot-Fehler während eines Rollouts, den niemand wollte |
 | `pnpm test:gates` | Die beiden obigen Gates über Fixtures. `check:api-surface` konnte bisher nicht erkennen, wenn ein Member aus `const rebase` verschwand |
 | `node scripts/check-release-bump.mjs` | Dass die Bump-Stufe, unter der ein Release veröffentlicht wird, dem entspricht, was das Release an den obigen Baselines geändert hat – ausgeführt von `publish.yml`, bevor das Changelog abgestempelt wird |
 | SaaS-CI | Die Control Plane, gebaut gegen `main` dieses Repositories, bei eigenen Pushes und nächtlich |

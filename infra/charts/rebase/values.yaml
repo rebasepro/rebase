@@ -1,7 +1,7 @@
 # Rebase on Kubernetes.
 #
 # The default here is deliberately the same shape as
-# `docker/docker-compose.selfhost.yml`: ONE process serving everything. Every
+# `infra/docker/docker-compose.selfhost.yml`: ONE process serving everything. Every
 # split below is opt-in, and turning one on is the only change — same image,
 # same bundle, same database.
 #

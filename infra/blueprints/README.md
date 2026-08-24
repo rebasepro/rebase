@@ -17,7 +17,7 @@ do-app.yaml       →  .do/app.yaml      (DigitalOcean App Platform)
 ```
 
 Coolify, Dokku and anything else that speaks Compose can use
-`docker/docker-compose.selfhost.yml` directly — see `docker/quickstart.sh`.
+`infra/docker/docker-compose.selfhost.yml` directly — see `infra/docker/quickstart.sh`.
 
 ## What every one of them has to get right
 

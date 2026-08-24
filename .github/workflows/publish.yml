@@ -457,7 +457,7 @@ jobs:
           # `check:runtime-image` fails on the next run.
           node -e "
             const fs=require('fs');
-            const f='charts/rebase/Chart.yaml';
+            const f='infra/charts/rebase/Chart.yaml';
             let t=fs.readFileSync(f,'utf8');
             const before=t;
             t=t.replace(/^version:.*\$/m, 'version: $VERSION');
@@ -608,7 +608,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/server.Dockerfile
+          file: infra/docker/server.Dockerfile
           # linux/arm64 as well as amd64: a self-hoster on Apple silicon running
           # `docker compose up` gets qemu emulation without it, which is slow
           # enough to read as a hang on first boot.
@@ -683,7 +683,7 @@ jobs:
           # not reach it.
           echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io \
             --username "$DOCKERHUB_USERNAME" --password-stdin
-          helm package charts/rebase --destination /tmp/chart
+          helm package infra/charts/rebase --destination /tmp/chart
           helm push "/tmp/chart/rebase-${VERSION}.tgz" oci://registry-1.docker.io/rebasepro
 
       # Same reasoning as the image: a push that reported success and an artifact

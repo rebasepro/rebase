@@ -60,7 +60,7 @@ const bootEnvExtension = z.object({
      * `push` is in the enum and is **not** distinguished from `ensure` anywhere
      * in the boot path; nothing implements "reconcile destructively" here. The
      * published image goes further and refuses to start on it
-     * (`docker/entrypoint.mjs`), because a full push computes a diff and will
+     * (`infra/docker/entrypoint.mjs`), because a full push computes a diff and will
      * happily `DROP COLUMN` — and a container restart must never be able to
      * destroy a production column as a side effect of rescheduling. Reshaping
      * and destructive changes stay a deliberate `rebase db generate` + `rebase

@@ -19,7 +19,7 @@ Rebase supports multiple deployment strategies — from fully managed Rebase Clo
 | **Scaleway** | Serverless Containers with Managed PostgreSQL (EU-only) | ⭐⭐⭐ Advanced |
 | **Hetzner** | Cost-effective VPS with Docker Compose | ⭐⭐ Medium |
 | **PaaS** | Railway, Render, Fly.io — Docker-based platforms | ⭐⭐ Medium |
-| **Kubernetes** | The `charts/rebase` Helm chart — one process or several | ⭐⭐⭐ Advanced |
+| **Kubernetes** | The `infra/charts/rebase` Helm chart — one process or several | ⭐⭐⭐ Advanced |
 
 ## Rebase Cloud
 
@@ -925,7 +925,7 @@ collection subscriptions are unaffected — those travel through Postgres CDC.
 
 ## Kubernetes (Helm)
 
-`charts/rebase` is the Kubernetes peer of the self-hosting Compose setup: same
+`infra/charts/rebase` is the Kubernetes peer of the self-hosting Compose setup: same
 image, same bundle, and upgrading Rebase is a tag change.
 
 ```bash
@@ -1045,7 +1045,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 - **Docker Compose (template):** `packages/cli/templates/template/docker-compose.yml`
 - **Entrypoint:** `app/backend/entrypoint.sh`
 - **Env Schema:** `packages/server/src/env.ts`
-- **Helm chart:** `charts/rebase` (see `charts/rebase/README.md`)
+- **Helm chart:** `infra/charts/rebase` (see `infra/charts/rebase/README.md`)
 - **Role resolution:** `packages/server/src/boot/role.ts`
 - **serveSPA:** `packages/server/src/serve-spa.ts`
 - **Backend Entry:** `app/backend/src/index.ts`

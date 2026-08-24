@@ -2,7 +2,7 @@
  * Telling a *stale* driver apart from a driver that never had the feature.
  *
  * The managed runtime is two halves that version independently. The image
- * supplies `@rebasepro/server` — `docker/entrypoint.mjs` symlinks it over
+ * supplies `@rebasepro/server` — `infra/docker/entrypoint.mjs` symlinks it over
  * whatever the bundle installed, so the boot harness is always the image's. The
  * **driver** is not redirected: `@rebasepro/server-postgres` comes from the
  * bundle's `deps.declared`, pinned to whatever the project's `package.json`
@@ -229,7 +229,7 @@ export function readPackageVersion(packageDir: string): string | undefined {
  * The version of `@rebasepro/server` this deployment is actually running.
  *
  * Resolved from the same roots the drivers are, and that is the point rather
- * than a convenience. In a managed container `docker/entrypoint.mjs` replaces
+ * than a convenience. In a managed container `infra/docker/entrypoint.mjs` replaces
  * `/bundle/node_modules/@rebasepro/server` with a link to the image's copy, so
  * reading the manifest *through the bundle* reports the version that will
  * really execute — which is exactly the number the driver has to be compared

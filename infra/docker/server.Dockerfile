@@ -8,7 +8,7 @@
 #   docker run -v ./dist-bundle:/bundle -e DATABASE_URL=... rebasepro/server
 #
 # Build from the repository root:
-#   docker build -f docker/server.Dockerfile -t rebasepro/server:0.11.0 .
+#   docker build -f infra/docker/server.Dockerfile -t rebasepro/server:0.11.0 .
 
 # ── Stage 1: build the workspace packages ────────────────────────────────────
 FROM node:22-slim AS build
@@ -138,7 +138,7 @@ COPY --from=build /src/packages/server-postgres/dist ./node_modules/@rebasepro/s
 COPY --from=build /src/packages/server-postgres/src ./node_modules/@rebasepro/server-postgres/src
 COPY --from=build /src/packages/server-postgres/package.json ./node_modules/@rebasepro/server-postgres/package.json
 
-COPY docker/entrypoint.mjs ./entrypoint.mjs
+COPY infra/docker/entrypoint.mjs ./entrypoint.mjs
 
 # An empty mount point, so `docker run` without a volume fails with the runtime's
 # own "no bundle here" message rather than an ENOENT from the loader.

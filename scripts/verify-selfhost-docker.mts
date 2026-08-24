@@ -6,7 +6,7 @@
  * an image tag." Those two words are the gap. That script imports the runtime
  * **by path** — deliberately, so a worktree cannot silently verify the primary
  * checkout — which means nothing in CI has ever executed
- * `docker/docker-compose.selfhost.yml`, and nothing has ever booted the
+ * `infra/docker/docker-compose.selfhost.yml`, and nothing has ever booted the
  * published image.
  *
  * It is the same shape of hole that let the `.d.ts` files ship as `any` for the
@@ -104,8 +104,8 @@ if (image) {
     check(`using ${image}`, true, "REBASE_IMAGE was set, so nothing is built");
 } else {
     image = `rebasepro/server:verify-${process.pid}`;
-    console.log("  building from docker/server.Dockerfile (set REBASE_IMAGE to skip)…");
-    const built = run("docker", ["build", "-f", "docker/server.Dockerfile", "-t", image, "."]);
+    console.log("  building from infra/docker/server.Dockerfile (set REBASE_IMAGE to skip)…");
+    const built = run("docker", ["build", "-f", "infra/docker/server.Dockerfile", "-t", image, "."]);
     check("image builds from this commit", built.status === 0);
     if (built.status !== 0) process.exit(1);
 }
@@ -187,7 +187,7 @@ check("static app folded in", Array.isArray(
 
 // ── The env the recipe asks for ──────────────────────────────────────────────
 //
-// Written the way `docker/quickstart.sh` writes it, so this exercises the
+// Written the way `infra/docker/quickstart.sh` writes it, so this exercises the
 // documented shape rather than a private one.
 const SERVICE_KEY = secret();
 fs.writeFileSync(envFile, [

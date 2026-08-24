@@ -34,7 +34,7 @@ steps:
       - '-t'
       - '${_IMAGE}:${_TAG}'
       - '-f'
-      - 'docker/server.Dockerfile'
+      - 'infra/docker/server.Dockerfile'
       - '.'
 
 images:

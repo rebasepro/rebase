@@ -1,7 +1,7 @@
 /**
  * The public API surface of the packages the platform image forces onto a bundle.
  *
- * `docker/entrypoint.mjs` symlinks exactly one package over a deployed bundle's
+ * `infra/docker/entrypoint.mjs` symlinks exactly one package over a deployed bundle's
  * own copy — `RUNTIME_PROVIDED = ["@rebasepro/server"]`. Everything else in a
  * bundle is whatever it shipped with. So this package is the one whose exports
  * change *underneath already-deployed code*, on a schedule nobody rebuilding

@@ -2,7 +2,7 @@
  * Guard the exports that change underneath already-deployed bundles.
  *
  * See `api-surface.mjs` for why only `@rebasepro/server` is tracked. The short
- * version: it is the one package `docker/entrypoint.mjs` symlinks over a
+ * version: it is the one package `infra/docker/entrypoint.mjs` symlinks over a
  * bundle's own copy, so its exports move under tenant code that is already
  * built, during a fleet rollout nobody asked for.
  *
@@ -138,7 +138,7 @@ export function checkApiSurface({ baseline = BASELINE, targets } = {}) {
     if (breaking) {
         console.error(
             "\nThis package is symlinked over every deployed bundle's copy by\n" +
-            "docker/entrypoint.mjs, and the managed tier moves projects onto new images\n" +
+            "infra/docker/entrypoint.mjs, and the managed tier moves projects onto new images\n" +
             "without anyone rebuilding. A bundle that imports one of the symbols above\n" +
             "is ALREADY BUILT — it will not fail to compile, it will fail to boot, in a\n" +
             "wave, across the fleet.\n\n" +

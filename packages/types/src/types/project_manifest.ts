@@ -62,7 +62,7 @@ export interface RebaseBackendAppConfig {
      *
      * Independent of *where* it runs. Both run on Rebase Cloud and both
      * self-host — the destination lives in `.rebase/cloud.json`, not here. See
-     * `docker/docker-compose.selfhost.yml`, which boots a managed bundle on a
+     * `infra/docker/docker-compose.selfhost.yml`, which boots a managed bundle on a
      * developer's own Docker host.
      *
      * This is authored rather than inferred on purpose. It is the single most

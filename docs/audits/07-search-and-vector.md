@@ -126,7 +126,7 @@ only in the cloud control plane (`cloud-fleet-safety/backend/functions/extension
 manual CLI verb (`packages/cli/src/commands/cloud/extensions.ts:73-75`).
 
 The scaffold and self-host compose both run stock `postgres:18-alpine`
-(`packages/cli/templates/template/docker-compose.yml:33`, `docker/docker-compose.selfhost.yml:29`),
+(`packages/cli/templates/template/docker-compose.yml:33`, `infra/docker/docker-compose.selfhost.yml:29`),
 which does not ship pgvector.
 
 Failure scenario: a developer declares `{ type: "vector", dimensions: 1536 }`, runs `rebase dev`, and

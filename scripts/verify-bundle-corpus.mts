@@ -195,7 +195,7 @@ function gte(a: string, b: string): boolean {
  * This is the axis the corpus could not see. `stage()` above lends the whole
  * donor `node_modules`, so both halves come from this checkout and every run
  * boots current-driver + current-server — a pairing that exists on no tenant
- * anywhere. Production is the opposite: `docker/entrypoint.mjs` symlinks ONLY
+ * anywhere. Production is the opposite: `infra/docker/entrypoint.mjs` symlinks ONLY
  * `@rebasepro/server` from the image over the bundle's copy, so a project runs
  * today's server against whatever driver it was built with, possibly years old.
  *

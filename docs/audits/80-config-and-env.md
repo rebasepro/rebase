@@ -118,7 +118,7 @@ whenever that code path first runs.
 | `REBASE_LOG_RAW_QUERIES` | `utils/logger.ts:110` | off | Ignored in production by construction — clean |
 | `REBASE_CRON_ALWAYS_ON` | `cron/scale-to-zero.ts:65` | off | Accepts `1\|true\|yes\|on` |
 | `K_SERVICE`, `K_REVISION`, `K_CONFIGURATION`, `CLOUD_RUN_JOB`, `AWS_LAMBDA_FUNCTION_NAME`, `VERCEL`, `KUBERNETES_SERVICE_HOST` | `cron/scale-to-zero.ts:61-85` | — | Platform detection for the cron scale-to-zero warning |
-| `REBASE_BUNDLE` | `boot/boot.ts:103`, `docker/entrypoint.mjs:13`, `cli/commands/start.ts:87` | `dist-bundle` / `/bundle` | Missing manifest ⇒ hard fail with a hint |
+| `REBASE_BUNDLE` | `boot/boot.ts:103`, `infra/docker/entrypoint.mjs:13`, `cli/commands/start.ts:87` | `dist-bundle` / `/bundle` | Missing manifest ⇒ hard fail with a hint |
 | `REBASE_BUNDLE_URL` / `REBASE_BUNDLE_TOKEN` | `boot/fetch-bundle.ts:41,43` | — | A local `REBASE_BUNDLE` always wins |
 | `REBASE_DEV_PROJECT_ROOT` | `boot/boot.ts:115` | `cwd` | Dev port file location |
 | `BACKUP_SCHEDULE`, `BACKUP_DESTINATION`, `BACKUP_RETENTION_DAYS`, `BACKUP_KEEP_MINIMUM` | `server-postgres/src/backup/backup-cron.ts:68-90` | cron off when schedule unset | Non-integer values are named and refused — clean |
@@ -252,7 +252,7 @@ mean "off" means "on".
 
 Separately, `push` is in the enum and in the docblock, and:
 - `boot.ts` distinguishes only `none`, so `push` behaves exactly as `ensure`;
-- `docker/entrypoint.mjs:163-175` hard-fails the container on `push` with a message
+- `infra/docker/entrypoint.mjs:163-175` hard-fails the container on `push` with a message
   explaining it is unsupported.
 
 So the value is simultaneously documented as the dangerous option, inert on one
@@ -342,7 +342,7 @@ is not a rule. Fix direction: give the static path a real (narrow) schema — a
 `rebase init` copying `.env.example` (`init.ts:1109-1113`) — carries
 `NODE_ENV=development` (`packages/cli/templates/template/.env.example:41`).
 
-Only two places pin production: `docker/server.Dockerfile:112` (`ENV NODE_ENV=production`)
+Only two places pin production: `infra/docker/server.Dockerfile:112` (`ENV NODE_ENV=production`)
 and the generated `docker-compose.yml:82`. A self-hoster who runs
 `rebase start` on a VPS instead of the compose stack therefore gets, silently:
 
@@ -581,7 +581,7 @@ Same fix as finding 3.
 ## Open questions
 
 1. Is `REBASE_MIGRATE_ON_BOOT=push` meant to exist? It is in the enum, inert in
-   `boot.ts`, and fatal in `docker/entrypoint.mjs`. Removing it from the enum and
+   `boot.ts`, and fatal in `infra/docker/entrypoint.mjs`. Removing it from the enum and
    the docblock may be the honest fix.
 2. Should `rebase start` default `NODE_ENV` to `production`? It is documented as the
    production command, but changing the default is a behaviour change for anyone

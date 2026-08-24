@@ -105,7 +105,7 @@ in the file). Then publish it — see L1.
 
 ### H2. The API-surface gate gives zero member coverage to `rebase`, the export every hook and function imports
 
-`scripts/api-surface.mjs:56-67`, `api-surface/server.api.txt:34`,
+`scripts/api-surface.mjs:56-67`, `contracts/server.api.txt:34`,
 `packages/server/dist/singleton.d.ts:53`.
 
 `memberNames(decl)` reads `decl.members ?? decl.type?.members`. For
@@ -117,7 +117,7 @@ and the baseline records the bare line:
 const rebase
 ```
 
-`api-surface/server.api.txt:34`. That is the whole entry. The gate's own diff
+`contracts/server.api.txt:34`. That is the whole entry. The gate's own diff
 logic (`scripts/check-api-surface.mjs:79`) then computes `goneMembers` against
 an empty member list, which is empty by construction, so this entry can never
 report `CHANGED`.
@@ -138,7 +138,7 @@ straight past it.
 
 The same shape applies to `const logger`, `const requireAuth`,
 `const errorHandler` and the other 13 `const` exports
-(`api-surface/server.api.txt:21-36`) — all recorded as bare names.
+(`contracts/server.api.txt:21-36`) — all recorded as bare names.
 
 **Fix direction.** For a `VariableDeclaration`, resolve the declared type
 through the checker (`checker.getTypeAtLocation(decl)` →
@@ -176,7 +176,7 @@ it.
 
 **Fix direction.** Make the bump a *consequence*, not an input: fail the release
 when `git diff` against the previous tag touches
-`api-surface/server.api.txt` in the removal direction, or
+`contracts/server.api.txt` in the removal direction, or
 `contracts/derived-names.txt` at all, or either version constant, unless the bump
 is at least `minor` **and** the promoted CHANGELOG section carries a
 `### Breaking` heading. `prepare-changelog.mjs` already parses the section
@@ -189,7 +189,7 @@ structure and is the natural place.
 ### M1. No gate on the HTTP wire format
 
 No baseline file exists: the only two under version control are
-`contracts/derived-names.txt` and `api-surface/server.api.txt` (verified by
+`contracts/derived-names.txt` and `contracts/server.api.txt` (verified by
 enumerating `*.txt` outside `node_modules`).
 
 The OpenAPI document is generated at runtime by
@@ -205,7 +205,7 @@ envelope, the error-code vocabulary, or the header contract.
 
 **Failure scenario.** `POST /<collection>/bulk/delete` is renamed, or the
 `ApiResponse` envelope (`{ data, error, meta }`,
-`api-surface/server.api.txt:134`) gains a level, or an error `code` string
+`contracts/server.api.txt:134`) gains a level, or an error `code` string
 changes. Every generated SDK, every `curl` in a customer's CI, and every
 non-JS client breaks. Nothing in the repository notices, because the wire format
 is the one surface with no artifact to diff. Note that this axis is *worse* than
@@ -352,7 +352,7 @@ change is therefore uncontroversial. It is the single most dangerous change in
 the repository.
 
 **Fix direction.** Add contract 7 — "the public API surface of the
-runtime-provided packages", declared in `api-surface/server.api.txt`, checked by
+runtime-provided packages", declared in `contracts/server.api.txt`, checked by
 `pnpm check:api-surface`, direction "additive only within a contract major" —
 and a matching gate-table row.
 
@@ -447,10 +447,10 @@ docblock (`check-derived-names.mts:24-29`) says outright "The answer is almost
 never 'regenerate the baseline'", and the API gate prints a five-line
 explanation before exiting. What is missing is anything outside the script.
 There is **no `CODEOWNERS` file in the repository** (verified), so
-`contracts/derived-names.txt` and `api-surface/server.api.txt` carry no review
+`contracts/derived-names.txt` and `contracts/server.api.txt` carry no review
 requirement distinct from any other file.
 
-**Fix direction.** Add `CODEOWNERS` covering `contracts/`, `api-surface/`,
+**Fix direction.** Add `CODEOWNERS` covering `contracts/`, `contracts/`,
 `fixtures/bundles/` and the two version constants. Cheap, and it converts a
 regeneration from an invisible line in a diff into a named approval.
 
@@ -466,7 +466,7 @@ only. `interface AuthRepository extends UserRepository, RoleRepository,
 TokenRepository, MfaRepository {}`
 (`packages/server/dist/auth/interfaces.d.ts:493`) has an empty body, so the
 baseline records it as a bare `interface AuthRepository`
-(`api-surface/server.api.txt:137`) — the only member-less interface or class in
+(`contracts/server.api.txt:137`) — the only member-less interface or class in
 the file, which is the tell.
 
 Impact here is small: all four supertypes are themselves exported and tracked
@@ -543,7 +543,7 @@ as H2.
   `contract` is `columnType: "integer"` with a comment explaining that
   node-postgres returns `numeric` as a string and would break the `!==`
   comparison.
-- **`RUNTIME_PROVIDED` is genuinely one package.** `docker/entrypoint.mjs:110`
+- **`RUNTIME_PROVIDED` is genuinely one package.** `infra/docker/entrypoint.mjs:110`
   is `["@rebasepro/server"]`, matching `TRACKED` in `api-surface.mjs:41-43` and
   the scoping argument in its docblock. (Nothing *ties* the two lists together —
   a second entry in `entrypoint.mjs` would not reach `TRACKED` — but at one

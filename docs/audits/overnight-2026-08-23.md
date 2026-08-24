@@ -70,7 +70,7 @@ The init container is deleted.
 
 **The gate that was missing.** Every gate in this repo asserts on something
 *rendered* — helm output, a container object, an image tag. Nothing had ever
-executed `docker/entrypoint.mjs` or started the image. That is precisely why an
+executed `infra/docker/entrypoint.mjs` or started the image. That is precisely why an
 image ENV could defeat two producers whose gates both assert the variable's
 absence from the spec. `scripts/check-runtime-image-boots.mjs` builds the image
 and boots it against a real Postgres, both ways a bundle can arrive, and checks
@@ -207,7 +207,7 @@ it every custom function fails to load while the pod reports healthy. I had
 lifted that step into the runtime *with the flaw*, and the fetch path would have
 reproduced it. Fixed in `9d8eb54f5`, mutation-tested.
 
-Conflicting files, for whoever integrates: `docker/entrypoint.mjs`,
+Conflicting files, for whoever integrates: `infra/docker/entrypoint.mjs`,
 `packages/server-postgres/src/schema/generate-{drizzle-schema,postgres-ddl}.ts`,
 `packages/server/src/collections/validate-config.ts`. The last is an ordinary
 context conflict with the vector-index work.

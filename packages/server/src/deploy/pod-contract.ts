@@ -2,7 +2,7 @@
  * What every deployment of this runtime must get right about the pod.
  *
  * There are two things that place a Rebase runtime in Kubernetes — the Helm
- * chart in `charts/rebase`, for self-hosting, and the control plane's
+ * chart in `infra/charts/rebase`, for self-hosting, and the control plane's
  * `buildManagedContainer`, for cloud tenants — and they were written months
  * apart by people solving different problems. Rendering both for the same unit
  * and diffing them (2026-08-22) turned up four disagreements, and in three of

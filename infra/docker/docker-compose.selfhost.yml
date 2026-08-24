@@ -6,12 +6,12 @@
 # a bundle.
 #
 #   rebase build                # produces ./dist-bundle
-#   ./docker/quickstart.sh      # generates docker/.env if absent, then brings it up
+#   ./docker/quickstart.sh      # generates infra/docker/.env if absent, then brings it up
 #
 # `quickstart.sh` is one command doing two obvious things, and it prints both.
 # The long form, if you would rather own each step:
 #
-#   docker compose -f docker/docker-compose.selfhost.yml --env-file docker/.env up
+#   docker compose -f infra/docker/docker-compose.selfhost.yml --env-file infra/docker/.env up
 #
 # Bring the database up separately with `up -d db` if you want it first, but you
 # do not need to: `api` waits on the healthcheck below.

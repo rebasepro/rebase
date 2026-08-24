@@ -228,7 +228,7 @@ ok "Bumped all package versions"
 # install. Stamped here, beside the package bump, for the same reason.
 node -e "
   const fs = require('fs');
-  const f = 'charts/rebase/Chart.yaml';
+  const f = 'infra/charts/rebase/Chart.yaml';
   let t = fs.readFileSync(f, 'utf8');
   const before = t;
   t = t.replace(/^version:.*\$/m, 'version: $NEW_VERSION');

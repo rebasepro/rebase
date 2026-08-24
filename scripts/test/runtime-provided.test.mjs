@@ -3,7 +3,7 @@
  *
  * `packages/cli/src/bundle.ts` REMOVES a set of packages from a bundle's
  * declared dependencies, on the stated grounds that the runtime image supplies
- * them. `docker/entrypoint.mjs` is what supplies them, by linking the image's
+ * them. `infra/docker/entrypoint.mjs` is what supplies them, by linking the image's
  * copy into `/bundle/node_modules` — Node resolves a bare specifier by walking
  * up from the importing file, and `/bundle/backend/functions/foo.js` never
  * reaches the image's `/app/node_modules`.
@@ -39,7 +39,7 @@ function runtimeProvided(file) {
 }
 
 const fromBundler = runtimeProvided("packages/cli/src/bundle.ts");
-const fromEntrypoint = runtimeProvided("docker/entrypoint.mjs");
+const fromEntrypoint = runtimeProvided("infra/docker/entrypoint.mjs");
 const fromFetchPath = runtimeProvided("packages/server/src/boot/fetch-bundle.ts");
 
 test("both files actually declare some @rebasepro packages", () => {
@@ -106,7 +106,7 @@ test("the fetch path supplies exactly what the entrypoint does", () => {
     assert.deepEqual(
         [...fromFetchPath].sort(),
         [...fromEntrypoint].sort(),
-        "docker/entrypoint.mjs and packages/server/src/boot/fetch-bundle.ts stitch the same "
+        "infra/docker/entrypoint.mjs and packages/server/src/boot/fetch-bundle.ts stitch the same "
         + "packages into a bundle, one for a baked-in bundle and one for a fetched one. They "
         + "disagree, so the same project would get different packages depending on how its "
         + "bundle arrived."

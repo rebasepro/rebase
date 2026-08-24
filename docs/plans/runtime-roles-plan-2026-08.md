@@ -78,7 +78,7 @@ Functions are already much closer to independently deployable than they look.
 | Multi-instance cron | **Already coordinated.** `CronScheduler` claims each `(job, slot)` pair via `tryClaimRun` against `rebase.cron_claims`, and the store is attached by default on any SQL driver ([cron-scheduler.ts](../packages/server/src/cron/cron-scheduler.ts), [cron-store.ts](../packages/server/src/cron/cron-store.ts)). |
 | Multi-worker job queue | **Already safe.** `JobStore.claim` uses `FOR UPDATE SKIP LOCKED` and reclaims from workers that stop responding ([job-store.ts](../packages/server/src/jobs/job-store.ts)). |
 | A per-function permission scope | API keys already carry `functions` / `functions/<name>` permissions. |
-| Multi-container self-host | [docker-compose.selfhost.yml](../docker/docker-compose.selfhost.yml) already runs the published image against a mounted bundle, with no application image to build. Adding services is adding services. |
+| Multi-container self-host | [docker-compose.selfhost.yml](../../infra/docker/docker-compose.selfhost.yml) already runs the published image against a mounted bundle, with no application image to build. Adding services is adding services. |
 
 So the work is **not** "make functions deployable". It is: make the set of
 surfaces a process mounts, and the set of singletons it owns, a boot-time
@@ -134,7 +134,7 @@ Read from `REBASE_ROLE` in [boot/env.ts](../packages/server/src/boot/env.ts),
 alongside `REBASE_MIGRATE_ON_BOOT`, as a `z.enum([...]).default("all")`.
 
 Env rather than a CLI flag on purpose: Compose, Kubernetes and Cloud Run all
-configure environment identically, and `docker/entrypoint.mjs` does not have to
+configure environment identically, and `infra/docker/entrypoint.mjs` does not have to
 learn to forward arguments.
 
 ### 3.2 What each role owns
@@ -276,11 +276,11 @@ verification that must pass before the next begins.
 | 4 | `packages/server/src/boot/role.ts` + `REBASE_ROLE` in `boot/env.ts`; `boot/role.test.ts` |
 | 5 | `packages/server/src/functions/selection.ts`; `selection.test.ts` |
 | 6 | `packages/server/src/functions/proxy.ts`; `test/functions-proxy.test.ts` |
-| 7 | `docker/docker-compose.selfhost.yml`, `docs/deployment/split-processes.md` ×6 locales |
+| 7 | `infra/docker/docker-compose.selfhost.yml`, `docs/deployment/split-processes.md` ×6 locales |
 
 Gates at the end: 2330 server tests, 2062 server-postgres tests, both typecheck
 projects, eslint on both packages, `verify:docs`, `check:generated`, and a
-regenerated `api-surface/server.api.txt` (nine additions, no removals).
+regenerated `contracts/server.api.txt` (nine additions, no removals).
 
 ### Step 1 — Make the surface set explicit (no behaviour change)
 

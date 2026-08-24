@@ -10,7 +10,7 @@ Read that first for why this is the only structural gap left on the self-host si
 
 A split deployment today gives independent **isolation, scaling and restart**. Three
 Deployments, three replica counts, three failure domains, one `kubectl rollout restart`
-each. What it does not give is independent **release**: `charts/rebase/templates/deployment.yaml`
+each. What it does not give is independent **release**: `infra/charts/rebase/templates/deployment.yaml`
 renders one global `image` for every backend unit, `bundle.url` is one global URL, and
 `REBASE_FUNCTIONS_ONLY` selects at *boot* from a bundle that carries every function anyway.
 

@@ -1662,7 +1662,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
-| `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `api-surface/server.api.txt`. This is the package `docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
+| `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `contracts/server.api.txt`. This is the package `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
 | `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
