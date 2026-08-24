@@ -169,7 +169,7 @@ const projectPath = path.join(rootDir, "test-cli-init-project");
  * working tree through a project-shaped directory.
  */
 export const projectCliBin = path.join(projectPath, "node_modules", ".bin", "rebase");
-const screenshotDir = process.env.SCREENSHOT_DIR || path.join(rootDir, "e2e-screenshots");
+const screenshotDir = process.env.SCREENSHOT_DIR || path.join(rootDir, ".artifacts", "e2e-screenshots");
 const serviceKey = "mysupersecretkey12345678901234567890";
 
 /**

@@ -18,7 +18,6 @@ app/uploads
 .rebase-dev-port
 .rebase/
 .rebase-dev-url
-e2e-screenshots
 scratch
 test-cli-init-project
 
@@ -26,3 +25,4 @@ test-cli-init-project
 **/.env
 **/.env.*
 !**/.env.example
+.artifacts

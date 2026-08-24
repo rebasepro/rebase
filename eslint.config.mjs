@@ -33,7 +33,7 @@ export default [
             "**/.agent/**",
             "**/.antigravity/**",
             "**/scratch/**",
-            "**/e2e-screenshots/**",
+            "**/.artifacts/**",
             "**/playwright-report/**",
             "**/test-results/**",
             "**/videos/**",

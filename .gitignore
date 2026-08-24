@@ -133,15 +133,12 @@ app/uploads/
 !scripts/test/fixtures/**/*.d.ts
 
 # Temporary test, linting, and scratch outputs
-/e2e-screenshots/
 /eslint_report.json
 /scratch/
 /test-cli-init-project/
 /test-cli-init-baas-project/
 
 # Test results
-test-results/
-playwright-report/
 
 # Backend scratch files
 app/backend/scratch/
@@ -160,7 +157,6 @@ app/backend/scratch/
 /.reports/
 
 # Local e2e run output
-/e2e-screenshots/
 
 # IDE & AI agent configuration (personal/local)
 .antigravity/
@@ -209,3 +205,6 @@ packages/ui/dist/_design-sync-compiled.css
 # source with stale "statement not covered" annotations, as if those were
 # claims about the code today.
 coverage/
+
+# Test and report output — playwright, e2e screenshots. One place, so root stays legible.
+/.artifacts/

@@ -17,8 +17,6 @@
 /website/
 /tests/
 /videos/
-/playwright-report/
-/test-results/
 /.idea/
 /.vscode/
 /.astro/
@@ -54,3 +52,4 @@
 # and the deploy never reaches Cloud Build.
 **/.rebase-dev-port
 
+/.artifacts/

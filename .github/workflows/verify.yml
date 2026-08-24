@@ -382,7 +382,7 @@ jobs:
         run: npx tsx tests/e2e/tests/cli-init-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
-          SCREENSHOT_DIR: ${{ github.workspace }}/e2e-screenshots
+          SCREENSHOT_DIR: ${{ github.workspace }}/.artifacts/e2e-screenshots
 
       # The only place a scaffolded project is installed and booted for real —
       # workspace: deps don't resolve anywhere else — so it's what proves the
@@ -477,7 +477,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report/
+          path: .artifacts/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
 
@@ -632,5 +632,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: e2e-screenshots
-          path: ${{ github.workspace }}/e2e-screenshots/
+          path: ${{ github.workspace }}/.artifacts/e2e-screenshots/
           if-no-files-found: ignore
