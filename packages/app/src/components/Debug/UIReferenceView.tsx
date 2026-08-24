@@ -697,7 +697,15 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">IconButton — sizes</Typography>
-                            <div className="flex flex-wrap gap-3 items-center">
+                            {/* `items-end`, matching the Button size ramp above.
+                                Each entry is a column of button-over-label, and the
+                                buttons step 28→32→40→48px. Centring the columns
+                                against each other scattered the captions across a
+                                10px band, so a row meant to read as an even ramp
+                                read as ragged. Aligning the ends puts every caption
+                                on one baseline and lets the size difference show in
+                                the buttons, which is the point of the row. */}
+                            <div className="flex flex-wrap gap-3 items-end">
                                 {([
                                     { s: "smallest" as const, icon: <PencilIcon size={14}/> },
                                     { s: "small" as const, icon: <PencilIcon size={16}/> },
