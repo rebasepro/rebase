@@ -47,12 +47,48 @@ export const controlPaddingMixin = {
 
 export const focusedDisabled = "focus-visible:ring-0 focus-visible:ring-offset-0";
 export const focusedInvisibleMixin = "focus:bg-opacity-70 focus:bg-surface-accent-100 focus:dark:bg-white/[0.07] focus:bg-surface-accent-100/70";
-export const focusedClasses = "z-30 outline-hidden outline-none ring-2 ring-primary ring-opacity-50 ring-primary/50 ring-offset-0 ring-offset-transparent ";
-export const fieldBackgroundMixin = "bg-surface-accent-200/50 dark:bg-white/[0.055]";
+
+/**
+ * The focus ring — the single most-seen interaction state in the product, and
+ * until now the least tended.
+ *
+ * Three dead declarations were removed rather than reshuffled:
+ *   `outline-hidden` + `outline-none`  — the same instruction twice.
+ *   `ring-primary` + `ring-primary/50` — the first could never win.
+ *   `ring-opacity-50`                  — Tailwind v3 syntax. v4 expresses
+ *                                        opacity with the `/50` slash form, so
+ *                                        this generated nothing at all.
+ *
+ * What is left is the ring that was actually rendering, at 60% rather than 50%:
+ * on `surface-900` the old value sat close enough to the field's own border to
+ * be missed at a glance, which is the one thing a focus ring may not be.
+ * `ring-offset-0` + a transparent offset stay — without them the ring draws a
+ * white halo on dark surfaces.
+ */
+export const focusedClasses = "z-30 outline-none ring-2 ring-primary/60 ring-offset-0 ring-offset-transparent";
+
+/**
+ * Field surfaces.
+ *
+ * The inset top hairline is the whole difference between a field that reads as
+ * a filled rectangle and one that reads as recessed into the surface. It is a
+ * 1px inset highlight, not a gradient — the same device `.frame` already uses
+ * on the marketing site, and the flat-surface rule stands.
+ *
+ * Light mode gets none: on a white page the highlight has nothing to catch.
+ */
+export const fieldBackgroundMixin = "bg-surface-accent-200/50 dark:bg-white/[0.055] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.045)]";
 export const fieldBackgroundInvisibleMixin = "bg-surface-accent-200/0 dark:bg-white/0";
 export const fieldBackgroundDisabledMixin = "bg-surface-accent-200/50 dark:bg-white/[0.03]";
-export const fieldBackgroundHoverMixin = "hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09]";
-export const defaultBorderMixin = "border-surface-200 dark:border-surface-700/60 ";
+
+/**
+ * `transition-colors` here, because every other interactive surface in the kit
+ * has it and fields did not — `cardClickableMixin` eases, a TextField snapped.
+ * On a form of eight fields that difference is the whole feel of the screen.
+ */
+export const fieldBackgroundHoverMixin = "transition-colors duration-150 hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09]";
+
+export const defaultBorderMixin = "border-surface-200 dark:border-surface-700/60";
 
 // ---------------------------------------------------------------------------
 // Surfaces: two kinds, and the difference is what the border is for.

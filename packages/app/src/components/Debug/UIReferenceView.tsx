@@ -968,7 +968,7 @@ roles: [] }
                 {/* ═══════════════════════════════════════════════
                     SECTION: CRM Dashboard
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="crm-dashboard" title="CRM Dashboard — CrmDashboardDemo">
+                <SectionBlock wide id="crm-dashboard" title="CRM Dashboard — CrmDashboardDemo">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         A real-world showcase of a complex dashboard home page incorporating Rebase design language.
                     </Typography>
@@ -984,7 +984,7 @@ roles: [] }
                 {/* ═══════════════════════════════════════════════
                     SECTION: Collection Table
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="collection-table" title="Collection Table">
+                <SectionBlock wide id="collection-table" title="Collection Table">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         Sample data collection rendered as a sortable, searchable, filterable table with row selection.
                         Uses <code className="font-mono text-xs">Table</code>, <code className="font-mono text-xs">Chip</code>,{" "}
@@ -997,7 +997,7 @@ roles: [] }
                 {/* ═══════════════════════════════════════════════
                     SECTION: Card View
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="card-view" title="Card View">
+                <SectionBlock wide id="card-view" title="Card View">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         Grid of entity cards with thumbnail area, progress bar, status/priority chips, and assignee.
                         Uses <code className="font-mono text-xs">Card</code>, <code className="font-mono text-xs">Chip</code>,{" "}
@@ -1009,7 +1009,7 @@ roles: [] }
                 {/* ═══════════════════════════════════════════════
                     SECTION: Kanban Board
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="kanban-board" title="Kanban Board">
+                <SectionBlock wide id="kanban-board" title="Kanban Board">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         Drag-and-drop kanban board with four status columns.
                         Uses <code className="font-mono text-xs">KanbanView</code>, <code className="font-mono text-xs">BoardItem</code>,{" "}
@@ -1022,21 +1022,24 @@ roles: [] }
     );
 }
 
-function SectionBlock({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function SectionBlock({ id, title, wide, children }: { id: string; title: string; wide?: boolean; children: React.ReactNode }) {
     return (
-        // `max-w-5xl` used to sit on this element, alongside `border-b`. The two
-        // cannot share a box: several mocks here are app-scale and intrinsically
-        // wider than 64rem (the CRM dashboard reaches 1483px, the collection
-        // table 1377px), so the section's own rule stopped at 1264px while its
-        // content carried on past it. Every one of those sections read as a
+        // `max-w-5xl` and `border-b` used to share this element, and they cannot.
+        // Several mocks here are app-scale and intrinsically wider than 64rem
+        // (the CRM dashboard reaches 1483px), so the section's own rule stopped
+        // at 1264px while its content ran past it — every such section read as a
         // broken edge.
         //
-        // The rule now spans the section, and the reading measure is applied to
-        // the prose instead — where a measure actually belongs. Wide mocks get
-        // their own horizontal scroll below rather than pushing the page.
+        // Split instead: the SECTION spans the column, so its rule always
+        // reaches its own edges; the CONTENT keeps a measure, so a form column
+        // never stretches to 700px on a wide monitor. `wide` opts the app-scale
+        // mocks out of the measure — they pair it with `overflow-x-auto` so they
+        // scroll inside themselves rather than pushing the page.
         <section id={id} className={cls("px-6 py-8 border-b scroll-mt-0", defaultBorderMixin)}>
-            <Typography variant="h5" className="mb-1">{title}</Typography>
-            <div className="mt-4 [&>p]:max-w-3xl">{children}</div>
+            <div className={wide ? undefined : "max-w-5xl"}>
+                <Typography variant="h5" className="mb-1">{title}</Typography>
+                <div className="mt-4">{children}</div>
+            </div>
         </section>
     );
 }
