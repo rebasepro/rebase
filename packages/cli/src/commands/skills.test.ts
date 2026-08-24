@@ -23,7 +23,7 @@ import { installForAgent, loadSkills, rewriteAssetLinks } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bundle in this repository — `packages/cli/src/commands` → root. */
-const BUNDLE_ROOT = path.resolve(HERE, "../../../../rebase-agent-skills");
+const BUNDLE_ROOT = path.resolve(HERE, "../../../../tooling/rebase-agent-skills");
 const BUNDLE_SKILLS = path.join(BUNDLE_ROOT, "skills");
 
 /** Where each agent's rule file lands, and what a relative link resolves against. */
