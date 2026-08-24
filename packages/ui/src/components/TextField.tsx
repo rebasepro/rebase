@@ -229,7 +229,16 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                                     ? "text-primary dark:text-primary"
                                     : "text-text-secondary dark:text-text-secondary-dark"
                                 : "text-red-500 dark:text-red-600",
-                            disabled ? "opacity-50" : ""
+                            // A disabled field's LABEL is the one part that must
+                            // stay readable — it is what tells you which field
+                            // you cannot edit. `opacity-50` halved the alpha of
+                            // an already-muted #737373, landing near 2.2:1 over
+                            // the field fill; the label was effectively gone.
+                            //
+                            // The value below it keeps its own `opacity-50`,
+                            // which is the correct signal: the CONTENT is
+                            // inactive. Naming the field is not content.
+                            disabled ? "text-text-disabled dark:text-text-disabled-dark" : ""
                         )}
                         shrink={hasValue || focused}
                     >

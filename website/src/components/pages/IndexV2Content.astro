@@ -259,18 +259,22 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 to be reverted — a fill covers the Neat art rather than sitting
                 next to it. The slab tints the canvas instead, so the art is still
                 here and the section still turns blue. See `chapter-slab`. */}
-            <section class="chapter chapter-slab py-24 sm:py-32" style="--hue: var(--color-chroma-ultramarine); --slab-mix: 26%">
+            <section class="chapter chapter-slab chapter-slab--deep py-24 sm:py-32" style="--hue: var(--color-chroma-cyan)">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
+                            {/* No `text-[#b4b8bd]` inside a slab. That grey is
+                                tuned for the near-black page ground; on a
+                                coloured one it reads as dirt. The slab sets its
+                                own `color` and everything here inherits it. */}
                             <p class="eyebrow">
-                                <span class="font-mono" style="color: var(--color-primary-light)">03</span>
-                                <span class="mx-2 text-surface-700">·</span>{t("security.badge")}
+                                <span class="font-mono">03</span>
+                                <span class="mx-2 opacity-40">·</span>{t("security.badge")}
                             </p>
                             <h2 class="mt-4 font-headers text-display-2 text-balance">
                                 {t("security.title")}
                             </h2>
-                            <p class="mt-5 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("security.desc")}</p>
+                            <p class="mt-5 max-w-[38rem] leading-relaxed">{t("security.desc")}</p>
                             <div class="mt-8 flex flex-col items-start gap-3">
                                 <a href={translatePath("/studio")} class="accent-link">
                                     {t("security.link")}
@@ -447,18 +451,18 @@ const SELFHOST_COMMAND = "docker compose up -d";
             3.26:1 against white and fails AA; tinting dark art coral keeps the
             luminance down — measured at 27.3% grey at its brightest, ~9.5:1. */}
         <div>
-            <section class="chapter chapter-slab py-24 sm:py-32" style="--hue: var(--color-chroma-coral); --slab-mix: 38%">
+            <section class="chapter chapter-slab chapter-slab--bright py-24 sm:py-32" style="--hue: var(--color-chroma-coral)">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
                             <p class="eyebrow">
-                                <span class="font-mono" style="color: var(--hue)">07</span>
-                                <span class="mx-2 text-surface-700">·</span>{t("agentera.badge")}
+                                <span class="font-mono">07</span>
+                                <span class="mx-2 opacity-40">·</span>{t("agentera.badge")}
                             </p>
                             <h2 class="mt-4 font-headers text-display-2 text-balance">
                                 The backend an agent can't screw up.
                             </h2>
-                            <p class="mt-5 text-[#b4b8bd] leading-relaxed" set:html={t("agentera.p1")}></p>
+                            <p class="mt-5 leading-relaxed" set:html={t("agentera.p1")}></p>
                             <a href={translatePath("/ai")} class="accent-link mt-8">
                                 {t("agentera.link")}
                                 <ArrowRight size={15} />

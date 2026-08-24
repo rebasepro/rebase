@@ -126,79 +126,109 @@
 }
 
 /* ── Chapter slab ────────────────────────────────────────────────────────────
-   A section that breaks the page's rhythm. Used exactly twice — 03 security and
-   07 agent, the two highest-ranked claims — because a third stops being a break
+   A section that breaks the page's rhythm. Exactly two — 03 security and
+   07 agents, the highest-ranked claims — because a third stops being a break
    and starts being the page.
 
-   The mechanism matters, because the obvious one is wrong. A flat `background:
-   <hue>` was tried and reverted: it covered the Neat art bleeding through the
-   section, and the gradients are what this site is recognised by. A slab keeps
-   the canvas and TINTS it — `mix-blend-mode: color` takes hue and saturation
-   from the wash and LUMINANCE from the art, so every shape the canvas drew
-   survives and only its palette collapses to the chapter hue.
+   THE PALETTE SPLITS IN TWO, and this is the thing to know before picking a
+   hue. Colours are not interchangeable here:
 
-   That is also what makes coral usable. Flat coral put white copy at 3.26:1 and
-   failed AA outright; tinting dark art coral leaves it dark. Measured on the
-   bare ground behind the copy column, brightest pixel: ultramarine 41.9% grey
-   (~5.3:1 against white), coral 27.3% (~9.5:1). The colour changes, the
-   brightness does not.
+     Naturally dark   ultramarine, violet, cyan/teal. Hold their chroma at low
+                      lightness, so they work as a DARK ground with white ink.
+     Naturally light  coral, yellow, blush. These only exist as colours at high
+                      lightness. Darken coral in any colour space and you get
+                      blood red; darken yellow and you get olive. They can only
+                      be a BRIGHT ground with dark ink.
 
-   Two rules that are not decoration:
-   - `isolation: isolate` — without it the blend reaches through to the page.
-   - Hard hairlines top and bottom, never a mask. A slab that fades at its edges
-     stops reading as a slab; the whole device is that it has an edge. */
+   That was learned the hard way. The first version mixed every hue toward
+   near-black in sRGB, which collapses chroma as it darkens — coral came out a
+   muddy brown at 64% saturation. Redoing the mix in OKLCH barely helped (60%),
+   because the problem was never the colour space: it was asking a light hue to
+   be a dark ground.
+
+   Hence two variants rather than one with a variable. A single utility would
+   let a caller put white ink on coral, which measures 3.26:1 and fails AA. */
 @utility chapter-slab {
     position: relative;
     overflow: hidden;
-    border-top: 1px solid rgb(255 255 255 / 0.14);
-    border-bottom: 1px solid rgb(255 255 255 / 0.14);
     --hue: var(--color-surface-700);
-
-    /* A DEEP mix of the hue into the page ground, never the raw palette value.
-       That is the difference between this and the flat fill that had to be
-       reverted: `#FB5066` behind white copy measures 3.26:1 and fails AA
-       outright; the same hue mixed down clears it several times over.
-
-       The percentage is PER CHAPTER, not a constant, because the six hues do
-       not sit at the same luminance and one number does not serve them. Mixed
-       into near-black at 26%, ultramarine reads as a confident deep blue while
-       coral goes muddy brown and loses its identity entirely — it needs 38% to
-       read as coral at all. Set `--slab-mix` alongside `--hue` and check the
-       result rather than assuming the default travels.
-
-       Measured, white copy on the ground:
-         ultramarine 26%  ~18.5:1
-         coral       38%  ~11.5:1 */
-    --slab-mix: 30%;
-    background: color-mix(in srgb, var(--hue) var(--slab-mix), var(--color-page-ground));
 }
 
+/* Dark ground, white ink. `oklch(from …)` sets lightness explicitly and lifts
+   chroma, rather than mixing toward black — that is what keeps teal at 100%
+   saturation instead of sliding to navy. Measured on #004051: heading 11.34:1,
+   body 8.14:1, eyebrow 5.84:1. */
+.chapter-slab--deep {
+    background: oklch(from var(--hue) 0.30 calc(c * 1.4) h);
+    border-top: 1px solid rgb(255 255 255 / 0.14);
+    border-bottom: 1px solid rgb(255 255 255 / 0.14);
+    color: rgb(255 255 255 / 0.82);
+}
+
+/* `:not(.frame *)` is load-bearing on every ink rule below.
+
+   A slab's ink is for the slab's own copy. Inside a `.frame` sits a product
+   demo, which is a dark surface with its own light-on-dark palette — and these
+   selectors (class + `:is()`) outspecify the `text-white` utility the demo sets
+   on its headings. Without the exclusion the bright slab turned the agent
+   console's own h3 near-black on a near-black panel. */
+.chapter-slab--deep :is(h1, h2, h3):not(.frame *) { color: #fff; }
+.chapter-slab--deep .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+
+/* Bright ground, dark ink — the inversion, and the only way coral stays coral.
+   Near-black rather than pure black so it sits in the page's own family instead
+   of reading as a foreign black dropped onto the colour. Measured on #FB5066:
+   heading 6.11:1, body 5.04:1, eyebrow 5.90:1. */
+.chapter-slab--bright {
+    background: var(--hue);
+    border-top: 1px solid rgb(8 9 10 / 0.2);
+    border-bottom: 1px solid rgb(8 9 10 / 0.2);
+    color: rgb(8 9 10 / 0.82);
+}
+
+.chapter-slab--bright :is(h1, h2, h3):not(.frame *) { color: #08090a; }
+
+/* The frame is a dark panel wherever it sits, so inside one the copy returns to
+   the page's own ink rather than inheriting the slab's. */
+.chapter-slab .frame { color: var(--color-page-copy); }
+
+/* Opaque, not the 0.7 the dark slab can afford. An 11px label at 0.7 alpha on
+   coral measured 4.11:1 and failed AA — small text has no headroom to spend on
+   translucency, and a bright ground has less of it than a dark one. */
+.chapter-slab--bright .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
+
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
-   that stops working: on the ultramarine slab it is blue on blue, and on the
-   coral one it fights the hue. Inside a slab the link takes the section's own
-   ink and earns its affordance from the underline instead — a more robust
-   signal than hue anywhere, and the only one available here. */
+   that stops working: on teal it is close enough to fight the ground, and on
+   coral it is 1.9:1. Inside a slab the link takes the section's own ink and
+   earns its affordance from the underline instead — a more robust signal than
+   hue anywhere, and the only one available here. */
 .chapter-slab .accent-link {
-    color: #fff;
+    color: currentColor;
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 4px;
-    text-decoration-color: rgb(255 255 255 / 0.45);
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
 }
 
-.chapter-slab .accent-link:hover {
-    text-decoration-color: #fff;
-}
+.chapter-slab--deep .accent-link:not(.frame *) { color: #fff; }
+.chapter-slab--bright .accent-link:not(.frame *) { color: #08090a; }
+.chapter-slab .accent-link:hover { text-decoration-color: currentColor; }
 
-/* `.frame` draws a white hairline and assumes near-black behind it. On a
-   mid-luminance tinted ground both vanish and the demo reads as a hole. A
-   darker, more definite edge makes it an inset screen instead. */
+/* `.frame` draws a white hairline and assumes near-black behind it. Neither
+   slab is near-black, so the edge is restated per variant: on the deep ground a
+   darker edge reads as an inset screen, and on the bright one the dark panel
+   already separates itself and only needs the shadow to sit it down. */
 .chapter-slab .frame {
     border-color: rgb(8 9 10 / 0.4);
     box-shadow:
         inset 0 1px 0 rgb(255 255 255 / 0.05),
         0 2px 8px rgb(0 0 0 / 0.3),
         0 40px 80px -20px rgb(0 0 0 / 0.6);
+}
+
+.chapter-slab--bright .frame {
+    border-color: rgb(8 9 10 / 0.55);
+    box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.55);
 }
 
 /* ── Form controls, as the product actually draws them ───────────────────────

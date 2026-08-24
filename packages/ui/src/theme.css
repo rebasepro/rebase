@@ -118,7 +118,16 @@
        both grounds instead of the theoretical one. Same fix, and the same
        reasoning, as the `--color-surface-500` move recorded below. */
     --color-text-secondary: #737373;
-    --color-text-disabled: #9e9e9e;
+    /* #8b8b8b, not #9e9e9e. Measured against the field fill a disabled label
+       actually sits on (`surface-accent-200/50` over #fafafa ≈ #eef1f5),
+       #9e9e9e reached 2.36:1 — present, but not readable.
+       Full AA is not achievable here and should not be chased: 4.5:1 on that
+       fill needs #6e6e6e, which is DARKER than the #737373 an ENABLED label
+       uses, so the disabled state would read as the emphasised one. WCAG 1.4.3
+       exempts inactive controls for exactly this reason.
+       #8b8b8b lands at ~3:1 — legible at a glance, still unmistakably muted
+       against its enabled neighbour. */
+    --color-text-disabled: #8b8b8b;
     --color-text-primary-dark: #ffffff;
     --color-text-secondary-dark: #a0a0a9;
     --color-text-disabled-dark: #757580;
