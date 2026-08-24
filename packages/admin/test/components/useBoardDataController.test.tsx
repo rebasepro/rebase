@@ -171,13 +171,18 @@ order: "a" })
         // "done" is outside the `in` set: no listen, no count query, and the
         // column shows as an empty finished column rather than a loading one.
         expect(listen.mock.calls[0][0].where.status).toEqual(["==", "todo"]);
-        expect(result.current.columnData.done).toEqual({
+        // `listen` firing once proves `todo` subscribed; it does not prove
+        // `done` has been reduced to its finished state, which is a separate
+        // effect. Waiting on the value under assertion rather than on a proxy
+        // for it removes the race — this failed under `pnpm -r test` while
+        // passing 3/3 on its own.
+        await waitFor(() => expect(result.current.columnData.done).toEqual({
             entities: [],
             loading: false,
             hasMore: false,
             error: undefined,
             totalCount: 0
-        });
+        }));
         expect(count).toHaveBeenCalledTimes(1);
     });
 
