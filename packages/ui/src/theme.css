@@ -109,7 +109,15 @@
 
     /* Text Colors — using opaque values so icon strokes render solidly */
     --color-text-primary: #212121;
-    --color-text-secondary: #757575;
+    /* #737373, not #757575. Two units, and they are the two that matter.
+       The app's light page ground is #fafafa, not #ffffff, and #757575 lands at
+       4.41:1 there — under AA for the 14px type this token carries. It clears
+       4.5 only against pure white, which is not a surface the product actually
+       uses. Every field label in light mode was failing by a whisker.
+       #737373 measures 4.54:1 on #fafafa and 4.74:1 on #ffffff, so it passes on
+       both grounds instead of the theoretical one. Same fix, and the same
+       reasoning, as the `--color-surface-500` move recorded below. */
+    --color-text-secondary: #737373;
     --color-text-disabled: #9e9e9e;
     --color-text-primary-dark: #ffffff;
     --color-text-secondary-dark: #a0a0a9;
