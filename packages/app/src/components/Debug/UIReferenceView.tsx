@@ -118,7 +118,12 @@ export function UIReferenceView() {
         <div className="flex w-full">
 
             {/* ── Sidebar nav (same structure as DefaultDrawer) ─────────────── */}
-            <div className={cls("flex flex-col sticky top-0 h-screen grow-0 shrink-0 w-[200px] border-r", defaultBorderMixin)}>
+            {/* 232px, not 200px. The icon rail is 56px and the label is uppercase
+                at 12px, which left ~128px — one character short of "COLLECTION
+                TABLE", so the longest entry in the list rendered as
+                "COLLECTION TA…". This is the reference's own nav, not the shared
+                DefaultDrawer, so widening it costs no copy-fidelity. */}
+            <div className={cls("flex flex-col sticky top-0 h-screen grow-0 shrink-0 w-[232px] border-r", defaultBorderMixin)}>
                 {/* DrawerLogo */}
                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -187,7 +192,14 @@ export function UIReferenceView() {
             </div>
 
             {/* ── Main content area ───────────────────────────────────────────── */}
-            <div ref={scrollContainerRef} className="flex-1">
+            {/* `min-w-0` is required, not cosmetic. A flex item defaults to
+                `min-width: auto`, so this column sized itself to its widest
+                descendant — the 1451px CRM dashboard — and pushed the whole page
+                past the viewport, cutting the collection table's last columns
+                off screen. With `min-w-0` the column can shrink to the space
+                available and the `overflow-x-auto` on the wide mocks actually
+                engages instead of being overruled from above. */}
+            <div ref={scrollContainerRef} className="flex-1 min-w-0">
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Drawer
@@ -546,7 +558,7 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block mb-1">Property Editor (no selection)</Typography>
                             <div className={cls("flex flex-col items-center justify-center h-48 w-[320px] border rounded-lg", defaultBorderMixin)}>
                                 <div className="flex flex-col items-center justify-center h-full gap-4">
-                                    <Typography variant="label">
+                                    <Typography variant="label" className="text-center px-4">
                                         Select a property to edit it
                                     </Typography>
                                     <Button>
@@ -562,7 +574,7 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block mb-1">Property Editor (empty collection)</Typography>
                             <div className={cls("flex flex-col items-center justify-center h-48 w-[320px] border rounded-lg", defaultBorderMixin)}>
                                 <div className="flex flex-col items-center justify-center h-full gap-4">
-                                    <Typography variant="label">
+                                    <Typography variant="label" className="text-center px-4">
                                         Now you can add your first property
                                     </Typography>
                                     <Button>
@@ -578,7 +590,7 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block mb-1">Collection ListIcon (no selection)</Typography>
                             <div className={cls("flex flex-col items-center justify-center h-48 w-[320px] border rounded-lg", defaultBorderMixin)}>
                                 <div className="flex flex-col items-center justify-center h-full gap-4">
-                                    <Typography variant="label">
+                                    <Typography variant="label" className="text-center px-4">
                                         Select a collection or create a new one to start editing
                                     </Typography>
                                     <Button>
@@ -960,7 +972,11 @@ roles: [] }
                     <Typography variant="body2" color="secondary" className="mb-4">
                         A real-world showcase of a complex dashboard home page incorporating Rebase design language.
                     </Typography>
-                    <div className="w-full">
+                    {/* The dashboard is intrinsically ~1483px wide — wider than the
+                        content column at any laptop size. Scrolling it inside its
+                        own container is what stops it pushing the section, and is
+                        the same rule wide tables follow everywhere else. */}
+                    <div className="w-full overflow-x-auto">
                         <CrmDashboardDemo />
                     </div>
                 </SectionBlock>
@@ -999,7 +1015,7 @@ roles: [] }
                         Uses <code className="font-mono text-xs">KanbanView</code>, <code className="font-mono text-xs">BoardItem</code>,{" "}
                         <code className="font-mono text-xs">BoardItemViewProps</code>.
                     </Typography>
-                    <div className="w-full"><KanbanBoardDemo /></div>
+                    <div className="w-full overflow-x-auto"><KanbanBoardDemo /></div>
                 </SectionBlock>
             </div>
         </div>
@@ -1008,9 +1024,19 @@ roles: [] }
 
 function SectionBlock({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
     return (
-        <section id={id} className={cls("px-6 py-8 border-b scroll-mt-0 max-w-5xl", defaultBorderMixin)}>
+        // `max-w-5xl` used to sit on this element, alongside `border-b`. The two
+        // cannot share a box: several mocks here are app-scale and intrinsically
+        // wider than 64rem (the CRM dashboard reaches 1483px, the collection
+        // table 1377px), so the section's own rule stopped at 1264px while its
+        // content carried on past it. Every one of those sections read as a
+        // broken edge.
+        //
+        // The rule now spans the section, and the reading measure is applied to
+        // the prose instead — where a measure actually belongs. Wide mocks get
+        // their own horizontal scroll below rather than pushing the page.
+        <section id={id} className={cls("px-6 py-8 border-b scroll-mt-0", defaultBorderMixin)}>
             <Typography variant="h5" className="mb-1">{title}</Typography>
-            <div className="mt-4">{children}</div>
+            <div className="mt-4 [&>p]:max-w-3xl">{children}</div>
         </section>
     );
 }
