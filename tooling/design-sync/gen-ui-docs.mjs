@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SRC = path.join(ROOT, "ds-bundle/components");
 const PREVIEWS = path.join(ROOT, "tooling/design-sync/previews");
 const OUT = path.join(ROOT, "website/src/content/docs/docs/ui");

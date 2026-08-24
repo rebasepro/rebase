@@ -8,7 +8,7 @@
 # Run from anywhere: `bash tooling/design-sync/rebuild.sh`
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO"
 
 if [ "${1:-}" != "--css-only" ]; then

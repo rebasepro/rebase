@@ -16,7 +16,7 @@ warn() { echo -e "${YELLOW}⚠ $1${NC}"; }
 section() { echo -e "\n${YELLOW}━━━ $1 ━━━${NC}"; }
 error_count() { wc -l < "$ERROR_LOG" | tr -d ' '; }
 
-PACKAGES_DIR="$(cd "$(dirname "$0")/../packages" && pwd)"
+PACKAGES_DIR="$(cd "$(dirname "$0")/../../packages" && pwd)"
 
 # The packages sections 4-6 build and inspect, named once and checked here.
 # Each of those sections skips a package whose directory is absent — over a
