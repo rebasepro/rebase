@@ -11,7 +11,7 @@ import { findCollectionConfigProblems } from "../src/collections/validate-config
  * parse rejects one of them, the validator is wrong — an error here means the
  * key list has drifted from the types, not that the template has.
  *
- * `scripts/check-templates.mjs` already typechecks these, which catches the same
+ * `tooling/scripts/check-templates.mjs` already typechecks these, which catches the same
  * renames for a TypeScript project. It does not catch them for a JavaScript one,
  * or for a project whose installed `@rebasepro/types` is older than the code
  * reading its collections. That is what this covers.

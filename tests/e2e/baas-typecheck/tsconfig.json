@@ -1,5 +1,5 @@
 {
-    "//": "BaaS-only typecheck. Resolves @rebasepro/* to SOURCE so it needs no build, and maps react onto a stub standing in for its absence. `jsx` is deliberately unset so real JSX anywhere in the BaaS graph fails. skipLibCheck stays true: the core packages are program files here and fully checked either way, while false only adds noise from optional third-party dialects (drizzle's gel/mysql). The published-.d.ts angle is covered by scripts/headless-guard/check-types.mjs. Run via `pnpm check:baas-types`. See README.md.",
+    "//": "BaaS-only typecheck. Resolves @rebasepro/* to SOURCE so it needs no build, and maps react onto a stub standing in for its absence. `jsx` is deliberately unset so real JSX anywhere in the BaaS graph fails. skipLibCheck stays true: the core packages are program files here and fully checked either way, while false only adds noise from optional third-party dialects (drizzle's gel/mysql). The published-.d.ts angle is covered by tooling/scripts/headless-guard/check-types.mjs. Run via `pnpm check:baas-types`. See README.md.",
     "compilerOptions": {
         "noEmit": true,
         "module": "ESNext",

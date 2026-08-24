@@ -138,7 +138,7 @@ jobs:
       # Publishing is not the same as being pullable. Ask the registry from
       # outside, with no credentials, the way a self-hoster's daemon will.
       - name: Verify the image is pullable
-        run: node scripts/check-runtime-image.mjs --live --version "${{ inputs.version }}"
+        run: node tooling/scripts/check-runtime-image.mjs --live --version "${{ inputs.version }}"
 
       - name: Summary
         run: |

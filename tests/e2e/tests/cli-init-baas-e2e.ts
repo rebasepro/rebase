@@ -168,7 +168,7 @@ async function run() {
             env: cleanEnv
         });
 
-        // The guard in scripts/headless-guard covers the monorepo; only here can
+        // The guard in tooling/scripts/headless-guard covers the monorepo; only here can
         // we see what a user's install tree actually contains.
         const reactInstalled = fs.existsSync(path.join(projectPath, "node_modules", "react"))
             || fs.existsSync(path.join(projectPath, "backend", "node_modules", "react"));

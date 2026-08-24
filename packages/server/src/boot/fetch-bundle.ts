@@ -261,7 +261,7 @@ export async function installBundleDependencies(
  * suites use — so any version of this that reads its own path works in exactly
  * one of the two places it has to.
  *
- * Found by booting the built image (`scripts/check-runtime-image-boots.mjs`),
+ * Found by booting the built image (`tooling/scripts/check-runtime-image-boots.mjs`),
  * which is the only thing that runs the artifact this ships as. The unit tests
  * were green.
  *
@@ -278,7 +278,7 @@ function imageModulesDir(): string | undefined {
  * The packages the runtime image supplies to a fetched bundle.
  *
  * Must match `RUNTIME_PROVIDED` in `packages/cli/src/bundle.ts` and in
- * `infra/docker/entrypoint.mjs`; `scripts/test/runtime-provided.test.mjs` fails if any
+ * `infra/docker/entrypoint.mjs`; `tooling/scripts/test/runtime-provided.test.mjs` fails if any
  * of the three drift. The bundler STRIPS these from a bundle's declared
  * dependencies on the promise that the image supplies them, so a shorter list
  * here means the builder removed a dependency that nothing then provides, and

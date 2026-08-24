@@ -10,7 +10,7 @@
  * real catalog output.
  *
  * Usage:
- *   pnpm tsx scripts/capture-introspection-fixture.ts <database-url> <out.json> [schema] [--tables=a,b,c]
+ *   pnpm tsx tooling/scripts/capture-introspection-fixture.ts <database-url> <out.json> [schema] [--tables=a,b,c]
  *
  * `--tables` narrows the capture to a subset, for a database too large to
  * commit whole. The subset is still what the server returned for those tables —

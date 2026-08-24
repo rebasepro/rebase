@@ -157,7 +157,7 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
 // supplies `@rebasepro/server` to the bundle.
 //
 // This list must match `RUNTIME_PROVIDED` in `packages/cli/src/bundle.ts`, and
-// `scripts/test/runtime-provided.test.mjs` fails if it drifts. The bundler
+// `tooling/scripts/test/runtime-provided.test.mjs` fails if it drifts. The bundler
 // STRIPS these from the bundle's declared dependencies on the promise that the
 // image supplies them; if the two lists disagree, the bundler removes something
 // nothing then provides, and every file importing it fails to load. That is not

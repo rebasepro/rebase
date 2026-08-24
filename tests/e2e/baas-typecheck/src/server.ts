@@ -3,7 +3,7 @@
  * and it serves an API.
  *
  * No `as never` casts anywhere — the point is that the published types accept
- * this shape honestly. (`scripts/smoke-baas.ts` casts its config; that hides
+ * this shape honestly. (`tooling/scripts/smoke-baas.ts` casts its config; that hides
  * exactly the kind of drift this fixture exists to catch.)
  */
 import { Hono } from "hono";

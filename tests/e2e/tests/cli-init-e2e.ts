@@ -1109,7 +1109,7 @@ timeout: 10000 });
         // nothing, here or anywhere.
         //
         // What does cover the ejected project is `pnpm check:eject`
-        // (scripts/check-eject.mts), which runs the real command into a
+        // (tooling/scripts/check-eject.mts), which runs the real command into a
         // materialized scaffold, compiles what it emits for both flavours, and
         // asserts every `COPY` in the Dockerfile names a path the project has.
         // That is a static gate: it would catch a `COPY` of a directory that is

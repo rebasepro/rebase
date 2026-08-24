@@ -901,7 +901,7 @@ publish, since another agent's push carries it).
 | 6 — `saas` | done, unmerged | §4.9; migration 0032; saas backend 1504 tests green |
 
 **The self-host acceptance test passes**, as `pnpm verify:selfhost`
-(`scripts/verify-selfhost.mts`). Docker was unavailable, so it runs everything
+(`tooling/scripts/verify-selfhost.mts`). Docker was unavailable, so it runs everything
 the compose file runs except the container: a real bundle built from the
 reference app's 11 collections, two static apps folded in at `/` and `/admin`, a
 real `rebase db push` into Postgres, a real `bootFromBundle`, and real requests

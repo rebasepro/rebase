@@ -15,7 +15,7 @@
 
 ## Testing
 
-- [ ] All existing tests pass (`./scripts/verify-quality.sh`)
+- [ ] All existing tests pass (`./tooling/scripts/verify-quality.sh`)
 - [ ] Added/updated tests for new functionality (if applicable)
 - [ ] Manually tested the changes
 

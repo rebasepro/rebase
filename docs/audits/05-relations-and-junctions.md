@@ -278,7 +278,7 @@ so the same configuration can graft junction columns onto a real table.
 **Fix direction.** Give `generatePostgresPoliciesDdl` the same `seen` guard, and
 make the two producers share it rather than each carrying a copy. The
 derived-names gate would catch this class automatically if the fixture in
-`scripts/derived-names.mts` contained one junction pinned to a declared
+`tooling/scripts/derived-names.mts` contained one junction pinned to a declared
 collection's table — a name that appears under `[push]` only is precisely what
 that contract exists to surface.
 

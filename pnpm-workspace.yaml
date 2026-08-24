@@ -1,11 +1,11 @@
 trustLockfile: true
 packages:
   - packages/*
-  - rebase-agent-skills
+  - tooling/rebase-agent-skills
   - app
   - app/*
   - website
-  - videos
+  - tooling/videos
   - examples/*
   - saas/config
   - saas/backend

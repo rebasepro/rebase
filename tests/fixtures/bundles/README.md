@@ -1,7 +1,7 @@
 # The bundle corpus
 
 Every shape of bundle Rebase has shipped, frozen, and booted against the current
-runtime by `scripts/verify-bundle-corpus.mts`.
+runtime by `tooling/scripts/verify-bundle-corpus.mts`.
 
 ```bash
 createdb rebase_corpus
@@ -62,7 +62,7 @@ goes.
 2. Change `table` in its collections and in `backend/src/schema.generated.js` so
    the new fixture owns its own tables.
 3. Set `schemaVersion` in the manifest to what the CLI computed at build time.
-4. Add an entry to `CORPUS` in `scripts/verify-bundle-corpus.mts`.
+4. Add an entry to `CORPUS` in `tooling/scripts/verify-bundle-corpus.mts`.
 
 A bundle needs both halves of its schema story to work, and the failure modes are
 easy to miss:

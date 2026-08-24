@@ -11,7 +11,7 @@ of its three "product" layers are wired to nothing.**
 The evidence for alive is unambiguous. `@rebasepro/firebase` is published to npm
 (`latest` = 0.13.0, with canaries as recent as today — `dist-tags` shows
 `canary: 0.13.1-canary.g501e3cb`, matching HEAD), and it is published on *every*
-release because `scripts/release.sh:214,279` bump and publish `./packages/*`
+release because `tooling/scripts/release.sh:214,279` bump and publish `./packages/*`
 wholesale with no per-package opt-out. It is a member of the authoritative
 typecheck program (`tsconfig.typecheck.json:62-67,` include list) and
 `tsc --noEmit -p tsconfig.typecheck.json` is **clean** — I ran it. It builds
@@ -29,7 +29,7 @@ The evidence for legacy is equally clear. There is **no documentation page for
 it anywhere** — `website/src/content/docs/**` mentions `@rebasepro/firebase` only
 in the CHANGELOG and in the v0.12→0.13 package-rename table in `upgrading.mdx`.
 The only places that promise it are `README.md:258` and
-`rebase-agent-skills/skills/rebase-basics/SKILL.md:135` ("When connecting to a
+`tooling/rebase-agent-skills/skills/rebase-basics/SKILL.md:135` ("When connecting to a
 Firebase backend"), which is a promise an agent will act on and then find no
 guidance behind. The marketing site does not overpromise: `/rebase-vs-firebase`
 positions Rebase as the thing you migrate *away from* Firebase to. Meanwhile the
@@ -166,7 +166,7 @@ unreachable. But the hook is not inert: it opens two Firestore listeners on
 (`useBuildUserManagement.tsx:110,147`) and calls `authController.setUserRoles`
 (`:316`). So every `RebaseFirebaseApp` install pays for two subscriptions to
 paths it probably has no rules for, produces console errors, and gets no feature.
-Recorded in `scripts/unused-locals-baseline.json` as
+Recorded in `tooling/scripts/unused-locals-baseline.json` as
 `RebaseFirebaseApp.tsx::defaultUserManagement`.
 
 **M3 — App Check is initialised but never enforced.** Same file, `:124-131`
@@ -239,7 +239,7 @@ handed to `set()` is a `DatabaseReference` object, which RTDB cannot store.
 `buildLocalTextSearchController` (real: `localSearchControllerBuilder`),
 `useFirebaseRealTimeDBDelegate` (real: `useFirebaseRTDBDelegate` — the *file* has
 that name, the function does not), and `buildCollectionsFromFirestore`, which has
-no counterpart at all. `scripts/docs-verify/sdk-exports.mjs` builds the real
+no counterpart at all. `tooling/scripts/docs-verify/sdk-exports.mjs` builds the real
 export set for this package (`:35`) but is used to police website docs, not
 package READMEs — so this drifted unchecked.
 
@@ -349,10 +349,10 @@ declared peer installs an API this code does not target.
   all of them.
 - **Known gaps are already recorded rather than invisible.** The 17
   `exhaustive-deps` findings in this package are banked in
-  `scripts/hooks-baseline.json`; `defaultUserManagement`, `appCheckVerified` and
-  `error` are banked in `scripts/unused-locals-baseline.json`; and the missing
+  `tooling/scripts/hooks-baseline.json`; `defaultUserManagement`, `appCheckVerified` and
+  `error` are banked in `tooling/scripts/unused-locals-baseline.json`; and the missing
   test runner is an explicit, justified allow-list entry in
-  `scripts/check-test-scripts.mjs:39-43`, whose header documents the exact
+  `tooling/scripts/check-test-scripts.mjs:39-43`, whose header documents the exact
   consequence ("28 source files shipped to npm at 0.13.0 with a test directory
   that looks like coverage and is not"). I found nothing in those three
   categories that was not already banked.
@@ -428,7 +428,7 @@ itself as the alternative to Firestore.
    whose docs name functions that do not exist wastes the time of exactly the
    people trying to migrate off it.
 5. **Add the deprecation to the places that currently promise support:**
-   `README.md:258`, `rebase-agent-skills/skills/rebase-basics/SKILL.md:135`, and
+   `README.md:258`, `tooling/rebase-agent-skills/skills/rebase-basics/SKILL.md:135`, and
    `packages/firebase/README.md`. The agent skill matters most — it is the one
    that will actively route work here.
 6. **Drop the unused `@rebasepro/firebase` dependency from `website`** (L10) and

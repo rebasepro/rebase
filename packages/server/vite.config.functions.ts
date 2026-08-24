@@ -24,7 +24,7 @@ import { defineConfig } from "vite";
  * `hono`, which the consuming project already installs and which resolves on
  * every runtime this entry point targets.
  *
- * `scripts/assert-portable-entry.mjs` checks the emitted file rather than
+ * `tooling/scripts/assert-portable-entry.mjs` checks the emitted file rather than
  * trusting this config, because the failure mode being guarded against is
  * exactly a build setting that quietly stops being true.
  */

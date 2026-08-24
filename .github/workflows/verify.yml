@@ -162,7 +162,7 @@ jobs:
       # above does not print warnings at all. That left 183 candidate stale
       # closures accumulating where nobody would see a new one arrive.
       #
-      # This pins them in scripts/hooks-baseline.json and fails on anything new.
+      # This pins them in tooling/scripts/hooks-baseline.json and fails on anything new.
       # It also fails when a finding is FIXED, asking for the baseline to be
       # banked — otherwise the file slowly describes a codebase that no longer
       # exists, which is the same lie as a stale gate.
@@ -327,7 +327,7 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
       # The agent harness's own tests. They need neither a database nor a build,
-      # and nothing else covers `scripts/harness/` — including the deploy
+      # and nothing else covers `tooling/scripts/harness/` — including the deploy
       # preflight that AGENT.md describes as an enforced gate.
       - name: Harness tests
         run: pnpm run test:harness
@@ -485,7 +485,7 @@ jobs:
       # app's collections, fold two static apps in at different paths, boot it
       # against a real database and fetch it as a browser would.
       #
-      # `scripts/verify-selfhost.mts` says to run it when you touch the manifest,
+      # `tooling/scripts/verify-selfhost.mts` says to run it when you touch the manifest,
       # the bundle format, folding or serveSPA — and until now nothing did, so
       # the entire multi-app serving path had no automated proof at any tier.
       # It reuses the Postgres service above; the script pushes the schema
@@ -603,7 +603,7 @@ jobs:
       #
       # Findings the collections declare ON PURPOSE (the reference app is
       # public-read, so its SELECT policies are `USING (true)` and rls-check is
-      # right to say so) live in scripts/rls-baseline.json, per table, with a
+      # right to say so) live in tooling/scripts/rls-baseline.json, per table, with a
       # reason. That is deliberately not `--skip policy-always-true`: the same
       # check on a table nobody baselined — a newly added collection, say — still
       # fails.

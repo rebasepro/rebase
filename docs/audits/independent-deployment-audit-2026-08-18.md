@@ -137,7 +137,7 @@ The number closed itself mid-audit when a release bumped the repo to 0.15.0,
 which is the more interesting fact: **nothing held the two together**, so the
 chart could sit ahead of the release (a tag nothing built) or behind it (every
 default install quietly running an old runtime against a current bundle) and
-neither shows up as an error. `scripts/check-runtime-image.mjs` now treats the
+neither shows up as an error. `tooling/scripts/check-runtime-image.mjs` now treats the
 chart as what it is — a user-facing image reference — and holds `appVersion` to
 `@rebasepro/server`'s version, with `--live` covering whether the tag is
 pullable. Mutation-tested: bumping `appVersion` alone turns it red.
@@ -150,7 +150,7 @@ silently wrong (two schema owners, private rate-limit counting) and **nothing
 exercised a single one of them**. G2 was exactly the class of defect one `helm
 template` in CI would have caught on the commit that introduced it.
 
-`scripts/check-chart.mjs` (`pnpm run check:chart`, wired into `verify.yml`) lints,
+`tooling/scripts/check-chart.mjs` (`pnpm run check:chart`, wired into `verify.yml`) lints,
 renders the three documented topologies and reads the decisions back out — the
 roles, who provisions, that the worker gets no Service, that functions are
 reached in one hop through the ingress rather than two through the api's proxy,

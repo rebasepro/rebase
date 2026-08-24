@@ -19,7 +19,7 @@
         "db:push": "rebase db push --collections ../config/collections",
         "schema:generate": "rebase schema generate --collections ../config/collections",
         "generate:sdk": "rebase generate-sdk",
-        "deploy": "cd .. && ./scripts/deploy-demo.sh"
+        "deploy": "cd .. && ./tooling/scripts/deploy-demo.sh"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",

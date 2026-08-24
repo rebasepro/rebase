@@ -1,8 +1,8 @@
 # Audit 17 — RLS drift detection and scanning
 
 Scope: `packages/server-postgres/src/security/policy-drift.ts`,
-`packages/rls-check` (whole package), `scripts/rls-scan.mts`,
-`scripts/rls-baseline.json`, and the CI step that drives them
+`packages/rls-check` (whole package), `tooling/scripts/rls-scan.mts`,
+`tooling/scripts/rls-baseline.json`, and the CI step that drives them
 (`.github/workflows/verify.yml:521-525`).
 
 Read-only. Nothing in the repository was modified.
@@ -21,7 +21,7 @@ about confidence, gate on reachability rather than shape, resolve role
 membership transitively, read `relacl` rather than `information_schema`, and are
 each unit-tested against a hand-written snapshot plus a Docker fixture that
 asserts both halves (the `vuln_*` objects fire, the `secure_*` objects stay
-silent). `scripts/rls-scan.mts` has the vacuity floor and the 0/1/2 exit-code
+silent). `tooling/scripts/rls-scan.mts` has the vacuity floor and the 0/1/2 exit-code
 discipline that most gates in this repo learned the hard way.
 
 It is nevertheless **not a gate you can trust to fail**, for three independent
@@ -93,7 +93,7 @@ and `scan()` calls `introspect`, not `introspectWithDiagnostics`
 (`cli.ts:69`). `ScanResult` (`types.ts:210-226`) has no field for them.
 `grep -rn "degraded\|tlsVerificationDisabled" packages/rls-check/src` returns
 only the definition site and one unit test of `selectSchemas`. `report.ts` never
-mentions them. `scripts/rls-scan.mts` never mentions them.
+mentions them. `tooling/scripts/rls-scan.mts` never mentions them.
 
 Three separate promises in the docblocks are therefore false:
 
@@ -106,7 +106,7 @@ Three separate promises in the docblocks are therefore false:
   misleading one"* (`introspect.ts:48-51`) — the excluded-schema list is
   likewise dropped.
 
-**Which failures the vacuity guard does *not* cover.** `scripts/rls-scan.mts`
+**Which failures the vacuity guard does *not* cover.** `tooling/scripts/rls-scan.mts`
 floors `stats.tables` and `stats.policies` only (`:242-254`). Those two floors
 catch a failed `relations` read and a failed `policies` read. Everything else
 fails open:
@@ -134,7 +134,7 @@ and `GRANT ALL … TO rebase_user` ships.
 `tlsVerificationDisabled`, `excludedSchemas`), have `scan()` call
 `introspectWithDiagnostics`, print them in `renderReport` above the findings
 (they survive `--quiet`, like the privilege caveat), and make
-`scripts/rls-scan.mts` **exit 2 when `degraded` is non-empty** — a partially-read
+`tooling/scripts/rls-scan.mts` **exit 2 when `degraded` is non-empty** — a partially-read
 catalogue is "the scan did not happen", not "the database is clean". Pin it with
 a test that injects a failing query for each catalogue in turn and asserts a
 non-zero exit; the tell that the current design cannot be tested is that there is
@@ -144,7 +144,7 @@ no such test today.
 
 ### H2 — The CI baseline accepts a *write* policy where it recorded a *read* one
 
-`scripts/rls-scan.mts:163-174`; `scripts/rls-baseline.json:22-33`
+`tooling/scripts/rls-scan.mts:163-174`; `tooling/scripts/rls-baseline.json:22-33`
 
 ```ts
 function findingKey(finding: Finding): string {
@@ -326,7 +326,7 @@ lists cannot drift apart again.
 
 ### H5 — The CI gate runs above the severity of the incidents that created it
 
-`scripts/rls-scan.mts:97` (`let failOn: Severity | "none" = "high"`);
+`tooling/scripts/rls-scan.mts:97` (`let failOn: Severity | "none" = "high"`);
 `.github/workflows/verify.yml:521-525` (no `--fail-on` passed)
 
 Maximum severity each check can emit:
@@ -629,7 +629,7 @@ covered or explicitly excused.
 
 ### L3 — The gate prints a permanent set of mediums the baseline cannot record
 
-`scripts/rls-scan.mts:258-261`; `report.ts:224-275`
+`tooling/scripts/rls-scan.mts:258-261`; `report.ts:224-275`
 
 `renderReport` prints every finding; the baseline only filters `gating`
 (findings at or above `--fail-on`). On the acceptance database the tables are
@@ -642,7 +642,7 @@ suppress non-gating findings from the rendered output too.
 
 ### L4 — "Stale baseline entry" is also printed when the finding merely dropped below the threshold
 
-`scripts/rls-scan.mts:260-275`
+`tooling/scripts/rls-scan.mts:260-275`
 
 `matched` is built from `gating` only. If a baselined `policy-always-true`
 finding degrades to `medium` (M4's restrictive-gate path), it stops being in
@@ -677,7 +677,7 @@ collapses to after Postgres re-qualifies it (`scan.e2e.test.ts:234` asserts
 ## Checked and clean
 
 - **`pnpm rls:check` exits non-zero on findings, and it is in CI on pull
-  requests.** `scripts/rls-scan.mts:293` (`process.exit(1)`),
+  requests.** `tooling/scripts/rls-scan.mts:293` (`process.exit(1)`),
   `verify.yml:521-525`, `ci.yml:3-6` (`pull_request` and `push` to `main`),
   and `verify.yml` is `workflow_call`ed from both `ci.yml` and `publish.yml`, so
   the release path cannot drift from it.
@@ -694,7 +694,7 @@ collapses to after Postgres re-qualifies it (`scan.e2e.test.ts:234` asserts
   so `>= -1` matches everything and a typo gates *harder*. Only the exact string
   `none` disables the gate (`report.ts:46-51`). The `rls-check` CLI validates it
   properly (`cli.ts:273-287`).
-- **A missing baseline file fails closed.** Deleting `scripts/rls-baseline.json`
+- **A missing baseline file fails closed.** Deleting `tooling/scripts/rls-baseline.json`
   leaves `baseline = []`, so every finding becomes unexpected
   (`rls-scan.mts:177-180`). A malformed one, or an entry missing `check` /
   `target` / `reason`, exits 2 (`:183-193`). There is no regeneration script, so

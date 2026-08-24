@@ -21,7 +21,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copy source packages and app
 COPY packages ./packages
 COPY app ./app
-# Every package's build ends with `node ../../scripts/assert-build-output.mjs`,
+# Every package's build ends with `node ../../tooling/scripts/assert-build-output.mjs`,
 # so the build fails without it. The build context is the workspace root, but
 # only the directories named here are actually copied in.
 COPY scripts ./scripts
@@ -31,7 +31,7 @@ COPY scripts ./scripts
 # inherited from the host: the image's asset content is reproducible from git,
 # and a build from a fresh clone, a worktree, or CI ships the same images as one
 # from a long-lived checkout. Without this the demo served 404s for every image.
-RUN node scripts/mirror-seed-assets.mjs app/seed-assets app/uploads
+RUN node tooling/scripts/mirror-seed-assets.mjs app/seed-assets app/uploads
 
 # Install all dependencies with flat node_modules for Docker compatibility
 # (many packages rely on hoisted devDependencies like @vitejs/plugin-react)

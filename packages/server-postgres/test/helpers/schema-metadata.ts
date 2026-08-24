@@ -46,7 +46,7 @@ export interface LoadedSchema {
 
 /**
  * Loads a fixture captured from a live PostgreSQL server by
- * `scripts/capture-introspection-fixture.ts`.
+ * `tooling/scripts/capture-introspection-fixture.ts`.
  */
 export function loadRealSchema(name: RealSchemaName): LoadedSchema {
     const raw = fs.readFileSync(path.join(FIXTURE_DIR, `${name}.json`), "utf-8");

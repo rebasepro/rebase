@@ -18,7 +18,7 @@
  *   `config/admin.d.ts`, holding `/// <reference types="@rebasepro/admin-types" />` —
  *   which is why no collection file has to import anything from here to write `admin`.
  *   That reference resolves through `typeRoots`, so the project must also depend on this
- *   package; `scripts/check-templates.mjs` asserts both halves.
+ *   package; `tooling/scripts/check-templates.mjs` asserts both halves.
  * - Each concrete property narrows the block to its own options type
  *   (`AdminStringOptions` on `StringProperty`, and so on). That is legal because each
  *   extends `AdminPropertyOptions`, exactly as it was declared when these lived in core.

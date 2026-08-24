@@ -63,12 +63,12 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 | `app/` | Example application that consumes the packages |
 | `website/` | Documentation site |
 | `e2e/` | End-to-end tests (Playwright) |
-| `scripts/` | Build, release, and utility scripts |
+| `tooling/scripts/` | Build, release, and utility scripts |
 | `examples/` | Standalone example apps |
-| `rebase-agent-skills/` | Agent skills installed by `rebase skills install` |
+| `tooling/rebase-agent-skills/` | Agent skills installed by `rebase skills install` |
 | `videos/` | Remotion project for the product videos on the website (a workspace package, not part of the library) |
 
-One-off scripts, codemods and utilities go in `scripts/`, never at the repo root
+One-off scripts, codemods and utilities go in `tooling/scripts/`, never at the repo root
 or inside a package directory.
 
 ## Code Quality
@@ -76,7 +76,7 @@ or inside a package directory.
 Before submitting a PR, make sure all checks pass:
 
 ```bash
-./scripts/verify-quality.sh
+./tooling/scripts/verify-quality.sh
 ```
 
 This runs TypeScript compilation, ESLint, unit tests, and Playwright E2E tests.
@@ -99,7 +99,7 @@ the five minutes.
 
 1. Create a feature branch from `main`.
 2. Make your changes — keep commits focused and well-described.
-3. Run `./scripts/verify-quality.sh` and ensure everything passes.
+3. Run `./tooling/scripts/verify-quality.sh` and ensure everything passes.
 4. Open a PR with a clear description of what changed and why.
 5. Link any related issues.
 

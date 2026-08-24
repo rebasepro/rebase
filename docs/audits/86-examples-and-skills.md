@@ -1,4 +1,4 @@
-# Unit 86 — `examples/**` and `rebase-agent-skills/**`
+# Unit 86 — `examples/**` and `tooling/rebase-agent-skills/**`
 
 *Read-only audit, 2026-08-08. Lens: bug-classes.md class 34 — "documentation the
 verifier cannot see, because it is not documentation."*
@@ -8,9 +8,9 @@ verifier cannot see, because it is not documentation."*
 ## Verdict
 
 Both directories are inside a CI net, and both nets are narrower than their own
-comments claim. `rebase-agent-skills/**/*.md` is genuinely covered — it is in
-`DEFAULT_GLOBS` (`scripts/docs-verify/extract.mjs:73`) and in `ALL_DOC_GLOBS`
-(`scripts/docs-verify/check-api-names.mjs:27`), and `verify.yml:185` runs
+comments claim. `tooling/rebase-agent-skills/**/*.md` is genuinely covered — it is in
+`DEFAULT_GLOBS` (`tooling/scripts/docs-verify/extract.mjs:73`) and in `ALL_DOC_GLOBS`
+(`tooling/scripts/docs-verify/check-api-names.mjs:27`), and `verify.yml:185` runs
 `verify:docs:strict`. I re-ran the cheap stage: clean, zero findings. But that
 coverage is **fenced TypeScript only**. Of 1,076 fences in the 20 SKILL.md files,
 273 `typescript` + 116 `tsx` are compiled; 51 `bash`, 35 `json`, 4 `env`, 2
@@ -21,7 +21,7 @@ The CLI-command check that class 34 was written to add — deriving `rebase <cmd
 never been pointed at the skills. Same for the deploy build-context lint
 (`check-deploy-build-context.mjs:24-27`), which covers six locales of
 `website/**/deployment/*.md` and not
-`rebase-agent-skills/skills/rebase-deployment/SKILL.md`, a file that is 900 lines
+`tooling/rebase-agent-skills/skills/rebase-deployment/SKILL.md`, a file that is 900 lines
 of Dockerfiles and compose manifests. Everything I found in the skills lives in
 exactly those gaps: a dead `db` subcommand in two tables, two commands documented
 as "No options" that grew seven and two, an `npm install -g rebase` that installs
@@ -110,8 +110,8 @@ what the existing verifier structurally cannot see.
 
 **H1. Every MCP server manifest in the bundle names a file that has never
 existed.**
-`rebase-agent-skills/.mcp.json:6`, `rebase-agent-skills/kiro/mcp.json:6` and
-`rebase-agent-skills/gemini-extension.json:9` all launch:
+`tooling/rebase-agent-skills/.mcp.json:6`, `tooling/rebase-agent-skills/kiro/mcp.json:6` and
+`tooling/rebase-agent-skills/gemini-extension.json:9` all launch:
 
 ```
 node node_modules/@rebasepro/mcp/dist/cli.js
@@ -267,7 +267,7 @@ nothing imports. `package.json`'s `deploy` script targets site
 `firecms-demo-27150`. `App.tsx:38` computes `userIsAdmin` and discards it — a
 finding `check:unused` would report if examples were not ESLint-ignored.
 
-**L3. `rebase-agent-skills/README.md` documents an install path the repo does not
+**L3. `tooling/rebase-agent-skills/README.md` documents an install path the repo does not
 provide, and omits the one it does.**
 Five of its six options route through `github.com/rebaseco/agent-skills`
 (`:16`, `:24`, `:32`, `:38`, `:52`) — a different org from `package.json`'s
@@ -360,7 +360,7 @@ everything HIGH and MEDIUM above.
    `check-marketing-snippets.mjs` already derives the command tree from
    `cli.ts` + `server-postgres/src/cli.ts` — the hard part is done. Split
    `loadCliCommands` + the `CLI_INVOCATIONS` scan into a shared module and run it
-   over `rebase-agent-skills/**/*.md` and `examples/**/*.md`, with a shell-prompt
+   over `tooling/rebase-agent-skills/**/*.md` and `examples/**/*.md`, with a shell-prompt
    pattern (` ```bash ` fences and `$`-prefixed lines) instead of the
    markup-oriented one. That alone flags `rebase db studio` ×2. Then add a **flag**
    axis: `arg({...})` specs are greppable per command module, and a
@@ -383,7 +383,7 @@ everything HIGH and MEDIUM above.
 4. **Cover `examples/**/*.md`, and stop the examples being silently skippable.**
    Add `examples/**/*.md` to `check-api-names.mjs`'s `ALL_DOC_GLOBS` and to
    `extract.mjs`'s `DEFAULT_GLOBS` — they are documentation by every definition in
-   class 34. Separately, extend `scripts/check-test-scripts.mjs`'s pattern to
+   class 34. Separately, extend `tooling/scripts/check-test-scripts.mjs`'s pattern to
    assert every directory under `examples/` declares a `typecheck` script, and
    drop `**/examples/**` from `eslint.config.mjs:41` (both examples lint clean
    enough to bank a baseline; `sdk-demo` already ships a config).
@@ -403,7 +403,7 @@ false is worse than no gate: it is the reason nobody re-examines the blind spot.
 ## Open questions
 
 1. **Does `github.com/rebaseco/agent-skills` exist?** Five install paths in
-   `rebase-agent-skills/README.md` depend on it, and `package.json` names a
+   `tooling/rebase-agent-skills/README.md` depend on it, and `package.json` names a
    different org. If it is a real mirror, what syncs it — and does the mirror
    carry the `references/` files this repo has? If it is not, the entire
    Installation section is dead. UNCONFIRMED — no network check was made.

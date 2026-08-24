@@ -14,7 +14,7 @@
  * Each page is captured at deviceScaleFactor 2 and downsampled with Lanczos:
  * the mark is 64 flat-fill facets meeting along long diagonals, and almost all
  * of its antialiasing lives in the blend colours between two fills. Supersample,
- * never colour-quantise. See scripts/README or `magick -help` for the flags.
+ * never colour-quantise. See tooling/scripts/README or `magick -help` for the flags.
  *
  *   node website/og/render.mjs [--open]
  */

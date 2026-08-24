@@ -1,0 +1,34 @@
+{
+    "$comment": [
+        "Findings `pnpm rls:check` is allowed to see on the acceptance database — the one",
+        "`tooling/scripts/verify-selfhost.mts` builds by running `rebase db push` over the reference",
+        "app's collections. Anything NOT listed here fails CI.",
+        "",
+        "Every entry below is the same story: app/config/collections/index.ts declares",
+        "`{ operation: \"select\", access: \"public\" }` as the default rule, so the generator",
+        "correctly emits a SELECT policy with USING (true) for PUBLIC, and rls-check correctly",
+        "reports it. The finding is true; the access is intended. A public-read demo CMS is the",
+        "point of that app.",
+        "",
+        "What this file still catches, which is why it is a per-table list and not a `--skip`:",
+        "a NEW collection arriving with public read that nobody thought about, the same check",
+        "firing on a table that is supposed to be private, and every other check on every table.",
+        "",
+        "`target` is `schema.table` — never the policy name. Generated policy names carry a hash",
+        "of the rule's own semantics, so name-keyed entries would go stale on every unrelated",
+        "edit and the fix would be to paste in a new hash, which is how a baseline stops being",
+        "read. Matching ignores the policy name on purpose."
+    ],
+    "accepted": [
+        { "check": "policy-always-true", "target": "public.authors", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.customers", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.exercises", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.order_items", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.orders", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.posts", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.product_locales", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.products", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.tags", "reason": "Reference app: public read by default (app/config/collections/index.ts)." },
+        { "check": "policy-always-true", "target": "public.tickets", "reason": "Reference app: public read by default (app/config/collections/index.ts)." }
+    ]
+}

@@ -113,7 +113,7 @@ spec:
 
                The runtime states this at its own `/livez` registration, and
                `packages/server/src/deploy/pod-contract.ts` is the copy that
-               scripts/check-chart.mjs holds this file to. */}}
+               tooling/scripts/check-chart.mjs holds this file to. */}}
           livenessProbe:
             httpGet:
               path: /livez

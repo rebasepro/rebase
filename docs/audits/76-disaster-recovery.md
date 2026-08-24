@@ -27,7 +27,7 @@ The problem is that it was written on 2026-07-22 at 16:36 and the infrastructure
 kept moving. Three of its seven sections now describe a system that no longer
 exists, and the document has been edited twice since (07-29, 07-30) without
 either being touched. Worse, two of its steps are actively dangerous *because*
-they are stale: **§7 step 3 instructs you to run `scripts/phase0-gke-config.sh`,
+they are stale: **§7 step 3 instructs you to run `tooling/scripts/phase0-gke-config.sh`,
 which whole-file-applies `saas-control-plane.yaml` — an apply that
 `DEPLOYMENT.md:74-90` explicitly forbids on a live cluster, that the manifest's
 own NetworkPolicy comment forbids in capital letters
@@ -100,7 +100,7 @@ agree with the manifests that create them.
 | 39 | §6 `backupsConfigured` reports the store, not the cluster; trust `/backup-status` | Yes | `orchestrator.ts:2362`; route at `functions/backup.ts:796` | **OK** |
 | 40 | §7.1 `terraform apply` in `infra/gcp`, then `infra/saas-gcp`; "Without state, import first" | Yes | Correct, and the warning matters: `saas-secrets.tf:13-41` would otherwise mint a **new** encryption key | **OK (under-warned)** |
 | 41 | §7.2 recreate the static IPs and the pre-shared TLS cert | Yes (prose) | No commands; the pre-shared cert is by definition hand-provisioned | **UNVERIFIABLE** |
-| 42 | §7.3 run `scripts/phase0-gke-config.sh` | Yes | **Fails on a fresh cluster** (line 17 patches a Secret and a namespace nothing created) and **is unsafe on the live cluster** (bulk-applies the Ingress + NetworkPolicy, re-attaches dead cert v2) | **WRONG** |
+| 42 | §7.3 run `tooling/scripts/phase0-gke-config.sh` | Yes | **Fails on a fresh cluster** (line 17 patches a Secret and a namespace nothing created) and **is unsafe on the live cluster** (bulk-applies the Ingress + NetworkPolicy, re-attaches dead cert v2) | **WRONG** |
 | 43 | §7.4 restore the control-plane database (§2) | Yes | See rows 9–13 | **OK** |
 | 44 | §7.5 register the cluster so `baseline.ts` installs the baseline | Yes | `baseline.ts` ✓ | **OK** |
 | 45 | §7.6 re-point DNS once the new ingress IP is known | n/a | Manual at Namecheap | **UNVERIFIABLE** |
@@ -140,7 +140,7 @@ hand on 2026-07-20/21, which is the only reason the claim is true of anyone.
 Anything provisioned since, on the ambient rung, is unarchived.
 
 **H2 — §7 step 3 tells you to run a script that reproduces the 2026-08-07
-outage.** `scripts/phase0-gke-config.sh:48` does
+outage.** `tooling/scripts/phase0-gke-config.sh:48` does
 `kubectl apply -f …/saas-control-plane.yaml` — a whole-file apply of the document
 containing the Ingress and the NetworkPolicy. Three independent prohibitions:
 
@@ -180,7 +180,7 @@ in §4/§7:
   `rebase-saas-secrets` Secret. `phase0-gke-config.sh:17` *patches* that Secret
   under `set -euo pipefail`, so on a fresh cluster the script aborts at line 17.
   The only thing in the repo that creates the namespace and ServiceAccount is
-  `scripts/local-dev-setup.sh:25,32-38` — which also installs the **superseded**
+  `tooling/scripts/local-dev-setup.sh:25,32-38` — which also installs the **superseded**
   ClusterRole that `control-plane-rbac.yaml:8-13` documents as missing
   `jobs.batch`, `networkpolicies` and the CNPG CRDs, so an in-cluster deploy
   403s at the build job and the tenant NetworkPolicy is silently skipped. Reaching
@@ -208,7 +208,7 @@ dump produces a half-populated database and a clean exit. The doc's own next
 paragraph — "a restore that produced an empty `clusters` table is worse than no
 restore, because it looks like success" — is the exact failure the command
 permits. The safer form already exists two files over:
-`scripts/upgrade-postgres-18.sh:191` restores with `--single-transaction`.
+`tooling/scripts/upgrade-postgres-18.sh:191` restores with `--single-transaction`.
 
 **M2 — the destructive warning is attached to the non-destructive step.** §2's
 heading reads "Restore into the running StatefulSet (destructive — it replaces

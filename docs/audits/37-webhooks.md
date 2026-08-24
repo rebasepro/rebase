@@ -1,7 +1,7 @@
 # Audit 37 — Outbound webhooks
 
 **Date:** 2026-08-08 · **Scope:** `packages/server/src/services/webhook-service.ts`, every call
-site, and the places webhook destinations are configured (`rebase-agent-skills/skills/rebase-webhooks/`,
+site, and the places webhook destinations are configured (`tooling/rebase-agent-skills/skills/rebase-webhooks/`,
 `website/src/content/docs/docs/recipes/webhooks.md`, `saas/config/collections/webhooks.ts`).
 **Method:** read-only. Nothing was run, edited or fetched.
 
@@ -48,7 +48,7 @@ across `packages/*/src` returns nothing: no such guard exists anywhere in the mo
 
 Two things make this a live design defect rather than a hypothetical:
 
-* `rebase-agent-skills/skills/rebase-webhooks/SKILL.md:476` — *"Load webhook configs from
+* `tooling/rebase-agent-skills/skills/rebase-webhooks/SKILL.md:476` — *"Load webhook configs from
   environment or database"* — is the canonical "shared dispatcher" pattern the skill teaches.
 * `saas/config/collections/webhooks.ts:39-43` ships a `url` column with `validation: { required: true }`
   and nothing else, and `saas/config/collections/webhooks.ts:90-98` (`webhooks_owner_all`, mirrored
@@ -120,7 +120,7 @@ and cancels the rest, instead of `await response.text()`.
 ### H4. The whole retry sequence runs inside the write's Postgres transaction
 
 `packages/server-postgres/src/PostgresBackendDriver.ts:1680` → `:721-731`;
-`rebase-agent-skills/skills/rebase-webhooks/SKILL.md:379-389`
+`tooling/rebase-agent-skills/skills/rebase-webhooks/SKILL.md:379-389`
 
 For user-context writes — the REST/SDK path — `AuthenticatedPostgresBackendDriver.save` is
 `withTransaction((delegate) => delegate.save(props))` (`:1680`), and `withTransaction` opens a real
@@ -327,9 +327,9 @@ part is fine.
   `:44` and `:84` destructure `entityId`, which is not a field of `AfterSaveProps` (it is `id` —
   `packages/types/src/types/entity_callbacks.ts:144`); `:63-65` uses `entity.values.shopify_id`,
   where `AfterDeleteProps` has `row`, flat (`entity_callbacks.ts:203-229`). The file *is* in
-  `DEFAULT_GLOBS` (`scripts/docs-verify/extract.mjs:71`) and the fences are untagged `typescript`
+  `DEFAULT_GLOBS` (`tooling/scripts/docs-verify/extract.mjs:71`) and the fences are untagged `typescript`
   with no `no-verify`, yet this passes: the brace mismatch degrades to parse-artefact codes 1005/1128,
-  which are suppressed (`scripts/docs-verify/typecheck-snippets.mjs:96-104`), and the two bare
+  which are suppressed (`tooling/scripts/docs-verify/typecheck-snippets.mjs:96-104`), and the two bare
   `callbacks: { … }` fragments have no contextual type, so the wrong destructured names are just
   implicit-any (7031, also suppressed). Machine-translated into it/pt/fr/es; German has no copy of
   the page at all.

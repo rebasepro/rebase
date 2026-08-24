@@ -28,7 +28,7 @@ plan for it: the strings `1.0`, `deprecat`, and `support` do not appear in
 internal (beyond "not re-exported from the barrel"), no deprecation window, no
 support window, no definition of what a Rebase major would mean for a user's
 `package.json`. The one gate that *does* guard a JS surface —
-`scripts/check-api-surface.mjs`, which exists and runs on every PR — is not
+`tooling/scripts/check-api-surface.mjs`, which exists and runs on every PR — is not
 mentioned anywhere in the policy document, and its coverage has a hole at
 exactly the export every user touches.
 
@@ -105,7 +105,7 @@ in the file). Then publish it — see L1.
 
 ### H2. The API-surface gate gives zero member coverage to `rebase`, the export every hook and function imports
 
-`scripts/api-surface.mjs:56-67`, `contracts/server.api.txt:34`,
+`tooling/scripts/api-surface.mjs:56-67`, `contracts/server.api.txt:34`,
 `packages/server/dist/singleton.d.ts:53`.
 
 `memberNames(decl)` reads `decl.members ?? decl.type?.members`. For
@@ -118,7 +118,7 @@ const rebase
 ```
 
 `contracts/server.api.txt:34`. That is the whole entry. The gate's own diff
-logic (`scripts/check-api-surface.mjs:79`) then computes `goneMembers` against
+logic (`tooling/scripts/check-api-surface.mjs:79`) then computes `goneMembers` against
 an empty member list, which is empty by construction, so this entry can never
 report `CHANGED`.
 
@@ -132,7 +132,7 @@ proxies, or renames `dataAsAdmin`. `pnpm check:api-surface` prints
 "✓ API surface unchanged." The change ships in an image. The managed tier rolls
 the fleet onto it. Every tenant whose hook calls `rebase.email.send(...)` throws
 `TypeError: Cannot read properties of undefined` — at runtime, in a wave, in
-exactly the scenario the file's own docblock (`scripts/api-surface.mjs:8-16`)
+exactly the scenario the file's own docblock (`tooling/scripts/api-surface.mjs:8-16`)
 describes as the reason it exists. The gate is aimed precisely at this and looks
 straight past it.
 
@@ -148,7 +148,7 @@ free, since the resolved type carries inherited members.
 ### H3. The release bump level is an unvalidated human input; a contract break can ship as a patch
 
 `.github/workflows/publish.yml:20-26`, `:297-322`,
-`scripts/prepare-changelog.mjs` (whole file).
+`tooling/scripts/prepare-changelog.mjs` (whole file).
 
 Stable releases run from `workflow_dispatch` with a free-text `version` input
 defaulting to `"patch"` (`publish.yml:26`). The "Determine version" step
@@ -157,7 +157,7 @@ the number. Nothing in that step, or anywhere in the workflow, examines the
 diff: not the API-surface baseline, not `contracts/derived-names.txt`, not the
 CHANGELOG's sections, not the two contract constants.
 
-`scripts/prepare-changelog.mjs` does not classify either. It promotes
+`tooling/scripts/prepare-changelog.mjs` does not classify either. It promotes
 `## [Unreleased]` to `## [<version>] - <date>`, opens a fresh `[Unreleased]`,
 and mirrors the file into the docs site. It never inspects the section headings.
 `### Breaking` appears 4 times across 1,503 lines of `CHANGELOG.md`
@@ -165,7 +165,7 @@ and mirrors the file into the docs site. It never inspects the section headings.
 producer and no reader.
 
 **Failure scenario.** A PR removes an export from `@rebasepro/server`,
-regenerates the baseline with `node scripts/api-surface.mjs --write` (the gate
+regenerates the baseline with `node tooling/scripts/api-surface.mjs --write` (the gate
 then passes green, since it only detects *forgetting* to regenerate — see M-note
 below), and lands. The release is cut with the default `patch`, giving 0.13.1.
 Every consumer with `"@rebasepro/server": "^0.13.0"` — the range `rebase init`
@@ -241,8 +241,8 @@ commander/yargs definition is already data.
 
 ### M3. The derived-names fixture can be pruned, and only a `> 0` floor stands in the way
 
-`scripts/derived-names.mts:59-63`, `:244-247`;
-`scripts/check-derived-names.mts:80-86`.
+`tooling/scripts/derived-names.mts:59-63`, `:244-247`;
+`tooling/scripts/check-derived-names.mts:80-86`.
 
 The fixture's own comment states the rule:
 
@@ -313,7 +313,7 @@ allowed to be *ahead*, which is exactly what step 3 mandates.
 
 ### M5. Nothing produces or checks the breaking-change classification in the changelog
 
-`scripts/prepare-changelog.mjs` (whole file), `CHANGELOG.md`.
+`tooling/scripts/prepare-changelog.mjs` (whole file), `CHANGELOG.md`.
 
 Covered in H3 as a release-gating problem; called out separately because it is
 also a *documentation* problem. The current `[Unreleased]` section deprecates
@@ -334,7 +334,7 @@ baseline moved.
 
 `check:api-surface` exists, runs on every PR (`verify.yml:208-209`), guards a
 real fleet-wide boot failure, and carries the best explanatory docblock in
-`scripts/`. It appears nowhere in `docs/compatibility.md`: not as a seventh
+`tooling/scripts/`. It appears nowhere in `docs/compatibility.md`: not as a seventh
 contract, not as a row in "The gates that hold these", not in prose. Grepping
 the file for `api-surface`, `api surface` or `API surface` returns nothing.
 
@@ -434,10 +434,10 @@ outcome rather than unconditionally.)
 
 ### L3. Both baselines are regenerable in one command, and nothing marks a regeneration as a decision
 
-`scripts/check-api-surface.mjs:114-115`, `scripts/check-derived-names.mts:164-165`.
+`tooling/scripts/check-api-surface.mjs:114-115`, `tooling/scripts/check-derived-names.mts:164-165`.
 
 Both gates are **drift detectors, not approval gates**. They catch *forgetting*
-to regenerate; they do not catch *choosing* to. `node scripts/api-surface.mjs
+to regenerate; they do not catch *choosing* to. `node tooling/scripts/api-surface.mjs
 --write` or `pnpm write:derived-names` turns any break into a green build, and
 the resulting PR shows a diff in a file whose header says "GENERATED … do not
 hand-edit" — which reads to a reviewer as noise.
@@ -456,12 +456,12 @@ regeneration from an invisible line in a diff into a named approval.
 
 Minor asymmetry in the same area: `write:derived-names` is a `package.json`
 script (`:67`) but there is no `write:api-surface` — the API gate's own error
-message tells you to type `node scripts/api-surface.mjs --write`. Two gates,
+message tells you to type `node tooling/scripts/api-surface.mjs --write`. Two gates,
 two idioms.
 
 ### L4. Members inherited through `extends` are invisible to the surface renderer
 
-`scripts/api-surface.mjs:57` reads `decl.members`, which is the *declared body*
+`tooling/scripts/api-surface.mjs:57` reads `decl.members`, which is the *declared body*
 only. `interface AuthRepository extends UserRepository, RoleRepository,
 TokenRepository, MfaRepository {}`
 (`packages/server/dist/auth/interfaces.d.ts:493`) has an empty body, so the
@@ -477,10 +477,10 @@ as H2.
 
 ### L5. Two stale doc pointers
 
-- `scripts/derived-names.mts:238` — "Exported because
-  `scripts/record-project-snapshot.mts` provisions a database from it". The file
+- `tooling/scripts/derived-names.mts:238` — "Exported because
+  `tooling/scripts/record-project-snapshot.mts` provisions a database from it". The file
   is at `packages/server-postgres/scripts/record-project-snapshot.mts`; there is
-  no `scripts/record-project-snapshot.mts` (the sibling in `scripts/` is
+  no `tooling/scripts/record-project-snapshot.mts` (the sibling in `tooling/scripts/` is
   `record-schema-snapshot.mts`, a different tool). The consumer is real —
   `record-project-snapshot.mts:98` does `await import(.../scripts/derived-names.mts)`
   and destructures `FIXTURE` — only the path in the comment is wrong. Worth
@@ -555,7 +555,7 @@ as H2.
   `verify.yml:496` passes `--min-tables 8 --min-policies 40` to `rls:check` for
   the same reason.
 - **`verify:corpus` pins `manifest.schemaVersion` identity**
-  (`scripts/verify-bundle-corpus.mts:468-482`), which is contract 5's only
+  (`tooling/scripts/verify-bundle-corpus.mts:468-482`), which is contract 5's only
   meaningful guarantee.
 - **The changelog mirror cannot drift.** `check:generated` (`verify.yml:228`,
   `package.json`) runs `website generate-all` — which includes

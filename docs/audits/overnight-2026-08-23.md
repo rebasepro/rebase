@@ -72,7 +72,7 @@ The init container is deleted.
 *rendered* — helm output, a container object, an image tag. Nothing had ever
 executed `infra/docker/entrypoint.mjs` or started the image. That is precisely why an
 image ENV could defeat two producers whose gates both assert the variable's
-absence from the spec. `scripts/check-runtime-image-boots.mjs` builds the image
+absence from the spec. `tooling/scripts/check-runtime-image-boots.mjs` builds the image
 and boots it against a real Postgres, both ways a bundle can arrive, and checks
 it still refuses when given neither. Mutation-tested against all three original
 blockers.

@@ -15,7 +15,7 @@ the numbered files (`01-`…) are the sittings it has produced so far.
 Two constraints worth knowing before moving anything in here:
 
 - **`compatibility.md` stays at this level.** Its path appears in runtime error
-  messages (`scripts/check-derived-names.mts`, `scripts/derived-names.mts`)
+  messages (`tooling/scripts/check-derived-names.mts`, `tooling/scripts/derived-names.mts`)
   that users have already seen, and `website/scripts/copy_repo_docs.js` copies
   it into the published site by that exact path.
 - **Links between these files are relative.** Moving a file means every link

@@ -558,7 +558,7 @@ precedence in place. Its fixtures use the bare-object-literal shape, so C1 is in
    calls it "the idiom we actually recommend" and argues against the bare form; the editor only
    handles the bare form. If the scaffold changed and this was not swept, the same question
    applies to every other consumer that pattern-matches collection source — the codemods under
-   `scripts/codemod/` are the obvious next place to check. **UNCONFIRMED** — I did not read them.
+   `tooling/scripts/codemod/` are the obvious next place to check. **UNCONFIRMED** — I did not read them.
 2. **Is the schema editor reachable in the hosted console at all?** `RLSEditor.tsx:761-769`
    states the routes are not mounted under `NODE_ENV=production`, yet `hasCodebase`
    (`useStudioCapabilities`) still gates a UI branch that POSTs to them. Whether any deployment

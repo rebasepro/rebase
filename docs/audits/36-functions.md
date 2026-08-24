@@ -422,7 +422,7 @@ driver** (`init.ts:495`, `:729`) — the one thing in this system that genuinely
 (see H1) — presented in a webhook example with no warning whatsoever.
 
 It typechecks because `verify-docs` stubs relative imports to `any`
-(`scripts/docs-verify/typecheck-snippets.mjs:168-171`: `if (specifier.startsWith("."))
+(`tooling/scripts/docs-verify/typecheck-snippets.mjs:168-171`: `if (specifier.startsWith("."))
 return true`), and the snippet opens with `import { instance } from "../src/index"`. So
 `instance` is `any` and the whole expression is unchecked — the gate reports green over a
 snippet it is not reading. The Drizzle example at `:280` has the same shape.

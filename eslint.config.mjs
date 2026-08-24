@@ -59,7 +59,7 @@ export default [
             // that has run it, while CI, which never has, stays green.
             "ds-bundle/**",
             ".ds-sync/**",
-            ".design-sync/**",
+            "tooling/design-sync/**",
             ".pnp.loader.mjs",
             "update_translations.js",
             "inspect_product.mjs",
@@ -75,7 +75,7 @@ export default [
         // unscoped, so it matches every file, while `settings.react.version`
         // below lives here. A file outside this glob got the plugin without its
         // settings, and eslint-plugin-react warned about the missing version on
-        // every run — `scripts/verify-selfhost.mts` was the one such file.
+        // every run — `tooling/scripts/verify-selfhost.mts` was the one such file.
         files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
 
         plugins: {
@@ -160,7 +160,7 @@ export default [
             // be disabled to ship, and a rule everyone disables teaches nothing.
             //
             // What makes it useful anyway is `pnpm check:hooks`, which pins the
-            // current 183 in `scripts/hooks-baseline.json` and fails on the
+            // current 183 in `tooling/scripts/hooks-baseline.json` and fails on the
             // 184th. The count was never the problem; a list too long to read
             // hiding a genuinely new stale closure was.
             "react-hooks/rules-of-hooks": "error",

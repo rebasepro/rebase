@@ -21,7 +21,7 @@
  * cluster that looks healthy — which is why they are stated here, in the
  * runtime, rather than twice in the things that deploy it.
  *
- * The chart cannot import this module. `scripts/check-chart.mjs` renders the
+ * The chart cannot import this module. `tooling/scripts/check-chart.mjs` renders the
  * chart and asserts it against these values instead, so the chart conforms by
  * gate where the control plane conforms by construction.
  */

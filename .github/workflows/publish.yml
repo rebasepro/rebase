@@ -151,7 +151,7 @@ jobs:
           trap 'rm -rf "$PACK_DIR"' EXIT
           ERRORS=0
 
-          for pkg_dir in packages/*/ rebase-agent-skills/; do
+          for pkg_dir in packages/*/ tooling/rebase-agent-skills/; do
             [ -f "$pkg_dir/package.json" ] || continue
             is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
             [ "$is_private" = "true" ] && continue
@@ -325,7 +325,7 @@ jobs:
             echo ""
             echo "Set up the federated identity once — it creates the pool, the provider and"
             echo "the service account, and prints the two commands below:"
-            echo "  ./scripts/setup-release-wif.sh"
+            echo "  ./tooling/scripts/setup-release-wif.sh"
             echo ""
             echo "Then:"
             echo "  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER -R ${{ github.repository }}"
@@ -393,7 +393,7 @@ jobs:
       # minor with a declared `### Breaking` section. Before "Stamp changelog" on
       # purpose: the section it reads is still `[Unreleased]` at this point.
       - name: Bump level matches the diff
-        run: node scripts/check-release-bump.mjs "${{ steps.version.outputs.version }}" --from "v${{ steps.version.outputs.current }}"
+        run: node tooling/scripts/check-release-bump.mjs "${{ steps.version.outputs.version }}" --from "v${{ steps.version.outputs.current }}"
 
       # ── Stamp changelog ─────────────────────────────────────
       # Promote "## [Unreleased]" → "## [VERSION] - <date>", open a fresh
@@ -401,7 +401,7 @@ jobs:
       # the "Commit version bump" step below (skipped on dry runs). This is why
       # contributors only ever maintain the [Unreleased] section by hand.
       - name: Stamp changelog
-        run: node scripts/prepare-changelog.mjs "${{ steps.version.outputs.version }}"
+        run: node tooling/scripts/prepare-changelog.mjs "${{ steps.version.outputs.version }}"
 
       # ── Extract release notes from CHANGELOG.md ─────────────
       - name: Extract release notes
@@ -451,7 +451,7 @@ jobs:
           "
 
           # The chart ships with the runtime and its appVersion IS the default
-          # image tag, so it has to move with them — see scripts/release.sh,
+          # image tag, so it has to move with them — see tooling/scripts/release.sh,
           # which stamps it in the same place for the same reason. Left behind,
           # `helm install` with no `image.tag` renders the previous version and
           # `check:runtime-image` fails on the next run.
@@ -474,7 +474,7 @@ jobs:
           trap 'rm -rf "$PACK_DIR"' EXIT
           ERRORS=0
 
-          for pkg_dir in packages/*/ rebase-agent-skills/; do
+          for pkg_dir in packages/*/ tooling/rebase-agent-skills/; do
             [ -f "$pkg_dir/package.json" ] || continue
             is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
             [ "$is_private" = "true" ] && continue
@@ -573,7 +573,7 @@ jobs:
 
       # Federated, so no service-account key exists to leak or rotate. The job
       # already asks for `id-token: write` for npm provenance, which is the same
-      # token this exchanges. `./scripts/setup-release-wif.sh` creates the pool,
+      # token this exchanges. `./tooling/scripts/setup-release-wif.sh` creates the pool,
       # the provider and the service account, and scopes the trust to this
       # repository — a token minted by any other repository is refused by the
       # provider's attribute condition, not by anything here.
@@ -630,7 +630,7 @@ jobs:
       # outside, with no credentials — the way a self-hoster's daemon will.
       - name: Verify the image is pullable
         if: ${{ !inputs.dry_run }}
-        run: node scripts/check-runtime-image.mjs --live --version "${{ steps.version.outputs.version }}"
+        run: node tooling/scripts/check-runtime-image.mjs --live --version "${{ steps.version.outputs.version }}"
 
       # The same claim for the private tag, asked of the registry rather than of
       # the build log — which says "naming to <tag> done" for a purely local

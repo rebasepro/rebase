@@ -32,13 +32,13 @@
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/add-dts-extensions.mjs dist && node ../../scripts/assert-build-output.mjs",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
-    "smoke:baas": "tsx scripts/smoke-baas.ts",
-    "record:project-snapshot": "TSX_TSCONFIG_PATH=../../tsconfig.typecheck.json tsx scripts/record-project-snapshot.mts"
+    "smoke:baas": "tsx tooling/scripts/smoke-baas.ts",
+    "record:project-snapshot": "TSX_TSCONFIG_PATH=../../tsconfig.typecheck.json tsx tooling/scripts/record-project-snapshot.mts"
   },
   "exports": {
     ".": {

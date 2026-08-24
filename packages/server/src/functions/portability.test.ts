@@ -27,7 +27,7 @@
  * anything runs. That is not a loophole — it is what lets `HonoEnv` name types
  * from the Node-only auth modules without dragging them along.
  *
- * `scripts/assert-portable-entry.mjs` is the same gate applied to the emitted
+ * `tooling/scripts/assert-portable-entry.mjs` is the same gate applied to the emitted
  * bundle. Both exist because they fail differently: this one names the import
  * chain that broke the rule, and that one catches a build setting — a banner, a
  * resolve condition — that this one cannot see.

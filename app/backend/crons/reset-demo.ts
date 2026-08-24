@@ -10,7 +10,7 @@ import { runSeed } from "../src/seed.js";
  *
  * NOTE: the in-process scheduler only ticks while a server instance is
  * alive. On Cloud Run this requires --min-instances=1 (see
- * scripts/deploy-demo.sh); with scale-to-zero the instance sleeps and
+ * tooling/scripts/deploy-demo.sh); with scale-to-zero the instance sleeps and
  * this job will not fire.
  */
 export default defineCron({

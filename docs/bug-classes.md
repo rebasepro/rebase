@@ -1726,7 +1726,7 @@ thing next to it?"** Both fixes were three lines. Finding them was the work.
 `verify-docs.mjs` is thorough about what it covers: every locale grepped for
 unknown identifiers, every English fence compiled against workspace source, 930
 snippets, 2405 fences. That number is reassuring, and it is the problem — it
-describes coverage of `website/src/content/docs/**` and `rebase-agent-skills/**`
+describes coverage of `website/src/content/docs/**` and `tooling/rebase-agent-skills/**`
 and says nothing at all about the pages a reader actually lands on first.
 
 Marketing snippets are not fenced code. They are syntax-highlighted HTML, kept
@@ -1748,7 +1748,7 @@ markup, no type-checker in the repo has an opinion about it.
 **Recipe.** Strip the markup and re-apply the checks the docs already get:
 
 ```
-node scripts/verify-docs.mjs --names   # stage 3 covers website/src/{components,pages}
+node tooling/scripts/verify-docs.mjs --names   # stage 3 covers website/src/{components,pages}
 ```
 
 Two tests, not one. Named imports must be exported by the package — that catches

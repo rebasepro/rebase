@@ -55,12 +55,12 @@ pnpm record:project-snapshot
 ```
 
 It starts its own Postgres, provisions it from the reference project in
-`scripts/derived-names.mts` — the same naming-stress fixture the frozen-names gate
+`tooling/scripts/derived-names.mts` — the same naming-stress fixture the frozen-names gate
 uses — seeds rows, points every foreign key at a real row, and writes the four
 files above. No live database of the right vintage required, which is the point:
 "record one per release" is a discipline that had already been skipped three
 releases running, so the only version worth building is the one nobody has to
-remember. `scripts/release.sh` runs it.
+remember. `tooling/scripts/release.sh` runs it.
 
 It refuses to overwrite an existing snapshot. A snapshot is a record of what a
 release shipped; rewriting it un-tests every upgrade path that ran through it.

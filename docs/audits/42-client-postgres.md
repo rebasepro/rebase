@@ -14,7 +14,7 @@ unused** package: 156 lines of source in one file, a hook that wraps
 not the templates. The only non-self references are a vite alias in
 `cloud-fleet-safety/frontend/vite.config.ts:130` that no file resolves, and one
 `README` table row. It is nevertheless published to npm at `0.13.0` (latest) and
-re-shipped every release by `scripts/release.sh:279`. It is also **architecturally
+re-shipped every release by `tooling/scripts/release.sh:279`. It is also **architecturally
 contradicted by its own docs**: `docs/data-sources.md:20` states "Server sources
 need no frontend driver" and `:50` says "Postgres/Mongo ride the `client`" — which
 is exactly what the admin does (`Rebase.tsx:182`, `wrapAsEntityData(client.data)`).
@@ -278,8 +278,8 @@ the package.
 `import { useMemo, useEffect } from "react";` — `useEffect` is never used. eslint
 reports it (`'useEffect' is defined but never used`), but `test:lint` runs
 `eslint "src/**" --quiet`, which suppresses warnings, so the package's own lint
-gate reports success. `scripts/check-unused-locals.mjs` has the two rest-destructure
-locals baselined (`scripts/unused-locals-baseline.json:97-98`) but not this one.
+gate reports success. `tooling/scripts/check-unused-locals.mjs` has the two rest-destructure
+locals baselined (`tooling/scripts/unused-locals-baseline.json:97-98`) but not this one.
 
 #### F9 — `Rebase.tsx` re-derives the same `DatabaseAdmin` from the same socket
 
@@ -377,16 +377,16 @@ branch admin unconditionally.
    rides the `client` and only `direct`/`custom` sources need a frontend driver.
    `MODULAR-ARCHITECTURE.md:291` calls `client-postgres` "the one that really is an
    adapter over `client`". These two statements are in tension, and no code
-   resolves it. If the answer is "no", `scripts/deprecate-old-packages.sh` already
+   resolves it. If the answer is "no", `tooling/scripts/deprecate-old-packages.sh` already
    has the machinery.
 2. **Does anything outside this repo import it?** It is published, so the answer is
    not knowable from here. That is the only reason F1 is not simply "delete it".
-3. `rebase-agent-skills/skills/rebase-basics/SKILL.md:136` tells agents to reach
+3. `tooling/rebase-agent-skills/skills/rebase-basics/SKILL.md:136` tells agents to reach
    for this package "When connecting directly to PostgreSQL from client". That is
    factually wrong on both counts — the data path is the Rebase backend over
    WebSocket, and no Postgres wire protocol is involved. Should be corrected or
    removed regardless of what happens to the package.
-4. `scripts/docs-verify/sdk-exports.mjs:24` registers
+4. `tooling/scripts/docs-verify/sdk-exports.mjs:24` registers
    `@rebasepro/client-postgres` as a documented SDK entry point, so
    `usePostgresClientDriver` is in the allowlist of API names docs may mention —
    yet no page in `website/src/content/docs/**` mentions it outside the

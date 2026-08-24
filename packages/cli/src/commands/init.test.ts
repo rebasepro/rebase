@@ -1280,7 +1280,7 @@ runtime: "managed" });
     it("ships the SDK, which its example script imports", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(overlay, "package.json"), "utf8"));
 
-        // scripts/example.ts imports @rebasepro/client; with no frontend in a
+        // tooling/scripts/example.ts imports @rebasepro/client; with no frontend in a
         // baas project, nothing else would pull it in.
         expect(pkg.dependencies?.["@rebasepro/client"]).toBeDefined();
         expect(pkg.workspaces).toEqual(["backend", "config"]);

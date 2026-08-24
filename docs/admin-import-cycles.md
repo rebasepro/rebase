@@ -27,7 +27,7 @@ The stable measure is the strongly-connected components themselves:
 | largest cyclic component | 110 | 48 |
 | cyclic components | 4 | 3 |
 
-`scripts/` has no tool for this; the numbers above come from a Tarjan pass over
+`tooling/scripts/` has no tool for this; the numbers above come from a Tarjan pass over
 the intra-package import graph with `import type` edges excluded, since those are
 erased at runtime.
 

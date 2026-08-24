@@ -16,7 +16,7 @@
         "schema:introspect": "rebase schema introspect",
         "generate:sdk": "rebase generate-sdk",
         "skills:install": "rebase skills install",
-        "example": "tsx scripts/example.ts",
+        "example": "tsx tooling/scripts/example.ts",
         "deploy": "rebase cloud deploy"
     },
     "devDependencies": {

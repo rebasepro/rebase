@@ -398,7 +398,7 @@ export type { ContractRoutesConfig } from "./api/contract-routes";
 // =============================================================================
 // What the chart and the control plane must agree on about the pod. Exported so
 // the control plane conforms by construction; the chart is held to it by
-// `scripts/check-chart.mjs`, which cannot import TypeScript.
+// `tooling/scripts/check-chart.mjs`, which cannot import TypeScript.
 export {
     RUNTIME_HEALTH_PATH,
     RUNTIME_LIVENESS_PATH,

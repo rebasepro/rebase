@@ -6,7 +6,7 @@ Branch `feat/multi-app-projects` in both repositories.
 | Phase | Where it landed |
 | --- | --- |
 | 0 — the guard | superseded by Phase 2 and removed; the commit stands alone if you want it early |
-| 1 — app-scoped hosting | migration `0050_app_static_hosting`, `apps.static_deployment_id/path/spa`, `sites/<p>/<app>/<d>/`, `scripts/migrate-static-prefixes.ts` |
+| 1 — app-scoped hosting | migration `0050_app_static_hosting`, `apps.static_deployment_id/path/spa`, `sites/<p>/<app>/<d>/`, `tooling/scripts/migrate-static-prefixes.ts` |
 | 2 — path-aware front door | `RouteTable = Map<host, Mount[]>`, `mountsFor`, `RESERVED_BACKEND_PREFIXES` in `@rebasepro/types` |
 | 3 — `rebase deploy <app>` | `selectDeployApp`, shared `uploadAndTrigger` |
 | 4 — admin from a remote contract | **not built.** Still needs its own spec — see §5. |

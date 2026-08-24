@@ -35,7 +35,7 @@ const EXCLUDED_DIRS = ['docs/ui'];
  * Individual generated files, excluded for the same reason.
  *
  * `docs/CHANGELOG.md` is copied from the repo-root CHANGELOG by
- * `scripts/copy_changelog.js` on every `generate-all`, and `check:generated`
+ * `tooling/scripts/copy_changelog.js` on every `generate-all`, and `check:generated`
  * gates that it matches. Only the English copy is regenerated, so a translated
  * one is stale from the next release onward — and it is the one document where
  * being one release behind is worst.

@@ -1,7 +1,7 @@
 # `cloud deploy` and locally-linked framework packages
 
 **Status:** design note, not implemented. Written from the ~265-line
-`scripts/prepare-deploy.mjs` that the dadaki app carries, which is the only
+`tooling/scripts/prepare-deploy.mjs` that the dadaki app carries, which is the only
 worked example of this problem we have.
 
 ## The problem

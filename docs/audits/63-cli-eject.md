@@ -494,8 +494,8 @@ work, absence from the sidebar also means absence from `llms.txt`.
   `templates/overlays/baas/backend/package.json:11-20`). No undeclared runtime dependency
   of the npm-hoisting class here.
 - **`workspace:` protocol.** Eject emits no `package.json` and rewrites no dependency
-  specifier, so it cannot introduce a `workspace:` range. `scripts/validate-no-workspace-protocol.sh`
-  covers only `packages/*/package.json` and `rebase-agent-skills/package.json`, i.e. it does
+  specifier, so it cannot introduce a `workspace:` range. `tooling/scripts/validate-no-workspace-protocol.sh`
+  covers only `packages/*/package.json` and `tooling/rebase-agent-skills/package.json`, i.e. it does
   not look at templates at all — but that is an `init` exposure, not an eject one.
 - **Dotfiles.** The eject payload contains no `.gitignore`/`.npmrc`-class file, so the
   npm-pack stripping problem does not reach it. `templates/` is listed in

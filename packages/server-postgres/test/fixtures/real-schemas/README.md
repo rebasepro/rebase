@@ -30,14 +30,14 @@ from a real server, which is what matters for a parser that reads
 ## Refreshing
 
 ```bash
-pnpm tsx scripts/capture-introspection-fixture.ts <database-url> test/fixtures/real-schemas/<name>.json
+pnpm tsx tooling/scripts/capture-introspection-fixture.ts <database-url> test/fixtures/real-schemas/<name>.json
 ```
 
 `musicbrainz.json` is a subset — the full schema is 374 tables and does not
 belong in this repository — captured with:
 
 ```bash
-pnpm tsx scripts/capture-introspection-fixture.ts <url> test/fixtures/real-schemas/musicbrainz.json public --tables=area,tag,area_tag,area_tag_raw,editor,artist,artist_credit,artist_credit_name,area_type
+pnpm tsx tooling/scripts/capture-introspection-fixture.ts <url> test/fixtures/real-schemas/musicbrainz.json public --tables=area,tag,area_tag,area_tag_raw,editor,artist,artist_credit,artist_credit_name,area_type
 ```
 
 Loading it needs a collation the dump assumes exists:

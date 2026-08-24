@@ -277,7 +277,7 @@ const COLLECTION_MIGRATIONS: Record<string, Migration> = {
 for (const key of ADMIN_COLLECTION_KEYS) {
     COLLECTION_MIGRATIONS[key] = {
         fix: `\`${key}\` moved into the collection's \`admin\` block in 0.11 — write \`admin: { ${key}: … }\``,
-        codemod: "node scripts/codemod/collections-admin-block.mjs"
+        codemod: "node tooling/scripts/codemod/collections-admin-block.mjs"
     };
 }
 
@@ -320,7 +320,7 @@ const RELATION_PROPERTY_MIGRATIONS: Record<string, Migration> = {
     relationName: { fix: "move `relationName` inside `relation` — `relation: { kind: …, relationName: … }`" }
 };
 
-const RELATION_UNION_CODEMOD = "node scripts/codemod/relations-tagged-union.mjs";
+const RELATION_UNION_CODEMOD = "node tooling/scripts/codemod/relations-tagged-union.mjs";
 
 /** Fields the old flat `Relation` carried that the tagged union does not. */
 const RELATION_MIGRATIONS: Record<string, Migration> = {

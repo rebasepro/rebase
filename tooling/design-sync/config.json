@@ -1,0 +1,362 @@
+{
+  "projectId": "534fc573-6551-401a-9b82-5f1d26e454a0",
+  "shape": "package",
+  "pkg": "@rebasepro/ui",
+  "globalName": "RebaseUI",
+  "buildCmd": "bash tooling/design-sync/rebuild.sh",
+  "cssEntry": "dist/_design-sync-compiled.css",
+  "extraFonts": [
+    "../../app/frontend/node_modules/@fontsource-variable/inter/index.css",
+    "../../app/frontend/node_modules/@fontsource-variable/instrument-sans/index.css",
+    "../../app/frontend/node_modules/@fontsource/jetbrains-mono/index.css"
+  ],
+  "componentSrcMap": {
+    "AlertCircleIcon": null,
+    "AlertTriangleIcon": null,
+    "AlignLeftIcon": null,
+    "AppWindow": null,
+    "ArrowDownIcon": null,
+    "ArrowDownToLineIcon": null,
+    "ArrowLeftIcon": null,
+    "ArrowRightFromLineIcon": null,
+    "ArrowRightIcon": null,
+    "ArrowRightLeftIcon": null,
+    "ArrowRightToLineIcon": null,
+    "ArrowUpDownIcon": null,
+    "ArrowUpIcon": null,
+    "ArrowUpToLineIcon": null,
+    "BoldIcon": null,
+    "BookOpenIcon": null,
+    "CalendarIcon": null,
+    "CheckCircle2Icon": null,
+    "CheckCircleIcon": null,
+    "CheckIcon": null,
+    "CheckSquareIcon": null,
+    "ChevronDownIcon": null,
+    "ChevronLeftIcon": null,
+    "ChevronRightIcon": null,
+    "ChevronUpIcon": null,
+    "ChevronsLeftIcon": null,
+    "ChevronsRightIcon": null,
+    "ChevronsUpDownIcon": null,
+    "CircleDotIcon": null,
+    "CircleIcon": null,
+    "CircleUserIcon": null,
+    "CodeIcon": null,
+    "ColumnsIcon": null,
+    "CopyIcon": null,
+    "DatabaseIcon": null,
+    "DollarSignIcon": null,
+    "DownloadIcon": null,
+    "ExternalLinkIcon": null,
+    "EyeIcon": null,
+    "EyeOffIcon": null,
+    "FileIcon": null,
+    "FileSearchIcon": null,
+    "FileTextIcon": null,
+    "FilterIcon": null,
+    "FilterXIcon": null,
+    "FlagIcon": null,
+    "FolderIcon": null,
+    "FolderKanbanIcon": null,
+    "FolderPlusIcon": null,
+    "FolderUpIcon": null,
+    "FunctionSquareIcon": null,
+    "GitBranchIcon": null,
+    "GlobeIcon": null,
+    "HashIcon": null,
+    "Heading1Icon": null,
+    "Heading2Icon": null,
+    "Heading3Icon": null,
+    "HelpCircleIcon": null,
+    "HistoryIcon": null,
+    "HomeIcon": null,
+    "ImageIcon": null,
+    "ImageOffIcon": null,
+    "InfoIcon": null,
+    "ItalicIcon": null,
+    "KanbanIcon": null,
+    "KeyIcon": null,
+    "KeyRoundIcon": null,
+    "LanguagesIcon": null,
+    "LayoutGridIcon": null,
+    "Link2Icon": null,
+    "LinkIcon": null,
+    "ListIcon": null,
+    "ListOrderedIcon": null,
+    "ListPlusIcon": null,
+    "ListTodoIcon": null,
+    "LoaderIcon": null,
+    "LockIcon": null,
+    "LogOutIcon": null,
+    "MailIcon": null,
+    "Maximize2Icon": null,
+    "MenuIcon": null,
+    "MessageCircleIcon": null,
+    "MinusCircleIcon": null,
+    "MinusIcon": null,
+    "MoonIcon": null,
+    "MoreVerticalIcon": null,
+    "Music2Icon": null,
+    "PanelLeftIcon": null,
+    "PauseIcon": null,
+    "PenLineIcon": null,
+    "PencilIcon": null,
+    "PhoneIcon": null,
+    "PinIcon": null,
+    "PlayIcon": null,
+    "PlusIcon": null,
+    "QuoteIcon": null,
+    "RefreshCcwIcon": null,
+    "RefreshCwIcon": null,
+    "RepeatIcon": null,
+    "Rows3Icon": null,
+    "SaveIcon": null,
+    "SearchIcon": null,
+    "SendIcon": null,
+    "SettingsIcon": null,
+    "ShieldIcon": null,
+    "ShoppingCartIcon": null,
+    "SlidersHorizontalIcon": null,
+    "SquareIcon": null,
+    "StarIcon": null,
+    "StickyNoteIcon": null,
+    "StrikethroughIcon": null,
+    "SunIcon": null,
+    "SunMoonIcon": null,
+    "TableIcon": null,
+    "TagIcon": null,
+    "TerminalIcon": null,
+    "TextIcon": null,
+    "Trash2Icon": null,
+    "TrendingUpIcon": null,
+    "TypeIcon": null,
+    "UnderlineIcon": null,
+    "UndoIcon": null,
+    "Unlink2Icon": null,
+    "UploadCloudIcon": null,
+    "UploadIcon": null,
+    "UserCheckIcon": null,
+    "UserIcon": null,
+    "UserPlus": null,
+    "UsersIcon": null,
+    "VideoIcon": null,
+    "VoteIcon": null,
+    "Wand2Icon": null,
+    "WrenchIcon": null,
+    "XCircleIcon": null,
+    "XIcon": null
+  },
+  "dtsPropsFor": {
+    "Chip": "children?: React.ReactNode;\n  /** One of the 15 CHIP_COLORS keys, or a full scheme object. */\n  colorScheme?: \"blue\" | \"teal\" | \"yellow\" | \"pink\" | \"purple\" | \"cyan\" | \"orange\" | \"green\" | \"red\" | \"gray\" | \"indigo\" | \"violet\" | \"fuchsia\" | \"rose\" | \"emerald\";\n  size?: \"smallest\" | \"small\" | \"medium\" | \"large\";\n  outlined?: boolean;\n  error?: boolean;\n  icon?: React.ReactNode;\n  className?: string;\n  onClick?: React.MouseEventHandler<HTMLDivElement>;",
+    "ToggleButtonGroup": "/** Currently selected value */\n  value: string;\n  /** Callback when value changes */\n  onValueChange: (value: string) => void;\n  /** Options to display */\n  options: { value: string; label: string; icon?: React.ReactNode; disabled?: boolean }[];\n  className?: string;",
+    "DebouncedTextField": "/** Same contract as TextField; commits its value on a debounce. */\n  value?: string | number;\n  onChange?: React.ChangeEventHandler<HTMLInputElement>;\n  label?: React.ReactNode;\n  type?: \"text\" | \"number\" | \"search\" | \"email\" | \"url\" | \"password\" | \"date\" | \"time\" | \"datetime-local\" | \"month\" | \"week\" | \"color\" | \"phone\";\n  placeholder?: string;\n  size?: \"smallest\" | \"small\" | \"medium\" | \"large\";\n  multiline?: boolean;\n  minRows?: string | number;\n  maxRows?: string | number;\n  disabled?: boolean;\n  error?: boolean;\n  invisible?: boolean;\n  endAdornment?: React.ReactNode;\n  className?: string;\n  inputClassName?: string;",
+    "CardView": "/** Virtualized card grid. Generic over the row type T. */\n  data: T[];\n  renderCard: (item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode;\n  dataLoading?: boolean;\n  noMoreToLoad?: boolean;\n  dataLoadingError?: Error;\n  itemCount?: number;\n  setItemCount?: (itemCount: number) => void;\n  pageSize?: number;\n  paginationEnabled?: boolean;\n  onItemClick?: (item: T) => void;\n  selectedIds?: Set<string | number>;\n  highlightedIds?: Set<string | number>;\n  selectionEnabled?: boolean;\n  onSelectionChange?: (item: T, selected: boolean) => void;\n  initialScroll?: number;\n  size?: \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\";\n  emptyComponent?: React.ReactNode;",
+    "ListView": "/** Virtualized list. Generic over the row type T. */\n  data: T[];\n  renderRow: (params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode;\n  dataLoading?: boolean;\n  noMoreToLoad?: boolean;\n  dataLoadingError?: Error;\n  itemCount?: number;\n  setItemCount?: (itemCount: number) => void;\n  pageSize?: number;\n  paginationEnabled?: boolean;\n  onItemClick?: (item: T) => void;\n  selectedIds?: Set<string | number>;\n  highlightedIds?: Set<string | number>;\n  selectedEntityId?: string | number;\n  selectionEnabled?: boolean;\n  onSelectionChange?: (item: T, selected: boolean) => void;\n  size?: \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\";\n  emptyComponent?: React.ReactNode;",
+    "KanbanView": "/** Drag-and-drop board. T = card payload, COLUMN = the column key union. */\n  data: { id: string; data: T }[];\n  columns: COLUMN[];\n  assignColumn: (item: { id: string; data: T }) => COLUMN;\n  ItemComponent: React.ComponentType<{ item: { id: string; data: T }; isDragging: boolean; isClone?: boolean; isGroupedOver?: boolean; style?: React.CSSProperties; index?: number }>;\n  columnLabels?: Record<COLUMN, string>;\n  columnColors?: Record<COLUMN, unknown>;\n  allowColumnReorder?: boolean;\n  onColumnReorder?: (columns: COLUMN[]) => void;\n  onItemsReorder?: (items: { id: string; data: T }[], moveInfo?: { itemId: string; sourceColumn: COLUMN; targetColumn: COLUMN }) => void;\n  columnLoadingState?: { [columnKey: string]: { loading: boolean; hasMore: boolean; itemCount: number; totalCount?: number } };\n  onLoadMoreColumn?: (column: COLUMN) => void;\n  onAddItemToColumn?: (column: COLUMN) => void;\n  AddColumnComponent?: React.ReactNode;\n  className?: string;",
+    "DefaultCellRenderer": "row: Record<string, unknown>;\n  propertyKey: string;\n  /** CollectionPropertyConfig - inlined here because it is not separately emitted. */\n  property: { type: \"string\" | \"number\" | \"boolean\" | \"date\" | \"array\" | \"map\" | \"reference\" | \"relation\" | \"geopoint\"; name: string; description?: string; columnWidth?: number; hideFromCollection?: boolean; multiline?: boolean; previewAsTag?: boolean; url?: boolean | string; markdown?: boolean; storage?: boolean; email?: boolean; mode?: \"date\" | \"date_time\"; propertiesOrder?: string[] };\n  value: unknown;\n  size?: \"tiny\" | \"small\" | \"medium\" | \"large\";\n  width?: number;\n  height?: number;"
+  },
+  "overrides": {
+    "Menu": {
+      "cardMode": "single",
+      "primaryStory": "AccountMenu"
+    },
+    "Select": {
+      "cardMode": "single",
+      "primaryStory": "States"
+    },
+    "SelectItem": {
+      "cardMode": "single",
+      "primaryStory": "InOpenSelect"
+    },
+    "BooleanSwitchWithLabel": {
+      "cardMode": "column"
+    },
+    "Dialog": {
+      "cardMode": "single",
+      "primaryStory": "FormDialog"
+    },
+    "DialogTitle": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "DialogContent": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "DialogActions": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "primaryStory": "FilterPopover"
+    },
+    "PopoverPrimitive": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Sheet": {
+      "cardMode": "single",
+      "primaryStory": "RightPanel"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "MenuItem": {
+      "cardMode": "single",
+      "primaryStory": "Default"
+    },
+    "Menubar": {
+      "cardMode": "single",
+      "primaryStory": "FileMenuOpen"
+    },
+    "MenubarMenu": {
+      "cardMode": "single",
+      "primaryStory": "Open"
+    },
+    "MenubarTrigger": {
+      "cardMode": "single",
+      "primaryStory": "Active"
+    },
+    "MenubarContent": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarItem": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarCheckboxItem": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarItemIndicator": {
+      "cardMode": "single",
+      "primaryStory": "OnCheckboxItem"
+    },
+    "MenubarPortal": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarRadioGroup": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarRadioItem": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarSeparator": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarShortcut": {
+      "cardMode": "single",
+      "primaryStory": "FileShortcuts"
+    },
+    "MenubarSub": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarSubContent": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarSubTrigger": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "MenubarSubTriggerIndicator": {
+      "cardMode": "single",
+      "primaryStory": "Basic"
+    },
+    "CollectionView": {
+      "cardMode": "column"
+    },
+    "CardView": {
+      "cardMode": "column"
+    },
+    "ListView": {
+      "cardMode": "column"
+    },
+    "TableView": {
+      "cardMode": "column"
+    },
+    "KanbanView": {
+      "cardMode": "column"
+    },
+    "CollectionCardView": {
+      "cardMode": "column"
+    },
+    "CollectionListView": {
+      "cardMode": "column"
+    },
+    "CollectionTableView": {
+      "cardMode": "column"
+    },
+    "CollectionKanbanView": {
+      "cardMode": "column"
+    },
+    "CollectionViewToolbar": {
+      "cardMode": "column"
+    },
+    "DefaultCellRenderer": {
+      "cardMode": "column"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "TableHeader": {
+      "cardMode": "column"
+    },
+    "TableBody": {
+      "cardMode": "column"
+    },
+    "TableRow": {
+      "cardMode": "column"
+    },
+    "TableCell": {
+      "cardMode": "column"
+    },
+    "VirtualTable": {
+      "cardMode": "column"
+    },
+    "Autocomplete": {
+      "cardMode": "column"
+    },
+    "AutocompleteItem": {
+      "cardMode": "column"
+    },
+    "IconButton": {
+      "cardMode": "column"
+    },
+    "InfoLabel": {
+      "cardMode": "column"
+    },
+    "Markdown": {
+      "cardMode": "column"
+    },
+    "SearchBar": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    },
+    "TextField": {
+      "cardMode": "column"
+    },
+    "TextareaAutosize": {
+      "cardMode": "column"
+    },
+    "Typography": {
+      "cardMode": "column"
+    },
+    "SelectGroup": {
+      "cardMode": "single",
+      "primaryStory": "TwoGroups"
+    }
+  },
+  "readmeHeader": "tooling/design-sync/conventions.md"
+}

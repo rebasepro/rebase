@@ -104,7 +104,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     Concurrency (CREATE IF NOT EXISTS races), the six early-return gates, upgrade paths
     from an older stamped schema. **done 2026-08-09** — see [audits/12-boot-schema-ensure.md](12-boot-schema-ensure.md).
 13. **Upgrade / version-skew path** — `boot/version-skew.ts`, `schema-version.ts`,
-    `scripts/record-schema-snapshot.mts`, upgrade-e2e. Every N→N+1 boot from a real
+    `tooling/scripts/record-schema-snapshot.mts`, upgrade-e2e. Every N→N+1 boot from a real
     snapshot; the FK-rename brick is open. **done 2026-08-09** — see [audits/13-upgrade-and-version-skew.md](13-upgrade-and-version-skew.md).
 14. **Doctor** — `schema/doctor.ts`, `doctor-cli.ts`, `cli/src/commands/doctor.ts`.
     Does each diagnostic fire on a real broken DB, and is its remediation text correct
@@ -117,7 +117,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 16. **RLS policy generation** — `security/rls-enforcement.ts`, `rls-bootstrap-sql.ts`,
     `sqlToPolicy`. Predicate hoisting, unqualified columns binding to the wrong table,
     hashed/injected names, derived junction policies. **done 2026-08-09** — see [audits/16-rls-policy-generation.md](16-rls-policy-generation.md).
-17. **RLS drift & scanning** — `policy-drift.ts`, `packages/rls-check`, `scripts/rls-scan.mts`,
+17. **RLS drift & scanning** — `policy-drift.ts`, `packages/rls-check`, `tooling/scripts/rls-scan.mts`,
     `rls-baseline.json`. Does the scanner catch what it claims — and what class of hole is
     invisible to it? **done 2026-08-09** — see [audits/17-rls-drift-and-scanning.md](17-rls-drift-and-scanning.md).
 18. **Auth core** — `server/src/auth/routes.ts`, `middleware.ts`, `require-auth.ts`,
@@ -146,7 +146,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 27. **Secrets & encryption** — `ENCRYPTION_KEY` handling, `crypto-utils.ts`, env-var
     encryption in saas, key rotation story. **done 2026-08-09** — see [audits/27-secrets-and-encryption.md](27-secrets-and-encryption.md).
 28. **Dependency & supply chain** — `pnpm-workspace.yaml` overrides (bounded?),
-    `scripts/check-undeclared-deps.mjs`, published-dist runtime deps, npm trusted publishers. **partial**
+    `tooling/scripts/check-undeclared-deps.mjs`, published-dist runtime deps, npm trusted publishers. **partial**
 
 ## D. Storage
 
@@ -240,7 +240,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 63. **`rebase eject`** — does the ejected project actually build and run? **done 2026-08-08** — see [audits/63-cli-eject.md](63-cli-eject.md).
 64. **CLI auth, api-keys, apps, telemetry, skills commands** — smaller surfaces, never
     swept together: consent, storage of credentials, what telemetry sends. **done 2026-08-08** — see [audits/64-cli-small-commands.md](64-cli-small-commands.md).
-65. **Scaffolded templates** — `scripts/check-templates.mjs`, `test-cli-init-*-project`.
+65. **Scaffolded templates** — `tooling/scripts/check-templates.mjs`, `test-cli-init-*-project`.
     Every template: installs, typechecks, boots, deploys. `NODE_ENV` baked into builds
     was found here. **partial**
 66. **Error messages & DX surface** — a cross-cutting pass over the errors a developer
@@ -279,7 +279,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 77. **Test suite integrity** — a meta-audit: tests that bypass the wiring (class 3),
     inert type assertions, untypechecked test dirs, mutation-testing survivors,
     two runners in `server-postgres` that can't run together. **partial**
-78. **CI gates** — `.github` workflows + `scripts/check-*.mjs`. Which gates actually run
+78. **CI gates** — `.github` workflows + `tooling/scripts/check-*.mjs`. Which gates actually run
     on which event, ordering (an early failure skipping later gates silently), and which
     "guards" have baselines that only ever grow. **partial**
 79. **Logging & observability** — `utils/logger.ts`, `logging.ts`, `request-logger.ts`,
@@ -288,7 +288,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 80. **Config & env** — `server/src/env.ts`, `boot/env.ts`, `saas/backend/src/env.ts`,
     `validate-config.ts`. Fail-closed on missing/invalid, the collection-key allowlist that
     silently drops unknown keys. **done 2026-08-09** — see [audits/80-config-and-env.md](80-config-and-env.md).
-81. **Public API surface & compat policy** — `contracts/`, `scripts/check-api-surface.mjs`,
+81. **Public API surface & compat policy** — `contracts/`, `tooling/scripts/check-api-surface.mjs`,
     `contracts/derived-names.txt`, `docs/compatibility.md`. What is public, what may change,
     what is frozen. **done 2026-08-05** (surface, [api-surface-audit-2026-08-05.md](api-surface-audit-2026-08-05.md))
     / **done 2026-08-08** (policy, see [audits/81-compat-policy.md](81-compat-policy.md))
@@ -300,7 +300,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     prose claims, untranslated pages, missing sidebar entries (absent from llms.txt),
     the missing AI/agents section. **partial**
 85. **Website** — `website/`, marketing claims vs. shipped features, Lighthouse, legal TODOs. **partial**
-86. **Examples & agent skills** — `examples/*`, `rebase-agent-skills/`. Do they run against
+86. **Examples & agent skills** — `examples/*`, `tooling/rebase-agent-skills/`. Do they run against
     the current version, and do the skills describe the current API? **done 2026-08-08** — see [audits/86-examples-and-skills.md](86-examples-and-skills.md).
 
 ---

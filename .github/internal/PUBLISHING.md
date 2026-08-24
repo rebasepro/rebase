@@ -107,7 +107,7 @@ Preview what a release would do without making any changes:
 ```bash
 pnpm release:dry
 # or
-./scripts/release.sh minor --dry-run
+./tooling/scripts/release.sh minor --dry-run
 ```
 
 This shows:

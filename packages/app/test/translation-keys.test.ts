@@ -96,7 +96,7 @@ describe("translation keys", () => {
         // already in the tree.
         //
         // Hence a baseline rather than a bare zero, for the reason
-        // `scripts/check-untranslated.mjs` gives about its own: 159 ambient
+        // `tooling/scripts/check-untranslated.mjs` gives about its own: 159 ambient
         // findings make the 160th invisible, and the 160th arrives every time
         // somebody adds a key to `en.ts` and stops. Translate a line and drop
         // it from the baseline; the file only ever shrinks.

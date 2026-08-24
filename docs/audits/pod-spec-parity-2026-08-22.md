@@ -135,7 +135,7 @@ take. Those are facts about the runtime, so they live in the runtime.
   import it. `saas/backend` already imported `@rebasepro/server` for `logger`, so
   this adds no dependency.
 - **The chart conforms by gate** — Helm cannot import TypeScript, so
-  `scripts/check-chart.mjs` reads the contract as text and asserts the rendered
+  `tooling/scripts/check-chart.mjs` reads the contract as text and asserts the rendered
   chart against it: probe paths on *every* unit, the preStop drain, and both
   directions of the topology-variable list. It fails rather than passing empty if
   the contract stops parsing, because a parity check that silently matches

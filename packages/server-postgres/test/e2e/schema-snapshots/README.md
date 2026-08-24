@@ -35,7 +35,7 @@ Two kinds, both belong here.
 **Recorded** — the normal case, one per release. Run:
 
 ```bash
-node --import tsx scripts/record-schema-snapshot.mts
+node --import tsx tooling/scripts/record-schema-snapshot.mts
 ```
 
 It provisions an empty database with the code at your current checkout, stamps

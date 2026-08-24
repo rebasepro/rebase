@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.json && node ../../scripts/add-dts-extensions.mjs dist && node ../../scripts/assert-build-output.mjs",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json"
   },
