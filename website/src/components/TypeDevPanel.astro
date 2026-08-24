@@ -160,7 +160,14 @@ const isDev = import.meta.env.DEV;
             ":is(h1,h2,h3,h4,h5,h6):is(.text-3xl,.text-4xl,.text-5xl,.text-6xl,.text-7xl,.text-8xl,.text-xl,.text-2xl)" +
             "{font-weight:" + state.wd + " !important}" +
             "h1,h2,h3,h4,h5,h6{font-weight:" + state.ws + "}" +
-            "body,p,td,li{font-weight:" + state.wb + ";letter-spacing:" + (state.tb / 1000) + "em}" +
+            // `:not([class*="typography-"])` is load-bearing. This rule is
+            // UNLAYERED, and `.typography-*` lives in `layer(base)` — unlayered
+            // beats layered regardless of specificity, so a bare `p` selector
+            // here flattened EVERY Typography variant that renders a <p>, which
+            // is most of them. Measured on /ui: h1 showed 36px/400/0 on
+            // localhost while production ships 36px/600/-0.025em. The panel
+            // exists to tune body copy, not to overrule component classes.
+            "body,p:not([class*=\"typography-\"]),td,li{font-weight:" + state.wb + ";letter-spacing:" + (state.tb / 1000) + "em}" +
             heroSize;
 
         $("tdp-fh").value = state.fh; $("tdp-fb").value = state.fb;

@@ -19,6 +19,37 @@
     --color-page-ground: #08090a;
     --color-page-ink: #f7f8f8;
     --color-page-copy: #b4b8bd;
+
+    /* Chroma — the six-hue accent set. Added 2026-08-24.
+
+       Not new colours: this is the exact palette `NeatBackground` has been
+       rendering on this site all along, promoted from WebGL wallpaper into real
+       tokens so type, rules and fields can use the same six hues the art
+       already uses. Naming them is what lets a chapter *own* one.
+
+       MARKETING ONLY, and deliberately not in @rebasepro/ui. The admin panel,
+       the console and every customer app share that system, and none of them
+       has any use for a coral field — a chroma hue is how a page makes an
+       argument, and product UI does not make arguments. Keeping the tokens here
+       means a product surface cannot inherit one by reaching for a plausible
+       name. `--color-primary` (#0070F4) is untouched and still owns every
+       button and every in-product accent; a chroma hue never means "clickable".
+
+       Contrast as ink on the #08090a ground — five of six clear AA for body:
+         cyan 10.15:1   yellow 12.57:1   blush 11.90:1
+         violet 5.00:1  coral 6.85:1     ultramarine 1.89:1 (FAILS)
+
+       Ultramarine is the exception: at 1.89:1 it cannot be ink on this ground
+       at all. It is only usable as a FIELD with white type on it (10.49:1) —
+       and this page no longer has fields, so on `/` it is used for nothing.
+       The token stays because the value is right; before reaching for it,
+       check which side of the contrast it is on. */
+    --color-chroma-cyan: #36ccd6;
+    --color-chroma-yellow: #ffc600;
+    --color-chroma-violet: #8b6ae6;
+    --color-chroma-coral: #fb5066;
+    --color-chroma-blush: #ff9a9e;
+    --color-chroma-ultramarine: #2e0ec7;
     --spacing-shell: 72rem;
     --spacing-measure-head: 42rem;
     --spacing-measure-lead: 38rem;
@@ -75,6 +106,23 @@
     font-weight: 600;
     color: var(--color-primary);
     transition: opacity 0.2s ease;
+}
+
+/* ── Chapter hue ─────────────────────────────────────────────────────────────
+   A chapter opts in by setting `--hue` on itself; its eyebrow numeral reads it.
+   That is now the whole device.
+
+   It used to drive a 12rem cropped numeral behind each chapter as well. That
+   came out: at 0.28 opacity, sitting under the art, it was a watermark rather
+   than structure — and it carried nothing the 11px label beside it did not
+   already say. It also collided with the Neat gradients twice, which is the
+   symptom worth remembering. Flat graphic devices and this site's WebGL art are
+   competing systems; in the same frame one always mutes the other, and the art
+   is what the site is recognised by. */
+
+@utility chapter {
+    position: relative;
+    --hue: var(--color-surface-700);
 }
 
 /* ── Form controls, as the product actually draws them ───────────────────────
@@ -370,12 +418,33 @@ h1, h2, h3, h4, h5, h6 {
     @apply font-headers font-medium tracking-heading;
 }
 
-/* 500, measured against the reference and matched by the reworked home page.
-   Three different display weights were in play before this: 500 on the new
-   home (its arbitrary text-[2.6rem] misses this selector), 600 here, and 700
-   in packages/ui. All three are 500 now. */
+/* 600, matching `.typography-h1`/`h2` in @rebasepro/ui — see the ladder note
+   there. This was 500, and 500 is what rebase.pro actually served; every local
+   preview showed 600 because the dev-only TypeDevPanel injects `wd: 600` with
+   !important. The two now agree, so what you see on localhost is what ships. */
 :is(h1, h2, h3, h4, h5, h6):is(.text-3xl, .text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
-    @apply font-medium tracking-display;
+    @apply font-semibold tracking-display;
+}
+
+/* The display tier (`--text-display-1/2` in ui/theme.css) MUST be listed here,
+   and must NOT restate tracking. Two separate traps, both already paid for:
+
+   1. `h1..h6 { tracking-heading }` above is unlayered, so it beats every
+      Tailwind utility. A display class absent from a rule like this one
+      silently renders at -0.01em — which is exactly how the old home page's
+      arbitrary `text-[2.6rem]` missed the tier and nobody noticed.
+   2. Each display size carries its OWN tracking, tighter than
+      `tracking-display`, because -0.025em reads loose at 112px. So the value
+      is restated here per size — by token reference, never as an inline em —
+      rather than letting `tracking-display` flatten both back to one value. */
+:is(h1, h2, h3, h4, h5, h6).text-display-1 {
+    @apply font-semibold;
+    letter-spacing: var(--text-display-1--letter-spacing);
+}
+
+:is(h1, h2, h3, h4, h5, h6).text-display-2 {
+    @apply font-semibold;
+    letter-spacing: var(--text-display-2--letter-spacing);
 }
 
 :is(h1, h2, h3, h4, h5, h6):is(.text-xl, .text-2xl) {
@@ -519,15 +588,61 @@ h6 {
    adding `in-view` later selects the identical declarations, so nothing
    restarts. */
 
+/* ── Hero line reveal ────────────────────────────────────────────────────────
+   The headline arrives a line at a time on a 90ms grid, each line wiping up out
+   of its own box. Staccato rather than a single fade: the rhythm is the point.
+
+   It is built on `animate-immediate` for one non-negotiable reason — the hero
+   `<h1>` is the LCP element. An IntersectionObserver-gated reveal here is what
+   took this page to mobile 66, and no amount of choreography is worth paying
+   that again. These rules reveal off the stylesheet alone, first frame, no JS.
+
+   `clip-path` rather than `overflow: hidden` on a wrapper, so the markup stays
+   one <h1> with <br>s and the accessibility tree is unchanged — a screen reader
+   reads one heading, not four fragments. */
+.hero-line {
+    display: block;
+}
+
+.animate-on-scroll:is(.in-view, .animate-immediate) .hero-line {
+    animation-name: heroLineWipe;
+    animation-duration: 0.62s;
+    animation-fill-mode: backwards;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll:is(.in-view, .animate-immediate) .hero-line:nth-child(1) { animation-delay: 0s; }
+.animate-on-scroll:is(.in-view, .animate-immediate) .hero-line:nth-child(2) { animation-delay: 0.09s; }
+.animate-on-scroll:is(.in-view, .animate-immediate) .hero-line:nth-child(3) { animation-delay: 0.18s; }
+.animate-on-scroll:is(.in-view, .animate-immediate) .hero-line:nth-child(4) { animation-delay: 0.27s; }
+
+@keyframes heroLineWipe {
+    from {
+        clip-path: inset(0 0 100% 0);
+        transform: translateY(0.18em);
+    }
+}
+
 /* Reduce motion for accessibility. `!important` on the reset, because the
    variant rules above carry a class more than this selector does and would
-   otherwise keep their `animation-name` — the block has to beat them, not tie. */
+   otherwise keep their `animation-name` — the block has to beat them, not tie.
+
+   The hero lines are reset here too, and that one matters: `heroLineWipe`
+   starts from `clip-path: inset(0 0 100% 0)`, so an element whose animation is
+   cancelled without this rule is clipped to nothing and the headline is
+   INVISIBLE, not merely static. */
 @media (prefers-reduced-motion: reduce) {
     .animate-on-scroll {
         animation: none !important;
         opacity: 1;
         transform: none;
         filter: none;
+    }
+
+    .animate-on-scroll .hero-line {
+        animation: none !important;
+        clip-path: none !important;
+        transform: none !important;
     }
 }
 

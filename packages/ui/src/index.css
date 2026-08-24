@@ -48,17 +48,29 @@ html.dark {
 
    With a single face carrying both headings and body, weight and tracking are
    the only things separating a heading from the copy around it — so the tiers
-   have to actually differ, rather than all sitting at 600. */
+   have to actually differ, rather than all sitting at 600.
 
-/* 500, not 700. This reverses the 2026-08 "700 for display" decision on
-   purpose: the marketing site and the panel were running different display
-   weights, which is the single most visible incoherence between them. */
+   REVISED 2026-08-24. The ladder above described weight falling with size, but
+   the code ran 500/500/600/600/500/500 — a hump, where the LARGEST headings
+   were the LIGHTEST and h3 outweighed h1. Two rules were in play and neither
+   won cleanly. It is now monotonic: 600 for headings of consequence (h1-h4),
+   500 for small labels (h5/h6), 400 body. The display end still separates
+   itself by SIZE and tracking, which is what the paragraph above asks of it;
+   what it no longer does is separate itself by being *lighter* than the
+   smaller headings beneath it. 600 remains the ceiling. */
+
+/* 600. This reverses the earlier "500, not 700" setting — not back toward 700,
+   which stays banned, but up to the ceiling the ladder already used for h3/h4.
+   The 500 was only ever visible in production: the dev-only TypeDevPanel has
+   shipped a `wd: 600` default that overrode this with !important, so every
+   local preview of this site has been 600 while rebase.pro rendered 500. The
+   panel's constant is now telling the truth. */
 .typography-h1 {
-    @apply text-4xl font-headers font-medium tracking-display;
+    @apply text-4xl font-headers font-semibold tracking-display;
 }
 
 .typography-h2 {
-    @apply text-3xl font-headers font-medium tracking-display;
+    @apply text-3xl font-headers font-semibold tracking-display;
 }
 
 .typography-h3 {

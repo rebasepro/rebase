@@ -26,7 +26,13 @@
        console and the marketing site all spell the same intent the same way
        instead of each hardcoding its own em value. Pair display/title with
        font-semibold and heading with font-medium. */
-    --tracking-display: -0.022em; /* >= 30px — the headline tier; matches the marketing site */
+    /* -0.025em, revised 2026-08-24 from -0.022em. The website's dev-only
+       TypeDevPanel has shipped `td: -25` as its "SHIPPED" default all along, so
+       every local preview and every design decision taken in front of one was
+       made at -0.025em while the built site served -0.022em. Of the panel's
+       eleven defaults these two — tracking and display weight — were the only
+       ones that did not match the tokens. Both are now true. */
+    --tracking-display: -0.025em; /* >= 30px — the headline tier; matches the marketing site */
     --tracking-title: -0.018em;   /* 20-24px — section titles */
     --tracking-heading: -0.01em;  /* <= 18px — labels; still a heading, not a headline */
 
@@ -42,6 +48,31 @@
     --text-2xs--line-height: 1.45;
     --text-3xs: 10px;
     --text-3xs--line-height: 1.4;
+
+    /* Display tier — above `text-4xl`, where the scale stops being a heading
+       and starts being a statement. Added 2026-08-24.
+
+       Fluid rather than fixed because the same token has to survive four
+       locales: German and French run 15-25% longer than English, and a fixed
+       112px headline that fits "The Postgres you already have" does not fit
+       "Das Postgres, das Sie bereits haben". The `vw` middle term shrinks
+       before it can overflow; the `rem` floor protects small screens, where
+       the type is already proportionally large.
+
+       Both carry their own line-height and tracking: at this size 1.1 reads as
+       a gap and -0.025em reads as loose. Weight stays on the 600 ceiling —
+       this tier separates itself by SIZE, which is the whole point of adding
+       it rather than reaching for 700. */
+    --text-display-2: clamp(2.25rem, 4.4vw, 4rem);      /* 36 -> 64px */
+    --text-display-2--line-height: 1.0;
+    --text-display-2--letter-spacing: -0.028em;
+    /* 7.2vw capped at 7rem was too much: on a wide window the headline filled
+       the viewport on its own and pushed the install terminal below the fold,
+       which breaks the rule the hero exists to satisfy (SITE-STORY §5 — the
+       hero carries a product artifact). Still ~1.7x the 48px it replaced. */
+    --text-display-1: clamp(2.5rem, 5.2vw, 4.75rem);    /* 40 -> 76px */
+    --text-display-1--line-height: 0.94;
+    --text-display-1--letter-spacing: -0.032em;
 
     /* Control heights — the one scale every inline control resolves to, so a
        Button, TextField and Select at the same size share a baseline. Mirrors

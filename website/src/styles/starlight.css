@@ -63,15 +63,28 @@
     --sl-color-bg-inline-code: #f2f3f7;
 }
 
-/* Headings take their own weight and tracking tier; the face is the `.sl-markdown-content`
-   is the docs prose body, the rest are Starlight's own chrome headings. */
+/* Docs headings: `.sl-markdown-content` is the prose body, the rest are
+   Starlight's own chrome.
+
+   The bare `h1, h2, h3` that used to sit in this list has been split out below.
+   It applied SITE-WIDE, not just in docs, and it set `letter-spacing:
+   var(--tracking-title)` — so every marketing heading whose size class did not
+   happen to match the tier ladder in global.css silently rendered at title
+   tracking instead of display tracking. Measured before the split: h2 on
+   /security and /manifesto came out at -0.018em while the same tier on every
+   other page was -0.025em. One stray selector, two pages quietly off-system. */
 .sl-markdown-content :is(h1, h2, h3, h4, h5, h6),
 .content-panel :is(h1, h2, h3),
 .sidebar-content summary,
-site-title,
-h1, h2, h3 {
+site-title {
     font-family: var(--font-headers);
     letter-spacing: var(--tracking-title);
+}
+
+/* Face only. Tracking for bare headings comes from the size-tier ladder in
+   global.css, which is the single place that decides it. */
+h1, h2, h3 {
+    font-family: var(--font-headers);
 }
 
 /* Fixed header background and translucency */

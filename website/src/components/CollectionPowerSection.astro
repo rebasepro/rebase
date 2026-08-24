@@ -47,13 +47,17 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
 };`;
 ---
 
-<section id="collection-power" class="relative z-0 py-28 overflow-hidden">
+<section id="collection-power" class="chapter relative z-0 py-28 overflow-hidden" style="--hue: var(--color-chroma-cyan)">
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
-    {/* Header — keep centred with a soft max-width just for the text */}
-    <div class="mx-auto max-w-2xl text-center px-6 mb-16 animate-on-scroll fade-in-up">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{badge ?? t('power.badge')}</p>
-        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-5xl leading-tight" set:html={title ?? t('power.title')}></h2>
-        <p class="mt-6 text-lg text-surface-400">
+    {/* Header was centred in a 2xl measure while every other beat runs the
+        72rem shell left-aligned, so this one section's left edge agreed with
+        nothing above or below it. §6 asks for one shell width precisely so the
+        edges line up, and a grid this deliberate is what lets the numerals and
+        chroma fields read as structure rather than as decoration. */}
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-16 animate-on-scroll fade-in-up">
+        <p class="mb-4 eyebrow">{index && (<><span class="font-mono" style="color: var(--hue)">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{badge ?? t('power.badge')}</p>
+        <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={title ?? t('power.title')}></h2>
+        <p class="mt-6 max-w-[38rem] text-lg text-surface-400">
             {t('power.subtitle')}
         </p>
         <div class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-surface-700 bg-surface-900/60 text-surface-300 text-sm font-medium">

@@ -209,20 +209,44 @@ section was headed *"do not renegotiate"*; it was renegotiated, deliberately and
 with the owner, so what follows describes what the code now does. Anything here
 that a page contradicts is a bug in the page, not licence to drift.
 
-**The system lives in one file.** `src/styles/page-system.css`, imported by
-`Layout.astro` and scoped to `main.page-v2`, which Layout carries. Ground, copy
-colour, heading tracking, shell width, copy measures, the eyebrow, the product
-frame, the demo well and the accent link are defined there once. Do not
-re-implement any of them inline on a page.
+**The system lives in one file.** `src/styles/global.css`. (This section used to
+name `src/styles/page-system.css`; no such file has ever existed. Corrected
+2026-08-24.) Ground, copy colour, heading tracking, shell width, copy measures,
+the eyebrow, the product frame, the demo well and the accent link are defined
+there once. Do not re-implement any of them inline on a page.
 
 - **Ground is `#08090A`, not pure black.** Pure black kills the shadow system.
 - **Copy is `#B4B8BD`.** `surface-400` read washed at page scale.
-- **Headings are weight 500 at `-0.022em`.** The weight comes from
-  `global.css:88`, which sets `h1..h6 { font-headers font-medium tracking-heading }`
-  **unlayered** and therefore beats every Tailwind utility - override with a real
-  rule, never with `tracking-[...]` or `font-[...]` on the element. Note
-  `font-[560]` is parsed as a font-*family*; the weight syntax is
-  `font-[weight:560]`.
+- **Headings are weight 600 at `-0.025em`, and the tier decides both.** Revised
+  2026-08-24 from 500/-0.022em. The ladder is monotonic — 600 for h1-h4, 500 for
+  h5/h6, 400 body — and **700 stays banned**; the display end separates itself by
+  SIZE, never by weight. Before this it ran 500/500/600/600/500/500, a hump where
+  h3 outweighed h1.
+  - `global.css` sets `h1..h6` **unlayered**, so it beats every Tailwind utility.
+    Override with a real rule, never `tracking-[...]` or `font-[...]` on the
+    element. `font-[560]` parses as a font-*family*; the weight syntax is
+    `font-[weight:560]`.
+  - **Never write weight or tracking on a heading.** 166 headings across 34 files
+    each declared their own `font-semibold`/`font-medium` + `tracking-tight`,
+    disagreeing with each other at the same rendered size. They are gone; the
+    size class is the only thing a page states.
+- **Two display tiers, defined in `@rebasepro/ui/theme.css`** so the panel and
+  the console inherit them: `text-display-1` (40→76px) for the home hero only,
+  `text-display-2` (36→64px) for every deep-page hero and every home section
+  head. Both are fluid — German and French run 15-25% longer, and a fixed size
+  that fits English does not fit them.
+  - **A new display class must be added to the `:is()` tier selector in
+    `global.css`,** or it silently renders at `-0.01em`. That is how the old
+    home page's `text-[2.6rem]` missed the tier.
+  - The hero cap is bounded by the fold, not by taste: past ~84px the CTA row
+    drops below the fold on a 1440x900 window.
+- **`TypeDevPanel` is not a preview of production.** It injects `!important`
+  overrides, and three of its "SHIPPED" defaults were lying — display weight,
+  display tracking, and an **unlayered** `p { font-weight: 400 }` that beat every
+  layered `.typography-*` class and flattened the whole variant scale on
+  localhost while production shipped it correctly. All three are fixed. Before
+  trusting a local type judgement, confirm the panel is not the thing you are
+  looking at.
 - **One shell width (`72rem`) on every section**, so left edges agree across the
   page. Copy blocks are constrained separately: 42rem for section heads, 38rem
   for leads, 34rem for the hero sub.

@@ -86,7 +86,7 @@ const faqColumns = [
                      72px was picked over 80px because 80 leaves only 4% of slack
                      and any copy edit overflows it. Base stays 36px and wraps,
                      which is correct on phones. -->
-                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold leading-[1.08] text-white animate-on-scroll animate-immediate fade-in-up">
+                <h1 class="relative mb-6 text-display-1 leading-[1.08] text-white animate-on-scroll animate-immediate fade-in-up">
                     {t("hero.title.part1")}<br/>{t("hero.title.part2")}
                 </h1>
             </div>
@@ -188,7 +188,7 @@ const faqColumns = [
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">01</span><span class="mx-2 text-surface-600">·</span>{t("demo.badge")}</p>
-                <h2 class="mt-3 text-3xl sm:text-5xl font-semibold tracking-tight text-white text-balance">
+                <h2 class="mt-3 text-display-2 text-white text-balance">
                     {t("demo.title")}
                 </h2>
                 <div class="mt-8 max-w-2xl mx-auto">
@@ -344,7 +344,7 @@ const faqColumns = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("engine.title")}</h2>
+                <h2 class="mt-4 text-display-2 text-white text-balance">{t("engine.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
 
@@ -530,7 +530,7 @@ const faqColumns = [
         <div class="mx-auto max-w-6xl px-6 lg:px-12">
             <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-surface-500/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</p>
-                <h2 class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white text-balance"
+                <h2 class="mt-4 text-display-2 text-white text-balance"
                     set:html={t("modes.title")}></h2>
                 <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
                     {t("modes.subtitle")}
@@ -657,7 +657,7 @@ const faqColumns = [
         <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">05</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("see.title")}</h2>
+                <h2 class="mt-4 text-display-2 text-white text-balance">{t("see.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
             </div>
 
@@ -873,7 +873,7 @@ const faqColumns = [
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                 <div class="lg:col-span-5 animate-on-scroll fade-in-up">
                     <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">06</span><span class="mx-2 text-surface-600">·</span>{t("security.badge")}</p>
-                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
+                    <h2 class="text-3xl sm:text-4xl text-white mb-4">
                         {t("security.title")}
                     </h2>
                     <p class="text-lg text-surface-400 leading-relaxed">
@@ -970,7 +970,7 @@ const faqColumns = [
                         </svg>
                         {t("opensource.badge")}
                     </div>
-                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4"
+                    <h2 class="text-3xl sm:text-4xl text-white mb-4"
                         set:html={t("opensource.title")}>
                     </h2>
                     <p class="text-lg text-surface-400 leading-relaxed">
@@ -1003,7 +1003,7 @@ const faqColumns = [
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
                         {t("rlscheck.badge")}
                     </div>
-                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
+                    <h2 class="text-3xl sm:text-4xl text-white mb-4">
                         {t("rlscheck.title")}
                     </h2>
                     <p class="text-lg text-surface-400 leading-relaxed mb-6">
@@ -1063,7 +1063,7 @@ const faqColumns = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>{t("agentera.badge")}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance"
+                <h2 class="mt-4 text-display-2 text-white text-balance"
                     set:html={t("agentera.title")}></h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed"
                    set:html={t("agentera.p1")}></p>
@@ -1088,7 +1088,7 @@ const faqColumns = [
                          aria-hidden="true"
                          style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10">
-                        <h3 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white text-balance mb-4"
+                        <h3 class="text-2xl sm:text-3xl text-white text-balance mb-4"
                             set:html={t("agentera.card.title")}></h3>
                         <p class="text-surface-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
                             {t("agentera.card.desc")}
@@ -1127,7 +1127,7 @@ const faqColumns = [
  <section id="s-faq" class="py-28 sm:py-36">
         <div class="mx-auto max-w-6xl px-6">
             <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
-                <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t("faq.title")}</h2>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("faq.title")}</h2>
             </div>
             <p class="mx-auto mt-4 max-w-2xl text-center text-surface-400 animate-on-scroll fade-in-up">
                 {t("faq.subtitle")}
@@ -1184,7 +1184,7 @@ const faqColumns = [
  <section id="s-final-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
 
         <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl text-balance mb-4 animate-on-scroll fade-in-up">
+            <h2 class="text-3xl sm:text-4xl text-white text-balance mb-4 animate-on-scroll fade-in-up">
                 {t("cta.title")}
             </h2>
             <p class="text-surface-400 mb-6 text-lg max-w-xl mx-auto animate-on-scroll fade-in-up"

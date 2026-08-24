@@ -88,17 +88,20 @@ const cases = [
 ];
 ---
 
-<section id="s-case-study" class="relative z-0 py-28 sm:py-36">
+{/* Closes the sequence, so it carries the numeral like every other chapter —
+    the eyebrow already said "08" while nothing else on the section did. Cyan
+    returns here from beat 01: the page opens and closes on the same hue. */}
+<section id="s-case-study" class="chapter relative z-0 py-28 sm:py-36" style="--hue: var(--color-chroma-cyan)">
 
     <!-- Header: heading left, supporting copy right -->
-    <div class="mx-auto max-w-6xl px-6 lg:px-8">
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
             <div>
-                <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    <span class="font-mono text-surface-500">08</span><span
-                        class="mx-2 text-surface-600">·</span>{t("showcase.badge")}
+                <p class="eyebrow">
+                    <span class="font-mono" style="color: var(--hue)">08</span><span
+                        class="mx-2 text-surface-700">·</span>{t("showcase.badge")}
                 </p>
-                <h2 class="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight text-white text-balance">
+                <h2 class="mt-4 font-headers text-display-2 text-white text-balance">
                     {t("showcase.title.part1")} {t("showcase.title.part2")}
                 </h2>
             </div>
