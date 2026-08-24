@@ -51,7 +51,7 @@ import { classify } from "./check-api-surface.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-export const SURFACE = "api-surface/server.api.txt";
+export const SURFACE = "contracts/server.api.txt";
 export const DERIVED_NAMES = "contracts/derived-names.txt";
 export const MANIFEST = "packages/types/src/types/project_manifest.ts";
 export const CHANGELOG = "CHANGELOG.md";

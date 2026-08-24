@@ -74,7 +74,7 @@ export const TRACKED = [
     }
 ];
 
-export const BASELINE = path.join(ROOT, "api-surface", "server.api.txt");
+export const BASELINE = path.join(ROOT, "contracts", "server.api.txt");
 
 /**
  * Public members of an interface/class, so losing one is caught as well as

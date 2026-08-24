@@ -111,7 +111,7 @@ const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
     "pnpm-lock.yaml",
-    "MODULAR-ARCHITECTURE.md",
+    "docs/MODULAR-ARCHITECTURE.md",
     "website/public/llms.txt",
     "scripts/headless-guard/check-package-names.mjs",
     "scripts/deprecate-old-packages.sh"

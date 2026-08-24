@@ -44,7 +44,7 @@ The admin panel is a **layer you opt into**, not the price of entry. Add collect
 
 ### Adopt only what you want
 
-Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](./MODULAR-ARCHITECTURE.md).
+Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](./docs/MODULAR-ARCHITECTURE.md).
 
 | Mode | You get | Comparable to |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ automatically, derived from your schema at boot — change the schema with a mig
 and the API follows. No React anywhere in the dependency tree.
 
 The three adoption modes — BaaS (like Supabase), CMS (like Payload/Directus), and
-both together — are described in [MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md).
+both together — are described in [MODULAR-ARCHITECTURE.md](docs/MODULAR-ARCHITECTURE.md).
 
 ---
 
