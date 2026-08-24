@@ -63,7 +63,7 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 │   ├── collections/      # TypeScript collection files (one per collection)
 │   │   └── index.ts      # Barrel export of all collections
 │   └── storage.ts        # `storageAuthorize` — who may read/write which keys
-├── tooling/scripts/              # Standalone SDK scripts
+├── scripts/              # Standalone SDK scripts
 ├── rebase.json           # Which apps this project deploys, and how
 ├── .env                  # Environment variables (generated from .env.example)
 ├── .env.example          # Template with placeholder secrets

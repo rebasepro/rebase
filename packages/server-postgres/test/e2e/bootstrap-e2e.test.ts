@@ -34,7 +34,7 @@ import { PostgresAuthRepository } from "../../src/auth/services.js";
 // Imported by relative path, not by package name, and deliberately: inside a git
 // worktree `@rebasepro/server` resolves through node_modules into the PRIMARY
 // checkout, so a package-name import would quietly verify code that is not the
-// code under test. `tooling/scripts/verify-selfhost.mts` does the same, for the same
+// code under test. `scripts/verify-selfhost.mts` does the same, for the same
 // reason.
 import { createBuiltinAuthAdapter } from "../../../server/src/auth/builtin-auth-adapter.js";
 import { configureJwt } from "../../../server/src/auth/jwt.js";

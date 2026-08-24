@@ -40,8 +40,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { ejectCommand } from "../packages/cli/src/commands/eject";
-import { loadManifest } from "../packages/cli/src/manifest";
+import { ejectCommand } from "../../packages/cli/src/commands/eject";
+import { loadManifest } from "../../packages/cli/src/manifest";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");

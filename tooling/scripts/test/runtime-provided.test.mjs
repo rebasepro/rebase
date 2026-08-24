@@ -75,7 +75,7 @@ test("the entrypoint supplies nothing the bundler still expects a bundle to inst
 });
 
 test("the image ships every package the entrypoint promises to link", () => {
-    const dockerfile = fs.readFileSync(path.join(ROOT, "docker", "server.Dockerfile"), "utf8");
+    const dockerfile = fs.readFileSync(path.join(ROOT, "infra", "docker", "server.Dockerfile"), "utf8");
     for (const name of fromEntrypoint) {
         const shortName = name.slice("@rebasepro/".length);
         assert.ok(

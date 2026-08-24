@@ -598,7 +598,7 @@ export interface GeneratedFile {
  *   `augment.ts`, so importing it is also what *declares* the `admin` block. Only a
  *   project that depends on the package can resolve it.
  * - `common` — `@rebasepro/common`. Same key inference, no admin surface, no React
- *   anywhere in its graph (`tooling/scripts/headless-guard` lists it as core). This is the
+ *   anywhere in its graph (`scripts/headless-guard` lists it as core). This is the
  *   headless flavour.
  * - `annotation` — neither package is declared, so neither import would resolve and
  *   the old annotation is the only honest thing to emit. Projects scaffolded before
@@ -615,7 +615,7 @@ export type CollectionBuilder = "admin-types" | "common" | "annotation";
  * The package specifiers the generated files name, spelled once.
  *
  * Written as constants rather than inline in the import templates below because
- * `tooling/scripts/headless-guard/check-types.mjs` scans core sources for `from
+ * `scripts/headless-guard/check-types.mjs` scans core sources for `from
  * "@rebasepro/admin-types"` and cannot tell a real import from one this module
  * *writes*. It is right to be that blunt — the guard's whole value is that it
  * cannot be reasoned around — so the string simply never appears in that shape

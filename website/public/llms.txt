@@ -1107,7 +1107,7 @@ Every affected suite fails at **module load, with zero tests run**, so the
 output reads as a broken Jest config rather than as a dependency-format problem.
 The fix is a transformer that strips the HMR guard after ts-jest runs and
 transpiles `.mjs` under a `.js` filename; Rebase's own is
-[`tooling/scripts/jest/react-router-esm-transform.cjs`](https://github.com/rebasepro/rebase/blob/main/scripts/jest/react-router-esm-transform.cjs)
+[`scripts/jest/react-router-esm-transform.cjs`](https://github.com/rebasepro/rebase/blob/main/scripts/jest/react-router-esm-transform.cjs)
 and is meant to be copied. You will also need react-router and `cookie-es`
 lifted out of the blanket `node_modules` exclusion in
 `transformIgnorePatterns`, and `mjs` added to `moduleFileExtensions`.
@@ -1865,7 +1865,7 @@ core again.
 Before 0.11 these fields sat at the top level. To move them:
 
 ```bash
-node tooling/scripts/codemod/collections-admin-block.mjs config/collections
+node scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 It reports anything it cannot move safely — notably presentation inside

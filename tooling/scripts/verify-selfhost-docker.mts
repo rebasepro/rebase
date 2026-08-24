@@ -36,7 +36,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const COMPOSE_FILE = path.join(ROOT, "docker", "docker-compose.selfhost.yml");
+const COMPOSE_FILE = path.join(ROOT, "infra", "docker", "docker-compose.selfhost.yml");
 const PROJECT = "rebase-selfhost-verify";
 
 /** Host ports, chosen away from the defaults so a running dev stack is untouched. */

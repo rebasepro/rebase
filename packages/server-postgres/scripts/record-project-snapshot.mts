@@ -32,7 +32,7 @@
  * ## Self-provisioning, deliberately
  *
  * Unlike the auth recorder, this one starts its own Postgres and provisions it
- * from the reference project in `tooling/scripts/derived-names.mts`. That is what lets
+ * from the reference project in `scripts/derived-names.mts`. That is what lets
  * `release.sh` record a snapshot every time without anyone having to have a live
  * database of the right vintage lying around — and "once per release" is a
  * discipline that has already been skipped for three releases running, so the
@@ -43,8 +43,8 @@
  * real bundles. This one covers the axis neither does — a project's code and its
  * database, aged together and met by a newer release.
  *
- *     node --import tsx tooling/scripts/record-project-snapshot.mts
- *     node --import tsx tooling/scripts/record-project-snapshot.mts --out v0.14.0
+ *     node --import tsx scripts/record-project-snapshot.mts
+ *     node --import tsx scripts/record-project-snapshot.mts --out v0.14.0
  *
  * Requires Docker.
  */
@@ -56,7 +56,7 @@ import pg from "pg";
 
 /**
  * It lives in `packages/server-postgres/scripts` rather than the repo's own
- * `tooling/scripts/` for one flat reason: `pg`, `drizzle-orm` and `execa` are this
+ * `scripts/` for one flat reason: `pg`, `drizzle-orm` and `execa` are this
  * package's dependencies and do not resolve from the root, which is not a
  * workspace package. Run it through `pnpm record:project-snapshot` at the root.
  */
@@ -317,7 +317,7 @@ try {
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(
         path.join(outDir, "schema.sql"),
-        `-- Recorded by tooling/scripts/record-project-snapshot.mts from @rebasepro/server-postgres v${pkg.version}.\n` +
+        `-- Recorded by scripts/record-project-snapshot.mts from @rebasepro/server-postgres v${pkg.version}.\n` +
         "-- Do not hand-edit: this is a record of a database that shipped, and editing it to make\n" +
         "-- a test pass un-tests every upgrade path through it.\n\n" +
         `${cleaned}\n`

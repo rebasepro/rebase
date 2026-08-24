@@ -7,13 +7,13 @@
  *
  * Usage:
  *   # With local dev server running (`pnpm dev` in another terminal):
- *   npx tsx tooling/scripts/example.ts
+ *   npx tsx scripts/example.ts
  *
  *   # With remote backend:
- *   REBASE_URL=https://api.yourdomain.com npx tsx tooling/scripts/example.ts
+ *   REBASE_URL=https://api.yourdomain.com npx tsx scripts/example.ts
  *
  *   # Service key can also be passed as env var:
- *   REBASE_SERVICE_KEY=<key> REBASE_URL=https://api.yourdomain.com npx tsx tooling/scripts/example.ts
+ *   REBASE_SERVICE_KEY=<key> REBASE_URL=https://api.yourdomain.com npx tsx scripts/example.ts
  *
  * Generate a service key:
  *   node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
@@ -49,7 +49,7 @@ if (!baseUrl) {
     console.error("");
     console.error("Please make sure you have either:");
     console.error("1. Started the local dev server in another terminal (`pnpm dev`)");
-    console.error("2. Set the REBASE_URL environment variable (e.g. `REBASE_URL=https://api.yourdomain.com npx tsx tooling/scripts/example.ts`)");
+    console.error("2. Set the REBASE_URL environment variable (e.g. `REBASE_URL=https://api.yourdomain.com npx tsx scripts/example.ts`)");
     process.exit(1);
 }
 

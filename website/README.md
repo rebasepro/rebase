@@ -33,7 +33,7 @@ Run from `website/`. This repo uses `pnpm` exclusively.
 ```text
 website/
 ├── public/                 static assets, images, redirect targets
-├── tooling/scripts/                build-time generators (see "Generated artifacts")
+├── scripts/                build-time generators (see "Generated artifacts")
 └── src/
     ├── components/         page sections and the live demo components
     ├── content/
@@ -46,7 +46,7 @@ website/
     │   ├── blog/           blog index and post routes
     │   ├── dev/demos.astro internal gallery of the live demo components
     │   └── policy/         legal pages
-    ├── tooling/scripts/            client-side scripts, incl. the A/B testing harness
+    ├── scripts/            client-side scripts, incl. the A/B testing harness
     └── styles/             global.css and per-surface stylesheets
 ```
 
@@ -72,7 +72,7 @@ Marketing and docs are deliberately asymmetric:
 - the sitemap and the per-page `.md` variants (`[page].md.ts`, `index.md.ts`)
 - the changelog, copied in from the repo root
 
-Never hand-edit these; change the source or the generator in `tooling/scripts/`.
+Never hand-edit these; change the source or the generator in `scripts/`.
 
 ## Things that will surprise you
 

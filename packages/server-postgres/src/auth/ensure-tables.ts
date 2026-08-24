@@ -175,7 +175,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // rename breaks every auth query on whichever side is out of step.
         // Instead: add `uid`, backfill it, drop the NOT NULL on `user_id`, and
         // keep the two in sync with a trigger, so a backend of either era can
-        // read and write. `tooling/scripts/drop-legacy-auth-user-id.sql` removes the
+        // read and write. `scripts/drop-legacy-auth-user-id.sql` removes the
         // column once no old backend remains (phase 2, contract).
         //
         // Idempotent throughout: every step is guarded on catalogue state.

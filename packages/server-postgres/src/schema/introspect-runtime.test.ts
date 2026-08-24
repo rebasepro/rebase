@@ -175,7 +175,7 @@ describe("buildCollectionsFromSchema", () => {
         expect(resolved.product.kind).toBe("belongsTo");
         // `localKey` is the field `assertKnownWriteFields` adds to the known set,
         // which is what makes `product_id` writable. The write itself is covered
-        // end-to-end by `tooling/scripts/smoke-baas.ts` against a real database.
+        // end-to-end by `scripts/smoke-baas.ts` against a real database.
         expect((resolved.product as { localKey: string }).localKey).toBe("product_id");
     });
 

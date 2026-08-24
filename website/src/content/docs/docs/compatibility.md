@@ -178,7 +178,7 @@ migrate it: `legacyForeignKeyName` exists to be detected, never to be generated,
 and the baseline pins those detections too. Dropping one silently un-migrates
 every database still carrying that spelling.
 
-**The gate.** `scripts/derived-names.mts` runs a naming-stress fixture — irregular
+**The gate.** `tooling/scripts/derived-names.mts` runs a naming-stress fixture — irregular
 plurals, an `ss` ending, an acronym, a junction off a plural slug, explicit
 overrides, a slug long enough to truncate — through both producers of schema DDL,
 and renders every identifier either one names:
@@ -226,7 +226,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `pnpm rls:check` | the generated schema's policies |
 | `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `contracts/server.api.txt`. This is the package `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
 | `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
-| `node scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
+| `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
 **Record a bundle fixture and a schema snapshot once per release.** The value of

@@ -386,7 +386,7 @@ describe("era-1a — the legacy roles junction", () => {
 
     it("keeps the legacy user_id column readable for old pods mid-deploy", async () => {
         // Expand/contract: a rename would break whichever half of a rolling
-        // deploy is out of step. `tooling/scripts/drop-legacy-auth-user-id.sql` is the
+        // deploy is out of step. `scripts/drop-legacy-auth-user-id.sql` is the
         // contract phase, run by hand once no old pod remains.
         const columns = await client.query<{ column_name: string; is_nullable: string }>(
             `SELECT column_name, is_nullable FROM information_schema.columns

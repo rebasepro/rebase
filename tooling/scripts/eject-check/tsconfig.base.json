@@ -27,33 +27,33 @@
         ],
         "paths": {
             "@rebasepro/types": [
-                "../../packages/types/src"
+                "../../../packages/types/src"
             ],
             "@rebasepro/admin-types": [
-                "../../packages/admin-types/src"
+                "../../../packages/admin-types/src"
             ],
             "@rebasepro/common": [
-                "../../packages/common/src"
+                "../../../packages/common/src"
             ],
             "@rebasepro/utils": [
-                "../../packages/utils/src"
+                "../../../packages/utils/src"
             ],
             "@rebasepro/client": [
-                "../../packages/client/src"
+                "../../../packages/client/src"
             ],
             "@rebasepro/codegen": [
-                "../../packages/codegen/src"
+                "../../../packages/codegen/src"
             ],
             "@rebasepro/server": [
-                "../../packages/server/src"
+                "../../../packages/server/src"
             ],
             "@rebasepro/server-postgres": [
-                "../../packages/server-postgres/src"
+                "../../../packages/server-postgres/src"
             ]
         },
         "typeRoots": [
-            "../../node_modules/.pnpm/node_modules/@types",
-            "../../node_modules/@types"
+            "../../../node_modules/.pnpm/node_modules/@types",
+            "../../../node_modules/@types"
         ]
     }
 }

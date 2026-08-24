@@ -6,14 +6,14 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "prebuild": "node tooling/scripts/copy_repo_docs.js && node tooling/scripts/generate_llms_txt.js && node tooling/scripts/generate_sitemap_md.js",
+    "prebuild": "node scripts/copy_repo_docs.js && node scripts/generate_llms_txt.js && node scripts/generate_sitemap_md.js",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
     "deploy": "run-s build && firebase deploy --only hosting --project rebase-578f2",
-    "generate-llms": "node tooling/scripts/generate_llms_txt.js",
-    "generate-all": "node tooling/scripts/copy_repo_docs.js && node tooling/scripts/generate_llms_txt.js && node tooling/scripts/generate_sitemap_md.js",
-    "genAPI": "typedoc && node tooling/scripts/add_api_frontmatter.js"
+    "generate-llms": "node scripts/generate_llms_txt.js",
+    "generate-all": "node scripts/copy_repo_docs.js && node scripts/generate_llms_txt.js && node scripts/generate_sitemap_md.js",
+    "genAPI": "typedoc && node scripts/add_api_frontmatter.js"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.4",
