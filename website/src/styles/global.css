@@ -149,66 +149,28 @@
      stops reading as a slab; the whole device is that it has an edge. */
 @utility chapter-slab {
     position: relative;
-    isolation: isolate;
     overflow: hidden;
     border-top: 1px solid rgb(255 255 255 / 0.14);
     border-bottom: 1px solid rgb(255 255 255 / 0.14);
     --hue: var(--color-surface-700);
-}
 
-.chapter-slab__art {
-    position: absolute;
-    inset: 0;
-    z-index: -2;
-    pointer-events: none;
-}
+    /* A DEEP mix of the hue into the page ground, never the raw palette value.
+       That is the difference between this and the flat fill that had to be
+       reverted: `#FB5066` behind white copy measures 3.26:1 and fails AA
+       outright; the same hue mixed down clears it several times over.
 
-/* 0.45 — quieter than the 0.55 the dividers use, not louder.
+       The percentage is PER CHAPTER, not a constant, because the six hues do
+       not sit at the same luminance and one number does not serve them. Mixed
+       into near-black at 26%, ultramarine reads as a confident deep blue while
+       coral goes muddy brown and loses its identity entirely — it needs 38% to
+       read as coral at all. Set `--slab-mix` alongside `--hue` and check the
+       result rather than assuming the default travels.
 
-   The first cut ran this at 1.0 on the reasoning that a slab's art IS its
-   ground and should therefore be at full strength. Wrong, and the reason is
-   worth keeping: these two sections also carry a detailed product demo, and at
-   full strength the canvas's faceted shards are high-frequency enough to
-   compete with it. The break has to be loud; the GROUND has to recede.
-
-   Colour identity does not come from the art's opacity — it comes from the
-   tint, which stays at 0.85. Dropping the art only removes texture, and it
-   moves contrast the safe way: less art means more near-black page ground
-   showing through, so the copy's backdrop gets darker, not lighter. */
-.chapter-slab__art canvas {
-    opacity: 0.45;
-}
-
-.chapter-slab__tint {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--hue);
-    mix-blend-mode: color;
-    opacity: 0.85;
-    pointer-events: none;
-}
-
-/* The art's luminance varies across the frame, so copy on it has no single
-   measurable contrast. This gives the copy column a floor without flattening
-   the section — the art stays fully visible on the side the copy vacates. */
-.chapter-slab__scrim {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background: linear-gradient(90deg, rgb(8 9 10 / 0.86) 0%, rgb(8 9 10 / 0.66) 44%, transparent 80%);
-}
-
-/* The horizontal fade is a two-column assumption: it keeps the art visible on
-   the side the copy vacates. Stacked, the copy vacates nothing and runs the
-   full width, so the scrim becomes uniform. It still measured AA without this
-   (5.7:1 at the brightest coral pixel), but that was the layout being lucky
-   rather than the rule being right. */
-@media (max-width: 1023px) {
-    .chapter-slab__scrim {
-        background: rgb(8 9 10 / 0.72);
-    }
+       Measured, white copy on the ground:
+         ultramarine 26%  ~18.5:1
+         coral       38%  ~11.5:1 */
+    --slab-mix: 30%;
+    background: color-mix(in srgb, var(--hue) var(--slab-mix), var(--color-page-ground));
 }
 
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
