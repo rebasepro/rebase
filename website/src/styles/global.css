@@ -125,6 +125,110 @@
     --hue: var(--color-surface-700);
 }
 
+/* ── Chapter slab ────────────────────────────────────────────────────────────
+   A section that breaks the page's rhythm. Used exactly twice — 03 security and
+   07 agent, the two highest-ranked claims — because a third stops being a break
+   and starts being the page.
+
+   The mechanism matters, because the obvious one is wrong. A flat `background:
+   <hue>` was tried and reverted: it covered the Neat art bleeding through the
+   section, and the gradients are what this site is recognised by. A slab keeps
+   the canvas and TINTS it — `mix-blend-mode: color` takes hue and saturation
+   from the wash and LUMINANCE from the art, so every shape the canvas drew
+   survives and only its palette collapses to the chapter hue.
+
+   That is also what makes coral usable. Flat coral put white copy at 3.26:1 and
+   failed AA outright; tinting dark art coral leaves it dark. Measured on the
+   bare ground behind the copy column, brightest pixel: ultramarine 41.9% grey
+   (~5.3:1 against white), coral 27.3% (~9.5:1). The colour changes, the
+   brightness does not.
+
+   Two rules that are not decoration:
+   - `isolation: isolate` — without it the blend reaches through to the page.
+   - Hard hairlines top and bottom, never a mask. A slab that fades at its edges
+     stops reading as a slab; the whole device is that it has an edge. */
+@utility chapter-slab {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-top: 1px solid rgb(255 255 255 / 0.14);
+    border-bottom: 1px solid rgb(255 255 255 / 0.14);
+    --hue: var(--color-surface-700);
+}
+
+.chapter-slab__art {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* The divider variants ship at 0.55 so they can sit UNDER page copy. Here the
+   art IS the ground, so it runs at full strength. */
+.chapter-slab__art canvas {
+    opacity: 1;
+}
+
+.chapter-slab__tint {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--hue);
+    mix-blend-mode: color;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* The art's luminance varies across the frame, so copy on it has no single
+   measurable contrast. This gives the copy column a floor without flattening
+   the section — the art stays fully visible on the side the copy vacates. */
+.chapter-slab__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgb(8 9 10 / 0.86) 0%, rgb(8 9 10 / 0.66) 44%, transparent 80%);
+}
+
+/* The horizontal fade is a two-column assumption: it keeps the art visible on
+   the side the copy vacates. Stacked, the copy vacates nothing and runs the
+   full width, so the scrim becomes uniform. It still measured AA without this
+   (5.7:1 at the brightest coral pixel), but that was the layout being lucky
+   rather than the rule being right. */
+@media (max-width: 1023px) {
+    .chapter-slab__scrim {
+        background: rgb(8 9 10 / 0.72);
+    }
+}
+
+/* `--color-primary` is #0070F4, and a slab is the one place on the site where
+   that stops working: on the ultramarine slab it is blue on blue, and on the
+   coral one it fights the hue. Inside a slab the link takes the section's own
+   ink and earns its affordance from the underline instead — a more robust
+   signal than hue anywhere, and the only one available here. */
+.chapter-slab .accent-link {
+    color: #fff;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    text-decoration-color: rgb(255 255 255 / 0.45);
+}
+
+.chapter-slab .accent-link:hover {
+    text-decoration-color: #fff;
+}
+
+/* `.frame` draws a white hairline and assumes near-black behind it. On a
+   mid-luminance tinted ground both vanish and the demo reads as a hole. A
+   darker, more definite edge makes it an inset screen instead. */
+.chapter-slab .frame {
+    border-color: rgb(8 9 10 / 0.4);
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.05),
+        0 2px 8px rgb(0 0 0 / 0.3),
+        0 40px 80px -20px rgb(0 0 0 / 0.6);
+}
+
 /* ── Form controls, as the product actually draws them ───────────────────────
    Every demo that mocks the admin panel used to invent its own field: some
    `bg-surface-800/60`, some `bg-surface-100 dark:bg-surface-800/40`, radii

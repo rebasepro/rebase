@@ -250,17 +250,19 @@ const SELFHOST_COMMAND = "docker compose up -d";
              blue, because it carries the highest-ranked claim.
              ============================================================ -->
         <div>
-            {/* CHAPTER 03. This was a solid ultramarine field and it is not any
-                more. A flat background over a section the Neat dividers bleed
-                through does not sit NEXT TO the art, it replaces it — and this
-                is one of the largest regions on the page. The gradients are the
-                thing the site is recognised by; a colour field is not worth
-                trading them for.
+            {/* CHAPTER 03 — a slab. It carries the highest-ranked claim
+                (SITE-STORY §2), so it is one of the two places on the page that
+                breaks rhythm, and ultramarine because it is the brand blue's own
+                family: the section reads as an intensification, not a departure.
 
-                The chapter still owns its hue, through the numeral, the eyebrow
-                and the rule. That was always the part that carried the chapter
-                system; the field was the part that cost something. */}
-            <section class="chapter relative py-24 sm:py-32" style="--hue: var(--color-chroma-ultramarine)">
+                An earlier attempt painted this section a flat ultramarine and had
+                to be reverted — a fill covers the Neat art rather than sitting
+                next to it. The slab tints the canvas instead, so the art is still
+                here and the section still turns blue. See `chapter-slab`. */}
+            <section class="chapter chapter-slab py-24 sm:py-32" style="--hue: var(--color-chroma-ultramarine)">
+                <div class="chapter-slab__art" aria-hidden="true"><NeatBackground variant="b" client:visible /></div>
+                <div class="chapter-slab__tint" aria-hidden="true"></div>
+                <div class="chapter-slab__scrim" aria-hidden="true"></div>
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
@@ -436,20 +438,22 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </div>
         </section>
 
-        <!-- NEAT DIVIDER → chapter 07, violet. -->
-        <!-- Neat gradient divider, bled behind the sections either side -->
-        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
-             style="z-index: -1; height: 600px;">
-            <NeatBackground variant="b" client:visible />
-        </div>
+        {/* CHAPTER 07 — the second and last slab, and the page's loudest frame.
 
-        <!-- CHAPTER 07 — AGENT. -->
+            The divider that used to sit here is GONE, deliberately. Its job was
+            to introduce this chapter; a slab is a stronger version of the same
+            gesture, and running both would mean two canvases doing one job. The
+            slab replaces it, so this costs no extra shader — which matters on a
+            page that fought its way to Lighthouse 99.
+
+            Coral only works because of how the slab is built. Flat coral is
+            3.26:1 against white and fails AA; tinting dark art coral keeps the
+            luminance down — measured at 27.3% grey at its brightest, ~9.5:1. */}
         <div>
-            {/* CHAPTER 07. Was a solid coral field; reverted for the same reason
-                as 03. The violet divider directly above this section bleeds down
-                into it, and a flat background is exactly what stops that art
-                arriving. The hue survives in the numeral and the eyebrow. */}
-            <section class="chapter relative py-24 sm:py-32" style="--hue: var(--color-chroma-coral)">
+            <section class="chapter chapter-slab py-24 sm:py-32" style="--hue: var(--color-chroma-coral)">
+                <div class="chapter-slab__art" aria-hidden="true"><NeatBackground variant="a" client:visible /></div>
+                <div class="chapter-slab__tint" aria-hidden="true"></div>
+                <div class="chapter-slab__scrim" aria-hidden="true"></div>
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
