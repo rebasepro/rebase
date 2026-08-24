@@ -210,7 +210,7 @@ interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, 
 interface BuiltinAuthAdapterConfig { allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableMagicLink, oauthProviders, serviceKey }
 interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storageSources }
 interface BundleSchema { enums, relations, tables }
-interface CapturedEmail { at, html, id, links, subject, text, to }
+interface CapturedEmail { at, html, id, links, messageId, subject, text, to }
 interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
@@ -230,7 +230,8 @@ interface DevEmailSink { clear, list, sendEmail }
 interface DriverConnection { connectionString, db, pool, query }
 interface DriverRegistry { get, getDefault, getOrDefault, has, list, register, size }
 interface EmailConfig { appName, from, logoUrl, magicLinkUrl, resetPasswordUrl, sendEmail, smtp, templates, verifyEmailUrl }
-interface EmailSendOptions { html, replyTo, subject, text, to }
+interface EmailSendOptions { headers, html, replyTo, subject, text, to }
+interface EmailSendResult { accepted, messageId, rejected }
 interface EmailService { isConfigured, send, verifyConnection }
 interface EnqueueOptions { delayMs, idempotencyKey, maxAttempts }
 interface ErrorResponse { error }

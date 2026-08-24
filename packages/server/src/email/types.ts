@@ -7,9 +7,9 @@
  * (SMTP, template functions, …), so a backend imports one module, not two.
  */
 
-import type { EmailService, EmailSendOptions } from "@rebasepro/types";
+import type { EmailService, EmailSendOptions, EmailSendResult } from "@rebasepro/types";
 
-export type { EmailService, EmailSendOptions };
+export type { EmailService, EmailSendOptions, EmailSendResult };
 
 /**
  * SMTP server configuration
@@ -83,7 +83,7 @@ export interface EmailConfig {
      * Alternative: custom function to send emails
      * Use this for custom email providers (AWS SES SDK, Resend, etc.)
      */
-    sendEmail?: (options: EmailSendOptions) => Promise<void>;
+    sendEmail?: (options: EmailSendOptions) => Promise<EmailSendResult | void>;
 
     /**
      * Base URL for password reset links (e.g., "https://myapp.com")

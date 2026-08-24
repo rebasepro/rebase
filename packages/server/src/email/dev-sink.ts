@@ -25,7 +25,7 @@
  * The buffer is also capped and in-process. It is a development convenience, not
  * a mailbox — a restart empties it, and nothing persists it.
  */
-import type { EmailSendOptions } from "./types";
+import type { EmailSendOptions, EmailSendResult } from "./types";
 import { logger } from "../utils/logger";
 
 /** How many messages the ring buffer keeps before dropping the oldest. */
@@ -34,6 +34,15 @@ const DEFAULT_CAPACITY = 50;
 export interface CapturedEmail {
     /** Monotonic within a process. Not stable across restarts. */
     id: number;
+    /**
+     * The synthetic Message-ID this sink reported to the caller.
+     *
+     * Real, in the sense that it is what `send()` returned and what an
+     * application will have stored — so a flow that threads a reply against it
+     * behaves the same here as against a mail server, which is the entire point
+     * of the sink.
+     */
+    messageId: string;
     at: string;
     to: string;
     subject: string;
@@ -51,7 +60,7 @@ export interface CapturedEmail {
 
 export interface DevEmailSink {
     /** Drop-in for `EmailConfig.sendEmail`. */
-    sendEmail: (options: EmailSendOptions) => Promise<void>;
+    sendEmail: (options: EmailSendOptions) => Promise<EmailSendResult>;
     /** Most recent first. */
     list: () => CapturedEmail[];
     clear: () => void;
@@ -98,9 +107,14 @@ export function createDevEmailSink(options: { capacity?: number } = {}): DevEmai
     let nextId = 1;
     let announced = false;
 
-    const sendEmail = async (mail: EmailSendOptions): Promise<void> => {
+    const sendEmail = async (mail: EmailSendOptions): Promise<EmailSendResult> => {
+        const id = nextId++;
         const captured: CapturedEmail = {
-            id: nextId++,
+            id,
+            // Shaped like a real one and unique per process, so code that
+            // stores it and later matches a reply against it exercises the same
+            // path in development as in production.
+            messageId: `${id}.${Date.now()}.dev-sink@rebase.local`,
             at: new Date().toISOString(),
             to: formatRecipient(mail.to),
             subject: mail.subject,
@@ -131,6 +145,8 @@ export function createDevEmailSink(options: { capacity?: number } = {}): DevEmai
                 ? `\n         ${captured.links.join("\n         ")}`
                 : "\n         (no links in this message)")
         );
+
+        return { messageId: captured.messageId, accepted: [captured.to] };
     };
 
     return {

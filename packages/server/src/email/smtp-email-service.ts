@@ -1,5 +1,5 @@
 import type { Transporter } from "nodemailer";
-import { EmailConfig, EmailSendOptions, EmailService } from "./types";
+import { EmailConfig, EmailSendOptions, EmailSendResult, EmailService } from "./types";
 import { assertEmailLinkBases } from "./link-base";
 import { logger } from "../utils/logger";
 
@@ -29,6 +29,42 @@ function getHostname(urlStr: string): string | undefined {
     } catch {
         return undefined;
     }
+}
+
+/**
+ * Reject a header value that would end its own header.
+ *
+ * A CR or LF inside a value terminates the header and starts a new one, so any
+ * field assembled from data the sender did not write — a subject echoed back, a
+ * name from a form — is an injection point for `Bcc:`, a replaced body, or a
+ * second message entirely.
+ *
+ * It throws rather than stripping the newline, because stripping produces a
+ * message the caller did not write and tells nobody, and because a caller
+ * reaching this line has a bug worth seeing. The name is checked too: RFC 5322
+ * limits it to printable ASCII other than colon, and nodemailer will happily
+ * pass through whatever it is given.
+ */
+function assertSafeHeaders(headers: Record<string, string> | undefined): void {
+    if (!headers) return;
+    for (const [name, value] of Object.entries(headers)) {
+        if (!/^[!-9;-~]+$/.test(name)) {
+            throw new Error(`Invalid email header name ${JSON.stringify(name)}: expected printable ASCII without a colon.`);
+        }
+        if (/[\r\n]/.test(value)) {
+            throw new Error(
+                `Invalid value for email header "${name}": header values cannot contain CR or LF. `
+                + "A newline here would end the header and begin another one."
+            );
+        }
+    }
+}
+
+/** `<abc@host>` → `abc@host`. See EmailSendResult.messageId for why. */
+function normalizeMessageId(value: unknown): string | undefined {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim().replace(/^<|>$/g, "").trim();
+    return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**
@@ -94,11 +130,18 @@ export class SMTPEmailService implements EmailService {
     /**
      * Send an email using SMTP or custom send function
      */
-    async send(options: EmailSendOptions): Promise<void> {
+    async send(options: EmailSendOptions): Promise<EmailSendResult> {
+        // Validated before either path, so a custom `sendEmail` provider cannot
+        // be handed a header its own client will splice into the message.
+        assertSafeHeaders(options.headers);
+
         // Use custom send function if provided
         if (this.config.sendEmail) {
-            await this.config.sendEmail(options);
-            return;
+            // A custom provider may report nothing — it is typed to allow
+            // `void` so that an existing `async () => {}` still satisfies it —
+            // and "did not report an id" is a normal outcome, not a failure.
+            const result = await this.config.sendEmail(options);
+            return result ?? {};
         }
 
         // Use SMTP transporter
@@ -111,14 +154,24 @@ export class SMTPEmailService implements EmailService {
         const to = Array.isArray(options.to) ? options.to.join(", ") : options.to;
 
         try {
-            await this.transporter.sendMail({
+            const info = await this.transporter.sendMail({
                 from: this.config.from,
                 to,
                 subject: options.subject,
                 html: options.html,
                 text: options.text,
-                replyTo: options.replyTo
+                replyTo: options.replyTo,
+                headers: options.headers
             });
+
+            return {
+                messageId: normalizeMessageId(info?.messageId),
+                // Present on SMTP, absent on some transports. Passed through
+                // as-is: a rejected recipient is the provider's report, not an
+                // error, and the caller is the one who knows what to do with it.
+                accepted: Array.isArray(info?.accepted) ? info.accepted.map(String) : undefined,
+                rejected: Array.isArray(info?.rejected) ? info.rejected.map(String) : undefined
+            };
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             logger.error("Failed to send email", { detail: message });

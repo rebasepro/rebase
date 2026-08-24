@@ -144,9 +144,15 @@ describe("resolveEmailOptions — when the sink is used", () => {
     it("each boot gets its own buffer", async () => {
         const a = resolveEmailOptions(env(DEV))!;
         const b = resolveEmailOptions(env(DEV))!;
-        await a.sendEmail!({ to: "a@x.com", subject: "only in a", text: "t" });
-        // Nothing shared: b's sink never saw it. Asserted through the public
-        // surface rather than by reaching into either closure.
-        await expect(b.sendEmail!({ to: "b@x.com", subject: "only in b", text: "t" })).resolves.toBeUndefined();
+        const first = await a.sendEmail!({ to: "a@x.com", subject: "only in a", text: "t" });
+        const second = await b.sendEmail!({ to: "b@x.com", subject: "only in b", text: "t" });
+
+        // Nothing shared: b's sink never saw a's message. Asserted through the
+        // public surface rather than by reaching into either closure — the ids
+        // are numbered per sink, so two independent sinks both start at 1 and
+        // the timestamps are what separate them.
+        expect(first).toMatchObject({ messageId: expect.stringContaining("dev-sink@rebase.local") });
+        expect(second).toMatchObject({ messageId: expect.stringContaining("dev-sink@rebase.local") });
+        expect(second!.accepted).toEqual(["b@x.com"]);
     });
 });

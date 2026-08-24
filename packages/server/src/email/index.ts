@@ -5,6 +5,7 @@
 export type {
     EmailService,
     EmailSendOptions,
+    EmailSendResult,
     SMTPConfig,
     EmailConfig,
     PasswordResetTemplateFunction,

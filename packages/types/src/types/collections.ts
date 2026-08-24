@@ -3,6 +3,7 @@ import type { CollectionCallbacks } from "./entity_callbacks";
 import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
 
 import type { User } from "../users";
+import type { EmailSendResult } from "../controllers/email";
 import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
 import { getDataSourceCapabilities } from "./data_source";
@@ -702,8 +703,14 @@ export interface AuthCollectionConfig {
 export interface AuthCollectionContext {
     /** Hash a password using the configured algorithm (scrypt by default). */
     hashPassword: (password: string) => Promise<string>;
-    /** Send an email. Only available when email service is configured. */
-    sendEmail?: (options: { to: string; subject: string; html: string; text?: string }) => Promise<void>;
+    /**
+     * Send an email. Only available when email service is configured.
+     *
+     * Resolves with what the provider reported — the assigned Message-ID, most
+     * usefully — so a hook that sends a message can store the id and later
+     * thread a reply back to it. Callers that do not care may ignore it.
+     */
+    sendEmail?: (options: { to: string; subject: string; html: string; text?: string }) => Promise<EmailSendResult>;
     /** Whether the email service is configured and available. */
     emailConfigured: boolean;
     /** The app name from email config (for templates). */

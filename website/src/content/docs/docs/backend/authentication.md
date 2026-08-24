@@ -582,7 +582,7 @@ const membersCollection = defineCollection({
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
-- `sendEmail?: (options) => Promise<void>` — Send an email (only available when email service is configured).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured). Resolves with what the provider reported — `messageId`, `accepted`, `rejected` — so a hook can store the id and later thread a reply back to it.
 - `emailConfigured: boolean` — Whether email service is configured.
 - `appName: string` — The app name from email config.
 - `resetPasswordUrl: string` — The password reset link base URL.
