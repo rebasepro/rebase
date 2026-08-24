@@ -15,7 +15,7 @@ The headline is not "here is what to build". It is:
 
 Five subsystems are complete, tested, and reachable from nothing. They are not stray dead
 code: together they are waves 4–7 of
-[tenancy-and-cost-plan-2026-07.md](tenancy-and-cost-plan-2026-07.md), each built in
+[tenancy-and-cost-plan-2026-07.md](../plans/tenancy-and-cost-plan-2026-07.md), each built in
 isolation and never wired to the others.
 
 ---
@@ -101,7 +101,7 @@ This is the part the audit was asked for.
 was a `topology` block in the tenant's `rebase.json`. **That would have been a second
 definition of the same word**, on the wrong side of the trust boundary, and it repeats the
 `mode` failure catalogued in
-[apps-and-runtimes.md §2.1](apps-and-runtimes.md). Decision: topology stays derived and
+[apps-and-runtimes.md §2.1](../apps-and-runtimes.md). Decision: topology stays derived and
 platform-side. Nothing tenant-authored.
 
 Minor drift worth fixing while nearby: the plan's §4.1 lists a `k8s-shared-pool`

@@ -3,7 +3,7 @@
 <!-- impeccable:product-schema 1 -->
 
 `@rebasepro/ui` — the Rebase design system. Inherits
-[`/PRODUCT.md`](../../PRODUCT.md) for shared Rebase truth. This file records only
+[`/PRODUCT.md`](../../docs/PRODUCT.md) for shared Rebase truth. This file records only
 what is specific to the library.
 
 ## Platform

@@ -1,7 +1,7 @@
 # Independent release of a unit — the options
 
 Status: **decision document**, 2026-08-18. No code changed.
-Resolves G1 of [independent-deployment-audit-2026-08-18.md](independent-deployment-audit-2026-08-18.md).
+Resolves G1 of [independent-deployment-audit-2026-08-18.md](../audits/independent-deployment-audit-2026-08-18.md).
 Read that first for why this is the only structural gap left on the self-host side.
 
 ---

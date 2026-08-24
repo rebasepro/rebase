@@ -44,7 +44,7 @@ The admin panel is a **layer you opt into**, not the price of entry. Add collect
 
 ### Adopt only what you want
 
-Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](./docs/MODULAR-ARCHITECTURE.md).
+Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](docs/MODULAR-ARCHITECTURE.md).
 
 | Mode | You get | Comparable to |
 | --- | --- | --- |
@@ -330,7 +330,7 @@ If your AI coding agent or database role permissions cause a `permission denied 
 - 📖 [Documentation](https://rebase.pro/docs)
 - 💬 [Discord Community](https://discord.gg/fxy7xsQm3m)
 - 🐛 [GitHub Issues](https://github.com/rebasepro/rebase/issues)
-- 📝 [Changelog](./CHANGELOG.md)
+- 📝 [Changelog](CHANGELOG.md)
 
 ---
 

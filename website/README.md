@@ -6,12 +6,12 @@ and Tailwind CSS v4.
 
 ## Before you change a page
 
-Read [`SITE-STORY.md`](./SITE-STORY.md) first. It is the source of truth for what
+Read [`SITE-STORY.md`](SITE-STORY.md) first. It is the source of truth for what
 each page is for: the claims the site is allowed to lead with, the information
 architecture, the per-page demo budget, and the design language. **If a section
 can't be justified from that document, it does not belong on the site.**
 
-[`PRODUCT.md`](./PRODUCT.md) records the durable product truth behind it —
+[`PRODUCT.md`](PRODUCT.md) records the durable product truth behind it —
 audience, constraints, and the things future work must not fabricate.
 
 ## Commands
@@ -83,4 +83,4 @@ Never hand-edit these; change the source or the generator in `scripts/`.
   run it again.
 - **`NeatBackground` does not render in headless screenshots.** It is decoration,
   never a section's only light — pair it with CSS radial gradients.
-- Open legal items are tracked in [`LEGAL-TODO.md`](./LEGAL-TODO.md).
+- Open legal items are tracked in [`LEGAL-TODO.md`](LEGAL-TODO.md).

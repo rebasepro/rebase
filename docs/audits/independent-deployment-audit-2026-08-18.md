@@ -92,7 +92,7 @@ This is by design and it is written down — `docs/runtime-roles-plan-2026-08.md
 Phase 2, explicitly "after somebody has run a split deployment". Somebody now has.
 
 **What shipped** (2026-08-18, same day as this audit): option A of
-[independent-release-options-g1.md](independent-release-options-g1.md), in two
+[independent-release-options-g1.md](../plans/independent-release-options-g1.md), in two
 steps. The guard first — the provisioning process stamps the collections schema
 version it applied into `rebase.schema_meta`, and every other process computes
 its own and compares, warning by default and refusing under
@@ -123,7 +123,7 @@ axis the previous audit flagged for BYOC, arriving early. Decide it deliberately
 do not let a values-file field decide it.
 
 The five ways to answer it, what each costs and what it forecloses, are written
-up in [independent-release-options-g1.md](independent-release-options-g1.md).
+up in [independent-release-options-g1.md](../plans/independent-release-options-g1.md).
 
 ### G2 — The chart's default image tag does not exist — **FIXED**
 

@@ -8,7 +8,7 @@ contract, the CLI, and `rebase.json`.
 the real binary, not inferred from naming. Where a claim is about behaviour, the
 command or the file:line that proves it is given.
 
-Companion to [`dx-audit-2026-07-25.md`](./dx-audit-2026-07-25.md), which covered
+Companion to [`dx-audit-2026-07-25.md`](dx-audit-2026-07-25.md), which covered
 the first-run path. This one covers the APIs you live in afterwards.
 
 ---
@@ -325,7 +325,7 @@ including `CollectionClient`, `observe`, and `createMany`, are invisible to ever
 default code search. It is the only such file in the repository (swept across all
 tracked `.ts/.tsx/.js/.jsx/.md`).
 
-This is the failure mode already named in [`bug-classes.md`](./bug-classes.md).
+This is the failure mode already named in [`bug-classes.md`](../bug-classes.md).
 Functionally the value is correct and cannot collide with `JSON.stringify`
 output; only the source encoding is wrong.
 

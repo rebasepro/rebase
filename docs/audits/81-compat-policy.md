@@ -1,7 +1,7 @@
 # Unit 81 — the compatibility contract for a 1.0 (policy half)
 
 Read-only audit, 2026-08-08. Companion to
-[`api-surface-audit-2026-08-05.md`](../api-surface-audit-2026-08-05.md), which
+[`api-surface-audit-2026-08-05.md`](api-surface-audit-2026-08-05.md), which
 covered *what is exported*. This covers *what is allowed to change, and what
 enforces that*.
 

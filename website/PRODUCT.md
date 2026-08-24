@@ -3,7 +3,7 @@
 <!-- impeccable:product-schema 1 -->
 
 The marketing site and documentation at `rebase.pro`. Inherits
-[`/PRODUCT.md`](../PRODUCT.md) for shared Rebase truth — users, positioning,
+[`/PRODUCT.md`](../docs/PRODUCT.md) for shared Rebase truth — users, positioning,
 capabilities, brand commitments, and the self-host-only constraint. This file
 records only what is specific to the site.
 

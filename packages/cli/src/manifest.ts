@@ -466,7 +466,7 @@ function refuseStorageBlock(raw: unknown, issues: ManifestValidationIssue[]): un
  * else. It used to be inferred from the presence of `backend/src/index.ts`,
  * which every scaffolded project had whether or not it wanted its own server, so
  * projects predating the manifest silently landed on the custom runtime and paid
- * for it (see `docs/cloud-deploy-workspace-vendoring.md`).
+ * for it (see `docs/plans/cloud-deploy-workspace-vendoring.md`).
  */
 export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
     const exists = (relative: string): boolean => fs.existsSync(path.join(projectRoot, relative));

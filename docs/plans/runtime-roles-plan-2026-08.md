@@ -36,7 +36,7 @@ whole story. Phase 2+ (per-function declared resources, scale-to-zero,
 per-function autoscaling and metering) is control-plane work that builds on this
 and is out of scope; see §6.
 
-Related reading: [apps-and-runtimes.md](apps-and-runtimes.md) for the
+Related reading: [apps-and-runtimes.md](../apps-and-runtimes.md) for the
 bundle/runtime split this sits on top of, and
 `website/src/content/docs/docs/architecture/runtime-and-bundles.md` for the
 published version of the same.
