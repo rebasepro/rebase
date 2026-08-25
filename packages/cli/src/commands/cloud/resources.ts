@@ -222,18 +222,85 @@ connectionStatus: db.connectionStatus ?? null } : null,
 
 /* ─── metrics: live compute metrics ────────────────────────────── */
 
+/** What `/api/functions/metrics/:projectId` returns. Mirrors saas metrics.ts. */
+interface TenantMetrics {
+    status?: string;
+    cpu?: string;
+    memory?: string;
+    memoryPercent?: string;
+    disk?: string | null;
+    /** What the figures are OF — a project is not one machine. */
+    subject?: { workload?: string; kind?: string; sampledInstances?: number } | null;
+    /** The ceiling the percentages are measured against, per instance. */
+    allocation?: {
+        cpuLimitMillicores?: number | null;
+        memoryLimitBytes?: number | null;
+        cpuRequestMillicores?: number | null;
+        memoryRequestBytes?: number | null;
+    } | null;
+    instances?: {
+        name?: string;
+        phase?: string;
+        ready?: boolean;
+        restarts?: number;
+        cpuMillicores?: number | null;
+        memoryBytes?: number | null;
+        /** Why the previous container died. The whole story of a crashloop. */
+        lastTerminationReason?: string | null;
+        lastTerminationExitCode?: number | null;
+        /** Why it has not started yet — ImagePullBackOff, CreateContainerError. */
+        waitingReason?: string | null;
+    }[] | null;
+    condition?: { reason?: string; message?: string } | null;
+}
+
+/**
+ * CPU with the ceiling it is a percentage of.
+ *
+ * A bare "0.2%" is unreadable without knowing 0.2% of what, and on a burstable
+ * pod the answer is not obvious: these request 250m and may burst to 2 vCPU, so
+ * a pod at 40% of its LIMIT is at over three times its guaranteed share and may
+ * still be throttled. Naming both is the difference between a number and a
+ * number that means something.
+ */
+function cpuLine(m: TenantMetrics): string | undefined {
+    if (!m.cpu) return undefined;
+    const limit = m.allocation?.cpuLimitMillicores;
+    const request = m.allocation?.cpuRequestMillicores;
+    if (limit == null && request == null) return m.cpu;
+    const parts = [
+        request != null ? `${request}m guaranteed` : null,
+        limit != null ? `bursts to ${limit}m` : null
+    ].filter(Boolean).join(", ");
+    return `${m.cpu} ${chalk.gray(`(${parts}, per instance)`)}`;
+}
+
 export async function metricsCommand(rawArgs: string[]): Promise<void> {
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
-        const m = await client.functions.invoke<{
-            status?: string;
-            cpu?: string;
-            memory?: string;
-            memoryPercent?: string;
-            disk?: string;
-        }>("metrics", undefined, { method: "GET",
-path: projectId });
+        const m = await client.functions.invoke<TenantMetrics>(
+            "metrics", undefined, { method: "GET", path: projectId }
+        );
+
+        // What the numbers are OF. The endpoint has reported this since it
+        // learned to, and this command threw it away — printing bare
+        // "CPU / Memory" over figures that only ever cover the backend
+        // Deployment. A reader had every reason to think the database was in
+        // them; `metrics.ts` says in its own comment that it is not.
+        const of = m.subject?.workload
+            ? `${m.subject.workload}${m.subject.kind === "deployment" ? " (backend only — not the database)" : ""}`
+            : undefined;
+
+        // Sampled, not desired. A pod that has not reported to metrics-server
+        // yet is absent from the sum, so "89 MiB" across one instance of two is
+        // half a picture and should say so.
+        const sampled = m.subject?.sampledInstances;
+        const coverage = sampled === undefined
+            ? undefined
+            : sampled === 0
+              ? chalk.yellow("no instances reported yet")
+              : `${sampled} instance${sampled === 1 ? "" : "s"}`;
 
         emit(
             () => {
@@ -242,10 +309,47 @@ path: projectId });
                 console.log("");
                 keyValues([
                     ["Status", m.status ? colorStatus(m.status === "running" ? "active" : m.status) : undefined],
-                    ["CPU", m.cpu],
+                    ["Measuring", of],
+                    ["Sampled", coverage],
+                    ["CPU", cpuLine(m)],
                     ["Memory", m.memory ? `${m.memory}${m.memoryPercent ? ` (${m.memoryPercent})` : ""}` : undefined],
                     ["Disk", m.disk]
                 ]);
+
+                // Why it is unhealthy, when it is. Straight from the workload's
+                // own conditions — the endpoint does not interpret it and
+                // neither does this.
+                if (m.condition) {
+                    console.log("");
+                    console.error(chalk.red(`  ✗ ${m.condition.reason ?? "Not healthy"}`));
+                    if (m.condition.message) note(`  ${m.condition.message}`);
+                }
+
+                // Per instance, because an average hides the pod that is hot.
+                if (m.instances?.length) {
+                    console.log("");
+                    note("  Instances");
+                    for (const i of m.instances) {
+                        const cpu = i.cpuMillicores != null ? `${Math.round(i.cpuMillicores)}m` : "—";
+                        const mem = i.memoryBytes != null ? `${(i.memoryBytes / 1024 / 1024).toFixed(0)} MiB` : "—";
+                        const health = i.ready === false ? chalk.yellow(" not ready") : "";
+                        // Restarts are the first thing anyone wants when a
+                        // tenant is misbehaving, and a silent 0 is noise — so it
+                        // only appears when there are any.
+                        const restarts = i.restarts ? chalk.yellow(` ${i.restarts}×restarted`) : "";
+                        note(`    ${(i.name ?? "?").padEnd(34)} ${cpu.padStart(6)}  ${mem.padStart(9)}${health}${restarts}`);
+                        // Why the last one died, when one did. This is the line
+                        // that turns "it keeps restarting" into a diagnosis, and
+                        // it was being fetched and discarded.
+                        if (i.lastTerminationReason) {
+                            note(chalk.gray(
+                                `      last exit: ${i.lastTerminationReason}` +
+                                (i.lastTerminationExitCode != null ? ` (code ${i.lastTerminationExitCode})` : "")
+                            ));
+                        }
+                        if (i.waitingReason) note(chalk.gray(`      waiting: ${i.waitingReason}`));
+                    }
+                }
                 console.log("");
             },
             {
@@ -254,7 +358,14 @@ path: projectId });
                 cpu: m.cpu ?? null,
                 memory: m.memory ?? null,
                 memoryPercent: m.memoryPercent ?? null,
-                disk: m.disk ?? null
+                disk: m.disk ?? null,
+                // Passed through rather than reshaped: a script that wants the
+                // ceiling to compute its own percentage should get the same
+                // numbers the server sent.
+                subject: m.subject ?? null,
+                allocation: m.allocation ?? null,
+                instances: m.instances ?? null,
+                condition: m.condition ?? null
             }
         );
     } catch (e) {
