@@ -5115,6 +5115,7 @@ const backend = await initializeRebaseBackend({
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
+| `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
@@ -5176,7 +5177,7 @@ Or from the environment, which is what a managed deployment has:
 ```bash
 CAPTCHA_PROVIDER=turnstile
 CAPTCHA_SECRET=...
-CAPTCHA_ROUTES=register,forgotPassword,magicLink   # optional; this is the default
+CAPTCHA_ROUTES=register,forgotPassword,magicLink,emailOtp   # optional; this is the default
 ```
 
 The client sends the widget's token as `captchaToken` in the JSON body, or in
@@ -5234,6 +5235,65 @@ This is on whenever all three hold, and there is no setting that changes them:
 If any of them does not hold, `POST /auth/magic-link` and
 `POST /auth/forgot-password` answer `503 EMAIL_NOT_CONFIGURED` as before. In
 production, set `SMTP_HOST` (or `auth.email.sendEmail`) to send mail for real.
+
+##### Reading the captured mail without a terminal
+
+The log is only useful to someone watching it. A server in Docker, a second
+window, or a scrolled-past line all leave a link that was printed and cannot be
+found — so the same capture is served over HTTP:
+
+```
+GET    /api/admin/dev/emails      → { enabled: true, messages: [ … ] }
+DELETE /api/admin/dev/emails      → empties the mailbox
+```
+
+Each message carries `to`, `subject`, `at`, the `html` and `text` parts, and
+`links` — the absolute URLs found in the body, in document order, which is the
+part anyone actually wants.
+
+It is admin-only, through the same gate cron, logs and backups use, and it
+answers `501 DEV_MAILBOX_UNAVAILABLE` when there is nothing to serve — with SMTP
+configured, mail was delivered rather than held. `NODE_ENV=production` refuses
+it regardless of anything else: what these messages contain is a working login.
+
+#### One-time codes by email
+
+A magic link opens the session on whichever device holds the mailbox. That is
+the right device on a laptop and the wrong one everywhere else — a television, a
+terminal, a second browser, a kiosk. A code crosses that gap, because a person
+carries it across.
+
+```ts
+auth: {
+    emailOtp: true,   // or AUTH_EMAIL_OTP=true
+    email: { /* … */ }
+}
+```
+
+```ts
+await rebase.auth.sendEmailOtp("someone@example.com");
+// …the person reads six digits out of their inbox…
+const { user } = await rebase.auth.verifyEmailOtp("someone@example.com", "384102");
+```
+
+The address is sent again with the code, and that is not a convenience. What is
+stored is a hash of the address *and* the code together, so a guess is a guess
+against one named account — not against every account in the table at once,
+which is what a code-only lookup would make of a million possibilities.
+
+The rest of what keeps six digits sufficient:
+
+- **Ten minutes**, and single use.
+- **Five verification attempts per address per window**, keyed on the address
+  rather than the caller's IP: an IP is the attacker's to rotate and the account
+  under attack is not. Counts live wherever the deployment's rate-limit store
+  does — per replica by default, shared with `REBASE_RATE_LIMIT_STORE=sql`.
+- **Uniform digits**, from `randomInt` rather than a modulo of random bytes.
+- `POST /auth/otp` answers identically for an address with no account, so it
+  cannot be used to ask whether somebody is a customer.
+
+Reading a code out of the inbox proves the address, so a successful sign-in
+marks it verified — exactly as following a magic link does.
 
 #### Branding the default emails
 
@@ -5396,6 +5456,8 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Exchange a magic-link token for a session |
+| `POST` | `/api/auth/otp` | Email a six-digit sign-in code. Answers the same whether or not the address has an account |
+| `POST` | `/api/auth/otp/verify` | Exchange `{ email, code }` for a session |
 | `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
 | `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
@@ -5611,7 +5673,7 @@ const membersCollection = defineCollection({
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
-- `sendEmail?: (options) => Promise<void>` — Send an email (only available when email service is configured).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured). Resolves with what the provider reported — `messageId`, `accepted`, `rejected` — so a hook can store the id and later thread a reply back to it.
 - `emailConfigured: boolean` — Whether email service is configured.
 - `appName: string` — The app name from email config.
 - `resetPasswordUrl: string` — The password reset link base URL.
@@ -6074,6 +6136,41 @@ reachable anonymously, so the work is bounded rather than merely cached:
   answers **503 `TRANSFORM_OVERLOADED`** rather than accepting work it will not
   get to.
 
+That cache lives in the process, which means it is not shared between instances
+and does not survive a restart. Two replicas each compute every variant, and a
+deploy throws all of it away.
+
+#### Renditions that survive a restart
+
+`storageRenditionCache` writes each derived image back to the same bucket as its
+source, so the work is done once for the whole deployment rather than once per
+instance per release:
+
+```ts
+storageRenditionCache: { enabled: true }
+```
+
+or `STORAGE_RENDITION_CACHE=true` for a bundle deployment. Renditions are stored
+under the reserved prefix `_rebase/renditions/`, keyed by the source object's
+version — so replacing an image serves the new one immediately.
+
+Three things to know before turning it on:
+
+- **A read now writes.** Each new variant costs one `PUT` in your bucket. It is
+  off by default for that reason.
+- **A failed write is not a failed request.** Read-only credentials, or a bucket
+  policy that refuses the prefix, degrade to the in-process cache; the image is
+  still served and the reason is logged once.
+- **Superseded renditions are not collected.** Replacing a source object
+  abandons its old renditions. Set a lifecycle rule on `_rebase/renditions/`
+  — that prefix is fixed, not configurable, precisely so a rule can name it.
+
+The prefix is not addressable from the API. Reading or writing it directly
+answers **400 `INVALID_STORAGE_KEY`**: every access rule in the product —
+`storageAuthorize` and the declarative policies alike — is written against the
+*source* key, and a rendition served under its own path would answer a question
+nobody asked.
+
 #### What gets served
 
 The stored content type is whatever the uploader declared — nothing sniffs the
@@ -6368,6 +6465,52 @@ Worth knowing:
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
+
+### Reacting to an upload
+
+Every other write in Rebase can be reacted to — a row has `beforeSave` and
+`afterSave`, a schedule has a cron job — and an upload had nothing. Anything an
+upload implied had to be done by the client, on a second call, which means it
+was not done at all when the client went away in between.
+
+```ts
+storageTriggers: [
+    {
+        path: "uploads/:uid/**",
+        events: ["finalize"],
+        handler: async ({ key, params, size, user }) => {
+            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+        }
+    }
+]
+```
+
+The pattern language is the same as `storagePolicies` — literal segments, `*`
+for one segment, `:name` to capture one, `**` for the rest — and a malformed
+pattern fails the boot rather than quietly matching nothing.
+
+| Event | When |
+| --- | --- |
+| `finalize` | after the object is durably written; never for a write that failed |
+| `delete` | after the object is gone |
+
+`finalize` fires for the multipart and the resumable (TUS) paths alike — once
+per upload, not once per chunk — and a resumable upload reports the user who
+*created* it, since that is the principal the authorization checked.
+
+What a handler must not assume:
+
+- **A throwing handler does not fail the request.** The object is already stored
+  by the time it runs, so answering the client with an error would say the
+  upload failed when it did not, and clients retry uploads. Failures are logged
+  and the response is unchanged. If the work must happen, enqueue a job.
+- **Handlers are awaited**, in declaration order, before the response is sent —
+  firing and forgetting would leave a promise a serverless runtime is free to
+  freeze mid-flight. A slow handler is therefore a slow upload, which is the
+  other reason to enqueue rather than to work here.
+- **Internal writes do not fire triggers.** The image-rendition cache writes
+  derived objects straight to the storage controller; a `**` trigger firing on
+  those would be firing on its own output.
 
 ### Next Steps
 
@@ -16296,6 +16439,58 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 Run it under systemd, with `Environment=` lines for the variables above.
+
+### Connection pooling
+
+The runtime holds a small, long-lived pool and does not need a pooler. What does
+is everything else that talks to the same database and cannot hold a connection:
+a serverless function, a scheduled script, a BI tool, a queue worker that scales
+to fifty. Postgres' `max_connections` is a hard limit in the low hundreds and
+each connection is a *process*, so a lambda fan-out exhausts it long before the
+database is busy.
+
+The compose file ships a `pgbouncer` service for that traffic, behind a profile
+so a deployment with no such callers does not run a process it has no use for:
+
+```bash
+docker compose --profile pooler up -d
+```
+
+```
+postgres://rebase:$POSTGRES_PASSWORD@your-host:6432/rebase
+```
+
+```bash
+PGBOUNCER_PORT=6432           # host port
+PGBOUNCER_MAX_CLIENT_CONN=500 # client connections accepted
+PGBOUNCER_POOL_SIZE=20        # server connections used to serve them
+```
+
+Keep the sum of `PGBOUNCER_POOL_SIZE` across every pooler comfortably under the
+database's `max_connections` — the runtime is drawing from the same budget.
+
+#### What transaction pooling changes
+
+A pooled client holds a server connection for the length of a transaction and
+then gives it back, which is what lets 500 clients share 20 connections. Three
+things stop working through that port, and each is something Rebase itself uses
+— which is exactly why the runtime connects directly and this port is for other
+callers:
+
+- **`LISTEN`/`NOTIFY`.** Realtime is built on it, and a listener needs a
+  connection that outlives a transaction.
+- **Session state**: `SET` (as opposed to `SET LOCAL`), advisory locks held
+  across statements, `WITH HOLD` cursors, temporary tables. The next transaction
+  is on a different server connection and will not see any of it.
+- **Protocol-level prepared statements.** Most drivers can be told not to use
+  them — node-postgres does not by default; asyncpg needs
+  `statement_cache_size=0`.
+
+`SET LOCAL` is transaction-scoped and works, which is what row-level security is
+set with — so RLS behaves identically through the pooled port.
+
+Leave the profile off if nothing outside the runtime connects to your database.
+An unused port is surface.
 
 ### Health checks
 

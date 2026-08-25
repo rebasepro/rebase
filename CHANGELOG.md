@@ -126,6 +126,64 @@
   naming the cause. Sizes and allowances are both summed per project now, so a
   second database brings its own space rather than splitting the first one's.
 
+- **Six-digit sign-in codes by email.** A magic link opens the session on
+  whichever device holds the mailbox, which is the wrong device on a television,
+  a terminal, a kiosk or a second browser — the flow simply cannot be completed
+  there. `auth.emailOtp` (or `AUTH_EMAIL_OTP=true`) adds `POST /auth/otp` and
+  `POST /auth/otp/verify`, and `rebase.auth.sendEmailOtp` / `verifyEmailOtp` in
+  the client.
+
+  Six digits is a million possibilities, so what is stored is a hash of the
+  address *and* the code together: a guess is a guess against one named account
+  rather than against every account in the table, which is what a code-only
+  lookup would have made of it. Five verification attempts per address per
+  window, keyed on the address rather than the caller's IP because an IP is the
+  attacker's to rotate and the account under attack is not. Ten minutes, single
+  use, uniform digits. `POST /auth/otp` answers identically for an address with
+  no account, so it cannot be used to ask whether somebody is a customer.
+
+  `AUTH_MAGIC_LINK` arrives with it: both flows were code-level flags only, so a
+  bundle deployment — the shape every self-hosted and managed project runs —
+  could not turn either on without rebuilding.
+
+- **Storage triggers: run something when an object lands.** A row has
+  `beforeSave` and `afterSave`, a schedule has a cron job, and an upload had
+  nothing — so everything an upload implied had to be a second call from the
+  client, which means it does not happen when the client goes away between the
+  two. `storageTriggers` fires on `finalize` and `delete`, matched with the same
+  pattern language `storagePolicies` uses, for the multipart and resumable paths
+  alike. Handlers are awaited before the response, because a floating promise is
+  one a serverless runtime may freeze mid-flight; a handler that throws is
+  logged and does not fail the request, because the object is already stored and
+  an error would tell the client to repeat a write that succeeded.
+
+- **Image renditions can live in the storage source instead of one process's
+  memory.** The transform cache was per-instance and did not survive a restart,
+  so every replica computed every variant and every deploy threw the lot away.
+  `storageRenditionCache: { enabled: true }` writes each rendition back to the
+  source's own bucket under `_rebase/renditions/`, keyed by the source object's
+  version so a replaced image serves the new one. Off by default, because
+  turning it on makes a `GET` write to somebody's bucket — and when that write
+  fails the request still succeeds from memory, with the reason logged once.
+
+- **The development mailbox is readable over HTTP.** Auth mail with no SMTP
+  configured is captured and its links printed, which completes the flow for
+  somebody watching a terminal and leaves it incomplete for a server in Docker,
+  in another window, or one line above where the log has scrolled to.
+  `GET /api/admin/dev/emails` serves the same capture, `DELETE` empties it. What
+  it hands out is a working login, so it is gated three times over: admin-only,
+  a sink must be registered, and the handler re-reads `NODE_ENV` per request —
+  there is no configuration that makes it readable in production.
+
+- **A pooled Postgres port for the callers that cannot hold one.**
+  `docker compose --profile pooler up -d` adds pgbouncer on 6432, for the
+  serverless functions, scheduled scripts and BI tools that would otherwise
+  exhaust `max_connections` long before the database is busy. Documented with
+  what transaction pooling takes away — `LISTEN`/`NOTIFY`, session-level `SET`,
+  cross-statement advisory locks, prepared statements — which is why the runtime
+  keeps its direct connection. `SET LOCAL` survives, so RLS behaves identically
+  through it.
+
 ### Changed
 
 - **`EmailService.send()` reports what the provider said, and carries headers.** It returned `Promise<void>`, which meant an application that sent a message could not learn the id the server assigned it — so threading a reply back to the message that prompted it was impossible through this interface, and any app that needed it had to bypass the service and hold its own transport. It now resolves with `{ messageId, accepted, rejected }`, every field optional because not every backend reports them: an absent `messageId` means "not reported", never "not sent", which is still signalled by a throw. `messageId` comes back **without** angle brackets, since it is a value to store and compare against a reply's `In-Reply-To`, and one that sometimes carries brackets is a bug waiting in every comparison.
