@@ -137,6 +137,16 @@ export function loadCliFlags(root) {
         add("schema", driver);
     }
 
+    // `db backup` parses its own argv in the backup module rather than in the
+    // driver's cli.ts, so without this the union is missing `--out` — the flag
+    // `rebase db --help` puts in its own examples. The symptom is a docs
+    // finding against a command that works, which is worse than no finding: it
+    // sends a reader to "fix" correct documentation.
+    for (const rel of globSync("packages/server-postgres/src/backup/*.ts", { cwd: root })) {
+        if (path.basename(rel).endsWith(".test.ts")) continue;
+        add("db", read(root, rel));
+    }
+
     return flags;
 }
 

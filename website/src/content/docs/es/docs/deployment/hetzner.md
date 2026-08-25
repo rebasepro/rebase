@@ -1,113 +1,158 @@
 ---
 title: Despliegue de Rebase en Hetzner Cloud
-description: Aprenda a desplegar Rebase en Hetzner Cloud usando Docker Compose para un rendimiento excelente basado en la UE y soberanía de datos.
+description: Despliega Rebase en Hetzner Cloud con Terraform o Docker Compose, para un rendimiento europeo excelente y soberanía de datos.
 sidebar_label: Hetzner Cloud
 ---
 
-Hetzner Cloud es ampliamente reconocido por ofrecer una increíble relación rendimiento-precio y es una opción principal para proyectos que requieren estricta soberanía de datos europea y cumplimiento del GDPR (con centros de datos en Núremberg, Falkenstein y Helsinki).
+Hetzner Cloud ofrece una relación rendimiento-precio excepcional y es una opción sólida para proyectos que necesitan soberanía de datos europea, con centros de datos en Núremberg, Falkenstein y Helsinki.
 
-Desplegar Rebase en Hetzner es más fácil a través de Docker Compose en una instancia de nube estándar de Ubuntu.
+Nada de esto es específico de Hetzner en lo que respecta a tu proyecto. Un despliegue de Rebase son dos piezas separables — la imagen del runtime publicada y el **bundle** que produce `rebase build` — y el mismo bundle se ejecuta bajo Docker Compose en un portátil, en Rebase Cloud, bajo el [chart de Helm](/docs/deployment/kubernetes) y en una máquina de Hetzner. Cambiar entre ellos cambia la infraestructura, no la aplicación.
 
-## 1. Aprovisionar un Servidor
+## La vía más rápida: Terraform
 
-1. Inicie sesión en su Consola de Hetzner Cloud.
-2. Haga clic en **Añadir Servidor**.
-3. Elija su Ubicación preferida (p. ej., **Falkenstein** o **Núremberg**).
-4. Elija una Imagen: Seleccione **Ubuntu 24.04** o **App -> Docker CE** (esto preinstala Docker por usted).
-5. Elija un Tipo: Un `CPX21` (3 núcleos, 4GB de RAM) o `CX32` (4 núcleos, 8GB de RAM) proporciona una excelente base de cómputo para ejecutar Rebase + Postgres.
-6. Añada su clave SSH y pulse **Crear**.
+El módulo `terraform-hcloud-rebase` aprovisiona el servidor, un cortafuegos, una IP estable y — lo que de verdad importa — un volumen que contiene los datos de Postgres, de modo que reemplazar el host no destruye la base de datos.
 
-## 2. SSH y Configuración
+```hcl
+module "rebase" {
+  source = "rebasepro/rebase/hcloud"
 
-Una vez aprovisionado su servidor, obtenga la dirección IP pública.
+  domain          = "api.example.com"
+  cors_origins    = ["https://app.example.com"]
+  ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
 
-```bash
-ssh root@<your-server-ip>
-```
+  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
 
-Si no eligió la imagen de Docker, instale Docker y Docker Compose explícitamente:
-
-```bash
-apt update && apt install docker.io docker-compose-v2 -y
-```
-
-## 3. Clonar y Configurar Rebase
-
-Clone su proyecto Rebase directamente en la instancia del servidor.
-
-```bash
-git clone https://github.com/your-username/your-rebase-repo.git /opt/rebase
-cd /opt/rebase
-```
-
-Rebase proporciona un `docker-compose.yml` listo para usar. Necesitará definir sus variables de entorno de producción. Cree un archivo `.env.production`:
-
-```bash
-nano .env.production
-```
-
-Añada sus secretos:
-
-```env
-DATABASE_URL=postgresql://rebase_app:your_secure_db_password@postgres:5432/rebase
-JWT_SECRET=generate_a_very_long_secure_random_string_here
-NODE_ENV=production
-```
-
-*Asegúrese de actualizar `docker-compose.yml` si desea obtener la contraseña de Postgres de una variable de entorno.*
-
-## 4. Ejecutar la Pila
-
-Ponga la pila en línea usando el modo separado:
-
-```bash
-docker compose --env-file .env.production up -d --build
-```
-
-Docker construirá su backend de Node.js desde el `Dockerfile` local y pondrá en marcha el contenedor de Postgres. Una vez completado, su aplicación estará funcionando en `http://localhost:3001` (interno al servidor).
-
-## 5. Crear el Esquema de la Base de Datos
-
-Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de sus propias colecciones **no se crean automáticamente**. Debe aplicar el esquema una vez contra la base de datos de producción:
-
-```bash
-pnpm run db:push
-```
-
-Si omite este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
-
-En Hetzner ya dispone de un checkout del proyecto en el propio servidor (`/opt/rebase`), así que ejecútelo allí directamente con `DATABASE_URL` apuntando a la base de datos de producción; use `localhost:5432` como host, ya que el contenedor de Postgres expone ese puerto. Ejecútelo desde el checkout del proyecto, **no dentro del contenedor de la aplicación**: la imagen de producción se distribuye sin la CLI.
-
-Para migraciones versionadas, use `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
-
-## 6. Exponer a través de Caddy o Nginx
-
-Nunca debe exponer el puerto 3001 directamente a internet sin SSL. Recomendamos colocar **Caddy** delante de su instancia de Rebase para aprovisionar automáticamente certificados Let's Encrypt.
-
-Instalar Caddy:
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-Edite su Caddyfile:
-```bash
-nano /etc/caddy/Caddyfile
-```
-
-Añada lo siguiente (reemplace con su dominio, que debería tener su registro A apuntando a esta IP de Hetzner):
-
-```caddyfile
-admin.yourdomain.com {
-    reverse_proxy localhost:3001
+  s3_bucket            = "example-uploads"
+  s3_access_key_id     = var.s3_access_key_id
+  s3_secret_access_key = var.s3_secret_access_key
 }
 ```
 
-Reiniciar Caddy:
+Hay algo que debe estar bien antes del primer apply: el registro A de `domain` ya tiene que apuntar al servidor, o el desafío de Let's Encrypt de Caddy fallará. La dirección se crea de forma independiente del servidor, así que puedes obtenerla primero con `terraform apply -target=hcloud_primary_ip.ipv4`, configurar el DNS y luego aplicar de verdad.
+
+El resto de esta página es ese mismo despliegue a mano.
+
+## 1. Crear un servidor
+
+1. En la consola de Hetzner Cloud, haz clic en **Add Server**.
+2. Elige una **ubicación** — Falkenstein, Núremberg o Helsinki para residencia de datos en la UE.
+3. Elige una **imagen**: Ubuntu 24.04.
+4. Elige un **tipo**: `CPX21` (3 vCPU / 4 GB) es el mínimo viable, `CX32` (4 vCPU / 8 GB) es cómodo para el runtime más Postgres.
+5. Añade un **volumen** para la base de datos. Los datos en el disco propio del servidor mueren con el servidor.
+6. Añade tu clave SSH y créalo.
+
+## 2. Instalar Docker
+
 ```bash
-systemctl restart caddy
+ssh root@<ip-de-tu-servidor>
+apt update && apt install -y docker.io docker-compose-v2
 ```
 
-¡Eso es todo! Su plataforma Rebase está alojada de forma segura completamente dentro de la UE.
+## 3. Llevar tu bundle al servidor
+
+No hay ninguna imagen de aplicación que construir. `rebase build` produce un directorio `dist-bundle`, y la imagen del runtime publicada lo ejecuta:
+
+```bash
+rebase build
+rsync -a dist-bundle/ root@<ip-de-tu-servidor>:/opt/rebase/dist-bundle/
+```
+
+Para un despliegue real, es preferible una de las dos formas que no implican copiar archivos a mano:
+
+- **Hornearlo en una imagen** — `FROM rebasepro/server:0.16.0` y luego `COPY dist-bundle /bundle`; desplegar pasa a ser un cambio de etiqueta.
+- **Servirlo por HTTP** — define `REBASE_BUNDLE_URL` y el runtime descarga y descomprime el bundle en cada arranque. Es lo que hace el módulo de Terraform de arriba, y el mismo mecanismo que usa el chart de Helm.
+
+## 4. Configurar y arrancar
+
+Rebase incluye un fichero Compose exactamente para esto: [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). Es la receta canónica de autoalojamiento — Postgres y el runtime, con tu bundle montado — y merece la pena leerla en lugar de copiarla, porque sus comentarios explican cada decisión.
+
+Crea el entorno que espera:
+
+```env
+POSTGRES_PASSWORD=una_cadena_larga_y_aleatoria
+JWT_SECRET=otra_cadena_larga_de_al_menos_32_caracteres
+REBASE_SERVICE_KEY=una_tercera_cadena_larga_de_al_menos_32_caracteres
+CORS_ORIGINS=https://app.tudominio.com
+```
+
+Y levántalo:
+
+```bash
+docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
+```
+
+El runtime escucha en el puerto 8080 dentro de la red de Compose.
+
+`REBASE_SERVICE_KEY` se salta la seguridad a nivel de fila. Trátala como una credencial de superusuario de base de datos, no como una clave de API.
+
+## 5. Terminar TLS con Caddy
+
+Nunca expongas el runtime directamente. Caddy provisiona certificados de Let's Encrypt automáticamente; ejecutarlo como otro servicio de Compose mantiene toda la pila en un solo fichero:
+
+```yaml
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+```
+
+Con un `Caddyfile` así:
+
+```caddyfile
+api.tudominio.com {
+    reverse_proxy api:8080
+}
+```
+
+Apunta el registro A de ese dominio al servidor antes de arrancar Caddy, o la solicitud del certificado fallará.
+
+## El almacenamiento no es opcional
+
+El runtime **se niega a arrancar en producción** con almacenamiento local configurado, porque el sistema de ficheros del contenedor se destruye en cada reinicio y un backend local en producción es pérdida silenciosa de datos.
+
+Hetzner Object Storage es compatible con S3 y está en los mismos centros de datos, así que es el emparejamiento natural:
+
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=my-uploads
+S3_ENDPOINT=https://fsn1.your-objectstorage.com
+S3_REGION=fsn1
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+```
+
+Si tu proyecto no almacena ningún fichero, define `FORCE_LOCAL_STORAGE=true` para reconocerlo explícitamente. Consulta [Almacenamiento](/docs/backend/storage) para el panorama completo.
+
+## Qué le hace el arranque a tu esquema
+
+Con `REBASE_MIGRATE_ON_BOOT` en su valor por defecto `ensure`, el runtime aprovisiona tus tablas de colecciones **y sus políticas de seguridad a nivel de fila** al arrancar, de forma aditiva. Un primer arranque contra una base de datos vacía ya las sirve — no hay ningún paso de esquema que ejecutar antes de que el despliegue funcione.
+
+Lo que el arranque deliberadamente nunca hace es nada destructivo: no altera un tipo de columna, no elimina una columna ni edita una etiqueta de enum existente. Un reinicio de contenedor no debe poder remodelar un esquema como efecto secundario.
+
+Por eso dos cosas siguen necesitando [`rebase db push`](/docs/architecture/schema-as-code), ejecutado desde un checkout o desde CI, donde la barrera de cambios destructivos y una copia de seguridad están a mano:
+
+- la RLS de tablas de unión para relaciones muchos-a-muchos;
+- cualquier cambio que no sea puramente aditivo.
+
+Si el módulo o el fichero Compose ataron Postgres a loopback — ambos lo hacen — alcánzalo por un túnel SSH:
+
+```bash
+ssh -N -L 5433:127.0.0.1:5432 root@<ip-de-tu-servidor>
+```
+
+Un puerto de base de datos abierto a internet es la forma en que las filas de un despliegue Rebase acaban leyéndose esquivando la seguridad a nivel de fila en lugar de a través de ella.
+
+## Actualizar
+
+Cambia la etiqueta de la imagen y reinicia. Tu bundle queda intacto, y todos los proyectos sobre ese runtime recogen el nuevo motor.
+
+La excepción es la versión mayor de Postgres: Postgres se niega a arrancar contra un directorio de datos escrito por una versión mayor anterior, así que esa actualización es siempre volcado y restauración, nunca in situ.
+
+```bash
+rebase db backup --out ./backups
+# recrear el volumen en la nueva versión mayor
+rebase db restore ./backups/<fichero>.dump
+```
