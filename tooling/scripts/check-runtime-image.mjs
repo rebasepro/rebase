@@ -78,12 +78,30 @@ const CHART_IMAGE_DEFAULT = "infra/charts/rebase/values.yaml";
  * asserting a publisher for it would be asserting something about Docker Inc.
  * Anything NOT matched by this list is ours to publish.
  */
-// `pgvector/pgvector` is the official Postgres image with the `vector`
-// extension built in, published by the pgvector project. It is the only entry
-// here with an org prefix, which is what makes it worth a note: the heuristic
-// everywhere else is that a bare name is somebody else's and `org/name` is ours,
-// and this is the case that breaks it.
-const THIRD_PARTY = [/^postgres:/, /^pgvector\//, /^redis:/, /^minio\//, /^alpine:/, /^node:/, /^busybox:/];
+// Two entries here carry an org prefix, and they are the ones worth a note: the
+// heuristic everywhere else is that a bare name is somebody else's and
+// `org/name` is ours, and these are the cases that break it.
+//
+//   `pgvector/pgvector` — the official Postgres image with the `vector`
+//   extension built in, published by the pgvector project.
+//   `edoburu/pgbouncer` — the pgbouncer image the `pooler` compose profile
+//   runs, published by edoburu.
+//
+// Adding to this list is how a third-party image gets past this check, and it
+// should stay a deliberate line each time rather than becoming a pattern that
+// matches any `org/`: the whole value of the check is that an image we ship a
+// reference to, and do not publish, is caught before a user meets
+// "repository does not exist".
+const THIRD_PARTY = [
+    /^postgres:/,
+    /^pgvector\//,
+    /^edoburu\//,
+    /^redis:/,
+    /^minio\//,
+    /^alpine:/,
+    /^node:/,
+    /^busybox:/
+];
 
 /** Workflows that run without a human typing a command. */
 function automatedWorkflows() {
