@@ -155,11 +155,23 @@
 }
 
 /* Dark ground, white ink. `oklch(from …)` sets lightness explicitly and lifts
-   chroma, rather than mixing toward black — that is what keeps teal at 100%
-   saturation instead of sliding to navy. Measured on #004051: heading 11.34:1,
-   body 8.14:1, eyebrow 5.84:1. */
+   chroma, rather than mixing toward black — that is what keeps the result a
+   saturated colour instead of sliding to navy.
+
+   `--slab-l` and `--slab-c` are per hue and MUST be re-checked when the hue
+   changes; the defaults are tuned for the brand blue and do not travel. Two
+   worked examples:
+
+     #0070F4 at L .38, chroma x1.15  ->  #0021C1   10.57 / 8.04 / 6.82
+     #36CCD6 at L .30, chroma x1.40  ->  #004051   11.34 / 8.14 / 5.84
+
+   And a counter-example worth keeping: `#0070F4` used RAW as a ground puts
+   white body copy at 3.74:1 and the eyebrow at 3.34:1 — both under AA. The
+   brand blue is too light to be a slab without deepening. */
 .chapter-slab--deep {
-    background: oklch(from var(--hue) 0.30 calc(c * 1.4) h);
+    --slab-l: 0.38;
+    --slab-c: 1.15;
+    background: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
     border-top: 1px solid rgb(255 255 255 / 0.14);
     border-bottom: 1px solid rgb(255 255 255 / 0.14);
     color: rgb(255 255 255 / 0.82);
