@@ -389,11 +389,26 @@
     color: rgb(8 9 10 / 0.8);
 }
 
-/* The primary action keeps `--color-primary`. Blue on coral is the one place
-   the brand blue is unmissable, and it is the only element in the section that
-   should be — everything else here is inverted ground, this is the click. */
+/* The primary action goes NEAR-BLACK here, not `--color-primary`.
+
+   Blue on coral was tried and it is bad: two unrelated saturated hues touching,
+   clashing without meaning to. The brand blue earns its place on a neutral
+   ground, where it is the only colour and therefore reads as "act". On a ground
+   that is already at full chroma it is just a second colour, and the eye reads
+   the collision rather than the button.
+
+   On a bright ground the action should be the DENSEST thing, not the most
+   colourful. Near-black gives it the strongest possible figure against coral
+   (6.11:1 as a shape, white label at 18.9:1), matches the section's own ink
+   direction, and echoes the near-black product frames the rest of the page
+   uses — so the button reads as the same material as the product. */
 .ground-close a[class*="bg-primary"] {
+    background: #08090a;
     color: #fff;
+}
+
+.ground-close a[class*="bg-primary"]:hover {
+    background: #000;
 }
 
 /* The secondary button was a white hairline outline. */
