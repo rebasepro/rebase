@@ -119,10 +119,14 @@ services:
   # directly and this port is for other callers:
   #
   #   - LISTEN/NOTIFY. Realtime is built on it, and a listener needs a
-  #     connection that outlives a transaction;
+  #     connection that outlives a transaction. Note that `LISTEN` is *accepted*
+  #     here — it answers `LISTEN` and then the notifications never arrive,
+  #     which is the failure mode that takes longest to diagnose;
   #   - session state: `SET` (as opposed to `SET LOCAL`), advisory locks held
-  #     across statements, `WITH HOLD` cursors, temp tables. The next
-  #     transaction is on a different server connection and will not see them;
+  #     across statements, `WITH HOLD` cursors, temp tables. These behave the
+  #     same way: with one idle client the next transaction usually lands on the
+  #     same server connection and the state is still there, so it works in
+  #     testing and stops working under the concurrency it was pooled for;
   #   - protocol-level prepared statements. Most drivers can be told to stop
   #     using them (node-postgres does not use them by default; asyncpg needs
   #     `statement_cache_size=0`).
@@ -139,6 +143,10 @@ services:
     environment:
       DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
       POOL_MODE: transaction
+      # Required, not cosmetic. Postgres 18 stores a scram-sha-256 verifier, and
+      # this image defaults to md5 — which fails the *server* login, not the
+      # client one, with `FATAL: server login failed: wrong password type`.
+      AUTH_TYPE: scram-sha-256
       # Client connections this accepts. The point of the whole service: many
       # of these, few of the ones below.
       MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-500}
