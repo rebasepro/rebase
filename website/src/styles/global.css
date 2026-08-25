@@ -182,6 +182,20 @@
    about the reading column — a demo is a picture of the product, and boxing it
    into a 7-column cell makes the product look smaller than it is.
 
+   WHICH DEMOS. Two tests, both about the content, and a demo has to pass both:
+
+     1. The layout NARROWED it. A demo already spanning the full shell must not
+        bleed — it would move its LEFT edge off the shell too, and that edge has
+        to agree with the copy above it. Only side-column demos qualify: the
+        bleed gives back width the grid took, it does not grant new width.
+
+     2. The content WANTS the width. 03's policy editor and 07's agent console
+        are two-pane views whose right pane is the payload — every extra pixel
+        is another policy or another line of response. The hero terminal is the
+        counter-example and stays put: one command and four lines of output, so
+        the extra width would be empty box, and a wide frame around little
+        content reads as a mistake rather than as scale.
+
    The maths: the shell is 72rem centred, so each gutter is
    `(100vw - 72rem) / 2`. Pulling the element right by that, less a 1.5rem
    inset, lands it just short of the viewport edge. `max(0px, …)` is what keeps

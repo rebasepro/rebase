@@ -298,7 +298,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 </a>
                             </div>
                         </div>
-                        <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
+                        {/* Bleeds, like 07. The policy editor is a two-pane
+                            studio view and every extra pixel shows another
+                            policy; narrowed to seven columns it cropped the
+                            USING clauses it exists to show. */}
+                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
                             <div class="frame">
                                 <div class="frame-head">studio · row-level security</div>
                                 <!-- The demo reserves room for a longer policy list than it
