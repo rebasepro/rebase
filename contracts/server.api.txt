@@ -50,6 +50,7 @@ const requireAdmin
 const requireAuth
 function _resetRebaseMock
 function _setRebaseMock
+function activeDevEmailSink
 function applyCollectionDefaults
 function assertAllowedOutboundUrl
 function assertCollectionConfigs
@@ -60,6 +61,7 @@ function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }
 function cleanupDevPortFile
+function clearActiveDevEmailSink
 function compileStoragePolicies
 function createAppleProvider
 function createBackupRoutes
@@ -163,6 +165,7 @@ function providerVerifiedEmail
 function raw
 function readBackupBytes
 function readBundleManifest
+function registerDevEmailSink
 function requireDriver
 function requireEnv
 function requireRole

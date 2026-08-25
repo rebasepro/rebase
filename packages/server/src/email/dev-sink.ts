@@ -157,3 +157,47 @@ export function createDevEmailSink(options: { capacity?: number } = {}): DevEmai
         }
     };
 }
+
+// ── The active sink, and reading it back over HTTP ──────────────────────────
+//
+// `createDevEmailSink` is a factory so that a test can hold one privately. But
+// the mail a *running* server captured is only useful if something can read it,
+// and the thing that wants to read it — the admin panel — is nowhere near the
+// call that built the sink. So the boot path registers the one it wired, and
+// the admin route asks for it here.
+//
+// One per process, because there is one server per process and one mailbox for
+// it. Registration is refused under `NODE_ENV=production` for the same reason
+// the sink is never wired there: a captured reset mail carries a working token,
+// and this is the handle that would hand it out.
+
+let activeSink: DevEmailSink | undefined;
+
+/**
+ * Make `sink` the process's development mailbox.
+ *
+ * Returns the sink, so this can wrap the construction it replaces. In
+ * production it registers nothing and warns — the caller still gets its sink
+ * back and mail is still captured, it simply is not readable over HTTP.
+ */
+export function registerDevEmailSink(sink: DevEmailSink): DevEmailSink {
+    if (process.env.NODE_ENV === "production") {
+        logger.warn(
+            "[email] A development mail sink was registered under NODE_ENV=production. " +
+            "It will not be served over HTTP: captured messages carry working credentials."
+        );
+        return sink;
+    }
+    activeSink = sink;
+    return sink;
+}
+
+/** The registered mailbox, if there is one. */
+export function activeDevEmailSink(): DevEmailSink | undefined {
+    return process.env.NODE_ENV === "production" ? undefined : activeSink;
+}
+
+/** Forget the registered mailbox. For tests, and for a server shutting down. */
+export function clearActiveDevEmailSink(): void {
+    activeSink = undefined;
+}

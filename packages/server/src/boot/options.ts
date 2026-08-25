@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import type { RebaseAuthConfig } from "../init";
 import type { EmailConfig } from "../email";
-import { createDevEmailSink } from "../email/dev-sink";
+import { createDevEmailSink, registerDevEmailSink } from "../email/dev-sink";
 import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
@@ -48,7 +48,10 @@ export function resolveEmailOptions(env: RebaseBootEnv): EmailConfig | undefined
 
         return {
             from: env.SMTP_FROM || `${env.APP_NAME} <noreply@rebase.pro>`,
-            sendEmail: createDevEmailSink().sendEmail,
+            // Registered, not just constructed: the handle is what lets
+            // `GET /api/admin/dev/emails` show the captured message, so a
+            // magic link can be opened without a mail server or a terminal.
+            sendEmail: registerDevEmailSink(createDevEmailSink()).sendEmail,
             appName: env.APP_NAME,
             logoUrl: env.EMAIL_LOGO_URL,
             resetPasswordUrl: env.FRONTEND_URL

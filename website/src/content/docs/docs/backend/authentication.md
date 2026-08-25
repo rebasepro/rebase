@@ -204,6 +204,26 @@ If any of them does not hold, `POST /auth/magic-link` and
 `POST /auth/forgot-password` answer `503 EMAIL_NOT_CONFIGURED` as before. In
 production, set `SMTP_HOST` (or `auth.email.sendEmail`) to send mail for real.
 
+#### Reading the captured mail without a terminal
+
+The log is only useful to someone watching it. A server in Docker, a second
+window, or a scrolled-past line all leave a link that was printed and cannot be
+found — so the same capture is served over HTTP:
+
+```
+GET    /api/admin/dev/emails      → { enabled: true, messages: [ … ] }
+DELETE /api/admin/dev/emails      → empties the mailbox
+```
+
+Each message carries `to`, `subject`, `at`, the `html` and `text` parts, and
+`links` — the absolute URLs found in the body, in document order, which is the
+part anyone actually wants.
+
+It is admin-only, through the same gate cron, logs and backups use, and it
+answers `501 DEV_MAILBOX_UNAVAILABLE` when there is nothing to serve — with SMTP
+configured, mail was delivered rather than held. `NODE_ENV=production` refuses
+it regardless of anything else: what these messages contain is a working login.
+
 ### Branding the default emails
 
 The built-in password-reset, verification, invitation, welcome and magic-link

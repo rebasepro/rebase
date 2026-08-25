@@ -122,6 +122,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { createHistoryRoutes } from "./history";
 import type { EmailService } from "./email";
 import { createEmailService, EmailConfig } from "./email";
+import { activeDevEmailSink } from "./email/dev-sink";
 import type { OAuthProvider } from "./auth/interfaces";
 import type { AuthHooks } from "./auth/auth-hooks";
 import { _initRebase } from "./singleton";
@@ -2676,6 +2677,63 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         ));
         config.app.route(`${basePath}/admin/rls-audit`, rlsAuditRouter);
         logger.debug("RLS audit admin routes mounted", { path: `${basePath}/admin/rls-audit` });
+    }
+
+    // 6b-iii. The development mailbox.
+    //
+    // When no SMTP is configured outside production, auth mail is captured
+    // rather than sent (see `email/dev-sink.ts`). The links were printed to the
+    // log, which works and asks the reader to be looking at a terminal — so a
+    // magic link on a machine whose logs are in another window, or in Docker, or
+    // scrolled past, is a flow that still cannot be completed. This serves the
+    // same capture over HTTP so the panel can open it.
+    //
+    // Three independent gates, because what this hands out is a working
+    // credential — a password-reset token is a login:
+    //
+    //  1. `applyAdminGate` — authenticated, and an admin;
+    //  2. there must be a registered sink, which `registerDevEmailSink` refuses
+    //     to create under `NODE_ENV=production`;
+    //  3. this handler re-checks `NODE_ENV` at request time, so a sink
+    //     registered by hand before the environment was set is still not
+    //     readable.
+    //
+    // Any of them failing answers 501 with the reason rather than 404: a route
+    // the panel just called returning "not found" reads as a broken deploy.
+    if (surfaces.admin) {
+        const devMailRouter = new Hono<HonoEnv>();
+        applyAdminGate(devMailRouter, "Development mailbox");
+
+        const unavailable = {
+            error: {
+                code: "DEV_MAILBOX_UNAVAILABLE",
+                message:
+                    "No development mailbox is active. Mail is captured only when SMTP_HOST is " +
+                    "unset and NODE_ENV is not production; with a mail server configured, messages " +
+                    "are delivered rather than held here."
+            }
+        } as const;
+
+        devMailRouter.get("/", (c) => {
+            const sink = activeDevEmailSink();
+            if (!sink) return c.json(unavailable, 501);
+            return c.json({ enabled: true, messages: sink.list() });
+        });
+
+        // A mailbox that only grows is a mailbox nobody can find the newest
+        // message in. DELETE rather than POST /clear: it removes a collection
+        // of things, which is what DELETE means.
+        devMailRouter.delete("/", (c) => {
+            const sink = activeDevEmailSink();
+            if (!sink) return c.json(unavailable, 501);
+            sink.clear();
+            return c.json({ cleared: true });
+        });
+
+        config.app.route(`${basePath}/admin/dev/emails`, devMailRouter);
+        logger.debug("Development mailbox admin routes mounted", {
+            path: `${basePath}/admin/dev/emails`
+        });
     }
 
     // 6c. Mount Logs routes (for the Studio Logs Explorer). Request logs expose
