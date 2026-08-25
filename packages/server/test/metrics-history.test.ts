@@ -80,8 +80,8 @@ describe("metrics history — writing", () => {
         // mid-minute, must converge on a single row per series per minute —
         // otherwise the row count tracks restarts instead of time.
         const { exec, calls } = fakeExec();
-        await recordSamples(exec, [{ series: "memory_bytes", value: 123 }], new Date("2026-08-25T21:34:47.812Z"));
-        expect(calls[0].sql).toContain("ON CONFLICT (series, at) DO UPDATE");
+        await recordSamples(exec, [{ series: "memory_bytes", value: 123 }], "pod-a", new Date("2026-08-25T21:34:47.812Z"));
+        expect(calls[0].sql).toContain("ON CONFLICT (series, instance, at) DO UPDATE");
         expect((calls[0].params[0] as Date).toISOString()).toBe("2026-08-25T21:34:00.000Z");
     });
 
@@ -91,14 +91,14 @@ describe("metrics history — writing", () => {
             { series: "cpu_millicores", value: Infinity },
             { series: "memory_bytes", value: NaN },
             { series: "memory_bytes", value: 42 }
-        ]);
+        ], "pod-a");
         expect(calls).toHaveLength(1);
-        expect(calls[0].params[2]).toBe(42);
+        expect(calls[0].params[3]).toBe(42);
     });
 
     it("writes nothing at all for an empty tick", async () => {
         const { exec, calls } = fakeExec();
-        await recordSamples(exec, []);
+        await recordSamples(exec, [], "pod-a");
         expect(calls).toHaveLength(0);
     });
 });
@@ -112,8 +112,8 @@ describe("metrics history — reading", () => {
         const points = await readSeries(exec, "cpu_millicores", 60);
         expect(calls[0].sql).toContain("ORDER BY at ASC");
         expect(points).toEqual([
-            { at: "2026-08-25T21:00:00.000Z", value: 1 },
-            { at: "2026-08-25T21:01:00.000Z", value: 2 }
+            { at: "2026-08-25T21:00:00.000Z", value: 1, instances: 1 },
+            { at: "2026-08-25T21:01:00.000Z", value: 2, instances: 1 }
         ]);
     });
 
@@ -123,7 +123,48 @@ describe("metrics history — reading", () => {
         // bootstrapper's executor and a raw one.
         const wrapped = fakeExec({ rows: [{ at: "2026-08-25T21:00:00Z", value: 7 }] } as never);
         expect(await readSeries(wrapped.exec, "memory_bytes", 5)).toEqual([
-            { at: "2026-08-25T21:00:00Z", value: 7 }
+            { at: "2026-08-25T21:00:00Z", value: 7, instances: 1 }
         ]);
+    });
+});
+
+describe("metrics history — combining across replicas", () => {
+    it("sums consumption, so scaling out does not look like using less", async () => {
+        // Two pods at 300m each is 600m of CPU, not 300m. A mean would make an
+        // app that scaled out to handle load appear to have got cheaper.
+        const { exec, calls } = fakeExec();
+        await readSeries(exec, "cpu_millicores", 60);
+        expect(calls[0].sql).toMatch(/sum\(value\)/);
+        await readSeries(exec, "memory_bytes", 60);
+        expect(calls[1].sql).toMatch(/sum\(value\)/);
+    });
+
+    it("averages a condition each process is independently in", async () => {
+        // Event-loop delay is not consumption. Summing it produces a number no
+        // single pod ever experienced — "600ms" from six pods at 100ms each,
+        // which reads as an outage and is not one.
+        const { exec, calls } = fakeExec();
+        await readSeries(exec, "event_loop_delay_ms", 60);
+        expect(calls[0].sql).toMatch(/avg\(value\)/);
+        expect(calls[0].sql).not.toMatch(/sum\(value\)/);
+    });
+
+    it("reports how many instances made up each point", async () => {
+        // A sum whose contributor count changed is not comparable with itself:
+        // CPU doubling because the app got busy and CPU doubling because it
+        // scaled from one replica to two are different events, and a line alone
+        // cannot tell them apart.
+        const { exec } = fakeExec([{ at: "2026-08-26T09:00:00Z", value: 600, instances: "2" }]);
+        expect(await readSeries(exec, "cpu_millicores", 60)).toEqual([
+            { at: "2026-08-26T09:00:00Z", value: 600, instances: 2 }
+        ]);
+    });
+
+    it("groups by the bucket, not by the instance", async () => {
+        // Without the GROUP BY the read returns one row per pod per minute and
+        // a chart draws N overlapping lines it never asked for.
+        const { exec, calls } = fakeExec();
+        await readSeries(exec, "cpu_millicores", 60);
+        expect(calls[0].sql).toMatch(/GROUP BY at/);
     });
 });

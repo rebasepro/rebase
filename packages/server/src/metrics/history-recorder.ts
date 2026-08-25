@@ -53,6 +53,14 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
         ensure: () => ensureMetricsHistory(exec),
         read: (series, sinceMinutes) => readSeries(exec, series, sinceMinutes),
         start() {
+            // Which process this is. A tenant's replicas share one database and
+            // each records its own numbers, so a row needs to say whose they
+            // are — without it they overwrite each other and a scaled-out app
+            // charts one arbitrary pod.
+            //
+            // HOSTNAME is the pod name on Kubernetes and the container id under
+            // Docker; the pid fallback keeps two local processes distinct.
+            const instance = process.env.HOSTNAME?.trim() || `pid-${process.pid}`;
             let cursor: { cpu: NodeJS.CpuUsage; at: number } | null = null;
             let stopped = false;
 
@@ -61,7 +69,7 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
                 const { samples, cursor: next } = sampleSelf(cursor);
                 cursor = next;
                 try {
-                    await recordSamples(exec, samples);
+                    await recordSamples(exec, samples, instance);
                 } catch (err) {
                     // Never fatal, and never noisy: a sampler that crash-loops a
                     // pod over a chart would be a far worse trade than a gap in

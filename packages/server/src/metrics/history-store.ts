@@ -80,16 +80,17 @@ export interface MetricSample {
 export async function ensureMetricsHistory(exec: Exec): Promise<void> {
     await exec(`
         CREATE TABLE IF NOT EXISTS ${METRICS_HISTORY_TABLE} (
-            at      timestamptz      NOT NULL,
-            series  text             NOT NULL,
-            value   double precision NOT NULL,
-            PRIMARY KEY (series, at)
+            at        timestamptz      NOT NULL,
+            series    text             NOT NULL,
+            instance  text             NOT NULL,
+            value     double precision NOT NULL,
+            PRIMARY KEY (series, instance, at)
         )
     `, []);
 
     // (series, at DESC) rather than the primary key's order: every read is
-    // "this series, most recent first, bounded by time", and the PK's ascending
-    // order makes that a backwards scan.
+    // "this series across all instances, bounded by time", and the PK leads with
+    // instance, which is the wrong first column for that scan.
     await exec(`
         CREATE INDEX IF NOT EXISTS metric_samples_series_recent
             ON ${METRICS_HISTORY_TABLE} (series, at DESC)
@@ -136,44 +137,102 @@ export function sampleSelf(
     return { samples, cursor: { cpu, at: now } };
 }
 
-/** Write one tick's samples. */
+/**
+ * Write one tick's samples, for one instance.
+ *
+ * ## Why `instance` is part of the key
+ *
+ * A tenant's replicas share one database, and each records its OWN process. Key
+ * a row by `(series, minute)` alone and the pods overwrite each other every
+ * tick: one pod at 5m and another at 500m leave whichever wrote last, so a
+ * scaled-out tenant charts one arbitrary replica and calls it the app. Adding
+ * the instance makes each pod its own row, and lets the read decide whether the
+ * question is "the whole deployment" or "which pod is hot".
+ *
+ * Cardinality stays bounded: rows are series × replicas × minutes, and replicas
+ * are capped by the autoscaling ceiling. Six pods is ~43k rows a day and a
+ * fortnight of them is well under a million.
+ */
 export async function recordSamples(
     exec: Exec,
     samples: Omit<MetricSample, "at">[],
+    instance: string,
     at: Date = new Date()
 ): Promise<void> {
     if (samples.length === 0) return;
-    // Truncated to the minute, so a restart mid-minute overwrites rather than
-    // doubling the row count — and so two processes sampling the same database
-    // converge on one series instead of interleaving two.
+    // Truncated to the minute, so a pod restarting mid-minute overwrites its own
+    // earlier row rather than adding a second one for the same instant.
     const bucket = new Date(Math.floor(at.getTime() / 60_000) * 60_000);
     for (const s of samples) {
         if (!Number.isFinite(s.value)) continue;
         await exec(
-            `INSERT INTO ${METRICS_HISTORY_TABLE} (at, series, value)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (series, at) DO UPDATE SET value = EXCLUDED.value`,
-            [bucket, s.series, s.value]
+            `INSERT INTO ${METRICS_HISTORY_TABLE} (at, series, instance, value)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (series, instance, at) DO UPDATE SET value = EXCLUDED.value`,
+            [bucket, s.series, instance, s.value]
         );
     }
 }
 
-/** Read one series over a window, oldest first — the order a chart draws in. */
+/**
+ * How a series combines across the replicas that reported it.
+ *
+ * Not one answer for everything, because the right one differs by what the
+ * number means. CPU and memory are consumption: the deployment's figure is the
+ * sum, and a mean would make scaling out look like it reduced usage. A queue
+ * depth or an event-loop delay is a condition each process is independently in,
+ * and summing those produces a number no single pod ever experienced.
+ */
+const COMBINE: Record<MetricSeries, "sum" | "avg"> = {
+    cpu_millicores: "sum",
+    memory_bytes: "sum",
+    requests_total: "sum",
+    errors_total: "sum",
+    event_loop_delay_ms: "avg"
+};
+
+export interface SeriesPoint {
+    at: string;
+    /** The deployment's figure, combined per `COMBINE`. */
+    value: number;
+    /** How many instances reported in this bucket. */
+    instances: number;
+}
+
+/**
+ * Read one series over a window, oldest first — the order a chart draws in.
+ *
+ * Combined across instances rather than returned per-pod. A chart of "this
+ * app's CPU" is the question people ask; "which pod is hot" is answered by the
+ * live panel, which already lists instances individually and does not need
+ * history to do it.
+ *
+ * `instances` rides along because a sum whose contributor count changed is not
+ * comparable with itself: CPU doubling because the app got busy and CPU
+ * doubling because it scaled from one replica to two are different events, and
+ * a line chart alone cannot tell them apart.
+ */
 export async function readSeries(
     exec: Exec,
     series: MetricSeries,
     sinceMinutes: number
-): Promise<{ at: string; value: number }[]> {
+): Promise<SeriesPoint[]> {
+    const combine = COMBINE[series] === "avg" ? "avg" : "sum";
     const rows = await exec(
-        `SELECT at, value FROM ${METRICS_HISTORY_TABLE}
-         WHERE series = $1 AND at >= now() - make_interval(mins => $2)
-         ORDER BY at ASC`,
+        `SELECT at, ${combine}(value) AS value, count(*) AS instances
+           FROM ${METRICS_HISTORY_TABLE}
+          WHERE series = $1 AND at >= now() - make_interval(mins => $2)
+          GROUP BY at
+          ORDER BY at ASC`,
         [series, sinceMinutes]
-    ) as unknown as { rows?: { at: Date | string; value: number }[] } | { at: Date | string; value: number }[];
+    ) as unknown as { rows?: RawPoint[] } | RawPoint[];
 
     const list = Array.isArray(rows) ? rows : (rows?.rows ?? []);
     return list.map(r => ({
         at: r.at instanceof Date ? r.at.toISOString() : String(r.at),
-        value: Number(r.value)
+        value: Number(r.value),
+        instances: Number(r.instances ?? 1)
     }));
 }
+
+interface RawPoint { at: Date | string; value: number; instances?: number | string }
