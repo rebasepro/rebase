@@ -54,7 +54,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         nothing above or below it. §6 asks for one shell width precisely so the
         edges line up, and a grid this deliberate is what lets the numerals and
         chroma fields read as structure rather than as decoration. */}
-    <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-16 animate-on-scroll fade-in-up">
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-10 animate-on-scroll fade-in-up">
         <p class="mb-4 eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{badge ?? t('power.badge')}</p>
         <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={title ?? t('power.title')}></h2>
         <p class="mt-6 max-w-[38rem] text-lg text-surface-400">
@@ -89,7 +89,13 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
       Full-width diagram — no max-w constraint, just side padding
       3 column layout
     */}
-    <div id="cp-diagram" class="relative hidden lg:flex items-center justify-center gap-4 xl:gap-6 w-full max-w-[1400px] mx-auto min-h-[600px] my-10 animate-on-scroll fade-in-up delay-100 px-6" inert aria-hidden="true">
+    {/* `items-start`, not `items-center`. Centred, the three columns are 686px,
+        759px and 1005px tall, so the two shorter ones were pushed 123px and
+        159px down against the tallest — and the first card a reader sees on the
+        left is one of the short ones. That, not the margin, was most of the gap
+        between the copy and the artwork. The connector script measures centres
+        at draw time, so the lines re-fan on their own. */}
+    <div id="cp-diagram" class="relative hidden lg:flex items-start justify-center gap-4 xl:gap-6 w-full max-w-[1400px] mx-auto mt-2 mb-10 animate-on-scroll fade-in-up delay-100 px-6" inert aria-hidden="true">
 
         {/* ── Dynamic SVG connector lines — drawn by client script ── */}
         <svg id="cp-connectors" class="absolute inset-0 w-full h-full pointer-events-none z-10">
