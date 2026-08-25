@@ -114,6 +114,7 @@ const COLLECTION_KEY_LIST = [
     // PostgresCollectionConfig
     "schema",
     "search",
+    "indexes",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",

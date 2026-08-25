@@ -9,6 +9,7 @@ import type { SecurityRule } from "./security_rules";
 import { getDataSourceCapabilities } from "./data_source";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 import type { SearchConfig } from "./search";
+import type { CollectionIndex } from "./indexes";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -323,6 +324,24 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * @see SearchConfig
      */
     search?: SearchConfig;
+
+    /**
+     * Ordinary indexes on this collection's table.
+     *
+     * Collection-level, not per-property, because an index over two columns
+     * has no single property to hang on and a partial index has none at all —
+     * and because a second declaration site for the single-column case would
+     * put the same object in two places. An index's identity is a column list
+     * in an order; the single-column case is a degenerate one, not a special
+     * one.
+     *
+     * `VectorProperty.index` stays where it is: an ANN structure is a property
+     * of the column's type, not of a query.
+     *
+     * Postgres-only, like {@link SearchConfig}: refused on another engine
+     * rather than silently ignored.
+     */
+    indexes?: readonly CollectionIndex<Extract<keyof M, string>>[];
 }
 
 /**

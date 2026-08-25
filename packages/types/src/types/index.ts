@@ -6,6 +6,7 @@ export * from "./properties";
 export * from "./admin_block";
 export * from "./collections";
 export * from "./search";
+export * from "./indexes";
 export * from "./relations";
 export * from "./policy";
 export * from "./rls-functions";

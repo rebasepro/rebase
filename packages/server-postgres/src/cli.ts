@@ -18,6 +18,7 @@ import {
     readSearchDdl,
     seedDevDatabaseSearchHelpers,
     getTableExcludes,
+    getForeignIndexExcludes,
     ExcludeIntrospectionError,
     promptConfirm
 } from "./cli-helpers";
@@ -870,6 +871,27 @@ async function runAtlas(
             throw err;
         }
         for (const exc of excludes) {
+            atlasArgs.push("--exclude", exc);
+        }
+
+        // And the indexes on those tables that Rebase did not create. Same
+        // fail-closed contract as the table list above, for the same reason: a
+        // partial answer here silently drops somebody's index.
+        let indexExcludes: string[];
+        try {
+            indexExcludes = await getForeignIndexExcludes(databaseUrl, collectionsPath);
+        } catch (err) {
+            if (err instanceof ExcludeIntrospectionError) {
+                outError(chalk.red("\n✗ Aborting push: could not determine which indexes to protect."));
+                outError(chalk.gray(`  ${err.message}`));
+                outError(chalk.gray("  Refusing to apply — a partial exclude list could drop an index Rebase does not manage."));
+                const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
+                if (hint) outError(hint);
+                process.exit(1);
+            }
+            throw err;
+        }
+        for (const exc of indexExcludes) {
             atlasArgs.push("--exclude", exc);
         }
     }

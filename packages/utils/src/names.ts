@@ -82,11 +82,31 @@ export function legacyForeignKeyName(name: string): string {
  * and `TextDecoder` are standard in both runtimes and need no ambient types.
  */
 export function toPostgresIdentifier(name: string): string {
+    return truncateToBytes(name, 63);
+}
+
+/**
+ * {@link toPostgresIdentifier} with the bound lifted to a parameter.
+ *
+ * Exists for names that end in something load-bearing. Truncating at 63 keeps
+ * the *head* of a name and discards the tail, which is right for a descriptive
+ * identifier and wrong for a hashed one: the hash is the part that makes it
+ * unique, and it is at the end. A caller that appends a fingerprint truncates
+ * the readable head to `63 - <tail>` itself and then appends, so the bound is
+ * still 63 and the hash always survives.
+ *
+ * `contracts/derived-names.txt` records what the alternative costs — a foreign
+ * key frozen as `..._corres`, its `_fkey` suffix truncated away, so a second
+ * foreign key on that table would derive a byte-identical name.
+ *
+ * One truncation rule, in one function, so the two cannot drift.
+ */
+export function truncateToBytes(name: string, maxBytes: number): string {
     const bytes = new TextEncoder().encode(name);
-    if (bytes.byteLength <= 63) return name;
+    if (bytes.byteLength <= maxBytes) return name;
     // Decoding a slice that ends mid-character yields U+FFFD; dropping it lands
     // on the last whole character that fits, which is what Postgres does.
-    return new TextDecoder("utf-8").decode(bytes.subarray(0, 63)).replace(/�+$/, "");
+    return new TextDecoder("utf-8").decode(bytes.subarray(0, maxBytes)).replace(/�+$/, "");
 }
 
 /**

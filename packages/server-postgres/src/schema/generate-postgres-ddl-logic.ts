@@ -20,6 +20,7 @@ import {
     vectorIndexStatements,
     type VectorIndexPlan
 } from "./vector-index";
+import { buildCollectionIndexSpecs, collectionIndexStatements } from "./collection-index";
 import { REBASE_SCHEMA } from "@rebasepro/types";
 
 // --- Helper Functions ---
@@ -734,6 +735,13 @@ export const generatePostgresDdl = async (
                 indexStatements.push(`-- No ANN index on "${skip.schema}"."${skip.table}"."${skip.column}": ${skip.reason}`);
             }
 
+            // The collection's own `indexes:` block. Last of the three index
+            // producers, and the only one the developer wrote deliberately
+            // rather than getting as a side effect of another feature.
+            indexStatements.push(...collectionIndexStatements(
+                buildCollectionIndexSpecs(collection, resolveColumnName)
+            ));
+
             // The implicit primary key, for a collection that declares none.
             const hasPk = columns.some(c => c.includes("PRIMARY KEY"));
             if (!hasPk) {
@@ -762,14 +770,18 @@ export const generatePostgresDdl = async (
         }
     }
 
-    if (fkStatements.length > 0) {
-        ddl += "-- Foreign Key Constraints\n";
-        ddl += fkStatements.join("\n") + "\n\n";
-    }
-
+    // Indexes before foreign keys. Today every FK targets a primary key created
+    // inline, so the order is safe by accident; the moment a declared
+    // `unique: true` index can back an FK target, a constraint emitted first
+    // would reference an index that does not exist yet.
     if (indexStatements.length > 0) {
         ddl += "-- Indexes\n";
         ddl += indexStatements.join("\n") + "\n\n";
+    }
+
+    if (fkStatements.length > 0) {
+        ddl += "-- Foreign Key Constraints\n";
+        ddl += fkStatements.join("\n") + "\n\n";
     }
 
     if (policyStatements.length > 0) {

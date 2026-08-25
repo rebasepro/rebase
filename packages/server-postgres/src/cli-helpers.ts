@@ -6,6 +6,7 @@ import { createRequire } from "module";
 import readline from "readline";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
+import { isRebaseIndexName } from "./schema/collection-index";
 import { out, outWarn } from "./cli-output";
 import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
@@ -306,6 +307,119 @@ export async function seedDevDatabaseSearchHelpers(
  * catalogs. Separated from {@link getTableExcludes} so its failure mode can
  * be handled explicitly (fail closed) and so tests can inject a stub.
  */
+/**
+ * Every index Postgres holds on a table Rebase manages, as
+ * `schema.table.index`.
+ *
+ * Constraint-backed indexes are left out: a `PRIMARY KEY` or a `UNIQUE` is a
+ * *constraint* to Atlas, diffed from the constraint declaration, and naming its
+ * index in an exclude would shield the constraint itself.
+ */
+export async function queryExistingIndexes(databaseUrl: string): Promise<string[]> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        const res = await client.query(`
+            SELECT n.nspname || '.' || t.relname || '.' || i.relname AS full_name
+            FROM pg_index x
+            JOIN pg_class i ON i.oid = x.indexrelid
+            JOIN pg_class t ON t.oid = x.indrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND t.relkind IN ('r', 'p')
+              AND NOT EXISTS (
+                  SELECT 1 FROM pg_constraint c WHERE c.conindid = i.oid
+              );
+        `);
+        return res.rows.map((row: { full_name: string }) => row.full_name);
+    } finally {
+        await client.end();
+    }
+}
+
+/**
+ * Glob patterns keeping Atlas away from indexes that are not Rebase's.
+ *
+ * The problem this solves is live and predates the `indexes:` block. `db push`
+ * is declarative, so an index on a managed table that is absent from
+ * `schema.sql` is drift — and Atlas plans `DROP INDEX` for it. Verified
+ * against atlas v1.2.3: create one by hand, re-run an unchanged push, and the
+ * plan is a bare drop. `DROP INDEX` is not in `DESTRUCTIVE_PATTERNS`, so the
+ * auto-approved apply took it without asking. Until now the only way to have
+ * an index at all was to write it by hand, which made that the *only* outcome.
+ *
+ * Ownership rather than a prompt, because once indexes are declarable a drop
+ * is usually correct: removing one from the config should remove it from the
+ * database, quietly. What must never be dropped is an index Rebase never
+ * created — a hand-written one, or one an introspected database arrived with.
+ * {@link isRebaseIndexName} is the test, the same arrangement
+ * `isGeneratedPolicyName` uses to let policy reconciliation drop only what it
+ * generated.
+ *
+ * The named-in-the-desired-state check comes first and is what makes removal
+ * work: a declared index that the author has just deleted still matches the
+ * name pattern, is no longer in the plan, and so is *not* excluded — Atlas
+ * drops it, as intended.
+ *
+ * Three-part `schema.table.index`, never two: a two-part pattern reads as a
+ * *table* named `<index>` in a *schema* named `<table>`, matches nothing, and
+ * reports no error — the trap already recorded for the search excludes.
+ */
+export async function getForeignIndexExcludes(
+    databaseUrl: string,
+    collectionsPath: string,
+    deps: {
+        queryExistingIndexes?: (databaseUrl: string) => Promise<string[]>;
+        getManagedIndexNames?: (collectionsPath: string) => Promise<Set<string>>;
+    } = {}
+): Promise<string[]> {
+    const queryIndexes = deps.queryExistingIndexes ?? queryExistingIndexes;
+    const getManaged = deps.getManagedIndexNames ?? managedIndexNames;
+
+    const managed = await getManaged(collectionsPath);
+
+    let existing: string[];
+    try {
+        existing = await queryIndexes(databaseUrl);
+    } catch (err) {
+        // Fails CLOSED, like getTableExcludes: without the catalogue we cannot
+        // tell a foreign index from one of ours, and guessing wrong destroys
+        // an index somebody is relying on.
+        throw new ExcludeIntrospectionError(
+            `Failed to introspect the database for unmanaged indexes: ${err instanceof Error ? err.message : String(err)}`,
+            err
+        );
+    }
+
+    return existing.filter(full => {
+        const indexName = full.slice(full.lastIndexOf(".") + 1);
+        if (managed.has(indexName)) return false;   // ours, and still declared
+        return !isRebaseIndexName(indexName);       // ours, but no longer declared -> let it drop
+    });
+}
+
+/**
+ * The index names the current collections would create — search, vector and
+ * declared alike. Anything Atlas would emit is by definition not foreign.
+ */
+async function managedIndexNames(collectionsPath: string): Promise<Set<string>> {
+    const collections = await loadCollectionsForCli(collectionsPath);
+    const { resolveColumnName, searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    const { buildCollectionIndexPlan } = await import("./schema/collection-index");
+
+    const names = new Set<string>(
+        buildCollectionIndexPlan(collections, resolveColumnName).map(spec => spec.indexName)
+    );
+    // Search objects are excluded from Atlas wholesale by their own patterns;
+    // listing them here too is harmless and keeps this the single answer to
+    // "is this index one of ours".
+    for (const pattern of searchExcludePatterns(collections)) {
+        names.add(pattern.slice(pattern.lastIndexOf(".") + 1));
+    }
+    return names;
+}
+
 export async function queryExistingTables(databaseUrl: string): Promise<string[]> {
     const { Client } = await import("pg");
     const client = new Client({ connectionString: databaseUrl });
