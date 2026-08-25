@@ -4,7 +4,8 @@ import {
     readSeries,
     sampleSelf,
     RETENTION_DAYS,
-    METRICS_HISTORY_TABLE
+    METRICS_HISTORY_TABLE,
+    METRIC_SERIES
 } from "../src/metrics/history-store";
 
 /** Records every statement so the SQL itself can be asserted. */
@@ -223,5 +224,33 @@ describe("metrics history — the minute still being written", () => {
         const { exec, calls } = fakeExec();
         await readSeries(exec, "cpu_millicores", 60);
         expect(calls[0].sql).toMatch(/at\s*<\s*date_trunc\('minute', now\(\)\)/);
+    });
+});
+
+describe("metrics history — the declared list and the written one", () => {
+    it("declares nothing it does not record", async () => {
+        // `METRIC_SERIES` once named five series while `sampleSelf` wrote two.
+        // The route validates `?series=` against the list, so the other three
+        // were *valid* parameters that returned `points: []` — which is exactly
+        // the empty chart that reads as a quiet period, and exactly what the
+        // 400 beside it exists to prevent. A declared-but-unwritten series is
+        // worse than an absent one: the 400 tells you the name is wrong, and
+        // the empty array tells you the app was idle.
+        const first = sampleSelf(null, 1_000, 3.5);
+        const second = sampleSelf(first.cursor, 2_000, 3.5);
+        const written = new Set([...first.samples, ...second.samples].map(s => s.series));
+        expect([...written].sort()).toEqual([...METRIC_SERIES].sort());
+    });
+
+    it("omits event-loop delay when it could not be measured", () => {
+        // Zero is a real and common reading for an idle process, so defaulting
+        // to it would be indistinguishable from a healthy one.
+        const { samples } = sampleSelf({ cpu: process.cpuUsage(), at: 1_000 }, 2_000, undefined);
+        expect(samples.some(s => s.series === "event_loop_delay_ms")).toBe(false);
+    });
+
+    it("records a delay it was given", () => {
+        const { samples } = sampleSelf({ cpu: process.cpuUsage(), at: 1_000 }, 2_000, 12.25);
+        expect(samples.find(s => s.series === "event_loop_delay_ms")?.value).toBe(12.25);
     });
 });

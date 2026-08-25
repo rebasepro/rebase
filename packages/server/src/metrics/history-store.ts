@@ -15,10 +15,10 @@
  *
  * ## Why it stays cheap
  *
- * One row per series per minute. Five series is 7,200 rows a day, and the sweep
- * below keeps a bounded window of them, so the table reaches a steady size
- * measured in megabytes and stays there. It is deliberately NOT a general
- * time-series store: no labels, no cardinality to explode, no per-request rows.
+ * One row per series per instance per minute. Three series across two replicas
+ * is 8,640 rows a day, and the sweep below bounds the window, so the table settles
+ * at a size measured in megabytes. It is deliberately NOT a general time-series
+ * store: no labels, no cardinality to explode, no per-request rows.
  *
  * A minute is the resolution because that is what the question needs — "was it
  * slow at 15:40", "did my deploy cause that" — and because a finer grain buys
@@ -41,6 +41,13 @@ export const METRICS_HISTORY_TABLE = "rebase.metric_samples";
  * Two weeks answers "is this worse than last week" and stops well short of
  * being an archive. Anything that needs to outlive it — billing, capacity
  * planning — is a rollup somebody else owns, not a longer retention here.
+ *
+ * Read it as "14 days, or since this process started, whichever is longer": the
+ * sweep runs at boot and nowhere else, so a pod up for 90 days holds 90 days.
+ * That is a deliberate trade rather than an oversight — a cron for it would be
+ * machinery for a table that stays trivial either way, and reads are bounded by
+ * the index regardless — but the table does not "reach a steady size and stay
+ * there" on a long-lived pod, which an earlier version of this comment claimed.
  */
 export const RETENTION_DAYS = 14;
 
@@ -53,12 +60,29 @@ export const SAMPLE_INTERVAL_MS = 60_000;
  * A list rather than only a union, because the route validates against it: an
  * unknown `?series=` must be a named 400 rather than an empty chart, which
  * reads exactly like a quiet period.
+ *
+ * **It lists what `sampleSelf` actually writes, and nothing else.** It used to
+ * also name `requests_total`, `errors_total` and `event_loop_delay_ms`, none of
+ * which anything ever recorded — so those three were *valid* parameters that
+ * returned `points: []`, which is precisely the empty chart the 400 two
+ * paragraphs up exists to prevent. A declared-but-unwritten series is worse
+ * than an absent one: the 400 tells you the name is wrong, and the empty array
+ * tells you the app was quiet.
+ *
+ * `event_loop_delay_ms` kept its place by gaining a sampler, because it is the
+ * one signal here that says whether the process is *healthy* rather than how
+ * much it is using, and it has no counter semantics to get wrong.
+ *
+ * `requests_total` and `errors_total` were dropped rather than wired up. The
+ * registry does hold them, but they reset on restart, and a resetting counter
+ * summed across replicas is not monotonic — a rolling deploy would draw a
+ * cliff that looks like traffic collapsing. That needs a deliberate decision
+ * about deltas and resets, not a line added at 2am. Adding either back means
+ * adding its sampler in the same commit.
  */
 export const METRIC_SERIES = [
     "cpu_millicores",
     "memory_bytes",
-    "requests_total",
-    "errors_total",
     "event_loop_delay_ms"
 ] as const;
 
@@ -116,13 +140,26 @@ export async function ensureMetricsHistory(exec: Exec): Promise<void> {
  */
 export function sampleSelf(
     previous: { cpu: NodeJS.CpuUsage; at: number } | null,
-    now = Date.now()
+    now = Date.now(),
+    /**
+     * Mean event-loop delay over the last window, in milliseconds, or undefined
+     * where it cannot be measured. Passed in rather than read here so this
+     * function stays pure: the histogram is a stateful handle the recorder owns.
+     */
+    eventLoopDelayMs?: number
 ): { samples: Omit<MetricSample, "at">[]; cursor: { cpu: NodeJS.CpuUsage; at: number } } {
     const cpu = process.cpuUsage();
     const memory = process.memoryUsage();
     const samples: Omit<MetricSample, "at">[] = [
         { series: "memory_bytes", value: memory.rss }
     ];
+
+    // Only when it was actually measured. Zero is a real and common reading for
+    // an idle process, so a `?? 0` here would be indistinguishable from a
+    // healthy one — the same substitution this module rejects everywhere else.
+    if (typeof eventLoopDelayMs === "number" && Number.isFinite(eventLoopDelayMs)) {
+        samples.push({ series: "event_loop_delay_ms", value: eventLoopDelayMs });
+    }
 
     if (previous) {
         const elapsedMs = now - previous.at;
@@ -186,8 +223,6 @@ export async function recordSamples(
 const COMBINE: Record<MetricSeries, "sum" | "avg"> = {
     cpu_millicores: "sum",
     memory_bytes: "sum",
-    requests_total: "sum",
-    errors_total: "sum",
     event_loop_delay_ms: "avg"
 };
 
