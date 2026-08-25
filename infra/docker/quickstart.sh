@@ -7,8 +7,8 @@
 # seconds of trying one. This generates them once, into `infra/docker/.env`, tells you
 # it did, and then runs the compose file unchanged.
 #
-#   ./docker/quickstart.sh              # up, attached
-#   ./docker/quickstart.sh -d           # any argument is passed through to compose
+#   ./infra/docker/quickstart.sh        # up, attached
+#   ./infra/docker/quickstart.sh -d     # any argument is passed through to compose
 #
 # It generates secrets rather than shipping defaults: a compose file with
 # `JWT_SECRET=changeme` in it is a compose file that reaches production with
@@ -80,6 +80,10 @@ REBASE_VERSION=latest
 # Host ports.
 PORT=8080
 POSTGRES_PORT=5432
+# The pooled Postgres port, used only with `--profile pooler`. For serverless
+# clients and anything else that cannot hold a connection; see the compose file
+# for what transaction pooling changes about a connection.
+PGBOUNCER_PORT=6432
 EOF
     ok "Wrote infra/docker/.env (mode 600). Read it before you deploy anywhere."
 fi

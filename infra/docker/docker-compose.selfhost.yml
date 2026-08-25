@@ -6,7 +6,7 @@
 # a bundle.
 #
 #   rebase build                # produces ./dist-bundle
-#   ./docker/quickstart.sh      # generates infra/docker/.env if absent, then brings it up
+#   ./infra/docker/quickstart.sh   # generates infra/docker/.env if absent, then brings it up
 #
 # `quickstart.sh` is one command doing two obvious things, and it prints both.
 # The long form, if you would rather own each step:
@@ -88,6 +88,73 @@ services:
     # reachable from outside the compose network.
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+
+  # ── A pooled port, for everything that is not this runtime ─────────────────
+  #
+  # Opt-in, via a compose profile:
+  #
+  #     docker compose --profile pooler up -d
+  #
+  # The API server holds a small, long-lived pool and does not need this. What
+  # does need it is everything else that talks to the same database and cannot
+  # hold a connection: a serverless function, a scheduled script, a BI tool, a
+  # queue worker that scales to fifty. Postgres' `max_connections` is a hard
+  # limit measured in the low hundreds, and each of those is a *process*, so a
+  # lambda fan-out exhausts it long before the database is busy.
+  #
+  # Pooled connection string, from outside compose:
+  #     postgres://rebase:$POSTGRES_PASSWORD@localhost:6432/rebase
+  #
+  # `DATABASE_URL` rather than the DB_* variables: it is the form this image
+  # documents, and on startup it generates the `userlist.txt` and
+  # `pgbouncer.ini` entries from it, so client authentication needs no second
+  # copy of the password anywhere.
+  #
+  # ── Transaction pooling changes what a connection can do ───────────────────
+  #
+  # `POOL_MODE=transaction` is what makes one server connection serve many
+  # clients — a client gets a server connection for the length of a transaction
+  # and gives it back. Three things stop working through it, and each is
+  # something Rebase itself uses, which is exactly why the runtime connects
+  # directly and this port is for other callers:
+  #
+  #   - LISTEN/NOTIFY. Realtime is built on it, and a listener needs a
+  #     connection that outlives a transaction;
+  #   - session state: `SET` (as opposed to `SET LOCAL`), advisory locks held
+  #     across statements, `WITH HOLD` cursors, temp tables. The next
+  #     transaction is on a different server connection and will not see them;
+  #   - protocol-level prepared statements. Most drivers can be told to stop
+  #     using them (node-postgres does not use them by default; asyncpg needs
+  #     `statement_cache_size=0`).
+  #
+  # `SET LOCAL` is fine — it is scoped to the transaction — which is what
+  # row-level security is set with, so RLS works through this port.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.23.1-p3
+    profiles: ["pooler"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+      POOL_MODE: transaction
+      # Client connections this accepts. The point of the whole service: many
+      # of these, few of the ones below.
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-500}
+      # Server connections used to serve them. Keep the sum of these across
+      # every pooler comfortably under the database's `max_connections`, which
+      # the runtime is also drawing from.
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_POOL_SIZE:-20}
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:5432"
+    healthcheck:
+      # `pg_isready` ships in this image. Pointed at the pooler's own port, so
+      # it reports whether *this* is answering rather than whether Postgres is.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U rebase"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
   api:
     image: rebasepro/server:${REBASE_VERSION:-latest}
