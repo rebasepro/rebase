@@ -47,6 +47,16 @@ function log(message) {
     console.log(`[entrypoint] ${message}`);
 }
 
+/**
+ * The bundle directory this process will actually work in.
+ *
+ * Reassigned below when the mount cannot be written to. Everything after that
+ * point — the dependency install, the framework stitch, the handoff to the
+ * runtime — reads this rather than `BUNDLE`, so there is one answer to "where
+ * is the bundle" instead of three that can disagree.
+ */
+let bundleDir = BUNDLE;
+
 function fail(message, hint) {
     console.error(`[entrypoint] ${message}`);
     if (hint) console.error(`[entrypoint] ${hint}`);
@@ -62,13 +72,78 @@ if (!FETCH_MODE && !fs.existsSync(path.join(BUNDLE, "manifest.json"))) {
     );
 }
 
+// ── 1b. A bundle this process can write to ───────────────────────────────────
+//
+// Two steps below write *into* the bundle: the dependency install, and the
+// symlink stitch that makes `@rebasepro/server` resolvable from a function
+// file. A bind mount keeps its host ownership on Linux, and this image runs as
+// `node` (uid 1000) — so on any host whose uid is not 1000, both writes are
+// denied. The compose file says the mount is writable "because the container
+// installs the bundle's declared dependencies into it on first start", and that
+// promise was true only by the coincidence of matching uids.
+//
+// The failure was uid-dependent and therefore invisible to whoever wrote it: it
+// works on macOS, where Docker Desktop maps ownership away, and on the many
+// Linux desktops whose first user is 1000. It fails on a CI runner (uid 1001)
+// and on any hardened host that runs deploys as a service account — as
+// `EACCES: mkdir '/bundle/node_modules'` for the install, and as functions that
+// silently fail to load for the stitch.
+//
+// So: if the mount cannot be written, work from a copy the container owns. A
+// bundle is compiled output — small, and read-only as far as the project is
+// concerned — so copying it costs a moment at boot and nothing after.
+//
+// Deliberately not the alternatives:
+//   - `chown`/`chmod` on the mount would need root, which this image gives up
+//     on purpose, and would rewrite the ownership of the operator's own files;
+//   - `NODE_PATH` does not apply to ESM, and a bundle is ESM;
+//   - installing to `/node_modules` (which Node's upward walk from `/bundle`
+//     does reach) leaves the stitch in step 2b still writing to the mount.
+if (!FETCH_MODE) {
+    // A real write, not `fs.accessSync(BUNDLE, W_OK)`.
+    //
+    // `access` is advisory, and here it is simply wrong: over a Docker Desktop
+    // bind mount a directory with mode 555 owned by this very uid still answers
+    // "writable", and the truth only arrives later as npm's `EACCES`. Node's own
+    // documentation says not to check with `access` before writing, for exactly
+    // this reason. So the probe is the thing itself.
+    let writable = true;
+    const probe = path.join(BUNDLE, ".rebase-write-probe");
+    try {
+        fs.mkdirSync(probe);
+        fs.rmdirSync(probe);
+    } catch {
+        writable = false;
+    }
+
+    if (!writable) {
+        // Beside the runtime, which is already owned by `node`.
+        const workingCopy = path.join(path.dirname(fileURLToPath(import.meta.url)), "bundle");
+        log(`${BUNDLE} is not writable by this container; working from a copy at ${workingCopy}`);
+        try {
+            // `force: false` on a re-run would throw on the existing tree; a
+            // restarted container should get a fresh copy of what is mounted
+            // now, not last boot's.
+            fs.rmSync(workingCopy, { recursive: true, force: true });
+            fs.cpSync(BUNDLE, workingCopy, { recursive: true, dereference: false });
+            bundleDir = workingCopy;
+        } catch (err) {
+            fail(
+                `${BUNDLE} is not writable by this container, and copying it to ${workingCopy} failed: ${err.message}`,
+                "Mount the bundle with ownership this container can write (it runs as uid 1000), " +
+                "or pre-install its dependencies on the host and mount it read-only."
+            );
+        }
+    }
+}
+
 // ── 2. Dependencies the project declared ─────────────────────────────────────
 //
 // The image ships the engine; a project's own dependencies travel with its
 // bundle. Installing them here — rather than baking them into the image — is
 // what keeps one image able to run every project.
-const bundlePackageJson = path.join(BUNDLE, "package.json");
-const bundleModules = path.join(BUNDLE, "node_modules");
+const bundlePackageJson = path.join(bundleDir, "package.json");
+const bundleModules = path.join(bundleDir, "node_modules");
 
 // Skipped entirely in fetch mode: there is nothing here yet, and the runtime
 // runs the same install — same flags, same dedupe — once it has unpacked.
@@ -95,7 +170,7 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
         const result = spawnSync(
             "npm",
             ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
-            { cwd: BUNDLE, stdio: "inherit" }
+            { cwd: bundleDir, stdio: "inherit" }
         );
         if (result.status !== 0) {
             fail(
@@ -191,7 +266,7 @@ const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "no
 
 for (const pkg of FETCH_MODE ? [] : RUNTIME_PROVIDED) {
     const provided = path.join(imageModules, pkg);
-    const inBundle = path.join(BUNDLE, "node_modules", pkg);
+    const inBundle = path.join(bundleDir, "node_modules", pkg);
 
     // Nothing to do unless the image actually provides it.
     if (!fs.existsSync(provided)) continue;
@@ -269,4 +344,4 @@ if (!["none", "ensure"].includes(migrateMode)) {
 const { runFromBundle } = await import("@rebasepro/server");
 // No `bundleDir` in fetch mode: `bootFromBundle` reads it as "a bundle is
 // already located" and skips the download that has not happened yet.
-await runFromBundle(FETCH_MODE ? {} : { bundleDir: BUNDLE });
+await runFromBundle(FETCH_MODE ? {} : { bundleDir });
