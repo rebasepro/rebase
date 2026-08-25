@@ -51,8 +51,12 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-20 lg:pt-40">
         <NeatBackground client:idle/>
 
-        <div class="relative z-10 mx-auto max-w-6xl px-4 lg:px-12">
-            <div class="mx-auto mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
+        {/* `px-6 lg:px-8`, not `px-4 lg:px-12`. This page was the only one on the
+            site using its own shell padding, which put its left edge at 205px
+            while every other page sits at 176px — §6 asks for one shell width
+            precisely so those edges agree. */}
+        <div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
                 <span class="font-medium">MIT-licensed · Runs on your Postgres · We never see the data</span>
             </div>
 
@@ -60,18 +64,25 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                 Sovereignty is not<br/>a region setting.
             </h1>
 
-            <p class="mb-6 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-40">
+            {/* Measures, not padding. This carried `sm:px-16 … xl:px-40`, so on a
+                wide screen 160px of left padding pushed the lead a third of the
+                way across the page while the headline above it stayed on the
+                shell edge — three different left edges in one block. §6's lead
+                measure does the same job without moving the edge. */}
+            <p class="mb-6 max-w-[38rem] text-lg leading-8 text-surface-300 lg:text-xl">
                 Every backend platform will happily put your database in Frankfurt. That is the easy half.
                 The half nobody sells you is the second party — the company that operates the service, holds
                 the credentials, and can be asked for your rows without asking you first.
             </p>
-            <p class="mb-10 text-base leading-7 text-surface-400">
+            <p class="mb-10 max-w-[38rem] text-base leading-7 text-surface-400">
                 Rebase gives you what Firebase and Supabase give you — REST, a typed SDK, realtime, auth,
                 storage, functions, cron and an admin panel — as an open-source container you run on a box
                 you rent in Europe. There is no second party, because there is no us.
             </p>
 
-            <div class="mx-auto max-w-xl overflow-hidden rounded-xl border border-surface-800 bg-[#0c0d10] font-mono text-xs shadow-2xl">
+            {/* Left-aligned with everything above it. Centred, it was the only
+                element in the hero not on the shell edge. */}
+            <div class="max-w-xl overflow-hidden rounded-xl border border-surface-800 bg-[#0c0d10] font-mono text-xs shadow-2xl">
                 <div class="flex items-center gap-1.5 border-b border-surface-800/80 bg-[#14151a] px-4 py-2.5">
                     <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
                     <span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
@@ -90,7 +101,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <!-- ═══════════════════════ WHO HOLDS THE KEYS ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto mb-12 max-w-3xl text-center">
+            <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Who holds the keys</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     Everyone can host in Europe. That was never the hard part.
@@ -189,7 +200,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <!-- ═══════════════════════ THE BILL ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto mb-12 max-w-3xl text-center">
+            <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">The bill</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     Their price is a function of your success. Yours is a number you chose.
@@ -214,7 +225,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <!-- ═══════════════════════ NO LITE TIER ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto mb-12 max-w-3xl text-center">
+            <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">No lite tier</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     The self-hosted build is the build
@@ -256,7 +267,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <!-- ═══════════════════════ WHERE TO PUT IT ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto mb-12 max-w-3xl text-center">
+            <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Where to put it</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     European hosts we have no relationship with whatsoever
@@ -274,7 +285,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
     <!-- ═══════════════════════ PAPERWORK ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
-            <div class="mx-auto mb-12 max-w-3xl text-center">
+            <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Paperwork</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     Where this leaves you on GDPR
@@ -316,7 +327,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                 </div>
             </div>
 
-            <p class="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-surface-500">
+            <p class="mt-8 max-w-[38rem] text-xs leading-relaxed text-surface-500">
                 None of this is legal advice. It is an architecture description, which is the part we can actually be
                 held to — and the
                 <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">security page</a>{" "}
@@ -327,7 +338,10 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
 
     <!-- ═══════════════════════ CTA ═══════════════════════ -->
     <section class="relative z-0 py-20 sm:py-28">
-        <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
+        {/* The closing CTA runs the same 72rem shell as everything above it. It
+            was the last centred block on the page; centred, it re-broke the left
+            edge at the one moment the reader is being asked to act. */}
+        <div class="mx-auto max-w-6xl px-6 lg:px-8 [&_p]:max-w-[38rem] [&_h2]:max-w-[42rem]">
             <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                 It takes one command to find out
             </h2>
