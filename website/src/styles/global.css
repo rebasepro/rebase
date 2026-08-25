@@ -125,10 +125,41 @@
     --hue: var(--color-surface-700);
 }
 
-/* ── Chapter slab ────────────────────────────────────────────────────────────
-   A section that breaks the page's rhythm. Exactly two — 03 security and
-   07 agents, the highest-ranked claims — because a third stops being a break
-   and starts being the page.
+/* ── Chapter guarantee ───────────────────────────────────────────────────────
+   WHEN A CHAPTER GETS ONE. This is a rule, not a palette — reach for it because
+   the section qualifies, never because the page wants variety.
+
+   A guarantee chapter is one whose claim is the ABSENCE of an event. Every
+   other beat on the home page proves itself with something you can look at:
+
+     01  One collection. Everything generated.   the file, and its outputs
+     02  The whole backend, already running.     live SDK, REST, realtime
+     04  Take only the half you actually need.   both halves, same response
+     05  Every view. Zero code.                  the panel itself
+     08  Teams ship faster with Rebase           real products
+
+   Two cannot:
+
+     03  "...enforced by the database itself, not by middleware someone has to
+          remember to call."
+     07  "The backend an agent can't screw up."
+
+   You can screenshot a policy editor. You cannot screenshot NOBODY FORGOT TO
+   CHECK. You can screenshot an agent console; you cannot screenshot IT DIDN'T
+   DELETE ANYTHING. Those two sections carry colour precisely because their
+   proof is invisible — the ground does the work the demo cannot.
+
+   That is also the test for a third. 04 is the closest call, because "the API
+   answers exactly the same" is a promise too — but it is a demonstrable one,
+   and its headline is an instruction rather than a guarantee. If it ever earns
+   a slab, the reason has to be that its proof stopped being showable.
+
+   The two variants name which kind of guarantee, and their hue follows from it:
+
+     --structural  the promise holds because of how the system is built.
+                   The brand blue, deepened: this is what Rebase IS.
+     --hazard      the promise is that a named danger cannot land.
+                   Coral: the alarm colour, spent on the risk being neutralised.
 
    THE PALETTE SPLITS IN TWO, and this is the thing to know before picking a
    hue. Colours are not interchangeable here:
@@ -148,7 +179,7 @@
 
    Hence two variants rather than one with a variable. A single utility would
    let a caller put white ink on coral, which measures 3.26:1 and fails AA. */
-@utility chapter-slab {
+@utility chapter-guarantee {
     position: relative;
     overflow: hidden;
     --hue: var(--color-surface-700);
@@ -168,7 +199,7 @@
    And a counter-example worth keeping: `#0070F4` used RAW as a ground puts
    white body copy at 3.74:1 and the eyebrow at 3.34:1 — both under AA. The
    brand blue is too light to be a slab without deepening. */
-.chapter-slab--deep {
+.chapter-guarantee--structural {
     --slab-l: 0.38;
     --slab-c: 1.15;
     background: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
@@ -184,37 +215,37 @@
    selectors (class + `:is()`) outspecify the `text-white` utility the demo sets
    on its headings. Without the exclusion the bright slab turned the agent
    console's own h3 near-black on a near-black panel. */
-.chapter-slab--deep :is(h1, h2, h3):not(.frame *) { color: #fff; }
-.chapter-slab--deep .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+.chapter-guarantee--structural :is(h1, h2, h3):not(.frame *) { color: #fff; }
+.chapter-guarantee--structural .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
 
 /* Bright ground, dark ink — the inversion, and the only way coral stays coral.
    Near-black rather than pure black so it sits in the page's own family instead
    of reading as a foreign black dropped onto the colour. Measured on #FB5066:
    heading 6.11:1, body 5.04:1, eyebrow 5.90:1. */
-.chapter-slab--bright {
+.chapter-guarantee--hazard {
     background: var(--hue);
     border-top: 1px solid rgb(8 9 10 / 0.2);
     border-bottom: 1px solid rgb(8 9 10 / 0.2);
     color: rgb(8 9 10 / 0.82);
 }
 
-.chapter-slab--bright :is(h1, h2, h3):not(.frame *) { color: #08090a; }
+.chapter-guarantee--hazard :is(h1, h2, h3):not(.frame *) { color: #08090a; }
 
 /* The frame is a dark panel wherever it sits, so inside one the copy returns to
    the page's own ink rather than inheriting the slab's. */
-.chapter-slab .frame { color: var(--color-page-copy); }
+.chapter-guarantee .frame { color: var(--color-page-copy); }
 
 /* Opaque, not the 0.7 the dark slab can afford. An 11px label at 0.7 alpha on
    coral measured 4.11:1 and failed AA — small text has no headroom to spend on
    translucency, and a bright ground has less of it than a dark one. */
-.chapter-slab--bright .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
+.chapter-guarantee--hazard .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
 
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
    that stops working: on teal it is close enough to fight the ground, and on
    coral it is 1.9:1. Inside a slab the link takes the section's own ink and
    earns its affordance from the underline instead — a more robust signal than
    hue anywhere, and the only one available here. */
-.chapter-slab .accent-link {
+.chapter-guarantee .accent-link {
     color: currentColor;
     text-decoration: underline;
     text-decoration-thickness: 1px;
@@ -222,15 +253,15 @@
     text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
 }
 
-.chapter-slab--deep .accent-link:not(.frame *) { color: #fff; }
-.chapter-slab--bright .accent-link:not(.frame *) { color: #08090a; }
-.chapter-slab .accent-link:hover { text-decoration-color: currentColor; }
+.chapter-guarantee--structural .accent-link:not(.frame *) { color: #fff; }
+.chapter-guarantee--hazard .accent-link:not(.frame *) { color: #08090a; }
+.chapter-guarantee .accent-link:hover { text-decoration-color: currentColor; }
 
 /* `.frame` draws a white hairline and assumes near-black behind it. Neither
    slab is near-black, so the edge is restated per variant: on the deep ground a
    darker edge reads as an inset screen, and on the bright one the dark panel
    already separates itself and only needs the shadow to sit it down. */
-.chapter-slab .frame {
+.chapter-guarantee .frame {
     border-color: rgb(8 9 10 / 0.4);
     box-shadow:
         inset 0 1px 0 rgb(255 255 255 / 0.05),
@@ -238,7 +269,7 @@
         0 40px 80px -20px rgb(0 0 0 / 0.6);
 }
 
-.chapter-slab--bright .frame {
+.chapter-guarantee--hazard .frame {
     border-color: rgb(8 9 10 / 0.55);
     box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.55);
 }

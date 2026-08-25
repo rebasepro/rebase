@@ -269,6 +269,27 @@ there once. Do not re-implement any of them inline on a page.
   shares one palette and `textureSeed`; only the camera differs. The hero also
   runs a second pass of the same canvas *above* the type at
   `mix-blend-mode: multiply`, so the shape modulates the letterforms.
+- **Colour goes where the demo cannot finish the argument.** Exactly two sections
+  on the home page leave the near-black ground, and the rule for which is not
+  "the most important ones" — it is that their claim is the **absence of an
+  event**. Beats 01, 02, 04, 05 and 08 each prove themselves with something you
+  can look at and operate. Two cannot: 03 promises RLS "not by middleware someone
+  has to remember to call", 07 promises "an agent can't screw up". You can
+  screenshot a policy editor; you cannot screenshot *nobody forgot to check*.
+  Those sections carry a coloured ground because their proof is invisible.
+  - `--structural` (03) is the deepened brand blue: the promise holds by
+    construction, so it wears what Rebase is. `--hazard` (07) is coral: a named
+    danger that cannot land, in the page's alarm hue.
+  - **Before adding a third, apply the test.** 04 is the closest call — "the API
+    answers exactly the same" is a promise too — but it is demonstrable, and its
+    headline is an instruction rather than a guarantee. A third slab needs a
+    section whose proof stopped being showable, not a section that wants
+    attention.
+  - **Half the chroma palette cannot be a dark ground.** Ultramarine, violet and
+    cyan hold chroma at low lightness; coral, yellow and blush only exist as
+    colours at high lightness, so darkening them yields blood red or olive. A
+    light hue can only ever be a bright ground with dark ink. The raw brand blue
+    is likewise unusable as a ground — white body copy on `#0070F4` is 3.74:1.
 - **A free tool is not a hero.** `rls-check` lives next to the claim it tests.
 - **Nothing sits above the header.**
 - **No emoji, anywhere.**
