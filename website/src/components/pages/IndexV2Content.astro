@@ -154,8 +154,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </div>
         </section>
 
-        <!-- Logo wall — the short beat, straight after the tallest one. -->
-        <div class="border-y border-white/5 py-10 sm:py-14">
+        <!-- Logo wall — the short beat, straight after the tallest one.
+             `border-t` only: chapter 01 below opens with its own border-t at
+             white/8, and now that the divider between them occupies no flow the
+             two rules touch and paint as one 2px line. -->
+        <div class="border-t border-white/5 py-10 sm:py-14">
             <ClientLogos />
         </div>
 
@@ -163,8 +166,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
              NEAT DIVIDER → chapter 01. The strip is the real canvas; the
              chapter below inherits its cyan on rules, eyebrow and link.
              ============================================================ -->
-        <!-- Neat gradient divider, bled behind the sections either side -->
-        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
+        <!-- Neat gradient divider, bled behind the sections either side.
+             The two negative margins MUST sum to the height: it is decoration,
+             so it has to occupy zero flow. At -my-72 they summed to -576 against
+             a 600px box and leaked 24px of dead page ground into the seam. -->
+        <div class="neat-divider relative -my-[300px] pointer-events-none overflow-hidden"
              style="z-index: -1; height: 600px;">
             <NeatBackground variant="b" client:visible />
         </div>
@@ -358,8 +364,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
         </section>
 
         <!-- NEAT DIVIDER → chapter 05, gold. -->
-        <!-- Neat gradient divider, bled behind the sections either side -->
-        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden"
+        <!-- Neat gradient divider, bled behind the sections either side.
+             The two negative margins MUST sum to the height: it is decoration,
+             so it has to occupy zero flow. At -my-72 they summed to -576 against
+             a 600px box and leaked 24px of dead page ground into the seam. -->
+        <div class="neat-divider relative -my-[300px] pointer-events-none overflow-hidden"
              style="z-index: -1; height: 600px;">
             <NeatBackground variant="a" client:visible />
         </div>
