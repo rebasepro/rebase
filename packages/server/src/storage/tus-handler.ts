@@ -17,6 +17,7 @@ import type { StorageController } from "./types";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
+import { triggerUser } from "./triggers";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
 
 /** Metadata for an in-progress resumable upload. */
@@ -60,6 +61,15 @@ interface TusUpload {
     key: string;
     /** Whether the upload has been fully received and finalized. */
     completed: boolean;
+    /**
+     * Who created the upload.
+     *
+     * Kept because a resumable upload finishes on a later request than the one
+     * that authorized it — often a much later one — and a storage trigger asking
+     * "who uploaded this?" must be answered with the principal that was checked,
+     * not with whoever happened to send the final chunk.
+     */
+    user?: { uid: string; email?: string; roles?: string[] } | null;
 }
 
 /** Maximum upload size: 5 GB. */
@@ -96,7 +106,24 @@ export class TusHandler {
          * Every routing value the write will use is passed in, because the hook
          * can only answer for the destination it is told about.
          */
-        private authorizeUpload?: (c: Context, key: string, bucket: string, storageId?: string) => Promise<void>
+        private authorizeUpload?: (c: Context, key: string, bucket: string, storageId?: string) => Promise<void>,
+        /**
+         * Called once the bytes are stored, so storage triggers fire for the
+         * resumable path too. A trigger wired only to `POST /upload` would miss
+         * exactly the uploads big enough to be worth reacting to.
+         *
+         * Never throws: the dispatcher swallows handler errors, because the
+         * object is already written and failing here would tell the client to
+         * repeat a write that succeeded.
+         */
+        private onFinalized?: (event: {
+            key: string;
+            bucket?: string;
+            storageId?: string;
+            size: number;
+            contentType?: string;
+            user?: { uid: string; email?: string; roles?: string[] } | null;
+        }) => Promise<void>
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -269,7 +296,8 @@ export class TusHandler {
             bucket,
             storageId,
             key,
-            completed: false
+            completed: false,
+            user: triggerUser(c.get("user"))
         };
         this.uploads.set(id, upload);
 
@@ -465,6 +493,18 @@ export class TusHandler {
             this.uploads.delete(upload.id);
 
             logger.info(`[TUS] Upload ${upload.id} finalized → ${fileName}`, storageId ? { storageId } : {});
+
+            // After the bookkeeping, not before: a trigger that inspects the
+            // object must find it there, and a trigger that is slow must not
+            // hold the temp file open.
+            await this.onFinalized?.({
+                key: fileName,
+                bucket: upload.bucket,
+                storageId,
+                size: data.byteLength,
+                contentType: mimeType,
+                user: upload.user
+            });
         } catch (err) {
             logger.error(`[TUS] Failed to finalize upload ${upload.id}`, { error: err });
             // The bytes stay on disk and the upload stays incomplete, so a

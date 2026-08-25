@@ -563,6 +563,35 @@ export interface RebaseBackendConfig {
     storageRenditionCache?: import("./storage/rendition-cache").RenditionCacheConfig;
 
     /**
+     * Run something when an object lands, or when one goes.
+     *
+     * Every other write in the product can be reacted to — a row has
+     * `beforeSave` and `afterSave`, a schedule has a cron job — and an upload
+     * had nothing, so the work an upload implies had to be done by the client
+     * after the upload returned, which means it is not done at all when the
+     * client goes away between the two calls.
+     *
+     * ```ts
+     * storageTriggers: [
+     *     {
+     *         path: "uploads/:uid/**",
+     *         events: ["finalize"],
+     *         handler: async ({ key, params }) => { … }
+     *     }
+     * ]
+     * ```
+     *
+     * Same pattern language as {@link storagePolicies}. Fires for the
+     * multipart and resumable paths alike, after the object is durably
+     * written, and never for internal writes such as the image-rendition cache.
+     * Handlers are awaited and a throwing one is logged rather than failing the
+     * request — the object is already stored, so telling the client otherwise
+     * would invite it to repeat a write that succeeded. Enqueue a job for
+     * anything that must happen or is slow.
+     */
+    storageTriggers?: import("./storage/triggers").StorageTrigger[];
+
+    /**
      * Opt out of the storage access-control boot guard, keeping the legacy
      * behaviour where **any** authenticated user can read, overwrite, delete or
      * list **any** key (storage keys share one flat namespace and are not under
@@ -1992,7 +2021,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // Resolved lazily: the admin data plane is built further down, well
             // after these routes are mounted, but always before a request runs.
             authorizeData: () => storageAuthorizeData.current,
-            renditionCache: config.storageRenditionCache
+            renditionCache: config.storageRenditionCache,
+            triggers: config.storageTriggers
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it

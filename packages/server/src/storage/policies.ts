@@ -40,6 +40,12 @@ import type {
     StorageAuthorizeContext,
     StorageOperation
 } from "@rebasepro/types";
+import {
+    compileStoragePattern,
+    matchStoragePattern,
+    StoragePatternError,
+    type CompiledStoragePattern
+} from "./path-pattern";
 
 /** Everything a predicate is told, plus whatever the path captured. */
 export interface StoragePolicyContext extends StorageAuthorizeContext {
@@ -82,58 +88,22 @@ export class StoragePolicyError extends Error {
 const ALL_OPERATIONS: StorageOperation[] = ["read", "write", "delete", "list"];
 
 interface CompiledPolicy {
-    segments: string[];
-    /** True when the last segment is `**`. */
-    trailing: boolean;
+    pattern: CompiledStoragePattern;
     operations: Set<StorageOperation>;
     allow: StoragePolicy["allow"];
-    source: string;
-}
-
-/**
- * Split a key into segments, dropping empty ones.
- *
- * Empty segments come from a leading slash or a `//`, and treating them as real
- * would let `users//x` match a pattern expecting a captured segment with the
- * empty string. Keys reaching here are already sanitized against traversal; this
- * is about matching, not safety.
- */
-function segmentsOf(value: string): string[] {
-    return value.split("/").filter(segment => segment.length > 0);
 }
 
 function compile(policy: StoragePolicy, index: number): CompiledPolicy {
     const label = `storagePolicies[${index}]`;
 
-    if (typeof policy.path !== "string" || policy.path.trim() === "") {
-        throw new StoragePolicyError(`${label}: \`path\` must be a non-empty string.`);
-    }
-
-    const segments = segmentsOf(policy.path);
-    if (segments.length === 0) {
-        throw new StoragePolicyError(
-            `${label}: \`path\` "${policy.path}" names no segments. Use "**" to match every key.`
-        );
-    }
-
-    const starIndex = segments.indexOf("**");
-    if (starIndex !== -1 && starIndex !== segments.length - 1) {
-        throw new StoragePolicyError(
-            `${label}: "**" is only allowed as the last segment of \`path\`, and "${policy.path}" ` +
-            "puts it in the middle. Use \"*\" for a single segment."
-        );
-    }
-
-    const captures = segments.filter(s => s.startsWith(":")).map(s => s.slice(1));
-    for (const name of captures) {
-        if (name === "") {
-            throw new StoragePolicyError(`${label}: a ":" placeholder in "${policy.path}" has no name.`);
-        }
-        if (captures.filter(c => c === name).length > 1) {
-            throw new StoragePolicyError(
-                `${label}: "${policy.path}" captures ":${name}" twice, so one would silently win.`
-            );
-        }
+    // Rethrown as a `StoragePolicyError`: the pattern language is shared with
+    // `storageTriggers`, but a caller catching a bad *policy* should not have to
+    // know that, and the message already names the policy that was wrong.
+    let pattern: CompiledStoragePattern;
+    try {
+        pattern = compileStoragePattern(policy.path, label);
+    } catch (err) {
+        throw err instanceof StoragePatternError ? new StoragePolicyError(err.message) : err;
     }
 
     if (policy.operations !== undefined) {
@@ -161,35 +131,10 @@ function compile(policy: StoragePolicy, index: number): CompiledPolicy {
     }
 
     return {
-        segments,
-        trailing: starIndex !== -1,
+        pattern,
         operations: new Set(policy.operations ?? ALL_OPERATIONS),
-        allow: policy.allow,
-        source: policy.path
+        allow: policy.allow
     };
-}
-
-/** Match a key's segments against a compiled pattern, capturing as it goes. */
-function match(compiled: CompiledPolicy, key: string): Record<string, string> | undefined {
-    const keySegments = segmentsOf(key);
-    const pattern = compiled.trailing ? compiled.segments.slice(0, -1) : compiled.segments;
-
-    if (compiled.trailing ? keySegments.length < pattern.length : keySegments.length !== pattern.length) {
-        return undefined;
-    }
-
-    const params: Record<string, string> = {};
-    for (let i = 0; i < pattern.length; i++) {
-        const expected = pattern[i];
-        const actual = keySegments[i];
-        if (expected === "*") continue;
-        if (expected.startsWith(":")) {
-            params[expected.slice(1)] = actual;
-            continue;
-        }
-        if (expected !== actual) return undefined;
-    }
-    return params;
 }
 
 /**
@@ -212,7 +157,7 @@ export function compileStoragePolicies(
         for (const policy of compiled) {
             if (!policy.operations.has(ctx.operation)) continue;
 
-            const params = match(policy, ctx.key);
+            const params = matchStoragePattern(policy.pattern, ctx.key);
             if (!params) continue;
 
             if (policy.allow === "public") return true;

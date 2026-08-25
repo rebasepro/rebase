@@ -24,6 +24,7 @@ import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
+import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
 import {
     createDurableRenditionCache,
     isRenditionKey,
@@ -217,6 +218,10 @@ export interface StorageRoutesConfig {
      * why a read that writes to somebody's bucket is not a default.
      */
     renditionCache?: RenditionCacheConfig;
+    /**
+     * Run something when an object lands, or when one goes. See `triggers.ts`.
+     */
+    triggers?: StorageTrigger[];
 }
 
 /**
@@ -380,6 +385,13 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     // rendition bytes live in the bucket, which is the entire point.
     const durableRenditions = config.renditionCache?.enabled ? createDurableRenditionCache() : undefined;
     const transformMemory = createTransformMemory();
+
+    // Compiled here rather than at each call site: a malformed pattern fails
+    // the boot, and a trigger that matches nothing because of a typo is the
+    // failure this feature could most easily have had.
+    const fireTrigger: StorageTriggerDispatcher | undefined = config.triggers?.length
+        ? compileStorageTriggers(config.triggers)
+        : undefined;
 
     /**
      * Run the per-object authorization hook, if one is configured.
@@ -584,6 +596,17 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             key: finalKey,
             metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
             bucket
+        });
+
+        await fireTrigger?.({
+            event: "finalize",
+            key: finalKey,
+            bucket,
+            storageId: canonicalStorageId(storageId),
+            size: uploadedFile.size,
+            contentType: uploadedFile.type || undefined,
+            user: triggerUser(c.get("user")),
+            at: new Date().toISOString()
         });
 
         return c.json({
@@ -888,6 +911,15 @@ message: "No file to delete" });
 
         await resolved.deleteObject(resolvedPath, bucket);
 
+        await fireTrigger?.({
+            event: "delete",
+            key: resolvedPath,
+            bucket,
+            storageId: canonicalStorageId(storageId),
+            user: triggerUser(c.get("user")),
+            at: new Date().toISOString()
+        });
+
         return c.json({
             success: true,
             message: "File deleted"
@@ -1016,6 +1048,20 @@ message: "No file to delete" });
         authorize
             ? async (c, key, bucket, storageId) => {
                 await checkAuthorized(c as never, "write", key, bucket, storageId);
+            }
+            : undefined,
+        fireTrigger
+            ? async (event) => {
+                await fireTrigger({
+                    event: "finalize",
+                    key: event.key,
+                    bucket: event.bucket,
+                    storageId: canonicalStorageId(event.storageId),
+                    size: event.size,
+                    contentType: event.contentType,
+                    user: event.user,
+                    at: new Date().toISOString()
+                });
             }
             : undefined
     );

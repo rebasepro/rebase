@@ -464,6 +464,52 @@ Worth knowing:
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
 
+## Reacting to an upload
+
+Every other write in Rebase can be reacted to — a row has `beforeSave` and
+`afterSave`, a schedule has a cron job — and an upload had nothing. Anything an
+upload implied had to be done by the client, on a second call, which means it
+was not done at all when the client went away in between.
+
+```ts
+storageTriggers: [
+    {
+        path: "uploads/:uid/**",
+        events: ["finalize"],
+        handler: async ({ key, params, size, user }) => {
+            await jobs.enqueue("index-upload", { key, uid: params.uid, size });
+        }
+    }
+]
+```
+
+The pattern language is the same as `storagePolicies` — literal segments, `*`
+for one segment, `:name` to capture one, `**` for the rest — and a malformed
+pattern fails the boot rather than quietly matching nothing.
+
+| Event | When |
+| --- | --- |
+| `finalize` | after the object is durably written; never for a write that failed |
+| `delete` | after the object is gone |
+
+`finalize` fires for the multipart and the resumable (TUS) paths alike — once
+per upload, not once per chunk — and a resumable upload reports the user who
+*created* it, since that is the principal the authorization checked.
+
+What a handler must not assume:
+
+- **A throwing handler does not fail the request.** The object is already stored
+  by the time it runs, so answering the client with an error would say the
+  upload failed when it did not, and clients retry uploads. Failures are logged
+  and the response is unchanged. If the work must happen, enqueue a job.
+- **Handlers are awaited**, in declaration order, before the response is sent —
+  firing and forgetting would leave a promise a serverless runtime is free to
+  freeze mid-flight. A slow handler is therefore a slow upload, which is the
+  other reason to enqueue rather than to work here.
+- **Internal writes do not fire triggers.** The image-rendition cache writes
+  derived objects straight to the storage controller; a `**` trigger firing on
+  those would be firing on its own output.
+
 ## Next Steps
 
 - **[Frontend Storage & File Uploads](/docs/frontend/storage)** — File upload fields and hooks
