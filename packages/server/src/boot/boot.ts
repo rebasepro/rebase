@@ -295,6 +295,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // environment variable can express "this user may read this key".
         storageAuthorize: configExports.storageAuthorize,
         storagePublicRead: env.STORAGE_PUBLIC_READ,
+        storageRenditionCache: { enabled: env.STORAGE_RENDITION_CACHE },
         storageInsecureAllowAnyAuthenticated: env.STORAGE_ALLOW_ANY_AUTHENTICATED,
         callbacks: configExports.callbacks,
         auth: resolveAuthOptions(env, usersCollection),

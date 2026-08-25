@@ -132,6 +132,41 @@ reachable anonymously, so the work is bounded rather than merely cached:
   answers **503 `TRANSFORM_OVERLOADED`** rather than accepting work it will not
   get to.
 
+That cache lives in the process, which means it is not shared between instances
+and does not survive a restart. Two replicas each compute every variant, and a
+deploy throws all of it away.
+
+### Renditions that survive a restart
+
+`storageRenditionCache` writes each derived image back to the same bucket as its
+source, so the work is done once for the whole deployment rather than once per
+instance per release:
+
+```ts
+storageRenditionCache: { enabled: true }
+```
+
+or `STORAGE_RENDITION_CACHE=true` for a bundle deployment. Renditions are stored
+under the reserved prefix `_rebase/renditions/`, keyed by the source object's
+version — so replacing an image serves the new one immediately.
+
+Three things to know before turning it on:
+
+- **A read now writes.** Each new variant costs one `PUT` in your bucket. It is
+  off by default for that reason.
+- **A failed write is not a failed request.** Read-only credentials, or a bucket
+  policy that refuses the prefix, degrade to the in-process cache; the image is
+  still served and the reason is logged once.
+- **Superseded renditions are not collected.** Replacing a source object
+  abandons its old renditions. Set a lifecycle rule on `_rebase/renditions/`
+  — that prefix is fixed, not configurable, precisely so a rule can name it.
+
+The prefix is not addressable from the API. Reading or writing it directly
+answers **400 `INVALID_STORAGE_KEY`**: every access rule in the product —
+`storageAuthorize` and the declarative policies alike — is written against the
+*source* key, and a rendition served under its own path would answer a question
+nobody asked.
+
 ### What gets served
 
 The stored content type is whatever the uploader declared — nothing sniffs the

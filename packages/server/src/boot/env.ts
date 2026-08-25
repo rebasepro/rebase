@@ -82,6 +82,12 @@ const bootEnvExtension = z.object({
     /** Serve stored objects to unauthenticated readers. */
     STORAGE_PUBLIC_READ: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**
+     * Write derived image renditions back to the storage source, so a transform
+     * survives a restart and is computed once across instances rather than once
+     * per instance. Costs one PUT per new variant; see `rendition-cache.ts`.
+     */
+    STORAGE_RENDITION_CACHE: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
      * Opt out of the storage access-control boot guard, restoring the behaviour
      * where any authenticated user may read, overwrite, delete or list any key.
      * Only defensible when every signed-in user is trusted with every file.

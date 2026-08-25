@@ -24,19 +24,39 @@ import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
-
-/** Shared image transform cache (LRU, 500 entries, 1 hour TTL). */
-const transformCache = new TransformCache();
+import {
+    createDurableRenditionCache,
+    isRenditionKey,
+    RENDITION_PREFIX,
+    type DurableRenditionCache,
+    type RenditionCacheConfig
+} from "./rendition-cache";
 
 /**
- * Transforms currently being computed, keyed the same way the cache is.
+ * The in-memory half of transform caching, per router (LRU, 500 entries, 1
+ * hour TTL) together with the transforms currently being computed.
  *
- * Without it, N concurrent requests for one uncached variant run N full
- * decode+encode pipelines — the cache only helps the requests that arrive
- * after the first one has finished. Joining the in-flight promise makes a
- * thundering herd cost one decode.
+ * The in-flight map is what stops N concurrent requests for one uncached
+ * variant from running N full decode+encode pipelines: the cache alone only
+ * helps the requests that arrive after the first one has finished, so a
+ * thundering herd would cost N decodes. Joining the promise makes it cost one.
+ *
+ * Per router rather than per module. A process mounts one storage router, so
+ * this changes nothing about how much is cached — but it makes the cache's
+ * lifetime the router's, which is the only way a second router in the same
+ * process (another instance, a restart) can be reasoned about at all. With a
+ * module-level cache, a test that thinks it is asking "would another instance
+ * recompute this?" is really asking the first instance's memory.
  */
-const transformsInFlight = new Map<string, Promise<{ data: Buffer; contentType: string }>>();
+interface TransformMemory {
+    cache: TransformCache;
+    inFlight: Map<string, Promise<{ data: Buffer; contentType: string }>>;
+}
+
+const createTransformMemory = (): TransformMemory => ({
+    cache: new TransformCache(),
+    inFlight: new Map()
+});
 
 /**
  * Compute a transform, or join the one already running for this key.
@@ -45,20 +65,43 @@ const transformsInFlight = new Map<string, Promise<{ data: Buffer; contentType: 
  * join an in-flight transform do not each read the source object either.
  */
 async function transformOnce(
+    memory: TransformMemory,
     cacheKey: string,
     options: ImageTransformOptions,
-    loadSource: () => Promise<Buffer>
+    loadSource: () => Promise<Buffer>,
+    durable?: {
+        cache: DurableRenditionCache;
+        controller: StorageController;
+        bucket: string | undefined;
+    }
 ): Promise<{ data: Buffer; contentType: string }> {
-    const cached = transformCache.get(cacheKey);
+    const cached = memory.cache.get(cacheKey);
     if (cached) return cached;
 
-    const running = transformsInFlight.get(cacheKey);
+    const running = memory.inFlight.get(cacheKey);
     if (running) return running;
 
     const pending = (async () => {
         try {
+            // The durable read joins the same in-flight promise the compute
+            // does, so a burst of requests for one cold variant makes one
+            // round trip to the bucket rather than one each.
+            if (durable) {
+                const stored = await durable.cache.get(durable.controller, cacheKey, durable.bucket);
+                if (stored) {
+                    memory.cache.set(cacheKey, stored.data, stored.contentType);
+                    return stored;
+                }
+            }
+
             const result = await transformImage(await loadSource(), options);
-            transformCache.set(cacheKey, result.data, result.contentType);
+            memory.cache.set(cacheKey, result.data, result.contentType);
+            if (durable) {
+                // Awaited: a floating promise here would outlive the request
+                // and, in a serverless runtime, be frozen mid-write. The cost
+                // is one PUT on a miss, which is the trade the cache is.
+                await durable.cache.put(durable.controller, cacheKey, durable.bucket, result);
+            }
             return result;
         } catch (err) {
             // A refusal from the transform queue is a load signal, not a bad
@@ -71,11 +114,11 @@ async function transformOnce(
             throw err;
         }
     })();
-    transformsInFlight.set(cacheKey, pending);
+    memory.inFlight.set(cacheKey, pending);
     try {
         return await pending;
     } finally {
-        transformsInFlight.delete(cacheKey);
+        memory.inFlight.delete(cacheKey);
     }
 }
 
@@ -168,6 +211,12 @@ export interface StorageRoutesConfig {
      * resolved.
      */
     authorizeData?: () => StorageAuthorizeData | undefined;
+    /**
+     * Keep derived image renditions in the storage source instead of only in
+     * this process's memory. Off unless enabled — see `rendition-cache.ts` for
+     * why a read that writes to somebody's bucket is not a default.
+     */
+    renditionCache?: RenditionCacheConfig;
 }
 
 /**
@@ -204,7 +253,19 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
  */
 function canonicalKeyOrBadRequest(key: string): string {
     try {
-        return canonicalStorageKey(key);
+        const canonical = canonicalStorageKey(key);
+        // The rendition space is not addressable by callers, in either
+        // direction. Reading one would serve a derivative of a source object
+        // without the source's key ever reaching `storageAuthorize` or the
+        // declarative policies — both of which reason about that key — and
+        // writing one would let a caller choose what a later transform serves.
+        if (isRenditionKey(canonical)) {
+            throw new InvalidStorageKeyError(
+                `"${RENDITION_PREFIX}" is reserved for derived image renditions and cannot be ` +
+                "read or written directly."
+            );
+        }
+        return canonical;
     } catch (err) {
         throw new ApiError(
             400,
@@ -314,6 +375,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
     const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter, authorize, authorizeData } = config;
+
+    // Built once per router. Holds only the "already warned" flag; the
+    // rendition bytes live in the bucket, which is the entire point.
+    const durableRenditions = config.renditionCache?.enabled ? createDurableRenditionCache() : undefined;
+    const transformMemory = createTransformMemory();
 
     /**
      * Run the per-object authorization hook, if one is configured.
@@ -619,11 +685,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             // Apply image transforms if requested and the file is a transformable image
             if (transformOpts && isTransformableImage(contentType)) {
                 const sourceVersion = buildEntityTag(localStat.size, localStat.mtimeMs);
-                const cacheKey = transformCache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
+                const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
                 const transformed = await transformOnce(
+                    transformMemory,
                     cacheKey,
                     transformOpts,
-                    async () => Buffer.from(await fsp.readFile(absolutePath))
+                    async () => Buffer.from(await fsp.readFile(absolutePath)),
+                    durableRenditions
+                        ? { cache: durableRenditions, controller: resolved, bucket }
+                        : undefined
                 );
                 const validators = objectValidators(transformed.data.byteLength, localStat.mtimeMs);
                 applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));
@@ -697,11 +767,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // Apply image transforms for remote storage too
         if (transformOpts && isTransformableImage(remoteContentType)) {
             const sourceVersion = buildEntityTag(fileObject.size, fileObject.lastModified);
-            const cacheKey = transformCache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
+            const cacheKey = transformMemory.cache.buildKey(`${transformKeyPrefix}@${sourceVersion}`, transformOpts);
             const transformed = await transformOnce(
+                transformMemory,
                 cacheKey,
                 transformOpts,
-                async () => Buffer.from(await fileObject.arrayBuffer())
+                async () => Buffer.from(await fileObject.arrayBuffer()),
+                durableRenditions
+                    ? { cache: durableRenditions, controller: resolved, bucket }
+                    : undefined
             );
             const validators = objectValidators(transformed.data.byteLength, fileObject.lastModified);
             applyCacheHeaders(c, validators, cachePolicy(TRANSFORM_MAX_AGE));

@@ -537,6 +537,32 @@ export interface RebaseBackendConfig {
     storagePublicRead?: boolean;
 
     /**
+     * Keep derived image renditions — the results of `?width=`, `?format=` and
+     * friends — in the storage source rather than only in this process's
+     * memory.
+     *
+     * Without it a transform is recomputed by every instance, and again by all
+     * of them after every deploy: the cache is per-process and does not survive
+     * a restart. With it, the first instance to compute a variant writes it
+     * under a reserved prefix in the same bucket as the source, and every
+     * instance reads it from there.
+     *
+     * ```ts
+     * storageRenditionCache: { enabled: true }
+     * ```
+     *
+     * Off by default because turning it on makes a `GET` write to your bucket:
+     * it costs per object, and on read-only credentials it cannot work. When a
+     * write does fail the request still succeeds — the transform is served from
+     * memory and the failure is logged once.
+     *
+     * Renditions are keyed by the source object's version, so replacing an
+     * image serves the new one immediately; the superseded rendition is left
+     * behind. Set a lifecycle rule on `_rebase/renditions/` to collect them.
+     */
+    storageRenditionCache?: import("./storage/rendition-cache").RenditionCacheConfig;
+
+    /**
      * Opt out of the storage access-control boot guard, keeping the legacy
      * behaviour where **any** authenticated user can read, overwrite, delete or
      * list **any** key (storage keys share one flat namespace and are not under
@@ -1965,7 +1991,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             authorize: storageAccessControl,
             // Resolved lazily: the admin data plane is built further down, well
             // after these routes are mounted, but always before a request runs.
-            authorizeData: () => storageAuthorizeData.current
+            authorizeData: () => storageAuthorizeData.current,
+            renditionCache: config.storageRenditionCache
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it
