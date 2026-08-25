@@ -150,6 +150,29 @@ export class RestApiGenerator {
      * `⚠️` line on every request from any frontend holding a stale slug. The
      * envelope is the fix; the log volume is not part of it.
      */
+    /**
+     * Wrap a handler so the response says the verb that reached it is on its
+     * way out.
+     *
+     * `Deprecation: true` is RFC 8594's signal and costs one header on a route
+     * nobody should still be calling. No `Sunset` date: the removal is gated on
+     * which SDKs are in the field rather than on a calendar, and inventing a
+     * date we would not honour is worse than saying only what is true.
+     *
+     * Deliberately not logged. The alias is expected traffic from clients doing
+     * nothing wrong, and a per-request line on a working call is the kind of
+     * noise that gets a logger turned down — the header is the signal, and the
+     * access log already records the verb for anyone counting.
+     */
+    private deprecatedVerb<T extends (c: Context<HonoEnv>, next: () => Promise<void>) => unknown>(
+        handler: T
+    ): (c: Context<HonoEnv>, next: () => Promise<void>) => unknown {
+        return (c, next) => {
+            c.header("Deprecation", "true");
+            return handler(c, next);
+        };
+    }
+
     private createUnmatchedRoute(): void {
         const known = new Set(this.collections.map(collection => collection.slug));
         const notFound = (message: string): ApiError =>
@@ -841,14 +864,23 @@ values: entity as Record<string, unknown> },
          * gateway in front of this API would reject partial updates the server
          * would have accepted.
          *
-         * PUT was mounted on the same handler for a while so that published
-         * SDKs kept working. It is gone: two verbs for one operation meant the
-         * spec had to describe the same route twice, one of them marked
-         * deprecated, and a merge served under a verb that means replace is a
-         * contract nobody can generate against. `update()` in the SDK sends
-         * PATCH.
+         * PUT is mounted on the same handler, and is **not** in the generated
+         * spec: the contract is PATCH, and a client generated from the spec can
+         * only ever send it. The alias exists because dropping it was shipped
+         * ahead of the clients that needed it — every published SDK up to and
+         * including 0.16.0 sends PUT from `collection.update()`, so a control
+         * plane that had already dropped the alias answered `rebase cloud
+         * stop | start | restart` with a 404 naming the caller's own collection.
+         * A verb removal is only safe once the oldest client in the field speaks
+         * the new one.
+         *
+         * Delete it when no released SDK sends PUT any more — i.e. one release
+         * after the first published client whose `update()` sends PATCH, giving
+         * the field a version to move to. The `Deprecation` header is how a
+         * caller finds out before that happens.
          */
         this.router.patch(`${basePath}/:id`, updateEntity);
+        this.router.put(`${basePath}/:id`, this.deprecatedVerb(updateEntity));
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
@@ -1135,6 +1167,8 @@ id: parsed.id });
         };
 
         this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
+        // The same alias, for the same reason — see the note on `updateEntity`.
+        this.router.put("/:parent/:parentId/:rest{.+}", this.deprecatedVerb(updateNested));
 
         // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {
