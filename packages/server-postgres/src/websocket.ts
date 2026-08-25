@@ -1,5 +1,5 @@
 import { RealtimeService } from "./services/realtimeService";
-import { PostgresBackendDriver } from "./PostgresBackendDriver";
+import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
@@ -567,6 +567,16 @@ colors: true }));
                                 sql: typeof sql === "string" ? sql.substring(0, 500) : String(sql),
                                 database: options?.database,
                                 role: options?.role,
+                                // The role the statement asked for is above;
+                                // this is the one it ran as. They used to be
+                                // assumed identical, so an execution that fell
+                                // back to the owner was audited under the role
+                                // it had failed to assume. That fallback is now
+                                // an error everywhere except the documented
+                                // `DISABLE_DB_ROLE_SWITCHING` opt-out — which is
+                                // precisely the case this line still has to
+                                // report honestly.
+                                effectiveRole: effectiveSqlRole(options?.role),
                                 paramCount: Array.isArray(options?.params) ? options.params.length : 0,
                                 resultRows: Array.isArray(result) ? result.length : "unknown",
                                 uid: auditSession?.user?.uid ?? "unknown",

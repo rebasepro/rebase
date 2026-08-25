@@ -168,3 +168,46 @@ describe("metrics history — combining across replicas", () => {
         expect(calls[0].sql).toMatch(/GROUP BY at/);
     });
 });
+
+describe("metrics history — the route's payload", () => {
+    const { createMetricsRoutes, MetricsRegistry } = require("../src/metrics/index");
+
+    const call = async (history?: unknown, path = "/history?series=cpu_millicores") => {
+        const router = createMetricsRoutes(new MetricsRegistry(), undefined, history);
+        return router.request(`http://local${path}`);
+    };
+
+    it("carries the instance count all the way to the wire", async () => {
+        // The console draws a step line under the plot from this field. Nothing
+        // between the store and the browser is allowed to narrow it away: a
+        // `{at, value}` type here compiles, serialises fine by accident, and
+        // silently removes the only thing that distinguishes "the app got
+        // busier" from "the app scaled out".
+        const res = await call(async () => [{ at: "2026-08-26T09:00:00.000Z", value: 600, instances: 2 }]);
+        expect(res.status).toBe(200);
+        expect((await res.json()).points).toEqual([
+            { at: "2026-08-26T09:00:00.000Z", value: 600, instances: 2 }
+        ]);
+    });
+
+    it("answers 501, not an empty chart, when nothing is recorded", async () => {
+        // An empty `points: []` is indistinguishable from a quiet hour, and
+        // that ambiguity is the entire reason this endpoint names its absence.
+        const res = await call(undefined);
+        expect(res.status).toBe(501);
+        expect((await res.json()).error).toBe("history_unavailable");
+    });
+
+    it("names an unknown series rather than drawing nothing", async () => {
+        const res = await call(async () => [], "/history?series=cpu_milicores");
+        expect(res.status).toBe(400);
+        expect((await res.json()).error).toBe("unknown_series");
+    });
+
+    it("clamps the window instead of scanning the whole table", async () => {
+        let asked = -1;
+        await call(async (_s: string, minutes: number) => { asked = minutes; return []; },
+            "/history?series=cpu_millicores&minutes=999999");
+        expect(asked).toBe(20_160);
+    });
+});

@@ -15,7 +15,8 @@ import {
     sampleSelf,
     SAMPLE_INTERVAL_MS,
     type Exec,
-    type MetricSeries
+    type MetricSeries,
+    type SeriesPoint
 } from "./history-store.js";
 
 export interface MetricsHistory {
@@ -24,7 +25,7 @@ export interface MetricsHistory {
     /** Begin sampling this process. Returns a stop. */
     start(): () => void;
     /** Read one series, for the route and for anything else that asks. */
-    read(series: MetricSeries, sinceMinutes: number): Promise<{ at: string; value: number }[]>;
+    read(series: MetricSeries, sinceMinutes: number): Promise<SeriesPoint[]>;
 }
 
 /** Narrow structural check, matching how the job store decides the same thing. */

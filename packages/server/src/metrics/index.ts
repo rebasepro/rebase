@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { METRIC_SERIES, type MetricSeries } from "./history-store.js";
+import { METRIC_SERIES, type MetricSeries, type SeriesPoint } from "./history-store.js";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "../auth/crypto-utils";
 import { extractBearerToken } from "../auth/bearer-token";
@@ -333,7 +333,7 @@ export function createMetricsRoutes(
      * route then answers 501 rather than pretending an empty chart is a quiet
      * period.
      */
-    history?: (series: MetricSeries, sinceMinutes: number) => Promise<{ at: string; value: number }[]>
+    history?: (series: MetricSeries, sinceMinutes: number) => Promise<SeriesPoint[]>
 ): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 

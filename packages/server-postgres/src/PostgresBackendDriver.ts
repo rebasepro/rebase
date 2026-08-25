@@ -42,6 +42,67 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 
+/**
+ * Has an operator opted out of database role switching entirely?
+ *
+ * `DISABLE_DB_ROLE_SWITCHING=true` is documented (README, the configuration
+ * page, the backend skill) as "run Studio SQL Editor queries as the connection
+ * owner", for deployments whose application roles have no database role behind
+ * them. It is the only sanctioned way a statement that named a role runs
+ * without it — every other route now refuses.
+ *
+ * Exact `"true"` on purpose, matching the check this replaced. `=1` and `=yes`
+ * silently do nothing, which `docs/audits/80-config-and-env.md` already records
+ * as a finding across the env surface; fixing it here alone would make this one
+ * variable disagree with the rest.
+ */
+export function isRoleSwitchingOptedOut(): boolean {
+    return process.env.DISABLE_DB_ROLE_SWITCHING === "true";
+}
+
+/**
+ * The role a statement will actually have run as, given the role it asked for.
+ *
+ * For the audit log, which recorded `options.role` — the *requested* role — and
+ * so restated the caller's request as though it were the outcome. The two part
+ * company exactly when {@link isRoleSwitchingOptedOut} holds, because every
+ * other divergence is now an error rather than a quiet substitution.
+ */
+export function effectiveSqlRole(requestedRole?: string): string {
+    if (!requestedRole) return CONNECTION_OWNER;
+    return isRoleSwitchingOptedOut() ? CONNECTION_OWNER : requestedRole;
+}
+
+/** How {@link effectiveSqlRole} names "whatever role the connection holds". */
+export const CONNECTION_OWNER = "<connection owner>";
+
+/**
+ * A statement named a database role the connection cannot assume.
+ *
+ * Its own type because the tempting recovery — run it anyway, as the owner — is
+ * the one thing that must not happen. Callers that catch this should report it,
+ * not retry unscoped.
+ */
+export class RoleSwitchUnavailableError extends Error {
+    readonly code = "ROLE_SWITCH_UNAVAILABLE";
+    readonly role: string;
+    /** The underlying Postgres error, when the refusal came from a live attempt. */
+    readonly pgError?: unknown;
+
+    constructor(role: string, pgError?: unknown) {
+        super(
+            `Cannot execute SQL as role "${role}": this connection is not permitted to SET ROLE. ` +
+            `The statement was NOT executed — running it as the connection owner would return ` +
+            `owner-visible rows, which is a different question from the one that was asked. ` +
+            `Grant the connection user membership in "${role}", or set DISABLE_DB_ROLE_SWITCHING=true ` +
+            `to run SQL Editor queries as the connection owner.`
+        );
+        this.name = "RoleSwitchUnavailableError";
+        this.role = role;
+        this.pgError = pgError;
+    }
+}
+
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
@@ -55,12 +116,18 @@ export class PostgresBackendDriver implements DataDriver {
     public client?: RebaseClient;
 
     /**
-     * Auto-set to `true` when a SET LOCAL ROLE fails with insufficient
-     * privileges, so subsequent queries skip the doomed attempt.
-     * Mirrors the static `DISABLE_DB_ROLE_SWITCHING` env var but is
-     * learned at runtime.
+     * Auto-set to `true` once a `SET LOCAL ROLE` has failed with insufficient
+     * privileges, so later statements refuse without spending the round trip
+     * to be refused again.
+     *
+     * Deliberately NOT a mirror of `DISABLE_DB_ROLE_SWITCHING`, which it used
+     * to be described as. The env var is an operator saying "run these as the
+     * connection owner"; this flag is the database saying "I cannot give you
+     * the role you asked for". The first is a decision and permits the
+     * fallback, the second is a failure and must not — see the SECURITY note
+     * in {@link executeSql}.
      */
-    private _roleSwitchingDisabled = false;
+    private _roleSwitchingUnavailable = false;
 
     /**
      * Restricted role that authenticated (user-context) requests run as (via
@@ -1257,6 +1324,27 @@ export class PostgresBackendDriver implements DataDriver {
         return this.poolManager.getDrizzle(databaseName);
     }
 
+    /**
+     * Build one statement, binding `$n` placeholders as real parameters.
+     *
+     * Shared by the role-switched path (inside a transaction) and the
+     * unswitched one. They held byte-identical copies of this loop, which is
+     * exactly the shape where a fix lands in one copy and not the other.
+     */
+    private buildStatement(sqlText: string, params?: unknown[]) {
+        if (!params || params.length === 0) return drizzleSql.raw(sqlText);
+        const parts = sqlText.split(/\$(\d+)/);
+        const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
+        for (let i = 0; i < parts.length; i++) {
+            if (i % 2 === 0) {
+                if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
+            } else {
+                chunks.push(drizzleSql.param(params[Number(parts[i]) - 1]));
+            }
+        }
+        return drizzleSql.join(chunks, drizzleSql.raw(""));
+    }
+
     async executeSql(sqlText: string, options?: {
         database?: string,
         role?: string,
@@ -1269,77 +1357,81 @@ export class PostgresBackendDriver implements DataDriver {
         const targetDb = this.getTargetDb(options?.database);
 
         try {
-            // Determine if we actually need to switch roles.
-            // Skip SET LOCAL ROLE when the requested role matches the current session role,
-            // as it's a no-op that can fail on managed Postgres setups where the connection
-            // user doesn't have permission to SET ROLE.
+            // Does this actually need a role switch?
+            //
+            // Asking for the role the session already runs as is a no-op, not a
+            // downgrade — the statement really does execute as the requested
+            // role — so it stays allowed even where switching is unavailable.
+            // That is the ordinary Studio path: the role picker defaults to
+            // `current_user`.
             let needsRoleSwitch = false;
-            if (options?.role && process.env.DISABLE_DB_ROLE_SWITCHING !== "true" && !this._roleSwitchingDisabled) {
+            if (options?.role) {
                 try {
                     const currentRoleResult = await targetDb.execute(drizzleSql.raw("SELECT current_user AS role"));
                     const currentRole = (currentRoleResult.rows?.[0] as Record<string, unknown>)?.role as string | undefined;
                     needsRoleSwitch = !!currentRole && currentRole !== options.role;
                 } catch {
-                    // If we can't determine the current role, attempt the switch anyway
+                    // Current role unknown. Assume a switch is needed rather
+                    // than assume the session already is the requested role:
+                    // attempting and refusing beats guessing in our own favour.
                     needsRoleSwitch = true;
                 }
             }
 
             if (needsRoleSwitch && options?.role) {
-                const safeRole = options.role.replace(/"/g, "\"\"");
-                try {
-                    return await targetDb.transaction(async (tx) => {
-                        await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
-                        let result;
-                        if (options?.params && options.params.length > 0) {
-                            const parts = sqlText.split(/\$(\d+)/);
-                            const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
-                            for (let i = 0; i < parts.length; i++) {
-                                if (i % 2 === 0) {
-                                    if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
-                                } else {
-                                    chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
-                                }
-                            }
-                            result = await tx.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
-                        } else {
-                            result = await tx.execute(drizzleSql.raw(sqlText));
+                if (isRoleSwitchingOptedOut()) {
+                    // The one sanctioned way to run this unswitched, and a
+                    // decision somebody made rather than a failure: the env var
+                    // is documented (README, docs/getting-started/configuration)
+                    // as "run SQL Editor queries as the connection owner", for
+                    // deployments whose application roles have no database role
+                    // behind them. `effectiveSqlRole` reads the same switch, so
+                    // the audit log records the role that actually applied.
+                    logger.debug(
+                        `[PostgresBackendDriver] DISABLE_DB_ROLE_SWITCHING=true — running as the ` +
+                        `connection owner rather than "${options.role}".`
+                    );
+                } else if (this._roleSwitchingUnavailable) {
+                    // Already learned this connection cannot SET ROLE; refuse
+                    // without spending the round trip to be told again.
+                    throw new RoleSwitchUnavailableError(options.role);
+                } else {
+                    const safeRole = options.role.replace(/"/g, "\"\"");
+                    try {
+                        return await targetDb.transaction(async (tx) => {
+                            await tx.execute(drizzleSql.raw(`SET LOCAL ROLE "${safeRole}"`));
+                            const result = await tx.execute(this.buildStatement(sqlText, options?.params));
+                            return result.rows as Record<string, unknown>[];
+                        });
+                    } catch (roleError: unknown) {
+                        if (isRoleSwitchingPermissionError(roleError)) {
+                            // SECURITY: do NOT fall through and run this as the
+                            // owner.
+                            //
+                            // The caller asked for a *constrained* execution.
+                            // Owner rows are not a degraded answer to that
+                            // question, they are a confident wrong one: the only
+                            // reason to pass a role is to see what the database
+                            // looks like under RLS, and owner output makes a
+                            // protected table read as exposed. This used to warn
+                            // and continue — and latch, so a single failure
+                            // silently unscoped every later call in the process.
+                            //
+                            // `applyAuthContext` (the user request path) and
+                            // `scopeDataDriver` both fail closed. This is the
+                            // same question, so it gets the same answer.
+                            this._roleSwitchingUnavailable = true;
+                            throw new RoleSwitchUnavailableError(options.role, roleError);
                         }
-                        return result.rows as Record<string, unknown>[];
-                    });
-                } catch (roleError: unknown) {
-                    if (isRoleSwitchingPermissionError(roleError)) {
-                        logger.warn(
-                            `[PostgresBackendDriver] SET LOCAL ROLE "${safeRole}" failed — ` +
-                            `the connection user lacks permission. Falling back to executing ` +
-                            `without role switching. To suppress this warning, set ` +
-                            `DISABLE_DB_ROLE_SWITCHING=true in your .env file.`
-                        );
-                        this._roleSwitchingDisabled = true;
-                        // Fall through to execute without role switching below
-                    } else {
                         throw roleError;
                     }
                 }
             }
 
-            let result;
-            if (options?.params && options.params.length > 0) {
-                const parts = sqlText.split(/\$(\d+)/);
-                const chunks: ReturnType<typeof drizzleSql.raw | typeof drizzleSql.param>[] = [];
-                for (let i = 0; i < parts.length; i++) {
-                    if (i % 2 === 0) {
-                        if (parts[i].length > 0) chunks.push(drizzleSql.raw(parts[i]));
-                    } else {
-                        chunks.push(drizzleSql.param(options.params[Number(parts[i]) - 1]));
-                    }
-                }
-                result = await targetDb.execute(drizzleSql.join(chunks, drizzleSql.raw("")));
-            } else {
-                result = await targetDb.execute(drizzleSql.raw(sqlText));
-            }
+            const result = await targetDb.execute(this.buildStatement(sqlText, options?.params));
             return result.rows as Record<string, unknown>[];
         } catch (error: unknown) {
+            if (error instanceof RoleSwitchUnavailableError) throw error;
             const msg = error instanceof Error ? error.message : String(error);
             // Provide a user-friendly message for connection/auth errors
             if (msg.includes("pg_hba.conf") || msg.includes("no encryption") || msg.includes("connection refused")) {
