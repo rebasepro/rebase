@@ -218,10 +218,27 @@ export async function readSeries(
     sinceMinutes: number
 ): Promise<SeriesPoint[]> {
     const combine = COMBINE[series] === "avg" ? "avg" : "sum";
+    // The current minute is EXCLUDED, and that is not tidiness.
+    //
+    // Each replica samples on its own phase — `setInterval` from whenever that
+    // pod booted — so at 10:45:20 the bucket for 10:45 holds rows from whichever
+    // pods have ticked so far, typically one of three. The chart takes the last
+    // point as its headline figure, so a three-replica app displayed one
+    // replica's CPU as the deployment's, the line ended in a cliff, and the
+    // instance step dropped underneath it — which the chart's own caption
+    // explains to the reader as a scale-down that never happened.
+    //
+    // Every live pod has written bucket M-1 before the clock enters M, so the
+    // newest bucket returned is complete and its `instances` is the true
+    // contributor count. `date_trunc` rather than arithmetic because it matches
+    // the recorder's `floor(t / 60_000) * 60_000` exactly, and is
+    // timezone-independent on a timestamptz.
     const rows = await exec(
         `SELECT at, ${combine}(value) AS value, count(*) AS instances
            FROM ${METRICS_HISTORY_TABLE}
-          WHERE series = $1 AND at >= now() - make_interval(mins => $2)
+          WHERE series = $1
+            AND at >= now() - make_interval(mins => $2)
+            AND at < date_trunc('minute', now())
           GROUP BY at
           ORDER BY at ASC`,
         [series, sinceMinutes]

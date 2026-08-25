@@ -211,3 +211,17 @@ describe("metrics history — the route's payload", () => {
         expect(asked).toBe(20_160);
     });
 });
+
+describe("metrics history — the minute still being written", () => {
+    it("excludes the current bucket, which is only partly reported", async () => {
+        // Replicas sample on their own phase, so the newest bucket holds
+        // whichever pods have ticked so far — typically one of three. The chart
+        // takes the last point as its headline, so this rendered one replica's
+        // CPU as the whole deployment's, ending the line in a cliff with the
+        // instance step dropping under it: a scale-down the caption then
+        // explains to the reader as real.
+        const { exec, calls } = fakeExec();
+        await readSeries(exec, "cpu_millicores", 60);
+        expect(calls[0].sql).toMatch(/at\s*<\s*date_trunc\('minute', now\(\)\)/);
+    });
+});
