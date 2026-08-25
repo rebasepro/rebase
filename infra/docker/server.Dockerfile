@@ -47,7 +47,12 @@ COPY packages/client packages/client
 COPY packages/codegen packages/codegen
 COPY packages/server packages/server
 COPY packages/server-postgres packages/server-postgres
-COPY scripts scripts
+# `tooling/scripts`, not `scripts`. Every package build below shells out to
+# `../../tooling/scripts/{add-dts-extensions,assert-build-output}.mjs`, and the
+# directory moved there in 1530c79c5 while this line did not — so the image has
+# not been buildable since, failing at COPY with `"/scripts": not found` before
+# any of those scripts could be missed.
+COPY tooling/scripts tooling/scripts
 
 RUN pnpm --filter @rebasepro/types build \
     && pnpm --filter @rebasepro/utils build \
