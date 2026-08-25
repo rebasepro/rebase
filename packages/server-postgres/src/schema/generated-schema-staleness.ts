@@ -44,7 +44,14 @@ export interface LegacyForeignKeyName {
  * which is not staleness — it is a table the generator has not been asked about.
  */
 function tableBlock(source: string, table: string): string {
-    const start = source.indexOf(`pgTable("${table}"`);
+    // Both forms the generator emits. A collection with `schema: "rebase"` — the
+    // auth users collection, in every scaffold — is written as
+    // `rebaseSchema.table("users", …)`, so matching only `pgTable(` made this
+    // blind to every table outside `public`: the block came back empty, and an
+    // empty block reads as "a table the generator has not been asked about".
+    // The rename check therefore never inspected them.
+    const literal = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const start = source.search(new RegExp(`(?:pgTable|\\.table)\\(\\s*["']${literal}["']`));
     if (start === -1) return "";
     // Generated files put every table in its own `export const`, so the next one
     // is the end of this block. No brace counting, nothing to get wrong.
@@ -167,5 +174,111 @@ export function findLegacyForeignKeyNames(
 export function describeLegacyForeignKeyNames(found: LegacyForeignKeyName[]): string {
     return found
         .map(f => `  • ${f.table}.${f.legacy} → ${f.current}  (${f.relation})`)
+        .join("\n");
+}
+
+// ── The other way a generated schema goes stale ──────────────────────────────
+//
+// The rename above is the subtle one: nothing the developer owns changed. The
+// ordinary one is the opposite — a collection or a relation was added and the
+// generator was not re-run, so the checked-in module simply does not describe
+// part of the schema. It fails later and elsewhere: relation validation, or a
+// query against a table the module has never heard of.
+//
+// Still not "is this byte-for-byte what the generator would emit now". This asks
+// only about *names*, which is what the rest of the system reads out of the
+// file, so reformatting the generator cannot make it red.
+
+/** Something the collections derive that the generated schema does not declare. */
+export interface MissingGeneratedName {
+    /** The table it belongs to, or is. */
+    table: string;
+    /** The column, when a column is what is missing. */
+    column?: string;
+    /** `<collection>` or `<collection>.<relation>`, for the message. */
+    source: string;
+}
+
+/**
+ * Tables and derived foreign-key columns the collections name and the generated
+ * schema does not.
+ *
+ * @param generatedSource contents of `backend/src/schema.generated.ts`
+ * @param collections     the project's collections, as this release reads them
+ */
+export function findMissingGeneratedNames(
+    generatedSource: string,
+    collections: CollectionConfig[]
+): MissingGeneratedName[] {
+    const missing: MissingGeneratedName[] = [];
+    const seen = new Set<string>();
+
+    const report = (table: string, source: string, column?: string): void => {
+        const key = `${table}.${column ?? ""}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        missing.push({ table, source, ...(column ? { column } : {}) });
+    };
+
+    const requireColumn = (table: string, column: string | undefined, source: string): void => {
+        if (!table || !column) return;
+        const block = tableBlock(generatedSource, table);
+        // A table that is absent is reported once, as a table. Listing each of
+        // its columns as separately missing would bury the one fact that
+        // explains all of them.
+        if (!block) return report(table, source);
+        if (!declaresColumn(block, column)) report(table, source, column);
+    };
+
+    for (const collection of relationalCollections(collections)) {
+        const sourceTable = getTableName(collection);
+        if (!tableBlock(generatedSource, sourceTable)) {
+            report(sourceTable, collection.slug);
+            continue;
+        }
+
+        for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
+            const at = `${collection.slug}.${name}`;
+
+            let target: CollectionConfig | undefined;
+            try {
+                target = relation.target?.();
+            } catch {
+                // Its own defect, reported at boot by `validate-relations`.
+                continue;
+            }
+
+            switch (relation.kind) {
+                case "belongsTo":
+                    requireColumn(sourceTable, relation.localKey, at);
+                    break;
+
+                case "hasOne":
+                case "hasMany":
+                    if (target) requireColumn(getTableName(target), relation.foreignKeyOnTarget, at);
+                    break;
+
+                case "manyToMany":
+                    requireColumn(relation.through.table, relation.through.sourceColumn, at);
+                    requireColumn(relation.through.table, relation.through.targetColumn, at);
+                    break;
+
+                default:
+                    // `via` joins are written by hand; there is no derived name
+                    // to be missing.
+                    break;
+            }
+        }
+    }
+
+    return missing;
+}
+
+/** One-line summary for a log or a CLI notice. */
+export function describeMissingGeneratedNames(missing: MissingGeneratedName[]): string {
+    return missing
+        .map(m => (m.column
+            ? `  • ${m.table}.${m.column} is not declared  (${m.source})`
+            : `  • table ${m.table} is not declared  (${m.source})`))
         .join("\n");
 }

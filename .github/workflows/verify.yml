@@ -217,6 +217,20 @@ jobs:
       - name: Derived database identifiers
         run: pnpm run check:derived-names
 
+      # The checked-in `schema.generated.ts` can stop describing the schema
+      # without anybody editing anything — a library upgrade moves a derived
+      # foreign-key name, the collections watcher never fires, and boot-ensure
+      # renames the column while relation validation refuses to start on the
+      # stale module. It can also go stale the ordinary way: a collection added,
+      # the generator not re-run. `rebase dev` runs the first check with `--fix`
+      # on a developer's machine; nothing ran either against this repository,
+      # whose generated schema is also what the self-host acceptance gate builds
+      # its bundle from — and which broke every deploy once already.
+      #
+      # Reads source, like the step above, so a stale dist cannot make it pass.
+      - name: Generated Drizzle schema is current
+        run: pnpm run check:schema-fresh
+
       - name: Build packages
         run: pnpm run build
         env:

@@ -68,6 +68,7 @@
     "write:api-surface": "node tooling/scripts/api-surface.mjs --write",
     "check:release-bump": "node tooling/scripts/check-release-bump.mjs",
     "check:derived-names": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-derived-names.mts",
+    "check:schema-fresh": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-generated-schema.mts",
     "write:derived-names": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/derived-names.mts --write",
     "record:project-snapshot": "pnpm --filter @rebasepro/server-postgres record:project-snapshot",
     "check:chart": "node tooling/scripts/check-chart.mjs",

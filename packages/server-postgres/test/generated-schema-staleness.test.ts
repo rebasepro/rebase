@@ -23,7 +23,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
-import { findLegacyForeignKeyNames } from "../src/schema/generated-schema-staleness";
+import { findLegacyForeignKeyNames, findMissingGeneratedNames } from "../src/schema/generated-schema-staleness";
 
 // ── Collections ──────────────────────────────────────────────────────────────
 
@@ -165,5 +165,81 @@ export const categoriesProducts = pgTable("categories_products", {
 });
 `;
         expect(findLegacyForeignKeyNames(generated, [products, categories])).toEqual([]);
+    });
+});
+
+/**
+ * The other way a generated schema goes stale, and the blind spot both checks
+ * shared.
+ *
+ * The rename above is the subtle failure: nothing the developer owns changed.
+ * This is the ordinary one — a collection or relation was added and the
+ * generator was not re-run — plus the reason neither check could see a table
+ * outside `public`.
+ */
+describe("findMissingGeneratedNames", () => {
+    /** A `belongsTo`, whose derived column lives on the source table. */
+    const authors: CollectionConfig = {
+        slug: "authors",
+        table: "authors",
+        name: "Authors",
+        // `schema` is the point of the last test below: an auth collection is
+        // written this way in every scaffold.
+        schema: "rebase",
+        properties: { id: { name: "ID", type: "string", isId: "uuid" } }
+    } as unknown as CollectionConfig;
+
+    const articles: CollectionConfig = {
+        slug: "articles",
+        table: "articles",
+        name: "Articles",
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            author: {
+                type: "relation",
+                relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
+            }
+        }
+    } as unknown as CollectionConfig;
+
+    const collections = [articles, authors];
+
+    const AUTHORS_TABLE = `export const authors = rebaseSchema.table("authors", { id: text("id") });`;
+    const ARTICLES_WITH_FK =
+        `export const articles = pgTable("articles", { id: text("id"), authorId: text("author_id") });`;
+    const ARTICLES_WITHOUT_FK = `export const articles = pgTable("articles", { id: text("id") });`;
+
+    it("reports a table the generated schema does not declare", () => {
+        const found = findMissingGeneratedNames(AUTHORS_TABLE, collections);
+
+        expect(found).toContainEqual(expect.objectContaining({ table: "articles", source: "articles" }));
+    });
+
+    it("reports a derived foreign-key column the table does not declare", () => {
+        const found = findMissingGeneratedNames(`${ARTICLES_WITHOUT_FK}\n${AUTHORS_TABLE}`, collections);
+
+        expect(found).toContainEqual(
+            expect.objectContaining({ table: "articles", column: "author_id" })
+        );
+    });
+
+    it("says nothing when everything is declared", () => {
+        expect(findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, collections)).toEqual([]);
+    });
+
+    it("sees a table declared through a schema, not only through pgTable", () => {
+        // The blind spot this closes. `rebaseSchema.table("authors", …)` is how
+        // every scaffold's auth collection is written, and matching only
+        // `pgTable(` reported it absent — which also meant the *rename* check
+        // never inspected a single table outside `public`.
+        const found = findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, collections);
+
+        expect(found.map(f => f.table)).not.toContain("authors");
+    });
+
+    it("reports an absent table once, not once per column it would have held", () => {
+        const found = findMissingGeneratedNames(AUTHORS_TABLE, collections);
+
+        expect(found.filter(f => f.table === "articles")).toHaveLength(1);
     });
 });
