@@ -269,27 +269,46 @@ there once. Do not re-implement any of them inline on a page.
   shares one palette and `textureSeed`; only the camera differs. The hero also
   runs a second pass of the same canvas *above* the type at
   `mix-blend-mode: multiply`, so the shape modulates the letterforms.
-- **Colour goes where the demo cannot finish the argument.** Exactly two sections
-  on the home page leave the near-black ground, and the rule for which is not
-  "the most important ones" — it is that their claim is the **absence of an
-  event**. Beats 01, 02, 04, 05 and 08 each prove themselves with something you
-  can look at and operate. Two cannot: 03 promises RLS "not by middleware someone
-  has to remember to call", 07 promises "an agent can't screw up". You can
-  screenshot a policy editor; you cannot screenshot *nobody forgot to check*.
-  Those sections carry a coloured ground because their proof is invisible.
-  - `--structural` (03) is the deepened brand blue: the promise holds by
-    construction, so it wears what Rebase is. `--hazard` (07) is coral: a named
-    danger that cannot land, in the page's alarm hue.
-  - **Before adding a third, apply the test.** 04 is the closest call — "the API
-    answers exactly the same" is a promise too — but it is demonstrable, and its
-    headline is an instruction rather than a guarantee. A third slab needs a
-    section whose proof stopped being showable, not a section that wants
-    attention.
+- **Four grounds, and the ground says what kind of thing you are reading.** Every
+  section sits on one of them; nothing is left to look picked.
+
+  | | | |
+  |---|---|---|
+  | **BASE** `#08090A` | evidence | the logo wall, the panel, the people, the customers, the roadmap. You are being shown, not argued at. |
+  | **RAISED** `#14161B` | mechanism | 01 the collection and what it generates, 02 the running backend, 04 the two products, 07 what an agent can reach. The lift says *a machine is being opened*. |
+  | **LIT** Neat | transition | the hero and the dividers, where the page changes subject. The only register with the full palette. |
+  | **CHROMA** flat hue | remember this | twice, and only twice. |
+
+  Which gives the page a shape: `LIT · RAISED RAISED [BLUE] RAISED · LIT · BASE
+  BASE RAISED BASE · [CORAL]`.
+
+- **The two chroma sections are the claim and the close, and they are not
+  interchangeable.**
+  - `ground-claim` — **03, deepened brand blue `#0021C1`.** The argument the
+    product rests on: security lives in the database, ranked first in §2 and the
+    one claim that survives an expert. It wears the brand colour because this is
+    what Rebase *is*.
+  - `ground-close` — **the final CTA, coral `#FB5066` with near-black ink.** The
+    ask. The reader arrives having seen colour exactly once before, and the blue
+    primary button is unmissable on it. Before this the section ran a Neat canvas
+    under a gradient ending at `#000`, so the page faded to pure black at the
+    moment it asked for the click.
+  - **The page opens in art and closes in colour.** Atmosphere while you are
+    being persuaded; flat colour when you are being asked. That is why the CTA
+    lost its canvas — it is a register change, not a saving.
+  - **Do not spend chroma on a mid-page claim again.** It was previously on 03
+    and 07 under the rule "claims whose proof is absent". True of both, but it
+    could not survive the ranking: 07 is claim *four of four*, so the loudest
+    frame on the page sat on the argument this document ranks last, while claims
+    2 and 3 got nothing.
   - **Half the chroma palette cannot be a dark ground.** Ultramarine, violet and
     cyan hold chroma at low lightness; coral, yellow and blush only exist as
     colours at high lightness, so darkening them yields blood red or olive. A
     light hue can only ever be a bright ground with dark ink. The raw brand blue
     is likewise unusable as a ground — white body copy on `#0070F4` is 3.74:1.
+  - **A raised ground eats the muted tier's headroom.** `--color-surface-500` is
+    tuned for `#000`/`#0a0a0a` and falls to 4.16:1 on `#14161B`. The eyebrow
+    lifts to `#8a8a8a` there. A muted value is only muted relative to something.
 - **A free tool is not a hero.** `rls-check` lives next to the claim it tests.
 - **Nothing sits above the header.**
 - **No emoji, anywhere.**

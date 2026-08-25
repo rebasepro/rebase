@@ -131,10 +131,30 @@
               breathes. This is the only register that carries the full palette,
               and it is what the site is recognised by.
 
-     CHROMA   a flat hue.                CLAIM.
-              Exactly twice. The two sections whose promise cannot be
-              demonstrated — see `chapter-guarantee` for the test. They are the
-              loudest ground because they are doing the work no demo can.
+     CHROMA   a flat hue.                THE TWO THINGS TO REMEMBER.
+              Exactly twice, and the two are not interchangeable:
+
+                #0021C1 on 03   THE CLAIM the product rests on. Security lives
+                                in the database — ranked first in SITE-STORY §2,
+                                and the one argument that survives an expert.
+                                The brand blue, deepened: this is what Rebase is.
+
+                #FB5066 on the  THE ASK. Where the reader is told what to do.
+                CLOSING CTA     Coral, because nothing else on the page is, and
+                                the eye should arrive here having seen colour
+                                only once before.
+
+              The claim and the close. Everything between them is the argument,
+              and the argument is neutral.
+
+              THIS REPLACED "the two claims whose proof is absent", which put
+              chroma on 03 and 07. That rule was true of both sections but it
+              could not explain why THOSE two deserved the page's only colour:
+              07 is claim FOUR of four, so the loudest thing on the page sat on
+              the argument SITE-STORY ranks last, while claims 2 and 3 got
+              nothing. It also left the page fading to `#000` at the exact
+              moment it asks for the click — the strongest position on the page
+              was its weakest frame.
 
    WHY THIS EXISTS. Before it, the page had five ground states and no system:
    seven sections transparent, one at `surface-900/0.4`, one at `/0.3` (the same
@@ -229,7 +249,7 @@
 
    Hence two variants rather than one with a variable. A single utility would
    let a caller put white ink on coral, which measures 3.26:1 and fails AA. */
-@utility chapter-guarantee {
+@utility ground-chroma {
     position: relative;
     overflow: hidden;
     --hue: var(--color-surface-700);
@@ -249,7 +269,7 @@
    And a counter-example worth keeping: `#0070F4` used RAW as a ground puts
    white body copy at 3.74:1 and the eyebrow at 3.34:1 — both under AA. The
    brand blue is too light to be a slab without deepening. */
-.chapter-guarantee--structural {
+.ground-claim {
     --slab-l: 0.38;
     --slab-c: 1.15;
     background: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
@@ -265,37 +285,37 @@
    selectors (class + `:is()`) outspecify the `text-white` utility the demo sets
    on its headings. Without the exclusion the bright slab turned the agent
    console's own h3 near-black on a near-black panel. */
-.chapter-guarantee--structural :is(h1, h2, h3):not(.frame *) { color: #fff; }
-.chapter-guarantee--structural .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
+.ground-claim :is(h1, h2, h3):not(.frame *) { color: #fff; }
+.ground-claim .eyebrow:not(.frame *) { color: rgb(255 255 255 / 0.66); }
 
 /* Bright ground, dark ink — the inversion, and the only way coral stays coral.
    Near-black rather than pure black so it sits in the page's own family instead
    of reading as a foreign black dropped onto the colour. Measured on #FB5066:
    heading 6.11:1, body 5.04:1, eyebrow 5.90:1. */
-.chapter-guarantee--hazard {
+.ground-close {
     background: var(--hue);
     border-top: 1px solid rgb(8 9 10 / 0.2);
     border-bottom: 1px solid rgb(8 9 10 / 0.2);
     color: rgb(8 9 10 / 0.82);
 }
 
-.chapter-guarantee--hazard :is(h1, h2, h3):not(.frame *) { color: #08090a; }
+.ground-close :is(h1, h2, h3):not(.frame *) { color: #08090a; }
 
 /* The frame is a dark panel wherever it sits, so inside one the copy returns to
    the page's own ink rather than inheriting the slab's. */
-.chapter-guarantee .frame { color: var(--color-page-copy); }
+.ground-chroma .frame { color: var(--color-page-copy); }
 
 /* Opaque, not the 0.7 the dark slab can afford. An 11px label at 0.7 alpha on
    coral measured 4.11:1 and failed AA — small text has no headroom to spend on
    translucency, and a bright ground has less of it than a dark one. */
-.chapter-guarantee--hazard .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
+.ground-close .eyebrow:not(.frame *) { color: rgb(8 9 10 / 0.95); }
 
 /* `--color-primary` is #0070F4, and a slab is the one place on the site where
    that stops working: on teal it is close enough to fight the ground, and on
    coral it is 1.9:1. Inside a slab the link takes the section's own ink and
    earns its affordance from the underline instead — a more robust signal than
    hue anywhere, and the only one available here. */
-.chapter-guarantee .accent-link {
+.ground-chroma .accent-link {
     color: currentColor;
     text-decoration: underline;
     text-decoration-thickness: 1px;
@@ -303,15 +323,15 @@
     text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
 }
 
-.chapter-guarantee--structural .accent-link:not(.frame *) { color: #fff; }
-.chapter-guarantee--hazard .accent-link:not(.frame *) { color: #08090a; }
-.chapter-guarantee .accent-link:hover { text-decoration-color: currentColor; }
+.ground-claim .accent-link:not(.frame *) { color: #fff; }
+.ground-close .accent-link:not(.frame *) { color: #08090a; }
+.ground-chroma .accent-link:hover { text-decoration-color: currentColor; }
 
 /* `.frame` draws a white hairline and assumes near-black behind it. Neither
    slab is near-black, so the edge is restated per variant: on the deep ground a
    darker edge reads as an inset screen, and on the bright one the dark panel
    already separates itself and only needs the shadow to sit it down. */
-.chapter-guarantee .frame {
+.ground-chroma .frame {
     border-color: rgb(8 9 10 / 0.4);
     box-shadow:
         inset 0 1px 0 rgb(255 255 255 / 0.05),
@@ -319,9 +339,77 @@
         0 40px 80px -20px rgb(0 0 0 / 0.6);
 }
 
-.chapter-guarantee--hazard .frame {
+.ground-close .frame {
     border-color: rgb(8 9 10 / 0.55);
     box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.55);
+}
+
+/* ── The close, inverted ─────────────────────────────────────────────────────
+   The CTA carries the densest functional content on the page — three lanes,
+   two copy-to-clipboard buttons, code chips, a status badge, two buttons — all
+   of it written for a near-black ground in white-on-dark values. Inverting that
+   in the markup would mean fifteen edits and fifteen chances for one to be
+   missed on the next copy change.
+
+   So the vocabulary is remapped here instead. Each rule below is one of the
+   dark-ground idioms this section uses, restated for a bright one. If the CTA
+   gains a new element, it needs a line here, not a hand-tuned class. */
+
+/* Hairlines. `white/10` is invisible on coral; the same weight in near-black. */
+.ground-close :is([class*="border-white"], .border-y, .border-t, .border-r) {
+    border-color: rgb(8 9 10 / 0.22);
+}
+
+/* Secondary copy. `#b4b8bd` is tuned for #08090a and reads as dirt here. */
+.ground-close p:not(.eyebrow) {
+    color: rgb(8 9 10 / 0.78);
+}
+
+/* Code chips and the copy button — mono values that were light-on-dark. */
+.ground-close :is(code, .copy-btn) {
+    color: rgb(8 9 10 / 0.86);
+}
+
+.ground-close .copy-btn {
+    background: rgb(8 9 10 / 0.07);
+    border-color: rgb(8 9 10 / 0.18);
+}
+
+.ground-close .copy-btn:hover {
+    background: rgb(8 9 10 / 0.12);
+    border-color: rgb(8 9 10 / 0.3);
+    color: #08090a;
+}
+
+/* The "not launched" badge on the Cloud lane. Amber-on-dark becomes near-black
+   on a lighter tint of the ground, so it still reads as a status chip rather
+   than as a second accent competing with the section's own hue. */
+.ground-close .bg-amber-400\/15 {
+    background: rgb(8 9 10 / 0.1);
+    color: rgb(8 9 10 / 0.8);
+}
+
+/* The primary action keeps `--color-primary`. Blue on coral is the one place
+   the brand blue is unmissable, and it is the only element in the section that
+   should be — everything else here is inverted ground, this is the click. */
+.ground-close a[class*="bg-primary"] {
+    color: #fff;
+}
+
+/* The secondary button was a white hairline outline. */
+.ground-close a[class*="border-white"] {
+    border-color: rgb(8 9 10 / 0.35);
+    color: #08090a;
+}
+
+.ground-close a[class*="border-white"]:hover {
+    border-color: rgb(8 9 10 / 0.6);
+}
+
+/* The dashed "no command yet" well. */
+.ground-close .border-dashed {
+    border-color: rgb(8 9 10 / 0.28);
+    color: rgb(8 9 10 / 0.55);
 }
 
 /* ── Form controls, as the product actually draws them ───────────────────────

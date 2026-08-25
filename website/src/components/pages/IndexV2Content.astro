@@ -259,9 +259,9 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 carries the half of the argument the demo cannot.
 
                 Brand blue deepened, because this promise holds by construction —
-                it is what Rebase is. See `chapter-guarantee` for the rule and for
+                it is what Rebase is. See `ground-chroma` for the rule and for
                 why the raw #0070F4 cannot be used here. */}
-            <section class="chapter chapter-guarantee chapter-guarantee--structural py-24 sm:py-32" style="--hue: var(--color-primary)">
+            <section class="chapter ground-chroma ground-claim py-24 sm:py-32" style="--hue: var(--color-primary)">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
@@ -458,7 +458,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
             ground is a stronger version of the same gesture, and running both
             would have two devices doing one job. */}
         <div>
-            <section class="chapter chapter-guarantee chapter-guarantee--hazard py-24 sm:py-32" style="--hue: var(--color-chroma-coral)">
+            <section class="chapter ground-raised relative border-y border-white/8 py-24 sm:py-32">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
@@ -492,17 +492,20 @@ const SELFHOST_COMMAND = "docker compose up -d";
         <!-- ROADMAP -->
         <RoadmapSection />
 
-        <!-- FINAL CTA — the three lanes, as one band. -->
-        <section class="relative isolate overflow-hidden border-t border-white/8">
-            <div class="absolute inset-x-0 top-0 h-72 -z-10 opacity-70" aria-hidden="true">
-                <NeatBackground variant="a" client:visible />
-            </div>
-            <div
-                class="absolute inset-0 -z-10 pointer-events-none"
-                aria-hidden="true"
-                style="background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.9) 46%,#000 100%)"
-            ></div>
+        {/* FINAL CTA — the three lanes, as one band, and the page's second and
+            last chroma ground.
 
+            It used to run a Neat canvas under a gradient that ended at `#000`,
+            so the page faded to pure black at the exact moment it asked for the
+            click: the strongest position on the page was its weakest frame. The
+            ask is now the loudest thing after the claim, and the reader arrives
+            here having seen colour exactly once before.
+
+            The canvas goes with it. That is deliberate rather than a saving —
+            the page opens in art and closes in colour, which is a register
+            change the reader can feel: atmosphere while you are being
+            persuaded, flat colour when you are being asked. */}
+        <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 py-24 sm:py-32">
                 <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
                     {t("cta.title")}
