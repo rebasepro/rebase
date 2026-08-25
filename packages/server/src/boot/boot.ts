@@ -378,7 +378,11 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 "who can reach this port. Set a token, or keep the port on a private network."
             );
         }
-        app.route("/metrics", createMetricsRoutes(metrics.registry, env.REBASE_METRICS_TOKEN));
+        app.route("/metrics", createMetricsRoutes(
+            metrics.registry,
+            env.REBASE_METRICS_TOKEN,
+            backend.metricsHistory?.read
+        ));
     }
 
     // ── Static assets ────────────────────────────────────────────────────────
@@ -559,6 +563,9 @@ async function bootStaticApp(
     }
 
     if (metrics) {
+        // No history argument: this is the static-app path, which has no backend
+        // and no database — the route reports that honestly as a 501 rather
+        // than serving an empty series.
         app.route("/metrics", createMetricsRoutes(metrics.registry, metricsToken));
     }
 

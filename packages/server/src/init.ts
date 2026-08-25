@@ -842,6 +842,14 @@ export interface RebaseBackendInstance {
     realtimeService: RealtimeProvider;
     auth?: BootstrappedAuth;
     history?: { historyService: import("./history/history-routes").HistoryService };
+    /**
+     * Stored metrics for this deployment, when it can keep any.
+     *
+     * Absent on a driver with no SQL admin. The `/metrics/history` route turns
+     * that absence into a named 501 rather than an empty series, because an
+     * empty chart and "this deployment keeps no history" look identical.
+     */
+    metricsHistory?: import("./metrics/history-recorder.js").MetricsHistory;
     storageRegistry?: StorageRegistry;
     storageController?: StorageController;
     collectionRegistry: BackendCollectionRegistry;
@@ -2654,6 +2662,30 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         );
     }
 
+    // A little history for the metrics this process already keeps, in this
+    // project's own database. Beside the job store because it is the same kind
+    // of thing — a framework-owned table, created and swept at boot — and for
+    // the same reason: this is the moment the schema is reachable and nobody is
+    // mid-request.
+    //
+    // Undefined on a driver with no SQL admin, which the route reports as a
+    // named 501. An empty chart and "this deployment keeps no history" must not
+    // look alike.
+    let metricsHistory: import("./metrics/history-recorder.js").MetricsHistory | undefined;
+    try {
+        const { createMetricsHistory } = await import("./metrics/history-recorder.js");
+        metricsHistory = createMetricsHistory(defaultDriver);
+        if (metricsHistory) {
+            await metricsHistory.ensure();
+            metricsHistory.start();
+        }
+    } catch (err) {
+        // A backend that serves is worth more than one that charts. This is the
+        // only subsystem here whose absence costs nothing but a graph.
+        logger.warn("[metrics] history is unavailable; the runtime is otherwise unaffected.", { err });
+        metricsHistory = undefined;
+    }
+
     let jobQueue: import("./jobs").JobQueue | undefined;
     if (config.jobs?.enabled) {
         const { createJobStore, createJobQueue } = await import("./jobs");
@@ -2978,6 +3010,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         collectionRegistry,
         cronScheduler,
         jobQueue,
+        metricsHistory,
         healthCheck,
         shutdown
     };

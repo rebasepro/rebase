@@ -1,0 +1,179 @@
+/**
+ * A little history for the metrics this process already keeps.
+ *
+ * ## Why this is in the framework and not in the cloud console
+ *
+ * The console wants to draw "CPU over the last hour". The obvious way to get it
+ * on GKE is Cloud Monitoring, which already collects exactly this — and which
+ * would make the panel unportable the day the platform moves, for a feature
+ * every self-hoster also wants. So the history lives where the runtime lives:
+ * the process samples ITSELF, into its OWN database, and anything that can read
+ * the database can draw the chart. No cluster, no metrics-server, no vendor.
+ *
+ * That is the same rule the binder follows — the cloud is a better
+ * implementation behind the same interface, never a different one.
+ *
+ * ## Why it stays cheap
+ *
+ * One row per series per minute. Five series is 7,200 rows a day, and the sweep
+ * below keeps a bounded window of them, so the table reaches a steady size
+ * measured in megabytes and stays there. It is deliberately NOT a general
+ * time-series store: no labels, no cardinality to explode, no per-request rows.
+ *
+ * A minute is the resolution because that is what the question needs — "was it
+ * slow at 15:40", "did my deploy cause that" — and because a finer grain buys
+ * nothing a reader can see on a chart of an hour.
+ */
+/**
+ * The positional-parameter shape every store in this package settles on.
+ *
+ * The bootstrapper's own `SqlExec` takes an options object; each store wraps it
+ * once and reads better for it. Same two shapes, same reason, as `job-store`.
+ */
+export type Exec = (sql: string, params?: unknown[]) => Promise<unknown>;
+
+/** Where the samples live. Framework-owned, like `rebase.jobs`. */
+export const METRICS_HISTORY_TABLE = "rebase.metric_samples";
+
+/**
+ * How long a sample is kept.
+ *
+ * Two weeks answers "is this worse than last week" and stops well short of
+ * being an archive. Anything that needs to outlive it — billing, capacity
+ * planning — is a rollup somebody else owns, not a longer retention here.
+ */
+export const RETENTION_DAYS = 14;
+
+/** How often the process samples itself. Matched to the resolution it stores. */
+export const SAMPLE_INTERVAL_MS = 60_000;
+
+/**
+ * The series this records. A closed set on purpose — see the cardinality note.
+ *
+ * A list rather than only a union, because the route validates against it: an
+ * unknown `?series=` must be a named 400 rather than an empty chart, which
+ * reads exactly like a quiet period.
+ */
+export const METRIC_SERIES = [
+    "cpu_millicores",
+    "memory_bytes",
+    "requests_total",
+    "errors_total",
+    "event_loop_delay_ms"
+] as const;
+
+export type MetricSeries = (typeof METRIC_SERIES)[number];
+
+export interface MetricSample {
+    at: Date;
+    series: MetricSeries;
+    value: number;
+}
+
+/**
+ * Create the table and sweep what has aged out.
+ *
+ * Called at boot, beside the job and cron stores, and for the same reason they
+ * do it there: the only moment the schema is guaranteed to be reachable and
+ * nobody is mid-request.
+ */
+export async function ensureMetricsHistory(exec: Exec): Promise<void> {
+    await exec(`
+        CREATE TABLE IF NOT EXISTS ${METRICS_HISTORY_TABLE} (
+            at      timestamptz      NOT NULL,
+            series  text             NOT NULL,
+            value   double precision NOT NULL,
+            PRIMARY KEY (series, at)
+        )
+    `, []);
+
+    // (series, at DESC) rather than the primary key's order: every read is
+    // "this series, most recent first, bounded by time", and the PK's ascending
+    // order makes that a backwards scan.
+    await exec(`
+        CREATE INDEX IF NOT EXISTS metric_samples_series_recent
+            ON ${METRICS_HISTORY_TABLE} (series, at DESC)
+    `, []);
+
+    // Swept here rather than by a cron, so a deployment that runs no scheduler
+    // still stays bounded. A DELETE is the right tool at this size — a few
+    // thousand rows a day — and partitioning would be machinery for a table
+    // that never gets big.
+    await exec(
+        `DELETE FROM ${METRICS_HISTORY_TABLE} WHERE at < now() - make_interval(days => $1)`,
+        [RETENTION_DAYS]
+    );
+}
+
+/**
+ * What this process is using right now.
+ *
+ * `process.cpuUsage()` is cumulative, so a rate needs two readings and the gap
+ * between them — which is why the previous one is threaded through rather than
+ * held in a module global: a module global is shared by every test in a file
+ * and makes the first assertion depend on whatever ran before it.
+ */
+export function sampleSelf(
+    previous: { cpu: NodeJS.CpuUsage; at: number } | null,
+    now = Date.now()
+): { samples: Omit<MetricSample, "at">[]; cursor: { cpu: NodeJS.CpuUsage; at: number } } {
+    const cpu = process.cpuUsage();
+    const memory = process.memoryUsage();
+    const samples: Omit<MetricSample, "at">[] = [
+        { series: "memory_bytes", value: memory.rss }
+    ];
+
+    if (previous) {
+        const elapsedMs = now - previous.at;
+        if (elapsedMs > 0) {
+            // Microseconds of CPU over milliseconds of wall clock, as
+            // millicores: 1000m is one core saturated for the whole window.
+            const usedMicros = (cpu.user - previous.cpu.user) + (cpu.system - previous.cpu.system);
+            samples.push({ series: "cpu_millicores", value: (usedMicros / 1000 / elapsedMs) * 1000 });
+        }
+    }
+
+    return { samples, cursor: { cpu, at: now } };
+}
+
+/** Write one tick's samples. */
+export async function recordSamples(
+    exec: Exec,
+    samples: Omit<MetricSample, "at">[],
+    at: Date = new Date()
+): Promise<void> {
+    if (samples.length === 0) return;
+    // Truncated to the minute, so a restart mid-minute overwrites rather than
+    // doubling the row count — and so two processes sampling the same database
+    // converge on one series instead of interleaving two.
+    const bucket = new Date(Math.floor(at.getTime() / 60_000) * 60_000);
+    for (const s of samples) {
+        if (!Number.isFinite(s.value)) continue;
+        await exec(
+            `INSERT INTO ${METRICS_HISTORY_TABLE} (at, series, value)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (series, at) DO UPDATE SET value = EXCLUDED.value`,
+            [bucket, s.series, s.value]
+        );
+    }
+}
+
+/** Read one series over a window, oldest first — the order a chart draws in. */
+export async function readSeries(
+    exec: Exec,
+    series: MetricSeries,
+    sinceMinutes: number
+): Promise<{ at: string; value: number }[]> {
+    const rows = await exec(
+        `SELECT at, value FROM ${METRICS_HISTORY_TABLE}
+         WHERE series = $1 AND at >= now() - make_interval(mins => $2)
+         ORDER BY at ASC`,
+        [series, sinceMinutes]
+    ) as unknown as { rows?: { at: Date | string; value: number }[] } | { at: Date | string; value: number }[];
+
+    const list = Array.isArray(rows) ? rows : (rows?.rows ?? []);
+    return list.map(r => ({
+        at: r.at instanceof Date ? r.at.toISOString() : String(r.at),
+        value: Number(r.value)
+    }));
+}

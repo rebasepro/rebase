@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
+import { METRIC_SERIES, type MetricSeries } from "./history-store.js";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "../auth/crypto-utils";
 import { extractBearerToken } from "../auth/bearer-token";
@@ -323,19 +324,62 @@ export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
  * When a token is configured it is required, and compared in constant time — a
  * timing oracle on a metrics token is a small thing, but it is free to avoid.
  */
-export function createMetricsRoutes(registry: MetricsRegistry, token?: string): Hono<HonoEnv> {
+export function createMetricsRoutes(
+    registry: MetricsRegistry,
+    token?: string,
+    /**
+     * Reads a stored series. Absent when the deployment keeps no history — a
+     * driver with no SQL admin, or a role that does not provision — and the
+     * route then answers 501 rather than pretending an empty chart is a quiet
+     * period.
+     */
+    history?: (series: MetricSeries, sinceMinutes: number) => Promise<{ at: string; value: number }[]>
+): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
+    const authorized = (c: { req: { header(name: string): string | undefined } }): boolean => {
+        if (!token) return true;
+        const provided = extractBearerToken(c.req.header("authorization")) ?? "";
+        return Boolean(provided) && safeCompare(provided, token);
+    };
+
     router.get("/", (c) => {
-        if (token) {
-            const provided = extractBearerToken(c.req.header("authorization")) ?? "";
-            if (!provided || !safeCompare(provided, token)) {
-                return c.text("Unauthorized", 401);
-            }
-        }
+        if (!authorized(c)) return c.text("Unauthorized", 401);
         return c.text(registry.render(), 200, {
             "Content-Type": "text/plain; version=0.0.4; charset=utf-8"
         });
+    });
+
+    /**
+     * The same numbers, over time.
+     *
+     * Deliberately part of the runtime rather than of any console: a
+     * self-hosted deployment gets the same history from the same URL, and
+     * nothing here depends on a cluster or a cloud monitoring product.
+     */
+    router.get("/history", async (c) => {
+        if (!authorized(c)) return c.text("Unauthorized", 401);
+        if (!history) {
+            return c.json({
+                error: "history_unavailable",
+                message: "This deployment stores no metrics history. It needs a SQL driver and a role that provisions schema."
+            }, 501);
+        }
+
+        const series = c.req.query("series") as MetricSeries | undefined;
+        if (!series || !METRIC_SERIES.includes(series)) {
+            return c.json({
+                error: "unknown_series",
+                message: `Unknown series. Available: ${METRIC_SERIES.join(", ")}.`
+            }, 400);
+        }
+
+        // Bounded rather than defaulted-and-forgotten: an unbounded window on a
+        // per-minute table is a full scan, and nothing draws a year.
+        const raw = Number(c.req.query("minutes") ?? 60);
+        const minutes = Number.isFinite(raw) ? Math.min(Math.max(Math.round(raw), 1), 20_160) : 60;
+
+        return c.json({ series, minutes, points: await history(series, minutes) });
     });
 
     return router;
