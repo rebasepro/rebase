@@ -130,6 +130,8 @@ export function resolveAuthOptions(
         allowAnonymous: env.ALLOW_ANONYMOUS,
         allowUserLookup: env.AUTH_ALLOW_USER_LOOKUP,
         captcha: resolveCaptchaOptions(env),
+        magicLink: env.AUTH_MAGIC_LINK,
+        emailOtp: env.AUTH_EMAIL_OTP,
         email: resolveEmailOptions(env),
         // Cookie auth keeps the refresh token in an httpOnly cookie rather than
         // localStorage, putting it out of reach of XSS. Enabling it costs a

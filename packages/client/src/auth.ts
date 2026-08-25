@@ -746,6 +746,48 @@ accessToken: session.accessToken,
 refreshToken: session.refreshToken };
     }
 
+    /**
+     * Ask for a six-digit sign-in code by email.
+     *
+     * Answers the same thing whether or not the address has an account — do not
+     * use the result to tell a person whether they are registered, because it
+     * does not know.
+     */
+    async function sendEmailOtp(email: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/otp"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        return body as { success: boolean; message: string; expiresInSeconds: number };
+    }
+
+    /**
+     * Trade a code for a session.
+     *
+     * The address is sent with the code because the code is only valid for it:
+     * that is what keeps a six-digit guess a guess against one account rather
+     * than against every account at once.
+     */
+    async function verifyEmailOtp(email: string, code: string) {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/otp/verify"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, code }),
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+    }
+
     async function getSessions(): Promise<DeviceSession[]> {
         const data = await transport.request<{ sessions: DeviceSession[] }>(authPath + "/sessions", { method: "GET" });
         return data.sessions;
@@ -858,6 +900,8 @@ refreshToken: session.refreshToken };
         verifyEmail,
         sendMagicLink,
         verifyMagicLink,
+        sendEmailOtp,
+        verifyEmailOtp,
         getSessions,
         revokeSession,
         revokeAllSessions,

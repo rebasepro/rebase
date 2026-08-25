@@ -50,7 +50,7 @@ import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasep
 /**
  * Authentication method identifier for lifecycle hooks.
  */
-export type AuthMethod = "login" | "register" | "oauth" | "refresh" | "password-reset" | "anonymous" | "magic-link" | "mfa";
+export type AuthMethod = "login" | "register" | "oauth" | "refresh" | "password-reset" | "anonymous" | "magic-link" | "otp" | "mfa";
 
 /**
  * Hook specific parts of the built-in Rebase auth implementation.

@@ -318,6 +318,19 @@ export interface RebaseAuthConfig {
      * Requires email to be configured.
      */
     magicLink?: boolean;
+
+    /**
+     * Enable email one-time codes — six digits, typed in, instead of a link.
+     *
+     * A magic link opens the session on whichever device holds the mailbox,
+     * which is the wrong device whenever those are two different machines: a
+     * television, a terminal, a second browser. A code crosses that gap because
+     * a person carries it.
+     *
+     * `POST /auth/otp` sends one; `POST /auth/otp/verify` trades it for a
+     * session. Requires email to be configured, as magic link does.
+     */
+    emailOtp?: boolean;
     /**
      * Opt-in httpOnly cookie mode for refresh tokens.
      *
@@ -1549,6 +1562,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 authHooks: safeAuthConfig.hooks,
                 collectionAuthConfig,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
+                enableEmailOtp: safeAuthConfig.emailOtp ?? false,
                 cookieAuth: safeAuthConfig.cookieAuth
             });
 

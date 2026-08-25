@@ -15,6 +15,15 @@ import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 export type HonoEnv = {
     Variables: {
         user?: AuthResult | { uid?: string, roles?: string[] };
+        /**
+         * The address a one-time-code request named, lower-cased.
+         *
+         * Stashed by a middleware so the per-address verification limiter has
+         * something to key on: the limiter runs before the handler that parses
+         * the body, and without this it would key every attempt into one global
+         * bucket — a limiter in name only. See `auth/otp-routes.ts`.
+         */
+        otpEmail?: string;
         driver?: DataDriver;
         /** Set when the request is authenticated via a Service API Key. */
         apiKey?: ApiKeyMasked;

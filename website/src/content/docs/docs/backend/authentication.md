@@ -84,6 +84,7 @@ const backend = await initializeRebaseBackend({
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
+| `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
 | `cookieAuth` | `CookieAuthConfig` | — | Deliver the refresh token as an `httpOnly` `Secure` `SameSite` cookie instead of in the JSON body — see below |
 | `providers` | `OAuthProvider[]` | `[]` | The canonical OAuth array; the named provider fields resolve into it |
 | `allowedRedirectUris` | `string[]` | — | Narrow which redirect URIs the OAuth routes accept |
@@ -145,7 +146,7 @@ Or from the environment, which is what a managed deployment has:
 ```bash
 CAPTCHA_PROVIDER=turnstile
 CAPTCHA_SECRET=...
-CAPTCHA_ROUTES=register,forgotPassword,magicLink   # optional; this is the default
+CAPTCHA_ROUTES=register,forgotPassword,magicLink,emailOtp   # optional; this is the default
 ```
 
 The client sends the widget's token as `captchaToken` in the JSON body, or in
@@ -223,6 +224,45 @@ It is admin-only, through the same gate cron, logs and backups use, and it
 answers `501 DEV_MAILBOX_UNAVAILABLE` when there is nothing to serve — with SMTP
 configured, mail was delivered rather than held. `NODE_ENV=production` refuses
 it regardless of anything else: what these messages contain is a working login.
+
+### One-time codes by email
+
+A magic link opens the session on whichever device holds the mailbox. That is
+the right device on a laptop and the wrong one everywhere else — a television, a
+terminal, a second browser, a kiosk. A code crosses that gap, because a person
+carries it across.
+
+```ts
+auth: {
+    emailOtp: true,   // or AUTH_EMAIL_OTP=true
+    email: { /* … */ }
+}
+```
+
+```ts
+await rebase.auth.sendEmailOtp("someone@example.com");
+// …the person reads six digits out of their inbox…
+const { user } = await rebase.auth.verifyEmailOtp("someone@example.com", "384102");
+```
+
+The address is sent again with the code, and that is not a convenience. What is
+stored is a hash of the address *and* the code together, so a guess is a guess
+against one named account — not against every account in the table at once,
+which is what a code-only lookup would make of a million possibilities.
+
+The rest of what keeps six digits sufficient:
+
+- **Ten minutes**, and single use.
+- **Five verification attempts per address per window**, keyed on the address
+  rather than the caller's IP: an IP is the attacker's to rotate and the account
+  under attack is not. Counts live wherever the deployment's rate-limit store
+  does — per replica by default, shared with `REBASE_RATE_LIMIT_STORE=sql`.
+- **Uniform digits**, from `randomInt` rather than a modulo of random bytes.
+- `POST /auth/otp` answers identically for an address with no account, so it
+  cannot be used to ask whether somebody is a customer.
+
+Reading a code out of the inbox proves the address, so a successful sign-in
+marks it verified — exactly as following a magic link does.
 
 ### Branding the default emails
 
@@ -386,6 +426,8 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/verify-email` | Consume a verification link (the URL in that email) |
 | `POST` | `/api/auth/magic-link` | Email a one-time sign-in link. `503 EMAIL_NOT_CONFIGURED` without SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Exchange a magic-link token for a session |
+| `POST` | `/api/auth/otp` | Email a six-digit sign-in code. Answers the same whether or not the address has an account |
+| `POST` | `/api/auth/otp/verify` | Exchange `{ email, code }` for a session |
 | `POST` | `/api/auth/anonymous` | Create an anonymous session (opt-in — `ALLOW_ANONYMOUS`) |
 | `POST` | `/api/auth/anonymous/link` | Attach real credentials to the anonymous account already signed in |
 | `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |

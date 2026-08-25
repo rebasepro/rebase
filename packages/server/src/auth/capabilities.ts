@@ -32,6 +32,8 @@ export interface BuiltinAuthCapabilityInputs {
     allowAnonymous?: boolean;
     /** Magic-link login. Needs an email service to be of any use. */
     enableMagicLink?: boolean;
+    /** Email one-time codes. Needs an email service, as magic link does. */
+    enableEmailOtp?: boolean;
     /**
      * Whether an email service is configured.
      *
@@ -59,6 +61,7 @@ export function buildBuiltinAuthCapabilities(
         disableSelfRegistration,
         allowAnonymous,
         enableMagicLink,
+        enableEmailOtp,
         emailConfigured,
         enabledProviders
     } = inputs;
@@ -80,6 +83,7 @@ export function buildBuiltinAuthCapabilities(
         profileUpdate: true,
         emailVerification: emailConfigured,
         magicLink: !!enableMagicLink && emailConfigured,
+        emailOtp: !!enableEmailOtp && emailConfigured,
         // A capability that exists and is not in the capability surface is how a
         // client ends up calling a route it cannot discover is off.
         anonymousLogin: isAnonymousAuthOpen({ allowAnonymous, disableSelfRegistration }),

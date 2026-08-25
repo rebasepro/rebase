@@ -96,6 +96,7 @@ export interface BuiltinAuthAdapterConfig {
     collectionAuthConfig?: import("@rebasepro/types").AuthCollectionConfig;
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
+    enableEmailOtp?: boolean;
     /** Opt-in httpOnly cookie mode for refresh tokens. */
     cookieAuth?: import("./routes").CookieAuthConfig;
 }
@@ -124,6 +125,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         authHooks,
         collectionAuthConfig,
         enableMagicLink = false,
+        enableEmailOtp = false,
         cookieAuth
     } = config;
 
@@ -272,6 +274,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowedRedirectUris,
                 authHooks,
                 enableMagicLink,
+                enableEmailOtp,
                 cookieAuth,
                 captcha
             });
@@ -372,6 +375,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 disableSelfRegistration,
                 allowAnonymous,
                 enableMagicLink,
+                enableEmailOtp,
                 emailConfigured: !!emailService?.isConfigured(),
                 enabledProviders: oauthProviders.map((p) => p.id)
             });

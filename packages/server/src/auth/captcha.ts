@@ -85,9 +85,9 @@ export interface CaptchaConfig {
     timeoutMs?: number;
 }
 
-export type CaptchaRoute = "register" | "login" | "forgotPassword" | "magicLink";
+export type CaptchaRoute = "register" | "login" | "forgotPassword" | "magicLink" | "emailOtp";
 
-export const DEFAULT_CAPTCHA_ROUTES: CaptchaRoute[] = ["register", "forgotPassword", "magicLink"];
+export const DEFAULT_CAPTCHA_ROUTES: CaptchaRoute[] = ["register", "forgotPassword", "magicLink", "emailOtp"];
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_TOKEN_FIELD = "captchaToken";

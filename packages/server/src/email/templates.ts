@@ -88,6 +88,22 @@ const styles = {
         padding: 12px 16px;
         border-radius: 6px;
         margin-top: 20px;
+    `),
+    /**
+     * The one-time code itself. Monospace so the digits line up, spaced so a
+     * `1` and a `7` are not read as one glyph, and large enough to be copied by
+     * eye from a phone onto another device — which is the entire flow.
+     */
+    code: raw(`
+        display: inline-block;
+        font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 10px;
+        color: #1e293b;
+        background-color: #f1f5f9;
+        border-radius: 10px;
+        padding: 18px 20px 18px 30px;
     `)
 };
 
@@ -498,6 +514,84 @@ Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
     return { subject,
 html: body.toString().trim(),
 text };
+}
+
+/**
+ * Default one-time sign-in code email.
+ *
+ * The code is the entire content, so it is set large and repeated in the
+ * plain-text part: somebody is about to copy it by eye onto another device,
+ * which is the whole reason this flow exists rather than a link.
+ */
+export function getEmailOtpTemplate(
+    code: string,
+    user: TemplateUser,
+    appName = DEFAULT_APP_NAME,
+    logoUrl?: string
+): { subject: string; html: string; text: string } {
+    const greeting = getGreeting(user);
+
+    // The code goes in the subject line too: a phone shows the subject on the
+    // lock screen, and that is often the only place it needs to be read.
+    const subject = `${code} is your ${appName} sign-in code`;
+
+    const body = html`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc;">
+    <div style="${styles.container}">${renderHeader(appName, logoUrl)}
+        <div style="${styles.card}">
+            <h1 style="${styles.heading}">Your sign-in code</h1>
+
+            <p style="${styles.paragraph}">
+                Hi ${greeting},
+            </p>
+
+            <p style="${styles.paragraph}">
+                Enter this code to finish signing in to ${appName}:
+            </p>
+
+            <div style="text-align: center; margin: 32px 0;">
+                <span style="${styles.code}">${code}</span>
+            </div>
+
+            <div style="${styles.warning}">
+                ⏰ This code expires in 10 minutes and can only be used once.
+            </div>
+
+            <div style="${styles.footer}">
+                <p style="margin: 0;">
+                    If you didn't try to sign in, you can safely ignore this email.
+                    We will never ask you for this code.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const text = `
+Your ${appName} sign-in code
+
+Hi ${greeting},
+
+Enter this code to finish signing in:
+
+    ${code}
+
+This code expires in 10 minutes and can only be used once.
+
+If you didn't try to sign in, you can safely ignore this email. We will never
+ask you for this code.
+    `.trim();
+
+    return { subject, html: body.toString().trim(), text };
 }
 
 /**

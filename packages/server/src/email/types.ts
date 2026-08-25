@@ -66,6 +66,14 @@ export type MagicLinkTemplateFunction = (
 ) => { subject: string; html: string; text?: string };
 
 /**
+ * Template function for one-time sign-in code emails
+ */
+export type EmailOtpTemplateFunction = (
+    code: string,
+    user: { email: string; displayName?: string | null }
+) => { subject: string; html: string; text?: string };
+
+/**
  * Complete email configuration
  */
 export interface EmailConfig {
@@ -143,5 +151,6 @@ export interface EmailConfig {
         userInvitation?: UserInvitationTemplateFunction;
         welcomeEmail?: WelcomeEmailTemplateFunction;
         magicLink?: MagicLinkTemplateFunction;
+        emailOtp?: EmailOtpTemplateFunction;
     };
 }

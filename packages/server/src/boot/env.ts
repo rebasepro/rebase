@@ -98,12 +98,22 @@ const bootEnvExtension = z.object({
     AUTH_REQUIRE: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     AUTH_ALLOW_USER_LOOKUP: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**
+     * Passwordless email sign-in, both shapes of it.
+     *
+     * Both were code-level flags only, so a bundle deployment — the shape every
+     * self-hosted and managed project runs — could not turn either on without
+     * rebuilding. That is the wrong place for the switch: whether a deployment
+     * wants passwordless login is a property of the deployment.
+     */
+    AUTH_MAGIC_LINK: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    AUTH_EMAIL_OTP: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
      * Bot protection. Enabled by setting both — a provider without a secret
      * cannot verify anything, and is refused at boot rather than ignored.
      */
     CAPTCHA_PROVIDER: z.enum(["turnstile", "hcaptcha", ""]).optional(),
     CAPTCHA_SECRET: z.string().optional(),
-    /** Comma-separated: register, login, forgotPassword, magicLink. */
+    /** Comma-separated: register, login, forgotPassword, magicLink, emailOtp. */
     CAPTCHA_ROUTES: z.string().optional(),
     AUTH_COOKIE_SAME_SITE: z.enum(["Strict", "Lax", "None", ""]).optional(),
     AUTH_DEFAULT_ROLE: z.string().optional(),

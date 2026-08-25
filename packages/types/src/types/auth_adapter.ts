@@ -120,6 +120,14 @@ export interface AuthAdapterCapabilities {
     emailVerification: boolean;
     /** Supports passwordless magic link login. */
     magicLink: boolean;
+    /**
+     * Supports passwordless sign-in with a six-digit code sent by email.
+     *
+     * Optional so that an external adapter written before this existed still
+     * satisfies the interface; absent reads as "no", which is what an adapter
+     * that has never heard of the flow means.
+     */
+    emailOtp?: boolean;
     /** Whether `POST /auth/anonymous` will mint a credential-less session. */
     anonymousLogin: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
@@ -311,7 +319,7 @@ export interface TransformAuthResponseContext {
     /** The authenticated user's ID. */
     uid: string;
     /** The auth method that triggered this response. */
-    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
+    method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa";
     /** The raw HTTP request (for reading headers, IP, etc.). */
     request: Request;
 }

@@ -20,6 +20,7 @@ import { mountMfaRoutes } from "./mfa-routes";
 import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
+import { mountOtpRoutes } from "./otp-routes";
 import { isSteadyStateRegistrationOpen } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
@@ -73,6 +74,11 @@ export interface AuthModuleConfig {
     authHooks?: AuthHooks;
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
+    /**
+     * Enable email one-time codes: `POST /auth/otp` and `/auth/otp/verify`.
+     * Requires email to be configured, as magic link does.
+     */
+    enableEmailOtp?: boolean;
     /**
      * Opt-in httpOnly cookie mode for refresh tokens.
      *
@@ -1240,6 +1246,22 @@ aal: sessionAal };
             createSessionAndTokens,
             applyTransformHook,
             captchaMiddleware: captcha.magicLink
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Email one-time codes (six digits, for devices a link cannot reach)
+    // ═══════════════════════════════════════════════════════════════════════
+    if (config.enableEmailOtp) {
+        mountOtpRoutes({
+            router,
+            config,
+            ops,
+            parseBody,
+            buildAuthResponse,
+            createSessionAndTokens,
+            applyTransformHook,
+            captchaMiddleware: captcha.emailOtp
         });
     }
 

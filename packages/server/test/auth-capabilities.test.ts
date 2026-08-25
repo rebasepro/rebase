@@ -98,6 +98,7 @@ describe("buildBuiltinAuthCapabilities", () => {
         expect(Object.keys(buildBuiltinAuthCapabilities(base)).sort()).toEqual([
             "adminPasswordReset",
             "anonymousLogin",
+            "emailOtp",
             "emailPasswordLogin",
             "emailVerification",
             "enabledProviders",
