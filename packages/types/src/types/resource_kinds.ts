@@ -80,7 +80,7 @@ registerResourceKind({
         azure: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
         firebase: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]
     },
-    optionKeys: ["publicRead", "prefix"],
+    optionKeys: ["publicRead", "prefix", "account"],
     // Storage is genuinely optional: plenty of projects store nothing.
     implicitDefault: false
 });
@@ -97,6 +97,21 @@ export interface BucketOptions extends DeclareOptions {
     publicRead?: boolean;
     /** Key prefix within the bucket, for sharing one bucket between sources. */
     prefix?: string;
+    /**
+     * The credential set this bucket signs with, when several share one.
+     *
+     * `bucket("media", { engine: "s3", account: "minio" })` keeps reading its own
+     * `S3_BUCKET__MEDIA` — the bucket name is what distinguishes one source from
+     * another and never falls back — while the provider-level variables
+     * (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+     * `S3_FORCE_PATH_STYLE`) fall back to `__MINIO` when no per-key value is set.
+     *
+     * Fifteen buckets on one install go from ninety variables to eighteen, and
+     * rotating the key becomes one edit. A per-bucket value still wins, so a
+     * single source can move to another provider without breaking the rest off
+     * their shared account.
+     */
+    account?: string;
 }
 
 /** A bucket handle. Storage properties point at it via `storageSource`. */

@@ -56,6 +56,11 @@ export function graphToStorageSources(graph: ResourceGraph): StorageSourceDefini
             key: toStorageSourceKey(r.key),
             engine: r.engine,
             transport: r.transport,
+            // Carried, or the declaration's `account` is accepted at the call
+            // site and lost on the way to the reader — a declared option that
+            // does nothing, which is the exact failure this whole model exists
+            // to remove.
+            ...(typeof r.options.account === "string" ? { account: r.options.account } : {}),
             ...(r.label !== undefined ? { label: r.label } : {})
         }));
 }

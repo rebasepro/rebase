@@ -130,3 +130,33 @@ describe("storage sources on a shared account", () => {
         expect(resolved.exports).toMatchObject({ bucket: "b-exports" });
     });
 });
+
+describe("account survives the whole path, declaration to reader", () => {
+    it("reaches the resolver from a bucket() call", async () => {
+        // The seam that loses options. `declareResource` filters against each
+        // kind's optionKeys, and `graphToStorageSources` maps a declaration to a
+        // definition field by field — so an option can be accepted at the call
+        // site, pass every type check, and never arrive. That is the failure
+        // this model exists to remove, and it is one line away at all times.
+        const { bucket, buildResourceGraph, resetResourceRegistry } =
+            await import("@rebasepro/types");
+        const { graphToStorageSources } = await import("../src/boot/resource-adapters");
+
+        resetResourceRegistry?.();
+        bucket("media", { engine: "s3", account: "minio" });
+        bucket("avatars", { engine: "s3", account: "minio" });
+
+        const definitions = graphToStorageSources(buildResourceGraph());
+        expect(definitions.map(d => d.account)).toEqual(["minio", "minio"]);
+
+        const resolved = resolveStorageSources({
+            S3_BUCKET__MEDIA: "b-media",
+            S3_BUCKET__AVATARS: "b-avatars",
+            S3_ACCESS_KEY_ID__MINIO: "AKIA_SHARED",
+            S3_SECRET_ACCESS_KEY__MINIO: "SECRET_SHARED"
+        }, definitions, "/tmp")!;
+
+        expect(resolved.media).toMatchObject({ bucket: "b-media", accessKeyId: "AKIA_SHARED" });
+        expect(resolved.avatars).toMatchObject({ bucket: "b-avatars", accessKeyId: "AKIA_SHARED" });
+    });
+});
