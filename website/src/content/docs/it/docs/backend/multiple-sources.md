@@ -104,6 +104,39 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 
 `STORAGE_TYPE__<KEY>` può essere omesso quando la dichiarazione specifica già l'engine.
 
+### Più bucket su un solo account
+
+Ogni variabile viene letta per chiave: è corretto per il *nome* del bucket e
+sbagliato per le credenziali — quindici bucket sulla stessa installazione MinIO
+significherebbero quindici copie della stessa access key. Indica un `account` e
+le variabili a livello di provider vengono lette una volta sola:
+
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```
+S3_BUCKET__MEDIA=project-media       # per bucket, mai condiviso
+S3_BUCKET__AVATARS=project-avatars
+S3_ACCESS_KEY_ID__MINIO=…            # letta una volta, da entrambi
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+La forma con account copre le variabili che descrivono il *provider*:
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+`S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` e `GCS_KEY_FILENAME`. Il nome del bucket
+non è tra queste e non ricade mai sull'account: se lo facesse, due bucket sullo
+stesso account diventerebbero silenziosamente uno solo.
+
+Un valore per singolo bucket ha comunque la precedenza, quindi una fonte può
+essere spostata su un altro provider senza staccare le altre dall'account
+condiviso. Non esiste deliberatamente alcun ripiego sulla variabile senza
+suffisso: quella appartiene alla fonte predefinita, e lasciare che un bucket con
+nome la erediti significherebbe che una chiave digitata male firma con le
+credenziali di un'altra fonte.
+
 ## Comportamento in caso di errore
 
 Un'origine dati con trasporto server dichiarata ma priva di stringa di connessione **fa fallire l'avvio**, indicando la variabile da impostare. Questo è intenzionale ed è importante capirne il motivo: l'alternativa è che le collezioni instradate verso l'origine mancante ripieghino silenziosamente sul database predefinito. Ciò significherebbe dati che finiscono nel posto sbagliato dietro un server che si dichiara operativo: molto peggio di un container che si rifiuta di avviarsi.

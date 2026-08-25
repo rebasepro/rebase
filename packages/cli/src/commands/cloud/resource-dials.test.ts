@@ -92,3 +92,67 @@ describe("buildDialPatch", () => {
         expect(Object.keys(patch)).toEqual(["cpu"]);
     });
 });
+
+describe("the autoscaling range", () => {
+    it("sets both ends as numbers, not strings", () => {
+        // Numbers, because the control plane decides whether anything CHANGED by
+        // comparing against the stored value — and when something did, it
+        // re-syncs a Stripe subscription and rolls the tenant's pods. "6" against
+        // 6 differs, so a string here turns every unrelated save into a resize.
+        const { patch, error } = buildDialPatch(
+            ["set", "--autoscale-max", "6", "--autoscale-cpu-target", "70"]
+        );
+        expect(error).toBeUndefined();
+        expect(patch).toEqual({ autoscaleMaxReplicas: 6, autoscaleTargetCpuPercent: 70 });
+    });
+
+    it("refuses a fractional pod count", () => {
+        const { error } = buildDialPatch(["set", "--autoscale-max", "2.5"]);
+        expect(error).toMatch(/whole number/);
+    });
+
+    it("reads the floor and the ceiling as one change", () => {
+        // --replicas is the floor and the guaranteed spend; --autoscale-max is
+        // the ceiling and the worst case. Setting them together is the ordinary
+        // way to buy a range, so it must be one patch and one price quote.
+        const { patch } = buildDialPatch(["set", "--replicas", "2", "--autoscale-max", "6"]);
+        expect(patch).toEqual({ replicaCount: 2, autoscaleMaxReplicas: 6 });
+    });
+
+    it("names the new flags when nothing was passed", () => {
+        // The error lists what CAN be set. A flag missing from that list is a
+        // dial nobody discovers.
+        const { error } = buildDialPatch(["set"]);
+        expect(error).toContain("--autoscale-max");
+        expect(error).toContain("--autoscale-cpu-target");
+    });
+});
+
+describe("turning autoscaling off", () => {
+    it("clears both ends of the range", () => {
+        // null, not absent: the patch has to REACH the row and unset the column.
+        // An omitted key means "leave it as it is", which would report success
+        // and change nothing.
+        const { patch, error } = buildDialPatch(["set", "--no-autoscale"]);
+        expect(error).toBeUndefined();
+        expect(patch).toEqual({ autoscaleMaxReplicas: null, autoscaleTargetCpuPercent: null });
+    });
+
+    it("is offered when nothing was passed", () => {
+        const { error } = buildDialPatch(["set"]);
+        expect(error).toContain("--no-autoscale");
+    });
+
+    it("does not need a value, and does not swallow the next flag", () => {
+        // The value-less flag sits beside flags that DO take values. Reading a
+        // value here would consume `--replicas`, and `--replicas` would then be
+        // missing its own.
+        const { patch, error } = buildDialPatch(["set", "--no-autoscale", "--replicas", "2"]);
+        expect(error).toBeUndefined();
+        expect(patch).toEqual({
+            autoscaleMaxReplicas: null,
+            autoscaleTargetCpuPercent: null,
+            replicaCount: 2
+        });
+    });
+});

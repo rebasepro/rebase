@@ -104,6 +104,38 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 
 `STORAGE_TYPE__<KEY>` pode ser omitido quando a declaração já nomeia o engine.
 
+### Vários buckets em uma só conta
+
+Cada variável é lida por chave: isso é correto para o *nome* do bucket e errado
+para as credenciais — quinze buckets na mesma instalação MinIO significariam
+quinze cópias da mesma access key. Nomeie uma `account` e as variáveis de nível
+de provedor são lidas uma única vez:
+
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```
+S3_BUCKET__MEDIA=project-media       # por bucket, nunca compartilhado
+S3_BUCKET__AVATARS=project-avatars
+S3_ACCESS_KEY_ID__MINIO=…            # lida uma vez, pelos dois
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+A forma com conta cobre as variáveis que descrevem o *provedor*:
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+`S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` e `GCS_KEY_FILENAME`. O nome do bucket
+não é uma delas e nunca recorre à conta — se recorresse, dois buckets na mesma
+conta se tornariam silenciosamente um só.
+
+Um valor por bucket ainda prevalece, então uma fonte pode ser movida para outro
+provedor sem desligar as demais da conta compartilhada. Deliberadamente não há
+recurso à variável sem sufixo: ela pertence à fonte padrão, e deixar um bucket
+nomeado herdá-la significaria que uma chave digitada errado assina com as
+credenciais de outra fonte.
+
 ## Comportamento em caso de falha
 
 Uma fonte de dados com transporte de servidor declarada sem uma string de conexão **falha a inicialização**, nomeando a variável que precisa ser definida. Isso é deliberado e importante de entender: a alternativa seria que as coleções roteadas para a fonte ausente silenciosamente usassem o banco de dados padrão como fallback. Isso significaria dados indo para o lugar errado por trás de um servidor que se reporta como saudável — muito pior do que um contêiner que se recusa a iniciar.

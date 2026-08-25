@@ -952,7 +952,7 @@ function resolveTriggerFailure(e: unknown): { deploymentId: string; deduplicated
         status?: number;
         message?: string;
         code?: string;
-        details?: { deployment?: BlockingDeployment };
+        details?: { deployment?: BlockingDeployment; intakeCode?: string; hint?: string };
     };
 
     if (err?.status === 409) {
@@ -982,6 +982,21 @@ deduplicated: true };
             err.message || "Payment required before deploying.",
             "Attach a card once with `rebase cloud billing setup`, then deploy again.",
             "payment_required"
+        );
+    }
+
+    // An intake refusal, which is a decision about the bundle rather than a
+    // transport error. It carries a stable code and usually a remedy, and both
+    // used to be discarded here: the deploy printed
+    // `Failed to trigger deployment (400): …` and threw the hint away, which is
+    // a poor showing from a platform whose whole thesis is that silence is never
+    // an outcome. Same three-argument shape the 409 and 402 branches use, so
+    // `--json` carries the code and a human sees the fix.
+    if (err?.status === 400 && err.details?.intakeCode) {
+        fail(
+            err.message || "This bundle was refused.",
+            err.details.hint ?? "Run `rebase cloud resources` to see what this project is given.",
+            err.details.intakeCode
         );
     }
 

@@ -68,6 +68,40 @@ function readVar(env: EnvBag, base: string, suffix: string): string | undefined 
     return value === "" ? undefined : value;
 }
 
+/**
+ * Read a binding that may be shared across sources on one account.
+ *
+ * Two forms, in order: this source's own `<BASE>__<KEY>`, then the account's
+ * `<BASE>__<ACCOUNT>`. There is deliberately no third form falling through to
+ * the bare `<BASE>` — that variable belongs to the *default* source, and a named
+ * bucket inheriting it would mean a typo'd key silently signs with another
+ * source's credentials.
+ *
+ * A source that named no account gets exactly one lookup, so every project that
+ * predates this reads the same variables it always did.
+ */
+function readAccountVar(
+    env: EnvBag,
+    base: string,
+    suffix: string,
+    accountSuffix: string | undefined
+): string | undefined {
+    const own = readVar(env, base, suffix);
+    if (own !== undefined || accountSuffix === undefined) return own;
+    return readVar(env, base, accountSuffix);
+}
+
+function readAccountBool(
+    env: EnvBag,
+    base: string,
+    suffix: string,
+    accountSuffix: string | undefined
+): boolean | undefined {
+    const raw = readAccountVar(env, base, suffix, accountSuffix);
+    if (raw === undefined) return undefined;
+    return raw === "true";
+}
+
 function readBool(env: EnvBag, base: string, suffix: string): boolean | undefined {
     const raw = readVar(env, base, suffix);
     if (raw === undefined) return undefined;
@@ -248,9 +282,21 @@ export function resolveStorageBackend(
     env: EnvBag,
     key: string,
     engineHint: string | undefined,
-    defaultBasePath: string
+    defaultBasePath: string,
+    /**
+     * The credential set this source shares, from its declaration. Only the
+     * account-scoped bindings — the ones describing the provider rather than the
+     * bucket — consult it. See `StorageSourceDefinition.account`.
+     */
+    accountHint?: string
 ): BackendStorageConfig | undefined {
     const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
+    // The account's own suffix, derived by the same rule as a source key's, so
+    // `account: "minio"` reads `S3_ACCESS_KEY_ID__MINIO`. Undefined when the
+    // source named no account, which switches the fallback off entirely.
+    const accountSuffix = accountHint
+        ? envSuffixForKey(accountHint, DEFAULT_STORAGE_SOURCE_KEY)
+        : undefined;
     const declaredType = readVar(env, "STORAGE_TYPE", suffix);
     const type = (declaredType || engineHint || "").toLowerCase();
     // Whether the *environment* named this backend, as opposed to inheriting it
@@ -279,8 +325,11 @@ export function resolveStorageBackend(
                 `set ${`S3_BUCKET${suffix}`}.`
             );
         }
-        const accessKeyId = readVar(env, "S3_ACCESS_KEY_ID", suffix);
-        const secretAccessKey = readVar(env, "S3_SECRET_ACCESS_KEY", suffix);
+        // Account-scoped: the credentials describe the PROVIDER, not the bucket.
+        // Fifteen buckets on one MinIO install shared one access key and copied
+        // it fifteen times before this existed.
+        const accessKeyId = readAccountVar(env, "S3_ACCESS_KEY_ID", suffix, accountSuffix);
+        const secretAccessKey = readAccountVar(env, "S3_SECRET_ACCESS_KEY", suffix, accountSuffix);
         // A bucket with no credentials cannot work, and failing here is far
         // clearer than what it does otherwise: `S3StorageController` passes an
         // explicit `credentials: { accessKeyId: "", secretAccessKey: "" }` to the
@@ -294,9 +343,15 @@ export function resolveStorageBackend(
         // what this configuration is.
         if (!accessKeyId || !secretAccessKey) {
             if (!explicit) return undefined;
+            // Names the account form too when the source declared one, because
+            // that is the variable the reader would actually have accepted — an
+            // error naming only the per-key name would send someone to set the
+            // one they were deliberately trying not to repeat.
+            const nameFor = (base: string) =>
+                accountSuffix ? `${base}${suffix} or ${base}${accountSuffix}` : `${base}${suffix}`;
             const missing = [
-                !accessKeyId && `S3_ACCESS_KEY_ID${suffix}`,
-                !secretAccessKey && `S3_SECRET_ACCESS_KEY${suffix}`
+                !accessKeyId && nameFor("S3_ACCESS_KEY_ID"),
+                !secretAccessKey && nameFor("S3_SECRET_ACCESS_KEY")
             ].filter(Boolean).join(" and ");
             throw new BundleError(
                 `Storage source "${key}" is set to s3 with a bucket but no credentials — set ${missing}.`,
@@ -307,11 +362,11 @@ export function resolveStorageBackend(
         return {
             type: "s3",
             bucket,
-            region: readVar(env, "S3_REGION", suffix) || "auto",
+            region: readAccountVar(env, "S3_REGION", suffix, accountSuffix) || "auto",
             accessKeyId,
             secretAccessKey,
-            endpoint: readVar(env, "S3_ENDPOINT", suffix),
-            forcePathStyle: readBool(env, "S3_FORCE_PATH_STYLE", suffix)
+            endpoint: readAccountVar(env, "S3_ENDPOINT", suffix, accountSuffix),
+            forcePathStyle: readAccountBool(env, "S3_FORCE_PATH_STYLE", suffix, accountSuffix)
         };
     }
 
@@ -327,8 +382,12 @@ export function resolveStorageBackend(
         return {
             type: "gcs",
             bucket,
-            projectId: readVar(env, "GCS_PROJECT_ID", suffix),
-            keyFilename: readVar(env, "GCS_KEY_FILENAME", suffix)
+            // Account-scoped for the same reason as the S3 credentials: the
+            // GCP project and the service-account key file describe who is
+            // calling, not which bucket. Both stay optional — on GKE the
+            // ambient workload identity supplies them and neither is set.
+            projectId: readAccountVar(env, "GCS_PROJECT_ID", suffix, accountSuffix),
+            keyFilename: readAccountVar(env, "GCS_KEY_FILENAME", suffix, accountSuffix)
         };
     }
 
@@ -372,9 +431,8 @@ export function resolveStorageSources(
     // in development and in the media bucket in production. Two different
     // destinations either side of a deploy is worse than having no default
     // bucket, which at least fails the same way in both.
-    const effective: { key: string; engine?: string }[] = declared.length === 0
-        ? [{ key: DEFAULT_STORAGE_SOURCE_KEY,
-engine: undefined }]
+    const effective: { key: string; engine?: string; account?: string }[] = declared.length === 0
+        ? [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }]
         : serverSide;
 
     const result: Record<string, BackendStorageConfig> = {};
@@ -383,7 +441,8 @@ engine: undefined }]
             env,
             definition.key,
             definition.engine,
-            defaultBasePath
+            defaultBasePath,
+            definition.account
         );
         if (config) result[definition.key] = config;
     }

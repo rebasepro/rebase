@@ -151,19 +151,37 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 
 The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 
-### An infrastructure config file instead
+### Many buckets on one account
 
-Environment variables are the ordinary path. A deployment with many resources
-can use a file instead, which is read **before** the environment:
+Every variable is read per key, which is right for the bucket name and wrong for
+the credentials — fifteen buckets on one MinIO install would mean fifteen copies
+of the same access key. Name an `account` and the provider-level variables are
+read once:
 
-```bash
-rebase eject infra          # writes rebase.infra.json
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
-What it writes is the environment path spelled out — one entry per resource,
-each pointing at the variable that was already being read — so nothing changes
-until you edit it. Values are `{"$env": "..."}` pointers rather than literals,
-so the file can live in a config repository without carrying secrets.
+```bash
+S3_BUCKET__MEDIA=project-media       # per bucket, never shared
+S3_BUCKET__AVATARS=project-avatars
+S3_ACCESS_KEY_ID__MINIO=…            # read once, by both
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+The account form covers the variables that describe the *provider*:
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+`S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` and `GCS_KEY_FILENAME`. The bucket name
+is not one of them and never falls back — if it did, two buckets on one account
+would silently become one.
+
+A per-bucket value still wins where you set one, so a single source can be moved
+to another provider without breaking the others off their shared account. There
+is deliberately no fallback to the unsuffixed variable: that one belongs to the
+default source, and letting a named bucket inherit it would mean a mistyped key
+signs with another source's credentials.
 
 ## Topics
 

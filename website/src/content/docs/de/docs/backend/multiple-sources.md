@@ -114,6 +114,38 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 `STORAGE_TYPE__<KEY>` kann weggelassen werden, wenn die Deklaration die Engine
 bereits benennt.
 
+### Mehrere Buckets auf einem Konto
+
+Jede Variable wird pro Schlüssel gelesen. Für den *Namen* des Buckets ist das
+richtig, für die Zugangsdaten falsch — fünfzehn Buckets auf derselben
+MinIO-Installation hießen fünfzehn Kopien desselben Access Keys. Benenne ein
+`account`, und die Variablen auf Provider-Ebene werden nur einmal gelesen:
+
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```
+S3_BUCKET__MEDIA=project-media       # pro Bucket, nie geteilt
+S3_BUCKET__AVATARS=project-avatars
+S3_ACCESS_KEY_ID__MINIO=…            # einmal gelesen, von beiden
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+Die Konto-Form deckt die Variablen ab, die den *Provider* beschreiben:
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+`S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` und `GCS_KEY_FILENAME`. Der Bucket-Name
+gehört nicht dazu und fällt nie auf das Konto zurück — täte er es, würden zwei
+Buckets auf einem Konto stillschweigend zu einem.
+
+Ein Wert pro Bucket gewinnt weiterhin, eine einzelne Quelle lässt sich also zu
+einem anderen Provider verschieben, ohne die übrigen von ihrem gemeinsamen Konto
+zu trennen. Auf die Variable ohne Suffix wird bewusst nicht zurückgegriffen: sie
+gehört der Standardquelle, und ließe man einen benannten Bucket sie erben, würde
+ein vertippter Schlüssel mit den Zugangsdaten einer anderen Quelle signieren.
+
 ## Fehlerverhalten
 
 Eine deklarierte Datenquelle mit Server-Transport ohne Connection String **bricht den

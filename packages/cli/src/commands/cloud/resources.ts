@@ -707,7 +707,7 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
                 console.log("");
             }
         },
-        () => report
+        report
     );
 
     // Non-zero so this is usable as a gate in a script or a runbook step.
@@ -769,7 +769,7 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
             note("Verifying it can host tenants:");
             note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
         },
-        () => ({ id: created.id, name, provider, region })
+        { id: created.id, name, provider, region }
     );
 }
 
@@ -1021,11 +1021,25 @@ const DIAL_FLAGS = {
     "--db-instances": "databaseInstances",
     "--db-cpu": "databaseCpu",
     "--db-memory": "databaseMemory",
-    "--storage": "storageMode"
+    "--storage": "storageMode",
+    // Autoscaling is a RANGE, and `--replicas` is its floor rather than a
+    // separate concept: with a max set, the floor is what always exists and what
+    // the project is billed for at rest, and the max is the ceiling it may reach
+    // and the worst case it may be billed. Deliberately not a `--autoscale
+    // on|off` boolean — that would admit the incoherent state where autoscaling
+    // is enabled and the range is a single point. A max at or below the floor
+    // turns it off, which is the one rule `resolveAutoscaling` enforces.
+    "--autoscale-max": "autoscaleMaxReplicas",
+    "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
 } as const;
 
 /** Dials whose column is a number, not the text a flag carries. */
-const NUMERIC_DIALS = new Set(["databaseInstances", "replicaCount"]);
+const NUMERIC_DIALS = new Set([
+    "databaseInstances",
+    "replicaCount",
+    "autoscaleMaxReplicas",
+    "autoscaleTargetCpuPercent"
+]);
 /** Dials that are a yes/no. `--spot false` has to reach the row as `false`. */
 const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
 
@@ -1106,7 +1120,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
                 console.log("");
             },
-            () => ({
+            {
                 monthlyEur: quote?.totalEur ?? null,
                 lines: quote?.lines ?? null,
                 cpu: project!.cpu ?? null,
@@ -1119,7 +1133,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 databaseCpu: project!.databaseCpu ?? null,
                 databaseMemory: project!.databaseMemory ?? null,
                 storageMode: project!.storageMode ?? null
-            })
+            }
         );
         return;
     }
@@ -1149,7 +1163,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
             note("Applied now: the app rolls its pods and your subscription is prorated from today.");
             note("A change that restarts the database waits for a maintenance window.");
         },
-        () => ({ updated: patch })
+        { updated: patch }
     );
 }
 
@@ -1192,6 +1206,18 @@ export function buildDialPatch(
 ): { patch: Record<string, unknown>; error?: string } {
     const patch: Record<string, unknown> = {};
 
+    // A value-less flag, and the only way to turn autoscaling off.
+    //
+    // Setting the ceiling down to the floor would also disable it, but the
+    // control plane refuses that now: a row naming a ceiling that resolves to no
+    // autoscaler is a state nothing reads back correctly, and it used to happen
+    // silently — `--replicas 5` on a project whose ceiling was 5 deleted the
+    // HPA, left the ceiling on the row, and said nothing.
+    if (rawArgs.includes("--no-autoscale")) {
+        patch.autoscaleMaxReplicas = null;
+        patch.autoscaleTargetCpuPercent = null;
+    }
+
     for (const [flag, field] of Object.entries(DIAL_FLAGS)) {
         const idx = rawArgs.indexOf(flag);
         if (idx === -1) continue;
@@ -1227,7 +1253,10 @@ export function buildDialPatch(
     }
 
     if (opts?.requireOne !== false && Object.keys(patch).length === 0) {
-        return { patch: {}, error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}.` };
+        return {
+            patch: {},
+            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale.`
+        };
     }
     return { patch };
 }

@@ -112,6 +112,38 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 
 `STORAGE_TYPE__<KEY>` se puede omitir cuando la declaración ya nombra el motor (`engine`).
 
+### Varios buckets en una sola cuenta
+
+Cada variable se lee por clave: eso es correcto para el *nombre* del bucket y
+equivocado para las credenciales — quince buckets en la misma instalación de
+MinIO supondrían quince copias de la misma access key. Indica una `account` y
+las variables de nivel de proveedor se leen una sola vez:
+
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```
+S3_BUCKET__MEDIA=project-media       # por bucket, nunca compartido
+S3_BUCKET__AVATARS=project-avatars
+S3_ACCESS_KEY_ID__MINIO=…            # leída una vez, por ambos
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+La forma con cuenta cubre las variables que describen el *proveedor*:
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`,
+`S3_FORCE_PATH_STYLE`, `GCS_PROJECT_ID` y `GCS_KEY_FILENAME`. El nombre del
+bucket no es una de ellas y nunca recurre a la cuenta: si lo hiciera, dos buckets
+en una misma cuenta se convertirían silenciosamente en uno.
+
+Un valor por bucket sigue teniendo prioridad, así que una fuente puede moverse a
+otro proveedor sin desconectar las demás de su cuenta compartida. No existe
+deliberadamente ningún respaldo a la variable sin sufijo: esa pertenece a la
+fuente por defecto, y dejar que un bucket con nombre la herede significaría que
+una clave mal escrita firma con las credenciales de otra fuente.
+
 ## Comportamiento ante fallos
 
 Una fuente de datos declarada con transporte de servidor sin cadena de conexión **hace fallar el inicio**,
