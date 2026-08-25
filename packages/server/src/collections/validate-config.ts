@@ -1,5 +1,5 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
-import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig } from "@rebasepro/types";
+import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
 
 import { logger } from "../utils/logger";
 
@@ -164,7 +164,7 @@ const BASE_PROPERTY_KEYS = [
     "metadata",
     // as above: added by @rebasepro/admin-types, contents not checked here.
     "admin"
-];
+] as const;
 
 /**
  * Keys valid at the TOP LEVEL of a property, by type.
@@ -188,7 +188,7 @@ const BASE_PROPERTY_KEYS = [
  * list here. `admin-keys-are-not-top-level.test.ts` asserts it for every key and
  * every type, so a key added to the admin block later cannot be added here too.
  */
-const PROPERTY_KEYS_BY_TYPE: Record<string, string[]> = {
+const PROPERTY_KEYS_BY_TYPE = {
     string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url"],
     number: ["columnType", "isId", "enum"],
     boolean: [],
@@ -200,9 +200,39 @@ const PROPERTY_KEYS_BY_TYPE: Record<string, string[]> = {
     relation: ["isId", "relation", "resolvedRelation"],
     array: ["columnType", "of", "oneOf"],
     map: ["columnType", "properties", "propertiesOrder", "keyValue"]
-};
+} as const satisfies Record<Property["type"], readonly string[]>;
 
 const PROPERTY_TYPES = Object.keys(PROPERTY_KEYS_BY_TYPE);
+
+// ── This list cannot drift from the property types either ────────────────────
+//
+// The collection-level list above has had a compile-time assertion since a
+// `search` block shipped, generated correct DDL, passed its tests and did
+// nothing in production because the list had never heard of it. This one — one
+// level down, on properties — did not, so the identical failure was still
+// available: add an option to `VectorProperty`, document it, and watch it be
+// stripped at boot with a warning nobody reads.
+//
+// `ADMIN_PROPERTY_KEYS` is excluded rather than listed. Those keys moved into
+// the property's `admin` block, and `PROPERTY_MIGRATIONS` carries a hint for
+// each one telling an author to move it. Listing them here again is exactly the
+// bug the comment above describes: this allowlist is consulted first, so a
+// listed key is accepted, the hint is never reached, and nothing reads the
+// value. `admin-keys-are-not-top-level.test.ts` asserts the same thing from the
+// other direction.
+
+/** Keys a property type declares that neither list accepts. */
+type MissingPropertyKeys<T extends Property["type"]> = Exclude<
+    keyof Extract<Property, { type: T }>,
+    | typeof BASE_PROPERTY_KEYS[number]
+    | typeof PROPERTY_KEYS_BY_TYPE[T][number]
+    | typeof ADMIN_PROPERTY_KEYS[number]
+>;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _EveryPropertyKeyIsListed = AssertNever<{
+    [T in Property["type"]]: MissingPropertyKeys<T>
+}[Property["type"]]>;
 
 /** `RelationBase` plus the fields of every `kind` in the tagged union. */
 const RELATION_KEYS = new Set<string>([
@@ -478,7 +508,13 @@ function checkProperty(
 
     const allowed = new Set<string>([
         ...BASE_PROPERTY_KEYS,
-        ...(typeof type === "string" ? PROPERTY_KEYS_BY_TYPE[type] ?? [] : [])
+        // The narrow index is what makes the compile-time assertion above
+        // possible: a `Record<string, string[]>` erases the literals it needs.
+        // An unknown `type` is already reported above; here it simply adds no
+        // per-type keys.
+        ...(typeof type === "string" && type in PROPERTY_KEYS_BY_TYPE
+            ? PROPERTY_KEYS_BY_TYPE[type as Property["type"]]
+            : [])
     ]);
 
     for (const key of Object.keys(property)) {
