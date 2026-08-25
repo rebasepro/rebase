@@ -1,5 +1,5 @@
 export const en = {
-  "hero.badge": "Open-source · Self-hosted · Postgres-native",
+  "hero.badge": "Open-source · Deploy anywhere · Postgres-native",
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
@@ -215,7 +215,7 @@ export const en = {
   "faq.proof7": "Extension mechanisms",
   "faq.q1": "What database does Rebase support?",
   "faq.a1":
-    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; self-hosted Rebase never sees or copies your data.',
+    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. Run it yourself and you bring your own database instance, which Rebase never sees or copies; on Rebase Cloud it is a dedicated Postgres you can dump and take with you.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
     "Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-retool\">Retool</a>, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-supabase\">Supabase</a>, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. You keep the database; Rebase is what runs in front of it.",
@@ -224,7 +224,7 @@ export const en = {
     "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
   "faq.q4": "Is Rebase open-source?",
   "faq.a4":
-    "Yes. The entire framework is free and MIT-licensed — the schema editor, data import/export, user management, generated APIs, typed SDK, and every feature ships at no cost, fully self-hosted. Optional paid plans add enterprise support and SLAs; see <a class=\"text-primary hover:underline\" href=\"/pricing\">pricing</a>.",
+    "Yes. The entire framework is free and MIT-licensed — the schema editor, data import/export, user management, generated APIs, typed SDK, and every feature ships at no cost when you run it yourself. You pay only if you want us to host it, or if you need enterprise auth and support; see <a class=\"text-primary hover:underline\" href=\"/pricing\">pricing</a>.",
   "faq.q5": "What's the tech stack?",
   "faq.a5":
     'The admin panel is a <strong class="text-white font-medium">React 19 SPA</strong> built with TypeScript and Tailwind CSS. The backend is a lightweight <strong class="text-white font-medium">Node.js</strong> service that connects directly to your PostgreSQL database. No SSR, no monolithic framework.',
@@ -336,7 +336,7 @@ export const en = {
   "nav.cli.desc": "Scaffold, generate, migrate, deploy.",
   "nav.selfHost": "Deploy & self-host",
   "nav.selfHost.desc": "Docker, Railway, Fly.io, your own metal.",
-  "nav.europe": "Self-hosting in Europe",
+  "nav.europe": "Sovereignty in Europe",
   "nav.europe.desc": "Hetzner, OVHcloud, Scaleway — and who holds the keys.",
   "nav.docs.desc": "Guides, reference and recipes",
   "nav.security": "Security & RLS",
@@ -400,7 +400,7 @@ export const en = {
   "footer.ui": "UI Components",
   "footer.startups": "For Startups",
   "footer.agencies": "For Agencies",
-  "footer.europe": "Self-hosting in Europe",
+  "footer.europe": "Sovereignty in Europe",
   "footer.whyRebase": "Why Rebase",
   "footer.vsSupabase": "vs Supabase",
   "footer.vsPayload": "vs Payload",
@@ -649,7 +649,7 @@ export const en = {
   "about.story.title": "From a Developer's Toolkit to a Global Platform.",
   "about.story.p1": "Rebase started as an internal tool to launch a back-office in minutes, not weeks. Like many developers, our founders were tired of rebuilding the same admin interfaces for every new project. They wanted to focus on building great products, not spend weeks on CRUD operations, authentication, and form validation.",
   "about.story.p2": "What began as a side project quickly gained traction in the open-source community. Developers from around the world started using Rebase to build everything from content management systems to complex internal tools for enterprises.",
-  "about.story.p3": "Rebase is the second time we have built this. The first was <b class=\"text-white font-medium\">FireCMS</b> — an open-source CMS for Firebase used in more than 10,000 projects, by teams at companies including <b class=\"text-white font-medium\">Microsoft</b> and <b class=\"text-white font-medium\">IKEA</b>. Rebase applies what those years taught us to a database you own outright: Postgres, self-hosted, with nobody in the middle.",
+  "about.story.p3": "Rebase is the second time we have built this. The first was <b class=\"text-white font-medium\">FireCMS</b> — an open-source CMS for Firebase used in more than 10,000 projects, by teams at companies including <b class=\"text-white font-medium\">Microsoft</b> and <b class=\"text-white font-medium\">IKEA</b>. Rebase applies what those years taught us to a database you own outright: standard Postgres, running wherever you choose to put it.",
   "about.values.title": "Our Values",
   "about.values.v1.title": "Developer First",
   "about.values.v1.desc": "Every decision we make starts with one question: \"Does this make developers' lives easier?\" We prioritize great DX, comprehensive docs, and powerful APIs.",
@@ -667,7 +667,7 @@ export const en = {
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
   "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & Admin Panel",
-  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, self-hosted.",
+  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, deploy anywhere.",
   "admin.meta.title": "Admin panel — a separate product from the Rebase backend",
   "admin.meta.description": "A generated back office on top of any Rebase backend: spreadsheet editing, media, roles and history — opt-in, extensible with your own React, and never required by the API.",
   "backend.meta.title": "Backend & APIs — Rebase App Engine",
@@ -729,7 +729,7 @@ export const en = {
   "mosaic.title": "A visual framework for any use case.",
   "mosaic.subtitle": "From e-commerce and asset management to visual builders and live code edits. Rebase's schema-driven UI scales to meet any dashboard or editor requirement.",
   "pricing.meta.title": "Pricing | Rebase",
-  "pricing.meta.description": "Rebase is free and open-source (MIT) — self-host everything at no cost. Optional enterprise plans add SSO, dedicated support, and SLAs.",
+  "pricing.meta.description": "Rebase is free and open-source (MIT) — run everything yourself at no cost. You pay only if you want us to host it, or for enterprise SSO, dedicated support and SLAs.",
   "pricing.badge": "Pricing",
   "pricing.title": "Free and open-source. Pay only for what we run.",
   "pricing.subtitle":
@@ -768,7 +768,7 @@ export const en = {
   "pricing.ent.popular": "Most support",
   "pricing.faq.title": "Is anything in the framework paywalled?",
   "pricing.faq.desc":
-    "No. Every feature of the open-source framework is free and MIT-licensed. Enterprise plans only add support and SLAs — never core product features.",
+    "No. Every feature of the open-source framework is free and MIT-licensed. Rebase Cloud charges for running it for you, and Enterprise adds support and SLAs — never core product features.",
   "nav.pricing": "Pricing",
   "footer.pricing": "Pricing",
 
@@ -784,7 +784,7 @@ export const en = {
 
   "manifesto.problem.title": "The problem we keep seeing",
   "manifesto.problem.p1": "Every new project starts the same way. You need a database. You need an admin panel. You need authentication, an API layer, file storage, permissions. You've built all of this before — maybe dozens of times. And yet, every time, you start from scratch or lock yourself into a platform that owns your data and your roadmap.",
-  "manifesto.problem.p2": "The cloud platforms made it easy. Firebase, Supabase, the managed CMS tools — they let you skip the plumbing and get to building. But ease came with a price: vendor lock-in, opaque pricing, data you can't fully control, and an architecture you can't truly own.",
+  "manifesto.problem.p2": "The cloud platforms made it easy. Firebase, Supabase, the managed CMS tools — they let you skip the plumbing and get to building. Paying someone to run infrastructure was never the problem; most teams have better things to do than babysit a Postgres cluster. The problem is what usually comes attached to it: a schema you can only read through their console, pricing you can't predict, and an exit that means a rewrite. Convenience should be a bill you can stop paying, not a decision you can't reverse.",
   "manifesto.problem.p3": "On the other side, self-hosted tools exist, but they often feel like a different era. They're hard to set up, painful to customize, and designed for a world before AI, before TypeScript-everywhere, before developers expected tools to just work.",
 
   "manifesto.origin.title": "Where we come from",
@@ -803,7 +803,7 @@ export const en = {
   "manifesto.beliefs.b3.title": "Agents are users of your backend, not a feature bolted onto it",
   "manifesto.beliefs.b3.desc": "A large and growing share of the code written against your backend is now written by an agent — and agents don't read dashboards. They read schemas, types, and error messages. So Rebase ships an MCP server, machine-readable collection definitions, a generated typed SDK and scoped API keys, and we treat a confusing error as a bug whether the reader is a person or a model. Tools designed solely for a human clicking through a console are already being worked around rather than used.",
   "manifesto.beliefs.b4.title": "Open source is a foundation, not a feature",
-  "manifesto.beliefs.b4.desc": "Rebase is MIT — every package, every line. Not open-core with the useful half behind a licence key. Not source-available with a clause about who may compete with us. We've watched too many infrastructure projects use \"open source\" as a funnel and then relicense once the community had done its part, and we know exactly how that felt from the outside. The licence is the promise, and MIT is the only version of that promise we couldn't quietly take back later.",
+  "manifesto.beliefs.b4.desc": "Rebase is MIT — every package, every line. Not open-core with the useful half behind a licence key. Not source-available with a clause about who may compete with us. We've watched too many infrastructure projects use \"open source\" as a funnel and then relicense once the community had done its part, and we know exactly how that felt from the outside. The licence is the promise, and MIT is the only version of that promise we couldn't quietly take back later. And it goes all the way down: Postgres, Node, Hono, Drizzle — every layer underneath Rebase is open source too, and not one of them needs our infrastructure to run. That is what makes \"deploy anywhere\" a fact about the architecture rather than a line on a pricing page. We do intend to make money — by running Rebase for teams who'd rather not run it themselves. That's a bill you can cancel, and what you're left with afterwards is the same code we were running.",
   "manifesto.beliefs.b5.title": "Europe should own its infrastructure",
   "manifesto.beliefs.b5.desc": "We build from Madrid, and we think the current arrangement — where most European companies run their data on infrastructure owned elsewhere and governed by someone else's law — is a strategic mistake worth undoing. Data sovereignty and GDPR aren't a compliance checkbox on our roadmap; they're the reason several design decisions here went the harder way. You can run Rebase anywhere on earth and we'd be glad if you did. But we aren't neutral about this one.",
 
@@ -813,7 +813,7 @@ export const en = {
   "manifesto.audience.l2": "The startup that needs to move fast today and scale tomorrow — without re-platforming",
   "manifesto.audience.l3": "The agency that's tired of rebuilding the same admin panel for every client project",
   "manifesto.audience.l4": "The enterprise team that needs to keep data on their own infrastructure, with full audit trails",
-  "manifesto.audience.p2": "Rebase is highly modular — use the admin panel, the API layer, the SDK, or the full platform. Take only the parts you need, leave the rest. You decide how much of the stack you adopt.",
+  "manifesto.audience.p2": "Rebase is highly modular — use the admin panel, the API layer, the SDK, or the full platform. Take only the parts you need, leave the rest. You decide how much of the stack you adopt — and where it runs: your laptop, your own servers, or hosted by us. It's the same MIT-licensed code in all three, so moving between them is a redeploy, not a migration.",
 
   "manifesto.threeworlds.title": "Built for three worlds",
   "manifesto.threeworlds.p1": "Most tools are designed for one audience. We're building for three — because we believe the best platform is one where everyone can work effectively:",
@@ -837,11 +837,11 @@ export const en = {
   "manifesto.cta.github": "View on GitHub",
 
   // Manifesto Banner
-  "banner.title.control": "Stop renting your database.<br/> Own your stack.",
+  "banner.title.control": "Own your data.<br/> Run it anywhere.",
   "banner.title.mission": "We are taking back control of our stack.",
   "banner.title.founders": "An open letter to developers who care about data ownership.",
   "banner.cta": "Read the Manifesto",
-  "banner.subtitle": "Our manifesto on why developer tools must be open, self-hosted, and database-native.",
+  "banner.subtitle": "Our manifesto on why developer tools must be open, portable, and database-native.",
 
 
 

@@ -247,7 +247,7 @@ Ship your product faster with schema-driven development. Eliminate backend boile
 - **Zero Boilerplate**: Define your schema once; get admin, API, and SDK instantly.
 - **Database Native**: Connect directly to your existing Postgres — no vendor lock-in.
 - **Scale Securely**: RLS policies and JWT auth version-controlled in Git.
-- **Cost Effective**: Open-source, self-hosted, no per-seat developer pricing.
+- **Cost Effective**: Open-source and free to run yourself, no per-seat developer pricing.
 `;
   }
 

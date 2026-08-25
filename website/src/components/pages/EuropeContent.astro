@@ -57,7 +57,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
             precisely so those edges agree. */}
         <div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="font-medium">MIT-licensed · Runs on your Postgres · We never see the data</span>
+                <span class="font-medium">MIT-licensed · Runs on your Postgres · Operated in Europe, or by you</span>
             </div>
 
             <h1 class="mb-6 text-display-2 text-white">
@@ -76,8 +76,10 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
             </p>
             <p class="mb-10 max-w-[38rem] text-base leading-7 text-surface-400">
                 Rebase gives you what Firebase and Supabase give you — REST, a typed SDK, realtime, auth,
-                storage, functions, cron and an admin panel — as an open-source container you run on a box
-                you rent in Europe. There is no second party, because there is no us.
+                storage, functions, cron and an admin panel — as an open-source container. Run it yourself
+                and there is no second party at all. Let us run it and the second party is a Spanish
+                company, under European law, that you can leave with <code class="font-mono text-surface-300">pg_dump</code>.
+                What we will not sell you is a second party in Delaware with a Frankfurt region.
             </p>
 
             {/* Left-aligned with everything above it. Centred, it was the only
@@ -206,10 +208,11 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                     Their price is a function of your success. Yours is a number you chose.
                 </h2>
                 <p class="text-base leading-relaxed text-surface-400">
-                    This is the part of self-hosting that people are too polite to lead with, so we will. A managed
-                    backend prices monthly active users, gigabytes stored and gigabytes served, which means the bill
-                    grows in exactly the moment you least want a new bill. A VPS charges the same amount in the month
-                    you launch and the month you get on the front page.
+                    This is the part of self-hosting that people are too polite to lead with, so we will. Most
+                    managed backends price monthly active users, gigabytes stored and gigabytes served, which means
+                    the bill grows in exactly the moment you least want a new bill. A VPS charges the same amount in
+                    the month you launch and the month you get on the front page. Rebase Cloud is priced per resource
+                    for the same reason — you state what runs, and the invoice follows that rather than your traffic.
                 </p>
                 <p class="mt-4 text-base leading-relaxed text-surface-400">
                     Below is the honest version of that comparison, including the parts that do not favour us.
@@ -274,7 +277,8 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                 </h2>
                 <p class="text-base leading-relaxed text-surface-400">
                     Seventeen cities, seven companies, and a €-denominated invoice from each of them. Pick one below
-                    and watch which pins are theirs — the one thing they all have in common is that none of them is us.
+                    and watch which pins are theirs — we resell none of it, take nothing from any of them, and the
+                    runtime does not know or care which one you picked.
                 </p>
             </div>
 
@@ -321,8 +325,11 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                         <li><b class="text-white">Uptime is yours to own.</b> One VPS is one machine. If the business needs two, the architecture allows it and your invoice notices.</li>
                     </ul>
                     <p class="mt-5 text-sm leading-relaxed text-surface-500">
-                        If nobody on the team wants that job, that is a real answer and a managed platform is buying
-                        you something real. We would rather you decide that on the way in than find out later.
+                        If nobody on the team wants that job, that is a real answer, and a managed platform is
+                        buying you something real. Ours is <a href="/pricing" class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">Rebase Cloud</a>,
+                        operated by FireCMS S.L. in Spain — which makes us your processor, with everything that
+                        implies, rather than nobody at all. We would rather you decide that on the way in than
+                        find out later.
                     </p>
                 </div>
             </div>
