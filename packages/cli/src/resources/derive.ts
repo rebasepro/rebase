@@ -27,6 +27,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { createRequire } from "module";
 import { pathToFileURL } from "url";
 import {
     buildResourceGraph,
@@ -57,6 +58,72 @@ function collectionFiles(configDir: string): string[] {
         .filter(f => /\.(ts|js|mts|mjs)$/.test(f) && !/\.(test|spec|d)\./.test(f))
         .sort()
         .map(f => path.join(dir, f));
+}
+
+/**
+ * Make the project's own TypeScript loader active in this process.
+ *
+ * `import()` below relies on tsx's resolver, and nothing had registered it:
+ * `rebase build` runs from `node_modules/.bin/rebase`, which is plain Node.
+ * On a modern Node that *looks* like it works — native type stripping imports
+ * `collections/index.ts` happily — right up to the first relative specifier
+ * inside it. The scaffolded template writes `import posts from "./posts.js"`,
+ * which is the correct thing for TypeScript to emit and which native stripping
+ * does not remap back to `posts.ts`. So `rebase build` failed on every
+ * scaffolded project with `Cannot find module …/posts.js`, and the failure
+ * looked like a broken template rather than a missing loader.
+ *
+ * Resolved from the project, not from this package, exactly as `resolveTsx`
+ * does for the schema-generation subprocess: tsx is the project's dependency
+ * (the scaffold declares it), and taking it from anywhere else would mean
+ * evaluating a project's config with a loader it did not choose.
+ *
+ * Best-effort by design. A project with no tsx keeps the previous behaviour —
+ * which is correct for one whose config is plain JavaScript, or whose imports
+ * carry no extension — rather than failing on a dependency it never needed.
+ * Registered once per process; `register` is cheap but not free, and deriving
+ * twice in one process is an ordinary thing for a watch mode to do.
+ */
+let tsxRegistered = false;
+
+async function registerProjectTsx(configDir: string): Promise<void> {
+    if (tsxRegistered) return;
+    tsxRegistered = true;
+
+    // Where tsx might be, in the order most likely to find it. The scaffold
+    // declares tsx in the *backend* workspace, and pnpm's isolated layout puts
+    // it in `backend/node_modules` rather than hoisting it — so resolving only
+    // from the config directory finds nothing on exactly the project shape this
+    // exists to serve.
+    const projectRoot = path.dirname(configDir);
+    const bases = [configDir, projectRoot, path.join(projectRoot, "backend")];
+
+    for (const base of bases) {
+        try {
+            // Resolved against a file *inside* the project so Node walks that
+            // project's `node_modules`, not this package's.
+            const requireFromProject = createRequire(path.join(base, "noop.js"));
+            const api = await import(pathToFileURL(requireFromProject.resolve("tsx/esm/api")).href) as
+                { register?: () => unknown; default?: { register?: () => unknown } };
+
+            // tsx's own `register`, not `module.register`. `tsx/esm/api` is the
+            // API module; the loader is `tsx/esm`. Handing the API module to
+            // `module.register` registers something with no hooks and reports
+            // success — a worse failure than throwing, because the import below
+            // then resolves exactly as it did before and the bug looks unfixed.
+            const register = api.register ?? api.default?.register;
+            if (typeof register === "function") {
+                register();
+                return;
+            }
+        } catch {
+            // Not here. Try the next base.
+        }
+    }
+
+    // No tsx anywhere in the project. The import below still runs; it simply
+    // resolves the way Node alone would, which is correct for a config written
+    // in plain JavaScript or whose imports carry no extension.
 }
 
 /**
@@ -95,6 +162,10 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
     // handlers attached while its topics are gone — every one of them then
     // reads as orphaned against the *next* project. Caught by deriving twice
     // in one process, which is what a watch mode does.
+    // Before anything is evaluated: the loader has to be in place for the very
+    // first import, and the first import is a collection file.
+    await registerProjectTsx(configDir);
+
     resetDeclaredResources();
     resetDeclaredSubscriptions();
 
