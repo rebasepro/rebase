@@ -381,7 +381,8 @@ ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("clusters verify")}         Ask a cluster whether it can host tenants
   ${chalk.blue.bold("resources")}               Show what this project reserves, and what it costs per month
   ${chalk.blue.bold("resources set")}           Change it (--cpu, --memory, --replicas, --spot, --scale-to-zero,
-                          --db-mode, --db-instances, --db-cpu, --db-memory, --storage)
+                          --db-mode, --db-instances, --db-cpu, --db-memory, --storage,
+                          --autoscale-max, --autoscale-cpu-target)
   ${chalk.blue.bold("storage")}                 List storage buckets
   ${chalk.blue.bold("storage create")}          Provision platform-managed storage
   ${chalk.blue.bold("storage attach")}          Attach your own S3-compatible bucket

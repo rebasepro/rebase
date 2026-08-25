@@ -1021,11 +1021,25 @@ const DIAL_FLAGS = {
     "--db-instances": "databaseInstances",
     "--db-cpu": "databaseCpu",
     "--db-memory": "databaseMemory",
-    "--storage": "storageMode"
+    "--storage": "storageMode",
+    // Autoscaling is a RANGE, and `--replicas` is its floor rather than a
+    // separate concept: with a max set, the floor is what always exists and what
+    // the project is billed for at rest, and the max is the ceiling it may reach
+    // and the worst case it may be billed. Deliberately not a `--autoscale
+    // on|off` boolean — that would admit the incoherent state where autoscaling
+    // is enabled and the range is a single point. A max at or below the floor
+    // turns it off, which is the one rule `resolveAutoscaling` enforces.
+    "--autoscale-max": "autoscaleMaxReplicas",
+    "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
 } as const;
 
 /** Dials whose column is a number, not the text a flag carries. */
-const NUMERIC_DIALS = new Set(["databaseInstances", "replicaCount"]);
+const NUMERIC_DIALS = new Set([
+    "databaseInstances",
+    "replicaCount",
+    "autoscaleMaxReplicas",
+    "autoscaleTargetCpuPercent"
+]);
 /** Dials that are a yes/no. `--spot false` has to reach the row as `false`. */
 const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
 
