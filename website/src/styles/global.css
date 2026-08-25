@@ -108,17 +108,32 @@
     transition: opacity 0.2s ease;
 }
 
-/* ── Chapter hue ─────────────────────────────────────────────────────────────
-   A chapter opts in by setting `--hue` on itself; its eyebrow numeral reads it.
-   That is now the whole device.
+/* ── The page's colour budget ────────────────────────────────────────────────
+   THE HOME PAGE HAS THREE COLOUR REGISTERS AND NO OTHERS. Adding a fourth is
+   what made it look arbitrary the last time, so the count is the rule:
 
-   It used to drive a 12rem cropped numeral behind each chapter as well. That
-   came out: at 0.28 opacity, sitting under the art, it was a watermark rather
-   than structure — and it carried nothing the 11px label beside it did not
-   already say. It also collided with the Neat gradients twice, which is the
-   symptom worth remembering. Flat graphic devices and this site's WebGL art are
-   competing systems; in the same frame one always mutes the other, and the art
-   is what the site is recognised by. */
+     1. ART        the Neat canvases — hero and dividers. Atmosphere, the whole
+                   palette, everywhere. This is what the site is recognised by.
+     2. ARGUMENT   a flat chroma ground, exactly twice, on the two sections whose
+                   claim cannot be demonstrated. See `chapter-guarantee`.
+     3. ACTION     `--color-primary` on buttons and links. Never decorative;
+                   a hue that is not this one never means "clickable".
+
+   Everything else on the page is neutral, and that is not an oversight — it is
+   what lets register 2 read as deliberate. Colour appearing twice, meaning the
+   same thing both times, is a system. Colour appearing eight times meaning
+   nothing is noise.
+
+   WHAT WAS REMOVED, so it is not reintroduced: every chapter used to tint its
+   eyebrow numeral with a hue of its own — 01 cyan, 02 yellow, 04 violet,
+   05 blush, 08 cyan. Scrolling the page therefore showed cyan, yellow, BLUE
+   GROUND, violet, blush, grey, CORAL GROUND, cyan: six unrelated hues, none of
+   which meant anything (there was no reason 01 was cyan), competing with the
+   two that did. The two guarantee sections did not look random because of where
+   they sat. They looked random because five decorative hues were drowning them.
+
+   `--hue` therefore exists on exactly two sections now. If a chapter needs it,
+   the chapter needs to qualify first. */
 
 @utility chapter {
     position: relative;

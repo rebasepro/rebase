@@ -47,7 +47,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
 };`;
 ---
 
-<section id="collection-power" class="chapter relative z-0 py-28 overflow-hidden" style="--hue: var(--color-chroma-cyan)">
+<section id="collection-power" class="chapter relative z-0 py-28 overflow-hidden">
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
     {/* Header was centred in a 2xl measure while every other beat runs the
         72rem shell left-aligned, so this one section's left edge agreed with
@@ -55,7 +55,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         edges line up, and a grid this deliberate is what lets the numerals and
         chroma fields read as structure rather than as decoration. */}
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-16 animate-on-scroll fade-in-up">
-        <p class="mb-4 eyebrow">{index && (<><span class="font-mono" style="color: var(--hue)">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{badge ?? t('power.badge')}</p>
+        <p class="mb-4 eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{badge ?? t('power.badge')}</p>
         <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={title ?? t('power.title')}></h2>
         <p class="mt-6 max-w-[38rem] text-lg text-surface-400">
             {t('power.subtitle')}
