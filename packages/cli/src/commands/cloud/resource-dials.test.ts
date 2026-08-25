@@ -127,3 +127,32 @@ describe("the autoscaling range", () => {
         expect(error).toContain("--autoscale-cpu-target");
     });
 });
+
+describe("turning autoscaling off", () => {
+    it("clears both ends of the range", () => {
+        // null, not absent: the patch has to REACH the row and unset the column.
+        // An omitted key means "leave it as it is", which would report success
+        // and change nothing.
+        const { patch, error } = buildDialPatch(["set", "--no-autoscale"]);
+        expect(error).toBeUndefined();
+        expect(patch).toEqual({ autoscaleMaxReplicas: null, autoscaleTargetCpuPercent: null });
+    });
+
+    it("is offered when nothing was passed", () => {
+        const { error } = buildDialPatch(["set"]);
+        expect(error).toContain("--no-autoscale");
+    });
+
+    it("does not need a value, and does not swallow the next flag", () => {
+        // The value-less flag sits beside flags that DO take values. Reading a
+        // value here would consume `--replicas`, and `--replicas` would then be
+        // missing its own.
+        const { patch, error } = buildDialPatch(["set", "--no-autoscale", "--replicas", "2"]);
+        expect(error).toBeUndefined();
+        expect(patch).toEqual({
+            autoscaleMaxReplicas: null,
+            autoscaleTargetCpuPercent: null,
+            replicaCount: 2
+        });
+    });
+});

@@ -60,6 +60,34 @@ export interface StorageSourceDefinition {
     engine: string;
 
     /**
+     * The credential set this source signs with, when several sources share one.
+     *
+     * ## What it is for
+     *
+     * Every binding a bucket needs is read per key — `S3_BUCKET__MEDIA`,
+     * `S3_ACCESS_KEY_ID__MEDIA`, and so on. That is right for the bucket *name*,
+     * which is different for every source by definition, and wrong for the
+     * credentials, which usually are not: fifteen buckets on one MinIO install
+     * meant fifteen copies of the same endpoint, access key and secret — ninety
+     * variables where eighteen would do, and one key rotation became fifteen
+     * paired edits where a single missed one fails at upload time with an opaque
+     * signing error.
+     *
+     * Naming an account here lets the *account-scoped* bindings fall back to
+     * `<BASE>__<ACCOUNT>` when no per-key value is set. The bucket name never
+     * falls back: it is what distinguishes one source from another.
+     *
+     * ## Why it does not fall back to the bare variable
+     *
+     * A source with no `account` reads only its own suffixed names, exactly as
+     * before — so every project that predates this is wire-identical. The
+     * unsuffixed `S3_ACCESS_KEY_ID` belongs to the *default* source, and letting
+     * a named bucket inherit it would mean a typo'd key silently signs with
+     * another source's credentials. Two forms, both explicit, opt-in.
+     */
+    account?: string;
+
+    /**
      * How the frontend reaches this storage. Defaults to `"server"`.
      *
      * When `"direct"`, the client uses a provider-specific SDK

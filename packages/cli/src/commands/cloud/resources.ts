@@ -1206,6 +1206,18 @@ export function buildDialPatch(
 ): { patch: Record<string, unknown>; error?: string } {
     const patch: Record<string, unknown> = {};
 
+    // A value-less flag, and the only way to turn autoscaling off.
+    //
+    // Setting the ceiling down to the floor would also disable it, but the
+    // control plane refuses that now: a row naming a ceiling that resolves to no
+    // autoscaler is a state nothing reads back correctly, and it used to happen
+    // silently — `--replicas 5` on a project whose ceiling was 5 deleted the
+    // HPA, left the ceiling on the row, and said nothing.
+    if (rawArgs.includes("--no-autoscale")) {
+        patch.autoscaleMaxReplicas = null;
+        patch.autoscaleTargetCpuPercent = null;
+    }
+
     for (const [flag, field] of Object.entries(DIAL_FLAGS)) {
         const idx = rawArgs.indexOf(flag);
         if (idx === -1) continue;
@@ -1241,7 +1253,10 @@ export function buildDialPatch(
     }
 
     if (opts?.requireOne !== false && Object.keys(patch).length === 0) {
-        return { patch: {}, error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}.` };
+        return {
+            patch: {},
+            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale.`
+        };
     }
     return { patch };
 }
