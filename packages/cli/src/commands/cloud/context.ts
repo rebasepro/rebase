@@ -629,10 +629,26 @@ export function printJson(value: unknown): void {
  * (and nothing else); otherwise run `human`. Keeping the two behind a single
  * call is what guarantees a command can never print a table AND a JSON blob.
  */
-export function emit(human: () => void, json: unknown): void {
+export function emit<T>(human: () => void, json: JsonArg<T>): void {
     if (JSON_MODE) printJson(json);
     else human();
 }
+
+/**
+ * The JSON payload, which must be a value and not a producer of one.
+ *
+ * `json: unknown` accepted a function without complaint, and four call sites in
+ * `resources.ts` passed `() => ({ … })` — mirroring the human argument beside
+ * it, which *is* a thunk. In JSON mode `printJson` then stringified a function,
+ * which is `undefined`. So `rebase cloud resources`, `resources set` and two
+ * cluster commands printed the single word `undefined` on every piped or
+ * `--json` run — and since this family forces JSON mode off a TTY, that is
+ * every scripted use of them.
+ *
+ * Typed so the mistake cannot be made again: a function resolves the parameter
+ * to `never`, and the call site fails to compile.
+ */
+export type JsonArg<T> = T extends (...args: never[]) => unknown ? never : T;
 
 /**
  * Print a help page — the human one, or a machine-readable description of the

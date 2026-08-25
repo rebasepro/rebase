@@ -707,7 +707,7 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
                 console.log("");
             }
         },
-        () => report
+        report
     );
 
     // Non-zero so this is usable as a gate in a script or a runbook step.
@@ -769,7 +769,7 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
             note("Verifying it can host tenants:");
             note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
         },
-        () => ({ id: created.id, name, provider, region })
+        { id: created.id, name, provider, region }
     );
 }
 
@@ -1120,7 +1120,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
                 console.log("");
             },
-            () => ({
+            {
                 monthlyEur: quote?.totalEur ?? null,
                 lines: quote?.lines ?? null,
                 cpu: project!.cpu ?? null,
@@ -1133,7 +1133,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 databaseCpu: project!.databaseCpu ?? null,
                 databaseMemory: project!.databaseMemory ?? null,
                 storageMode: project!.storageMode ?? null
-            })
+            }
         );
         return;
     }
@@ -1163,7 +1163,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
             note("Applied now: the app rolls its pods and your subscription is prorated from today.");
             note("A change that restarts the database waits for a maintenance window.");
         },
-        () => ({ updated: patch })
+        { updated: patch }
     );
 }
 
