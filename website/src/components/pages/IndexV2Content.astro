@@ -167,11 +167,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
              chapter below inherits its cyan on rules, eyebrow and link.
              ============================================================ -->
         <!-- Neat gradient divider, bled behind the sections either side.
-             The two negative margins MUST sum to the height: it is decoration,
-             so it has to occupy zero flow. At -my-72 they summed to -576 against
-             a 600px box and leaked 24px of dead page ground into the seam. -->
-        <div class="neat-divider relative -my-[300px] pointer-events-none overflow-hidden"
-             style="z-index: -1; height: 600px;">
+             `--divider-h` is the only number here: .neat-divider derives the box
+             and the margins that cancel it out of the flow. -->
+        <div class="neat-divider relative pointer-events-none overflow-hidden"
+             style="z-index: -1; --divider-h: 600px;">
             <NeatBackground variant="b" client:visible />
         </div>
 
@@ -365,11 +364,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
         <!-- NEAT DIVIDER → chapter 05, gold. -->
         <!-- Neat gradient divider, bled behind the sections either side.
-             The two negative margins MUST sum to the height: it is decoration,
-             so it has to occupy zero flow. At -my-72 they summed to -576 against
-             a 600px box and leaked 24px of dead page ground into the seam. -->
-        <div class="neat-divider relative -my-[300px] pointer-events-none overflow-hidden"
-             style="z-index: -1; height: 600px;">
+             `--divider-h` is the only number here: .neat-divider derives the box
+             and the margins that cancel it out of the flow. -->
+        <div class="neat-divider relative pointer-events-none overflow-hidden"
+             style="z-index: -1; --divider-h: 600px;">
             <NeatBackground variant="a" client:visible />
         </div>
 

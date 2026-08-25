@@ -1140,8 +1140,27 @@ html.banner-dismissed-instant #manifesto-banner {
 }
 
 /* Neat gradient dividers: fade the WebGL art out toward both edges so the
-   overflow-hidden container never shows a hard horizontal cut. */
+   overflow-hidden container never shows a hard horizontal cut.
+   =========================================================================
+   THE DIVIDER OWNS ITS OWN GEOMETRY. A call site states its height ONCE, as
+   `style="--divider-h: 600px"`, and this rule derives both the box and the
+   margins that cancel it out of the flow.
+
+   It has to net to zero. The divider is decoration — pointer-events-none,
+   z-index -1, bled behind the sections either side — so any flow it occupies
+   shows up as a dead strip of unlit page ground at a seam, reading as a
+   misalignment rather than as a break.
+
+   This used to be a hand-written `-my-72` beside a hand-written `height`, and
+   the pair silently disagreed: -288 x 2 = -576 against a 600px box leaked 24px,
+   and against the two 700px ones it leaked 124px. The site had 37 copies of that
+   div and 35 of them were wrong, because the number is only correct relative to
+   another number sitting a line away in a different attribute. Deriving it here
+   means a copy-paste cannot reintroduce the bug, and a call site that changes
+   its height stays correct without anyone recomputing anything. */
 .neat-divider {
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
     mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+    height: var(--divider-h, 600px);
+    margin-block: calc(var(--divider-h, 600px) / -2);
 }
