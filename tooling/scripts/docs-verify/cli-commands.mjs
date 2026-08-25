@@ -91,7 +91,19 @@ export function loadCliFlags(root) {
      */
     const argSpecs = source => {
         const specs = [];
-        for (const m of source.matchAll(/\barg\(\s*\{/g)) {
+        // `arg(` and the CLI's two wrappers around it. A command that parses
+        // through `parseCloudArgs({ spec: { … } })` still declares its flags as
+        // quoted keys, and the brace matcher below reaches them just as well —
+        // but the pattern has to name the call, or the whole command's flag set
+        // silently disappears.
+        //
+        // That is not hypothetical: `cloud deploy` moved from `arg(` to
+        // `parseCloudArgs(` on 2026-08-25, and this check lost all eight of its
+        // flags. It then reported `rebase cloud deploy --message "…"` — a
+        // documented line that works — as a command a reader cannot run, and
+        // named the wrong culprit. A checker that cannot find a spec must not
+        // conclude the spec is empty.
+        for (const m of source.matchAll(/\b(?:arg|parseCloudArgs|parseCommandArgs)\(\s*\{/g)) {
             let depth = 1;
             let i = m.index + m[0].length;
             for (; i < source.length && depth > 0; i++) {
