@@ -17,6 +17,7 @@
    the system by matching its display-tier selector instead of overriding it. */
 @theme {
     --color-page-ground: #08090a;
+    --color-page-raised: #14161b;
     --color-page-ink: #f7f8f8;
     --color-page-copy: #b4b8bd;
 
@@ -108,32 +109,66 @@
     transition: opacity 0.2s ease;
 }
 
-/* ── The page's colour budget ────────────────────────────────────────────────
-   THE HOME PAGE HAS THREE COLOUR REGISTERS AND NO OTHERS. Adding a fourth is
-   what made it look arbitrary the last time, so the count is the rule:
+/* ── THE FOUR GROUNDS ────────────────────────────────────────────────────────
+   Every section on the home page sits on one of four grounds, and the ground
+   says what KIND of thing you are reading. This is the page's colour story; the
+   two chroma sections are the top of this scale, not two decisions taken on
+   their own.
 
-     1. ART        the Neat canvases — hero and dividers. Atmosphere, the whole
-                   palette, everywhere. This is what the site is recognised by.
-     2. ARGUMENT   a flat chroma ground, exactly twice, on the two sections whose
-                   claim cannot be demonstrated. See `chapter-guarantee`.
-     3. ACTION     `--color-primary` on buttons and links. Never decorative;
-                   a hue that is not this one never means "clickable".
+     BASE     #08090A, the page ground.  EVIDENCE.
+              You are looking at something real: the logo wall, the panel
+              itself, the three people, the customers. Nothing is being argued
+              — you are being shown.
 
-   Everything else on the page is neutral, and that is not an oversight — it is
-   what lets register 2 read as deliberate. Colour appearing twice, meaning the
-   same thing both times, is a system. Colour appearing eight times meaning
-   nothing is noise.
+     RAISED   #14161B, one step up.      MECHANISM.
+              You are being shown how it works: the collection file and what it
+              generates, the SDK and REST and realtime, the three packages. The
+              lift says "this is a machine being opened", and it groups the
+              sections that explain rather than assert.
 
-   WHAT WAS REMOVED, so it is not reintroduced: every chapter used to tint its
+     LIT      a Neat canvas.             TRANSITION.
+              The hero and the dividers. Where the page changes subject and
+              breathes. This is the only register that carries the full palette,
+              and it is what the site is recognised by.
+
+     CHROMA   a flat hue.                CLAIM.
+              Exactly twice. The two sections whose promise cannot be
+              demonstrated — see `chapter-guarantee` for the test. They are the
+              loudest ground because they are doing the work no demo can.
+
+   WHY THIS EXISTS. Before it, the page had five ground states and no system:
+   seven sections transparent, one at `surface-900/0.4`, one at `/0.3` (the same
+   intent at two different values, pure drift), and two flat hues. The two
+   coloured sections did not read as arbitrary because of which sections they
+   were. They read as arbitrary because nothing else on the page had a ground
+   language for them to belong to. A scale with two members at the top is a
+   system; two members and nothing else is a coincidence.
+
+   Also removed, so it is not reintroduced: every chapter used to tint its
    eyebrow numeral with a hue of its own — 01 cyan, 02 yellow, 04 violet,
-   05 blush, 08 cyan. Scrolling the page therefore showed cyan, yellow, BLUE
-   GROUND, violet, blush, grey, CORAL GROUND, cyan: six unrelated hues, none of
-   which meant anything (there was no reason 01 was cyan), competing with the
-   two that did. The two guarantee sections did not look random because of where
-   they sat. They looked random because five decorative hues were drowning them.
+   05 blush, 08 cyan. Six unrelated hues, none of which meant anything, all
+   competing with the two that did.
 
-   `--hue` therefore exists on exactly two sections now. If a chapter needs it,
-   the chapter needs to qualify first. */
+   `--hue` therefore exists on exactly two sections. A chapter qualifies for a
+   ground; it does not pick one. */
+
+@utility ground-raised {
+    background: var(--color-page-raised);
+}
+
+/* A raised ground eats the muted tier's headroom, so the muted tier lifts with
+   it. `--color-surface-500` (#797979) is tuned for #000/#0a0a0a, where it
+   measures 4.82:1 and 4.55:1 — deliberately close to the line, because it is
+   the balance point where the light and dark curves cross. Move the ground up
+   to #14161b and the same value falls to 4.16:1 and fails AA.
+   #8a8a8a restores it at 5.24:1.
+
+   This is the general rule for any new surface, not a patch for this one: a
+   muted value is only muted RELATIVE to something, and the whole tier has to
+   move when the ground does. */
+.ground-raised .eyebrow {
+    color: #8a8a8a;
+}
 
 @utility chapter {
     position: relative;
