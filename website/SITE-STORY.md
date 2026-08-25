@@ -151,12 +151,17 @@ unaided. Each column is one concrete scenario closing on a different deep page �
 rather than three cards, because beat 05 above it is a carousel and §6 bans a card
 grid straight after another one.
 
-**The `/europe` rule: control, not location.** The tempting sovereignty pitch —
-"their servers are in Virginia" — is false. Supabase provisions in
+**The `/europe` rule: jurisdiction, not location.** The tempting sovereignty
+pitch — "their servers are in Virginia" — is false. Supabase provisions in
 `eu-central-1`; Firestore has `eur3`. If the page ever implies otherwise it is
 lying and a reader who knows the products will catch it. The argument that is
-true is structural: a managed backend has a *second party* who operates the
-service and holds the credentials, and a self-hosted one does not.
+true is structural, and it has **three** states rather than two: no second party
+at all (you run it), a second party seated inside EU jurisdiction (we run it, as
+a Spanish company), or a second party a US court can reach whatever the region
+says. Location is the row that does not move; the operator's seat is the row that
+does — which is why `JurisdictionDemo` carries a three-valued `posture` and not a
+`thirdParty` boolean. A boolean there collapses the two answers the page exists
+to separate.
 
 **The cost demo must size *both* columns from the workload, with the same rule.**
 Sizing only our side was the second version of the same bug as the first: with
@@ -177,11 +182,24 @@ too small to hold it, stops the sliders where one machine stops being the right
 shape, and says **"here the managed bill wins"** when it does. A comparison this
 page cannot defend costs more than the comparison is worth.
 
-**`/europe` sells self-hosting and nothing else.** There is no managed Rebase
-offering today, so the page must not mention one — not as a footnote, not as a
-"coming soon", not as a waitlist. The counterweight to "you are the only
-processor" is *"being the only processor is also a job"* (backups, keys,
-uptime), not a hosted tier we would rather sell.
+**`/europe` may sell Rebase Cloud, but only by naming us as the second party.**
+This rule used to be its exact opposite — "sells self-hosting and nothing else",
+not as a footnote, not as a "coming soon", not as a waitlist — because there was
+no managed offering and a waitlist inheriting into the footer contradicted the
+page's own argument. Rebase Cloud exists now and the page carries it. What does
+not change is that the page cannot win the argument by being vague about our
+role: if we operate it we are a processor, the page says that in those words,
+and it discloses the sub-processor underneath (today Google Cloud in Belgium)
+*including* the part we have not finished. A page arguing about who can be served
+with a warrant does not get to round its own answer up.
+
+The counterweight to "you are the only processor" is still *"being the only
+processor is also a job"* (backups, keys, uptime). Rebase Cloud is now the named
+answer to that job rather than a tier the page pretends not to have.
+
+If `/europe` ever goes back to a no-operator argument, the footer waitlist
+suppression in `Footer.astro` has to come back with it — that is the line the
+frontmatter note there is holding for you.
 
 **No emoji, anywhere.** `/ai` shipped with a card grid headed 📝 👤 🗄️ 🌿 ⚙️ 🖥️ 📁.
 Icons are fine — lucide paths, inherited colour, sized to the text. Emoji render
