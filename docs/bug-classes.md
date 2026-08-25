@@ -2751,3 +2751,63 @@ same class list had already been dropped by `twMerge` (it conflicts with `transf
 so the one surviving line was the one nobody would suspect. Covered by
 `packages/ui/test/sheet-portal-container.test.tsx`, which asserts the host wears none
 of them.
+
+## 48. A response that depends on a proxy default it never states
+
+A streaming endpoint — SSE, chunked JSON, a token feed — works in production
+because the ingress in front of it *happens* to be configured not to buffer.
+Nothing in the response says it needs that. ingress-nginx defaults
+`proxy-buffering` to **off**; plain nginx, most CDNs, and several managed load
+balancers default it **on**, and a buffered stream delivers nothing until the
+buffer fills or the connection closes.
+
+The class is not "SSE is fragile". It is **a correctness requirement that lives
+in someone else's config file**. The code is right, the tests pass, the local dev
+server has no proxy at all, and the deployment that breaks it is a deployment
+that changed nothing about the code.
+
+**What makes it expensive is that the symptom points away from the cause.** A
+buffered stream is not an error. There is no status code, no log line, no failed
+request — the connection is open and healthy and silent. The live-resources panel
+sits empty, which reads as "nothing is running"; a token stream into a form field
+stays blank for the whole generation and then fills at once, which reads as a
+hang followed by a glitch. Both get diagnosed as application bugs, in the
+application, for as long as it takes someone to think about the proxy.
+
+**The tell:** any behaviour whose correctness argument is "it works on our
+cluster". If you cannot point at a line in the response that demands the
+behaviour, the behaviour is inherited, and inheritance ends at the next
+migration. The Rebase platform is expected to move off GKE, which is what turned
+this from pedantry into a scheduled outage.
+
+**Fix:** the response carries its own requirement. `X-Accel-Buffering: no` is
+honoured per-response by every nginx and ignored harmlessly by everything else,
+so it travels with the thing that needs it. Pair it with a heartbeat inside the
+proxy's idle timeout (nginx cuts an idle upstream at 60s by default) — a stream
+that only speaks when something changes is indistinguishable from a dead one, to
+the proxy and to the reader both.
+
+**Sweep** — 2026-08-26, every streaming response on the platform:
+
+    grep -rn --include='*.ts' -e 'streamSSE' -e 'text/event-stream' packages saas/backend
+
+| checked | result |
+|---|---|
+| `saas/backend/functions/metrics.ts` — live resources | **BUG.** No header. The panel built to stop confidently-stale state had staleness as its own failure mode |
+| `saas/backend/functions/ai.ts` — autofill, autocomplete (2 live streams) | **BUG ×2.** Worse symptom: a watched field blank for the whole generation, then filled at once |
+| `saas/backend/functions/ai.ts` — the empty-autofill branch | clean, and now says so — one event then close, where a buffer flushes at once regardless |
+| `packages/server/src/api/logs-routes.ts` — the runtime log tail | clean, and the correct sibling: it sets the header *and* explains why. The sweep question that found the rest was "does this agree with the thing next to it?" |
+| `packages/server/src/utils/compression.ts` | clean — refuses to compress `text/event-stream`, and its comment notes it does not rely on `streamSSE` having set the type |
+| `saas/backend/functions/runtime-logs.ts` | clean, and instructive: it does **not** stream, because the SDK the console uses buffers the whole body and `JSON.parse`s it. It implements an incremental-poll contract instead, with the reasoning written down |
+| tenant ingresses (`orchestrator.ts`), self-host chart (`charts/rebase`) | clean — neither sets `proxy-buffering`, so both rely on the default; the per-response header is what covers them |
+
+**Gated by** `saas/backend/src/k8s/console-ingress.test.ts`: every
+`return streamSSE(` under `functions/` must be matched by a disabling header or a
+written opt-out, so the next stream added is covered without anyone remembering
+to write a test. Gate the class, not the input.
+
+**Watch for:** a guard that matches a header *name* as a substring. The first
+version counted occurrences of `X-Accel-Buffering`, and renaming the header to
+`X-Accel-Buffering-x` still matched — the mutation passed and the guard was
+inert. It matches the whole call now. Prove the gate fails; a guard you did not
+break is a guard you did not test.
