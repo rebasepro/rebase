@@ -483,7 +483,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <ArrowRight size={15} />
                             </a>
                         </div>
-                        <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
+                        {/* Bleeds toward the viewport edge. Boxed into seven of
+                            twelve columns the console read as a thumbnail of the
+                            product rather than the product; the copy column
+                            stays on the shell, so the left edge is unaffected. */}
+                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
                             <AgentConsoleDemo client:visible />
                         </div>
                     </div>

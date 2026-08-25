@@ -176,6 +176,27 @@
     background: var(--color-page-raised);
 }
 
+/* ── Bleed ───────────────────────────────────────────────────────────────────
+   A product artifact may run past the shell toward the viewport edge. COPY
+   NEVER MAY. §6 asks for one shell width so left edges agree, and that rule is
+   about the reading column — a demo is a picture of the product, and boxing it
+   into a 7-column cell makes the product look smaller than it is.
+
+   The maths: the shell is 72rem centred, so each gutter is
+   `(100vw - 72rem) / 2`. Pulling the element right by that, less a 1.5rem
+   inset, lands it just short of the viewport edge. `max(0px, …)` is what keeps
+   it honest below 72rem, where the gutter is negative and an unguarded calc
+   would push the element back INTO the page and crush it.
+
+   `100vw` includes the scrollbar, so this can overshoot by ~15px on a desktop
+   with classic scrollbars. `html, body { overflow-x: clip }` upstream absorbs
+   that without producing a horizontal scrollbar — but it clips rather than
+   reflows, so anything bled must be decorative-safe at its outer edge. A demo
+   frame is; a control or a line of text would not be. */
+@utility bleed-right {
+    margin-right: calc(-1 * max(0px, (100vw - 72rem) / 2 - 1.5rem));
+}
+
 /* A raised ground eats the muted tier's headroom, so the muted tier lifts with
    it. `--color-surface-500` (#797979) is tuned for #000/#0a0a0a, where it
    measures 4.82:1 and 4.55:1 — deliberately close to the line, because it is
