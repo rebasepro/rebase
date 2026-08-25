@@ -456,6 +456,11 @@ export const GLOBAL_CLOUD_FLAGS = {
     "--yes": Boolean,
     "--help": Boolean,
     "--project": String,
+    /* `resolveCloudUrl` reads this off the raw line for EVERY command in the
+       family — it is the first entry in the URL priority list — so a strict
+       parse that did not declare it would reject a flag the CLI itself honours
+       on the command being parsed. */
+    "--url": String,
     "-p": "--project",
     "-y": "--yes",
     "-h": "--help"

@@ -20,6 +20,7 @@ import { spawn } from "child_process";
 import {
     requireClient,
     resolveProjectRef,
+    parseCloudArgs,
     colorStatus,
     emit,
     isJsonMode,
@@ -721,9 +722,31 @@ function declaresManagedRuntime(appName?: string): boolean {
     }
 }
 
-export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
-    const args = arg(
-        { "--no-follow": Boolean,
+/**
+ * `rebase cloud deploy [app]` — its flags, and which app of this repository the
+ * line named.
+ *
+ * Parsed through `parseCloudArgs` rather than `arg` directly, and the reason is
+ * the positional. This command used to parse `rawArgs.slice(2)` permissively
+ * and read `_[0]` as the app name — but `rawArgs` is the WHOLE `process.argv`,
+ * so `_` opens with the command words themselves. `_[0]` was therefore the
+ * literal string `"cloud"` on every run, which then went to `selectDeployApp`
+ * and came back as:
+ *
+ *   This repository declares no app named "cloud". It declares: backend, web.
+ *
+ * So the documented `rebase cloud deploy --bundle` failed on every project that
+ * did not happen to declare an app called `cloud`, `rebase cloud deploy web`
+ * could not reach `web`, and the refusal named the user's real apps — reading
+ * as a fault in their `rebase.json` rather than in the CLI's own parse.
+ *
+ * `commandWords` counts from `cloud` itself, so `cloud deploy` is 2, and it is
+ * applied to the PARSED positionals: a flag written before the group no longer
+ * shifts the app name either.
+ */
+export function resolveDeployArgs(rawArgs: string[]) {
+    const { flags, positionals } = parseCloudArgs({
+        spec: { "--no-follow": Boolean,
 "--source": String,
 "--message": String,
 "--bundle": Boolean,
@@ -738,9 +761,17 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
    `ejectRefusal`. */
 "--force": Boolean,
 "-m": "--message" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+        rawArgs,
+        commandWords: 2, // cloud deploy
+        command: "cloud deploy",
+        maxPositionals: 1
+    });
+    return { flags,
+appName: positionals[0] as string | undefined };
+}
+
+export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
+    const { flags: args, appName } = resolveDeployArgs(rawArgs);
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
@@ -760,8 +791,8 @@ permissive: true }
     // `rebase cloud deploy <app>` — which app of the project this repository is
     // shipping. Positional because it is the subject of the sentence, not an
     // option: a repository holding only an admin panel deploys it by name, and a
-    // repository with one backend keeps saying nothing at all.
-    const appName = args._?.[0];
+    // repository with one backend keeps saying nothing at all. Resolved by
+    // `resolveDeployArgs` above, off the parsed positionals.
 
     const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime(appName);
     if (args["--bundle"] || declaredManaged) {

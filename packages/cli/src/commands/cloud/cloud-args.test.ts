@@ -51,6 +51,7 @@ import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
 import { resolveWebhookIdArg, webhooksCommand } from "./resources";
 import { resolveProjectArg } from "./projects";
+import { resolveDeployArgs } from "./deploy";
 
 /** `rebase <words…>` as `process.argv` — what every command is handed. */
 function argv(...words: string[]): string[] {
@@ -274,6 +275,77 @@ describe("projects info|delete", () => {
 
     it("takes an explicit id", () => {
         expect(resolveProjectArg(argv("projects", "delete", "shop", "--yes"), "delete")).toBe("shop");
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   cloud deploy: the app name
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * `deploy` was the one command in this family still reading `_[0]` off a
+ * permissive `rawArgs.slice(2)`, and `_[0]` there is the command word `cloud`.
+ * So the documented line refused itself:
+ *
+ *   $ rebase cloud deploy --bundle
+ *   This repository declares no app named "cloud". It declares: backend, web.
+ *
+ * These assert the resolved app name directly rather than through a fixture
+ * manifest, because a fixture that happened to declare an app called `cloud`
+ * would have passed against the broken parse.
+ */
+describe("cloud deploy", () => {
+    it("names NO app when the line names none", () => {
+        // "cloud", every time, before the fix.
+        expect(resolveDeployArgs(argv("deploy", "--bundle")).appName).toBeUndefined();
+        expect(resolveDeployArgs(argv("deploy")).appName).toBeUndefined();
+    });
+
+    it("names the app the line names", () => {
+        expect(resolveDeployArgs(argv("deploy", "web", "--bundle")).appName).toBe("web");
+        expect(resolveDeployArgs(argv("deploy", "--bundle", "web")).appName).toBe("web");
+    });
+
+    it("is unshifted by a flag written before the group", () => {
+        const line = ["/usr/bin/node", "/x/y/rebase.js", "--debug", "cloud", "deploy", "web"];
+        expect(resolveDeployArgs(line).appName).toBe("web");
+    });
+
+    it("reads no app from a declared flag's value", () => {
+        expect(resolveDeployArgs(argv("deploy", "-p", "acme", "--bundle")).appName).toBeUndefined();
+        // `-m cloud` is the trap in miniature: a legitimate message that is also
+        // the command word.
+        const parsed = resolveDeployArgs(argv("deploy", "-m", "cloud", "--bundle"));
+        expect(parsed.appName).toBeUndefined();
+        expect(parsed.flags["--message"]).toBe("cloud");
+    });
+
+    it("keeps the flags it declares, and the ones every cloud command takes", () => {
+        const { flags } = resolveDeployArgs(
+            argv("deploy", "web", "--bundle", "--bundle-dir", "dist-bundle",
+                "--skip-type-check", "--no-follow", "-m", "why", "--url", "http://localhost:3000")
+        );
+        expect(flags["--bundle"]).toBe(true);
+        expect(flags["--bundle-dir"]).toBe("dist-bundle");
+        expect(flags["--skip-type-check"]).toBe(true);
+        expect(flags["--no-follow"]).toBe(true);
+        expect(flags["--message"]).toBe("why");
+        // `resolveCloudUrl` honours `--url` on every line in this family, so a
+        // strict parse has to accept it here too.
+        expect(flags["--url"]).toBe("http://localhost:3000");
+    });
+
+    it("refuses an undeclared flag rather than deploying an app named after it", async () => {
+        const err = await refusalOf(() => resolveDeployArgs(argv("deploy", "--bundel")));
+        expect(err.code).toBe("usage");
+        expect(err.message).toContain("--bundel");
+        expect(err.message).toContain("rebase cloud deploy --help");
+    });
+
+    it("refuses a second positional instead of ignoring it", async () => {
+        const err = await refusalOf(() => resolveDeployArgs(argv("deploy", "web", "backend")));
+        expect(err.code).toBe("usage");
+        expect(err.message).toContain("1 argument");
     });
 });
 
