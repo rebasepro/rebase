@@ -379,10 +379,18 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         </h2>
                         <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("showcase.sync.tab1.desc")}</p>
                     </div>
+                    {/* No `.frame` here. The carousel draws its own browser
+                        chrome — traffic lights and a URL bar — so wrapping it
+                        gave the section two nested borders, and §6 allows a demo
+                        one frame, not two.
+
+                        It also put the List / Spreadsheet / Kanban toggle inside
+                        the product's border, which reads as though the panel
+                        itself has a view switcher at the bottom of its window.
+                        The toggle is page furniture: it drives the carousel, not
+                        the product. It belongs outside the edge. */}
                     <div class="mt-12 animate-on-scroll fade-in-up">
-                        <div class="frame">
-                            <AdminDemoCarousel client:visible height={620} />
-                        </div>
+                        <AdminDemoCarousel client:visible height={620} />
                     </div>
                     <a href={translatePath("/admin")} class="accent-link mt-8">
                         Explore the admin panel

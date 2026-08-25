@@ -82,7 +82,11 @@ export function AdminDemoCarousel({
   };
 
   return (
-    <div className="not-content flex flex-col items-center" style={rootStyle}>
+    // `items-start`, not `items-center`. The browser frame is `w-full` so it is
+    // unaffected either way, but the tab row below it is not: centred, it was
+    // the only thing in the section off the 72rem shell edge, floating under a
+    // left-aligned heading and a left-aligned frame.
+    <div className="not-content flex flex-col items-start" style={rootStyle}>
       {/* Browser frame */}
       <div className="w-full rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
         {/* Browser Chrome */}
