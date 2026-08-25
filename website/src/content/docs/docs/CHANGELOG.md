@@ -7,6 +7,27 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Removed
+
+- **`rebase eject infra` and `rebase.infra.json`.** The command wrote a file
+  documented as being "read *before* the environment", and nothing read it:
+  `loadInfraConfig` and `bindResources` had no caller outside their own tests,
+  in either repository. The three-tier binder they implemented — file, then
+  environment, then a local provisioner — never ran, and the header claiming
+  the control plane injected such a file was contradicted by the control plane's
+  own comment saying it deliberately does not.
+
+  Resources bind from the environment on the `<BASE>__<KEY>` convention, which
+  is the path every deployment has always used. Running the command now names
+  the removal rather than failing as an unknown app. `packages/server/src/boot/local-provisioner.ts`
+  went with it — it returned `STORAGE_BUCKET` and `REBASE_STORAGE_ENGINE`, names
+  the resolver has never read.
+
+  Removing this drops the `{"$env": "..."}` indirection with it. A self-hoster
+  wiring secrets from Vault or SOPS renders them into the environment, which is
+  what everyone was already doing — the alternative was maintaining a second
+  binding path no deployment has ever exercised.
+
 > **Breaking: resources are declared, not configured.** `RebaseBackendConfig`'s
 > `dataSources` and `storageSources` are gone; declare them in `rebase.json` and
 > the config package. A bundle built before this will not boot on a current
@@ -94,24 +115,27 @@ description: Every released change to Rebase — new features, fixes, and the br
   bucket, has none" on a first deploy, and how a `custom` runtime (which emits
   no bundle manifest) is visible to the platform at all.
 
-- **Binding is separate from declaration, and identical everywhere.** An
-  infrastructure config file is read first, then environment variables on the
-  existing `<BASE>__<KEY>` convention, then — in development only — local
-  provisioning. A declared bucket becomes a real directory on a laptop, so
-  `bucket("media")` plus `rebase dev` is enough to upload a file; never in
-  production or on the managed runtime, where an invented bucket would write
-  uploads to a filesystem that vanishes on the next rollout.
+- **Binding is separate from declaration, and identical everywhere.** A
+  declaration says a resource exists; the environment says where it lives, on
+  the `<BASE>__<KEY>` convention. Baking the address into the repository is how
+  a project ends up with its staging credentials in git, and it is why staging
+  and production can run the same commit against different infrastructure.
 
-  The cloud is not a fourth mechanism: the control plane binds the same
-  `<BASE>__<KEY>` variables a self-hoster sets, so a managed tenant runs exactly
-  the code path a self-hoster runs.
+  The cloud is not a second mechanism: the control plane binds the same
+  variables a self-hoster sets, so a managed tenant runs exactly the code path a
+  self-hoster runs.
 
-- **`rebase eject infra`** writes `rebase.infra.json` — the environment path
-  spelled out, one entry per resource, each pointing at the variable the binder
-  was already reading, so nothing changes until you edit it. Values are
-  `{"$env": "..."}` pointers rather than literals, so the file can live in a
-  config repository without carrying secrets. It joins `rebase eject`, which
-  hands over the process: one rung for the addresses, one for the code.
+- **Several buckets can share one account.** `bucket("media", { account: "minio" })`
+  reads its own `S3_BUCKET__MEDIA` while the provider-level variables —
+  credentials, endpoint, region — fall back to `S3_ACCESS_KEY_ID__MINIO` and so
+  on. Fifteen buckets on one install go from ninety variables to eighteen, and
+  rotating a key is one edit rather than fifteen paired ones.
+
+  The bucket name itself never falls back, and neither form falls through to the
+  unsuffixed variable: that one belongs to the default source, and letting a
+  named bucket inherit it would mean a mistyped key silently signs with another
+  source's credentials.
+
 
 - **Topics, delivered through the durable job queue.** Publishing writes one
   row *per subscription*, so each subscriber retries on its own schedule and a
