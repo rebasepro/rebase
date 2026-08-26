@@ -73,6 +73,71 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 - **An ANN index for every vector column**, with pgvector shipped in the scaffolded database image.
 
+- **Collections declare their indexes, and a hand-written index stops
+  disappearing.** The collection model had no `indexes` key: the DDL generator
+  emitted index statements for exactly two things, both structures a *feature*
+  owns rather than queries anyone wrote — the GIN index behind a `search` block
+  and the ANN index behind a `vector` property. The plain case, the btree behind
+  a `where` clause, had no declaration site at all.
+
+  ```ts
+  indexes: [
+      { on: ["status", { prop: "publishDate", direction: "desc" }],
+        reason: "admin list: filter by status, newest first" },
+      { on: ["publishDate"], where: { prop: "status", op: "=", value: "published" },
+        reason: "public feed is published-only" },
+      { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+  ]
+  ```
+
+  So the only way to have one was to write it by hand — which is the other half
+  of this. `rebase db push` is declarative, so an index on a managed table that
+  is absent from `schema.sql` is drift and Atlas plans `DROP INDEX` for it.
+  `DROP INDEX` is not in `DESTRUCTIVE_PATTERNS`, so the auto-approved apply took
+  it with no prompt. Measured against atlas v1.2.3 and Postgres 18, not
+  inferred: create an index by hand, re-run an unchanged push, and the plan is a
+  bare drop. Every hand-written index in the field has been living on borrowed
+  time, and since a hand-written index was the *only* kind there was, that was
+  the only outcome.
+
+  Adding `DROP INDEX` to the destructive list would have been the wrong fix —
+  once indexes are declarable, removing one from your config *should* remove it
+  without a scare. Ownership is decided by the name instead, the arrangement
+  policies already use. An index is named `<table>_<columns>_ix_<7 hex>` (`_ux_`
+  when unique), which no other namer here can produce, so a declaration you
+  delete drops as intended and an index Rebase did not create is excluded from
+  the diff and never touched. That also settles the introspection round trip:
+  the existing indexes of a database you point Rebase at are foreign until
+  somebody declares them.
+
+  The hash is over the index's *semantics*, not its rendered SQL, so
+  reformatting the generator never renames a live object — and it is what makes
+  a redefinition take effect at all, since `CREATE INDEX IF NOT EXISTS` matches
+  on the name. (That bug is shipped today one layer over: `vector-index.ts`
+  leaves `WITH (m, ef_construction, lists)` out of its name, so retuning an HNSW
+  index is a permanent silent no-op.)
+
+  `prop` takes a **property key, never a column name**, because the two differ
+  in exactly the case people index most: a `belongsTo` resolves to its
+  `localKey`, so `author` becomes `author_id`. `where` is structured rather than
+  a SQL string — a string could not be checked against the collection's
+  properties and could not be fingerprinted without putting its own text in the
+  index name. And `reason` is required, and deliberately not hashed: an index is
+  the only thing a config can declare that costs money forever and whose benefit
+  is invisible from the config, so rewording the justification must not rebuild
+  it.
+
+  Both producers emit them — `db push` on the ordinary Atlas path, and
+  boot-time schema ensure with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. The
+  first cut only did the former, which a managed-runtime tenant never runs; the
+  derived-names contract caught it, with the whole suite green and the round
+  trip through real Atlas clean.
+
+  Not included, each its own subsystem: the deferred `CONCURRENTLY` builder for
+  a redefinition (today a DROP + CREATE holding a lock), a size-based push gate,
+  `doctor`'s index categories, introspection adoption, and the drizzle-schema
+  side. See [Indexes](/docs/backend/indexes).
+
 - **A pod contract the chart and the control plane both answer to.** Probe paths, shutdown budgets, the bundle mount and the set of topology variables a deployer owns now live in one place that both pod builders read, instead of two hand-written lists that had already disagreed.
 
 - **`rebase cloud resources` is priced, with no plan left to name**, and `rebase cloud projects info` prints a Storage line — plus a warning or a lockout notice when the project is near or past its limit. The shared pools already enforced a per-tenant disk ceiling by setting `CONNECTION LIMIT 0`; the tenant's first signal used to be their database refusing connections, with no number anywhere that would have warned them.

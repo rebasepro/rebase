@@ -110,8 +110,10 @@ Wenn Rebase das Datenbankschema aktualisiert, ordnet es TypeScript-Sammlungsdefi
 2. **Schema-Einschränkungen (`schemaFilter`)**: Die DB-Synchronisierung ist ausschließlich auf das `public`-Schema beschränkt. Interne Datenbanktabellen, benutzerdefinierte Schemata und erweiterungsspezifische Tabellen bleiben unberührt.
 3. **Rollen- und Erweiterungsschutz**: Drizzle ist so konfiguriert, dass es keine Datenbankrollen (`entities.roles: false`) oder Hilfstabellen von Erweiterungen wie PostGIS verwaltet.
 4. **Interaktive Bestätigung im Entwicklungsmodus**: Beim Ausführen von `rebase db push` in der Entwicklung wird die CLI mit den Flags `--strict` und `--verbose` ausgeführt. Dies stellt sicher, dass Entwickler alle destruktiven SQL-Aktionen vor der Ausführung explizit überprüfen und genehmigen müssen.
+5. **Index-Besitz über den Namen**: Indizes sind das eine Objekt, das *auf* einer gemappten Tabelle liegt, also kann Tabellen-Filterung sie nicht schützen — und ein Push plante früher `DROP INDEX` für jeden Index, der im Zielzustand fehlte, also für jeden handgeschriebenen. Rebase benennt die von ihm erzeugten Indizes jetzt `<table>_<columns>_ix_<7 hex>` (`_ux_` bei `unique`), eine Form, die kein anderer Namensgeber hier erzeugt, und schließt alles Übrige namentlich vom Diff aus. Ein selbst geschriebener oder per Introspektion übernommener Index wird nie angefasst; eine gelöschte Deklaration entfernt ihren Index weiterhin, was so gewollt ist. Siehe **[Indizes](/docs/backend/indexes)**.
 
 ## Nächste Schritte
 
 - **[Sammlungen](/docs/collections)** — Vollständige Referenz zur Sammlungs-Konfiguration
 - **[Eigenschaften](/docs/collections/properties)** — Detaillierte Spaltentyp-Zuordnungen
+- **[Indizes](/docs/backend/indexes)** — Die Indizes deklarieren, die Ihre Abfragen brauchen

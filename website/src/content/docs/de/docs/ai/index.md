@@ -71,9 +71,16 @@ Dies ist bereits an zwei Stellen dokumentiert:
 Drei Dinge, die Sie wissen sollten, bevor Sie darauf aufbauend entwickeln: **Rebase speichert und durchsucht
 Embeddings; es berechnet sie nicht** – es gibt in Rebase keinen Embedding-Provider,
 keine Modell-Einstellung und keinen API-Schlüssel, die Generierung der Vektoren liegt also bei Ihnen.
-**pgvector ist eine Voraussetzung, die Rebase nicht automatisch für Sie installiert.** Und **für eine Vektorspalte
-wird kein ANN-Index erstellt**, daher ist `vectorSearch` ein exakter Scan –
-völlig ausreichend für Tausende von Zeilen, jedoch nicht für Millionen.
+**pgvector ist eine Voraussetzung.** Das Datenbank-Image des Scaffolds bringt
+die Erweiterung mit, ein per `rebase init` erstelltes Projekt braucht hier also
+nichts. Zeigt Rebase auf eine Datenbank, die jemand anderes bereitgestellt hat,
+benötigen Sie ein Image mit der Erweiterung und eine Rolle, die einmalig
+`CREATE EXTENSION vector;` ausführen darf – Rebase installiert keine
+Erweiterungen für Sie. Und **jede Vektorspalte erhält einen HNSW-Index für die
+Kosinus-Distanz**, denn mit Kosinus misst `vectorSearch`, sofern Sie nicht
+`distance` übergeben – ein Index bedient genau einen Operator. Anpassen oder
+abschalten lässt er sich an der Property: siehe
+[Der Index](/docs/sdk/querying#the-index).
 
 Vektor-Abfragen können zudem nicht abonniert werden; `.vectorSearch(...).listen()` wird
 mit `VECTOR_SEARCH_NOT_LIVE` abgelehnt.

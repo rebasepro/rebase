@@ -133,6 +133,7 @@ Ma un'annotazione si limita a *validare* l'oggetto — non vede i nomi delle tue
 | `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Indici Postgres di cui questa tabella ha bisogno. Vedi [Indici](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Ricerca full-text con ranking sui campi che indichi, inclusi i contenuti JSONB e array. Solo Postgres. Vedi [Ricerca](/docs/backend/search). |
+| `auth` | `boolean \| AuthCollectionConfig` | Contrassegna la collezione come collezione di autenticazione (gestione utenti, reimpostazione password, ecc.) |
 
 ### Configurazione dell'interfaccia utente
 

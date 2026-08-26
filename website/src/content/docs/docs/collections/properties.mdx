@@ -486,9 +486,21 @@ embedding: {
 | Property | Type | Description |
 |----------|------|-------------|
 | `dimensions` | `number` | **Required.** Length of the vector. Compiles to `VECTOR(n)`. |
+| `index` | `VectorIndexConfig \| false` | How the ANN index is built. Omitted, one HNSW index for cosine distance. `false` creates none. |
+
+An ANN index is created with the column, so `vectorSearch` is approximate and
+fast rather than an exact scan. It is built for **cosine** distance, which is
+what `vectorSearch` measures with unless you pass `distance` — an index serves
+exactly one operator, so an `l2` query against a cosine index quietly goes back
+to scanning. `method` (`hnsw` or `ivfflat`), `distance` (one or several), `m`,
+`efConstruction` and `lists` are all on `index`. Above 2000 dimensions pgvector
+can build neither index type, so the column is left unindexed and the boot says
+so.
 
 Query it with [`.vectorSearch()`](/docs/sdk/querying#vector-search), which also
-covers what pgvector needs to be installed and when to add an index.
+covers what pgvector needs to be installed and how to tune the index. For
+ordinary btree, GIN and BRIN indexes on any collection, see
+[Indexes](/docs/backend/indexes).
 
 ## Binary Properties
 

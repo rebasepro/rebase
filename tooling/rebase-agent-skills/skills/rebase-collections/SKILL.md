@@ -1,6 +1,6 @@
 ---
 name: rebase-collections
-description: Comprehensive guide for defining Rebase collections, property types, validation, and schema configuration. Use this skill when the user needs help creating collections, adding properties, configuring field types, understanding the schema-as-code approach, or making a collection searchable — including when search returns nothing for content stored in a map/JSONB property.
+description: Comprehensive guide for defining Rebase collections, property types, validation, and schema configuration. Use this skill when the user needs help creating collections, adding properties, configuring field types, understanding the schema-as-code approach, making a collection searchable — including when search returns nothing for content stored in a map/JSONB property — or declaring indexes on a collection.
 ---
 
 # Rebase Collections
@@ -429,6 +429,103 @@ config: it costs a `ts_headline` per field per row.
 If the user wants exact matching on a known field, use `where` — it is exact,
 indexed, and needs no schema. The `search` block is for free-text queries a
 human types.
+
+## Indexes
+
+A collection declares the indexes its queries need, in `indexes`. Postgres only
+— refused at boot on another engine, not silently ignored.
+
+```typescript
+const posts: PostgresCollectionConfig = {
+    slug: "posts",
+    table: "posts",
+    name: "Blog posts",
+    properties: { /* … */ },
+    indexes: [
+        // Filter by status, newest first. ONE index serves the filter and the
+        // sort, because a btree can be read in order.
+        { on: ["status", { prop: "publishDate", direction: "desc" }],
+          reason: "admin list: filter by status, newest first" },
+        // Partial: the index holds only published rows, and stays small as
+        // drafts accumulate.
+        { on: ["publishDate"],
+          where: { prop: "status", op: "=", value: "published" },
+          reason: "public feed is published-only" },
+        // `author` is a belongsTo — it resolves to author_id.
+        { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+    ]
+};
+```
+
+### Rules an agent must not get wrong
+
+- **`on` takes property keys, never column names.** A `belongsTo` resolves to
+  its `localKey`, so `author` → `author_id`. Writing `author_id` yourself works
+  for most properties and is refused for a relation — and getting this backwards
+  is how you index nothing on the one case people reach for. A `hasMany` or
+  many-to-many property is refused: the foreign key is on the *other* table, so
+  declare the index there.
+- **`reason` is required**, and it is prose, not SQL. Say what query it serves.
+  It is what gets printed beside "0 scans in 34 days, 412 MB" later, and it is
+  deliberately not part of the index's identity, so rewording it rebuilds
+  nothing.
+- **Order is the index's identity.** Postgres uses a *leading subset* only:
+  `["ownerId", "createdAt"]` serves a filter on `ownerId`, and on both, and
+  **never** on `createdAt` alone. Do not reorder keys to "tidy" a declaration.
+- **Do not declare a `desc` twin.** A btree is scanned backwards just as fast,
+  so a lone `DESC` index is redundant with its `ASC` one. `direction` earns its
+  place only when an `ORDER BY` mixes directions.
+- **Never suggest a plain index for text search or embeddings.** Trigram search
+  is the `search` block; ANN is a `vector` property's `index`. Both build their
+  own index, and an index needing `gin_trgm_ops` or `vector_cosine_ops` is
+  refused here at build time.
+- **Do not add `unique: true` to a single column** whose property already has
+  `validation.unique` — that is the same guarantee declared twice, and it is
+  refused. Single-column uniqueness is `validation.unique`; `unique` here is for
+  composites.
+- **Do not index the primary key.** `<table>_pkey` already covers exactly those
+  columns, and declaring it is refused.
+- **Changing a declaration is a DROP and a CREATE**, no `CONCURRENTLY`, with a
+  window in between where the index does not exist. Fine on a dev database; on a
+  large live table, say so before suggesting the edit.
+
+### The shape
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `on` | `(string \| IndexKey)[]` | **Required.** 1–5 keys. `IndexKey` is `{ prop, direction?, nulls? }`. |
+| `reason` | `string` | **Required.** One line of prose. |
+| `using` | `"btree" \| "gin" \| "brin"` | Default `btree`. No `gist`, no `hash`. |
+| `where` | `IndexPredicate` | Partial index. See below. |
+| `unique` | `boolean` | btree only, composites only. |
+| `include` | `string[]` | btree only. Payload columns for index-only scans; may not overlap `on`. |
+
+`where` is **structured, never a SQL string**: `{ prop, op, value }` with `op`
+one of `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null`, `is not null`, nested
+under `{ and: [...] }`. There is no `or` — an OR predicate means the index
+should probably not be partial; declare two indexes instead.
+
+`gin` is containment over an `array` or JSONB `map`. `brin` is a
+naturally-ordered column on an append-only table. Neither takes `direction` or
+`nulls`.
+
+### Why hand-written indexes were disappearing
+
+Worth knowing when a user says an index they created is gone. `rebase db push`
+is declarative, so an index on a managed table absent from `schema.sql` was
+drift, and Atlas planned `DROP INDEX` — which is not a destructive pattern, so
+the auto-approved apply took it silently.
+
+Ownership is now decided by the name: `<table>_<columns>_ix_<7 hex>` (`_ux_` if
+unique), which no other namer produces. A declaration you delete drops as
+intended; an index Rebase did not create is excluded from the diff and never
+touched. **Do not tell a user to re-create a hand-written index defensively, and
+do not rename one to look generated** — the hash is over the index's semantics
+and the name is frozen in `contracts/derived-names.txt`.
+
+Declared indexes are created by `rebase db push` *and* by boot-time schema
+ensure (`CREATE INDEX CONCURRENTLY IF NOT EXISTS`), so a deployment that never
+runs `db push` still gets them.
 
 ## Data sources & multiple backends
 
@@ -1684,6 +1781,41 @@ embedding: {
 | Option | Type | Description |
 |--------|------|-------------|
 | `dimensions` | `number` | **Required.** Number of dimensions in the vector |
+| `index` | `VectorIndexConfig \| false` | ANN index. Omitted, one HNSW index for cosine distance. `false` creates none. |
+
+**Every vector column gets an ANN index by default** — HNSW, cosine — so
+`vectorSearch` is approximate and fast rather than an exact scan. Cosine because
+that is what `vectorSearch` measures with unless a `distance` is passed, and
+**an index serves exactly one operator**: an `l2` query against a cosine-only
+index quietly goes back to scanning. Index several by naming several, at the
+cost of a separate build and separate storage each:
+
+```typescript
+embedding: {
+    name: "Embedding",
+    type: "vector",
+    dimensions: 1536,
+    index: {
+        method: "hnsw",              // or "ivfflat"
+        distance: ["cosine", "l2"],  // one index each
+        m: 24,                       // hnsw
+        efConstruction: 128          // hnsw
+        // lists: 200                // ivfflat only
+    }
+}
+```
+
+- `ivfflat` partitions by centroid, so an index built on an empty or tiny table
+  has useless partitions — build it after the data is loaded, and set `lists`.
+  `hnsw` needs no training data and works on an empty table, which is why it is
+  the default.
+- `index: false` keeps the exact scan deliberately.
+- **Above 2000 dimensions pgvector can index neither type**, so the column is
+  created unindexed and the boot says so. A 3072-dimension embedding does not
+  fail to boot; it scans.
+- pgvector itself is a prerequisite. The scaffold's database image ships it; a
+  database someone else provisioned needs the extension available and a role
+  that can run `CREATE EXTENSION vector;` once.
 
 ## Geopoint Properties
 

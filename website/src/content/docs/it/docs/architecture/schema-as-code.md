@@ -110,8 +110,10 @@ Quando Rebase aggiorna lo schema del database, mappa le definizioni delle collez
 2. **Restrizioni sullo Schema (`schemaFilter`)**: La sincronizzazione del database è limitata esclusivamente allo schema `public`. Le tabelle interne del database, gli schemi personalizzati e le tabelle specifiche delle estensioni non vengono toccate.
 3. **Protezione dei Ruoli e delle Estensioni**: Drizzle è configurato per non gestire i ruoli del database (`entities.roles: false`) o le tabelle di supporto di estensioni come PostGIS.
 4. **Conferma Interattiva in Modalità di Sviluppo**: Quando si esegue `rebase db push` in sviluppo, la CLI viene eseguita con i flag `--strict` e `--verbose`, il che assicura che gli sviluppatori debbano esaminare e approvare esplicitamente qualsiasi azione SQL distruttiva prima che venga eseguita.
+5. **Proprietà degli Indici in Base al Nome**: Gli indici sono l'unico oggetto che vive *su* una tabella mappata, quindi il filtro sulle tabelle non può proteggerli — e un push pianificava `DROP INDEX` per qualsiasi indice assente dallo stato desiderato, cioè per ogni indice scritto a mano. Ora Rebase nomina gli indici che genera `<table>_<columns>_ix_<7 hex>` (`_ux_` quando sono unici), una forma che nessun altro generatore di nomi qui produce, ed esclude dal diff tutto il resto in base al nome. Un indice scritto a mano, o arrivato tramite introspezione, non viene mai toccato; una dichiarazione che elimini rimuove comunque il suo indice, ed è l'intento. Vedi **[Indici](/docs/backend/indexes)**.
 
 ## Prossimi Passi
 
 - **[Collezioni](/docs/collections)** — Riferimento completo alla configurazione delle collezioni
 - **[Proprietà](/docs/collections/properties)** — Mappature dettagliate dei tipi di colonna
+- **[Indici](/docs/backend/indexes)** — Dichiarare gli indici di cui le tue query hanno bisogno

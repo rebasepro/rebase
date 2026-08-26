@@ -133,6 +133,7 @@ Eine Annotation *validiert* das Objekt jedoch nur — sie kann Ihre Eigenschafts
 | `securityRules` | `SecurityRule[]` | Row Level Security-Richtlinien. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Postgres-Indizes, die diese Tabelle braucht. Siehe [Indizes](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Gerankte Volltextsuche über die von Ihnen benannten Felder, einschließlich JSONB- und Array-Inhalten. Nur Postgres. Siehe [Suche](/docs/backend/search). |
+| `auth` | `boolean \| AuthCollectionConfig` | Die Sammlung als Authentifizierungs-Sammlung kennzeichnen (Benutzerverwaltung, Passwort zurücksetzen usw.) |
 
 ### UI-Konfiguration
 

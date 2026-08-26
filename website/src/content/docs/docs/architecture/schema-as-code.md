@@ -110,8 +110,10 @@ When Rebase updates the database schema, it maps TypeScript collection definitio
 2. **Schema Restrictions (`schemaFilter`)**: The DB sync is restricted exclusively to the `public` schema. Internal database tables, custom schemas, and extension-specific tables are left untouched.
 3. **Roles and Extension Protection**: Drizzle is configured not to manage database roles (`entities.roles: false`) or helper tables from extensions like PostGIS.
 4. **Interactive Dev Mode Confirmation**: When running `rebase db push` in development, the CLI executes with `--strict` and `--verbose` flags, which ensures that developers must explicitly review and approve any destructive SQL actions before they are executed.
+5. **Index Ownership by Name**: Indexes are the one object that lives *on* a mapped table, so table filtering cannot protect them — and a push used to plan `DROP INDEX` for any index missing from the desired state, which meant every hand-written one. Rebase now names the indexes it generates `<table>_<columns>_ix_<7 hex>` (`_ux_` when unique), a shape no other namer here produces, and excludes everything else from the diff by name. An index you wrote by hand, or that came in through introspection, is never touched; a declaration you delete still drops, which is the intent. See **[Indexes](/docs/backend/indexes)**.
 
 ## Next Steps
 
 - **[Collections](/docs/collections)** — Full collection configuration reference
 - **[Properties](/docs/collections/properties)** — Detailed column type mappings
+- **[Indexes](/docs/backend/indexes)** — Declaring the indexes your queries need

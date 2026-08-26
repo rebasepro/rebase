@@ -613,6 +613,15 @@ The `shutdown(timeoutMs?: number)` method (default timeout: 15000ms) performs:
 - **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
+- **Indexes are declared too** — a collection's `indexes` array is emitted into `schema.sql` by
+  `db push`/`db generate` *and* created at boot with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`,
+  so a deployment that never runs `db push` still gets them. See the `rebase-collections` skill.
+- **A hand-written index on a managed table used to be dropped by `db push`.** Push is
+  declarative: an index absent from `schema.sql` was drift, Atlas planned `DROP INDEX`, and that
+  is not a destructive pattern, so the auto-approved apply took it with no prompt. Ownership is
+  now decided by the name — `<table>_<columns>_ix_<7 hex>` / `_ux_` is Rebase's, everything else
+  is excluded from the diff and never touched. Deleting a declaration still drops that index, on
+  purpose. Never rename a hand-written index to look generated.
 - **Review generated SQL** — always inspect the `.sql` files in `./drizzle/` before applying
 - **Collections directory** — Collection definitions are defined in the `config/collections/` directory.
 

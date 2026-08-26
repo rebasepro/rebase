@@ -71,9 +71,15 @@ Isso já está documentado, em dois lugares em vez de um:
 Três coisas para saber antes de projetar sua solução em torno disso. **O Rebase armazena
 e busca embeddings; ele não os calcula** — não há provedor de embeddings, configuração
 de modelo ou chave de API em nenhum lugar no Rebase, portanto, produzir os vetores é
-tarefa sua. **O pgvector é um pré-requisito que o Rebase não instala para você.** E
-**nenhum índice ANN é criado para uma coluna de vetor**, portanto `vectorSearch` é uma
-varredura exata — excelente para milhares de linhas, não para milhões.
+tarefa sua. **O pgvector é um pré-requisito.** A imagem de banco de dados do scaffold já o
+traz, então um projeto criado com `rebase init` não precisa de nada aqui;
+apontado para um banco provisionado por outra pessoa, você precisa de uma imagem
+que carregue a extensão e de um papel autorizado a executar
+`CREATE EXTENSION vector;` uma vez — o Rebase não instala extensões por você. E
+**cada coluna de vetor ganha um índice HNSW para distância de cosseno**, porque é
+com cosseno que `vectorSearch` mede a menos que você passe `distance` — um índice
+serve exatamente um operador. Ajuste-o, ou desligue-o, na propriedade: veja
+[O índice](/docs/sdk/querying#the-index).
 
 Consultas vetoriais também não aceitam subscrição em tempo real; `.vectorSearch(...).listen()`
 é recusado com `VECTOR_SEARCH_NOT_LIVE`.

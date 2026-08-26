@@ -110,8 +110,10 @@ Lorsque Rebase met à jour le schéma de base de données, il associe les défin
 2. **Restrictions de Schéma (`schemaFilter`)** : La synchronisation de la base de données est limitée exclusivement au schéma `public`. Les tables de base de données internes, les schémas personnalisés et les tables spécifiques aux extensions ne sont pas touchés.
 3. **Protection des Rôles et des Extensions** : Drizzle est configuré pour ne pas gérer les rôles de base de données (`entities.roles: false`) ni les tables d'aide des extensions comme PostGIS.
 4. **Confirmation Interactive en Mode Dev** : Lors de l'exécution de `rebase db push` en développement, la CLI s'exécute avec les indicateurs `--strict` et `--verbose`, ce qui garantit que les développeurs doivent explicitement examiner et approuver toutes les actions SQL destructrices avant qu'elles ne soient exécutées.
+5. **Propriété des Index par le Nom** : Les index sont le seul objet qui vit *sur* une table mappée, le filtrage de tables ne peut donc pas les protéger — et un push planifiait `DROP INDEX` pour tout index absent de l'état souhaité, c'est-à-dire tous ceux écrits à la main. Rebase nomme désormais les index qu'il génère `<table>_<columns>_ix_<7 hex>` (`_ux_` s'ils sont uniques), une forme qu'aucun autre nommage ici ne produit, et exclut tout le reste du diff par le nom. Un index que vous avez écrit à la main, ou arrivé par introspection, n'est jamais touché ; une déclaration que vous supprimez retire toujours son index, ce qui est l'intention. Voir **[Index](/docs/backend/indexes)**.
 
 ## Prochaines Étapes
 
 - **[Collections](/docs/collections)** — Référence complète de la configuration des collections
 - **[Propriétés](/docs/collections/properties)** — Mappages détaillés des types de colonnes
+- **[Index](/docs/backend/indexes)** — Déclarer les index dont vos requêtes ont besoin

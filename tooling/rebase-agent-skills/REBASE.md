@@ -70,7 +70,7 @@ For specific topics, see:
 - `rebase-local-env-setup` — First-time setup only: Node.js, pnpm, PostgreSQL, Docker
 - `rebase-sdk` — The client SDK: CRUD, filtering, live queries, offline / local-first sync
 - `rebase-realtime` — WebSocket engine, broadcast channels, presence
-- `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
+- `rebase-collections` — Collection schemas, properties, relations, indexes, callbacks, entity actions
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies
 - `rebase-security` — Backend security architecture, RLS, API keys, threat model

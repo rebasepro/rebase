@@ -1942,7 +1942,9 @@ export const productsCollection = defineCollection({
 | `properties` | `Properties` | **Required.** Map of property key → property definition. Each key becomes a database column. |
 | `relations` | `Relation[]` | SQL relations — foreign keys, junction tables. See [Relations](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security policies. See [Security Rules](/docs/collections/security-rules). |
-| `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
+| `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
+| `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 #### UI Configuration
 
@@ -1952,7 +1954,8 @@ All of the following go inside `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
-| `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
+| `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |
@@ -2568,9 +2571,21 @@ embedding: {
 | Property | Type | Description |
 |----------|------|-------------|
 | `dimensions` | `number` | **Required.** Length of the vector. Compiles to `VECTOR(n)`. |
+| `index` | `VectorIndexConfig \| false` | How the ANN index is built. Omitted, one HNSW index for cosine distance. `false` creates none. |
+
+An ANN index is created with the column, so `vectorSearch` is approximate and
+fast rather than an exact scan. It is built for **cosine** distance, which is
+what `vectorSearch` measures with unless you pass `distance` — an index serves
+exactly one operator, so an `l2` query against a cosine index quietly goes back
+to scanning. `method` (`hnsw` or `ivfflat`), `distance` (one or several), `m`,
+`efConstruction` and `lists` are all on `index`. Above 2000 dimensions pgvector
+can build neither index type, so the column is left unindexed and the boot says
+so.
 
 Query it with [`.vectorSearch()`](/docs/sdk/querying#vector-search), which also
-covers what pgvector needs to be installed and when to add an index.
+covers what pgvector needs to be installed and how to tune the index. For
+ordinary btree, GIN and BRIN indexes on any collection, see
+[Indexes](/docs/backend/indexes).
 
 ### Binary Properties
 
@@ -7599,6 +7614,280 @@ The `search` block is Postgres-only, and is rejected at boot on other engines
 rather than silently ignored. MongoDB collections keep their regex-based
 matching; Firestore collections use the external text-search controller.
 
+## Indexes
+
+A collection declares the indexes its queries need, in the same file as the
+properties they cover:
+
+```typescript
+
+const posts: PostgresCollectionConfig = {
+    slug: "posts",
+    table: "posts",
+    name: "Blog posts",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        title: { name: "Title", type: "string" },
+        status: { name: "Status", type: "string", enum: { draft: "Draft", published: "Published" } },
+        publish_date: { name: "Publish date", type: "date" }
+    },
+    indexes: [
+        {
+            on: ["status", { prop: "publish_date", direction: "desc" }],
+            reason: "admin list: filter by status, newest first"
+        }
+    ]
+};
+```
+
+Postgres only. On another engine the key is refused at boot rather than
+silently ignored.
+
+### Why this exists
+
+The DDL generator has always emitted index statements for exactly two things,
+and both are structures a *feature* owns rather than queries you wrote: the GIN
+index behind a [`search` block](/docs/backend/search), and the ANN index behind
+a [`vector` property](/docs/sdk/querying#the-index). The plain case — the btree
+behind a `where` clause — had no declaration site at all.
+
+So the only way to have one was to write it by hand. And:
+
+:::caution[If you have hand-written indexes on a Rebase-managed table]
+`rebase db push` is declarative. An index on a managed table that was absent
+from `schema.sql` counted as drift, and Atlas planned `DROP INDEX` for it —
+which is not in the destructive-statement list, so the auto-approved apply took
+it without asking. Every hand-written index on a managed table was living on
+borrowed time.
+
+That is fixed by the ownership rule below: an index Rebase did not create is now
+excluded from the diff by name and never touched. Declaring your hand-written
+indexes is still the better end state — a declared index is created on a fresh
+database and on every tenant, and a hand-written one is not — but nothing drops
+them in the meantime.
+:::
+
+### The shape
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `on` | `(string \| IndexKey)[]` | **Required.** The key columns, in order. 1–5 entries. |
+| `reason` | `string` | **Required.** Why this index exists, in one line. |
+| `using` | `"btree" \| "gin" \| "brin"` | Access method. Defaults to `btree`. |
+| `where` | `IndexPredicate` | Makes the index partial — it covers only the rows matching this. |
+| `unique` | `boolean` | btree only. A composite uniqueness guarantee. |
+| `include` | `string[]` | btree only. Payload columns carried for index-only scans. |
+
+#### `on` takes property keys, never column names
+
+This is the one that bites. A `belongsTo` relation compiles to its resolved
+`localKey`, so the property `author` is the column `author_id`:
+
+```typescript
+// Correct — `author` is the relation property.
+{ on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+```
+
+Writing `author_id` here would work for most properties and quietly index
+nothing for a foreign key, which is the one people reach for. Postgres does not
+index a foreign key column for you — without this index, both "list this
+author's posts" and the `ON DELETE` cascade are sequential scans.
+
+A `hasMany` or many-to-many relation has no column on this table, and is
+refused with the collection that does own the foreign key.
+
+#### Order matters, and only a leading subset is usable
+
+Postgres can use a leading subset of the key columns, so
+`["ownerId", "createdAt"]` serves a query filtering on `ownerId`, and one
+filtering on both, and **never** one filtering on `createdAt` alone.
+
+`direction` and `nulls` earn their place only when a query's `ORDER BY` mixes
+directions. A lone `DESC` index is redundant with its `ASC` twin — Postgres
+scans a btree backwards just as fast — so one index serves the filter *and* the
+sort in the example at the top of this page.
+
+```typescript
+{ on: [{ prop: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }
+```
+
+Writing the Postgres default down explicitly is free: the derived name hashes
+the *effective* order, so adding `direction: "asc"` to a column that was already
+ascending is not a redefinition and rebuilds nothing.
+
+The cap is five keys. Postgres allows thirty-two; past four the trailing columns
+are dead weight on every write, and the declaration is usually someone hoping a
+query gets faster by accretion. Payload columns that are not searched belong in
+`include`, which does not count against the cap.
+
+#### `where` is structured, not SQL
+
+```typescript
+{
+    on: ["publish_date"],
+    where: { prop: "status", op: "=", value: "published" },
+    reason: "public feed: published posts by date"
+}
+```
+
+The index then holds only published rows, and stays small as drafts accumulate.
+
+Operators are `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` and
+`is not null`, combined with `and`:
+
+```typescript
+{
+    on: ["assignee"],
+    where: {
+        and: [
+            { prop: "status", op: "in", value: ["open", "in_progress"] },
+            { prop: "archived_at", op: "is null" }
+        ]
+    },
+    reason: "the open-work queue, which is a fraction of the table"
+}
+```
+
+There is deliberately no `or`. An OR predicate almost always means the index
+should not be partial at all; if you genuinely need one, declare two indexes.
+
+A predicate is structure rather than a string because a string could not be
+checked against the collection's properties, could not be fingerprinted without
+putting its own text into the index name — so reformatting it would rename a
+live index — and would be the one place a caller reaches for an extension
+operator class that the planner cannot replay.
+
+#### `unique` is for composites only
+
+Single-column uniqueness is `validation.unique` on the property, and declaring
+it here as well is refused rather than accepted as a synonym.
+`validation.unique` compiles to an inline `UNIQUE` whose backing index
+Postgres — not Rebase — names `<table>_<column>_key`.
+
+```typescript
+{ on: ["tenantId", "slug"], unique: true, reason: "one slug per tenant" }
+```
+
+#### `include` buys an index-only scan
+
+Payload columns live in the leaf pages: not searchable, not ordered, and they
+save a heap fetch at the cost of a fatter index. They may not overlap `on`.
+
+```typescript
+{ on: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }
+```
+
+#### `using`
+
+`btree` (the default) answers equality, range, `ORDER BY` and uniqueness.
+
+`gin` is containment over an `array` property or a JSONB `map`. `brin` is for a
+naturally-ordered column on an append-only table — tiny, and useless the moment
+rows start arriving out of order. Neither has an ordering, so `direction` and
+`nulls` are unrepresentable on them rather than refused later by Postgres.
+
+There is no `gist` and no `hash`: every interesting gist operator class ships in
+an extension, and hash indexes cannot be unique, composite, or ordered. That
+restriction is what keeps the whole model on the Atlas path — `rebase db push`
+materialises the desired state in a bare scratch database to plan against, and
+`CREATE EXTENSION` cannot go in that file. **Trigram search is
+[`search:`](/docs/backend/search); ANN is a
+[`vector` property](/docs/sdk/querying#the-index).** An index needing
+`gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
+emitted to fail later against a database you have never seen.
+
+#### `reason` is required
+
+It is the only required field with no SQL behind it.
+
+An index is the only thing a Rebase config can declare that costs money forever
+and whose benefit is invisible from the config. The reason is what gets printed
+beside "0 scans in 34 days, 412 MB", which is the one moment anybody is in a
+position to decide whether to delete it. Without it nobody can decide, so nobody
+does, and the table accretes indexes for the life of the product.
+
+It is deliberately **not** part of the index's identity — rewording a
+justification never rebuilds an index.
+
+### What a declaration is called
+
+`<table>_<columns>_ix_<7 hex>`, or `_ux_` when unique. For example
+`posts_status_publish_date_ix_a91c3f4`.
+
+The hash is over the index's *semantics* — method, columns, order, uniqueness,
+included columns, predicate — and not over its rendered SQL, so a change to how
+Rebase formats DDL never renames anything in your database.
+
+The hash is load-bearing. `CREATE INDEX IF NOT EXISTS` matches on the **name**,
+not the definition: with a readable name, changing a declaration would keep the
+old index and report success forever. With the hash in the name, a redefinition
+is a different object, so it is created and the old one dropped.
+
+Two consequences worth stating:
+
+- **Changing a declaration is a DROP and a CREATE**, emitted bare — no
+  `CONCURRENTLY`, and a window with no index in between. Fine on a development
+  database; on a large live table, apply it at a time you choose.
+- The name is [a frozen derived name](/docs/architecture/schema-as-code). It is
+  in `contracts/derived-names.txt` and cannot change across releases.
+
+### Who owns an index
+
+`_ix_`/`_ux_` plus seven hex is unreachable by every other namer here — `_fkey`,
+`_gin`, `_trgm`, `_pkey`, `_key`, the vector distances, auth's `idx_` prefix. So
+the name alone decides ownership:
+
+| The index | In the plan? | Named by Rebase? | What happens |
+|---|---|---|---|
+| declared | yes | yes | created, then kept |
+| declaration deleted | no | yes | **dropped**, as intended |
+| hand-written, or from introspection | no | no | **excluded — never touched** |
+
+Neither case needs a prompt. Deleting a declaration *should* remove the index
+quietly; what must never be dropped is one Rebase did not create. This is also
+what makes the introspection round trip safe: the existing indexes of a database
+you pointed Rebase at are foreign until somebody declares them.
+
+### When they are created
+
+Both producers emit them, which matters because not every deployment runs
+`db push`:
+
+- **`rebase db push` / `rebase db generate`** put them in `schema.sql`, on the
+  ordinary Atlas path — so they get migrations, drift detection and rollback
+  like every other object.
+- **Boot-time schema ensure** creates them with
+  `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
+  indexes beside it. A managed-runtime tenant provisions at boot and never runs
+  `db push`; without this it would start with none of its declared indexes and
+  nothing would say so.
+
+### What is refused, and when
+
+All of these throw at build time, naming the collection and the position in the
+array — an index that silently does not exist is the failure this whole feature
+removes:
+
+- a property that is not on the collection, or a relation whose foreign key
+  lives on the other table
+- more than five keys in `on`, or the same column twice
+- exactly the primary key columns — `<table>_pkey` already indexes those
+- a column in both `on` and `include`
+- `unique` on one column whose property already declares `validation.unique`
+- `direction` or `nulls` under `gin` or `brin`
+- an `in` list that repeats a value
+- two declarations that derive the same name — they are the same index, twice
+- an empty or missing `reason`
+
+### Related
+
+- [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
+  index over a generated `tsvector`
+- [Vector search](/docs/sdk/querying#vector-search) — the ANN index over an
+  embedding column, configured on the property
+- [Schema as code](/docs/architecture/schema-as-code) — how declarations reach
+  the database, and what a derived name is
+
 ## Cron Jobs
 
 ### Overview
@@ -10270,14 +10559,19 @@ const productsCollection = defineCollection({
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        sortOrder: { name: "Order", type: "number" }
+        // The order key. A *string*, never a number — see "Ordering" below.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     name: "Products",
     table: "products",
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "sortOrder",         // Property for drag-and-drop ordering
+        orderProperty: "__order",           // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -10342,11 +10636,15 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Sort Order" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
-        orderProperty: "sortOrder",
+        orderProperty: "__order",
         kanban: {
             columnProperty: "status"
         }
@@ -10356,6 +10654,72 @@ const tasksCollection = defineCollection({
 ```
 
 Drag-and-drop between columns automatically updates the enum field and sort order.
+
+#### Ordering
+
+`kanban` and `orderProperty` are two halves of one feature. Declare both, every
+time — three mistakes here all produce a board that looks configured and is not.
+
+**`orderProperty` is not optional.** Without it a card still drags between
+columns, because that writes `columnProperty`. Its position *within* a column
+has nowhere to be stored, so it resets on the next read, and the board renders an
+amber bar telling you ordering is not configured.
+
+**The property must be a `string`.** Reordering writes a
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing) key —
+`"i0"`, `"i1"`, `"i0i"` — not an index. A `number` property can never hold one,
+so a numeric `sortOrder` leaves the board asking to be initialised forever, and
+the initialisation itself fails against a numeric column. Declare it hidden; it
+is machinery, not content:
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Rows created outside the admin arrive without a key.** Nothing assigns one on
+insert. A row written by a cron, a seed script, a migration or the REST API lands
+with `__order` null, and the board shows *"Some items don't have order values"*
+with an **Initialize** button — one click backfills the first page, and the next
+cron run brings the bar straight back. If a backend creates rows for a board, it
+should append the key itself. Use the same alphabet the admin uses:
+
+```typescript
+
+// Base36, lower case. Postgres does the sorting and its default collation is
+// not byte ordering, so the library's default base62 alphabet — which mixes
+// cases — sorts differently in the database than in the key. Omitting this
+// third argument produces keys like "a0" that the board rejects.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST, so without it this reads back one of the very rows that
+// has no key and every insert lands on the same "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
+});
+```
+
+Rows created through the admin form arrive unkeyed too — the difference is only
+that you see the bar the moment you add one. **Initialize** is the fix there; on
+a board fed by a backend it is a fix that undoes itself every run.
 
 ### Cards View
 
@@ -13923,9 +14287,14 @@ It is already documented, in two places rather than one:
 Three things to know before designing around it. **Rebase stores and searches
 embeddings; it does not compute them** — there is no embedding provider, model
 setting or API key anywhere in Rebase, so producing the vectors is your job.
-**pgvector is a prerequisite Rebase does not install for you.** And **no ANN
-index is created for a vector column**, so `vectorSearch` is an exact scan —
-fine for thousands of rows, not for millions.
+**pgvector is a prerequisite.** The scaffold's database image ships it, so a
+project created by `rebase init` needs nothing here; pointed at a database
+someone else provisioned, you need an image carrying the extension and a role
+allowed to run `CREATE EXTENSION vector;` once — Rebase does not install
+extensions on your behalf. And **every vector column gets an HNSW index for
+cosine distance**, because cosine is what `vectorSearch` measures with unless
+you pass `distance` — an index serves exactly one operator. Tune it, or turn it
+off, on the property: see [The index](/docs/sdk/querying#the-index).
 
 Vector queries also cannot be subscribed to; `.vectorSearch(...).listen()` is
 refused with `VECTOR_SEARCH_NOT_LIVE`.
@@ -15771,11 +16140,13 @@ When Rebase updates the database schema, it maps TypeScript collection definitio
 2. **Schema Restrictions (`schemaFilter`)**: The DB sync is restricted exclusively to the `public` schema. Internal database tables, custom schemas, and extension-specific tables are left untouched.
 3. **Roles and Extension Protection**: Drizzle is configured not to manage database roles (`entities.roles: false`) or helper tables from extensions like PostGIS.
 4. **Interactive Dev Mode Confirmation**: When running `rebase db push` in development, the CLI executes with `--strict` and `--verbose` flags, which ensures that developers must explicitly review and approve any destructive SQL actions before they are executed.
+5. **Index Ownership by Name**: Indexes are the one object that lives *on* a mapped table, so table filtering cannot protect them — and a push used to plan `DROP INDEX` for any index missing from the desired state, which meant every hand-written one. Rebase now names the indexes it generates `<table>_<columns>_ix_<7 hex>` (`_ux_` when unique), a shape no other namer here produces, and excludes everything else from the diff by name. An index you wrote by hand, or that came in through introspection, is never touched; a declaration you delete still drops, which is the intent. See **[Indexes](/docs/backend/indexes)**.
 
 ### Next Steps
 
 - **[Collections](/docs/collections)** — Full collection configuration reference
 - **[Properties](/docs/collections/properties)** — Detailed column type mappings
+- **[Indexes](/docs/backend/indexes)** — Declaring the indexes your queries need
 
 ## Runtime and Bundles
 

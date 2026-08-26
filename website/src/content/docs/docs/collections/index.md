@@ -261,7 +261,7 @@ export const productsCollection = defineCollection({
 | `securityRules` | `SecurityRule[]` | Row Level Security policies. See [Security Rules](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
-| `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
+| `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 ### UI Configuration
 

@@ -99,6 +99,7 @@ export default defineConfig({
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Search", slug: "docs/backend/search" },
+                        { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
