@@ -94,6 +94,7 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     "idempotency_keys",
     "entity_history",
     "branches",
+    "metric_samples",
     // realtime channels — authorization for these lives in the channel rules the
     // server evaluates before it reads or writes, never in a row policy
     "channel_messages",

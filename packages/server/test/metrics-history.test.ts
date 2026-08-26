@@ -254,3 +254,45 @@ describe("metrics history — the declared list and the written one", () => {
         expect(samples.find(s => s.series === "event_loop_delay_ms")?.value).toBe(12.25);
     });
 });
+
+describe("metrics history — the end-user role cannot address it", () => {
+    it("revokes rebase_user at creation", async () => {
+        // The driver grants `rebase_user` full DML across a project's schemas,
+        // plus ALTER DEFAULT PRIVILEGES so tables created later inherit it — and
+        // this one is created later, at boot. Without the revoke an
+        // authenticated request could read and write another deployment's
+        // process metrics. `pnpm rls:check` called it `[critical] rls-disabled`
+        // the first time CI saw the table, which is exactly what that gate is
+        // for.
+        const { exec, calls } = fakeExec();
+        await ensureMetricsHistory(exec);
+        const revoke = calls.find(c => c.sql.includes("REVOKE ALL"));
+        expect(revoke).toBeDefined();
+        expect(revoke!.sql).toContain('"rebase"."metric_samples"');
+        expect(revoke!.sql).toContain("rebase_user");
+    });
+
+    it("is listed for the boot-time sweep, not only revoked at creation", async () => {
+        // The creation-time revoke fires once, on the boot that first makes the
+        // table, so it cannot repair a database provisioned before the revoke
+        // existed. `REBASE_INTERNAL_TABLES` is what the sweep in `ensureAppRole`
+        // iterates — a table revoked at creation but missing from that list is
+        // permanently stranded on every older database. That already happened
+        // once, to `jobs`.
+        const { REBASE_INTERNAL_TABLES } = await import("@rebasepro/common");
+        expect(REBASE_INTERNAL_TABLES).toContain("metric_samples");
+    });
+
+    it("revokes before it writes anything", async () => {
+        // Order matters on a database where the table already exists with the
+        // inherited grant: the revoke has to land before this boot's first
+        // sample, or there is a window where the row is both present and
+        // readable by the app's role.
+        const { exec, calls } = fakeExec();
+        await ensureMetricsHistory(exec);
+        const revokeAt = calls.findIndex(c => c.sql.includes("REVOKE ALL"));
+        const deleteAt = calls.findIndex(c => c.sql.includes("DELETE"));
+        expect(revokeAt).toBeGreaterThanOrEqual(0);
+        expect(revokeAt).toBeLessThan(deleteAt);
+    });
+});

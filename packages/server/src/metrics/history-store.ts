@@ -30,6 +30,8 @@
  * The bootstrapper's own `SqlExec` takes an options object; each store wraps it
  * once and reads better for it. Same two shapes, same reason, as `job-store`.
  */
+import { revokeInternalTableSql } from "@rebasepro/common";
+
 export type Exec = (sql: string, params?: unknown[]) => Promise<unknown>;
 
 /** Where the samples live. Framework-owned, like `rebase.jobs`. */
@@ -119,6 +121,23 @@ export async function ensureMetricsHistory(exec: Exec): Promise<void> {
         CREATE INDEX IF NOT EXISTS metric_samples_series_recent
             ON ${METRICS_HISTORY_TABLE} (series, at DESC)
     `, []);
+
+    // Framework-internal, so the end-user role must not be able to address it.
+    //
+    // The driver grants `rebase_user` full DML across the schemas a project
+    // uses, plus `ALTER DEFAULT PRIVILEGES` so tables created later inherit it —
+    // and this one is created later, at boot. Without the revoke, an
+    // authenticated request could read and write another deployment's process
+    // metrics, and `pnpm rls:check` correctly called that `[critical]
+    // rls-disabled` the first time CI saw the table.
+    //
+    // REVOKE rather than `ENABLE ROW LEVEL SECURITY`, matching every other table
+    // in `REBASE_INTERNAL_TABLES`: RLS with no policy denies the same rows but
+    // is the weaker statement, because the grant survives and a later policy
+    // reopens it. There is no row here any end user should reach, so "this role
+    // has no privilege at all" is the honest encoding. The owner connection the
+    // recorder runs on is unaffected.
+    await exec(revokeInternalTableSql("rebase", "metric_samples"), []);
 
     // Swept here rather than by a cron, so a deployment that runs no scheduler
     // still stays bounded. A DELETE is the right tool at this size — a few
