@@ -219,7 +219,7 @@ interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
-interface ConfigProblem { message, path, severity }
+interface ConfigProblem { kind, message, path, severity }
 interface ContractRoutesConfig { collectionRegistry, runtimeVersion, schemaVersion }
 interface CountOptions { databaseId, filter, logical, searchString }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
