@@ -4,6 +4,33 @@ locals {
   uses_bundle_url = var.bundle_url != null
   runtime_image   = coalesce(var.image, "rebasepro/server:${var.runtime_version}")
 
+  # Can the pinned runtime fetch its own bundle?
+  #
+  # `bundle_url` sets REBASE_BUNDLE_URL and nothing else: there is no fetch step
+  # in this module, by design, because the runtime is supposed to do it. That
+  # capability landed after 0.16.0. At or below it the entrypoint looks only for
+  # a bundle already on disk and exits with `No bundle found at /bundle.` before
+  # the server is imported — so `terraform apply` succeeds, reports a healthy
+  # plan, and leaves a container restart-looping behind Caddy serving 502s.
+  #
+  # `latest` is not a pass. On Docker Hub it and `0.16.0` are the same digest
+  # today, so the default value of `runtime_version` is precisely the broken
+  # case; an unparseable tag is treated as unable, which is the safe direction.
+  runtime_parts = try([for p in split(".", split("-", var.runtime_version)[0]) : tonumber(p)], [])
+  # The whole comparison sits inside `try(..., false)`, and that is load-bearing
+  # rather than defensive style. Terraform does NOT short-circuit `&&`: guarding
+  # with `length(parts) == 3 && parts[0] > 0` still evaluates the index, and
+  # indexing an empty list yields UNKNOWN rather than an error. A precondition
+  # whose condition is unknown does not fail — it DEFERS. So the guarded form let
+  # `latest` through, which is both the default value and the one broken case
+  # this exists to catch. Anything unparseable now falls to false, which refuses.
+  runtime_can_fetch_bundle = try(
+    local.runtime_parts[0] > 0 ||
+    (local.runtime_parts[0] == 0 && local.runtime_parts[1] > 16) ||
+    (local.runtime_parts[0] == 0 && local.runtime_parts[1] == 16 && local.runtime_parts[2] > 0),
+    false
+  )
+
   jwt_secret        = coalesce(var.jwt_secret, random_password.jwt.result)
   service_key       = coalesce(var.service_key, random_password.service_key.result)
   postgres_password = coalesce(var.postgres_password, random_password.postgres.result)
@@ -401,6 +428,26 @@ resource "hcloud_server" "this" {
         use. `image` runs an image with the bundle already baked in. Setting
         both is ambiguous; setting neither leaves the runtime with no project to
         serve, and it will refuse to boot rather than serve an empty schema.
+      EOT
+    }
+
+    precondition {
+      condition     = var.bundle_url == null || var.image != null || local.runtime_can_fetch_bundle
+      error_message = <<-EOT
+        `bundle_url` needs a runtime that fetches its own bundle, and
+        `rebasepro/server:${var.runtime_version}` cannot.
+
+        This module sets REBASE_BUNDLE_URL and relies on the runtime to download
+        the tarball at boot. That landed after 0.16.0. At or below it the
+        entrypoint looks only for a bundle already on disk and exits with
+        `No bundle found at /bundle.` — so this apply would succeed and leave a
+        container restart-looping behind a proxy serving 502s.
+
+        `latest` is the same digest as `0.16.0` on Docker Hub today, so the
+        default is the broken case rather than a way around it.
+
+        Pin `runtime_version` to a release above 0.16.0, or bake the bundle into
+        an image and pass `image` instead.
       EOT
     }
 
