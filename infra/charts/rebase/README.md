@@ -23,7 +23,7 @@ backups and your failover, which is a much larger promise than "run the app".
 | `bundle.mode` | How | When |
 |---|---|---|
 | `image` (default) | You build `FROM rebasepro/server` with `COPY dist-bundle /bundle` and set `image.repository` | Almost always. One artifact, immutable, no runtime dependency on a URL staying up |
-| `url` | Stock image; the runtime downloads a tarball at every pod start | A control plane that ships bundles out of band |
+| `url` | Stock image; the runtime downloads a tarball at every pod start. **Needs a runtime above 0.16.0** — the chart refuses older ones, which cannot fetch. | A control plane that ships bundles out of band |
 
 ## One process, or several
 
@@ -192,6 +192,13 @@ unaffected; those go through Postgres CDC.
 ## Status
 
 Rendered and linted against Helm v4, and every refusal above is verified to
-fire. **It has not yet been applied to a live cluster** — in particular the
-`rebasepro/server` image it references is not published to a public registry at
-the time of writing, so `bundle.mode=url` cannot be exercised end to end.
+fire.
+
+`rebasepro/server` **is** published now, which makes the older caveat here
+misleading rather than merely stale: it said url mode could not be exercised
+because the image was unavailable, and a reader took that as the only obstacle.
+The real one was that no released runtime could fetch a bundle from a URL, and
+this chart never had an init container to fetch one for it — so `bundle.mode=url`
+rendered happily and every pod exited with `No bundle found at /bundle.`. The
+chart refuses that combination now, naming the value to change. Use
+`bundle.mode=image` on 0.16.0 and below.

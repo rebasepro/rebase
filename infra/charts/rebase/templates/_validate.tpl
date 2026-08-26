@@ -33,6 +33,27 @@ failed `helm install` and has one screen to work from.
 {{- if and (eq .Values.bundle.mode "url") (not .Values.bundle.url) }}
   {{- fail "bundle.mode=url needs bundle.url. With no bundle the runtime has no project to serve." }}
 {{- end }}
+{{/*
+  `url` mode is served by the runtime fetching its own bundle at boot. That
+  capability landed after 0.16.0, and the stock image at or below it looks only
+  for a bundle already on disk: it exits with `No bundle found at /bundle.`
+  before @rebasepro/server is imported, so every workload in the release
+  crashloops — or, with the migration Job enabled, `helm install` aborts at the
+  pre-install hook.
+
+  The chart had no init container to fetch one either (`git log -S initContainers`
+  over this directory is empty), so this mode has never worked in a published
+  chart while values.yaml, the README's mode table and the `mode=image` refusal
+  below all recommended it. Refusing is the whole fix: there is nothing to
+  repair at runtime, and an operator reading a failed `helm install` has one
+  screen to work from, so the message names the value to change.
+*/}}
+{{- if eq .Values.bundle.mode "url" }}
+  {{- $tag := default .Chart.AppVersion .Values.image.tag }}
+  {{- if and (eq .Values.image.repository "rebasepro/server") (semverCompare "<=0.16.0" $tag) }}
+    {{- fail (printf "bundle.mode=url needs a runtime that fetches its own bundle, and rebasepro/server:%s cannot — it looks only for a bundle already on disk and exits with `No bundle found at /bundle.`. Pin image.tag to a release above 0.16.0, or use bundle.mode=image with a bundle baked into your own image." $tag) }}
+  {{- end }}
+{{- end }}
 {{- if and (eq .Values.bundle.mode "image") (eq .Values.image.repository "rebasepro/server") }}
   {{- fail "bundle.mode=image means the bundle is baked into image.repository, but that is still the stock runtime image (rebasepro/server), which contains no project. Build one FROM rebasepro/server with `COPY dist-bundle /bundle` and set image.repository to it — or use bundle.mode=url." }}
 {{- end }}

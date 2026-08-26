@@ -478,6 +478,15 @@ const REFUSAL_CASES = [
     ["no service key", ["--set", "config.serviceKey="]],
     ["bundle mode nonsense", ["--set", "bundle.mode=magnet"]],
     ["bundle url mode with no url", ["--set", "bundle.mode=url", "--set", "bundle.url="]],
+    // url mode on a runtime that cannot fetch. The capability landed after
+    // 0.16.0; the chart never had an init container to fetch a bundle either, so
+    // this combination rendered happily and every pod exited with `No bundle
+    // found at /bundle.` — while values.yaml, the README's mode table and the
+    // `mode=image` refusal all pointed operators at it.
+    ["url mode on a runtime that cannot fetch", [
+        "--set", "bundle.mode=url", "--set", "bundle.url=https://example.com/b.tgz",
+        "--set", "image.repository=rebasepro/server", "--set", "image.tag=0.16.0"
+    ]],
     ["stock image with mode=image", ["--set", "image.repository=rebasepro/server"]],
     ["units enabled without a split", ["--set", "functions.enabled=true"]],
     ["only and exclude together", [
