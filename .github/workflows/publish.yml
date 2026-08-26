@@ -654,6 +654,52 @@ jobs:
           fi
           echo "$FLEET_IMAGE:$FLEET_TAG → $DIGEST"
 
+      # ── Tell the cloud the image exists ─────────────────────
+      #
+      # Pushing an image changes nothing about Rebase Cloud. The fleet schedules
+      # onto rows in `runtime_releases`, and until a row exists a published image
+      # is invisible to every project — which is how 0.14.0, 0.14.1 and 0.15.0
+      # were all published while the managed fleet ran 0.13.0 for three weeks.
+      # Writing that row was a human typing two commands afterwards.
+      #
+      # This does NOT send the release; it asks the control plane to look. The
+      # `release-intake` cron reconciles Artifact Registry against
+      # `runtime_releases` on its own every 15 minutes, and this trigger only
+      # collapses that latency to zero. So the request carries no body, cannot
+      # register anything the control plane would not have registered by itself,
+      # and its worst case is one wasted registry read.
+      #
+      # Registering is not rolling: existing projects stay where they are until
+      # someone runs `release:runtime --roll`. This makes the release VISIBLE.
+      - name: Ask the control plane to pick up the new image
+        if: ${{ !inputs.dry_run }}
+        continue-on-error: true
+        env:
+          CP_URL: ${{ vars.REBASE_CONTROL_PLANE_URL || 'https://api.rebase.pro' }}
+          CP_KEY: ${{ secrets.REBASE_CONTROL_PLANE_ADMIN_KEY }}
+        run: |
+          set -uo pipefail
+          if [ -z "${CP_KEY:-}" ]; then
+            echo "::warning::REBASE_CONTROL_PLANE_ADMIN_KEY is not set — skipping the intake trigger."
+            echo "The release-intake cron will pick this image up within 15 minutes on its own."
+            echo "To make it immediate:  gh secret set REBASE_CONTROL_PLANE_ADMIN_KEY -R ${{ github.repository }}"
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/intake.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $CP_KEY" \
+            --max-time 60 \
+            "$CP_URL/api/cron/release-intake/trigger" || echo "000")
+          echo "control plane answered $code"
+          head -c 600 /tmp/intake.json 2>/dev/null || true
+          echo
+          # Deliberately not a release-blocking failure. The image is pushed and
+          # verified; the cron closes this within 15 minutes regardless, so
+          # failing the release over a trigger would trade a real artifact for a
+          # latency improvement.
+          if [ "$code" != "200" ]; then
+            echo "::warning::Intake trigger did not succeed ($code). The release-intake cron will still register this image."
+          fi
+
       # ── Helm chart ──────────────────────────────────────────
       #
       # The chart is the Kubernetes half of the same promise the image makes, and
