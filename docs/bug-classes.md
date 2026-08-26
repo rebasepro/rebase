@@ -976,6 +976,18 @@ caller. The filter belongs at the exported boundary, not in the caller: these
 functions have four callers each (generate, push, boot, doctor) and a rule
 applied in three of them is a rule that does not exist.
 
+**Second instance (2026-08-26), `rollbackDeployment`.** It restores a tenant by
+finding the newest ReplicaSet whose pod template differs from the current one —
+out of `listNamespacedReplicaSet({ namespace })`, every ReplicaSet in the
+namespace. A split tenant runs three Deployments in one namespace, their
+templates always differ, and the newest belongs to whichever unit deployed last.
+So rolling back the api unit would have restated the *worker's* pod template onto
+it: the API replaced by a process that serves no HTTP, by the operation whose
+whole purpose is restoring a working state. Same question as the sweep above —
+what subset of this list am I entitled to — with the same answer: filter at the
+read, on `ownerReferences`. It had never fired only because rollback and split
+tenants have not met in production.
+
 **Watch for:** the include list. Most of the outputs here were inert — an empty
 table nobody writes to. The exclude list `db push` builds is the inverse of the
 include list, so a name wrongly *included* is a name Atlas is allowed to **drop**:
@@ -2926,6 +2938,7 @@ flipped.
 | `saas/backend/src/k8s/baseline.ts` — `waitForDeployments` | clean by construction: installs cluster components that did not exist before, so there is no previous version whose readiness could be borrowed |
 | `saas/backend/src/k8s/baseline.ts` — `applyClusterIssuers` | clean: retries an *action* until it stops throwing, rather than reading a state that might be stale |
 | `saas/backend/src/managed/tenant-live-stream.ts`, `saas/backend/functions/metrics.ts` | clean, and the distinction worth keeping: both read `readyReplicas` to **show** a number in the console. The same counter is correct as a report and wrong as a verdict |
+| `saas/backend/functions/deploy.ts` — which Deployment the deploy waits on | **BUG, one level up.** The wait takes a single Deployment name and the deploy used the default, so a split tenant had its functions and worker units unobserved: a worker crash-looping still deployed "successfully", surfacing days later as jobs not running |
 
 **Gated by** `saas/backend/src/k8s/rollout-counter-guard.test.ts`: a file that
 reads a summed counter must read a per-template one too, or be named as
