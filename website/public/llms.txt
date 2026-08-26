@@ -17179,113 +17179,158 @@ Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set 
 
 ## Deploying Rebase on Hetzner Cloud
 
-Hetzner Cloud is widely recognized for offering incredible performance-to-price ratios and is a top choice for projects requiring strict European data sovereignty and GDPR compliance (with datacenters in Nuremberg, Falkenstein, and Helsinki).
+Hetzner Cloud offers an unusually good performance-to-price ratio and is a strong choice for projects that need European data sovereignty, with datacenters in Nuremberg, Falkenstein and Helsinki.
 
-Deploying Rebase on Hetzner is easiest via Docker Compose on a standard Ubuntu cloud instance.
+Nothing here is Hetzner-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and on a Hetzner box. Moving between them is a change of infrastructure, not of application.
 
-### 1. Provision a Server
+### The quickest path: Terraform
 
-1. Log into your Hetzner Cloud Console.
-2. Click **Add Server**.
-3. Choose your preferred Location (e.g., **Falkenstein** or **Nuremberg**).
-4. Choose an Image: Select **Ubuntu 24.04** or **App -> Docker CE** (this pre-installs Docker for you).
-5. Choose a Type: A `CPX21` (3 cores, 4GB RAM) or `CX32` (4 cores, 8GB RAM) provides excellent baseline compute for running Rebase + Postgres.
-6. Add your SSH key and hit **Create**.
+The `terraform-hcloud-rebase` module provisions the server, a firewall, a stable IP and — the part that matters — a volume that holds Postgres data, so replacing the host does not destroy the database.
 
-### 2. SSH and Setup
+```hcl
+module "rebase" {
+  source = "rebasepro/rebase/hcloud"
 
-Once your server is provisioned, grab the public IP address.
+  domain          = "api.example.com"
+  cors_origins    = ["https://app.example.com"]
+  ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
 
-```bash
-ssh root@<your-server-ip>
-```
+  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
 
-If you didn't choose the Docker image, install Docker and Docker Compose explicitly:
-
-```bash
-apt update && apt install docker.io docker-compose-v2 -y
-```
-
-### 3. Clone and Configure Rebase
-
-Clone your Rebase project directly onto the server instance. 
-
-```bash
-git clone https://github.com/your-username/your-rebase-repo.git /opt/rebase
-cd /opt/rebase
-```
-
-Rebase provides a `docker-compose.yml` out of the box. You'll need to define your production environment variables. Create a `.env.production` file:
-
-```bash
-nano .env.production
-```
-
-Add your secrets:
-
-```env
-DATABASE_URL=postgresql://rebase_app:your_secure_db_password@postgres:5432/rebase
-JWT_SECRET=generate_a_very_long_secure_random_string_here
-REBASE_SERVICE_KEY=generate_another_very_long_secure_random_string
-NODE_ENV=production
-CORS_ORIGINS=https://admin.yourdomain.com
-FRONTEND_URL=https://admin.yourdomain.com
-ALLOW_REGISTRATION=false
-```
-
-*Be sure to update `docker-compose.yml` if you want to pull the Postgres password from an environment variable.*
-
-### 4. Run the Stack
-
-Bring the stack online using detached mode:
-
-```bash
-docker compose --env-file .env.production up -d --build
-```
-
-Docker will build your Node.js backend from the local `Dockerfile` and spin up the Postgres container. Once completed, your app will be running on `http://localhost:3001` (internal to the server).
-
-### 5. Expose via Caddy or Nginx
-
-You should never expose port 3001 directly to the internet without SSL. We recommend placing **Caddy** in front of your Rebase instance to automatically provision Let's Encrypt certificates.
-
-Install Caddy:
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-Edit your Caddyfile:
-```bash
-nano /etc/caddy/Caddyfile
-```
-
-Add the following (replace with your domain, which should have its A-Record pointing to this Hetzner IP):
-
-```caddyfile
-admin.yourdomain.com {
-    reverse_proxy localhost:3001
+  s3_bucket            = "example-uploads"
+  s3_access_key_id     = var.s3_access_key_id
+  s3_secret_access_key = var.s3_secret_access_key
 }
 ```
 
-Restart Caddy:
+One thing to get right before the first apply: the A record for `domain` must already point at the server, or Caddy's Let's Encrypt challenge fails. The address is created independently of the server, so you can get it first with `terraform apply -target=hcloud_primary_ip.ipv4`, set DNS, then apply properly.
+
+The rest of this page is the same deployment by hand.
+
+### 1. Provision a server
+
+1. In the Hetzner Cloud Console, click **Add Server**.
+2. Choose a **Location** — Falkenstein, Nuremberg or Helsinki for EU data residency.
+3. Choose an **Image**: Ubuntu 24.04.
+4. Choose a **Type**: `CPX21` (3 vCPU / 4GB) is a workable floor, `CX32` (4 vCPU / 8GB) is comfortable for the runtime plus Postgres.
+5. Add a **Volume** for the database. Data on the server's own disk dies with the server.
+6. Add your SSH key and create it.
+
+### 2. Install Docker
+
 ```bash
-systemctl restart caddy
+ssh root@<your-server-ip>
+apt update && apt install -y docker.io docker-compose-v2
 ```
 
-That's it! Your Rebase platform is securely hosted entirely within the EU.
+### 3. Get your bundle onto the server
 
-### 6. Create the Database Schema
-
-The stack is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error. From your project checkout on the server (with dependencies installed), point `DATABASE_URL` at the Postgres container and push the schema:
+There is no application image to build. `rebase build` produces a `dist-bundle` directory, and the published runtime image runs it:
 
 ```bash
-pnpm run db:push
+rebase build
+rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 ```
 
-For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead. On startup the server logs a boxed warning naming exactly which tables are missing and the command to run.
+For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
+
+- **Bake it into an image** — `FROM rebasepro/server:0.16.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
+
+### 4. Configure and run
+
+Rebase ships a Compose file for exactly this: [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml). It is the canonical self-hosting recipe — Postgres and the runtime, with your bundle mounted in — and it is worth reading rather than copying, because its comments explain each choice.
+
+Create the environment it expects:
+
+```env
+POSTGRES_PASSWORD=a_long_random_string
+JWT_SECRET=another_long_random_string_at_least_32_chars
+REBASE_SERVICE_KEY=a_third_long_random_string_at_least_32_chars
+CORS_ORIGINS=https://app.yourdomain.com
+```
+
+Then bring it up:
+
+```bash
+docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
+```
+
+The runtime listens on port 8080 inside the Compose network.
+
+`REBASE_SERVICE_KEY` bypasses row-level security. Treat it as a database superuser credential, not as an API key.
+
+### 5. Terminate TLS with Caddy
+
+Never expose the runtime directly. Caddy provisions Let's Encrypt certificates automatically; running it as another Compose service keeps the whole stack in one file:
+
+```yaml
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+```
+
+With a `Caddyfile` of:
+
+```caddyfile
+api.yourdomain.com {
+    reverse_proxy api:8080
+}
+```
+
+Point that domain's A record at the server before starting Caddy, or the certificate request fails.
+
+### Storage is not optional
+
+The runtime **refuses to start in production** with local storage configured, because the container filesystem is destroyed on every restart and a local backend in production is silent data loss.
+
+Hetzner Object Storage is S3-compatible and sits in the same datacenters, so it is the natural pairing:
+
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=my-uploads
+S3_ENDPOINT=https://fsn1.your-objectstorage.com
+S3_REGION=fsn1
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+```
+
+If your project stores no uploads at all, set `FORCE_LOCAL_STORAGE=true` to acknowledge that explicitly. See [Storage](/docs/backend/storage) for the full picture.
+
+### What boot does to your schema
+
+With `REBASE_MIGRATE_ON_BOOT` at its default of `ensure`, the runtime provisions your collection tables **and their row-level security policies** at boot, additively. A first start against an empty database comes up serving them — there is no schema step to run before the deployment works.
+
+What boot deliberately never does is anything destructive: it does not alter a column type, drop a column, or edit an existing enum label. A container restart must not be able to reshape a schema as a side effect.
+
+Two things therefore still need [`rebase db push`](/docs/architecture/schema-as-code), run from a checkout or CI where the destructive-change gate and a backup are in reach:
+
+- junction-table RLS for many-to-many relations;
+- any change that is not purely additive.
+
+If the module or Compose file bound Postgres to loopback — both do — reach it through an SSH tunnel:
+
+```bash
+ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>
+```
+
+A database port open to the internet is how a Rebase deployment gets its rows read around row-level security rather than through it.
+
+### Upgrading
+
+Change the image tag and restart. Your bundle is untouched, and every project on that runtime picks up the new engine.
+
+The exception is the Postgres major version: Postgres refuses to start against a data directory written by an older major, so that upgrade is a dump and restore, never in place.
+
+```bash
+rebase db backup --out ./backups
+# recreate the volume on the new major
+rebase db restore ./backups/<file>.dump
+```
 
 ## Deploying Rebase on Scaleway
 
