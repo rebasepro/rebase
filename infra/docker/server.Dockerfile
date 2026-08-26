@@ -78,7 +78,7 @@ RUN mkdir -p /runtime \
         "pg@^8.21.0" \
         "@aws-sdk/client-s3@^3.1068.0" \
         "@aws-sdk/s3-request-presigner@^3.1068.0" \
-        "nodemailer@^6.9.0" \
+        "nodemailer@^9.0.0" \
         "json-logic-js@^2.0.5" \
         "fast-equals@6.0.2" \
         "object-hash@^3.0.0" \
