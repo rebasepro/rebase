@@ -2811,3 +2811,55 @@ version counted occurrences of `X-Accel-Buffering`, and renaming the header to
 `X-Accel-Buffering-x` still matched — the mutation passed and the guard was
 inert. It matches the whole call now. Prove the gate fails; a guard you did not
 break is a guard you did not test.
+
+## 49. "Unknown" has no channel on the wire
+
+Every producer distinguishes *absent* from *could not look*. Every boundary type
+between them destroys the distinction. The prose is right at each site and the
+payload cannot carry what the prose says.
+
+The shape, from an audit of one subsystem on 2026-08-26 where **seven of eleven
+findings had this single root cause**:
+
+| the producer says | the boundary offers | what the reader sees |
+|---|---|---|
+| "Returns `null` — never `[]` — so 'no instances' and 'could not look' stay distinct" | `instances: T[]` (non-nullable) | an empty list, i.e. "nothing is running" |
+| "Absent, not zero" | no `allocation` key at all | a container with no limits |
+| "Not '0%': we could not read the deployment, so usage is unknown" | a `status` word derived from `availableReplicas` | a measured `CPU 0.0%` |
+| a deliberate 501 meaning "I keep no history" | `FetchLike = { ok: boolean }` | "your runtime lacks this feature" — said to a pod that was restarting |
+| a 404 meaning "there is no HPA" | one `catch { return null }` | a red banner accusing a healthy, paid autoscaler of provisioning nothing |
+
+**Why it is invisible.** A narrowed structural type accepts a superset silently,
+so the field that carries the distinction can be dropped from a declaration
+without a single compiler error. One `as SomeState` at the consumer accepts a
+*subset* just as silently. Neither end complains; the information simply stops
+existing halfway across.
+
+**Why it survives review.** The comment at each site states the correct rule, so
+reading the code confirms the behaviour is intended — and the reader stops
+there. **Treat a comment asserting behaviour as a specification that owes you a
+test, never as evidence the behaviour exists.** Each of the findings above sat
+within forty lines of a comment correctly forbidding it.
+
+**The class-level fix is a rule, not N patches:** *a renderer may not assert
+absence unless the payload proves the read happened.* Every payload that can
+carry "nothing" must also be able to carry "could not look" — an `unreadable`
+list, a discriminated result, a nullable that means exactly one thing.
+
+**One test shape enforces it everywhere:**
+
+> A failed read must not produce a payload identical to a successful empty read.
+
+Applied at four boundaries it caught four of the seven directly. Assert the
+**reason**, not just the outcome kind — an oversized body also fails
+`JSON.parse`, so a test checking only `kind === "unreachable"` passes with the
+size check deleted, satisfied by the wrong mechanism.
+
+**Adjacent habit, same audit:** *assert the number, not the state word next to
+it.* A 60-case test file held the fabricated `CPU 0.0%` because one test pinned
+`body.status === "stopped"` and another pinned `body.instances`, and nothing
+ever pinned `body.cpu`. The defect was mutation-proof by construction.
+
+**Where it hides:** the file with no test file at all. Three of the four
+must-fix findings were in one module that had none — while its neighbours, with
+worse comments and 60 tests, had one between them.
