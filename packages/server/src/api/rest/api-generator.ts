@@ -150,29 +150,6 @@ export class RestApiGenerator {
      * `⚠️` line on every request from any frontend holding a stale slug. The
      * envelope is the fix; the log volume is not part of it.
      */
-    /**
-     * Wrap a handler so the response says the verb that reached it is on its
-     * way out.
-     *
-     * `Deprecation: true` is RFC 8594's signal and costs one header on a route
-     * nobody should still be calling. No `Sunset` date: the removal is gated on
-     * which SDKs are in the field rather than on a calendar, and inventing a
-     * date we would not honour is worse than saying only what is true.
-     *
-     * Deliberately not logged. The alias is expected traffic from clients doing
-     * nothing wrong, and a per-request line on a working call is the kind of
-     * noise that gets a logger turned down — the header is the signal, and the
-     * access log already records the verb for anyone counting.
-     */
-    private deprecatedVerb<T extends (c: Context<HonoEnv>, next: () => Promise<void>) => unknown>(
-        handler: T
-    ): (c: Context<HonoEnv>, next: () => Promise<void>) => unknown {
-        return (c, next) => {
-            c.header("Deprecation", "true");
-            return handler(c, next);
-        };
-    }
-
     private createUnmatchedRoute(): void {
         const known = new Set(this.collections.map(collection => collection.slug));
         const notFound = (message: string): ApiError =>
@@ -876,11 +853,21 @@ values: entity as Record<string, unknown> },
          *
          * Delete it when no released SDK sends PUT any more — i.e. one release
          * after the first published client whose `update()` sends PATCH, giving
-         * the field a version to move to. The `Deprecation` header is how a
-         * caller finds out before that happens.
+         * the field a version to move to.
+         *
+         * `Deprecation: true` is RFC 8594's signal, and how a caller finds out
+         * before that happens. No `Sunset` date: the removal is gated on which
+         * SDKs are in the field rather than on a calendar, and inventing a date
+         * we would not honour is worse than saying only what is true. Set inline
+         * rather than through a wrapper — a wrapper has to name the handler's
+         * return type, and Hono's is worth neither widening nor casting for one
+         * header at two call sites.
          */
         this.router.patch(`${basePath}/:id`, updateEntity);
-        this.router.put(`${basePath}/:id`, this.deprecatedVerb(updateEntity));
+        this.router.put(`${basePath}/:id`, (c) => {
+            c.header("Deprecation", "true");
+            return updateEntity(c);
+        });
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
@@ -1168,7 +1155,10 @@ id: parsed.id });
 
         this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
         // The same alias, for the same reason — see the note on `updateEntity`.
-        this.router.put("/:parent/:parentId/:rest{.+}", this.deprecatedVerb(updateNested));
+        this.router.put("/:parent/:parentId/:rest{.+}", (c, next) => {
+            c.header("Deprecation", "true");
+            return updateNested(c, next);
+        });
 
         // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {
