@@ -19,6 +19,11 @@ do-app.yaml       →  .do/app.yaml      (DigitalOcean App Platform)
 Coolify, Dokku and anything else that speaks Compose can use
 `infra/docker/docker-compose.selfhost.yml` directly — see `infra/docker/quickstart.sh`.
 
+Hetzner Cloud has a Terraform module rather than a blueprint, because the thing
+worth declaring there is infrastructure the platform would otherwise own for you
+— a firewall, a stable address, and a volume that outlives the server. See
+`infra/terraform-hcloud-rebase/`.
+
 ## What every one of them has to get right
 
 The same four things, in every platform's own dialect. Each is a real boot
