@@ -49,6 +49,7 @@ import {
     quoteSqlLiteral
 } from "./generate-postgres-ddl-logic";
 import { buildVectorIndexPlan, vectorIndexStatement, type SkippedVectorIndex } from "./vector-index";
+import { buildCollectionIndexPlan, collectionIndexStatement } from "./collection-index";
 import {
     AUTH_USERS_COLUMNS,
     authUsersColumnDefinition,
@@ -810,6 +811,26 @@ export function planCollectionSchemaEnsure(
             });
         }
         vectorIndexSkipped.push(...plan.skipped);
+    }
+
+    //    Declared indexes, on exactly the same terms as the ANN ones above.
+    //
+    //    Boot has to emit these, not just `db push`: the managed runtime
+    //    provisions at boot and never runs a push, so a push-only index would
+    //    simply not exist there — and nothing would say so.
+    //    `contracts/derived-names.txt` states the rule ("Both, or it is a
+    //    bug") and the gate enforces it, which is what caught this.
+    //
+    //    `concurrently` is a parameter here rather than a string replacement
+    //    on the rendered SQL. The `.replace("CREATE INDEX IF NOT EXISTS", …)`
+    //    just above silently does nothing for a UNIQUE index, whose text is
+    //    `CREATE UNIQUE INDEX …` and never matches the pattern.
+    for (const spec of buildCollectionIndexPlan(collections, resolveColumnName)) {
+        actions.push({
+            kind: "create-index",
+            target: `${spec.schema}.${spec.table}`,
+            sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true })
+        });
     }
 
     return {

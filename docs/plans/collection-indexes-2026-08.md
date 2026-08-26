@@ -1,8 +1,9 @@
 # Declarable indexes
 
 Status: **phase 1 landed** on `feat/collection-indexes`. Phases 2–4 specified
-below, not built. The naming scheme is **not yet frozen** into
-`contracts/derived-names.txt` — see "The one decision to make first".
+below, not built. The naming scheme is **frozen** into
+`contracts/derived-names.txt` as of 2026-08-26 — nine index names, all
+`[boot,push]`. It cannot be changed without renaming live objects.
 
 ## The problem, stated precisely
 
@@ -137,15 +138,26 @@ Each is its own subsystem, and none is required for the above to be correct:
 - **The drizzle-schema side**, the live schema editor, and the rls-check
   finding for an index whose leading column is not the policy column.
 
-## The one decision to make first
+## Freezing it caught a defect
 
-The fixture declares no indexes, so **the naming scheme is not in
-`contracts/derived-names.txt` yet**. That was deliberate: derived names are
-frozen once shipped, and freezing this one before you have looked at it would
-be the expensive kind of mistake. Adding `indexes:` to the fixture and running
-`pnpm write:derived-names` is the act that commits to it.
+The contract file states the rule: *"The [push,boot] tag is which producer
+emits it. Both, or it is a bug… Any OTHER push-only or boot-only line is a
+defect."*
 
-Three smaller calls, in descending order of how much they matter:
+The first run rendered all nine index lines as `[push]` only. Boot did not
+create declared indexes — so a managed-runtime tenant, which provisions at boot
+and never runs `db push`, would have started with none of them and nothing
+would have said so. That is precisely the silent absence this feature exists to
+remove, reintroduced one layer down.
+
+`planCollectionSchemaEnsure` now emits them, `CONCURRENTLY IF NOT EXISTS`, on
+the same terms as the ANN indexes beside it. All nine lines are `[boot,push]`.
+
+Worth stating plainly: nothing about the feature looked wrong, the whole suite
+was green, and the round trip through real Atlas was clean. The contract gate
+is the only thing that caught it.
+
+## Smaller calls still open, in descending order of how much they matter:
 
 1. **Is `reason` really required?** It is the only field with no SQL behind it,
    and it is the thing that makes `unused_index` actionable later. It also

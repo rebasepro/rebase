@@ -168,8 +168,33 @@ const products: Fixture = {
         // A vector column, so the ANN index name is frozen like any other
         // derived identifier. 1536 is within what pgvector can index; a wider
         // one creates no index and would therefore name nothing to freeze.
-        embedding: { type: "vector", dimensions: 1536 }
-    }
+        embedding: { type: "vector", dimensions: 1536 },
+        // A date and an array, carried so the `indexes` block below can fire a
+        // DESC key, a BRIN and a GIN. Neither derives a name on its own.
+        createdAt: { type: "date" },
+        keywords: { type: "array", columnType: "text[]" }
+    },
+    /**
+     * Declared indexes, chosen so every part of the fingerprint moves at least
+     * one name.
+     *
+     * The two `created_at` entries are the point of the exercise: same table,
+     * same column, same readable head, two different indexes — one partial,
+     * one BRIN. Under a readable naming scheme they would collide, and because
+     * `CREATE INDEX IF NOT EXISTS` matches on the name, the second would
+     * silently never be created. Here they differ in the hash alone.
+     */
+    indexes: [
+        { on: ["status"], reason: "admin list filters by status" },
+        { on: ["status", { prop: "createdAt", direction: "desc" }], reason: "status feed, newest first" },
+        { on: ["createdAt"], where: { prop: "status", op: "=", value: "published" }, reason: "public feed is published-only" },
+        { on: ["createdAt"], using: "brin", reason: "append-only scan over the whole table" },
+        { on: ["title"], include: ["status"], reason: "index-only scan for the status column" },
+        { on: ["keywords"], using: "gin", reason: "keyword containment search" },
+        // A belongsTo resolves to its foreign key column, so this freezes
+        // `primary_category_id` — not `primary_category`.
+        { on: ["primaryCategory", "status"], unique: true, reason: "one product per category and status" }
+    ]
 };
 
 /**
@@ -203,7 +228,10 @@ const inventory: Fixture = {
     name: "Inventory",
     schema: "shop",
     securityRules: allOperations,
-    properties: { ...uuidId, sku: { type: "string" } }
+    properties: { ...uuidId, sku: { type: "string" } },
+    // The schema is in the fingerprint, so the identical declaration on a
+    // `public` table hashes differently. Nothing else in the fixture proves it.
+    indexes: [{ on: ["sku"], reason: "warehouse lookup by SKU" }]
 };
 
 /**
@@ -226,7 +254,16 @@ const longName: Fixture = {
                 relationName: "correspondingOrganizationalUnit"
             }
         }
-    }
+    },
+    /**
+     * The truncation case. A 56-byte table plus a 36-byte column is far over
+     * 63, so the readable head is cut — and the `_ix_` tag and the hash, which
+     * are what make the name recognisable and unique, must both survive.
+     *
+     * The baseline records the answer. Compare it against the `_fkey` line for
+     * this same collection, which is frozen with its suffix truncated away.
+     */
+    indexes: [{ on: ["correspondingOrganizationalUnit"], reason: "join back to the owning unit" }]
 };
 
 const suppliers: Fixture = {
