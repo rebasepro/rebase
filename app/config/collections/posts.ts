@@ -23,6 +23,24 @@ const postsCollection: PostgresCollectionConfig = {
             { path: "content", weight: "D" }
         ]
     },
+    // Dogfooding the index block, on the three queries this collection
+    // actually serves. Each `reason` is what `rebase doctor` will print beside
+    // "0 scans in 34 days" — the one moment anyone can decide to delete one.
+    indexes: [
+        // The admin list: filter by status, newest first. One index serves both
+        // the filter and the sort, because a btree can be read in order.
+        { on: ["status", { prop: "publish_date", direction: "desc" }],
+          reason: "admin list: filter by status, newest first" },
+        // The public feed only ever reads published rows, so the index only
+        // holds published rows — smaller, and it stays small as drafts pile up.
+        { on: ["publish_date"],
+          where: { prop: "status", op: "=", value: "published" },
+          reason: "public feed: published posts by date" },
+        // Postgres does NOT index a foreign key column for you. Without this,
+        // listing one author's posts is a sequential scan, and so is the
+        // cascade when an author is deleted. `author` resolves to `author_id`.
+        { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+    ],
     properties: {
         id: {
             name: "ID",
