@@ -411,6 +411,65 @@ if (live) {
     }
 }
 
+// ── One build recipe, and it names what it produces ──────────────────────────
+//
+// `infra/cloudbuild-runtime.yaml` had a twin at `infra/docker/cloudbuild-runtime.yaml`
+// — same filename, different contents, last touched five weeks earlier. The
+// refactor that moved both recorded the collision in its own commit message and
+// left it unresolved, so the repository shipped two answers to "how is the
+// runtime image built", and the stale one was the copy sitting in the directory
+// named `docker`.
+//
+// What made it dangerous is not that it existed but what it said: `_TAG: "dev"`,
+// so a submit with no substitution republishes one tag over a different commit —
+// and the control plane resolves releases BY NAME, so a re-pushed tag silently
+// changes what the fleet runs with no version anywhere changing. Two checks,
+// because either alone lets the failure back in.
+{
+    const recipes = [];
+    const walk = (dir) => {
+        for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+            if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+            const rel = `${dir}/${e.name}`;
+            if (e.isDirectory()) walk(rel);
+            else if (e.name === "cloudbuild-runtime.yaml") recipes.push(rel);
+        }
+    };
+    walk("infra");
+
+    if (recipes.length !== 1) {
+        problems.push(
+            `${recipes.length} runtime build recipes: ${recipes.join(", ")}. ` +
+            `There must be exactly one — a stale copy is reachable, looks current, and ` +
+            `is the one whose path matches the directory you are already in.`
+        );
+    }
+    for (const rel of recipes) {
+        const text = fs.readFileSync(path.join(ROOT, rel), "utf8");
+        // A default here is the mutable-tag bug with extra steps.
+        const tagDefault = /^\s*_TAG:\s*(.+)$/m.exec(text);
+        if (!tagDefault) {
+            problems.push(`${rel} does not declare a _TAG substitution.`);
+        } else if (!/^(''|"")\s*(#.*)?$/.test(tagDefault[1].trim())) {
+            problems.push(
+                `${rel} defaults _TAG to ${tagDefault[1].trim()}. It must default to '' so a ` +
+                `build that does not say what it produces fails, instead of republishing one ` +
+                `tag over a different commit.`
+            );
+        }
+        // The fleet push must not ride on the `images:` list, which Cloud Build
+        // runs only after EVERY step — including the optional Docker Hub one.
+        if (/^images:/m.test(text)) {
+            problems.push(
+                `${rel} pushes through an \`images:\` list. Cloud Build defers that until every ` +
+                `step succeeds, so a failure in the optional Docker Hub step takes the mandatory ` +
+                `fleet push down with it — silently, because the log still says "naming to … done".`
+            );
+        }
+        checked.push(rel);
+    }
+}
+
 // ── Report ───────────────────────────────────────────────────────────────────
 
 console.log(`\n${DIM}Checked ${checked.length} first-party image reference(s) across ` +

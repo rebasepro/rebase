@@ -50,8 +50,17 @@
 # which is the same immutability the fleet gets from digest pinning.
 #
 # Usage:
-#   gcloud builds submit --config cloudbuild-runtime.yaml \
-#     --substitutions=_TAG="0.12.0-$(git rev-parse --short HEAD)",_VERSION="0.12.0" .
+#   # a release: fleet tag + public tags, one image
+#   gcloud builds submit --config infra/cloudbuild-runtime.yaml --project=rebase-578f2 \
+#     --substitutions=_TAG="0.12.0-$(git rev-parse --short=9 HEAD)",_VERSION="0.12.0" .
+#
+#   # a canary the fleet should try: fleet tag only, no public tags moved
+#   gcloud builds submit --config infra/cloudbuild-runtime.yaml --project=rebase-578f2 \
+#     --substitutions=_TAG="0.16.1-canary.g$(git rev-parse --short=9 HEAD)" .
+#
+# `--project` is not optional in practice: gcloud's active project is machine-global
+# and another repository in this account repoints it, which surfaces as an Artifact
+# Registry permission denial that reads exactly like an IAM regression.
 #
 # Requires a Docker Hub access token in Secret Manager as `dockerhub-token`,
 # readable by the Cloud Build service account, with push rights to `rebasepro`.
@@ -65,10 +74,6 @@ steps:
       - 'build'
       - '-t'
       - '$_REPO:$_TAG'
-      - '-t'
-      - '$_HUB_REPO:$_VERSION'
-      - '-t'
-      - '$_HUB_REPO:latest'
       - '--build-arg=BUILDKIT_INLINE_CACHE=1'
       - '-f'
       - 'infra/docker/server.Dockerfile'
@@ -88,6 +93,26 @@ steps:
 
   # Cloud Build is not authenticated for Docker Hub, so the Hub tags cannot go in
   # an `images:` list — they are pushed here, after an explicit login.
+  #
+  # SKIPPED when `_VERSION` is empty, and that is the whole reason this file no
+  # longer has a twin. Two builds are wanted from one recipe:
+  #
+  #   a release build   `_TAG` and `_VERSION` — the fleet tag AND the public
+  #                     tags, one image id, so the artifact a self-hoster pulls
+  #                     is the artifact Rebase Cloud runs.
+  #   a fleet build     `_TAG` only — a canary or a branch the fleet should try.
+  #                     Pushing `rebasepro/server:latest` for one of those would
+  #                     hand every self-hoster an unreleased build.
+  #
+  # There WAS a second file for the second case, `infra/docker/cloudbuild-runtime.yaml`,
+  # last touched 2026-07-27 and carried forward by a refactor that recorded the
+  # collision and left it. It had defaulted `_TAG` to "dev" — so a build with no
+  # substitution silently republished one tag over a different commit, the exact
+  # mutable-label failure this file's `_TAG: ''` exists to prevent — and it pushed
+  # through an `images:` list, the exact coupling the `push-fleet` step exists to
+  # break. A stale copy of a build recipe is worse than no copy: it is reachable,
+  # it looks current, and it is the one whose name matches the directory you are
+  # already in.
   - name: 'gcr.io/cloud-builders/docker'
     id: push-dockerhub
     entrypoint: 'bash'
@@ -96,6 +121,12 @@ steps:
       - '-c'
       - |
         set -euo pipefail
+        if [ -z "$_VERSION" ]; then
+          echo "No _VERSION — fleet-only build. Not pushing public tags."
+          exit 0
+        fi
+        docker tag "$_REPO:$_TAG" "$_HUB_REPO:$_VERSION"
+        docker tag "$_REPO:$_TAG" "$_HUB_REPO:latest"
         echo "$$DOCKERHUB_TOKEN" | docker login -u "$_HUB_USER" --password-stdin
         docker push "$_HUB_REPO:$_VERSION"
         docker push "$_HUB_REPO:latest"
@@ -117,8 +148,9 @@ substitutions:
   # No default: a build that does not say what it is producing should fail rather
   # than quietly overwrite whatever the last one produced.
   _TAG: ''
-  # Same reasoning, and more so — an unversioned push to a *public* registry is
-  # worse than a failed build.
+  # Empty means "fleet only" — see the push-dockerhub step. An unversioned push
+  # to a *public* registry is worse than a failed build, so this never defaults
+  # to something; it either names a release or turns the public half off.
   _VERSION: ''
 
 options:

@@ -162,7 +162,7 @@ first-class", held per-checkout in `.rebase/cloud.json`.
 ### The axes are already orthogonal in the implementation
 
 `managed` is not a cloud-only concept, and this is load-bearing for self-hosting.
-`docker/cloudbuild-runtime.yaml` describes `rebasepro/server` as:
+`infra/cloudbuild-runtime.yaml` describes `rebasepro/server` as:
 
 > the image every managed tenant runs and every self-hoster can run: the server
 > package plus an entrypoint that boots a project bundle.
