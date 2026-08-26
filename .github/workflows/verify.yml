@@ -108,6 +108,14 @@ jobs:
       - name: Shipped image references have a publisher
         run: pnpm run check:runtime-image
 
+      # The image promises to supply @rebasepro/common, /utils and friends so a
+      # bundle does not vendor them. Nothing checked those copies could actually
+      # load: three of their dependencies were missing from the image's npm
+      # install, and the first one surfaced only when a project was promoted to
+      # the managed runtime and could not read a single collection.
+      - name: Runtime-provided dependencies are installed
+        run: pnpm run check:runtime-deps
+
       # The chart shipped with no coverage of any kind, and its failure mode is
       # a cluster that comes up looking right: nineteen refusals in
       # `_validate.tpl` guard topologies that produce no runtime error, and not
