@@ -26,9 +26,9 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
+        orderProperty: "__order",           // Eigenschaft für die Drag-and-drop-Sortierung
         kanban: {
-            columnProperty: "status",        // Enum property for columns
-            orderProperty: "sortOrder"      // Property for drag-and-drop ordering
+            columnProperty: "status"         // Enum property for columns
         }
     }
 });
@@ -91,13 +91,17 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Sort Order" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
+        orderProperty: "__order",
         kanban: {
-            columnProperty: "status",
-            orderProperty: "sortOrder"
+            columnProperty: "status"
         }
     }
 });
@@ -105,6 +109,68 @@ const tasksCollection = defineCollection({
 ```
 
 Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die Sortierreihenfolge.
+
+### Sortierung
+
+`kanban` und `orderProperty` sind zwei Hälften einer Funktion. Deklarieren Sie
+immer beide — drei Fehler an dieser Stelle ergeben ein Board, das konfiguriert
+*aussieht* und es nicht ist.
+
+**`orderProperty` ist nicht optional.** Ohne sie lässt sich eine Karte weiterhin
+zwischen Spalten ziehen, denn das schreibt `columnProperty`. Ihre Position
+*innerhalb* einer Spalte hat keinen Speicherort, springt beim nächsten Laden
+zurück, und das Board zeigt einen bernsteinfarbenen Hinweisbalken, dass die
+Sortierung nicht konfiguriert ist.
+
+**Die Eigenschaft muss ein `string` sein.** Das Umsortieren schreibt einen
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing)-Schlüssel
+— `"i0"`, `"i1"`, `"i0i"` — keinen Index. Eine `number`-Eigenschaft kann ihn nie
+aufnehmen: ein numerisches `sortOrder` lässt das Board dauerhaft nach
+Initialisierung fragen, und die Initialisierung selbst scheitert an einer
+numerischen Spalte. Deklarieren Sie sie versteckt — sie ist Mechanik, kein
+Inhalt.
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Außerhalb des Admin erzeugte Zeilen kommen ohne Schlüssel an.** Beim Insert
+vergibt ihn niemand. Eine Zeile aus einem Cron, einem Seed-Skript, einer
+Migration oder der REST-API landet mit `__order` auf null, und das Board zeigt
+*"Some items don't have order values"* samt **Initialize**-Schaltfläche — ein
+Klick füllt die erste Seite, der nächste Cron-Lauf holt den Balken zurück.
+Erzeugt ein Backend Zeilen für ein Board, vergibt es den Schlüssel selbst, mit
+demselben Alphabet wie der Admin:
+
+```typescript
+import { generateKeyBetween } from "fractional-indexing";
+
+// Base36, Kleinbuchstaben. Sortiert wird von Postgres, dessen Standard-Collation
+// keine Byte-Ordnung ist: Lässt man dieses dritte Argument weg, entstehen
+// base62-Schlüssel wie "a0", die das Board ablehnt.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// Der zuletzt vergebene Schlüssel. `is-not-null` ist nicht optional: eine
+// absteigende Sortierung ist NULLS FIRST, ohne sie liest das hier eine der
+// schlüssellosen Zeilen zurück und jeder Insert landet auf demselben "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+});
+```
 
 ## Kartenansicht
 

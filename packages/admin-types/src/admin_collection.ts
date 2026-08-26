@@ -489,16 +489,39 @@ export type AdminCollectionOptions<
     /**
      * Configuration for Kanban board view mode.
      * When set, the Kanban view mode becomes available.
+     *
+     * A board is only half-configured without {@link orderProperty}. Cards
+     * still drag between columns — that writes `columnProperty` — but their
+     * order *within* a column has nowhere to be stored, so it resets on the
+     * next read and the board renders a warning bar saying so. Declare both,
+     * always.
      */
     kanban?: KanbanConfig<M>;
 
     /**
      * Property key to use for ordering items.
-     * Must reference a string/text property. When items are reordered,
-     * this property will be updated with lexicographic sort keys
-     * (e.g. "a0", "a1", "a0V") using string-based fractional indexing.
-     * Used by Kanban view for ordering within columns
-     * and can be used for general ordering purposes.
+     *
+     * Must reference a **string** property — a `number` can never hold one of
+     * these keys, so a numeric `sortOrder` leaves the board permanently asking
+     * to be initialised. The convention across the collections here is a
+     * hidden `__order: { type: "string", admin: { disabled: true,
+     * hideFromCollection: true } }`.
+     *
+     * Reordering writes a `fractional-indexing` key built from the base36,
+     * lower-case alphabet `0123456789abcdefghijklmnopqrstuvwxyz` — `"i0"`,
+     * `"i1"`, `"i0i"`. Single case because *Postgres* does the sorting and its
+     * default collation is not byte ordering; base36 rather than the library's
+     * default base62 for the same reason. Generating a key without passing
+     * that alphabet yields base62 keys (`"a0"`), which this board rejects.
+     *
+     * Nothing assigns a key on insert. A row created by a cron, a seed, a
+     * migration or the REST API lands with this property null, and the board
+     * shows an **Initialize** bar until someone clicks it. Backends that
+     * create rows for a board should append a key themselves — see the
+     * "Kanban boards" section of the `rebase-collections` skill.
+     *
+     * Used by Kanban view for ordering within columns and can be used for
+     * general ordering purposes.
      */
     readonly orderProperty?: Extract<keyof M, string>;
 

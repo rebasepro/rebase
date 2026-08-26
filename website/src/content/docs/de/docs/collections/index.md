@@ -131,6 +131,8 @@ Eine Annotation *validiert* das Objekt jedoch nur — sie kann Ihre Eigenschafts
 | `properties` | `Properties` | **Erforderlich.** Abbildung von Eigenschaftsschlüssel → Eigenschaftsdefinition. Jeder Schlüssel wird zu einer Datenbankspalte. |
 | `relations` | `Relation[]` | SQL-Relationen – Fremdschlüssel, Verknüpfungstabellen. Siehe [Relationen](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security-Richtlinien. Siehe [Sicherheitsregeln](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Postgres-Indizes, die diese Tabelle braucht. Siehe [Indizes](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Gerankte Volltextsuche über die von Ihnen benannten Felder, einschließlich JSONB- und Array-Inhalten. Nur Postgres. Siehe [Suche](/docs/backend/search). |
 
 ### UI-Konfiguration
 
@@ -140,7 +142,8 @@ Alle folgenden Felder gehören in `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Standardansichtsmodus |
 | `enabledViews` | `ViewMode[]` | Alle vier | Welche Ansichtsmodi verfügbar sind |
-| `kanban` | `KanbanConfig` | — | Kanban-Konfiguration (Spalteneigenschaft) |
+| `kanban` | `KanbanConfig` | — | Kanban-Konfiguration (Spalteneigenschaft). Immer zusammen mit `orderProperty` angeben — siehe [Ansichtsmodi](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Schlüssel der **string**-Eigenschaft, die den Drag-and-drop-Sortierschlüssel hält. Für ein funktionierendes Kanban-Board erforderlich |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | Wie Entitäten zur Bearbeitung geöffnet werden |
 | `sideDialogWidth` | `number \| string` | — | Breite des Seitendialogs |
 | `inlineEditing` | `boolean` | `true` | Inline-Bearbeitung in der Tabellenansicht aktivieren |

@@ -131,6 +131,8 @@ Mais une annotation ne fait que *valider* l'objet — elle ne voit pas les noms 
 | `properties` | `Properties` | **Obligatoire.** Mappage clé de propriété → définition de propriété. Chaque clé devient une colonne de base de données. |
 | `relations` | `Relation[]` | Relations SQL — clés étrangères, tables de jonction. Voir [Relations](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Politiques de sécurité au niveau des lignes (Row Level Security). Voir [Règles de sécurité](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Index Postgres dont cette table a besoin. Voir [Index](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Recherche plein texte classée sur les champs que vous nommez, y compris le contenu JSONB et les tableaux. Postgres uniquement. Voir [Recherche](/docs/backend/search). |
 
 ### Configuration de l'interface utilisateur
 
@@ -140,7 +142,8 @@ Tous les champs suivants vont dans `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Mode d'affichage par défaut |
 | `enabledViews` | `ViewMode[]` | All four | Quels modes d'affichage sont disponibles |
-| `kanban` | `KanbanConfig` | — | Configuration Kanban (propriété de colonne) |
+| `kanban` | `KanbanConfig` | — | Configuration Kanban (propriété de colonne). Toujours à associer à `orderProperty` — voir [Modes d'affichage](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Clé de la propriété **string** qui stocke la clé d'ordre du glisser-déposer. Indispensable pour un tableau Kanban fonctionnel |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | Comment les entités s'ouvrent pour l'édition |
 | `sideDialogWidth` | `number \| string` | — | Largeur du dialogue latéral |
 | `inlineEditing` | `boolean` | `true` | Activer l'édition en ligne dans la vue feuille de calcul |

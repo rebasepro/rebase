@@ -24,14 +24,19 @@ const productsCollection = defineCollection({
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
         status: { name: "Status", type: "string" },
-        sortOrder: { name: "Order", type: "number" }
+        // The order key. A *string*, never a number — see "Ordering" below.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     name: "Products",
     table: "products",
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "sortOrder",         // Property for drag-and-drop ordering
+        orderProperty: "__order",           // Property for drag-and-drop ordering
         kanban: {
             columnProperty: "status"         // Enum property for columns
         }
@@ -96,11 +101,15 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Sort Order" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
-        orderProperty: "sortOrder",
+        orderProperty: "__order",
         kanban: {
             columnProperty: "status"
         }
@@ -110,6 +119,73 @@ const tasksCollection = defineCollection({
 ```
 
 Drag-and-drop between columns automatically updates the enum field and sort order.
+
+### Ordering
+
+`kanban` and `orderProperty` are two halves of one feature. Declare both, every
+time — three mistakes here all produce a board that looks configured and is not.
+
+**`orderProperty` is not optional.** Without it a card still drags between
+columns, because that writes `columnProperty`. Its position *within* a column
+has nowhere to be stored, so it resets on the next read, and the board renders an
+amber bar telling you ordering is not configured.
+
+**The property must be a `string`.** Reordering writes a
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing) key —
+`"i0"`, `"i1"`, `"i0i"` — not an index. A `number` property can never hold one,
+so a numeric `sortOrder` leaves the board asking to be initialised forever, and
+the initialisation itself fails against a numeric column. Declare it hidden; it
+is machinery, not content:
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Rows created outside the admin arrive without a key.** Nothing assigns one on
+insert. A row written by a cron, a seed script, a migration or the REST API lands
+with `__order` null, and the board shows *"Some items don't have order values"*
+with an **Initialize** button — one click backfills the first page, and the next
+cron run brings the bar straight back. If a backend creates rows for a board, it
+should append the key itself. Use the same alphabet the admin uses:
+
+```typescript
+import { generateKeyBetween } from "fractional-indexing";
+
+// Base36, lower case. Postgres does the sorting and its default collation is
+// not byte ordering, so the library's default base62 alphabet — which mixes
+// cases — sorts differently in the database than in the key. Omitting this
+// third argument produces keys like "a0" that the board rejects.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST, so without it this reads back one of the very rows that
+// has no key and every insert lands on the same "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
+});
+```
+
+Rows created through the admin form arrive unkeyed too — the difference is only
+that you see the bar the moment you add one. **Initialize** is the fix there; on
+a board fed by a backend it is a fix that undoes itself every run.
 
 ## Cards View
 

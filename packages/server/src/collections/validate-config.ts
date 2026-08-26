@@ -40,6 +40,19 @@ export type UnknownKeyPolicy = "warn" | "error" | "off";
 
 export interface ConfigProblem {
     severity: "error" | "warning";
+    /**
+     * What kind of wrong this is, because the two read very differently and the
+     * remedies differ.
+     *
+     * - `"key"` — a key this version does not read, whether renamed, removed or
+     *   simply unrecognised. The feature it configures is absent; the config is
+     *   otherwise coherent. `REBASE_STRICT_COLLECTION_CONFIG` governs how loud
+     *   the unrecognised half of this is.
+     * - `"incoherent"` — every key is recognised and the *combination* cannot do
+     *   what it says. That policy has no bearing on these, and saying it did
+     *   sent people to an environment variable that would not have helped.
+     */
+    kind: "key" | "incoherent";
     /** Dotted path into the config, e.g. `posts.properties.author`. */
     path: string;
     message: string;
@@ -371,8 +384,19 @@ class ProblemCollector {
     constructor(private readonly unknownKeys: UnknownKeyPolicy) {
     }
 
-    error(path: string, message: string): void {
-        this.problems.push({ severity: "error", path, message });
+    error(path: string, message: string, kind: ConfigProblem["kind"] = "incoherent"): void {
+        this.problems.push({ severity: "error", kind, path, message });
+    }
+
+    /**
+     * Config that parses but cannot do what it says.
+     *
+     * Not gated on `unknownKeys`: that policy is about keys this version has
+     * never heard of, where silence is defensible. This is the opposite —
+     * every key is recognised, and the combination is known to be wrong.
+     */
+    warn(path: string, message: string): void {
+        this.problems.push({ severity: "warning", kind: "incoherent", path, message });
     }
 
     /** A key we know moved or died. Always fatal — we know exactly what to do. */
@@ -380,7 +404,8 @@ class ProblemCollector {
         this.error(
             path,
             `\`${key}\` is no longer read here. ${migration.fix}.` +
-            (migration.codemod ? ` Run \`${migration.codemod}\` to migrate the whole project.` : "")
+            (migration.codemod ? ` Run \`${migration.codemod}\` to migrate the whole project.` : ""),
+            "key"
         );
     }
 
@@ -389,6 +414,7 @@ class ProblemCollector {
         if (this.unknownKeys === "off") return;
         this.problems.push({
             severity: this.unknownKeys === "error" ? "error" : "warning",
+            kind: "key",
             path,
             message:
                 `\`${key}\` is not a known ${context} key and is being ignored. ` +
@@ -573,6 +599,83 @@ function checkProperties(
     }
 }
 
+/**
+ * A board's two halves, checked against each other and against `properties`.
+ *
+ * Every failure here parses cleanly, boots, serves rows and renders a board.
+ * The only symptom is that dragging does not stick — which no test, no
+ * typecheck and no config review catches, because the config is *valid*, just
+ * incoherent. The panel says so in an amber bar, but only to whoever opens the
+ * board; this says it to whoever starts the server.
+ *
+ * The order key is a `fractional-indexing` key in the base36, lower-case
+ * alphabet (`"i0"`, `"i1"`, `"i0i"`) — a string, always. Postgres does the
+ * sorting and its default collation is not byte ordering, which is why the
+ * alphabet is single-case; see `useKanbanDragAndDrop.ts` in the admin.
+ */
+function checkBoardConfig(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const admin = isPlainObject(collection.admin) ? collection.admin : undefined;
+    if (!admin) return;
+
+    const orderProperty = admin.orderProperty;
+    const hasBoard = isPlainObject(admin.kanban)
+        || (Array.isArray(admin.enabledViews) && admin.enabledViews.includes("kanban"))
+        || admin.defaultViewMode === "kanban";
+
+    if (hasBoard && orderProperty === undefined) {
+        collect.warn(
+            `${at}.admin.orderProperty`,
+            "this collection renders a Kanban board but declares no `orderProperty`, so a card's " +
+            "position within a column has nowhere to be stored and resets on the next read. " +
+            "(Moving a card *between* columns still works — that writes `kanban.columnProperty`.) " +
+            "Add a hidden string property and name it here: " +
+            "`__order: { name: \"Order\", type: \"string\", admin: { disabled: true, hideFromCollection: true } }`."
+        );
+    }
+
+    if (orderProperty === undefined) return;
+
+    if (typeof orderProperty !== "string" || !orderProperty) {
+        collect.error(
+            `${at}.admin.orderProperty`,
+            "`orderProperty` must be the key of a property in this collection."
+        );
+        return;
+    }
+
+    // Only checkable when the collection declares its properties inline. Some
+    // authoring styles build them elsewhere, and guessing would be worse than
+    // silence — the same rule `checkProperty` applies to builder functions.
+    if (!isPlainObject(collection.properties)) return;
+
+    const target = collection.properties[orderProperty];
+    if (target === undefined) {
+        collect.error(
+            `${at}.admin.orderProperty`,
+            `\`orderProperty: "${orderProperty}"\` names no property in this collection. ` +
+            "Nothing reads or writes it, so the board cannot be reordered at all."
+        );
+        return;
+    }
+
+    if (typeof target === "function") return;
+    if (!isPlainObject(target)) return;
+
+    if (target.type !== "string") {
+        collect.error(
+            `${at}.properties.${orderProperty}`,
+            `\`orderProperty\` names a \`${String(target.type)}\` property, and an order key is a string ` +
+            "— a `fractional-indexing` key such as \"i0\" or \"i0i\", not an index. Stored values can " +
+            "never be valid, so the board asks to be initialised forever and the initialisation itself " +
+            "fails writing a string into this column. Change it to `type: \"string\"`."
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -623,6 +726,8 @@ function checkCollection(
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }
 
+    checkBoardConfig(collection, at, collect);
+
     if (Array.isArray(collection.relations)) {
         collection.relations.forEach((relation, i) => {
             const name = isPlainObject(relation) && typeof relation.relationName === "string"
@@ -670,20 +775,47 @@ export function assertCollectionConfigs(
     const warnings = problems.filter(p => p.severity === "warning");
     const errors = problems.filter(p => p.severity === "error");
 
-    if (warnings.length > 0) {
+    const unknownWarnings = warnings.filter(p => p.kind === "key");
+    const incoherentWarnings = warnings.filter(p => p.kind === "incoherent");
+
+    if (unknownWarnings.length > 0) {
         logger.warn(
-            `[collections] ${warnings.length} unrecognised key(s) in the collection config, ignored:\n\n` +
-            render(warnings) +
+            `[collections] ${unknownWarnings.length} unrecognised key(s) in the collection config, ignored:\n\n` +
+            render(unknownWarnings) +
             "\n\nSet REBASE_STRICT_COLLECTION_CONFIG=error to make these fail the boot.\n"
+        );
+    }
+
+    // Deliberately not offered the strict-mode escalation: that variable governs
+    // unrecognised keys, and pointing at it here would send someone to a switch
+    // that does nothing for their problem.
+    if (incoherentWarnings.length > 0) {
+        logger.warn(
+            `[collections] ${incoherentWarnings.length} collection(s) configured for something they cannot do:\n\n` +
+            render(incoherentWarnings) + "\n"
         );
     }
 
     if (errors.length === 0) return;
 
+    const deadKeys = errors.filter(p => p.kind === "key");
+    const incoherent = errors.filter(p => p.kind === "incoherent");
+
+    const sections = [
+        deadKeys.length > 0
+            ? "These keys are not read by this version. Nothing would have failed at runtime — " +
+              "whatever they configure would simply be absent — so they are fatal at boot instead.\n\n" +
+              render(deadKeys)
+            : undefined,
+        incoherent.length > 0
+            ? "These parse, and cannot do what they say. Nothing would have failed at runtime — " +
+              "the feature would simply not work — so they are fatal at boot instead.\n\n" +
+              render(incoherent)
+            : undefined
+    ].filter(Boolean);
+
     throw new Error(
         `${errors.length} problem(s) in the collection config.\n\n` +
-        "These keys are not read by this version. Nothing would have failed at runtime — " +
-        "whatever they configure would simply be absent — so they are fatal at boot instead.\n\n" +
-        render(errors) + "\n"
+        sections.join("\n\n") + "\n"
     );
 }

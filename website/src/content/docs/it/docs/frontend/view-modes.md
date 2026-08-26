@@ -26,9 +26,9 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
+        orderProperty: "__order",           // Proprietà per il riordino drag-and-drop
         kanban: {
-            columnProperty: "status",        // Enum property for columns
-            orderProperty: "sortOrder"      // Property for drag-and-drop ordering
+            columnProperty: "status"         // Enum property for columns
         }
     }
 });
@@ -91,13 +91,17 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Sort Order" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
+        orderProperty: "__order",
         kanban: {
-            columnProperty: "status",
-            orderProperty: "sortOrder"
+            columnProperty: "status"
         }
     }
 });
@@ -105,6 +109,65 @@ const tasksCollection = defineCollection({
 ```
 
 Il trascinamento tra le colonne aggiorna automaticamente il campo enum e l'ordine di ordinamento.
+
+### Ordinamento
+
+`kanban` e `orderProperty` sono due metà della stessa funzionalità. Dichiarale
+sempre entrambe — tre errori qui producono una board che *sembra* configurata e
+non lo è.
+
+**`orderProperty` non è opzionale.** Senza, una card si trascina comunque tra le
+colonne, perché quel gesto scrive `columnProperty`. La sua posizione *dentro* la
+colonna non ha dove essere salvata: torna indietro alla lettura successiva e la
+board mostra una barra ambra che segnala l'ordinamento non configurato.
+
+**La proprietà deve essere una `string`.** Il riordino scrive una chiave
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`,
+`"i1"`, `"i0i"` — non un indice. Una proprietà `number` non può contenerla:
+un `sortOrder` numerico lascia la board che chiede all'infinito di essere
+inizializzata, e l'inizializzazione stessa fallisce contro una colonna numerica.
+Dichiarala nascosta: è meccanica, non contenuto.
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Le righe create fuori dall'admin arrivano senza chiave.** Nessuno la assegna
+all'inserimento. Una riga scritta da un cron, uno script di seed, una migrazione
+o l'API REST arriva con `__order` a null e la board mostra *"Some items don't
+have order values"* con un pulsante **Initialize** — un clic riempie la prima
+pagina, e il cron successivo riporta la barra. Se un backend crea righe per una
+board, deve assegnare la chiave da sé, con lo stesso alfabeto usato dall'admin:
+
+```typescript
+import { generateKeyBetween } from "fractional-indexing";
+
+// Base36, minuscolo. Ordina Postgres, la cui collation predefinita non è
+// l'ordinamento per byte: omettere questo terzo argomento produce chiavi base62
+// come "a0" che la board rifiuta.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// L'ultima chiave in uso. `is-not-null` non è opzionale: un ordinamento
+// discendente è NULLS FIRST, quindi senza di esso questo rilegge una delle
+// righe senza chiave e ogni inserimento finisce sullo stesso "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+});
+```
 
 ## Visualizzazione Schede
 

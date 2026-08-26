@@ -131,6 +131,8 @@ Ma un'annotazione si limita a *validare* l'oggetto — non vede i nomi delle tue
 | `properties` | `Properties` | **Obbligatorio.** Mappa della chiave di proprietà → definizione della proprietà. Ogni chiave diventa una colonna del database. |
 | `relations` | `Relation[]` | Relazioni SQL — chiavi esterne, tabelle di congiunzione. Vedi [Relazioni](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Indici Postgres di cui questa tabella ha bisogno. Vedi [Indici](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Ricerca full-text con ranking sui campi che indichi, inclusi i contenuti JSONB e array. Solo Postgres. Vedi [Ricerca](/docs/backend/search). |
 
 ### Configurazione dell'interfaccia utente
 
@@ -140,7 +142,8 @@ Tutti i campi seguenti vanno dentro `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Modalità di visualizzazione predefinita |
 | `enabledViews` | `ViewMode[]` | Tutte e quattro | Quali modalità di visualizzazione sono disponibili |
-| `kanban` | `KanbanConfig` | — | Configurazione Kanban (proprietà colonna) |
+| `kanban` | `KanbanConfig` | — | Configurazione Kanban (proprietà colonna). Va sempre abbinata a `orderProperty` — vedi [Modalità di visualizzazione](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Chiave della proprietà **string** che contiene la chiave di ordinamento drag-and-drop. Necessaria perché una board Kanban funzioni |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | Come le entità si aprono per la modifica |
 | `sideDialogWidth` | `number \| string` | — | Larghezza della finestra di dialogo laterale |
 | `inlineEditing` | `boolean` | `true` | Abilita la modifica inline nella vista a foglio di calcolo |

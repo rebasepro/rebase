@@ -26,9 +26,9 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
+        orderProperty: "__order",           // Propriedade para reordenação por arrastar e soltar
         kanban: {
-            columnProperty: "status",        // Enum property for columns
-            orderProperty: "sortOrder"      // Property for drag-and-drop ordering
+            columnProperty: "status"         // Enum property for columns
         }
     }
 });
@@ -91,13 +91,17 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Done", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Sort Order" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
+        orderProperty: "__order",
         kanban: {
-            columnProperty: "status",
-            orderProperty: "sortOrder"
+            columnProperty: "status"
         }
     }
 });
@@ -105,6 +109,65 @@ const tasksCollection = defineCollection({
 ```
 
 Arrastar e soltar entre colunas atualiza automaticamente o campo enum e a ordem de classificação.
+
+### Ordenação
+
+`kanban` e `orderProperty` são duas metades do mesmo recurso. Declare as duas,
+sempre — três enganos aqui produzem um quadro que *parece* configurado e não
+está.
+
+**`orderProperty` não é opcional.** Sem ela um cartão ainda arrasta entre
+colunas, porque isso grava `columnProperty`. A posição *dentro* da coluna não tem
+onde ser guardada: volta ao normal na leitura seguinte, e o quadro exibe uma
+barra âmbar dizendo que a ordenação não está configurada.
+
+**A propriedade tem de ser uma `string`.** A reordenação grava uma chave
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`,
+`"i1"`, `"i0i"` — não um índice. Uma propriedade `number` nunca consegue
+guardá-la: um `sortOrder` numérico deixa o quadro pedindo inicialização para
+sempre, e a própria inicialização falha contra uma coluna numérica. Declare-a
+oculta: é maquinaria, não conteúdo.
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Linhas criadas fora do admin chegam sem chave.** Nada a atribui na inserção.
+Uma linha escrita por um cron, um script de seed, uma migração ou a API REST
+chega com `__order` nulo, e o quadro mostra *"Some items don't have order
+values"* com um botão **Initialize** — um clique preenche a primeira página, e a
+execução seguinte do cron traz a barra de volta. Se um backend cria linhas para
+um quadro, ele mesmo deve atribuir a chave, com o mesmo alfabeto do admin:
+
+```typescript
+import { generateKeyBetween } from "fractional-indexing";
+
+// Base36, minúsculas. Quem ordena é o Postgres, cuja collation padrão não é a
+// ordenação por bytes: omitir este terceiro argumento produz chaves base62 como
+// "a0" que o quadro rejeita.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// A última chave em uso. `is-not-null` não é opcional: uma ordenação
+// descendente é NULLS FIRST, então sem ela isto relê uma das próprias linhas
+// sem chave e cada inserção cai no mesmo "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+});
+```
 
 ## Visualização em Cartões
 

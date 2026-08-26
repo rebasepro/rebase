@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 
 import {
     assertCollectionConfigs,
@@ -386,5 +386,165 @@ describe("reporting", () => {
         const [problem] = errors([collection]);
 
         expect(problem.path).toBe("posts.properties.blocks.of.properties.text.ui");
+    });
+});
+
+/**
+ * A Kanban board is two declarations that have to agree, and every way of
+ * getting it wrong parses, boots, serves rows and renders a board. The panel
+ * shows an amber bar to whoever opens the board; nothing told whoever started
+ * the server, which is how a collection ships with a board that cannot be
+ * reordered and nobody notices for weeks.
+ */
+describe("a Kanban board's two halves", () => {
+    const board = (admin: Record<string, unknown>, extraProperties: Record<string, unknown> = {}) => ({
+        ...valid(),
+        properties: {
+            ...valid().properties,
+            status: { name: "Status", type: "string", enum: [{ id: "todo", label: "To do" }] },
+            ...extraProperties
+        },
+        admin: { icon: "Article", ...admin }
+    });
+
+    const orderKey = {
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    };
+
+    it("passes when both halves are declared", () => {
+        const collection = board(
+            { kanban: { columnProperty: "status" }, orderProperty: "__order" },
+            orderKey
+        );
+        expect(findCollectionConfigProblems([collection])).toEqual([]);
+    });
+
+    it("warns when `kanban` is declared without an `orderProperty`", () => {
+        const problems = warnings([board({ kanban: { columnProperty: "status" } })]);
+        expect(problems).toHaveLength(1);
+        expect(problems[0].path).toBe("posts.admin.orderProperty");
+        expect(problems[0].message).toContain("no `orderProperty`");
+    });
+
+    it("warns on a board reached through `enabledViews` alone", () => {
+        // `kanban` is optional — listing the view is enough to render one.
+        const problems = warnings([board({ enabledViews: ["table", "kanban"] })]);
+        expect(problems).toHaveLength(1);
+        expect(problems[0].path).toBe("posts.admin.orderProperty");
+    });
+
+    it("warns on a board reached through `defaultViewMode` alone", () => {
+        const problems = warnings([board({ defaultViewMode: "kanban" })]);
+        expect(problems).toHaveLength(1);
+    });
+
+    it("boots on that warning — the board works, it just does not reorder", () => {
+        expect(() => assertCollectionConfigs([board({ kanban: { columnProperty: "status" } })]))
+            .not.toThrow();
+    });
+
+    it("says nothing about a collection that has no board", () => {
+        expect(findCollectionConfigProblems([board({ enabledViews: ["table", "cards"] })])).toEqual([]);
+    });
+
+    it("errors when `orderProperty` names no property", () => {
+        const problems = errors([board(
+            { kanban: { columnProperty: "status" }, orderProperty: "sortOrder" }
+        )]);
+        expect(problems).toHaveLength(1);
+        expect(problems[0].message).toContain("names no property");
+    });
+
+    it("errors when `orderProperty` names a number — an order key is a string", () => {
+        // The documented example said `type: "number"` for a long time. Stored
+        // values can never be valid `fractional-indexing` keys, so the board
+        // offers to initialise itself forever and the initialisation then fails
+        // writing a string into a numeric column.
+        const problems = errors([board(
+            { kanban: { columnProperty: "status" }, orderProperty: "sortOrder" },
+            { sortOrder: { name: "Sort Order", type: "number" } }
+        )]);
+        expect(problems).toHaveLength(1);
+        expect(problems[0].path).toBe("posts.properties.sortOrder");
+        expect(problems[0].message).toContain('type: "string"');
+    });
+
+    it("refuses to boot on a non-string order property", () => {
+        expect(() => assertCollectionConfigs([board(
+            { kanban: { columnProperty: "status" }, orderProperty: "sortOrder" },
+            { sortOrder: { name: "Sort Order", type: "number" } }
+        )])).toThrow(/order key is a string/);
+    });
+
+    it("checks `orderProperty` even on a collection with no board — it orders tables too", () => {
+        const problems = errors([board({ orderProperty: "nope" })]);
+        expect(problems).toHaveLength(1);
+        expect(problems[0].message).toContain("names no property");
+    });
+
+    it("stays quiet when the properties are not declared inline to check against", () => {
+        const collection = { ...board({ orderProperty: "__order" }), properties: undefined };
+        expect(errors([collection]).filter(p => p.path.includes("orderProperty"))).toEqual([]);
+    });
+});
+
+describe("the two kinds of problem are reported apart", () => {
+    /**
+     * They used to share one header. Once a semantic check existed, that header
+     * announced "unrecognised key(s) ... ignored" over a problem that was
+     * neither, and pointed at REBASE_STRICT_COLLECTION_CONFIG — a switch that
+     * would not have changed anything about it.
+     */
+    const boardWithoutOrder = () => ({
+        ...valid(),
+        admin: { icon: "Article", kanban: { columnProperty: "status" } },
+        properties: {
+            ...valid().properties,
+            status: { name: "Status", type: "string", enum: [{ id: "todo", label: "To do" }] }
+        }
+    });
+
+    it("tags an unrecognised key as a key problem", () => {
+        const problems = findCollectionConfigProblems([{ ...valid(), whatIsThis: true }]);
+        expect(problems.map(p => p.kind)).toEqual(["key"]);
+    });
+
+    it("tags a renamed key as a key problem too — same remedy, different confidence", () => {
+        const problems = findCollectionConfigProblems([{ ...valid(), views: [] }]);
+        expect(problems.every(p => p.kind === "key")).toBe(true);
+    });
+
+    it("tags an incoherent board as its own kind", () => {
+        expect(findCollectionConfigProblems([boardWithoutOrder()]).map(p => p.kind))
+            .toEqual(["incoherent"]);
+    });
+
+    it("does not offer strict mode as a remedy for an incoherent config", () => {
+        const logged: string[] = [];
+        const spy = jest.spyOn(console, "warn").mockImplementation(m => { logged.push(String(m)); });
+        try {
+            assertCollectionConfigs([boardWithoutOrder()]);
+        } finally {
+            spy.mockRestore();
+        }
+        const output = logged.join("\n");
+        expect(output).toContain("cannot do");
+        expect(output).not.toContain("REBASE_STRICT_COLLECTION_CONFIG");
+        expect(output).not.toContain("unrecognised key");
+    });
+
+    it("still offers it for an unrecognised key", () => {
+        const logged: string[] = [];
+        const spy = jest.spyOn(console, "warn").mockImplementation(m => { logged.push(String(m)); });
+        try {
+            assertCollectionConfigs([{ ...valid(), whatIsThis: true }]);
+        } finally {
+            spy.mockRestore();
+        }
+        expect(logged.join("\n")).toContain("REBASE_STRICT_COLLECTION_CONFIG");
     });
 });

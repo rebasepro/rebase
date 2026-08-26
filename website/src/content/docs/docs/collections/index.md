@@ -259,6 +259,8 @@ export const productsCollection = defineCollection({
 | `properties` | `Properties` | **Required.** Map of property key → property definition. Each key becomes a database column. |
 | `relations` | `Relation[]` | SQL relations — foreign keys, junction tables. See [Relations](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Row Level Security policies. See [Security Rules](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
 | `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 ### UI Configuration
@@ -269,7 +271,8 @@ All of the following go inside `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
-| `kanban` | `KanbanConfig` | — | Kanban configuration (column property) |
+| `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | `"full_screen"` | How entities open for editing |
 | `sideDialogWidth` | `number \| string` | — | Width of the side dialog |
 | `inlineEditing` | `boolean` | `true` | Enable inline editing in the spreadsheet view |

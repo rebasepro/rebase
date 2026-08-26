@@ -168,7 +168,7 @@ export default productsCollection;
 | `admin.enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
 | `admin.openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
 | `admin.defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
-| `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
+| `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property). **Always pair with `admin.orderProperty`** — see **Kanban boards** below |
 | `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
 | `admin.form` | `FormLayoutConfig` | — | Form layout: `sidebar`, `sections`, `showRecordMeta`. See **Form layout** below |
 | `admin.entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
@@ -185,7 +185,7 @@ export default productsCollection;
 | `admin.defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
 | `admin.filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
 | `admin.sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["createdAt", "desc"]` |
-| `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
+| `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general). Must name a **string** property — never a number. See **Kanban boards** below |
 | `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
 | `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
 | `admin.hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
@@ -210,6 +210,144 @@ export default productsCollection;
 | `admin.components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
 
 
+
+## Kanban boards
+
+A Kanban board is **three** decisions, not one. Ship all three together; each one
+missing produces a board that renders, looks configured, and silently does not
+reorder.
+
+### 1. `kanban` and `orderProperty` are two halves of one feature
+
+```ts
+import { PostgresCollectionConfig } from "@rebasepro/types";
+
+const tasksCollection: PostgresCollectionConfig = {
+    name: "Tasks",
+    slug: "tasks",
+    table: "tasks",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        title: { name: "Title", type: "string" },
+        status: {
+            name: "Status",
+            type: "string",
+            enum: [
+                { id: "todo", label: "To do" },
+                { id: "doing", label: "Doing" },
+                { id: "done", label: "Done" }
+            ]
+        },
+        // The order key. Machinery, not content — hide it.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
+    admin: {
+        defaultViewMode: "kanban",
+        enabledViews: ["kanban", "table"],
+        kanban: { columnProperty: "status" },
+        orderProperty: "__order"      // ← never omit this
+    }
+};
+```
+
+Declaring `kanban` without `orderProperty` still gives you a draggable board:
+moving a card between columns writes `columnProperty` and sticks. Its position
+*within* a column has nowhere to be stored, so it snaps back on the next read,
+and the board renders an amber "ordering is not configured" bar above the
+columns. Nothing errors. Reviewing the config will not show you the bug — only
+opening the board will.
+
+### 2. The order property is a `string`
+
+Reordering writes a `fractional-indexing` key — `"i0"`, `"i1"`, `"i0i"` — not an
+index. Keys use the **base36, lower-case** alphabet
+`0123456789abcdefghijklmnopqrstuvwxyz`: Postgres does the sorting and its default
+collation is not byte ordering, so the library's default base62 output (`"a0"`,
+mixing cases) sorts differently in the database than in the key.
+
+Consequences worth knowing before you pick a type:
+
+- `type: "number"` can never hold a key. A `sortOrder` number leaves the board
+  permanently asking to be initialised, and the initialisation then fails writing
+  a string into a numeric column.
+- A plain counter in a string column — `"1"`, `"12"`, `"000001"` — is rejected
+  just as hard. `fractional-indexing` cannot interpolate against it, so the board
+  treats it as absent.
+- `generateKeyBetween(a, b)` **without the alphabet argument** produces base62
+  keys the board rejects. Always pass `ORDER_KEY_DIGITS`.
+
+### 3. Rows created outside the admin need a key assigned
+
+Nothing assigns an order key on insert — not the REST API, not the SDK, not a
+cron, not a seed script, not a migration. Those rows land with `__order` null and
+the board shows *"Some items don't have order values. Initialize to enable
+drag-and-drop reordering."* Clicking **Initialize** backfills one page; the next
+cron run brings the bar straight back.
+
+**If a backend writes rows into a board collection, it assigns the key.**
+
+```ts
+import { generateKeyBetween } from "fractional-indexing";
+
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const leads = client.data.collection("leads");
+
+// The last key currently in use. `is-not-null` is not optional: a descending
+// sort is NULLS FIRST in this driver, so without it this reads back one of the
+// very rows that has no key, and every insert lands on the same "i0".
+const { data: last } = await leads.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+let cursor: string | null = (last[0]?.__order as string | undefined) ?? null;
+
+for (const candidate of shortlist) {
+    cursor = generateKeyBetween(cursor, null, ORDER_KEY_DIGITS);
+    await leads.create({ /* … */ status: "new", __order: cursor });
+}
+```
+
+Note the `cursor` carried across the loop. Calling
+`generateKeyBetween(null, null, …)` per row instead hands every row of the batch
+the same key — valid enough to clear the warning bar, useless as an order.
+Re-reading the max inside the loop is correct but costs a round-trip per row.
+
+### The config validator checks two of these for you
+
+`assertCollectionConfigs` runs wherever the collections are loaded — server
+boot, `rebase schema generate`, `rebase doctor` — so you do not have to
+remember:
+
+- `kanban` (or a `kanban` entry in `enabledViews`/`defaultViewMode`) with no
+  `orderProperty` → **warning**, naming the property to add. It boots: the board
+  works, it just does not reorder.
+- `orderProperty` naming a property that does not exist, or one that is not a
+  `string` → **error**, and the boot fails. Both are unambiguously broken, and
+  the fix is one line.
+
+Nothing checks decision 3 — no static check can tell which code paths write to
+a collection. That one is on you.
+
+### Checklist
+
+Before calling a Kanban collection done:
+
+- [ ] `kanban.columnProperty` names an **enum** property
+- [ ] `orderProperty` is set, and names a **string** property
+- [ ] that property is hidden (`admin: { disabled: true, hideFromCollection: true }`)
+- [ ] every code path that creates rows in this collection assigns an order key
+- [ ] the property exists in `properties` — under `defineCollection` the key is
+      checked against them, so a missing one narrows to `never` and fails to
+      typecheck; under `PostgresCollectionConfig` it is a plain `string` and a
+      typo goes through silently
+- [ ] the schema was regenerated and pushed after adding it (**Schema Migration
+      Workflow** below) — the column has to exist before anything can write a key
 
 ## Search
 

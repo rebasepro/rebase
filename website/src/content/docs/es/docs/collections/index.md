@@ -131,6 +131,8 @@ Pero una anotación solo *valida* el objeto — no puede ver los nombres de tus 
 | `properties` | `Properties` | **Requerido.** Mapa de clave de propiedad → definición de propiedad. Cada clave se convierte en una columna de la base de datos. |
 | `relations` | `Relation[]` | Relaciones SQL — claves foráneas, tablas de unión. Ver [Relaciones](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Políticas de Seguridad a Nivel de Fila. Ver [Reglas de Seguridad](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Índices de Postgres que necesita esta tabla. Ver [Índices](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Búsqueda de texto completo clasificada sobre los campos que especifiques, incluyendo contenido JSONB y arrays. Solo Postgres. Ver [Búsqueda](/docs/backend/search). |
 
 ### Configuración de la UI
 
@@ -140,7 +142,8 @@ Todos los siguientes van dentro de `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Modo de vista predeterminado |
 | `enabledViews` | `ViewMode[]` | Las cuatro | Qué modos de vista están disponibles |
-| `kanban` | `KanbanConfig` | — | Configuración de Kanban (propiedad de columna) |
+| `kanban` | `KanbanConfig` | — | Configuración de Kanban (propiedad de columna). Combínala siempre con `orderProperty` — consulta [Modos de vista](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Clave de la propiedad **string** que guarda la clave de orden de arrastrar y soltar. Necesaria para que un tablero Kanban funcione |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | Cómo se abren las entidades para editar |
 | `sideDialogWidth` | `number \| string` | — | Ancho del diálogo lateral |
 | `inlineEditing` | `boolean` | `true` | Habilitar edición en línea en la vista de hoja de cálculo |

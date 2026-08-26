@@ -26,9 +26,9 @@ const productsCollection = defineCollection({
     admin: {
         defaultViewMode: "table",            // Vista predeterminada
         enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
+        orderProperty: "__order",           // Propiedad para el ordenamiento de arrastrar y soltar
         kanban: {
-            columnProperty: "status",        // Propiedad de enumeración para columnas
-            orderProperty: "sortOrder"      // Propiedad para el ordenamiento de arrastrar y soltar
+            columnProperty: "status"         // Propiedad de enumeración para columnas
         }
     }
 });
@@ -91,13 +91,17 @@ const tasksCollection = defineCollection({
                 { id: "done", label: "Hecho", color: "green" }
             ]
         },
-        sortOrder: { type: "number", name: "Orden de Clasificación" }
+        __order: {
+            type: "string",
+            name: "Order",
+            admin: { disabled: true, hideFromCollection: true }
+        }
     },
     admin: {
         defaultViewMode: "kanban",
+        orderProperty: "__order",
         kanban: {
-            columnProperty: "status",
-            orderProperty: "sortOrder"
+            columnProperty: "status"
         }
     }
 });
@@ -105,6 +109,67 @@ const tasksCollection = defineCollection({
 ```
 
 Arrastrar y soltar entre columnas actualiza automáticamente el campo de enumeración y el orden de clasificación.
+
+### Ordenamiento
+
+`kanban` y `orderProperty` son dos mitades de una misma función. Declara siempre
+ambas — tres descuidos aquí producen un tablero que *parece* configurado y no lo
+está.
+
+**`orderProperty` no es opcional.** Sin ella una tarjeta se sigue arrastrando
+entre columnas, porque eso escribe `columnProperty`. Su posición *dentro* de una
+columna no tiene dónde guardarse: vuelve a su sitio en la siguiente lectura, y el
+tablero muestra una barra ámbar avisando de que el ordenamiento no está
+configurado.
+
+**La propiedad debe ser un `string`.** Reordenar escribe una clave de
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`,
+`"i1"`, `"i0i"` — no un índice. Una propiedad `number` nunca puede contenerla: un
+`sortOrder` numérico deja el tablero pidiendo inicializarse para siempre, y la
+propia inicialización falla contra una columna numérica. Decláralo oculto: es
+maquinaria, no contenido.
+
+```typescript
+__order: {
+    type: "string",
+    name: "Order",
+    admin: { disabled: true, hideFromCollection: true }
+}
+```
+
+**Las filas creadas fuera del admin llegan sin clave.** Nadie la asigna al
+insertar. Una fila escrita por un cron, un script de seed, una migración o la API
+REST llega con `__order` en null, y el tablero muestra *"Some items don't have
+order values"* con un botón **Initialize** — un clic rellena la primera página, y
+la siguiente ejecución del cron devuelve la barra. Si un backend crea filas para
+un tablero, debe asignar la clave él mismo, con el mismo alfabeto que usa el
+admin:
+
+```typescript
+import { generateKeyBetween } from "fractional-indexing";
+
+// Base36, minúsculas. Quien ordena es Postgres, cuya collation por defecto no es
+// el orden de bytes: omitir este tercer argumento produce claves base62 como
+// "a0" que el tablero rechaza.
+const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+const tasks = client.data.collection("tasks");
+
+// La última clave en uso. `is-not-null` no es opcional: un orden descendente es
+// NULLS FIRST, así que sin él esto relee una de las filas que precisamente no
+// tienen clave y cada inserción cae en el mismo "i0".
+const { data: last } = await tasks.find({
+    where: { __order: ["is-not-null", null] },
+    orderBy: ["__order", "desc"],
+    limit: 1
+});
+
+await tasks.create({
+    title,
+    status,
+    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+});
+```
 
 ## Vista de Tarjetas
 

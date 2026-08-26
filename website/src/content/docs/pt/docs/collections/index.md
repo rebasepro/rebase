@@ -131,6 +131,8 @@ Mas uma anotação apenas *valida* o objeto — ela não enxerga os nomes das su
 | `properties` | `Properties` | **Obrigatório.** Mapa de chave de propriedade → definição de propriedade. Cada chave se torna uma coluna de banco de dados. |
 | `relations` | `Relation[]` | Relações SQL — chaves estrangeiras, tabelas de junção. Veja [Relações](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Políticas de Segurança em Nível de Linha. Veja [Regras de Segurança](/docs/collections/security-rules). |
+| `indexes` | `CollectionIndex[]` | Índices do Postgres de que esta tabela precisa. Veja [Índices](/docs/backend/indexes). |
+| `search` | `SearchConfig` | Busca textual (full-text) ranqueada sobre os campos que você especificar, incluindo conteúdo de JSONB e arrays. Apenas Postgres. Veja [Busca](/docs/backend/search). |
 
 ### Configuração da UI
 
@@ -140,7 +142,8 @@ Todos os campos seguintes ficam dentro de `admin`.
 |----------|------|---------|-------------|
 | `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Modo de visualização padrão |
 | `enabledViews` | `ViewMode[]` | Todos os quatro | Quais modos de visualização estão disponíveis |
-| `kanban` | `KanbanConfig` | — | Configuração Kanban (propriedade da coluna) |
+| `kanban` | `KanbanConfig` | — | Configuração Kanban (propriedade da coluna). Combine sempre com `orderProperty` — veja [Modos de Visualização](/docs/frontend/view-modes) |
+| `orderProperty` | `string` | — | Chave da propriedade **string** que guarda a chave de ordenação por arrastar e soltar. Necessária para um quadro Kanban funcional |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split"` | `"full_screen"` | Como as entidades são abertas para edição |
 | `sideDialogWidth` | `number \| string` | — | Largura do diálogo lateral |
 | `inlineEditing` | `boolean` | `true` | Habilita a edição inline na visualização de planilha |
