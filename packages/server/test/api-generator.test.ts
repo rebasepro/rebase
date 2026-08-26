@@ -645,17 +645,24 @@ values: savedRow },
 });
 
 /**
- * PATCH is the only update verb, and it matches what the handler does.
+ * PATCH is the update verb; PUT is the alias published clients still send.
  *
  * The handler merges — it writes the columns in the body and leaves the rest —
  * which is what `update(id, data: Partial<M>)` means. PUT was the original
  * route, and PUT means replace, so the generated OpenAPI spec described a full
  * replacement (reusing the *create* input schema, `required` fields and all)
  * for an endpoint that performs a partial one. A client generated from that
- * spec demanded fields the server does not. PATCH was mounted beside it, then
- * the alias was removed: the last assertion here is that PUT is really gone,
- * because a route left mounted is a second definition of the same operation
- * waiting to drift from the first.
+ * spec demanded fields the server does not. PATCH is what the spec names, and
+ * the only verb anything generated from it can send.
+ *
+ * The alias was removed once and that removal reached production before the
+ * clients did: every SDK up to 0.16.0 sends PUT from `collection.update()`, so
+ * `rebase cloud stop | start | restart` — three commands that are one
+ * `update()` — answered 404 against a control plane that had already dropped
+ * it. So both verbs are asserted here: same write, same 404 on a missing row,
+ * and PUT additionally carrying the header that tells a caller it is on its way
+ * out. The last test is what dates the alias — when no released SDK sends PUT,
+ * it and the route go together.
  */
 describe("RestApiGenerator — update verbs", () => {
     let mockDriver: jest.Mocked<DataDriver>;
@@ -689,7 +696,7 @@ describe("RestApiGenerator — update verbs", () => {
         } as unknown as jest.Mocked<DataDriver>;
     });
 
-    it.each(["PATCH"])("%s /api/users/123 performs the same partial write", async (method) => {
+    it.each(["PATCH", "PUT"])("%s /api/users/123 performs the same partial write", async (method) => {
         const res = await app().request("/api/users/123", {
             method,
             headers: { "Content-Type": "application/json" },
@@ -709,7 +716,7 @@ describe("RestApiGenerator — update verbs", () => {
         );
     });
 
-    it.each(["PATCH"])("%s on a missing row is a 404", async (method) => {
+    it.each(["PATCH", "PUT"])("%s on a missing row is a 404", async (method) => {
         mockDriver.fetchOne.mockResolvedValue(undefined as any);
 
         const res = await app().request("/api/users/nope", {
@@ -722,14 +729,30 @@ describe("RestApiGenerator — update verbs", () => {
         expect(mockDriver.save).not.toHaveBeenCalled();
     });
 
-    it("no longer answers PUT", async () => {
+    it("answers PUT, and says it is deprecated", async () => {
         const res = await app().request("/api/users/123", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: "Bob Jr" })
         });
 
-        expect(res.status).toBe(404);
-        expect(mockDriver.save).not.toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        // RFC 8594. The signal a caller can act on without reading a changelog,
+        // and the reason this alias can be removed later without a surprise.
+        expect(res.headers.get("Deprecation")).toBe("true");
+    });
+
+    it("does not advertise PUT: PATCH is the only verb on the write path", async () => {
+        // The alias is a courtesy to clients already in the field, not part of
+        // the contract — anything generated from the spec sends PATCH, so the
+        // spec must keep describing exactly one update operation.
+        const res = await app().request("/api/users/123", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Bob Jr" })
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("Deprecation")).toBeNull();
     });
 });

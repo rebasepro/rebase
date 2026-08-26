@@ -841,14 +841,33 @@ values: entity as Record<string, unknown> },
          * gateway in front of this API would reject partial updates the server
          * would have accepted.
          *
-         * PUT was mounted on the same handler for a while so that published
-         * SDKs kept working. It is gone: two verbs for one operation meant the
-         * spec had to describe the same route twice, one of them marked
-         * deprecated, and a merge served under a verb that means replace is a
-         * contract nobody can generate against. `update()` in the SDK sends
-         * PATCH.
+         * PUT is mounted on the same handler, and is **not** in the generated
+         * spec: the contract is PATCH, and a client generated from the spec can
+         * only ever send it. The alias exists because dropping it was shipped
+         * ahead of the clients that needed it — every published SDK up to and
+         * including 0.16.0 sends PUT from `collection.update()`, so a control
+         * plane that had already dropped the alias answered `rebase cloud
+         * stop | start | restart` with a 404 naming the caller's own collection.
+         * A verb removal is only safe once the oldest client in the field speaks
+         * the new one.
+         *
+         * Delete it when no released SDK sends PUT any more — i.e. one release
+         * after the first published client whose `update()` sends PATCH, giving
+         * the field a version to move to.
+         *
+         * `Deprecation: true` is RFC 8594's signal, and how a caller finds out
+         * before that happens. No `Sunset` date: the removal is gated on which
+         * SDKs are in the field rather than on a calendar, and inventing a date
+         * we would not honour is worse than saying only what is true. Set inline
+         * rather than through a wrapper — a wrapper has to name the handler's
+         * return type, and Hono's is worth neither widening nor casting for one
+         * header at two call sites.
          */
         this.router.patch(`${basePath}/:id`, updateEntity);
+        this.router.put(`${basePath}/:id`, (c) => {
+            c.header("Deprecation", "true");
+            return updateEntity(c);
+        });
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
@@ -1135,6 +1154,11 @@ id: parsed.id });
         };
 
         this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
+        // The same alias, for the same reason — see the note on `updateEntity`.
+        this.router.put("/:parent/:parentId/:rest{.+}", (c, next) => {
+            c.header("Deprecation", "true");
+            return updateNested(c, next);
+        });
 
         // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {

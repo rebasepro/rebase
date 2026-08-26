@@ -6,6 +6,7 @@
  * This half is the part that cannot be unit-tested meaningfully: it opens a
  * connection and starts an interval.
  */
+import { monitorEventLoopDelay } from "node:perf_hooks";
 import { logger } from "../utils/logger.js";
 import type { DataDriver } from "@rebasepro/types";
 import {
@@ -53,7 +54,7 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
     return {
         ensure: () => ensureMetricsHistory(exec),
         read: (series, sinceMinutes) => readSeries(exec, series, sinceMinutes),
-        start() {
+        start(): () => void {
             // Which process this is. A tenant's replicas share one database and
             // each records its own numbers, so a row needs to say whose they
             // are — without it they overwrite each other and a scaled-out app
@@ -65,9 +66,32 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
             let cursor: { cpu: NodeJS.CpuUsage; at: number } | null = null;
             let stopped = false;
 
+            // Event-loop delay: how long a callback waited past its schedule.
+            // The one number here that says whether this process is *healthy*
+            // rather than how much it is consuming — a pod can sit at 20% CPU
+            // and still be unable to answer, and nothing else recorded would
+            // show it.
+            //
+            // `monitorEventLoopDelay` samples in libuv at a fixed resolution and
+            // costs effectively nothing; `.enable()` is required, and the
+            // histogram is reset each tick so every sample describes its own
+            // minute rather than the process's whole life.
+            interface LoopHistogram { mean: number; enable(): void; reset(): void }
+            let loop: LoopHistogram | null = null;
+            try {
+                loop = monitorEventLoopDelay({ resolution: 20 }) as unknown as LoopHistogram;
+                loop.enable();
+            } catch {
+                // A runtime without it still records the other two.
+                loop = null;
+            }
+
             const tick = async () => {
                 if (stopped) return;
-                const { samples, cursor: next } = sampleSelf(cursor);
+                // Nanoseconds from the histogram, milliseconds on the wire.
+                const delayMs = loop ? loop.mean / 1e6 : undefined;
+                loop?.reset();
+                const { samples, cursor: next } = sampleSelf(cursor, Date.now(), delayMs);
                 cursor = next;
                 try {
                     await recordSamples(exec, samples, instance);

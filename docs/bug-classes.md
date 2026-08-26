@@ -976,6 +976,18 @@ caller. The filter belongs at the exported boundary, not in the caller: these
 functions have four callers each (generate, push, boot, doctor) and a rule
 applied in three of them is a rule that does not exist.
 
+**Second instance (2026-08-26), `rollbackDeployment`.** It restores a tenant by
+finding the newest ReplicaSet whose pod template differs from the current one —
+out of `listNamespacedReplicaSet({ namespace })`, every ReplicaSet in the
+namespace. A split tenant runs three Deployments in one namespace, their
+templates always differ, and the newest belongs to whichever unit deployed last.
+So rolling back the api unit would have restated the *worker's* pod template onto
+it: the API replaced by a process that serves no HTTP, by the operation whose
+whole purpose is restoring a working state. Same question as the sweep above —
+what subset of this list am I entitled to — with the same answer: filter at the
+read, on `ownerReferences`. It had never fired only because rollback and split
+tenants have not met in production.
+
 **Watch for:** the include list. Most of the outputs here were inert — an empty
 table nobody writes to. The exclude list `db push` builds is the inverse of the
 include list, so a name wrongly *included* is a name Atlas is allowed to **drop**:
@@ -2811,3 +2823,132 @@ version counted occurrences of `X-Accel-Buffering`, and renaming the header to
 `X-Accel-Buffering-x` still matched — the mutation passed and the guard was
 inert. It matches the whole call now. Prove the gate fails; a guard you did not
 break is a guard you did not test.
+
+## 49. "Unknown" has no channel on the wire
+
+Every producer distinguishes *absent* from *could not look*. Every boundary type
+between them destroys the distinction. The prose is right at each site and the
+payload cannot carry what the prose says.
+
+The shape, from an audit of one subsystem on 2026-08-26 where **seven of eleven
+findings had this single root cause**:
+
+| the producer says | the boundary offers | what the reader sees |
+|---|---|---|
+| "Returns `null` — never `[]` — so 'no instances' and 'could not look' stay distinct" | `instances: T[]` (non-nullable) | an empty list, i.e. "nothing is running" |
+| "Absent, not zero" | no `allocation` key at all | a container with no limits |
+| "Not '0%': we could not read the deployment, so usage is unknown" | a `status` word derived from `availableReplicas` | a measured `CPU 0.0%` |
+| a deliberate 501 meaning "I keep no history" | `FetchLike = { ok: boolean }` | "your runtime lacks this feature" — said to a pod that was restarting |
+| a 404 meaning "there is no HPA" | one `catch { return null }` | a red banner accusing a healthy, paid autoscaler of provisioning nothing |
+
+**Why it is invisible.** A narrowed structural type accepts a superset silently,
+so the field that carries the distinction can be dropped from a declaration
+without a single compiler error. One `as SomeState` at the consumer accepts a
+*subset* just as silently. Neither end complains; the information simply stops
+existing halfway across.
+
+**Why it survives review.** The comment at each site states the correct rule, so
+reading the code confirms the behaviour is intended — and the reader stops
+there. **Treat a comment asserting behaviour as a specification that owes you a
+test, never as evidence the behaviour exists.** Each of the findings above sat
+within forty lines of a comment correctly forbidding it.
+
+**The class-level fix is a rule, not N patches:** *a renderer may not assert
+absence unless the payload proves the read happened.* Every payload that can
+carry "nothing" must also be able to carry "could not look" — an `unreadable`
+list, a discriminated result, a nullable that means exactly one thing.
+
+**One test shape enforces it everywhere:**
+
+> A failed read must not produce a payload identical to a successful empty read.
+
+Applied at four boundaries it caught four of the seven directly. Assert the
+**reason**, not just the outcome kind — an oversized body also fails
+`JSON.parse`, so a test checking only `kind === "unreachable"` passes with the
+size check deleted, satisfied by the wrong mechanism.
+
+**Adjacent habit, same audit:** *assert the number, not the state word next to
+it.* A 60-case test file held the fabricated `CPU 0.0%` because one test pinned
+`body.status === "stopped"` and another pinned `body.instances`, and nothing
+ever pinned `body.cpu`. The defect was mutation-proof by construction.
+
+**Where it hides:** the file with no test file at all. Three of the four
+must-fix findings were in one module that had none — while its neighbours, with
+worse comments and 60 tests, had one between them.
+
+## 50. A completion check the state before the change already passes
+
+Something is replaced — a Deployment's pods, a Knative revision, a cached build
+— and the code then waits for the replacement to be "ready". The predicate it
+waits on is one the *outgoing* thing satisfies. So the wait returns immediately,
+against the version being replaced, and everything downstream records a success
+that is a fact about the previous release.
+
+The class is not "polling is hard". It is **a predicate that does not mention
+the change it is supposed to be observing**. `readyReplicas >= desired` is a true
+statement about a healthy Deployment, and it is true one millisecond after an
+apply, when the only pod in existence is the old one. Nothing about it is
+wrong except that it answers a different question than the one being asked.
+
+**Why it is expensive:** it fails in the safe-looking direction, and it takes the
+diagnosis with it. Nothing errors. The rollout is healthy, the pods are up, the
+log line is a green tick, and `deployments list`, `cloud status` and the build
+log all agree the new release is live. The only disagreeing witness is the URL,
+which nobody consults because five other signals just said it was fine. It cost
+thirty minutes and two deploys to establish that a site was serving a build from
+two days earlier, and the log entry it produced records the debugging as the
+expensive part, not the bug.
+
+Its second cost is that it hides *other* bugs. Any failure between "apply
+accepted" and "new code serving" — a bundle that does not land, an image that
+does not pull, a config the runtime rejects — is invisible while the wait keeps
+reporting success on the strength of the pod that is still up.
+
+**The tell:** read the predicate and ask *what was true one instant before the
+operation*. If the answer is "all of it", the check dates nothing. Ordering
+counters (`observedGeneration`) are only half an answer: they go true when the
+controller *notices* the spec, seconds before the new pods exist, and every
+count beside them is still describing the old ones.
+
+**Fix:** compare against the state, not against a threshold. Kubernetes exposes
+per-template counters for exactly this — `updatedReplicas` (pods on the CURRENT
+template), `replicas` (pods on any), `availableReplicas` — which the outgoing
+pods cannot satisfy; Knative exposes `status.observedGeneration` against
+`metadata.generation`. And read a *pre-operation* value where the operation might
+be a no-op: an apply that changes nothing never moves `generation`, so a check
+anchored only to the current value was already true before the deploy began.
+
+Waiting is only safe when something decides it will never finish. Add that
+before the wait: `Progressing: False` is Kubernetes' own verdict, and using it
+beats inventing a timeout — otherwise the fix for "advanced too early" is a
+project that stalls forever instead, which is the same bug with the sign
+flipped.
+
+**Sweep** — 2026-08-26, every place that waits across a version change:
+
+    grep -rn --include='*.ts' -e 'readyReplicas' -e 'while (Date.now()' -e 'Ready' saas/backend/src packages/*/src
+
+| checked | result |
+|---|---|
+| `saas/backend/src/k8s/orchestrator.ts` — `awaitRolloutOrRollback` | **BUG ×2.** Accepted on the first poll of a real rollout (old pod ready, nothing unavailable yet) *and* on an apply that changed nothing (`generation` never moved). Prints `✅ New version is serving.` |
+| `saas/backend/src/managed/tenant-readiness.ts` — `isRolledOut` | **BUG, widest blast radius.** Gates whether a runtime release advances across the fleet. Its own comment claimed the `observedGeneration` half prevented exactly this |
+| `saas/backend/src/cloudrun/admin.ts` — `waitForCloudRunReady` | **BUG, other substrate.** Returned on the `Ready` condition, which describes the last revision Knative reconciled; the recorded `revision` was the one being replaced |
+| `saas/backend/src/k8s/orchestrator.ts` — Kaniko pod selection | clean, and the correct sibling: takes the newest non-terminating pod, with a comment naming the failure ("streams the old build's logs and reports the old build's exit status as this deployment's result"). The same bug, already learned once, one file away from three that had not |
+| `saas/backend/src/k8s/orchestrator.ts` — Kaniko job removal wait | clean by construction: it waits for a **404**, an absence the previous state cannot satisfy. Waiting for a thing to be gone is immune to this class |
+| `saas/backend/src/k8s/baseline.ts` — `waitForDeployments` | clean by construction: installs cluster components that did not exist before, so there is no previous version whose readiness could be borrowed |
+| `saas/backend/src/k8s/baseline.ts` — `applyClusterIssuers` | clean: retries an *action* until it stops throwing, rather than reading a state that might be stale |
+| `saas/backend/src/managed/tenant-live-stream.ts`, `saas/backend/functions/metrics.ts` | clean, and the distinction worth keeping: both read `readyReplicas` to **show** a number in the console. The same counter is correct as a report and wrong as a verdict |
+| `saas/backend/functions/deploy.ts` — which Deployment the deploy waits on | **BUG, one level up.** The wait takes a single Deployment name and the deploy used the default, so a split tenant had its functions and worker units unobserved: a worker crash-looping still deployed "successfully", surfacing days later as jobs not running |
+
+**Gated by** `saas/backend/src/k8s/rollout-counter-guard.test.ts`: a file that
+reads a summed counter must read a per-template one too, or be named as
+reporting-only with its reason. Comments are stripped before matching — all
+three fixes explain the old counters at length, and a guard that reads prose
+finds the explanation instead of the defect. Proved failing against a planted
+violation.
+
+**Watch for:** the fix that only moves the failure. Making a rollout-in-progress
+report `not-ready` would revert healthy tenants for being mid-move; making it
+`unknown` stalls forever on a pod that can never be scheduled. Three states and
+Kubernetes' own progress deadline are what let both be right — when a wait gains
+a "not yet" answer, ask what happens to something that stays in it.

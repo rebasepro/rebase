@@ -4,7 +4,8 @@ import {
     readSeries,
     sampleSelf,
     RETENTION_DAYS,
-    METRICS_HISTORY_TABLE
+    METRICS_HISTORY_TABLE,
+    METRIC_SERIES
 } from "../src/metrics/history-store";
 
 /** Records every statement so the SQL itself can be asserted. */
@@ -209,5 +210,89 @@ describe("metrics history — the route's payload", () => {
         await call(async (_s: string, minutes: number) => { asked = minutes; return []; },
             "/history?series=cpu_millicores&minutes=999999");
         expect(asked).toBe(20_160);
+    });
+});
+
+describe("metrics history — the minute still being written", () => {
+    it("excludes the current bucket, which is only partly reported", async () => {
+        // Replicas sample on their own phase, so the newest bucket holds
+        // whichever pods have ticked so far — typically one of three. The chart
+        // takes the last point as its headline, so this rendered one replica's
+        // CPU as the whole deployment's, ending the line in a cliff with the
+        // instance step dropping under it: a scale-down the caption then
+        // explains to the reader as real.
+        const { exec, calls } = fakeExec();
+        await readSeries(exec, "cpu_millicores", 60);
+        expect(calls[0].sql).toMatch(/at\s*<\s*date_trunc\('minute', now\(\)\)/);
+    });
+});
+
+describe("metrics history — the declared list and the written one", () => {
+    it("declares nothing it does not record", async () => {
+        // `METRIC_SERIES` once named five series while `sampleSelf` wrote two.
+        // The route validates `?series=` against the list, so the other three
+        // were *valid* parameters that returned `points: []` — which is exactly
+        // the empty chart that reads as a quiet period, and exactly what the
+        // 400 beside it exists to prevent. A declared-but-unwritten series is
+        // worse than an absent one: the 400 tells you the name is wrong, and
+        // the empty array tells you the app was idle.
+        const first = sampleSelf(null, 1_000, 3.5);
+        const second = sampleSelf(first.cursor, 2_000, 3.5);
+        const written = new Set([...first.samples, ...second.samples].map(s => s.series));
+        expect([...written].sort()).toEqual([...METRIC_SERIES].sort());
+    });
+
+    it("omits event-loop delay when it could not be measured", () => {
+        // Zero is a real and common reading for an idle process, so defaulting
+        // to it would be indistinguishable from a healthy one.
+        const { samples } = sampleSelf({ cpu: process.cpuUsage(), at: 1_000 }, 2_000, undefined);
+        expect(samples.some(s => s.series === "event_loop_delay_ms")).toBe(false);
+    });
+
+    it("records a delay it was given", () => {
+        const { samples } = sampleSelf({ cpu: process.cpuUsage(), at: 1_000 }, 2_000, 12.25);
+        expect(samples.find(s => s.series === "event_loop_delay_ms")?.value).toBe(12.25);
+    });
+});
+
+describe("metrics history — the end-user role cannot address it", () => {
+    it("revokes rebase_user at creation", async () => {
+        // The driver grants `rebase_user` full DML across a project's schemas,
+        // plus ALTER DEFAULT PRIVILEGES so tables created later inherit it — and
+        // this one is created later, at boot. Without the revoke an
+        // authenticated request could read and write another deployment's
+        // process metrics. `pnpm rls:check` called it `[critical] rls-disabled`
+        // the first time CI saw the table, which is exactly what that gate is
+        // for.
+        const { exec, calls } = fakeExec();
+        await ensureMetricsHistory(exec);
+        const revoke = calls.find(c => c.sql.includes("REVOKE ALL"));
+        expect(revoke).toBeDefined();
+        expect(revoke!.sql).toContain('"rebase"."metric_samples"');
+        expect(revoke!.sql).toContain("rebase_user");
+    });
+
+    it("is listed for the boot-time sweep, not only revoked at creation", async () => {
+        // The creation-time revoke fires once, on the boot that first makes the
+        // table, so it cannot repair a database provisioned before the revoke
+        // existed. `REBASE_INTERNAL_TABLES` is what the sweep in `ensureAppRole`
+        // iterates — a table revoked at creation but missing from that list is
+        // permanently stranded on every older database. That already happened
+        // once, to `jobs`.
+        const { REBASE_INTERNAL_TABLES } = await import("@rebasepro/common");
+        expect(REBASE_INTERNAL_TABLES).toContain("metric_samples");
+    });
+
+    it("revokes before it writes anything", async () => {
+        // Order matters on a database where the table already exists with the
+        // inherited grant: the revoke has to land before this boot's first
+        // sample, or there is a window where the row is both present and
+        // readable by the app's role.
+        const { exec, calls } = fakeExec();
+        await ensureMetricsHistory(exec);
+        const revokeAt = calls.findIndex(c => c.sql.includes("REVOKE ALL"));
+        const deleteAt = calls.findIndex(c => c.sql.includes("DELETE"));
+        expect(revokeAt).toBeGreaterThanOrEqual(0);
+        expect(revokeAt).toBeLessThan(deleteAt);
     });
 });
