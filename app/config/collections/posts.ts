@@ -173,6 +173,15 @@ const postsCollection: PostgresCollectionConfig = {
                 kind: "manyToMany",
                 target: () => tagsCollection,
             }
+        },
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: {
+                disabled: true,
+                hideFromCollection: true
+            },
+            description: "Fractional index maintained by the Kanban board"
         }
     },
     callbacks: {
@@ -221,6 +230,7 @@ const postsCollection: PostgresCollectionConfig = {
         kanban: {
             columnProperty: "status"
         },
+        orderProperty: "__order",
         propertiesOrder: [
             "title",
             "slug",
@@ -232,7 +242,8 @@ const postsCollection: PostgresCollectionConfig = {
             "tags",
             "content",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "__order"
         ],
         entityViews: [
             "blog_preview"

@@ -162,6 +162,7 @@ export const posts = pgTable("posts", {
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     authorId: uuid("author_id").references(() => authors.id, { onDelete: "set null" }),
+    __order: text("order"),
     search_vector: customType({ dataType() { return 'tsvector'; } })("search_vector").generatedAlwaysAs(sql`setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("excerpt", '')), 'C') || setweight(to_tsvector('english', public.rebase_search_text(coalesce("content", '{}'::jsonb))), 'D')`)
 }, (table) => ([
     pgPolicy("posts_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
