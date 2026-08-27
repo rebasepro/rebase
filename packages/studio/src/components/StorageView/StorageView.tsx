@@ -505,7 +505,6 @@ export const StorageView = () => {
     const [loading, setLoading] = useState(true);
     /** Why the listing failed, classified — see `storage-failure.ts`. */
     const [failure, setFailure] = useState<StorageFailure | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     // Contents
     const [folders, setFolders] = useState<StorageFile[]>([]);
@@ -545,7 +544,6 @@ export const StorageView = () => {
     // ── Fetch directory contents ──
     const fetchContents = useCallback(async (path: string) => {
         setLoading(true);
-        setError(null);
         setFailure(null);
         try {
             const result: StorageListResult = await storageSourceRef.current.listObjects(path);
