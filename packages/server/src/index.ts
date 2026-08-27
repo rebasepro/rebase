@@ -124,7 +124,16 @@ export {
     // app, and would otherwise have no way to publish a JWKS.
     getJwks,
     hasAsymmetricSigningKey,
-    createJwksRoutes
+    createJwksRoutes,
+    // Exported because the documented fix for the dual-package hazard requires
+    // it. Under pnpm with `--preserve-symlinks`, Node can resolve two module
+    // instances of this package: the one `initializeRebaseBackend` configures
+    // and the one the request path reads, which surfaces as
+    // "JWT secret not configured. Call configureJwt() first" on a backend that
+    // plainly did configure it. `rebase-backend-postgres`'s SKILL.md tells you
+    // to call `configureJwt` yourself before init — sound advice that could not
+    // be followed, because the symbol was internal.
+    configureJwt
 } from "./auth";
 export type {
     // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.

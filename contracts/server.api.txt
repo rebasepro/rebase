@@ -63,6 +63,7 @@ function classifySurface { collection, surface }
 function cleanupDevPortFile
 function clearActiveDevEmailSink
 function compileStoragePolicies
+function configureJwt
 function createAppleProvider
 function createBackupRoutes
 function createBitbucketProvider

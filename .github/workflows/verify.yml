@@ -297,6 +297,16 @@ jobs:
       - name: Runtime API surface
         run: pnpm run check:api-surface
 
+      # Documentation is the one consumer of the API that is never compiled. A
+      # skill can instruct people to import a deleted symbol indefinitely and
+      # nothing notices — the code is a fenced block. Two were live when this was
+      # added: a cron skill declaring the removed `ctx.client` in a type block
+      # eight lines under its own prose saying the name was gone, and a backend
+      # skill whose FIX for a confusing dual-package error was itself an import
+      # that did not resolve. Reads the same baseline as the gate above.
+      - name: Documented imports exist
+        run: pnpm run check:docs-imports
+
       # Whether the *published* types survive being resolved. Every other gate
       # in this file maps `@rebasepro/*` onto source, so all of them were blind
       # to the state the packages were actually shipped in: extensionless

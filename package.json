@@ -97,7 +97,8 @@
     "deploy:demo": "./tooling/scripts/deploy-demo.sh",
     "deploy:demo:quick": "./tooling/scripts/deploy-demo.sh --only-deploy",
     "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true",
-    "smoke:baas": "pnpm --filter @rebasepro/server-postgres smoke:baas"
+    "smoke:baas": "pnpm --filter @rebasepro/server-postgres smoke:baas",
+    "check:docs-imports": "node tooling/scripts/check-docs-imports.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

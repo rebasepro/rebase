@@ -229,8 +229,6 @@ interface CronJobContext {
     /** The server-side Rebase singleton — data, email, storage, raw SQL. */
     rebase: RebaseServerClient;
 
-    /** @deprecated The same object, under the name this context used before. */
-    client: RebaseServerClient & { data: RebaseSdkData };
 }
 ```
 
@@ -240,7 +238,6 @@ interface CronJobContext {
 | `scheduledAt` | `Date` | The timestamp when this execution was scheduled to start. |
 | `log` | `(...args: unknown[]) => void` | Logger whose output is captured in `CronJobLogEntry.logs`. Use like `console.log`. |
 | `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
-| `client` | *deprecated* | The same object under its old name. Removed in the next major; its type re-exposes `client.data`, which `RebaseServerClient` deliberately omits so the privileged plane has one name. |
 
 > **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so DataHooks and Collection Callbacks still run on this path even though the HTTP loop is skipped. This means:
 > - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
