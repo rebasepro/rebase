@@ -43,7 +43,7 @@
         "../types/src"
       ],
       "@rebasepro/cms": [
-        "../admin/src"
+        "../cms/src"
       ],
       "@rebasepro/inference": [
         "../inference/src"

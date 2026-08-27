@@ -29,7 +29,15 @@ const RENAMED = {
     "mcp-server": "mcp",
     formex: "forms",
     core: "app",
-    auth: "app (folded in — it was one hook)"
+    auth: "app (folded in — it was one hook)",
+    // 0.17.0: the panel's CMS half took a product name of its own, so "admin"
+    // could stop meaning both the whole panel and the content half of it.
+    // Deliberately NOT in BARE below: `admin` is an ordinary word here — an auth
+    // role, the `admin:` collection config key, a dozen identifiers named after
+    // that key — so only the anchored `@rebasepro/admin` and `packages/admin/`
+    // forms denote the package that is gone.
+    admin: "cms",
+    "admin-types": "cms-types"
 };
 
 /**

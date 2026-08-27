@@ -80,7 +80,7 @@
       "node"
     ],
     "moduleNameMapper": {
-      "^@rebasepro/cms$": "<rootDir>/../admin/src/index.ts",
+      "^@rebasepro/cms$": "<rootDir>/../cms/src/index.ts",
       "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts",
       "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",

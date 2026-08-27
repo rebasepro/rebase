@@ -1,6 +1,6 @@
 ---
 name: rebase-studio
-description: Guide for using and customizing the Rebase Studio developer tools layer. Use this skill when the user needs help with Studio dev tools (SQL/JS/RLS/Storage/Cron/Schema Visualizer/Branches/API Explorer/Logs), admin modes (content/studio/settings), Studio home page customization, bridge hooks, or Studio configuration. Studio is NOT the CMS — the CMS lives in @rebasepro/cms.
+description: Guide for using and customizing the Rebase Studio developer tools layer. Use this skill when the user needs help with Studio dev tools (SQL/JS/RLS/Storage/Cron/Schema Visualizer/Branches/API Explorer/Logs), admin modes (cms/studio/settings), Studio home page customization, bridge hooks, or Studio configuration. Studio is NOT the CMS — the CMS lives in @rebasepro/cms.
 ---
 
 # Rebase Studio
@@ -15,15 +15,15 @@ Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It 
 
 ## Admin Modes (Tri-State)
 
-> **IMPORTANT FOR AGENTS:** The Studio uses a **tri-state** mode system: `"content"` | `"studio"` | `"settings"`. It is NOT `"developer"` / `"editor"`. These are the only valid values.
+> **IMPORTANT FOR AGENTS:** The Studio uses a **tri-state** mode system: `"cms"` | `"studio"` | `"settings"`. It is NOT `"developer"` / `"editor"`. These are the only valid values.
 
-The admin mode is controlled by `AdminModeController` and persisted in `localStorage` under the key `rebase-admin-mode`. Default mode is `"content"`.
+The admin mode is controlled by `AdminModeController` and persisted in `localStorage` under the key `rebase-admin-mode`. Default mode is `"cms"`. A browser that used the panel before 0.17.0 still holds `"content"`; it is migrated on read.
 
 ### Mode Values
 
 | Mode | Description | Navigation Shows |
 |------|-------------|------------------|
-| `"content"` | Clean CMS experience for editing data. Default mode. | Collections + admin entries (Users/Roles) |
+| `"cms"` | Clean CMS experience for editing data. Default mode. | Collections + admin entries (Users/Roles) |
 | `"studio"` | Developer tools and schema management. | Dev tool views + admin entries (Users/Roles) |
 | `"settings"` | Application settings and configuration. | Settings-related views |
 
@@ -33,8 +33,8 @@ The admin mode is controlled by `AdminModeController` and persisted in `localSto
 import { useAdminModeController } from "@rebasepro/app";
 
 interface AdminModeController {
-    mode: "content" | "studio" | "settings";
-    setMode: (mode: "content" | "studio" | "settings") => void;
+    mode: "cms" | "studio" | "settings";
+    setMode: (mode: "cms" | "studio" | "settings") => void;
 }
 
 // Usage in a component
@@ -47,13 +47,13 @@ function MyComponent() {
     }
 
     // Switch modes
-    adminModeController.setMode("content");
+    adminModeController.setMode("cms");
 }
 ```
 
 ### Drawer Mode Switch
 
-When `<RebaseStudio>` is registered, the drawer automatically renders a segmented **Content / Studio** toggle. Clicking "Content" sets mode to `"content"` and navigates to the base path. Clicking "Studio" sets mode to `"studio"` and navigates to `/s`.
+When `<RebaseStudio>` is registered, the drawer automatically renders a segmented **Content / Studio** toggle. Clicking "Content" (the button label is unchanged) sets mode to `"cms"` and navigates to the base path. Clicking "Studio" sets mode to `"studio"` and navigates to `/s`.
 
 ## Effective Role Simulation
 

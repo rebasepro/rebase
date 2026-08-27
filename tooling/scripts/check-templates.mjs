@@ -134,7 +134,7 @@ function materializeBaas(into) {
     // overlay replaces config/index.ts with one that exports only that.
     fs.rmSync(path.join(into, "frontend"), { recursive: true, force: true });
     fs.rmSync(path.join(into, "config/collections"), { recursive: true, force: true });
-    for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
+    for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
         fs.rmSync(path.join(into, "config", stray), { force: true });
     }
     fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
@@ -189,7 +189,7 @@ const TSCONFIG = {
  */
 function checkAdminTypesDeclared() {
     const manifest = path.join(templateConfig, "package.json");
-    const ref = path.join(templateConfig, "admin.d.ts");
+    const ref = path.join(templateConfig, "cms.d.ts");
     const problems = [];
 
     const hasRef = fs.existsSync(ref)

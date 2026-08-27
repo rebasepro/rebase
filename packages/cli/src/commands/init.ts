@@ -808,7 +808,7 @@ force: true });
     // with one that exports the storage hook alone.
     fs.rmSync(path.join(targetDirectory, "config", "collections"), { recursive: true,
 force: true });
-    for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
+    for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
         fs.rmSync(path.join(targetDirectory, "config", stray), { force: true });
     }
     // Generated from collection files; a headless project reads the live schema.

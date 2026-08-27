@@ -7,9 +7,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### EN Pages
 - [Home (EN)](https://rebase.pro/) — [Markdown Version](https://rebase.pro/index.md)
 - [Compare Rebase (EN)](https://rebase.pro/compare) — [Markdown Version](https://rebase.pro/compare.md)
-- [Admin panel (EN)](https://rebase.pro/admin) — [Markdown Version](https://rebase.pro/admin.md)
+- [Rebase CMS (EN)](https://rebase.pro/cms) — [Markdown Version](https://rebase.pro/cms.md)
 - [Rebase Studio (EN)](https://rebase.pro/studio) — [Markdown Version](https://rebase.pro/studio.md)
-- [Content editing (EN)](https://rebase.pro/editing) — [Markdown Version](https://rebase.pro/editing.md)
 - [Client SDK (EN)](https://rebase.pro/sdk) — [Markdown Version](https://rebase.pro/sdk.md)
 - [CLI Tooling (EN)](https://rebase.pro/cli) — [Markdown Version](https://rebase.pro/cli.md)
 - [Backend & APIs (EN)](https://rebase.pro/backend) — [Markdown Version](https://rebase.pro/backend.md)
@@ -26,9 +25,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### ES Pages
 - [Home (ES)](https://rebase.pro/es) — [Markdown Version](https://rebase.pro/es/index.md)
 - [Compare Rebase (ES)](https://rebase.pro/es/compare) — [Markdown Version](https://rebase.pro/es/compare.md)
-- [Admin panel (ES)](https://rebase.pro/es/admin) — [Markdown Version](https://rebase.pro/es/admin.md)
+- [Rebase CMS (ES)](https://rebase.pro/es/cms) — [Markdown Version](https://rebase.pro/es/cms.md)
 - [Rebase Studio (ES)](https://rebase.pro/es/studio) — [Markdown Version](https://rebase.pro/es/studio.md)
-- [Content editing (ES)](https://rebase.pro/es/editing) — [Markdown Version](https://rebase.pro/es/editing.md)
 - [Client SDK (ES)](https://rebase.pro/es/sdk) — [Markdown Version](https://rebase.pro/es/sdk.md)
 - [CLI Tooling (ES)](https://rebase.pro/es/cli) — [Markdown Version](https://rebase.pro/es/cli.md)
 - [Backend & APIs (ES)](https://rebase.pro/es/backend) — [Markdown Version](https://rebase.pro/es/backend.md)
@@ -45,9 +43,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### DE Pages
 - [Home (DE)](https://rebase.pro/de) — [Markdown Version](https://rebase.pro/de/index.md)
 - [Compare Rebase (DE)](https://rebase.pro/de/compare) — [Markdown Version](https://rebase.pro/de/compare.md)
-- [Admin panel (DE)](https://rebase.pro/de/admin) — [Markdown Version](https://rebase.pro/de/admin.md)
+- [Rebase CMS (DE)](https://rebase.pro/de/cms) — [Markdown Version](https://rebase.pro/de/cms.md)
 - [Rebase Studio (DE)](https://rebase.pro/de/studio) — [Markdown Version](https://rebase.pro/de/studio.md)
-- [Content editing (DE)](https://rebase.pro/de/editing) — [Markdown Version](https://rebase.pro/de/editing.md)
 - [Client SDK (DE)](https://rebase.pro/de/sdk) — [Markdown Version](https://rebase.pro/de/sdk.md)
 - [CLI Tooling (DE)](https://rebase.pro/de/cli) — [Markdown Version](https://rebase.pro/de/cli.md)
 - [Backend & APIs (DE)](https://rebase.pro/de/backend) — [Markdown Version](https://rebase.pro/de/backend.md)
@@ -64,9 +61,8 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### FR Pages
 - [Home (FR)](https://rebase.pro/fr) — [Markdown Version](https://rebase.pro/fr/index.md)
 - [Compare Rebase (FR)](https://rebase.pro/fr/compare) — [Markdown Version](https://rebase.pro/fr/compare.md)
-- [Admin panel (FR)](https://rebase.pro/fr/admin) — [Markdown Version](https://rebase.pro/fr/admin.md)
+- [Rebase CMS (FR)](https://rebase.pro/fr/cms) — [Markdown Version](https://rebase.pro/fr/cms.md)
 - [Rebase Studio (FR)](https://rebase.pro/fr/studio) — [Markdown Version](https://rebase.pro/fr/studio.md)
-- [Content editing (FR)](https://rebase.pro/fr/editing) — [Markdown Version](https://rebase.pro/fr/editing.md)
 - [Client SDK (FR)](https://rebase.pro/fr/sdk) — [Markdown Version](https://rebase.pro/fr/sdk.md)
 - [CLI Tooling (FR)](https://rebase.pro/fr/cli) — [Markdown Version](https://rebase.pro/fr/cli.md)
 - [Backend & APIs (FR)](https://rebase.pro/fr/backend) — [Markdown Version](https://rebase.pro/fr/backend.md)

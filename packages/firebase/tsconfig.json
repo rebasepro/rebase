@@ -46,7 +46,7 @@
         "../forms/src"
       ],
       "@rebasepro/cms": [
-        "../admin/src"
+        "../cms/src"
       ],
 
       "@rebasepro/plugin-ai": [

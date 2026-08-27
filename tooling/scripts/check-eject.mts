@@ -100,7 +100,7 @@ function materialize(flavour: "cms" | "baas", into: string): void {
         // Mirrors `applyHeadless` in commands/init.ts.
         fs.rmSync(path.join(into, "frontend"), { recursive: true, force: true });
         fs.rmSync(path.join(into, "config/collections"), { recursive: true, force: true });
-        for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
+        for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
             fs.rmSync(path.join(into, "config", stray), { force: true });
         }
         fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
