@@ -2952,3 +2952,44 @@ report `not-ready` would revert healthy tenants for being mid-move; making it
 `unknown` stalls forever on a pod that can never be scheduled. Three states and
 Kubernetes' own progress deadline are what let both be right — when a wait gains
 a "not yet" answer, ask what happens to something that stays in it.
+
+---
+
+## 50. The reassuring half, and the same defect run backwards
+
+Class 49 says an unknown must have a channel. Two things a full UX sweep of the
+SaaS console's project view (2026-08-27) added to it.
+
+**First: fixing the class once does not fix it.** `read-failure-states.test.ts`
+was written for two catches and keyed its assertions to those two BY NAME
+(`fetchBackups`, `fetchDeployments`). Three more of exactly the same shape were
+invisible to it, all reachable from the tab an owner opens first:
+
+| site | what a failed read said |
+|---|---|
+| `fetchMetrics` — swallowed into `console.error` | `metrics` stays at its initial literal (no `placement`), `describeHealth` reads zero desired replicas, and the Compute page announces **"Not deployed — no instance is scheduled for this project yet"** over a project serving traffic |
+| `<OverviewTab>` — never passed the `deploymentsError` the fix had already created | the project HOME PAGE answered a failed query with "No deploys yet" plus **first-run onboarding**, telling the owner of a months-old project how to make their first deploy |
+| `ResourcesPanel` — `.catch(() => undefined)` on both price quotes | an empty line-item list and **"—" per month**, under a Save button that changes the invoice |
+
+The lesson is about the guard, not the code: a test that names the call sites it
+covers cannot see a fourth. Assert the SHAPE — a catch whose only effect is a log
+line — not the identifier.
+
+**Second: the class runs backwards, and reads as a fault that is not there.**
+`StorageSettings` set `sources = []` in its catch and gated the "could not be
+read" branch on `sources.length === 0`. So a project with genuinely no storage
+was told its storage state was unreadable. Its own comment says the branch exists
+because "silence is what this screen is being fixed for" — it simply could not
+tell the two silences apart. **Gate on the failure, never on the count**: the
+count is what the failure sets.
+
+**Watch for:** a message that is correct in isolation and false in its branch.
+The backups tab said "what you see below may be out of date" from inside an
+`if/else` that rendered no rows — a sentence promising a stale list, over an
+empty tab. That one shipped as the FIX for class 49, and reading the message
+convinced three reviewers the branch was right.
+
+**Gated by** `saas/frontend/src/views/project/read-failure-states.test.ts`
+(extended) and `saas/frontend/src/test/untranslated-literals.test.ts`. Both
+mutation-tested in both directions — restoring each swallowed catch fails, and
+so does re-gating storage on the count.
