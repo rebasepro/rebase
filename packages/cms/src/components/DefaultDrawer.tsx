@@ -419,7 +419,7 @@ function DrawerModeSwitch({
                 showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
             )}
         >
-            <div role="group" aria-label="Content mode" className="flex bg-surface-100 dark:bg-surface-900 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700/60">
+            <div role="group" aria-label="Panel mode" className="flex bg-surface-100 dark:bg-surface-900 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700/60">
                 <button
                     onClick={() => {
                         adminModeController.setMode("cms");
@@ -433,7 +433,7 @@ function DrawerModeSwitch({
                             : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
                     )}
                 >
-                    Content
+                    CMS
                 </button>
                 <button
                     onClick={() => {

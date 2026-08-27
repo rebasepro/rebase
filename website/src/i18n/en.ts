@@ -664,7 +664,7 @@ export const en = {
   "about.join.desc": "We're always looking for passionate developers to join our community and contribute to the project.",
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
-  "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & Admin Panel",
+  "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & CMS",
   "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, deploy anywhere.",
   "cms.meta.title": "Rebase CMS — a separate product from the Rebase backend",
   "cms.meta.description": "A generated back office on top of any Rebase backend: spreadsheet editing, media, roles and history — opt-in, extensible with your own React, and never required by the API.",

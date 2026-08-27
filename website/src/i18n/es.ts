@@ -572,7 +572,7 @@ export const es = {
   "about.join.desc": "Siempre buscamos desarrolladores con ganas de unirse a la comunidad y contribuir al proyecto.",
   "about.join.github": "Contribuir en GitHub",
   "about.join.discord": "Únete a nuestro Discord",
-  "index.meta.title": "Rebase — El backend open-source para Postgres: APIs, auth, tiempo real y panel admin",
+  "index.meta.title": "Rebase — El backend open-source para Postgres: APIs, auth, tiempo real y CMS",
   "index.meta.description": "Apunta Rebase a tu Postgres y obtén APIs REST, auth, storage, tiempo real y backups — más un panel admin generado desde tu esquema cuando lo quieras. Protegido por row-level security. Open-source, despliégalo donde quieras.",
   "cms.meta.title": "Panel de administración — un producto aparte del backend de Rebase",
   "cms.meta.description": "Un back office generado sobre cualquier backend de Rebase: edición tipo hoja de cálculo, medios, roles e historial — opcional, ampliable con tu propio React y nunca requerido por la API.",
