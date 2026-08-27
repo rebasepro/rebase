@@ -94,6 +94,38 @@ steps:
   # "naming to <AR tag> done", which is local tagging, not a push. So a missing
   # `dockerhub-token` read as a self-hoster problem while it was blocking every
   # managed release. Any step added after this one would resurrect that coupling.
+  # The tag must not overstate what the image holds.
+  #
+  # `planRegistration` reads `framework_version` straight off the tag's version
+  # prefix, so a tag that claims 0.16.1 over an image containing 0.16.0 writes a
+  # false fact into the control plane — and that has already happened twice
+  # (releases 1.14.0 and 1.15.0). Before the push, not after: a wrong tag that
+  # reached the registry is a name somebody may already have registered.
+  - name: 'gcr.io/cloud-builders/docker'
+    id: verify-framework-label
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        # Assigned first. Cloud Build substitutes `$_TAG` textually and does NOT
+        # touch `${_TAG%%-*}`, so bash would see an unset variable and `set -u`
+        # would kill the step — failing closed, but for a reason that has nothing
+        # to do with the tag, and breaking every legitimate build too.
+        TAG_NAME="$_TAG"
+        HELD=$(docker run --rm --entrypoint cat "$_REPO:$_TAG" /app/.framework-version)
+        CLAIMED="$${TAG_NAME%%-*}"
+        if [ "$$HELD" != "$$CLAIMED" ]; then
+          echo "Tag says @rebasepro $$CLAIMED; the image contains $$HELD."
+          echo
+          echo "The control plane reads framework_version off the tag's version"
+          echo "prefix, so this tag would register a version the artifact does not"
+          echo "have. Name the tag for what is inside it:"
+          echo "  _TAG=$$HELD-\$(git rev-parse --short=9 HEAD)"
+          exit 1
+        fi
+        echo "tag and contents agree: @rebasepro $$HELD"
+
   - name: 'gcr.io/cloud-builders/docker'
     id: push-fleet
     args: ['push', '$_REPO:$_TAG']

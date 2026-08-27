@@ -163,5 +163,19 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+# The framework version this image CONTAINS, written into the image itself.
+#
+# `planRegistration` infers it from the image tag — `imageTag.split("-")[0]` —
+# which is sound at exactly the moment the tag is minted and nowhere else. It has
+# already been wrong: releases 1.14.0 and 1.15.0 are tagged `0.16.1-canary.g<sha>`
+# and both contain 0.16.0, so the control plane carries two rows asserting a
+# version their own artifact does not have. A name that implies a fact is not the
+# fact.
+#
+# This is not read at runtime. It exists so the build can check the tag against
+# the contents (see `verify-framework-label` in infra/cloudbuild-runtime.yaml) and
+# a mistagged image fails its own build instead of becoming a false row.
+RUN node -e "const v=require('/app/node_modules/@rebasepro/server/package.json').version; require('fs').writeFileSync('/app/.framework-version', v); console.log('framework version: '+v)"
+
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "./entrypoint.mjs"]
