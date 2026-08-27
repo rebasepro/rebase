@@ -30,15 +30,15 @@ export interface AdoptionStackDemoProps {
     };
 }
 
-type Optional = "admin" | "studio";
+type Optional = "cms" | "studio";
 type Layer = "backend" | Optional;
 
 const CAPABILITIES: { label: string; layer: Layer }[] = [
     { label: "REST, auth, storage and realtime over your Postgres", layer: "backend" },
     { label: "Row-level security enforced by the database", layer: "backend" },
     { label: "A typed SDK generated from your schema", layer: "backend" },
-    { label: "A back office your team can edit data in", layer: "admin" },
-    { label: "Kanban, media, history, import & export", layer: "admin" },
+    { label: "A back office your team can edit data in", layer: "cms" },
+    { label: "Kanban, media, history, import & export", layer: "cms" },
     { label: "SQL editor, schema visualizer, RLS policy editor", layer: "studio" }
 ];
 
@@ -46,8 +46,8 @@ const DEPS: { name: string; layer: Layer }[] = [
     { name: "@rebasepro/server", layer: "backend" },
     { name: "@rebasepro/server-postgres", layer: "backend" },
     { name: "@rebasepro/client", layer: "backend" },
-    { name: "@rebasepro/cms", layer: "admin" },
-    { name: "@rebasepro/cms-types", layer: "admin" },
+    { name: "@rebasepro/cms", layer: "cms" },
+    { name: "@rebasepro/cms-types", layer: "cms" },
     { name: "@rebasepro/studio", layer: "studio" }
 ];
 

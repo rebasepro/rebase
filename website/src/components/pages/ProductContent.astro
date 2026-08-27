@@ -27,7 +27,6 @@ const backendParts = [
 const adminParts = [
     { name: "Collection views", note: "Table, cards, list and Kanban over the same rows", meta: "enabledViews" },
     { name: "Entity forms", note: "Generated from properties, with validation and relations", meta: "properties" },
-    { name: "Content editing", note: "Block editor, Markdown, media, structured fields", meta: "/editing" },
     { name: "Your React", note: "Custom fields, previews, views and entity actions", meta: "admin.Field" },
     { name: "Users & roles", note: "The same roles your policies read, managed by humans", meta: "RBAC" },
     { name: "Studio", note: "SQL editor, schema builder, policy editor, branches, logs", meta: "/studio" },
@@ -332,7 +331,7 @@ const replaced = [
                         </p>
                     </div>
                     <div class="px-7 py-5 border-t border-surface-800/80">
-                        <a href={translatePath("/admin")}
+                        <a href={translatePath("/cms")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                             What your team gets from the panel
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"

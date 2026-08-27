@@ -12,16 +12,16 @@ const currentLang = lang || defaultLang;
 const t = useTranslations(currentLang as keyof typeof languages);
 
 import Layout from '../../layouts/Layout.astro';
-import AdminContent from '../../components/pages/AdminContent.astro';
+import CMSContent from '../../components/pages/CMSContent.astro';
 
-const title = t("admin.meta.title");
-const description = t("admin.meta.description");
+const title = t("cms.meta.title");
+const description = t("cms.meta.description");
 
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },
-    { name: "Admin panel", url: "https://rebase.pro/admin" }
+    { name: "Rebase CMS", url: "https://rebase.pro/cms" }
 ];
 ---
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <AdminContent lang={currentLang} t={t} />
+    <CMSContent lang={currentLang} t={t} />
 </Layout>

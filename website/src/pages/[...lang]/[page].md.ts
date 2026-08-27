@@ -17,7 +17,7 @@ const PAGES = [
   "studio",
   "ui",
   "backend",
-  "admin"
+  "cms"
 ];
 
 export function getStaticPaths() {

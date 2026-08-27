@@ -38,6 +38,26 @@
         "source": "/:lang(es|de|fr)/why-rebase",
         "destination": "/:lang/compare",
         "type": 301
+      },
+      {
+        "source": "/admin",
+        "destination": "/cms",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/admin",
+        "destination": "/:lang/cms",
+        "type": 301
+      },
+      {
+        "source": "/editing",
+        "destination": "/cms",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/editing",
+        "destination": "/:lang/cms",
+        "type": 301
       }
     ],
     "headers": [
