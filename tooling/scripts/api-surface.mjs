@@ -33,46 +33,86 @@ import ts from "typescript";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
- * Only packages whose code is swapped under a deployed bundle belong here.
- * `@rebasepro/server-postgres` deliberately does NOT: a bundle keeps the driver
- * it shipped with, so changing that package cannot break already-deployed code
- * the way this one can. The skew it *does* cause is the corpus's job.
+ * The packages whose code is swapped under a deployed bundle.
+ *
+ * DERIVED from `infra/docker/entrypoint.mjs`, not written out here, and that is
+ * the whole point. This list used to be a literal naming `@rebasepro/server`
+ * alone, which was correct when it was written and stopped being correct at
+ * b0a97a1f3 (2026-08-22), where the entrypoint went from symlinking one package
+ * to symlinking five. Nothing connected the two, so the gate went on guarding a
+ * fifth of the surface it was named after, and its own docstring kept saying
+ * `RUNTIME_PROVIDED = ["@rebasepro/server"]` — the stale sentence being the only
+ * remaining trace of the assumption.
+ *
+ * What that cost, precisely: `d99d7db9d` removed `client` from `CronJobContext`
+ * in `@rebasepro/types`. This gate would have printed
+ * `interface CronJobContext — lost client` on that PR, with the message about
+ * breaking deployed bundles at boot. It printed nothing, because `types` was not
+ * in the list. Every cron in rebase-growth then broke on promotion, silently,
+ * with a clean typecheck.
+ *
+ * `@rebasepro/server-postgres` is deliberately absent — and is absent from the
+ * entrypoint too, so deriving keeps that right for free: a bundle keeps the
+ * driver it shipped with, so changing that package cannot break already-deployed
+ * code the way these can. The skew it *does* cause is the corpus's job.
  */
-export const TRACKED = [
+export function runtimeProvidedPackages() {
+    const src = fs.readFileSync(path.join(ROOT, "infra/docker/entrypoint.mjs"), "utf8");
+    const block = /const RUNTIME_PROVIDED = \[([\s\S]*?)\]/.exec(src);
+    if (!block) {
+        throw new Error(
+            "could not find RUNTIME_PROVIDED in infra/docker/entrypoint.mjs — " +
+            "this gate derives its scope from there, and a silent empty scope is " +
+            "how it came to guard one package out of five."
+        );
+    }
+    return [...block[1].matchAll(/"(@rebasepro\/[^"]+)"/g)].map((m) => m[1]);
+}
+
+/** `@rebasepro/server` -> `packages/server/dist/index.d.ts`. */
+const dtsFor = (pkg) => `packages/${pkg.replace("@rebasepro/", "")}/dist/index.d.ts`;
+
+/**
+ * Extra entry points that are published separately and carry their own contract.
+ *
+ * `@rebasepro/server/functions` is what every custom function imports, and those
+ * functions are the user code most likely to be running unchanged across an
+ * image swap. Its surface is small enough that a removal is never an accident of
+ * refactoring — it is a decision, and it should have to look like one in a diff.
+ */
+const EXTRA_ENTRY_POINTS = [
     {
-        pkg: "@rebasepro/server",
-        dts: "packages/server/dist/index.d.ts",
-        /**
-         * Exports that MUST render with members, or the render is refused.
-         *
-         * A floor, in the same sense as `rls:check --min-tables`: this file spent
-         * its whole life reporting `const rebase` as a bare name, because reading
-         * `decl.type?.members` off a type *reference* returns nothing and nothing
-         * complained about nothing. The singleton is the export every tenant hook,
-         * function and cron imports, so the one entry that must never be empty is
-         * the one that was empty. If a TypeScript upgrade breaks the resolution
-         * again, this fails loudly instead of quietly recording a bare name.
-         */
-        mustHaveMembers: ["rebase"]
-    },
-    {
-        /**
-         * The portable authoring surface, tracked separately because it is a
-         * separate published entry point with a separate contract.
-         *
-         * If anything in this file deserves the strictest reading of "removing
-         * one breaks tenants at boot", it is this: `@rebasepro/server/functions`
-         * is what every custom function imports, and those functions are the
-         * user code most likely to be running unchanged across an image swap.
-         * Its surface is also small enough that a removal here is never an
-         * accident of refactoring — it is a decision, and it should have to
-         * look like one in a diff.
-         */
         pkg: "@rebasepro/server/functions",
         dts: "packages/server/dist/functions/index.d.ts",
         mustHaveMembers: ["rebase"]
     }
 ];
+
+/**
+ * Exports that MUST render with members, or the render is refused.
+ *
+ * A floor, in the same sense as `rls:check --min-tables`: this file spent its
+ * whole life reporting `const rebase` as a bare name, because reading
+ * `decl.type?.members` off a type *reference* returns nothing and nothing
+ * complained about nothing. The singleton is the export every tenant hook,
+ * function and cron imports, so the one entry that must never be empty is the
+ * one that was empty. If a TypeScript upgrade breaks the resolution again, this
+ * fails loudly instead of quietly recording a bare name.
+ */
+const MUST_HAVE_MEMBERS = {
+    "@rebasepro/server": ["rebase"],
+    "@rebasepro/types": ["CronJobContext"]
+};
+
+export const TRACKED = [
+    ...runtimeProvidedPackages().map((pkg) => ({
+        pkg,
+        dts: dtsFor(pkg),
+        mustHaveMembers: MUST_HAVE_MEMBERS[pkg] ?? []
+    })),
+    ...EXTRA_ENTRY_POINTS
+];
+
 
 export const BASELINE = path.join(ROOT, "contracts", "server.api.txt");
 

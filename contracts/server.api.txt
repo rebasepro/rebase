@@ -348,6 +348,767 @@ type UnknownKeyPolicy
 type UserInvitationTemplateFunction
 type WelcomeEmailTemplateFunction
 
+## @rebasepro/types
+class EntityReference { databaseId, driver, fullPath, id, isEntityReference, path, pathWithId }
+class EntityRelation { data, id, isEntityReference, isEntityRelation, path, pathWithId }
+class GeoPoint { latitude, longitude }
+class ListLimitError { code, details, maxLimit, status }
+class RebaseApiError { code, details, status }
+class RebaseClientError { code, details, status }
+class Vector { value }
+const ADMIN_COLLECTION_KEYS
+const ADMIN_PROPERTY_KEYS
+const ALL_WHERE_FILTER_OPS
+const ANONYMOUS_USER_ID
+const ANONYMOUS_USER_IDS
+const BUNDLE_FORMAT_VERSION
+const CANONICAL_TO_REST
+const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile }
+const DEFAULT_DATA_SOURCE_KEY
+const DEFAULT_FILTERABLE_RELATION_KINDS
+const DEFAULT_FUZZY_THRESHOLD
+const DEFAULT_LIST_LIMIT
+const DEFAULT_RESOURCE_KEY
+const DEFAULT_SEARCH_COLUMN
+const DEFAULT_SEARCH_LANGUAGE
+const DEFAULT_SEARCH_WEIGHT
+const DEFAULT_STORAGE_SOURCE_KEY
+const DEFAULT_VECTOR_LIST_LIMIT
+const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const LEGACY_RLS_JWT_SQL
+const LEGACY_RLS_ROLES_SQL
+const LEGACY_RLS_SCHEMA
+const LEGACY_RLS_UID_SQL
+const MAX_LIST_LIMIT
+const MONGODB_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const NULL_OPS
+const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const PUBLIC_STORAGE_PREFIX
+const REBASE_SCHEMA
+const RELEVANCE_SORT_FIELD
+const RESERVED_BACKEND_PREFIXES
+const RESOURCE_GRAPH_VERSION
+const REST_TO_CANONICAL
+const RLS_JWT_SQL
+const RLS_ROLES_SQL
+const RLS_UID_SQL
+const RUNTIME_CONTRACT_VERSION
+const SCHEMA_VERSION_HEADER
+const policy { and, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, rolesContain, rolesOverlap, serverContext, true }
+function bucket
+function buildResourceGraph
+function canonicalSchemaPayload
+function computeSchemaVersion
+function database
+function declareResource
+function declaredDataSources
+function declaredResources
+function declaredStorageSources
+function declaredSubscriptions
+function deserializeCollections
+function encodeRelationAggregateSort
+function envBasesForResource
+function findEnvSuffixCollision
+function findStorageSuffixCollision
+function getCollectionDataPath
+function getDataSourceCapabilities
+function getDeclaredSubcollections
+function hasForeignKeyOnTarget
+function isAnonymousUid
+function isBranchAdmin
+function isChannelBusInstance
+function isDocumentAdmin
+function isFirebaseCollectionConfig
+function isLazyComponentRef
+function isManyToMany
+function isMongoDBCollectionConfig
+function isPostgresCollectionConfig
+function isPublicStoragePath
+function isRelationAggregateSort
+function isRelationalCollectionConfig
+function isResourceHandle
+function isSQLAdmin
+function isSchemaAdmin
+function isSchemaEditingAdmin
+function isSerializedCollectionRef
+function isToMany
+function isValidEngine
+function nestAdminCollectionKeys
+function nestAdminKeysOf
+function nestAdminPropertyKeys
+function normalizeStorageSources
+function parseRelationAggregateSort
+function registerDataSourceCapabilities
+function registerResourceKind
+function reservedPrefixFor
+function resetDeclaredResources
+function resetDeclaredSubscriptions
+function resolveClientListLimit
+function resourceEnvSuffix
+function resourceKeyOf
+function resourceKind
+function resourceKinds
+function rewriteLegacyRlsFunctions
+function serializeCollections
+function setTopicRuntime
+function sortKeyToString
+function storageEnvSuffix
+function toCanonicalOp
+function topic
+function usesLegacyRlsFunctions
+interface AdminAPI { bootstrap, createUser, deleteUser, getUser, listRoles, listUsers, listUsersPaginated, resetPassword, updateUser }
+interface AdminUser { createdAt, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
+interface AfterDeleteProps { collection, context, id, path, row }
+interface AfterReadProps { collection, context, path, row }
+interface AfterSaveProps { collection, context, id, path, previousValues, status, values }
+interface AndPolicyExpression { kind, operands }
+interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
+interface ApiKeyPermission { collection, operations }
+interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
+interface ApiKeysAPI { createKey, getKey, listKeys, revokeKey, updateKey }
+interface ArrayProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
+interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
+interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, getCapabilities, id, initialize, prepareUserCreation, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
+interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
+interface AuthClient { canRestoreSession, getSession, getSessions, getUser, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
+interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword }
+interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
+interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
+interface AuthCollectionResetResult { invitationSent, temporaryPassword }
+interface AuthCreateUserData { displayName, email, metadata, password, photoUrl }
+interface AuthResponsePayload { tokens, user }
+interface AuthRolesPolicyOperand { kind }
+interface AuthSchemaHealth { databaseVersion, healthy, problems, runtimeVersion }
+interface AuthState { user }
+interface AuthTokens { accessToken, accessTokenExpiresAt, refreshToken }
+interface AuthUidPolicyOperand { kind }
+interface AuthUserData { createdAt, displayName, email, emailVerified, id, metadata, photoUrl, updatedAt }
+interface AuthUserListOptions { limit, offset, orderBy, orderDir, roleId, search }
+interface AuthUserListResult { limit, offset, total, users }
+interface AuthenticatedPolicyExpression { kind }
+interface AuthenticatedUser { claims, displayName, email, isAdmin, photoUrl, rawToken, roles, uid }
+interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type }
+interface BackendConfig { connection, schema, type }
+interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
+interface BackendLifecycle { destroy, healthCheck, initialize }
+interface BackupInfo { createdAt, destinationKind, key, name, sizeBytes }
+interface BackupsAPI { download, list }
+interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
+interface BaseProperty { callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }
+interface BeforeDeleteProps { collection, context, id, path, row }
+interface BelongsToRelation { kind, localKey, onDelete, onUpdate, overrides, relationName, target, validation }
+interface BinaryProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface BooleanProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface BootstrappedAuth { authRepository, emailService, roleService, schemaHealthCheck, userService }
+interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
+interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
+interface BrinIndex { on, reason, using, where }
+interface BtreeIndex { include, on, reason, unique, using, where }
+interface BucketOptions { account, engine, label, prefix, publicRead, transport }
+interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
+interface ChannelHistoryEntry { at, event, payload, senderId, seq }
+interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
+interface ChannelRetentionRule { limit, match, ttl }
+interface ClassifiedSchemaChanges { applicable, changes, verdict }
+interface CollectionAccessor { count, create, createMany, delete, deleteMany, find, findById, include, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface CollectionPatchMessage { channel, error, id, payload, pks, requestId, row, rows, subscriptionId, type }
+interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
+interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
+interface CollectionUpdateMessage { channel, error, payload, pks, requestId, row, rows, subscriptionId, type }
+interface ComparePolicyExpression { kind, left, op, right }
+interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
+interface ConditionContext { entityId, index, isNew, now, path, previousValues, propertyValue, user, values }
+interface CountOptions { databaseId, filter, logical, searchString }
+interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+interface CronAPI { getJob, getJobLogs, listJobs, toggleJob, triggerJob }
+interface CronJobContext { jobId, log, rebase, scheduledAt }
+interface CronJobDefinition { catchUpWindowSeconds, description, enabled, handler, name, schedule, timeoutSeconds }
+interface CronJobLogEntry { durationMs, error, finishedAt, jobId, logs, manual, result, startedAt, success }
+interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
+interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
+interface DataDriver { admin, checkUniqueField, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, restFetchService, save, saveMany, updateMany }
+interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
+interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+interface DataSourceDefinition { databaseId, engine, key, label, transport }
+interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
+interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type }
+interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, introspectCollections, realtime, schemaProvisioning }
+interface DatabaseConnection { close, isConnected, type }
+interface DatabaseOptions { databaseId, engine, label, migrations, transport }
+interface DateProperty { autoValue, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
+interface DatePropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
+interface DeclareOptions { engine, label, transport }
+interface DeleteManyProps { collection, ids, path }
+interface DeleteProps { collection, row }
+interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
+interface DocumentAdmin { executeAggregate, fetchCollectionStats }
+interface DownloadConfig { fileNotFound, metadata, url }
+interface DownloadMetadata { bucket, contentType, customMetadata, fullPath, name, public, size, token, tokenExpiresIn }
+interface EffectiveRoleController { effectiveRole, setEffectiveRole }
+interface EmailSendOptions { headers, html, replyTo, subject, text, to }
+interface EmailSendResult { accepted, messageId, rejected }
+interface EmailService { isConfigured, send, verifyConnection }
+interface Entity { databaseId, driver, id, path, searchMatches, values }
+interface EntityChildView { collection, key, source }
+interface EntityHistoryEntry { action, changed_fields, entity_id, id, previous_values, table_name, updated_at, updated_by, values }
+interface EntityReferenceProps { databaseId, driver, id, path }
+interface EnumValueConditions { disabled, disabledMessage, hidden }
+interface ExistsInPolicyExpression { collection, kind, where }
+interface FalsePolicyExpression { kind }
+interface FetchCollectionOptions { collection, databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
+interface FetchCollectionProps { collection, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter, vectorSearch }
+interface FetchHistoryOptions { limit, offset }
+interface FetchOneProps { collection, databaseId, id, path }
+interface FieldPolicyOperand { kind, name }
+interface FilterCondition { column, operator, value }
+interface FilterPreset { filterValues, label, sort }
+interface FindParams { include, limit, logical, offset, orderBy, page, searchExplain, searchString, vectorSearch, where }
+interface FindResponse { data, meta }
+interface FindResult { data, meta }
+interface FirebaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites, subcollections }
+interface FunctionInvokeOptions { headers, method, path }
+interface FunctionsAPI { invoke }
+interface GeopointProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
+interface GinIndex { on, reason, using, where }
+interface HasManyRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target, validation }
+interface HasOneRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target, validation }
+interface HealthCheckResult { details, healthy, latencyMs }
+interface HistoryRetentionConfig { maxEntries, ttlDays }
+interface ImageResize { format, maxHeight, maxWidth, mode, quality }
+interface IndexKey { direction, nulls, prop }
+interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider }
+interface JoinStep { on, table }
+interface LazyComponentRef { load }
+interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
+interface LiteralPolicyOperand { kind, value }
+interface LogicalCondition { conditions, type }
+interface ManagedCompatibility { eligible, reasons }
+interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through, validation }
+interface MapProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
+interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
+interface NativeDependency { name, reason }
+interface NotPolicyExpression { kind, operand }
+interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, propertyConfig, type, validation }
+interface NumberPropertyValidationSchema { integer, lessThan, max, min, moreThan, negative, positive, required, requiredMessage, unique, uniqueInArray }
+interface OrPolicyExpression { kind, operands }
+interface OuterFieldPolicyOperand { kind, name }
+interface OwnerSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface PageWalkOptions { cursor, maxPages, pageSize }
+interface PaginationMeta { hasMore, limit, offset, total }
+interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
+interface PostgresPolicy { cmd, permissive, policyname, qual, roles, status, tablename, with_check }
+interface PropertyConditions { acceptedFiles, allowedEnumValues, canAddElements, clearOnDisabled, defaultValue, disabled, disabledMessage, enumConditions, excludedEnumValues, hidden, max, maxFileSize, min, readOnly, referenceFilter, referencePath, required, requiredMessage, sortable }
+interface PropertyValidationSchema { required, requiredMessage, unique, uniqueInArray }
+interface PublicSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface QueryBuilderInterface { find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
+interface QueryFilter { field, operator, value }
+interface RawPolicyExpression { kind, sql }
+interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface RealtimeChannelsConfig { bus, channels }
+interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
+interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, runtime, schema, type, usersCollection }
+interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
+interface RebaseBundleFunction { file, name, portable, requires }
+interface RebaseBundleManifest { app, build, bundleFormat, collections, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage }
+interface RebaseBundleStatic { dir, path, spa }
+interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+interface RebaseErrorInit { cause, code, details, status }
+interface RebaseProjectContract { collectionSlugs, collections, generatedAt, runtime, schemaVersion }
+interface RebaseProjectLink { apiUrl, org, project }
+interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
+interface RebaseServerClient { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
+interface RebaseSession { accessToken, expiresAt, refreshToken, user }
+interface RebaseStaticAppConfig { build, output, path, root, spa, type }
+interface RebaseStorageSourceConfig { engine, label, transport }
+interface RebaseWebSocket { authenticate, disconnect, on, setAuthTokenGetter }
+interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy, values }
+interface ReferenceProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
+interface RelationAggregateSort { agg, field, relation }
+interface RelationBase { onDelete, onUpdate, overrides, relationName, target, validation }
+interface RelationProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
+interface ResolvedBelongsTo { cardinality, kind, localKey, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResolvedDataSource { capabilities, databaseId, engine, key, transport }
+interface ResolvedHasMany { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, validation, writable }
+interface ResolvedHasOne { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, validation, writable }
+interface ResolvedManyToMany { cardinality, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, through, validation, writable }
+interface ResolvedRelationBase { cardinality, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResolvedStorageSource { engine, key, label, transport }
+interface ResolvedVia { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResourceDeclaration { engine, key, kind, label, options, transport }
+interface ResourceGraph { resources, version }
+interface ResourceHandle { engine, key, kind, label, options, toString, transport }
+interface ResourceKindSpec { defaultEngine, engines, envBases, envBasesByEngine, implicitDefault, kind, optionKeys }
+interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest }
+interface RolesContainPolicyExpression { kind, roles }
+interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface RolesOverlapPolicyExpression { kind, roles }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
+interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
+interface SaveManyProps { collection, path, rows, upsert }
+interface SaveProps { collection, id, path, previousValues, status, upsert, values }
+interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
+interface SchemaChange { collection, detail, kind, property, remedy, verdict }
+interface SchemaChangeFile { contents, path }
+interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
+interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile }
+interface SchemaEditingAdmin { planSchemaChange }
+interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, unaccent }
+interface SearchField { path, weight }
+interface SearchMatch { field, snippet }
+interface SearchOptions { collection, databaseId, filter, limit, order, orderBy }
+interface SecurityRuleBase { mode, name, operation, operations, pgRoles, roles }
+interface SerializedCollectionRef
+interface ServerContextPolicyExpression { kind }
+interface SingleSubscriptionConfig { clientId, id, path }
+interface SingleUpdateMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
+interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
+interface StorageAuthorizeData { collection }
+interface StorageAuthorizeUser { email, roles, uid }
+interface StorageListResult { items, nextPageToken, prefixes }
+interface StorageReference { bucket, fullPath, name, parent, root, toString }
+interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
+interface StorageSourceDefinition { account, engine, key, label, transport }
+interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
+interface StringProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
+interface StringPropertyValidationSchema { length, lowercase, matches, matchesMessage, max, min, required, requiredMessage, trim, unique, uniqueInArray, uppercase }
+interface StructuredSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface TableColumnInfo { character_maximum_length, column_default, column_name, data_type, enum_values, is_nullable, udt_name }
+interface TableForeignKeyInfo { column_name, foreign_column_name, foreign_table_name }
+interface TableJunctionInfo { junction_table_name, source_column_name, target_column_name, target_table_name }
+interface TableMetadata { columns, foreignKeys, junctions, policies }
+interface TablePolicyInfo { cmd, policy_name, qual, roles, with_check }
+interface TopicHandle { engine, key, kind, label, options, publish, subscription, toString, transport }
+interface TopicOptions { delivery, engine, label, maxAttempts, transport }
+interface TopicRuntime { publish }
+interface TopicSubscription { handler, maxAttempts, name, topic }
+interface TransformAuthResponseContext { method, request, uid }
+interface TruePolicyExpression { kind }
+interface UnorderedIndexKey { prop }
+interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+interface UpdateManyProps { collection, path, updates }
+interface UploadFileProps { bucket, file, key, metadata, public }
+interface UploadFileResult { bucket, key, storageUrl }
+interface UploadedFileContext { entityId, file, path, property, propertyKey, storage, values }
+interface UserCreationFinalizeResult { emailDeliveryFailed, invitationSent, temporaryPassword }
+interface UserCreationPrepareResult { clearPassword, hookHandledEmail, invitationSent, values }
+interface UserCreationWriteContract { extraFields, validate }
+interface UserManagementAdapter { createUser, deleteUser, getUserById, getUserRoles, listUsers, setUserRoles, updateUser }
+interface VectorIndexConfig { distance, efConstruction, lists, m, method }
+interface VectorProperty { callbacks, columnName, conditions, defaultValue, description, dimensions, dynamicProps, excludeFromApi, index, metadata, name, propertyConfig, type, validation }
+interface VectorSearchParams { distance, property, threshold, vector }
+interface ViaRelation { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, target, validation }
+interface WebSocketErrorPayload { code, error, message }
+interface WebSocketMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
+interface WithheldSchemaConstraint { kind, reason, remedy, target }
+interface WriteOptions { idempotencyKey }
+type AdminCollectionKey
+type AdminPropertyKey
+type AfterSaveErrorProps
+type AnyCollectionConfig
+type AuthChangeEvent
+type BackendFactory
+type BackupDestinationKind
+type BeforeSaveProps
+type BucketHandle
+type ChannelBusConfig
+type ChannelBusFrame
+type ChannelBusHandler
+type ChannelBusSetting
+type ChildViewSource
+type CollectionCallbacks { afterDelete, afterRead, afterSave, afterSaveError, beforeDelete, beforeSave }
+type CollectionConfig
+type CollectionIndex
+type CollectionRegistryController { collections, convertIdsToPaths, getCollection, getParentCollectionSlugs, getParentEntityIds, getParentReferencesFromPath, getRawCollection, initialised }
+type ColorHue
+type ColorKey
+type ColorScheme { color, text }
+type ColorTone
+type ComponentLike
+type ComponentRef
+type ComputedSortField
+type ConditionBuilderStatic { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
+type ConditionRule
+type CronJobRunState
+type CronLogLevel
+type CursorSpec
+type DataSourceFeatures
+type DataSourceTransport
+type DataType
+type DatabaseAdmin
+type DatabaseHandle
+type DeclaredStorageSources
+type ElementOf
+type EngineProperties
+type EntityStatus
+type EntityValues
+type EnumValueConfig { color, disabled, id, label }
+type EnumValues
+type FieldPath
+type FileType
+type FilterCombinationValidProps { collection, databaseId, filterValues, path, sortBy }
+type FilterValues
+type FindAllParams
+type FirebaseProperties
+type FirebaseProperty
+type HistoryConfig
+type IdOf
+type IndexPredicate
+type InferCollectionConfigType
+type InferEntityType
+type InferPropertyType
+type InsertOf
+type IterateParams
+type JsonLogicRule
+type ListenCollectionProps
+type ListenOneProps
+type MongoProperties
+type MongoProperty
+type OnAction
+type OrderBySortTuple
+type OrderBySpec
+type OrderByTuple
+type PolicyCompareOperator
+type PolicyExpression
+type PolicyOperand
+type PostgresProperties
+type PostgresProperty
+type Properties
+type Property
+type PropertyBuilderProps { authController, entityId, index, path, previousValues, propertyValue, values }
+type PropertyCallbacks { afterRead, beforeSave }
+type QueryComputedFields
+type RebaseAppConfig
+type RebaseAppType
+type RebaseCallContext { client, data, driver, storageSource, user }
+type RebaseData
+type RebaseErrorCode
+type RebaseSdkData
+type Relation
+type RelationAggregateFn
+type RelationKind
+type ResolvedForeignKeyOnTarget
+type ResolvedRelation
+type ResourceTransport
+type RestFilterOp
+type RowOf
+type SchemaChangeKind
+type SchemaChangeVerdict
+type SearchWeight
+type SecurityOperation
+type SecurityRule
+type SortKey
+type StorageAuthorize
+type StorageConfig { acceptedFiles, fileName, imageResize, includeBucketUrl, maxSize, metadata, postProcess, previewUrl, processFile, public, storagePath, storageSource, storeUrl }
+type StorageOperation
+type StorageSourceTransport
+type TopicDelivery
+type TopicHandler
+type UpdateOf
+type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
+type VectorDistance
+type WhereElementOf
+type WhereFilterOp
+type WhereValueFor
+type WireFilterValues
+type WirePrimaryKeys
+
+## @rebasepro/client
+class MemoryOfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
+class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
+class RebaseApiError { code, details, status }
+class RebaseClientError { code, details, status }
+class RebasePaginationError { code }
+class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onPresence, sequence, track, untrack }
+class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onReconnect, onUnauthorized, reauthenticate, save, sendMessage, setAuthTokenGetter }
+function and
+function cond
+function createBackups { download, list }
+function createCookieStorage
+function createMemoryStorage
+function createRebaseClient
+function isOfflineError
+function or
+interface AdminUser { createdAt, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
+interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
+interface ApiKeyPermission { collection, operations }
+interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
+interface AuthStorage { getItem, removeItem, setItem }
+interface AuthTokens { accessToken, accessTokenExpiresAt, refreshToken }
+interface BroadcastEvent { event, payload, replayed, seq }
+interface ChannelHistoryEntry { at, event, payload, senderId, seq }
+interface ChannelHistoryResult { latestSeq, messages, retained }
+interface ChannelOptions { history }
+interface ChannelTransport { onChannelMessage, onReconnect, sendMessage }
+interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
+interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
+interface CreateAdminOptions { adminPath }
+interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+interface CreateApiKeysOptions { apiKeysPath }
+interface CreateAuthOptions { authFlowMode, authPath, autoRefresh, persistSession, storage }
+interface CreateBackupsOptions { backupsPath }
+interface CreateCronOptions { cronPath }
+interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, offline, onUnauthorized, realtime, storageSources, storageUrlOrigin, token, websocketUrl }
+interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
+interface FindResult { data, meta }
+interface FunctionInvokeOptions { headers, method, path }
+interface FunctionsClient { invoke }
+interface LiveResult { data, error, fromCache, hasPendingWrites, meta, partial }
+interface MutationRollback { rows }
+interface ObserveOptions { realtime }
+interface OfflineApi { clear, onQueueChange, onStatusChange, pending, status, sync }
+interface OfflineCacheEntry { cachedAt, value }
+interface OfflineCacheRecord { cachedAt, key, value }
+interface OfflineConfig { crossTab, maxCachedQueriesPerCollection, maxCachedRowsPerCollection, maxRetries, onSyncError, store, syncIntervalMs }
+interface OfflineStatus { lastError, lastSyncedAt, online, pending, syncing }
+interface OfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
+interface PageWalkOptions { cursor, maxPages, pageSize }
+interface PaginationMeta { hasMore, limit, offset, total }
+interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, queuedAt, rollback, type, updates, upsert }
+interface PresenceDiff { joins, leaves }
+interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, onUnauthorized, realtime, storageUrlOrigin, token, websocketUrl }
+interface RebaseSession { accessToken, expiresAt, refreshToken, user }
+interface RowSnapshotMeta { fromCache, hasPendingWrites }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
+interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
+type AuthChangeEvent
+type AuthConfig
+type CreateRebaseClientResult
+type CursorSpec
+type FindAllParams
+type FindParams
+type FindResponse
+type IterateParams
+type PaginationErrorCode
+type PresenceState
+type RebaseErrorCode
+type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
+
+## @rebasepro/common
+class CollectionRegistry { get, getCollectionByPath, getCollections, getGlobalCallbacks, getRaw, getRawCollections, normalizeCollection, register, registerMultiple, reset, resolvePathToCollections, setDataSources, setGlobalCallbacks }
+class OrderBySpecError { code }
+class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
+class RebasePaginationError { code }
+class UnknownFilterOperatorError { code, details, field, operator, statusCode, validOperators }
+const COLLECTION_PATH_SEPARATOR
+const COMPOSITE_ID_SEPARATOR
+const DEFAULT_FIND_ALL_MAX_ROWS
+const DEFAULT_MAX_PAGES
+const DEFAULT_ONE_OF_TYPE
+const DEFAULT_ONE_OF_VALUE
+const DEFAULT_PAGE_SIZE
+const DEFAULT_STRING_COLUMN_LENGTH
+const JUNCTION_TABLES_SQL
+const MAX_LOGICAL_NESTING_DEPTH
+const REBASE_INTERNAL_PREFIXES
+const REBASE_INTERNAL_SCHEMAS
+const REBASE_INTERNAL_TABLES
+const REBASE_USER_ROLE
+const buildPropertyCallbacks
+const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
+function and
+function buildCollectionFromTableMetadata
+function buildCompositeId
+function buildConditionContext
+function buildRebaseData
+function buildRoutedRebaseData
+function buildSdkData
+function canCreateEntity
+function canDeleteEntity
+function canEditEntity
+function canReadCollection
+function checkOperation
+function classifyTable
+function collectAllPages
+function cond
+function createDataSourceRegistry
+function createPaginationHelpers { findAll, iterate }
+function createRelationRef
+function createRelationRefWithData
+function defineCollection
+function deserializeFilter
+function deserializeLogicalCondition
+function deserializeOrderBy
+function deserializeOrderByList
+function detectJunctionTables
+function embedParentExpression
+function enumToObjectEntries
+function evaluateCondition
+function evaluatePolicy
+function fieldKeyForColumn
+function findAnonymousGrants
+function findRelation
+function fullPathToCollectionSegments
+function getArrayResolvedProperties
+function getChildViewDeclaringProperties
+function getChildViewRelationPropertyKeys
+function getColumnName
+function getDeclaredPrimaryKeys
+function getDefaultValueFor
+function getDefaultValueFortype
+function getDefaultValuesFor
+function getEffectiveSecurityRules
+function getEntityChildViews
+function getEnumVarName
+function getGeneratedPolicyNames
+function getInjectedSecurityRules
+function getJunctionCollectionConfig
+function getJunctionSecurityRules
+function getLabelOrConfigFrom
+function getPrimaryKeys
+function getReferenceFrom
+function getRelationFrom
+function getRelationTargetPath
+function getSubcollections
+function getTableName
+function getTableVarName
+function isAddressableId
+function isJunctionBackedRelation
+function isPropertyBuilder
+function isRebaseInternalTable
+function isRelationalCollection
+function normalizeDriverOrderBy
+function normalizeEmail
+function normalizeOrderBy
+function normalizeToEntityRelation
+function or
+function paginateFind
+function parseIdValues
+function parseOrderBySpecStrict
+function policyToPostgres
+function primaryOrderBy
+function registerConditionOperations
+function relationalCollections
+function resolveArrayProperties
+function resolveCollectionRelations
+function resolveDataSource
+function resolveEnumValues
+function resolveFindWindow { driverOffset, limit, offset }
+function resolveJunctionSpecs
+function resolvePrimaryKeys
+function resolveProperties
+function resolveProperty
+function resolvePropertyEnum
+function resolveRelation
+function resolveRelationProperty
+function resolveStorageFilenameString
+function resolveStoragePathString
+function resolveStorageSource
+function resolveStringColumnLength
+function revokeInternalTableAccess
+function revokeInternalTableSql
+function sanitizeData
+function securityRuleToConditions
+function segmentsToStrippedPath
+function serializeFilter
+function serializeLogicalCondition
+function serializeOrderBy
+function sortCollectionsBySlug
+function sortProperties
+function sqlToPolicy
+function stripCollectionPath
+function toFilterTuples
+function traverseValueProperty
+function traverseValuesProperties
+function updateDateAutoValues
+function wrapAsEntityData
+function wrapAsSdkData
+interface AnonymousGrantRisk { detail, explanation, pattern }
+interface CheckOperationOptions { clauses, onUnknown }
+interface DataSourceResolvable { dataSource, databaseId, engine }
+interface EntityDataOptions { resolveCollection }
+interface IntrospectedCollection { name, properties, propertiesOrder, relations, securityRules, slug, table }
+interface JunctionDeclaringSide { collection, junctionColumn, relation }
+interface JunctionEndpoint { collection, junctionColumn }
+interface JunctionSpec { declaringSides, endpoints, schema, table }
+interface PolicyCompileOptions { resolveCollection }
+interface PolicyEvalContext { entity, roles, uid }
+interface PrimaryKeyInfo { fieldName, isUUID, type }
+interface RelationRef { id, path }
+interface RelationRefWithData { data, id, path }
+interface RoutedRebaseDataParams { defaultData, resolveKey, sources }
+interface RuleConditions { usingExpr, withCheckExpr }
+type AuthContext
+type DataSourceRegistry
+type EntityCallbackContext
+type FilterTuple
+type PageFinder
+type PaginationErrorCode
+type PolicyClauses
+type ResolvePropertyProps { authController, entityId, ignoreMissingFields, index, path, previousValues, property, propertyConfigs, propertyKey, values }
+type RoutableData
+type TableCategory
+type TriState
+type UnknownResolution
+
+## @rebasepro/utils
+const defaultDateFormat
+const isArrayValue
+const isEmptyArray
+const isFunction
+const isInteger
+const isNaN
+const isRecordValue
+const pick
+const toKebabCase
+const toSnakeCase
+function camelCase
+function clone
+function deepClone
+function firstFreeKey
+function flattenObject
+function formatRelativeTime
+function generateForeignKeyName
+function getArrayValuesCount
+function getHashValue
+function getIn
+function getPolicyNameHash
+function getPolicyNamesForRule
+function getPolicyNamesForRules
+function getPolicyOperations
+function getValueInPath
+function getWebStorage
+function hashString
+function hydrateRegExp
+function isDefaultFieldConfigId
+function isEmptyObject
+function isObject
+function isPlainObject
+function isPrototypePollutingKey
+function isValidRegExp
+function legacyForeignKeyName
+function mergeDeep
+function pathTraversesPrototype
+function plural
+function prettifyIdentifier
+function randomColor
+function randomString
+function readStoredJson
+function readStoredString
+function removeFunctions
+function removeInPath
+function removeNulls
+function removePropsIfExisting
+function removeUndefined
+function serializeRegExp
+function setIn
+function sha1Hex
+function singular
+function slugify
+function toArray
+function toPostgresIdentifier
+function toWireKey
+function truncateToBytes
+function unslugify
+function writeStoredJson
+function writeStoredString
+interface WebStorageLike { getItem, removeItem, setItem }
+type ArrayValuesCount
+type FormatRelativeTimeOptions { maxMs, now }
+type ReadStoredJsonOptions { accept, fallback, storage }
+
 ## @rebasepro/server/functions
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
