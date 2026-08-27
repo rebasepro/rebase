@@ -43,6 +43,7 @@ import {
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
+import { classifyStorageFailure, type StorageFailure } from "./storage-failure";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
 
@@ -502,6 +503,8 @@ export const StorageView = () => {
     // working; only the namespaced one is ever written.
     const currentPath = searchParams.get(STORAGE_PATH_PARAM) || searchParams.get("path") || "";
     const [loading, setLoading] = useState(true);
+    /** Why the listing failed, classified — see `storage-failure.ts`. */
+    const [failure, setFailure] = useState<StorageFailure | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     // Contents
@@ -543,6 +546,7 @@ export const StorageView = () => {
     const fetchContents = useCallback(async (path: string) => {
         setLoading(true);
         setError(null);
+        setFailure(null);
         try {
             const result: StorageListResult = await storageSourceRef.current.listObjects(path);
 
@@ -579,7 +583,10 @@ export const StorageView = () => {
             setFiles(fileItems);
         } catch (e) {
             console.error("Storage list error:", e);
-            setError(e instanceof Error ? e.message : String(e));
+            // A refusal from the project's own `storageAuthorize` hook is not a
+            // fault — see `storage-failure.ts`. Rendering both the same way told
+            // a customer with a working project that their storage was broken.
+            setFailure(classifyStorageFailure(e));
         } finally {
             setLoading(false);
         }
@@ -941,10 +948,35 @@ message: e instanceof Error ? e.message : String(e) });
             );
         }
 
-        if (error) {
+        if (failure?.kind === "denied") {
             return (
                 <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
-                    <ErrorView title="Error loading storage" error={error} onRetry={handleRefresh}/>
+                    <div className="max-w-md text-center">
+                        <Typography variant="subtitle2" className="block">
+                            This project&apos;s storage rules refused this listing
+                        </Typography>
+                        <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark block mt-2">
+                            Nothing is wrong with the project. Its <code>storageAuthorize</code> hook
+                            decides who may read which keys, and it declined this path for the
+                            signed-in account — commonly because a listing must name a prefix the
+                            rule recognises rather than the bucket root.
+                        </Typography>
+                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark block mt-3 font-mono break-all">
+                            {failure.detail}
+                        </Typography>
+                    </div>
+                </div>
+            );
+        }
+
+        if (failure) {
+            return (
+                <div className="flex-grow flex items-center justify-center p-6 overflow-auto">
+                    <ErrorView
+                        title="Could not read this project's storage"
+                        error={failure.detail}
+                        onRetry={failure.retryable ? handleRefresh : undefined}
+                    />
                 </div>
             );
         }
