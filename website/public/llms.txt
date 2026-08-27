@@ -15440,12 +15440,21 @@ rebase db migrate
 
 ### Overview
 
-Rebase has two modes:
+The panel has three modes — `"cms" | "studio" | "settings"`:
 
-- **Content Mode** — For content editors and operations teams. Shows collections and data management.
-- **Studio Mode** — For developers. Unlocks developer-facing tools.
+- **CMS** (`"cms"`) — For content editors and operations teams. Shows collections and data management. This is the default.
+- **Studio** (`"studio"`) — For developers. Unlocks the tools below.
+- **Settings** (`"settings"`) — declared in the type, but nothing sets it and
+  nothing reads it. There is no way to enter this mode today. It is listed here
+  because it is part of the public `AdminModeController` type you will see in
+  your editor, not because it does anything.
 
-Toggle between modes using the admin mode controller or the UI toggle in the app bar.
+The drawer's toggle switches between the first two.
+
+Toggle between them with the admin mode controller or the drawer toggle. The
+chosen mode is persisted in `localStorage` under `rebase-admin-mode`; a browser
+that used the panel before 0.17.0 holds the old `"content"` value and is
+migrated to `"cms"` on read.
 
 ### Built-in Studio Tools
 
