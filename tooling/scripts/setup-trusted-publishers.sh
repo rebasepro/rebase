@@ -99,6 +99,15 @@ trust_call() {
   parsed=$(printf '%s' "$current" | node -e '
     let s = "";
     process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      // npm answers --json with NOTHING AT ALL for a package that has no trust
+      // config — the plain form prints "No trust configurations found", but the
+      // JSON form is zero bytes. Reading that as an error made this script
+      // unable to configure a brand-new package, which is the one case it most
+      // needs to handle: a rename publishes a new name, and that name has no
+      // config by definition. Empty is "nothing configured", not a failure.
+      // The EOTP case this guard exists for is NON-empty — it is a JSON object
+      // with .error — so the two stay distinguishable.
+      if (!s.trim()) { console.log("- -"); return }
       let j;
       try { j = JSON.parse(s) } catch { console.log("! unparseable"); return }
       if (j.error) { console.log("! " + (j.error.code || "unknown")); return }
