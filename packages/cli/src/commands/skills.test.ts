@@ -149,7 +149,15 @@ describe("the published tarball", () => {
             encoding: "utf-8",
             stdio: ["ignore", "pipe", "ignore"]
         });
-        const [entry] = JSON.parse(out) as { files: { path: string }[] }[];
+        // npm 12 changed this payload: up to npm 11 `pack --json` answered an
+        // ARRAY of package entries, and from 12 it answers an OBJECT keyed by
+        // package name. Reading only the array form made this test fail with
+        // "object is not iterable" the moment npm was upgraded — a failure that
+        // names nothing about the tarball it is checking. Accept both.
+        const parsed = JSON.parse(out) as
+            | { files: { path: string }[] }[]
+            | Record<string, { files: { path: string }[] }>;
+        const entry = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
         return new Set(entry.files.map(f => f.path.split(path.sep).join("/")));
     }
 

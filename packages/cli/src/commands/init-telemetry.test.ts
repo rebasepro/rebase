@@ -26,6 +26,7 @@ let workdir: string;
 let previousHome: string | undefined;
 let previousCwd: string;
 let fetchMock: ReturnType<typeof vi.fn>;
+let previousE2E: string | undefined;
 
 beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-init-home-"));
@@ -39,6 +40,16 @@ beforeEach(() => {
     delete process.env.DO_NOT_TRACK;
     delete process.env.REBASE_TELEMETRY_DISABLED;
     delete process.env.CI;
+
+    // The docblock above promises nothing is spawned. It was not true: version
+    // resolution shells out to `npm view` through execa, which a `fetch` mock
+    // cannot intercept, so every run of this file hit the live registry. That
+    // made a telemetry test assert on what npm happens to be serving — it went
+    // red the moment two packages were renamed, naming a release gap that has
+    // nothing to do with telemetry. REBASE_E2E short-circuits the lookup to the
+    // CLI's own version, which is what the rest of this file already assumes.
+    previousE2E = process.env.REBASE_E2E;
+    process.env.REBASE_E2E = "true";
 
     fetchMock = vi.fn().mockResolvedValue({ ok: true,
 status: 204 });
@@ -54,6 +65,8 @@ afterEach(() => {
     vi.restoreAllMocks();
     if (previousHome === undefined) delete process.env.HOME;
     else process.env.HOME = previousHome;
+    if (previousE2E === undefined) delete process.env.REBASE_E2E;
+    else process.env.REBASE_E2E = previousE2E;
     fs.rmSync(home, { recursive: true,
 force: true });
     fs.rmSync(workdir, { recursive: true,
