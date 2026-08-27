@@ -16,7 +16,7 @@ web
    primary audience: this is the library their custom fields are meant to be
    built with, and `rebase.pro/ui` is its public gallery. They are strangers to
    the monorepo and read the exports, not the source.
-2. **Rebase's own packages** — `@rebasepro/admin`, `@rebasepro/studio`, the
+2. **Rebase's own packages** — `@rebasepro/cms`, `@rebasepro/studio`, the
    console, and the marketing site — which consume it as a workspace dependency
    and are its highest-volume caller.
 

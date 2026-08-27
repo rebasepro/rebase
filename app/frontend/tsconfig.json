@@ -53,8 +53,8 @@
       "@rebasepro/common": [
         "../../packages/common/src"
       ],
-      "@rebasepro/admin": [
-        "../../packages/admin/src"
+      "@rebasepro/cms": [
+        "../../packages/cms/src"
       ],
       "@rebasepro/client": [
         "../../packages/client/src"

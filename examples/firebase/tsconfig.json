@@ -38,8 +38,8 @@
       "@rebasepro/ui": [
         "../../packages/ui/src"
       ],
-      "@rebasepro/admin": [
-        "../../packages/admin/src"
+      "@rebasepro/cms": [
+        "../../packages/cms/src"
       ]
     }
   },

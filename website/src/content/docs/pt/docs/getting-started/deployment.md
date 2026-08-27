@@ -157,10 +157,10 @@ isso para que a resolução URL⇄coleção considere o prefixo — caso contrá
 spinner sem buscar dados:
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Defina **ou** o `basename` do router **ou** `RebaseAdmin basePath` — não ambos, senão o
+Defina **ou** o `basename` do router **ou** `RebaseCMS basePath` — não ambos, senão o
 prefixo é aplicado duas vezes.
 :::
 
@@ -174,7 +174,7 @@ de modo que cada app seja carregada de forma preguiçosa e os visitantes do prod
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router

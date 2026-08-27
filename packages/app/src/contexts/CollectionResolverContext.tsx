@@ -10,7 +10,7 @@ export type CollectionResolver = (slug: string) => { properties?: Record<string,
  * layer, which needs a collection's primary keys to give its rows an address.
  *
  * The inversion is forced by the composition: `<Rebase client>` builds the data
- * layer, and `<RebaseAdmin collections>` sits inside it — so the collections are
+ * layer, and `<RebaseCMS collections>` sits inside it — so the collections are
  * not in scope where the data is created, and `Rebase` cannot take them as a
  * prop without giving every headless BaaS app a collections argument it has no
  * use for.

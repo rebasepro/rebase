@@ -700,7 +700,7 @@ export interface AuthCollectionConfig {
      *
      * Set to `false` to disable, or pass a custom `EntityAction` to replace the UI.
      *
-     * The object form is an `EntityAction` from `@rebasepro/admin-types`, typed
+     * The object form is an `EntityAction` from `@rebasepro/cms-types`, typed
      * here as `object` because it is a React component with admin controllers in
      * its props and nothing on the server reads it — only whether the built-in
      * action is injected, which is the boolean.

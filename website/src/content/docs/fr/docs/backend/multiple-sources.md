@@ -49,7 +49,7 @@ moteur que cette build ne connaît pas, on écrit `custom:` — par exemple
 Pointer ensuite une collection vers l'une d'elles :
 
 ```ts
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",

@@ -3,7 +3,7 @@
 Read-only security review, `main` @ `c678e1745`, 2026-08-09.
 Scope: `packages/server/src/auth/{admin-roles-route,admin-user-ops,admin-users-route,reset-password-admin,registration-policy,rls-scope}.ts`,
 the role storage/lookup in `packages/server-postgres/src/auth/services.ts`, and the
-admin-UI callers (`packages/admin/src/components/UserSelector.tsx`, the studio's
+admin-UI callers (`packages/cms/src/components/UserSelector.tsx`, the studio's
 "run as user" surfaces). Lens: bug class 33 (a privileged reader on a route that
 never asks who is calling) and class 36 (a mechanism nothing enforces).
 
@@ -365,7 +365,7 @@ is told about the resolved subset rather than the request (the same shape as the
 history-pagination finding in the 2026-08-07 sweep).
 
 ### L7. `UserSelector` 403s for every non-admin, and its comment about the alternative is stale
-`packages/admin/src/components/UserSelector.tsx:71-78` fetches
+`packages/cms/src/components/UserSelector.tsx:71-78` fetches
 `${apiBase}/admin/users`, which is `requireAdmin`. For an editor-role user the
 response is 403, the `catch` at `:101-103` sets `hasMore=false`, and the picker
 renders "No users found." — indistinguishable from an empty system, on a field

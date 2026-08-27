@@ -15,7 +15,7 @@ const PACKAGES_DIR = path.resolve(__dirname, "../../packages");
  * This was a hand-written list of fourteen, and it carried a comment about the
  * one it had already been caught missing: "without this one `utils` alone came
  * from its built `dist`, so edits to it did nothing in dev until the package
- * was rebuilt." It was still missing `@rebasepro/admin-types`, with exactly
+ * was rebuilt." It was still missing `@rebasepro/cms-types`, with exactly
  * that consequence — an edit there does nothing, and what runs is whatever
  * `dist` was last built, which is worse than nothing happening because it looks
  * like the edit was wrong.
@@ -121,7 +121,7 @@ export default defineConfig({
                     if (id.includes("packages/ui/")) return "rebase-ui";
                     if (id.includes("packages/app/")) return "rebase-core";
 
-                    // `packages/admin` used to be named here too, split by
+                    // `packages/cms` used to be named here too, split by
                     // directory "to stay under size limits". It did the
                     // opposite. This app resolves @rebasepro/* to SOURCE, so
                     // those names applied to individual admin modules, and each

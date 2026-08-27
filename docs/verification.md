@@ -396,8 +396,8 @@ so it should be chosen deliberately. Pinned in `query-contract.property.test.ts`
 which also fails if the reserved set grows, since adding a name is today a
 breaking change for anyone whose schema already uses it.
 
-**Board order keys are structurally untestable in `packages/admin`.**
-`fractional-indexing` is ESM-only and `packages/admin` runs CommonJS ts-jest, so
+**Board order keys are structurally untestable in `packages/cms`.**
+`fractional-indexing` is ESM-only and `packages/cms` runs CommonJS ts-jest, so
 the module that owns `ORDER_KEY_DIGITS` and `isValidOrderKey` cannot be imported
 by that runner at all — neither statically nor by dynamic `import()`, which
 ts-jest transpiles to `require`. The collation-safety reasoning behind the

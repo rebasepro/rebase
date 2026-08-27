@@ -1,4 +1,4 @@
-import type { SnackbarAction, SnackbarMessageType } from "@rebasepro/admin-types";
+import type { SnackbarAction, SnackbarMessageType } from "@rebasepro/cms-types";
 import React, { useCallback, useMemo } from "react";
 import { useSnackbar } from "notistack";
 import { Button } from "@rebasepro/ui";

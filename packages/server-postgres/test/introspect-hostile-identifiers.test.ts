@@ -54,7 +54,7 @@ function diagnostics(files: Map<string, string>): string[] {
             fs.writeFileSync(file, source, "utf-8");
             entryFiles.push(file);
         }
-        entryFiles.push(path.join(REPO_ROOT, "packages/admin-types/src/augment.ts"));
+        entryFiles.push(path.join(REPO_ROOT, "packages/cms-types/src/augment.ts"));
 
         const program = ts.createProgram(entryFiles, {
             noEmit: true,
@@ -69,7 +69,7 @@ function diagnostics(files: Map<string, string>): string[] {
             types: [],
             paths: {
                 "@rebasepro/types": [path.join(REPO_ROOT, "packages/types/src")],
-                "@rebasepro/admin-types": [path.join(REPO_ROOT, "packages/admin-types/src")],
+                "@rebasepro/cms-types": [path.join(REPO_ROOT, "packages/cms-types/src")],
                 "@rebasepro/common": [path.join(REPO_ROOT, "packages/common/src")],
                 "@rebasepro/utils": [path.join(REPO_ROOT, "packages/utils/src")]
             }

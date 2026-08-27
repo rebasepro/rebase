@@ -77,7 +77,7 @@ const navigationStateController = useBuildNavigationStateController({
 Hier ist ein minimales Plugin, das jeder Sammlung eine Toolbar-Aktion hinzufügt:
 
 ```tsx
-import type { RebasePlugin } from "@rebasepro/admin-types";
+import type { RebasePlugin } from "@rebasepro/cms-types";
 
 function useMyPlugin(): RebasePlugin {
     return {

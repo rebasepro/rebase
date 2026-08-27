@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from "react";
 
 import { CollectionComponentOverrideProvider } from "./ComponentOverrideContext";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Carries the collection a UI subtree is currently bound to.

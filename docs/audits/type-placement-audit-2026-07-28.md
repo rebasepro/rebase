@@ -48,11 +48,11 @@ These are not placement smells. Each one produces a wrong result today.
 widget?: "select" | "dialog";   // "Choose the widget to use for selecting the relation."
 ```
 
-`packages/admin-types/src/types/property_options.ts:120` declares the same option
+`packages/cms-types/src/types/property_options.ts:120` declares the same option
 again on `AdminRelationOptions`. The admin reads **only** the admin-block one:
 
-- `packages/admin/src/form/field_bindings/RelationFieldBinding.tsx:32` — `property.admin?.widget ?? "select"`
-- `packages/admin/src/components/CollectionTableBinding/table_bindings.tsx:237` — `(property as RelationProperty).admin?.widget === "dialog"`
+- `packages/cms/src/form/field_bindings/RelationFieldBinding.tsx:32` — `property.admin?.widget ?? "select"`
+- `packages/cms/src/components/CollectionTableBinding/table_bindings.tsx:237` — `(property as RelationProperty).admin?.widget === "dialog"`
 
 So a user who follows the core doc comment and writes `widget: "dialog"` on the
 property gets a `select` and no error. Two declarations, one reader.
@@ -112,8 +112,8 @@ wire shape — is what let the two disagree silently.
 
 ### 1.4 The collection editor's serializable mirror silently drops five fields
 
-`packages/admin/src/collection_editor/serializable_types.ts` is a 497-line
-hand-maintained mirror of the types in `@rebasepro/types` and `@rebasepro/admin-types`,
+`packages/cms/src/collection_editor/serializable_types.ts` is a 497-line
+hand-maintained mirror of the types in `@rebasepro/types` and `@rebasepro/cms-types`,
 and `serializable_utils.ts` copies field-by-field through an explicit whitelist
 (`toSerializableCollectionConfig`, line 434). Fields added to core since the mirror
 was last synced are absent from both:
@@ -334,7 +334,7 @@ It is rewritten to cover both the old gates and the new ones, and
 > finding, kept for the record.
 
 
-`packages/admin-types/src/augment.ts` adds `admin?: Admin*Options` back onto
+`packages/cms-types/src/augment.ts` adds `admin?: Admin*Options` back onto
 `BaseCollectionConfig` and all ten property interfaces by declaration merging. Its
 header states the intent plainly: a BaaS install "cannot even write one". For
 collections that holds — `ADMIN_COLLECTION_KEYS` lists 37 keys and none of them is
@@ -366,7 +366,7 @@ Two of these are not straightforward moves, and both stayed in core:
   which is what the generated schema is emitted from.
 - `MapProperty.propertiesOrder` is read by `sortProperties` in `@rebasepro/common`,
   which `@rebasepro/firebase` calls when it builds collections. A core package cannot
-  read the admin block at all — the field only exists once `@rebasepro/admin-types`
+  read the admin block at all — the field only exists once `@rebasepro/cms-types`
   is installed — so moving it would break a driver.
 
 `MapProperty.previewProperties` did move: `AdminReferenceOptions` and

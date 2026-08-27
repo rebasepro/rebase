@@ -6,7 +6,7 @@ Shared product truth for the Rebase monorepo. App-specific records extend this f
 and do not repeat it:
 
 - [`website/PRODUCT.md`](../website/PRODUCT.md) — the marketing site and docs at rebase.pro
-- [`packages/admin/PRODUCT.md`](../packages/admin/PRODUCT.md) — the CMS / admin panel
+- [`packages/cms/PRODUCT.md`](../packages/cms/PRODUCT.md) — the CMS / admin panel
 - [`packages/ui/PRODUCT.md`](../packages/ui/PRODUCT.md) — the public design system
 
 ## Platform

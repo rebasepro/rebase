@@ -52,7 +52,7 @@ export async function queryParamsAreChecked(): Promise<void> {
 
     // Legitimate: real columns only.
     // (The dotted-path arm — `"profile.city"` into a `map` column — is asserted in
-    // packages/admin-types/test/admin_collection.test.ts, which has a map property
+    // packages/cms-types/test/admin_collection.test.ts, which has a map property
     // to point at. Its root must exist too, which is the point of the check.)
     await posts.find({
         where: { status: ["==", "published"], views: [">=", 10] },

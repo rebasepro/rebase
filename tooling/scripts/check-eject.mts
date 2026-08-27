@@ -136,10 +136,10 @@ function materialize(flavour: "cms" | "baas", into: string): void {
 }
 
 /**
- * Make `@rebasepro/admin-types` resolvable the way a scaffolded project resolves
+ * Make `@rebasepro/cms-types` resolvable the way a scaffolded project resolves
  * it: as a dependency found by walking up from the file.
  *
- * `config/admin.d.ts` opts in with `/// <reference types="@rebasepro/admin-types" />`,
+ * `config/cms.d.ts` opts in with `/// <reference types="@rebasepro/cms-types" />`,
  * and a triple-slash type reference is resolved through `typeRoots` and
  * `node_modules` — never through tsconfig `paths`. Same shim, and same reason, as
  * `tooling/scripts/check-templates.mjs`.
@@ -149,12 +149,12 @@ function linkAdminTypes(into: string): void {
     fs.mkdirSync(shim, { recursive: true });
     fs.writeFileSync(
         path.join(shim, "package.json"),
-        JSON.stringify({ name: "@rebasepro/admin-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
+        JSON.stringify({ name: "@rebasepro/cms-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
         "utf8"
     );
     fs.writeFileSync(
         path.join(shim, "index.d.ts"),
-        `export * from ${JSON.stringify(path.join(repoRoot, "packages/admin-types/src/index"))};\n`,
+        `export * from ${JSON.stringify(path.join(repoRoot, "packages/cms-types/src/index"))};\n`,
         "utf8"
     );
 }

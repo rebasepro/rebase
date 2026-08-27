@@ -42,7 +42,7 @@
       "@rebasepro/ui": [
         "../ui/src"
       ],
-      "@rebasepro/admin": [
+      "@rebasepro/cms": [
         "../admin/src"
       ],
       "@rebasepro/common": [

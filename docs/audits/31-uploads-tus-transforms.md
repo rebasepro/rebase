@@ -28,7 +28,7 @@ file *and* the map entry permanently while the client is told 204, PATCHes are
 not serialized so the byte count and the file can diverge, and the three
 advertised size limits (5 GB, 50 MB, 10 MB) disagree with the smallest one
 winning silently. And the whole protocol has no client: nothing in
-`packages/client`, `packages/admin`, `docs/` or `website/` mentions it, and
+`packages/client`, `packages/cms`, `docs/` or `website/` mentions it, and
 `image-transform.ts` has no test of any kind.
 
 Counts: 1 critical, 3 high, 6 medium, 5 low.
@@ -451,7 +451,7 @@ the `get` handler (tested against 4.13.0), so tus clients' offset probes land.
 ### L4 — resumable upload is a server feature with no client, no docs and no tests
 
 `packages/client/src/storage.ts:30-71`;
-`grep -rn "tus|resumable"` over `packages/client/src`, `packages/admin/src`,
+`grep -rn "tus|resumable"` over `packages/client/src`, `packages/cms/src`,
 `docs/`, `website/` → nothing
 
 The SDK's only upload path is a single multipart `POST /storage/upload`. The TUS

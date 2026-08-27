@@ -15,8 +15,8 @@ module.exports = {
         "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
         "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
         // Only the shipped templates import this, and only for `defineCollection`
-        // — see test/stubs/admin-types.ts. The server itself may not depend on it.
-        "^@rebasepro/admin-types$": "<rootDir>/test/stubs/admin-types.ts",
+        // — see test/stubs/cms-types.ts. The server itself may not depend on it.
+        "^@rebasepro/cms-types$": "<rootDir>/test/stubs/cms-types.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
     }
 };

@@ -49,10 +49,10 @@ function declaredDependencies(manifestPath: string): Set<string> {
  * at the moment of generation. The alternatives are all proxies for it: `rebase.json`'s
  * `apps` block says a CMS scaffold declared an admin app, and a `frontend/` directory
  * says one was scaffolded, but neither is what the compiler consults, and either can be
- * true of a project whose `config` package does not depend on `@rebasepro/admin-types`.
+ * true of a project whose `config` package does not depend on `@rebasepro/cms-types`.
  *
  * Ambiguity resolves towards the admin panel: a project that declares both packages has
- * a panel, and `@rebasepro/admin-types` is the flavour that keeps the `admin` block.
+ * a panel, and `@rebasepro/cms-types` is the flavour that keeps the `admin` block.
  */
 export function detectCollectionBuilder(outDir: string): CollectionBuilder {
     let dir = path.resolve(outDir);

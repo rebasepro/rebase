@@ -36,7 +36,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { User } from "@rebasepro/types";
-import { AuthControllerExtended } from "@rebasepro/admin-types";
+import { AuthControllerExtended } from "@rebasepro/cms-types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
 import { LanguageToggle } from "../LanguageToggle";

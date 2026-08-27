@@ -9,7 +9,7 @@ description: Definieren Sie Row Level Security (RLS)-Richtlinien für Ihre Samml
 Sicherheitsregeln ermöglichen es Ihnen, **Row Level Security (RLS)**-Richtlinien für Ihre PostgreSQL-Tabellen direkt in Ihren Sammlungsdefinitionen zu definieren. Wenn das Drizzle-Schema generiert wird, erstellt Rebase die entsprechenden `CREATE POLICY`-Anweisungen.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

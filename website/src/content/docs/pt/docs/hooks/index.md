@@ -50,7 +50,7 @@ function UserMenu() {
 Abra entidades programaticamente em um painel lateral:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/cms";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -142,7 +142,7 @@ function ThemeToggle() {
 Abra um diálogo lateral para selecionar entidades de uma coleção. Este é o mesmo hook usado internamente quando uma propriedade de relação é renderizada:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/admin";
+import { useSelectionDialog } from "@rebasepro/cms";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({
@@ -162,7 +162,7 @@ function SelectProduct() {
 Acessar estado de navegação e coleções resolvidas:
 
 ```typescript
-import { useNavigationStateController } from "@rebasepro/admin";
+import { useNavigationStateController } from "@rebasepro/cms";
 
 function MyComponent() {
     const navigation = useNavigationStateController();

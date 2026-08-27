@@ -12,7 +12,7 @@
  * thing: the same store answers an imperative caller (an export, a breadcrumb
  * built outside the tree), and it is testable without a renderer.
  */
-import type { EntityDisplayRole } from "@rebasepro/admin-types";
+import type { EntityDisplayRole } from "@rebasepro/cms-types";
 
 type CacheEntry = {
     /** Set once resolved. `null` means "resolved to nothing", not "unknown". */

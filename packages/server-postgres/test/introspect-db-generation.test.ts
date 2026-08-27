@@ -552,13 +552,13 @@ is_nullable: "NO" })]);
                 "t", meta, [], new Set(), new Map([["t", meta]]), new Map(), undefined, { builder }
             );
 
-            expect(gen("admin-types")).toContain('import { defineCollection } from "@rebasepro/admin-types"');
+            expect(gen("admin-types")).toContain('import { defineCollection } from "@rebasepro/cms-types"');
             expect(gen("admin-types")).toContain("const tCollection = defineCollection({");
 
             // No admin-types in a headless project, so the headless builder — same
             // key inference, no admin surface, nothing React in its graph.
             expect(gen("common")).toContain('import { defineCollection } from "@rebasepro/common"');
-            expect(gen("common")).not.toContain("@rebasepro/admin-types");
+            expect(gen("common")).not.toContain("@rebasepro/cms-types");
 
             // Neither package declared: neither import would resolve, so the old
             // annotation is the only honest thing to emit.
@@ -568,7 +568,7 @@ is_nullable: "NO" })]);
 
         /**
          * `@rebasepro/types` declares no `admin` field at all — the augmentation in
-         * `@rebasepro/admin-types` is what adds it — so emitting the block into a
+         * `@rebasepro/cms-types` is what adds it — so emitting the block into a
          * project that does not have that package writes a type error into every
          * generated file. It did, until this.
          */

@@ -53,7 +53,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/forms": "workspace:*",
     "@rebasepro/types": "workspace:*",
@@ -136,7 +136,7 @@
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
-      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts"
+      "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts"
     },
     "transformIgnorePatterns": [
       "node_modules/(?!.*(?:react-router|cookie-es|fractional-indexing))"

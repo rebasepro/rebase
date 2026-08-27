@@ -339,9 +339,9 @@ construction.
 ## Smaller notes
 
 - **`defineCollection` exists twice** — `@rebasepro/common` and
-  `@rebasepro/admin-types`. The split is deliberate and well-argued, but because
+  `@rebasepro/cms-types`. The split is deliberate and well-argued, but because
   the `admin` augmentation is program-global (and the templates pull it in via
-  `config/admin.d.ts`), both behave identically in a scaffolded project. The docs
+  `config/cms.d.ts`), both behave identically in a scaffolded project. The docs
   need to arbitrate which one a reader should import, or the split is two names
   for one function.
 - **`buildCallContext` is cast, not typed.**
@@ -380,7 +380,7 @@ Worth not breaking:
 
 - The `@rebasepro/client` barrel is an explicit curated list with the rule
   written down in the file, and internal factories are deliberately withheld.
-- The `admin`-block augmentation (`packages/admin-types/src/augment.ts`) — the
+- The `admin`-block augmentation (`packages/cms-types/src/augment.ts`) — the
   interface-vs-type constraint, the program-scope caveat, and the `M` forwarding
   bug are all documented at the point where someone would otherwise reintroduce
   them.

@@ -60,7 +60,7 @@ function App() {
 To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
 const productsCollection = defineCollection({
@@ -145,6 +145,6 @@ override map does not name a props type per key — `ComponentOverride<P>` defau
 argument, when you want the props checked. A few of the built-ins do export a
 props type you can import and reuse: `CollectionViewProps` (`@rebasepro/ui`);
 `CollectionEmptyStateProps`, `CollectionActionsProps` and
-`FilterFieldBindingProps` (`@rebasepro/admin-types`); `EntityFormProps` and
-`EntityFormActionsProps` (`@rebasepro/admin`). The rest have no exported props
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` and
+`EntityFormActionsProps` (`@rebasepro/cms`). The rest have no exported props
 type — write the shape you actually read.

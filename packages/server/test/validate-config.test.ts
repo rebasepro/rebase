@@ -43,7 +43,7 @@ describe("a current-era config", () => {
     });
 
     it("does not look inside the admin block for keys it simply does not know", () => {
-        // The block belongs to @rebasepro/admin-types, which the server may not
+        // The block belongs to @rebasepro/cms-types, which the server may not
         // import. Guessing at its contents here would reject keys the panel adds.
         const collection = { ...valid(), admin: { icon: "Article", somethingTheAdminAdded: true } };
         expect(findCollectionConfigProblems([collection])).toEqual([]);

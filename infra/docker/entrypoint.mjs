@@ -194,7 +194,7 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
 //
 // TOO MANY: the install above can leave a SECOND copy inside
 // `/bundle/node_modules` — `@rebasepro/server` arrives that way as a transitive
-// dependency of `@rebasepro/admin` and `@rebasepro/server-postgres`, which many
+// dependency of `@rebasepro/cms` and `@rebasepro/server-postgres`, which many
 // projects declare.
 //
 // That is not merely wasteful, it is a silent, total breakage of custom

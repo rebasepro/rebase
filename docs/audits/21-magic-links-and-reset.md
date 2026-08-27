@@ -52,7 +52,7 @@ Four call sites change a password without touching sessions:
 | `admin-users-route.ts:305` (`PUT /users/:uid` with `password`) | `updateUser({passwordHash})` | **no** |
 
 Both admin UI modes reach the non-revoking route:
-`packages/admin/src/components/common/default_entity_actions.tsx:276` POSTs
+`packages/cms/src/components/common/default_entity_actions.tsx:276` POSTs
 `/admin/users/:uid/reset-password` with `{password}` for "set manually" and
 `{}` for "email a link".
 

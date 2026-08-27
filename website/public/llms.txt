@@ -1060,7 +1060,7 @@ A CommonJS consumer must use dynamic `import()` or move to ESM.
 
 ### 6. `react-router` 8, and `react-router-dom` is gone
 
-Only relevant if you use the admin panel — `@rebasepro/admin`, `app`, `studio`
+Only relevant if you use the admin panel — `@rebasepro/cms`, `app`, `studio`
 or `plugin-ai`. A headless install has no router.
 
 react-router 8 deletes the `react-router-dom` package. It was only ever a
@@ -1145,7 +1145,7 @@ Additionally, **`@rebasepro/auth` is removed**. `useRebaseAuthController`,
 from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they
 are used with.
 
-**`RebaseCMS` is now `RebaseAdmin`.** `mode: "cms"` on `RebaseBackendConfig` is
+**`RebaseCMS` is now `RebaseCMS`.** `mode: "cms"` on `RebaseBackendConfig` is
 unchanged — it describes where collections come from, not the UI.
 
 ---
@@ -1754,7 +1754,7 @@ the cast makes the exception explicit:
 propertiesOrder: ["title", "score" as AdditionalFieldKey]
 ```
 
-Import it from `@rebasepro/admin-types` in a project that has an admin panel — that is
+Import it from `@rebasepro/cms-types` in a project that has an admin panel — that is
 the copy that also typechecks the `admin` block. A headless BaaS project, which has no
 admin block and no React, imports the same function from `@rebasepro/common` instead.
 
@@ -1822,12 +1822,12 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 #### The `admin` block exists only if you install the admin types
 
 `@rebasepro/types` declares no `admin` field — not on a collection, not on a property. In
-a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
+a BaaS project, writing one is a **type error**. `@rebasepro/cms-types` adds it back by
 declaration merging, so one line per project turns it on:
 
 ```typescript no-verify
-// config/admin.d.ts
-/// <reference types="@rebasepro/admin-types" />
+// config/cms.d.ts
+/// <reference types="@rebasepro/cms-types" />
 ```
 
 After that, plain core types carry a fully typed block — a typo like `icoon` is an error,
@@ -9976,7 +9976,7 @@ Or register the component once and name it by key, which is also what makes it
 selectable from the collection editor:
 
 ```tsx
-<RebaseAdmin
+<RebaseCMS
     collections={collections}
     collectionViews={[{ key: "map", name: "Map", icon: "Map", Builder: MapView }]}
 />
@@ -10280,8 +10280,8 @@ override map does not name a props type per key — `ComponentOverride<P>` defau
 argument, when you want the props checked. A few of the built-ins do export a
 props type you can import and reuse: `CollectionViewProps` (`@rebasepro/ui`);
 `CollectionEmptyStateProps`, `CollectionActionsProps` and
-`FilterFieldBindingProps` (`@rebasepro/admin-types`); `EntityFormProps` and
-`EntityFormActionsProps` (`@rebasepro/admin`). The rest have no exported props
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` and
+`EntityFormActionsProps` (`@rebasepro/cms`). The rest have no exported props
 type — write the shape you actually read.
 
 ## Authentication & Login
@@ -15251,7 +15251,7 @@ Introspection writes collections against `defineCollection`, which keeps the pro
 
 | Your project declares | Generated collections use | `admin` block |
 |------|------|------|
-| `@rebasepro/admin-types` (a project with the panel) | `defineCollection` from `@rebasepro/admin-types` | yes |
+| `@rebasepro/cms-types` (a project with the panel) | `defineCollection` from `@rebasepro/cms-types` | yes |
 | `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
 | neither | a `PostgresCollectionConfig` annotation, with a warning | no |
 
@@ -15458,8 +15458,8 @@ A visual schema editor that lets you create and modify collections through a dra
 ```tsx
 
 // The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseAdmin component
-<RebaseAdmin
+// collectionEditor configuration to your RebaseCMS component
+<RebaseCMS
     collections={collections}
     collectionEditor={{
         getAuthToken: authController.getAuthToken
@@ -15489,7 +15489,7 @@ open costs nothing.
 | API Keys | `api-keys` | Access Control | Create and manage scoped service API keys |
 
 The **Collection Editor** is not in this list because it is not a Studio tool: it
-is a built-in admin feature, injected automatically when `RebaseAdmin` is given a
+is a built-in admin feature, injected automatically when `RebaseCMS` is given a
 `collectionEditor` prop.
 
 ### Adding Studio Views
@@ -16650,10 +16650,10 @@ it so URL⇄collection resolution accounts for the prefix — otherwise views ha
 spinner with no data fetch:
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Set **either** the router `basename` **or** `RebaseAdmin basePath` — not both, or the
+Set **either** the router `basename` **or** `RebaseCMS basePath` — not both, or the
 prefix is applied twice.
 :::
 
@@ -16667,7 +16667,7 @@ so each app is lazy-loaded and product visitors never download the admin bundle:
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router
@@ -18295,7 +18295,7 @@ the drawer orders groups rather than individual views.
 
 A view component receives no props. To route somewhere — another custom view, a
 collection, an entity — reach for `useUrlController`, which is exported from
-`@rebasepro/admin`:
+`@rebasepro/cms`:
 
 ```tsx
 

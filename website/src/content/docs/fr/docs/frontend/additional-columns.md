@@ -11,7 +11,7 @@ Les colonnes supplémentaires vous permettent d'afficher des données calculées
 ## Définir des colonnes supplémentaires
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

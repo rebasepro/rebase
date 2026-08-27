@@ -1,4 +1,4 @@
-import { RichTextEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/cms/editor";
 
 const sampleContent = `# Getting Started with Rebase
 

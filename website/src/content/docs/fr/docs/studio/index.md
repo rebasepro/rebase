@@ -22,11 +22,11 @@ Un éditeur de schéma visuel qui vous permet de créer et de modifier des colle
 ![Éditeur de collection](/img/collection_editor.png)
 
 ```tsx
-import { RebaseAdmin } from "@rebasepro/admin";
+import { RebaseCMS } from "@rebasepro/cms";
 
 // The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseAdmin component
-<RebaseAdmin
+// collectionEditor configuration to your RebaseCMS component
+<RebaseCMS
     collections={collections}
     collectionEditor={{
         getAuthToken: authController.getAuthToken

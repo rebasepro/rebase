@@ -37,7 +37,7 @@ import { DataEnhancementController } from "../types/data_enhancement_controller"
  * that the Apply button's count matches what Apply will really write.
  */
 
-jest.mock("@rebasepro/admin", () => ({
+jest.mock("@rebasepro/cms", () => ({
     getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field")
 }));
 

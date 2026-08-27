@@ -16,7 +16,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*"

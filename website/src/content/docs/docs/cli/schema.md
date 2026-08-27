@@ -83,7 +83,7 @@ Introspection writes collections against `defineCollection`, which keeps the pro
 
 | Your project declares | Generated collections use | `admin` block |
 |------|------|------|
-| `@rebasepro/admin-types` (a project with the panel) | `defineCollection` from `@rebasepro/admin-types` | yes |
+| `@rebasepro/cms-types` (a project with the panel) | `defineCollection` from `@rebasepro/cms-types` | yes |
 | `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
 | neither | a `PostgresCollectionConfig` annotation, with a warning | no |
 

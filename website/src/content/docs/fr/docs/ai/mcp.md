@@ -159,7 +159,7 @@ contexte serveur de confiance et au rôle `admin`. Une collection peut refuser c
 politique de base et prendre l'entière responsabilité de son propre RLS :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

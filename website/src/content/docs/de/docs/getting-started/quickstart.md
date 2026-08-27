@@ -99,7 +99,7 @@ Wenn Sie die von `rebase dev` ausgegebene Frontend-URL öffnen, sehen Sie den An
 Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Sammlung als **Default-Export** — so wird sie von der Registry erkannt:
 
 ```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

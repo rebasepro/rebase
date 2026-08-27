@@ -22,8 +22,8 @@
       "@rebasepro/types/*": ["../../packages/types/src/*"],
       "@rebasepro/common": ["../../packages/common/src/index.ts"],
       "@rebasepro/common/*": ["../../packages/common/src/*"],
-      "@rebasepro/admin": ["../../packages/admin/src/index.ts"],
-      "@rebasepro/admin/*": ["../../packages/admin/src/*"]
+      "@rebasepro/cms": ["../../packages/cms/src/index.ts"],
+      "@rebasepro/cms/*": ["../../packages/cms/src/*"]
     }
   },
   "include": [

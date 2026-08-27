@@ -51,7 +51,7 @@ Antes de importar, o assistente valida todas as linhas contra as definições de
 A importação é habilitada por padrão. Para desativá-la em uma coleção específica, use o sub-objeto `admin`:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -91,7 +91,7 @@ Quaisquer filtros ativos na visão da coleção são aplicados à exportação. 
 A exportação é habilitada por padrão. Você pode configurá-la com campos computados adicionais:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -108,7 +108,7 @@ const productsCollection = defineCollection({
 Para desativar a exportação:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     table: "products",
@@ -126,7 +126,7 @@ const productsCollection = defineCollection({
 Use o objeto `ExportConfig` para adicionar colunas computadas personalizadas às suas exportações. Essas colunas não existem no banco de dados — são calculadas no momento da exportação:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

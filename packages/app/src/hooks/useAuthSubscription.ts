@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { AuthClient, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/admin-types";
+import { AuthController } from "@rebasepro/cms-types";
 
 export function useAuthSubscription(authClient?: AuthClient): AuthController {
 

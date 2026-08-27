@@ -3,7 +3,7 @@ import { useAuthController } from "./useAuthController";
 import { Entity } from "@rebasepro/types";
 import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/common";
 import { useCallback, useMemo } from "react";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Hook to evaluate roles and permissions for the current user.

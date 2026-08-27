@@ -99,7 +99,7 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
+      "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts",
       "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"

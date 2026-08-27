@@ -1,6 +1,6 @@
 
 import { Entity, CollectionCallbacks, User } from "@rebasepro/types";
-import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
+import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 
 /**

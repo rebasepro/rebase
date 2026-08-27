@@ -16,7 +16,7 @@ Cree un backend de blog con:
 ### Autores
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const authorsCollection = defineCollection({
     slug: "authors",
@@ -60,7 +60,7 @@ export const authorsCollection = defineCollection({
 ### Categorías
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 export const categoriesCollection = defineCollection({
     slug: "categories",
     name: "Categories",
@@ -98,7 +98,7 @@ export const categoriesCollection = defineCollection({
 ### Artículos
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;

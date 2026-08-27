@@ -32,7 +32,7 @@ export const PACKAGE_ENTRIES = {
     "@rebasepro/utils": "packages/utils/src/index.ts",
     "@rebasepro/ui": "packages/ui/src/index.ts",
     "@rebasepro/app": "packages/app/src/index.ts",
-    "@rebasepro/admin": "packages/admin/src/index.ts",
+    "@rebasepro/cms": "packages/cms/src/index.ts",
     "@rebasepro/forms": "packages/forms/src/index.ts",
     "@rebasepro/studio": "packages/studio/src/index.ts",
     "@rebasepro/codegen": "packages/codegen/src/index.ts",

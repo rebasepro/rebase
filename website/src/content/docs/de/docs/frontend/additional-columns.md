@@ -11,7 +11,7 @@ Zusätzliche Spalten ermöglichen es Ihnen, berechnete oder abgeleitete Daten in
 ## Definieren zusätzlicher Spalten
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

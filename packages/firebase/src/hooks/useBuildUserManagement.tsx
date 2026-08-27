@@ -9,7 +9,7 @@ import {
 } from "@rebasepro/types";
 import {
     AuthController
-} from "@rebasepro/admin-types";
+} from "@rebasepro/cms-types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
 
 export interface Role {

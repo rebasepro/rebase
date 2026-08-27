@@ -20,7 +20,7 @@ import { firstFreeKey, prettifyIdentifier, toWireKey } from "@rebasepro/utils";
  * Deliberately not `Partial<AdminCollection>`, which is what this returned
  * while it lived in `@rebasepro/studio`. `propertiesOrder` is the only admin
  * key it produces, and naming the admin view model for one field would put
- * `@rebasepro/admin-types` on the dependency path of a package the backend
+ * `@rebasepro/cms-types` on the dependency path of a package the backend
  * loads.
  */
 export interface IntrospectedCollection {

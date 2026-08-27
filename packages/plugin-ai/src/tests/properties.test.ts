@@ -18,7 +18,7 @@ import { Properties } from "@rebasepro/types";
  * `getFieldId` is mocked to something deterministic — the real one resolves
  * against the admin field registry, which is not what is under test here.
  */
-jest.mock("@rebasepro/admin", () => ({
+jest.mock("@rebasepro/cms", () => ({
     getFieldId: (property: { type?: string; admin?: { markdown?: boolean; multiline?: boolean } }) => {
         if (!property?.type) return undefined;
         if (property.type === "string" && property.admin?.markdown) return "markdown";

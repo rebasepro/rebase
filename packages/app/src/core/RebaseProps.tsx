@@ -1,6 +1,6 @@
 import React from "react";
 import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
-import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/admin-types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -108,7 +108,7 @@ import type { EffectiveRoleController } from "@rebasepro/types";
 export type RebaseProps<USER extends User, DB = unknown> = {
 
     /**
-     * The root components of your application. Use RebaseAdmin, RebaseStudio, and RebaseShell.
+     * The root components of your application. Use RebaseCMS, RebaseStudio, and RebaseShell.
      * Alternatively, pass a render function that receives { context, loading }.
      */
     children: React.ReactNode | ((props: { context: RebaseContext; loading: boolean }) => React.ReactNode);

@@ -60,7 +60,7 @@ function App() {
 Para substituir componentes apenas para uma coleção específica, adicione um objeto `components` à sua definição. Isso é útil para personalizar estados vazios, cards ou visões de detalhe para modelos específicos.
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
 const productsCollection = defineCollection({

@@ -255,7 +255,7 @@ declared peer installs an API this code does not target.
   `packages/firebase/src/utils/pinecone.ts:5` still defaults to
   `https://api.rebase.pro`. `packages/plugin-ai/src/api.ts:11-17` documents that
   exact host as *"a FireCMS-era host that resolves but serves nothing — every
-  path 404s"* and moved off it. `packages/admin/src/collection_editor/api/generateCollectionApi.ts:51`
+  path 404s"* and moved off it. `packages/cms/src/collection_editor/api/generateCollectionApi.ts:51`
   is a third occurrence. Additionally `pinecone.ts:35` sends a Firebase ID token
   as `Authorization: Basic ${firebaseToken}` — the wrong scheme, and the same
   "hand a live credential to a third party that cannot verify it" shape

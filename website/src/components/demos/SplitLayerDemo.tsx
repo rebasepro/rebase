@@ -17,8 +17,8 @@ const BACKEND_DEPS = [
 ];
 
 const ADMIN_DEPS = [
-    "@rebasepro/admin",
-    "@rebasepro/admin-types"
+    "@rebasepro/cms",
+    "@rebasepro/cms-types"
 ];
 
 export function SplitLayerDemo() {

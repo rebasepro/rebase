@@ -123,9 +123,9 @@ importers:
 
   app/config:
     dependencies:
-      '@rebasepro/admin-types':
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../../packages/admin-types
+        version: link:../../packages/cms-types
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -181,12 +181,12 @@ importers:
       '@fontsource/jetbrains-mono':
         specifier: ^5.3.0
         version: 5.3.0
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../../packages/admin
-      '@rebasepro/admin-types':
+        version: link:../../packages/cms
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../../packages/admin-types
+        version: link:../../packages/cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -287,9 +287,9 @@ importers:
       '@fontsource/jetbrains-mono':
         specifier: ^5.3.0
         version: 5.3.0
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../../packages/admin
+        version: link:../../packages/cms
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -419,7 +419,7 @@ importers:
         specifier: ^8.1.5
         version: 8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/admin:
+  packages/cms:
     dependencies:
       '@dnd-kit/core':
         specifier: ^6.3.1
@@ -436,9 +436,9 @@ importers:
       '@floating-ui/dom':
         specifier: ^1.8.0
         version: 1.8.0
-      '@rebasepro/admin-types':
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../app
@@ -597,7 +597,7 @@ importers:
         specifier: ^8.1.5
         version: 8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
-  packages/admin-types:
+  packages/cms-types:
     dependencies:
       '@rebasepro/types':
         specifier: workspace:*
@@ -648,9 +648,9 @@ importers:
 
   packages/app:
     dependencies:
-      '@rebasepro/admin-types':
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
@@ -966,12 +966,12 @@ importers:
 
   packages/firebase:
     dependencies:
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../admin
-      '@rebasepro/admin-types':
+        version: link:../cms
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../app
@@ -1156,12 +1156,12 @@ importers:
 
   packages/plugin-ai:
     dependencies:
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../admin
-      '@rebasepro/admin-types':
+        version: link:../cms
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../app
@@ -1232,9 +1232,9 @@ importers:
 
   packages/plugin-insights:
     dependencies:
-      '@rebasepro/admin-types':
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../app
@@ -1534,12 +1534,12 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.56.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../admin
-      '@rebasepro/admin-types':
+        version: link:../cms
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../admin-types
+        version: link:../cms-types
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../app
@@ -1958,9 +1958,9 @@ importers:
 
   saas/config:
     dependencies:
-      '@rebasepro/admin-types':
+      '@rebasepro/cms-types':
         specifier: workspace:*
-        version: link:../../packages/admin-types
+        version: link:../../packages/cms-types
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -1971,9 +1971,9 @@ importers:
 
   saas/frontend:
     dependencies:
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:*
-        version: link:../../packages/admin
+        version: link:../../packages/cms
       '@rebasepro/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -2095,9 +2095,9 @@ importers:
       '@google/generative-ai':
         specifier: 0.24.1
         version: 0.24.1
-      '@rebasepro/admin':
+      '@rebasepro/cms':
         specifier: workspace:^
-        version: link:../packages/admin
+        version: link:../packages/cms
       '@rebasepro/app':
         specifier: workspace:^
         version: link:../packages/app

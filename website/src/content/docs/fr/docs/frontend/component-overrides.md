@@ -60,7 +60,7 @@ function App() {
 Pour surcharger des composants uniquement pour une collection spécifique, ajoutez un objet `components` à sa définition. C'est utile pour personnaliser les états vides, les cartes ou les vues de détail pour des modèles particuliers.
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
 const productsCollection = defineCollection({

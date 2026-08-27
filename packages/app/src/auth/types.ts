@@ -1,5 +1,5 @@
 import { User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/admin-types";
+import { AuthController } from "@rebasepro/cms-types";
 import type { AuthConfigResponse } from "./api";
 
 // Re-export canonical types so the auth entry point stays self-contained. `User`

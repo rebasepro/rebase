@@ -1,4 +1,4 @@
-import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/admin-types";
+import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";

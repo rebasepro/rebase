@@ -1,4 +1,4 @@
-import { getFieldId } from "@rebasepro/admin";
+import { getFieldId } from "@rebasepro/cms";
 import { EnumValues, Properties, Property } from "@rebasepro/types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { InputProperty } from "../types/data_enhancement_controller";

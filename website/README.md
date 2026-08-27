@@ -50,7 +50,7 @@ website/
     └── styles/             global.css and per-surface stylesheets
 ```
 
-The site imports the real product packages (`@rebasepro/ui`, `@rebasepro/admin`,
+The site imports the real product packages (`@rebasepro/ui`, `@rebasepro/cms`,
 `@rebasepro/app`) as workspace dependencies and aliases them to source in
 `astro.config.mjs`, so the demos run the actual components rather than mockups.
 

@@ -91,7 +91,7 @@ export default function App() {
 
 ## Related Packages
 
-- `@rebasepro/admin` — Admin panel UI (Scaffold, Drawer, SideDialogs)
+- `@rebasepro/cms` — Admin panel UI (Scaffold, Drawer, SideDialogs)
 - `@rebasepro/app` — Core framework (Rebase provider, routing)
 - `@rebasepro/common` — Shared data utilities
 - `@rebasepro/types` — Shared type definitions

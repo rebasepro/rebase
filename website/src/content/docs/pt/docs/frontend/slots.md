@@ -119,7 +119,7 @@ const myPlugin: RebasePlugin = {
 Todos os tipos de props dos slots são exportados de `@rebasepro/types` e podem ser importados para componentes de slot com segurança de tipos:
 
 ```typescript
-import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/admin-types";
+import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";
 ```
 
 Cada tipo de props fornece acesso ao contexto relevante para o local do slot — metadados de coleção, dados de entidade, estado de navegação e mais. Consulte as definições de tipo individuais para todos os detalhes das propriedades.

@@ -51,7 +51,7 @@ Avant l'import, l'assistant valide toutes les lignes par rapport aux définition
 L'import est activé par défaut. Pour le désactiver sur une collection spécifique, utilisez le sous-objet `admin` :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -91,7 +91,7 @@ Tous les filtres actifs dans la vue de collection sont appliqués à l'export. C
 L'export est activé par défaut. Vous pouvez le configurer avec des champs calculés supplémentaires :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -108,7 +108,7 @@ const productsCollection = defineCollection({
 Pour désactiver l'export :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     table: "products",
@@ -126,7 +126,7 @@ const productsCollection = defineCollection({
 Utilisez l'objet `ExportConfig` pour ajouter des colonnes calculées personnalisées à vos exports. Ces colonnes n'existent pas dans la base de données — elles sont calculées au moment de l'export :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

@@ -46,7 +46,7 @@ export function buildStringProperty({
             .filter((value) => typeof value === "string" && value.length === 28 && !value.includes(" "))
             .length > totalDocsCount / 3 * 2;
         // No `admin.readOnly` here. This package is core — the field does not exist in
-        // `@rebasepro/types`, because `@rebasepro/admin-types` declares it — and a
+        // `@rebasepro/types`, because `@rebasepro/cms-types` declares it — and a
         // guess about whether a form should be editable is presentation, not schema.
         // (It also would not have enforced anything: nothing on the server reads
         // `readOnly`.) The inferred `isId` below is the part that carries meaning.

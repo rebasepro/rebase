@@ -40,7 +40,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASELINE = path.join(ROOT, "tooling", "scripts", "untranslated-baseline.json");
 const EN = path.join(ROOT, "packages/app/src/locales/en.ts");
-const SCANNED = ["packages/admin/src"];
+const SCANNED = ["packages/cms/src"];
 const update = process.argv.includes("--update");
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;

@@ -17,7 +17,7 @@ Rebase genera campi modulo automaticamente in base ai tipi di proprietà. Per un
 Un campo personalizzato è un componente React che riceve `FieldProps`:
 
 ```tsx
-import type { FieldProps } from "@rebasepro/admin";
+import type { FieldProps } from "@rebasepro/cms";
 import type { StringProperty, NumberProperty } from "@rebasepro/types";
 
 function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {

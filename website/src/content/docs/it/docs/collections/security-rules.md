@@ -9,7 +9,7 @@ description: Definisci le politiche di sicurezza a livello di riga (Row Level Se
 Le regole di sicurezza ti consentono di definire le politiche di **Sicurezza a Livello di Riga (RLS)** per le tue tabelle PostgreSQL direttamente nelle definizioni delle tue collection. Quando lo schema Drizzle viene generato, Rebase crea le corrispondenti istruzioni `CREATE POLICY`.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

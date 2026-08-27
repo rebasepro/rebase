@@ -134,7 +134,7 @@ of `policyToPostgres(policy.authenticated())` rather than a hand-typed string.
 ### H3 — `disableDefaultPolicies` silently removes the restrictive privilege-escalation gate on auth collections
 
 `packages/common/src/util/auth-default-policies.ts:95-97`, `:126-135`;
-`packages/admin/src/collection_editor/serializable_utils.ts:506-507`
+`packages/cms/src/collection_editor/serializable_utils.ts:506-507`
 
 `getEffectiveSecurityRules` returns the author's rules unchanged when
 `disableDefaultPolicies` is set. For an auth collection that discards four

@@ -1,7 +1,7 @@
 # Audit 50 — admin data import / export
 
-*Read-only audit, 2026-08-08. Scope: `packages/admin/src/data_export/**`,
-`packages/admin/src/data_import/**`, and the read/write path they actually ride —
+*Read-only audit, 2026-08-08. Scope: `packages/cms/src/data_export/**`,
+`packages/cms/src/data_import/**`, and the read/write path they actually ride —
 `packages/common/src/data/buildRebaseData.ts` (`wrapAsEntityData`),
 `packages/client/src/{collection,transport,reviver}.ts`,
 `packages/server/src/api/rest/{query-parser,api-generator}.ts`,
@@ -67,7 +67,7 @@ the already-written rows now conflict on their ids, can never succeed.
 
 #### F1 — Export silently returns the first 50 rows and calls it an export
 
-`packages/admin/src/data_export/export/ExportCollectionAction.tsx:126`
+`packages/cms/src/data_export/export/ExportCollectionAction.tsx:126`
 `packages/server/src/api/rest/query-parser.ts:351`
 `packages/types/src/controllers/data_driver.ts:57,61,84`
 
@@ -111,9 +111,9 @@ in silence.
 
 #### F2 — Prototype pollution from an uploaded file's header row
 
-`packages/admin/src/data_import/utils/transforms.ts:6-36`
-reached from `packages/admin/src/data_import/utils/file_to_json.ts:68`
-and `packages/admin/src/data_import/utils/data.ts:37`
+`packages/cms/src/data_import/utils/transforms.ts:6-36`
+reached from `packages/cms/src/data_import/utils/file_to_json.ts:68`
+and `packages/cms/src/data_import/utils/data.ts:37`
 
 ```ts
 } else if (i !== keyParts.length - 1) {
@@ -160,7 +160,7 @@ the same source and want the same guard.
 
 #### F3 — Exported CSV executes formulas when opened
 
-`packages/admin/src/data_export/export/export.ts:212-222`
+`packages/cms/src/data_export/export/export.ts:212-222`
 (same defect in the unused `downloadDataAsCsv`, `export.ts:233-248`)
 
 ```ts
@@ -187,9 +187,9 @@ callers).
 
 #### F4 — CSV import is broken; the round trip cannot close
 
-`packages/admin/src/data_import/utils/file_to_json.ts:37-79`
-`packages/admin/src/data_import/components/ImportFileUpload.tsx:11`
-`packages/admin/src/data_import/import/ImportCollectionAction.tsx:126`
+`packages/cms/src/data_import/utils/file_to_json.ts:37-79`
+`packages/cms/src/data_import/components/ImportFileUpload.tsx:11`
+`packages/cms/src/data_import/import/ImportCollectionAction.tsx:126`
 
 The picker accepts `.csv` (`"text/*": [".csv", ".xls", ".xlsx"]`) and the dialog
 promises "Upload a CSV, Excel or JSON file", but `convertFileToJson` branches only
@@ -207,7 +207,7 @@ message: error.message })` (`ImportFileUpload.tsx:35-38`). This is a regression:
 `git show eef4e7b72^:…/file_to_json.ts` used `XLSX.read(data, { type: "array",
 codepage: 65001, cellDates: true })`, which auto-detects CSV. The migration to
 ExcelJS dropped CSV support, the UTF-8 codepage hint and `cellDates` in one
-commit, and nothing tested it — `packages/admin/test/data_import/` covers
+commit, and nothing tested it — `packages/cms/test/data_import/` covers
 `mapJsonParse`, `unflattenObject` and `convertDataToEntity`, never
 `convertFileToJson`.
 
@@ -224,7 +224,7 @@ error message would have passed the whole time.
 
 #### F5 — Partial failure leaves an unknown state, names no row, and offers a retry that cannot work
 
-`packages/admin/src/data_import/components/ImportSaveInProgress.tsx:30-52,98-122`
+`packages/cms/src/data_import/components/ImportSaveInProgress.tsx:30-52,98-122`
 
 ```ts
 const batch = data.slice(offset, offset + batchSize);
@@ -265,7 +265,7 @@ than from zero.
 
 #### F6 — Import cannot overwrite; the preview says it can
 
-`packages/admin/src/data_import/import/ImportCollectionAction.tsx:403`
+`packages/cms/src/data_import/import/ImportCollectionAction.tsx:403`
 `packages/common/src/data/buildRebaseData.ts:666`
 `packages/server/src/api/rest/api-generator.ts:621-626`
 `packages/server-postgres/src/services/PersistService.ts:372-388,490`
@@ -295,9 +295,9 @@ wanted, change the sentence.
 
 #### F7 — The date export toggle does nothing on real data; the test agrees with the fiction
 
-`packages/admin/src/data_export/export/export.ts:184-185`
-`packages/admin/src/data_export/export/ExportCollectionAction.tsx:219-228`
-`packages/admin/test/data_export/export.test.ts:13,23`
+`packages/cms/src/data_export/export/export.ts:184-185`
+`packages/cms/src/data_export/export/ExportCollectionAction.tsx:219-228`
+`packages/cms/test/data_export/export.test.ts:13,23`
 
 ```ts
 } else if (property.type === "date" && inputValue instanceof Date) {
@@ -327,7 +327,7 @@ actually returns.
 
 #### F8 — Relation columns export empty
 
-`packages/admin/src/data_export/export/export.ts:181-183`
+`packages/cms/src/data_export/export/export.ts:181-183`
 `packages/server-postgres/src/services/row-pipeline.ts:213-240`
 
 `processValueForExport` handles `type: "reference"` (the document-DB primitive,
@@ -356,9 +356,9 @@ Import has the mirror gap: `processValueMapping` handles `to === "reference"`
 
 #### F9 — Flattened array columns cannot be re-imported
 
-`packages/admin/src/data_export/export/export.ts:117-120`
-`packages/admin/src/data_import/utils/data.ts:25`
-`packages/admin/src/util/property_utils.tsx:139-153`
+`packages/cms/src/data_export/export/export.ts:117-120`
+`packages/cms/src/data_import/utils/data.ts:25`
+`packages/cms/src/util/property_utils.tsx:139-153`
 
 With `flattenArrays` on (the default), an array property whose longest value has
 more than one element is exported as `tags[0]`, `tags[1]`, … On import,
@@ -384,7 +384,7 @@ lookup.
 
 #### F10 — Any column header containing a dot ignores the user's mapping
 
-`packages/admin/src/data_import/utils/data.ts:23`
+`packages/cms/src/data_import/utils/data.ts:23`
 
 ```ts
 const mappedKey = (getIn(headersMapping, key) as string | undefined) ?? key;
@@ -409,7 +409,7 @@ resulting entity would pin it.
 
 #### F11 — `mapJsonParse` runs `JSON.parse` on every cell
 
-`packages/admin/src/data_import/utils/transforms.ts:38-47`
+`packages/cms/src/data_import/utils/transforms.ts:38-47`
 
 Every cell value is speculatively `JSON.parse`d and, on success, replaced. This is
 how `"true"` becomes a boolean, `"null"` becomes `null`, `"1e999"` becomes
@@ -427,7 +427,7 @@ scalars against the declared type.
 
 #### F12 — An unparseable date imports as `null` behind a `catch` that cannot fire
 
-`packages/admin/src/data_import/utils/data.ts:126-131`
+`packages/cms/src/data_import/utils/data.ts:126-131`
 
 ```ts
 } else if (from === "string" && to === "date" && typeof value === "string") {
@@ -449,8 +449,8 @@ currently runs.
 
 #### F13 — A blank header cell shifts every later column's data
 
-`packages/admin/src/data_import/utils/file_headers.ts:10-13`
-`packages/admin/src/data_import/utils/file_to_json.ts:55-64`
+`packages/cms/src/data_import/utils/file_headers.ts:10-13`
+`packages/cms/src/data_import/utils/file_to_json.ts:55-64`
 
 ```ts
 headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
@@ -474,9 +474,9 @@ plausible, and one column's values are stored under a neighbouring column's name
 
 #### F14 — `admin.exportable` is declared and never enforced
 
-`packages/admin-types/src/admin_collection.ts:414`
-`packages/admin/src/components/CollectionViewBinding/CollectionViewActions.tsx:186-193`
-`packages/admin/src/data_export/export/ExportCollectionAction.tsx:50`
+`packages/cms-types/src/admin_collection.ts:414`
+`packages/cms/src/components/CollectionViewBinding/CollectionViewActions.tsx:186-193`
+`packages/cms/src/data_export/export/ExportCollectionAction.tsx:50`
 
 `exportable?: boolean | ExportConfig<USER>` is a public option, listed in the admin
 block allowlist (`packages/types/src/types/admin_block.ts:48`), round-tripped by
@@ -497,7 +497,7 @@ the dead-option list and warn, per the pattern the class-21 write-up recommends.
 
 #### F15 — Export ignores the table's active filter, search and sort
 
-`packages/admin/src/data_export/export/ExportCollectionAction.tsx:126`
+`packages/cms/src/data_export/export/ExportCollectionAction.tsx:126`
 
 `find({})` carries no `where`, `searchString` or `orderBy`, and `tableController`
 — which holds all three — is available in `actionProps`
@@ -510,8 +510,8 @@ is about to be exported ("50 of 12,431 matching rows").
 
 #### F16 — Cancelling during the save does not cancel the import
 
-`packages/admin/src/data_import/import/ImportCollectionAction.tsx:206-209`
-`packages/admin/src/data_import/components/ImportSaveInProgress.tsx:37-52`
+`packages/cms/src/data_import/import/ImportCollectionAction.tsx:206-209`
+`packages/cms/src/data_import/components/ImportSaveInProgress.tsx:37-52`
 
 The Cancel button is rendered in `DialogActions` for every step, including
 `import_data_saving`. Clicking it calls `handleClose`, unmounting
@@ -597,7 +597,7 @@ sibling does.
   and returns `null`. Class 20/21 in miniature.
 - **Dead code.** `isUnixTimestamp` (`get_import_inference_type.ts:24`) has no
   caller; `downloadDataAsCsv` (`export.ts:233`) has no caller but is publicly
-  exported from `packages/admin/src/data_export/index.ts`;
+  exported from `packages/cms/src/data_export/index.ts`;
   `get_properties_mapping.ts` is 68 lines of commented-out source;
   `ExportCollectionAction.tsx:5-9` imports `useAuthController` and
   `useCustomizationController` and uses neither.

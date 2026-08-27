@@ -20,7 +20,7 @@ Le relazioni possono essere definite in linea all'interno della proprietà, o es
 Puoi definire la relazione direttamente sulla proprietà. Il framework le estrae automaticamente nell'array `relations[]` della collezione al momento della normalizzazione, quindi non hai più bisogno di una voce `relations[]` separata per le proprietà.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",
@@ -46,7 +46,7 @@ const postsCollection = defineCollection({
 Per casi d'uso avanzati o quando una relazione non mappa direttamente a un campo del form, puoi definirla nell'array `relations`:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

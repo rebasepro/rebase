@@ -5,7 +5,7 @@
  * discriminator was *value* exports — functions, consts, classes — which is the
  * right signal for a package whose surface is mostly values and blind for one
  * whose surface is mostly types. Breaking a type-only re-export in
- * `@rebasepro/admin` by hand changed no value count, and the gate passed it.
+ * `@rebasepro/cms` by hand changed no value count, and the gate passed it.
  * `@rebasepro/types`, the package most consumers feel first, was blind along
  * its entire surface for the same reason.
  *

@@ -437,7 +437,7 @@ describe("generated collections typecheck", () => {
     /**
      * Compiles a whole generated directory against the workspace source of
      * `@rebasepro/*`, with the admin-block augmentation in the program — the
-     * arrangement a scaffolded project has via `config/admin.d.ts`.
+     * arrangement a scaffolded project has via `config/cms.d.ts`.
      */
     function diagnosticsFor(schemas: GeneratedSchema[], flavour: CollectionBuilder = "admin-types"): string[] {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-introspect-tc-"));
@@ -455,13 +455,13 @@ describe("generated collections typecheck", () => {
             }
             if (flavour === "admin-types") {
                 // A scaffolded project pulls the admin block in through
-                // `config/admin.d.ts` and `typeRoots`. Naming the augmentation's
+                // `config/cms.d.ts` and `typeRoots`. Naming the augmentation's
                 // source directly gets the same declaration merging into the program
                 // without depending on node_modules layout.
-                entryFiles.push(path.join(REPO_ROOT, "packages/admin-types/src/augment.ts"));
+                entryFiles.push(path.join(REPO_ROOT, "packages/cms-types/src/augment.ts"));
             }
 
-            // A headless project has no `@rebasepro/admin-types` to resolve. Leaving
+            // A headless project has no `@rebasepro/cms-types` to resolve. Leaving
             // the mapping in place would let an accidental admin-types import
             // compile here and fail for the user, which is the failure this whole
             // change is about — so the path is dropped along with the augmentation.
@@ -471,7 +471,7 @@ describe("generated collections typecheck", () => {
                 "@rebasepro/utils": [path.join(REPO_ROOT, "packages/utils/src")]
             };
             if (flavour === "admin-types") {
-                paths["@rebasepro/admin-types"] = [path.join(REPO_ROOT, "packages/admin-types/src")];
+                paths["@rebasepro/cms-types"] = [path.join(REPO_ROOT, "packages/cms-types/src")];
             }
 
             const program = ts.createProgram(entryFiles, {
@@ -585,7 +585,7 @@ describe("generated collections typecheck", () => {
 
     /**
      * The same schemas, generated for a project that does not have
-     * `@rebasepro/admin-types` — and compiled in a program that cannot resolve it
+     * `@rebasepro/cms-types` — and compiled in a program that cannot resolve it
      * either, which is the arrangement a headless project actually has.
      *
      * This is the half that was broken and unmeasured: the generator emitted an
@@ -600,7 +600,7 @@ describe("generated collections typecheck", () => {
         for (const schema of headless) {
             for (const source of schema.files.values()) {
                 expect(source).not.toContain("admin: {");
-                expect(source).not.toContain("@rebasepro/admin-types");
+                expect(source).not.toContain("@rebasepro/cms-types");
             }
         }
 

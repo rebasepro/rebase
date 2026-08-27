@@ -106,7 +106,7 @@ role: "admin" });
     });
 
     it("resolves late, so a registry registered after the data layer still works", async () => {
-        // <Rebase> builds the data layer above <RebaseAdmin>, which owns the
+        // <Rebase> builds the data layer above <RebaseCMS>, which owns the
         // collections — so the resolver is registered after the fact. A miss
         // must not be memoized, or the collection stays address-less forever.
         let registry: Record<string, { properties: Record<string, unknown> }> = {};

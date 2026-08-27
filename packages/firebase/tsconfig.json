@@ -45,7 +45,7 @@
       "@rebasepro/forms": [
         "../forms/src"
       ],
-      "@rebasepro/admin": [
+      "@rebasepro/cms": [
         "../admin/src"
       ],
 

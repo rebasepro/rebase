@@ -3,7 +3,7 @@
  *
  * Imports every collection file and every server package under a loader hook
  * that throws if the module graph touches a UI package. This is what keeps BaaS
- * mode honest: a stray `import { x } from "@rebasepro/admin"` in a collection
+ * mode honest: a stray `import { x } from "@rebasepro/cms"` in a collection
  * file drags the whole React tree into the Node process, and nothing else in CI
  * would notice.
  *

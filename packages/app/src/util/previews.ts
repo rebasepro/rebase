@@ -1,6 +1,6 @@
 import type { Property } from "@rebasepro/types";
-import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
-import { AuthController } from "@rebasepro/admin-types";
+import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
+import { AuthController } from "@rebasepro/cms-types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { getTitlePropertyKey } from "@rebasepro/app";
 import { SUMMARY_RANK, isStorageProperty, rankSummaryProperty } from "../collections/summary-property";

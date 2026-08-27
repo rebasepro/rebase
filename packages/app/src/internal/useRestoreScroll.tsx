@@ -8,7 +8,7 @@ const scrollsMap: Record<string, number> = {};
  * router location. Used by the framework's own home page implementations.
  *
  * @internal Not part of the stable public API — exported only because
- * `@rebasepro/admin` and `@rebasepro/studio` reuse it in their home page
+ * `@rebasepro/cms` and `@rebasepro/studio` reuse it in their home page
  * components. Its behavior (module-level scroll cache, router coupling) is
  * an implementation detail and may change without a major version bump.
  */

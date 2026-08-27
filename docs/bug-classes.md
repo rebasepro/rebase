@@ -797,7 +797,7 @@ is the half that survived in the copy whose write was safe.
 
 **The sibling the first sweep missed** is the one the paragraph above names out
 loud: *a column mapped out of an imported CSV*. `unflattenObject`
-(`packages/admin/src/data_import/utils/transforms.ts`) turns the header row of an
+(`packages/cms/src/data_import/utils/transforms.ts`) turns the header row of an
 uploaded workbook into nested objects one dot-segment at a time, with no guard —
 so a column headed `__proto__.polluted` wrote onto `Object.prototype` for the
 life of the admin tab, and `constructor.prototype.x` threw `Cannot assign to
@@ -1025,7 +1025,7 @@ happens is a fix to an ordering nobody had chosen.
 navigation arrives while the first is still settling and is silently ignored" —
 is wrong for react-router 8, and it is worth knowing which way round it is
 before writing a fix that depends on it. Pinned in
-`packages/admin/test/components/router_two_navigations_one_handler.test.tsx`:
+`packages/cms/test/components/router_two_navigations_one_handler.test.tsx`:
 against a data router (`createBrowserRouter`, which is what the app boots), the
 **last call wins** in every shape — push after replace, push after push, `-1`
 after replace, replace to the URL you are already on, both from an async
@@ -1043,7 +1043,7 @@ to change the URL? Count `navigate`, every controller method that wraps it
 allowed to do anything. Two or more is the smell; the ordering between them then
 has to be deliberate and commented, or collapsed to one.
 
-The sweep of `packages/admin/src` found one live sibling and one seam.
+The sweep of `packages/cms/src` found one live sibling and one seam.
 `SidePanelBinding.onUpdate` reached three — `props.onUpdate?.()`, then a
 `replace` or `closeEditView()`, then `closeAfterSave()`. Its "save and close"
 path worked only because the close happened to be last; the reference picker's
@@ -1571,9 +1571,9 @@ caller-supplied callback.
 | `EditViewBinding`'s `onSaved` fan-out | seam, not reachable in-repo — it calls `onSaved?.()` and `formProps?.onSaved?.()`, both caller-supplied and both free to navigate. No caller in the workspace passes `formProps.onSaved`. Reachable by an embedder; the ordering is now stated in a comment rather than left to whoever edits the block next. |
 | `SplitListView`, `RebaseRoute`, `DetailViewBinding`, `CollectionViewStartActions`, the two `RouterCollection*StudioView`s, `ConfigControllerProvider`, `DefaultAppBar`, `DefaultDrawer`, `FavouritesView`, `NavigationCardBinding` | clean — one navigation per handler, and the delete action's two are a genuine `if`/`else` on `openEntityMode`. |
 | `AdminModeSyncer`, the one component whose job is to react to a URL | clean — it only calls `setMode`; the drawer's mode buttons navigate and it does not, so a mode switch stays one navigation. |
-| `packages/app/src` | clean by construction — the package contains no `navigate` call at all; every navigation in the panel is raised from `packages/admin`. |
+| `packages/app/src` | clean by construction — the package contains no `navigate` call at all; every navigation in the panel is raised from `packages/cms`. |
 | `closeOnSave` on `SidePanelController` | **BUG, fixed** (class 21) — declared, documented, passed as `true` by `SelectionTableBinding`, and read by nothing. The behaviour it names is exactly what the picker flow above was trying and failing to get by hand, so honouring it *is* the fix: `onUpdate` closes when the opener asked it to, and stops replacing a panel on its way out. |
-| the controller-mediated navigations, on a second pass | **the first pass had missed them** — grepping `navigate(` over `packages/admin/src` finds seventeen files and none of the calls that matter here, because `sidePanelController.replace` and `sideDialogsController.close` navigate without saying so. Re-run against the wrappers: `EntityFormBinding.navigateBack` and `useSelectionDialog` are clean (`if`/`else`, one each), and `SidePanelBinding` held all the rest. |
+| the controller-mediated navigations, on a second pass | **the first pass had missed them** — grepping `navigate(` over `packages/cms/src` finds seventeen files and none of the calls that matter here, because `sidePanelController.replace` and `sideDialogsController.close` navigate without saying so. Re-run against the wrappers: `EntityFormBinding.navigateBack` and `useSelectionDialog` are clean (`if`/`else`, one each), and `SidePanelBinding` held all the rest. |
 
 The picker finding is the one to keep. Correcting the *order* of those three
 calls would still have left `replace()` writing into a slot that `close()` had
@@ -2175,7 +2175,7 @@ address no allowlist ever saw. Redirects alone make "who typed it" moot.
 non-literal argument is still the right start; the verdict on each hit needs
 three answers rather than one.
 
-1. *Where does the process run?* A `fetch` in `packages/cli`, `packages/admin`,
+1. *Where does the process run?* A `fetch` in `packages/cli`, `packages/cms`,
    `packages/client` or `packages/app` runs on the developer's machine or in the
    user's browser, from that user's own network position, and is not this class.
    `packages/server`, `packages/server-postgres`, `packages/server-mongo`, and
@@ -2661,7 +2661,7 @@ invisible.
 
 ### Last sweep — 2026-08-15, the admin's translation catalogue
 
-294 literal keys across `packages/app/src` and `packages/admin/src`, against the
+294 literal keys across `packages/app/src` and `packages/cms/src`, against the
 891 `en.ts` declares. Seven missing, all seven fixed: the six sort keys above and
 `save_entity_before_subcollections`. Gated by
 `packages/app/test/translation-keys.test.ts` at zero, so the next one fails on
@@ -2712,7 +2712,7 @@ green test that proves nothing.
 
 ### Last sweep — 2026-08-16, chunk loading across a deploy
 
-Every `lazy()` in `packages/admin`, `packages/studio` and `packages/app` — 19
+Every `lazy()` in `packages/cms`, `packages/studio` and `packages/app` — 19
 call sites, the last of which resolves every user-supplied custom view — now
 goes through `lazyChunk`, which retries once and then fails with
 an error `ErrorBoundary` renders as "New version available" plus a reload, rather

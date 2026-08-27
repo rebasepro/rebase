@@ -239,7 +239,7 @@ export async function installBundleDependencies(
  * ready. Seen in production as every custom-function route 500ing while
  * `/api/data/*` served fine.
  *
- * It arrives transitively: `@rebasepro/admin` and `@rebasepro/server-postgres`
+ * It arrives transitively: `@rebasepro/cms` and `@rebasepro/server-postgres`
  * both depend on it, and nearly every project declares one of them.
  *
  * NOT every package the image ships. The image installs the narrow set of

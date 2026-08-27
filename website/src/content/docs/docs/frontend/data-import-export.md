@@ -51,7 +51,7 @@ Before importing, the wizard validates all rows against your collection's proper
 Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -91,7 +91,7 @@ Any active filters in the collection view are applied to the export. This lets y
 Export is enabled by default. You can configure it with additional computed fields:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -108,7 +108,7 @@ const productsCollection = defineCollection({
 To disable export:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     table: "products",
@@ -126,7 +126,7 @@ const productsCollection = defineCollection({
 Use the `ExportConfig` object to add custom computed columns to your exports. These columns don't exist in the database — they are calculated at export time:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

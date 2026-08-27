@@ -325,8 +325,8 @@ now live in `cfg.overrides`:
   preview is built from the underlying primitives —
   `createVirtualTableSelectionStore`, `useVirtualTableSelection`,
   `useVirtualTableCellSelected`, all real top-level exports. The one real caller
-  to copy from is `packages/admin/src/components/SelectableTable/SelectionStore.ts`.
-- **`Autocomplete` is used nowhere in `packages/app` or `packages/admin`** — its
+  to copy from is `packages/cms/src/components/SelectableTable/SelectionStore.ts`.
+- **`Autocomplete` is used nowhere in `packages/app` or `packages/cms`** — its
   preview composition is original. It is `Collapse`-based, positioned
   `absolute top-full` as a sibling of a `TextField` inside a shared
   `<div className="relative">`.

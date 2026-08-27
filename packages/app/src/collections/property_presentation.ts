@@ -22,7 +22,7 @@
  * needs an entity to be evaluated against and one that does not.
  */
 import type { ConditionContext, ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
-import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/admin-types";
+import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/cms-types";
 import { evaluateCondition } from "@rebasepro/common";
 
 /**

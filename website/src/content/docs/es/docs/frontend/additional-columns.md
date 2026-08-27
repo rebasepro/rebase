@@ -11,7 +11,7 @@ Las columnas adicionales le permiten mostrar datos calculados o derivados en la 
 ## Definiendo Columnas Adicionales
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

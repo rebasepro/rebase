@@ -15,7 +15,7 @@ pnpm add @rebasepro/ui
 
 ## What This Package Does
 
-`@rebasepro/ui` provides all the shared UI primitives used across Rebase packages (`@rebasepro/studio`, `@rebasepro/admin`, etc.). It wraps Radix UI components with Rebase's design tokens and Tailwind styling, and re-exports lucide-react icons so other packages don't need direct icon dependencies.
+`@rebasepro/ui` provides all the shared UI primitives used across Rebase packages (`@rebasepro/studio`, `@rebasepro/cms`, etc.). It wraps Radix UI components with Rebase's design tokens and Tailwind styling, and re-exports lucide-react icons so other packages don't need direct icon dependencies.
 
 Import the stylesheet in your app:
 
@@ -140,5 +140,5 @@ function MyForm() {
 ## Related Packages
 
 - `@rebasepro/studio` — Dev tools layer (depends on this package)
-- `@rebasepro/admin` — CMS layer (depends on this package)
+- `@rebasepro/cms` — CMS layer (depends on this package)
 - `@rebasepro/app` — Core framework (uses this for shared UI)

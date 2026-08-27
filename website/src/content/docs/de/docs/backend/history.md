@@ -35,7 +35,7 @@ history: {
 Markieren Sie, welche Kollektionen die Historie verfolgen sollen:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

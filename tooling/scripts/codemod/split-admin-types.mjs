@@ -1,12 +1,12 @@
 /**
- * Repoint imports of admin-only types from @rebasepro/types to @rebasepro/admin-types.
+ * Repoint imports of admin-only types from @rebasepro/types to @rebasepro/cms-types.
  *
  * Most import statements are mixed — `import { CollectionConfig, EntityAction }
  * from "@rebasepro/types"` names one type from each half — so this cannot be a
  * find-and-replace on the specifier. It parses the brace list, partitions the
  * symbols against the set that actually moved, and emits one statement per half.
  *
- * The moved set is derived from the files under packages/admin-types/src rather
+ * The moved set is derived from the files under packages/cms-types/src rather
  * than hardcoded, so it cannot drift from what the package really exports.
  *
  * Run: node tooling/scripts/codemod/split-admin-types.mjs [--dry] [paths...]
@@ -15,14 +15,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const CORE = "@rebasepro/types";
-const ADMIN = "@rebasepro/admin-types";
+const ADMIN = "@rebasepro/cms-types";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry");
 const targets = args.filter((a) => !a.startsWith("--"));
 
-/** Every symbol exported from a file under packages/admin-types/src. */
+/** Every symbol exported from a file under packages/cms-types/src. */
 function collectMovedSymbols() {
     const moved = new Set();
     const walk = (dir) => {
@@ -112,7 +112,7 @@ for (const root of roots) {
     if (!fs.existsSync(abs)) continue;
     for (const file of filesUnder(abs)) {
         // admin-types' own sources import from core by design.
-        if (file.includes(`${path.sep}packages${path.sep}admin-types${path.sep}`)) continue;
+        if (file.includes(`${path.sep}packages${path.sep}cms-types${path.sep}`)) continue;
         const before = fs.readFileSync(file, "utf8");
         if (!before.includes(CORE)) continue;
         const after = rewrite(before);

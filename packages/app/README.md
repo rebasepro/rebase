@@ -1,6 +1,6 @@
 # @rebasepro/app
 
-Framework-agnostic runtime for data-driven admin panels — React hooks, providers, contexts, and shared components used by `@rebasepro/admin` and `@rebasepro/studio`.
+Framework-agnostic runtime for data-driven admin panels — React hooks, providers, contexts, and shared components used by `@rebasepro/cms` and `@rebasepro/studio`.
 
 ## Installation
 
@@ -166,7 +166,7 @@ function ProductList() {
 
 ## Related Packages
 
-- [`@rebasepro/admin`](../admin) — CMS views, forms, and routing (built on top of core)
+- [`@rebasepro/cms`](../admin) — CMS views, forms, and routing (built on top of core)
 - [`@rebasepro/ui`](../ui) — Design system components
 - [`@rebasepro/common`](../common) — Shared utilities and collection registry
 - [`@rebasepro/types`](../types) — TypeScript type definitions

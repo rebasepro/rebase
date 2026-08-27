@@ -42,7 +42,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 // ─── Types ───────────────────────────────────────────────────────────
 

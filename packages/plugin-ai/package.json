@@ -16,8 +16,8 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@rebasepro/admin": "workspace:*",
-    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/cms": "workspace:*",
+    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
@@ -80,8 +80,8 @@
       "node"
     ],
     "moduleNameMapper": {
-      "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
-      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
+      "^@rebasepro/cms$": "<rootDir>/../admin/src/index.ts",
+      "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts",
       "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",

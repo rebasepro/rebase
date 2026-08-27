@@ -530,7 +530,7 @@ hono: "1.0.0" }
         write("package.json", JSON.stringify({
             dependencies: {
                 "@rebasepro/server": "^0.12.0",
-                "@rebasepro/admin": "^0.13.0"
+                "@rebasepro/cms": "^0.13.0"
             }
         }));
         const drift = detectFrameworkDepDrift(scratch, "0.12.0");
@@ -542,7 +542,7 @@ hono: "1.0.0" }
         write("package.json", JSON.stringify({
             dependencies: {
                 "@rebasepro/server": "^0.12.0",
-                "@rebasepro/admin": "0.12.0"
+                "@rebasepro/cms": "0.12.0"
             }
         }));
         expect(detectFrameworkDepDrift(scratch, "0.12.0").disagreeing).toEqual([]);

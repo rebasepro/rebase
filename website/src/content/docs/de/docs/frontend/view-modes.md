@@ -16,7 +16,7 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 ## Konfiguration
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     properties: { /* … */ },
@@ -74,7 +74,7 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const tasksCollection = defineCollection({
     slug: "tasks",
     name: "Tasks",
@@ -179,7 +179,7 @@ await tasks.create({
 Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",

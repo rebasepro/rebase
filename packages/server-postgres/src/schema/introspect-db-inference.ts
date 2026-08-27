@@ -17,7 +17,7 @@ export function inferPropertyFromData(
     sampleValues: unknown[],
     isPk: boolean,
     /**
-     * False when generating for a project without `@rebasepro/admin-types`, where
+     * False when generating for a project without `@rebasepro/cms-types`, where
      * `BaseProperty` declares no `admin` field and the block below would not
      * compile. The type-level inferences (`propType`, `url`, `storage`) are
      * unaffected — only the form-widget hints are dropped.

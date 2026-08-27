@@ -1,4 +1,4 @@
-import type { DialogControllerEntryProps, DialogsController } from "@rebasepro/admin-types";
+import type { DialogControllerEntryProps, DialogsController } from "@rebasepro/cms-types";
 import React, { PropsWithChildren, useCallback, useRef, useState, useMemo } from "react";
 ;
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from "react";
-import type { FieldProps } from "@rebasepro/admin";
+import type { FieldProps } from "@rebasepro/cms";
 import type { ArrayProperty } from "@rebasepro/types";
 import { Typography, cls, defaultBorderMixin, fieldBackgroundMixin } from "@rebasepro/ui";
 

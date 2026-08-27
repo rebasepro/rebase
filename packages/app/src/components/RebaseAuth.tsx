@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef } from "react";
 import { useRebaseRegistryDispatch } from "../hooks";
-import type { RebaseAuthViewConfig } from "@rebasepro/admin-types";
+import type { RebaseAuthViewConfig } from "@rebasepro/cms-types";
 
 /**
  * Declarative component to configure authentication in Rebase.

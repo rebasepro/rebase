@@ -31,7 +31,7 @@ class RawExpression {
  * Move presentation keys into the `admin` block.
  *
  * The rule itself lives in `@rebasepro/types`, next to `ADMIN_COLLECTION_KEYS`,
- * because `@rebasepro/admin-types` has to apply the identical one on the panel's
+ * because `@rebasepro/cms-types` has to apply the identical one on the panel's
  * side and this package cannot import that one. Two copies used to exist and
  * they disagreed about precedence, which decided whether a presentation edit was
  * saved or silently reverted to the value the user had just changed away from.

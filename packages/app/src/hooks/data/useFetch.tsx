@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { Entity, User } from "@rebasepro/types";
-import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
+import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
 

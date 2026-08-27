@@ -24,7 +24,7 @@ import { findCollectionConfigProblems } from "../src/collections/validate-config
 
 jest.setTimeout(30_000);
 
-const POSTS = `import { defineCollection } from "@rebasepro/admin-types";
+const POSTS = `import { defineCollection } from "@rebasepro/cms-types";
 import authorsCollection from "./authors.js";
 
 const postsCollection = defineCollection({
@@ -65,7 +65,7 @@ const postsCollection = defineCollection({
 export default postsCollection;
 `;
 
-const AUTHORS = `import { defineCollection } from "@rebasepro/admin-types";
+const AUTHORS = `import { defineCollection } from "@rebasepro/cms-types";
 
 const authorsCollection = defineCollection({
     name: "Authors",
@@ -278,7 +278,7 @@ describe("AstSchemaEditor relations", () => {
         fs.writeFileSync(path.join(dir, "comments.ts"), AUTHORS
             .replace(/authors/g, "comments")
             .replace(/Authors/g, "Comments"));
-        fs.writeFileSync(path.join(dir, "posts.ts"), `import { defineCollection } from "@rebasepro/admin-types";
+        fs.writeFileSync(path.join(dir, "posts.ts"), `import { defineCollection } from "@rebasepro/cms-types";
 import commentsCollection from "./comments.js";
 
 const postsCollection = defineCollection({

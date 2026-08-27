@@ -1,12 +1,12 @@
 "use client";
 import type { RebaseProps } from "./RebaseProps";
-import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/admin-types";
-import type { ComponentOverrideMap } from "@rebasepro/admin-types";
+import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/cms-types";
+import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
 import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/admin-types";
+import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";
@@ -119,7 +119,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     }, [dataSourcesProp]);
 
     // Rows arrive as columns only; their address is derived from the
-    // collection's primary keys. The collections live below us (in RebaseAdmin),
+    // collection's primary keys. The collections live below us (in RebaseCMS),
     // so they register a resolver here and we read it lazily, per row. Headless
     // apps register nothing and are unaffected.
     const collectionResolverRef = useRef<CollectionResolver | undefined>(undefined);

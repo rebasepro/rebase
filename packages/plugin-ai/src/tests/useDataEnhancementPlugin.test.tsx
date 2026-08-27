@@ -21,7 +21,7 @@ import { renderHook } from "@testing-library/react";
 import { useDataEnhancementPlugin } from "../useDataEnhancementPlugin";
 import { DEFAULT_AI_ENDPOINT } from "../api";
 
-jest.mock("@rebasepro/admin", () => ({
+jest.mock("@rebasepro/cms", () => ({
     useUrlController: () => ({})
 }));
 

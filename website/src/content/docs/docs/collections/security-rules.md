@@ -9,7 +9,7 @@ description: Define Row Level Security policies for your collections using conve
 Security rules let you define **Row Level Security (RLS)** policies for your PostgreSQL tables directly in your collection definitions. When the Drizzle schema is generated, Rebase creates the corresponding `CREATE POLICY` statements.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

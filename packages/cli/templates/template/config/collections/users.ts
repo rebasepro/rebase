@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const usersCollection = defineCollection({
     name: "Users",

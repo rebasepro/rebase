@@ -2,7 +2,7 @@ import type { Property, MapProperty, Properties, RelationProperty } from "@rebas
 import { useMemo } from "react";
 ;
 import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getSubcollections } from "@rebasepro/common";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPropertyInPath } from "../../collections/property-path";
 import { isDisabled } from "../../collections/property_presentation";
 

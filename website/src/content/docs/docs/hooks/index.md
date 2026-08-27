@@ -229,7 +229,7 @@ function CopyButton({ text }) {
 Programmatically open entities in a side panel:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/cms";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -348,7 +348,7 @@ function ThemeToggle() {
 Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/admin";
+import { useSelectionDialog } from "@rebasepro/cms";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({
@@ -368,7 +368,7 @@ function SelectProduct() {
 Access navigation state and resolved collections:
 
 ```typescript
-import { useNavigationStateController } from "@rebasepro/admin";
+import { useNavigationStateController } from "@rebasepro/cms";
 
 function MyComponent() {
     const navigation = useNavigationStateController();

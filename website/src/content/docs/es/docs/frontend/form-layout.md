@@ -20,7 +20,7 @@ Utiliza `admin.form` cuando la solución derivada no se ajuste a tu dominio.
 El ancho de un campo es un **span** (extensión) sobre una cuadrícula de cuatro columnas. `4` es el ancho completo de la columna principal.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -55,7 +55,7 @@ En diseños demasiado estrechos para dos columnas (el panel lateral, el panel di
 `sections` agrupa la columna principal bajo encabezados. Una sección con título se puede contraer; una sin título, no.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -99,7 +99,7 @@ Un error de validación dentro de una sección contraída la despliega, por lo q
 `sidebar` mueve campos fuera de la columna principal a un panel lateral estrecho junto a ella: estado, propiedad, fechas de publicación, indicadores (flags).
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",

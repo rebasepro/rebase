@@ -149,7 +149,7 @@ interface AdminUser {
     updatedAt: string;
 }
 
-interface RebaseAdmin {
+interface RebaseCMS {
     listUsers(): Promise<{ users: AdminUser[] }>;
     getUser(userId: string): Promise<{ user: AdminUser }>;
     createUser(data: { email: string; displayName?: string; password?: string; roles?: string[] }): Promise<{ user: AdminUser }>;
@@ -223,7 +223,7 @@ interface RebaseClient {
     /** Authentication methods */
     auth: RebaseAuth;
     /** User/role admin methods */
-    admin: RebaseAdmin;
+    admin: RebaseCMS;
     /** Storage operations */
     storage?: StorageSource;
     /** Call a custom server-side endpoint */

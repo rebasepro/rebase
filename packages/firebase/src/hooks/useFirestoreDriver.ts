@@ -1,6 +1,6 @@
 import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, OrderByTuple, SaveProps, WhereFilterOp } from "@rebasepro/types";
 import { normalizeDriverOrderBy } from "@rebasepro/common";
-import { FilterCombination } from "@rebasepro/admin-types";
+import { FilterCombination } from "@rebasepro/cms-types";
 import { User } from "firebase/auth";
 import {
     collection as collectionClause,

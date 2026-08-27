@@ -98,7 +98,7 @@ Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla 
 Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como **export por defecto** — así es como el registro la detecta:
 
 ```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

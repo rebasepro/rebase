@@ -8,7 +8,7 @@ import {
     ProposedField
 } from "../types/data_enhancement_controller";
 import { CollectionConfig, User } from "@rebasepro/types";
-import { PluginFormActionProps } from "@rebasepro/admin-types";
+import { PluginFormActionProps } from "@rebasepro/cms-types";
 import { useAuthController } from "@rebasepro/app";
 import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";
 import { getSimplifiedProperties } from "../utils/properties";

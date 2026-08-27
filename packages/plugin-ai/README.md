@@ -124,6 +124,6 @@ token.
 
 ## Related Packages
 
-- `@rebasepro/admin` — The admin panel this plugin extends
+- `@rebasepro/cms` — The admin panel this plugin extends
 - `@rebasepro/app` — Core framework providing the plugin system
 - `@rebasepro/types` — Shared types (`RebasePlugin`, `CollectionConfig`, etc.)

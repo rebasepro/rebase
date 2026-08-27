@@ -1,5 +1,5 @@
 import React from "react";
-import type { CollectionCustomViewParams } from "@rebasepro/admin-types";
+import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
 import { Typography } from "@rebasepro/ui";
 
 /**

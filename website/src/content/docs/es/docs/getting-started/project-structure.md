@@ -39,7 +39,7 @@ El frontend es una aplicación estándar de **Vite + React + TypeScript**. El ar
 
 ```typescript title="frontend/src/App.tsx"
 import { Rebase } from "@rebasepro/app";
-import { Scaffold, AppBar, Drawer } from "@rebasepro/admin";
+import { Scaffold, AppBar, Drawer } from "@rebasepro/cms";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
@@ -103,7 +103,7 @@ await initializeRebaseBackend({
 Las colecciones son la **única fuente de verdad** para tu modelo de datos. Se definen en TypeScript y son consumidas tanto por el frontend (para la generación de la interfaz de usuario) como por el backend (para la generación de esquemas y el enrutamiento de la API).
 
 ```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const productsCollection = defineCollection({
     slug: "products",

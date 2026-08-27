@@ -1,7 +1,7 @@
 # Unit 49 — the in-app collection/schema editor
 
-Read-only audit, 2026-08-08. Scope: `packages/admin/src/collection_editor/**`,
-`packages/admin/src/collection_editor_ui.ts`, `packages/server/src/api/ast-schema-editor.ts`,
+Read-only audit, 2026-08-08. Scope: `packages/cms/src/collection_editor/**`,
+`packages/cms/src/collection_editor_ui.ts`, `packages/server/src/api/ast-schema-editor.ts`,
 `packages/server/src/api/schema-editor-routes.ts`, `packages/server/src/collections/validate-config.ts`,
 `packages/studio`.
 
@@ -195,7 +195,7 @@ writer. Failing that, `convertJsonToAstString` needs a "merge, do not replace" m
 
 ### H2. The property editor writes `ui.*`, which is dead *and* fatal at the next boot
 
-`packages/admin/src/collection_editor/ui/collection_editor/properties/advanced/AdvancedPropertyValidation.tsx:10-11`
+`packages/cms/src/collection_editor/ui/collection_editor/properties/advanced/AdvancedPropertyValidation.tsx:10-11`
 and `properties/MapPropertyField.tsx:114`
 
 ```ts
@@ -233,7 +233,7 @@ is the gate: assert that whatever the editor writes, `assertCollectionConfigs` a
 
 ### H3. Two nesting functions for one job, with opposite precedence
 
-`packages/admin-types/src/admin_collection.ts:716-732` vs
+`packages/cms-types/src/admin_collection.ts:716-732` vs
 `packages/server/src/api/ast-schema-editor.ts:15-31`
 
 ```ts
@@ -266,7 +266,7 @@ the wrong direction, and its comment ("The block is what the file said") describ
 not an edit.
 
 **Fix direction.** Delete `nestAdminKeys` and import `toAdminCollectionConfig`, or — since
-`@rebasepro/server` must not depend on `@rebasepro/admin-types` — move the single implementation
+`@rebasepro/server` must not depend on `@rebasepro/cms-types` — move the single implementation
 next to `ADMIN_COLLECTION_KEYS` in `@rebasepro/types` and have both packages call it. Then pin
 *agreement* rather than behaviour: a test that flattens, edits the flat copy, nests, and asserts
 the edit survived.
@@ -339,8 +339,8 @@ the user.
 
 ### M1. The local controller drops three declared parameters
 
-`packages/admin/src/collection_editor/useLocalCollectionsConfigController.tsx:193-227` vs
-`packages/admin/src/collection_editor/types/config_controller.tsx:64-94`
+`packages/cms/src/collection_editor/useLocalCollectionsConfigController.tsx:193-227` vs
+`packages/cms/src/collection_editor/types/config_controller.tsx:64-94`
 
 `SaveCollectionParams`/`UpdateCollectionParams` declare `previousId` and `parentCollectionSlugs`;
 `SavePropertyParams`/`DeletePropertyParams` declare `namespace` and `parentCollectionSlugs`. The
@@ -369,7 +369,7 @@ implementations.
 
 ### M2. The editor opens the *un-flattened* collection, so presentation fields render blank
 
-`packages/admin/src/hooks/navigation/useBuildCollectionRegistryController.tsx:113` vs `:99`, `:188`
+`packages/cms/src/hooks/navigation/useBuildCollectionRegistryController.tsx:113` vs `:99`, `:188`
 
 `getCollection` and the `collections` array both pass through `resolveAdminCollection`;
 `getRawCollection` returns `registry.getRaw(...)` and merely *casts* to `AdminCollection`
@@ -456,7 +456,7 @@ text nobody tested, inverted: reassurance nobody tested.
 
 ### M5. Renaming a property key from the standalone dialog leaves the old key behind
 
-`packages/admin/src/collection_editor/ConfigControllerProvider.tsx:305-328` calls
+`packages/cms/src/collection_editor/ConfigControllerProvider.tsx:305-328` calls
 `saveProperty({ propertyKey: id, … })` with the **new** id and never reads `previousId`.
 `AstSchemaEditor.saveProperty` looks the key up, misses, and takes the add branch
 (`ast-schema-editor.ts:221-225`). The collection now declares both. The dialog path inside
@@ -528,7 +528,7 @@ addressable. Cosmetic next to M1, but it is the message a user will see.
 ## Expressiveness gap
 
 **Backend supports, UI cannot express.** Zero references anywhere under
-`packages/admin/src/collection_editor/` (verified by grep for the quoted key name):
+`packages/cms/src/collection_editor/` (verified by grep for the quoted key name):
 `strictWrites`, `disableDefaultPolicies`, `dataSource`, `engine` (read via `values.engine` for
 capability gating, never editable), `search`, `ownerId`, `listProperties`, and the property-level
 `excludeFromApi`. `schema` is referenced only in the duplicate-collection comment

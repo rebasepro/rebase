@@ -11,8 +11,8 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "dependencies": {
-    "@rebasepro/admin": "workspace:*",
-    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/cms": "workspace:*",
+    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",

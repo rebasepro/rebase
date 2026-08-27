@@ -16,7 +16,7 @@ Entity views let you add custom **tabs** to the entity detail page alongside the
 ## Adding Entity Views
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     table: "articles",
@@ -43,7 +43,7 @@ const articlesCollection = defineCollection({
 ## Building a entity View
 
 ```tsx
-import type { EntityCustomViewParams } from "@rebasepro/admin-types";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
     entity,

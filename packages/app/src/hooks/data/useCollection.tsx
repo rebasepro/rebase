@@ -5,7 +5,7 @@ import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 import { toFindParams } from "./collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 /**
  * @group Hooks and utilities
  */

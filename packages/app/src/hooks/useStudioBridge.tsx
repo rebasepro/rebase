@@ -8,7 +8,7 @@ import type {
     NavigationStateController,
     BreadcrumbEntry,
     BreadcrumbsController
-} from "@rebasepro/admin-types";
+} from "@rebasepro/cms-types";
 
 export type { BreadcrumbEntry, BreadcrumbsController };
 

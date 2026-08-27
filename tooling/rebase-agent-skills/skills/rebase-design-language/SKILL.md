@@ -28,7 +28,7 @@ Its header says *"All markup / styles are copied verbatim from source files. DO 
 
 ### See it rendered
 
-The route is registered by `@rebasepro/admin` in every Rebase app. Start the dev server and open:
+The route is registered by `@rebasepro/cms` in every Rebase app. Start the dev server and open:
 
 ```
 http://localhost:5173/debug/ui
@@ -758,12 +758,12 @@ When building new views, always reference these existing implementations. All of
 | Component            | Location (from your project root)                                                     | What it demonstrates           |
 |----------------------|---------------------------------------------------------------------------------------|--------------------------------|
 | `UIReferenceView`    | `node_modules/@rebasepro/app/src/components/Debug/UIReferenceView.tsx`                | **Everything** — see §0        |
-| `NavigationCard`     | `node_modules/@rebasepro/admin/src/components/HomePage/NavigationCard.tsx`             | Card pattern, plain icon treatment |
-| `SmallNavigationCard`| `node_modules/@rebasepro/admin/src/components/HomePage/SmallNavigationCard.tsx`        | Compact card with mixins       |
-| `ContentHomePage`    | `node_modules/@rebasepro/admin/src/components/HomePage/ContentHomePage.tsx`            | Page layout, Container usage   |
-| `NavigationGroup`    | `node_modules/@rebasepro/admin/src/components/HomePage/NavigationGroup.tsx`            | Section headers, grouping      |
+| `NavigationCard`     | `node_modules/@rebasepro/cms/src/components/HomePage/NavigationCard.tsx`             | Card pattern, plain icon treatment |
+| `SmallNavigationCard`| `node_modules/@rebasepro/cms/src/components/HomePage/SmallNavigationCard.tsx`        | Compact card with mixins       |
+| `ContentHomePage`    | `node_modules/@rebasepro/cms/src/components/HomePage/ContentHomePage.tsx`            | Page layout, Container usage   |
+| `NavigationGroup`    | `node_modules/@rebasepro/cms/src/components/HomePage/NavigationGroup.tsx`            | Section headers, grouping      |
 
-If you are working *inside the Rebase monorepo*, drop the `node_modules/@rebasepro/` prefix and use `packages/app/…` / `packages/admin/…` instead.
+If you are working *inside the Rebase monorepo*, drop the `node_modules/@rebasepro/` prefix and use `packages/app/…` / `packages/cms/…` instead.
 
 Whole-view skeletons built from these live in **`references/view-patterns.md`**, next to this file.
 

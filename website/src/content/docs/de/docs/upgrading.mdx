@@ -217,7 +217,7 @@ Ein CommonJS-Konsument muss dynamisches `import()` verwenden oder zu ESM wechsel
 
 ## 6. `react-router` 8 und `react-router-dom` ist entfernt
 
-Nur relevant, wenn Sie das Admin-Panel verwenden — `@rebasepro/admin`, `app`, `studio` oder `plugin-ai`. Eine Headless-Installation hat keinen Router.
+Nur relevant, wenn Sie das Admin-Panel verwenden — `@rebasepro/cms`, `app`, `studio` oder `plugin-ai`. Eine Headless-Installation hat keinen Router.
 
 react-router 8 löscht das Paket `react-router-dom`. Es war lediglich ein Kompatibilitäts-Shim für v6; alles DOM-Spezifische wurde bereits in v7 in `react-router` selbst integriert. Entfernen Sie die Abhängigkeit und ändern Sie zwei Importe:
 
@@ -275,7 +275,7 @@ Die alten Namen sind auf npm als veraltet (deprecated) markiert. Wenn Sie einen 
 
 Zusätzlich **wurde `@rebasepro/auth` entfernt**. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` und `clearAuthConfigCache` stammen jetzt aus `@rebasepro/app`, direkt neben den Komponenten `RebaseAuth` und `LoginView`, mit denen sie verwendet werden.
 
-**`RebaseCMS` heißt jetzt `RebaseAdmin`.** `mode: "cms"` in `RebaseBackendConfig` bleibt unverändert — es beschreibt, woher die Collections stammen, nicht die Benutzeroberfläche.
+**`RebaseCMS` heißt jetzt `RebaseCMS`.** `mode: "cms"` in `RebaseBackendConfig` bleibt unverändert — es beschreibt, woher die Collections stammen, nicht die Benutzeroberfläche.
 
 ---
 

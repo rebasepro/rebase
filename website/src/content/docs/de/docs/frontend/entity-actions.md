@@ -11,7 +11,7 @@ Entitätsaktionen sind benutzerdefinierte Schaltflächen, die bei einzelnen Enti
 ## Entitätsaktionen definieren
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -59,7 +59,7 @@ const articlesCollection = defineCollection({
 Für Aktionen auf Symbolleisten-Ebene, die für die Sammlung oder ausgewählte Entitäten gelten:
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;

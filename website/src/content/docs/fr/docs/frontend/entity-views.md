@@ -16,7 +16,7 @@ Les vues d'entité vous permettent d'ajouter des **onglets** personnalisés à l
 ## Ajout de vues d'entité
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     table: "articles",
@@ -43,7 +43,7 @@ const articlesCollection = defineCollection({
 ## Création d'une vue d'entité
 
 ```tsx
-import type { EntityCustomViewParams } from "@rebasepro/admin-types";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
     entity,

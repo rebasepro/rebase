@@ -56,7 +56,7 @@ Severity counts: **1 critical, 3 high, 5 medium, 5 low.**
 **Where `aal` is read:** `packages/server/src/auth/mfa-routes.ts:296` — and
 nowhere else. `grep -rn "aal" packages/server/src` returns writes at
 `routes.ts:289,294,990,994`, `jwt.ts:112,122,197`, `mfa-routes.ts:226`, and that
-single consumer. `packages/admin/src`, `packages/client/src` and `saas/backend/src`
+single consumer. `packages/cms/src`, `packages/client/src` and `saas/backend/src`
 contain no occurrence of `mfa`, `totp` or `aal2` at all.
 
 **What's wrong.** MFA is modelled as an *optional step-up* that no resource
@@ -452,7 +452,7 @@ error. Reject on an out-of-alphabet character.
    authentication with recovery codes" tag implies to a reader), C1 is the whole
    feature. This choice determines the shape of every other fix.
 2. **Is there any client-side MFA support planned?** `packages/client/src` and
-   `packages/admin/src` contain no `mfa`/`totp` occurrence, so today no shipped UI
+   `packages/cms/src` contain no `mfa`/`totp` occurrence, so today no shipped UI
    or SDK method can drive enrolment or challenge — the endpoints are reachable
    only by hand-rolled fetch. Worth confirming whether the feature is considered
    released.

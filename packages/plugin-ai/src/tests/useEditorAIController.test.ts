@@ -13,7 +13,7 @@ import { useEditorAIController } from "../editor/useEditorAIController";
  * no such thing. The property worth pinning is that it now needs no token at
  * all, and that its streamed deltas reach the editor in order.
  */
-jest.mock("@rebasepro/admin", () => ({}));
+jest.mock("@rebasepro/cms", () => ({}));
 
 function streamingResponse(chunks: string[]): any {
     const encoder = new TextEncoder();

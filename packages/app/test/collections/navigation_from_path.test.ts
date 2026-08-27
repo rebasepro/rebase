@@ -1,6 +1,6 @@
 import { getNavigationEntriesFromPath } from "../../src/collections/navigation_from_path";
 import { CollectionConfig, FirebaseCollectionConfig } from "@rebasepro/types";
-import { EntityCustomView } from "@rebasepro/admin-types";
+import { EntityCustomView } from "@rebasepro/cms-types";
 
 function makeCollection(overrides: Record<string, any> = {}): CollectionConfig {
     const base = {

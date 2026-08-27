@@ -1,6 +1,6 @@
-/// <reference types="@rebasepro/admin-types" />
+/// <reference types="@rebasepro/cms-types" />
 
-// One line, once per project. `@rebasepro/admin-types` declares the `admin` block on
+// One line, once per project. `@rebasepro/cms-types` declares the `admin` block on
 // `CollectionConfig` and on every property type by declaration merging, and an
 // augmentation applies to the whole *program* — so this reference is what makes
 // `admin: { … }` legal in every collection file here.

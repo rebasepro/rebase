@@ -9,7 +9,7 @@
  * They were spread across three places that had nothing to do with each other:
  * the `Table*` shapes sat in `websockets.ts`, next to the WebSocket frame types
  * they share no relationship with, and `PostgresPolicy` was declared twice — in
- * `@rebasepro/admin`'s RLS tab and again in `@rebasepro/studio`'s RLS editor,
+ * `@rebasepro/cms`'s RLS tab and again in `@rebasepro/studio`'s RLS editor,
  * the second with a comment explaining it was inline "to avoid depending on
  * @rebasepro/studio". Neither had to: this package is already a dependency of
  * both.

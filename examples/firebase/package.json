@@ -7,7 +7,7 @@
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "@rebasepro/admin": "workspace:*",
+    "@rebasepro/cms": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/firebase": "workspace:*",

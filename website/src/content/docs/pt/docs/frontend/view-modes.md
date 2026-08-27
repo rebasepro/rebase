@@ -16,7 +16,7 @@ Cada coleção pode ser exibida em quatro modos de visualização:
 ## Configuração
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     properties: { /* … */ },
@@ -74,7 +74,7 @@ Controle a altura da linha com `defaultSize`:
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const tasksCollection = defineCollection({
     slug: "tasks",
     name: "Tasks",
@@ -176,7 +176,7 @@ await tasks.create({
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",

@@ -78,7 +78,7 @@
     ],
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
+      "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"

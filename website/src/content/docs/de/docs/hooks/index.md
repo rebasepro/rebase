@@ -51,7 +51,7 @@ function UserMenu() {
 Entitäten programmatisch in einem Seitenfenster öffnen:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/cms";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -143,7 +143,7 @@ function ThemeToggle() {
 Öffnen eines Seitendialogs zur Auswahl von Entitäten aus einer Sammlung. Dies ist derselbe Hook, der intern verwendet wird, wenn eine Relationseigenschaft gerendert wird:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/admin";
+import { useSelectionDialog } from "@rebasepro/cms";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({
@@ -163,7 +163,7 @@ function SelectProduct() {
 Zugriff auf Navigationszustand und aufgelöste Sammlungen:
 
 ```typescript
-import { useNavigationStateController } from "@rebasepro/admin";
+import { useNavigationStateController } from "@rebasepro/cms";
 
 function MyComponent() {
     const navigation = useNavigationStateController();

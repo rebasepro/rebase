@@ -11,7 +11,7 @@ Additional columns let you display computed or derived data in the collection ta
 ## Defining Additional Columns
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

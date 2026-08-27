@@ -62,7 +62,7 @@ alias: item.name.alias });
 }
 
 import { toSnakeCase } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
  * Resolve which collections are referenced by a SQL query.

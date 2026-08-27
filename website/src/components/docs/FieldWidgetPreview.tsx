@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useCallback } from "react";
-import { RichTextEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/cms/editor";
 import {
     TextField,
     TextareaAutosize,

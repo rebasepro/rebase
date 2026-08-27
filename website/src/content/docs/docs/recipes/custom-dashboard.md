@@ -126,10 +126,10 @@ the drawer orders groups rather than individual views.
 
 A view component receives no props. To route somewhere — another custom view, a
 collection, an entity — reach for `useUrlController`, which is exported from
-`@rebasepro/admin`:
+`@rebasepro/cms`:
 
 ```tsx
-import { useUrlController } from "@rebasepro/admin";
+import { useUrlController } from "@rebasepro/cms";
 
 function DashboardView() {
     const urlController = useUrlController();

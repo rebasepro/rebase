@@ -8,7 +8,7 @@ import { defineCollection } from "../util/builders";
  * override by defining their own collection with `slug: "users"`.
  *
  * Schema only — no `admin` block. This package is on the backend's dependency path,
- * where that field does not exist: `@rebasepro/admin-types` adds it by declaration
+ * where that field does not exist: `@rebasepro/cms-types` adds it by declaration
  * merging, and a BaaS install never installs that. The scaffolded
  * `config/collections/users.ts` carries the presentation for projects that want this
  * collection in their panel, which is also where it is editable.

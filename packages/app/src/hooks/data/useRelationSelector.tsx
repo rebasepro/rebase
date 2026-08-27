@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 import { getRelationIncludeParams } from "../../util/previews";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 export interface RelationItem {
     id: string | number;
     label: string;

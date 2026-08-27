@@ -37,7 +37,7 @@ import { useLiveRlsTables } from "./useLiveRls";
 import type { TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
 import { RelationEdge } from "./RelationEdge";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 // ─── Custom node / edge type registrations ────────────────────────────
 

@@ -152,7 +152,7 @@ role `admin`. Uma coleção pode desativar essa política básica e assumir tota
 responsabilidade pelo seu próprio RLS:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

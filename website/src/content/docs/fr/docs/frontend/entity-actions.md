@@ -11,7 +11,7 @@ Les actions d'entité sont des boutons personnalisés qui apparaissent sur les e
 ## Définition des Actions d'Entité
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -59,7 +59,7 @@ const articlesCollection = defineCollection({
 Pour les actions au niveau de la barre d'outils qui s'appliquent à la collection ou aux entités sélectionnées :
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;

@@ -1,0 +1,240 @@
+import type { Properties } from "@rebasepro/types";
+
+import React, { useState, useCallback } from "react";
+import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
+import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection, ViewMode } from "@rebasepro/cms-types";
+import { ErrorBoundary, iconSize } from "@rebasepro/ui";
+import { Badge, Button, cls, FilterIcon, IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
+import { ClearFilterSortButton } from "../ClearFilterSortButton";
+import { FiltersDialog } from "./FiltersDialog";
+import { FilterPresetsButton } from "./FilterPresetsButton";
+import { SortButton } from "./SortButton";
+import { toArray } from "@rebasepro/utils";
+import { useNavigate } from "react-router";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
+import { withViewMode } from "../../util/view_mode";
+import { useSplitView } from "./SplitViewContext";
+
+export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
+    collection: AdminCollection<M>;
+    path: string;
+    relativePath: string;
+    parentCollectionSlugs: string[], parentEntityIds: string[];
+    selectionController: SelectionController<M>;
+    tableController: EntityTableController<M>;
+    collectionEntitiesCount?: number;
+    /**
+     * Number of records the current filters and search resolve to, rendered at
+     * the end of this group.
+     * - `undefined`: not applicable
+     * - `null`: still counting
+     * - number: the count
+     */
+    entitiesCount?: number | null;
+    /**
+     * Resolved properties from the collection for the filters dialog
+     */
+    resolvedProperties?: Properties;
+    /**
+     * Which view is being displayed. Decides whether the sort control is
+     * offered — see `sortButton`.
+     */
+    viewMode?: ViewMode;
+    compact?: boolean;
+    openNewDocument: (defaultValues?: Record<string, unknown>) => void;
+}
+
+export function CollectionViewStartActions<M extends Record<string, unknown>>({
+    collection,
+    relativePath,
+    parentCollectionSlugs, parentEntityIds,
+    path,
+    selectionController,
+    tableController,
+    collectionEntitiesCount,
+    entitiesCount,
+    resolvedProperties,
+    viewMode,
+    compact,
+    openNewDocument
+}: CollectionViewStartActionsProps<M>) {
+
+    const context = useAdminContext();
+    const largeLayout = useLargeLayout();
+    const { t } = useTranslation();
+
+    const navigate = useNavigate();
+    const urlController = useUrlController();
+    const splitView = useSplitView();
+
+    // Filters dialog state
+    const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
+
+    // Count active filters (excluding force filters)
+    const filterValues = tableController.filterValues;
+    const fixedFilter = collection.fixedFilter;
+    const activeFilterCount = filterValues
+        ? Object.keys(filterValues).filter(key => !fixedFilter || !(key in fixedFilter)).length
+        : 0;
+
+    const actionProps: CollectionActionsProps<M> = {
+        path,
+        relativePath,
+        parentCollectionSlugs,
+parentEntityIds,
+        collection,
+        selectionController,
+        context,
+        tableController,
+        collectionEntitiesCount,
+        openNewDocument
+    };
+
+    const handleBackClick = useCallback(() => {
+        navigate(withViewMode(urlController.buildUrlCollectionPath(path)));
+    }, [navigate, urlController, path]);
+
+    // In a split view the control that closes the list lives at the leading
+    // edge of the record's app bar (`SplitListCloseButton`), not here.
+    //
+    // Outside one — a compact list with no record open beside it — the only
+    // thing this can mean is "leave the record behind".
+    const backButton = compact && !splitView?.detailOpen && (
+        <Tooltip title={t("close")} key={"close_tooltip"}>
+            <IconButton
+                size="small"
+                onClick={handleBackClick}
+                aria-label={t("close")}
+                className="mr-1"
+            >
+                <XIcon size={iconSize.smallest}/>
+            </IconButton>
+        </Tooltip>
+    );
+
+    // Whether the toolbar is showing icon-only controls. The filters button
+    // drops its label — and its icon a size with it — on a narrow layout as
+    // well as in the split view, and the sort and clear controls beside it
+    // follow: keyed on `compact` alone they stayed 20px next to a 16px filter
+    // icon at every width below `largeLayout`.
+    const iconOnlyToolbar = !largeLayout || Boolean(compact);
+
+    const filtersButton = resolvedProperties && tableController.setFilterValues && (
+        <Tooltip title={t("filters")}
+            key={"filters_tooltip"}>
+            <Badge
+                color="primary"
+                invisible={activeFilterCount === 0}
+            >
+                {largeLayout && !compact ? (
+                    <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => setFiltersDialogOpen(true)}
+                        startIcon={<FilterIcon size={iconSize.small}/>}
+                        className={cls(activeFilterCount > 0 && "text-primary")}
+                    >
+                        {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
+                    </Button>
+                ) : (
+                    <IconButton
+                        size={"small"}
+                        onClick={() => setFiltersDialogOpen(true)}
+                        className={cls(activeFilterCount > 0 && "text-primary")}
+                    >
+                        <FilterIcon size={iconSize.smallest}/>
+                    </IconButton>
+                )}
+            </Badge>
+        </Tooltip>
+    );
+
+    // Everywhere a `sortBy` means something — which is every view but the
+    // board, whose columns are ordered by their own order key and which ignores
+    // `sortBy` entirely, so the control would appear to do nothing.
+    //
+    // Including the table, whose headers were once thought to cover it. They
+    // build a multi-key sort (shift-click) and they show its ranks, but they
+    // cannot *re-rank* it: promoting the third key above the first means
+    // clearing the sort and shift-clicking all three back in the new order.
+    // Nor can they remove a middle key without cycling it through descending
+    // first. This popover is the only place either is one click, and a table
+    // with a three-key sort needs it more than a card grid does, not less.
+    const sortButton = resolvedProperties && viewMode !== "kanban" && (
+        <SortButton
+            key={"sort_button"}
+            tableController={tableController}
+            properties={resolvedProperties}
+            compact={iconOnlyToolbar}
+        />
+    );
+
+    // Not in the split view. The toolbar there is a strip a few hundred pixels
+    // wide above the list, and a row of preset chips crowded out the controls
+    // that act on what you are looking at. The presets are still one click away
+    // inside the filters dialog.
+    const filterPresetsButton = !compact && collection.filterPresets?.length ? (
+        <FilterPresetsButton
+            key={"filter_presets"}
+            filterPresets={collection.filterPresets}
+            tableController={tableController}
+            compact={compact}
+        />
+    ) : null;
+
+    // The count closes the group the filter, sort and preset controls open: it
+    // is what they resolve to. It used to live in the breadcrumb trail, which
+    // the app bar owns — and a collection rendered without an app bar has no
+    // breadcrumbs, so the number simply disappeared.
+    //
+    // Hidden on the same layouts the trail was (`hidden lg:block` there) and in
+    // the split view, where this toolbar is a few hundred pixels wide and
+    // scrolls: a passive readout is the first thing that should give up its
+    // room to the controls.
+    const countBadge = !iconOnlyToolbar && entitiesCount !== undefined ? (
+        <Tooltip title={t("records_in_view")} key={"entities_count"}>
+            {entitiesCount === null
+                ? <Skeleton className={"w-8 h-4 rounded-md mx-1"}/>
+                : <span
+                    className={"mx-1 text-xs text-surface-accent-600 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded tabular-nums"}>
+                    {entitiesCount.toLocaleString()}
+                </span>}
+        </Tooltip>
+    ) : null;
+
+    const actions: React.ReactNode[] = [
+        backButton,
+        filtersButton,
+        sortButton,
+        <ClearFilterSortButton
+            key={"clear_filter"}
+            tableController={tableController}
+            compact={iconOnlyToolbar}
+            enabled={!collection.fixedFilter}/>,
+        filterPresetsButton,
+        countBadge
+    ];
+
+    const pluginActionsStart = useSlot("collection.actions.start", actionProps);
+
+    return (
+        <>
+            {actions}
+            {pluginActionsStart}
+
+            {/* Filters Dialog */}
+            {resolvedProperties && tableController.setFilterValues && (
+                <FiltersDialog
+                    open={filtersDialogOpen}
+                    onOpenChange={setFiltersDialogOpen}
+                    properties={resolvedProperties}
+                    filterValues={tableController.filterValues}
+                    setFilterValues={(filterValues) => tableController.setFilterValues?.(filterValues ?? {})}
+                    fixedFilter={collection.fixedFilter}
+                />
+            )}
+        </>
+    );
+}
+

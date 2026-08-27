@@ -8,7 +8,7 @@ import { fr } from "../locales/fr";
 import { it } from "../locales/it";
 import { hi } from "../locales/hi";
 import { pt } from "../locales/pt";
-import { RebaseTranslations } from "@rebasepro/admin-types";
+import { RebaseTranslations } from "@rebasepro/cms-types";
 import { readStoredString, writeStoredString } from "../util/local_storage";
 
 const REBASE_NS = "rebase_core";

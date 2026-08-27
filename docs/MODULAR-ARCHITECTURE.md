@@ -13,7 +13,7 @@ differently.
 The architecture enforces this at two levels. **No server package imports a UI
 package** at runtime, and — since the 0.11 split — **no core package names React even
 in a type position**. `@rebasepro/types` is the BaaS contract;
-`@rebasepro/admin-types` holds the React layer and depends on it, never the reverse.
+`@rebasepro/cms-types` holds the React layer and depends on it, never the reverse.
 `@rebasepro/client` is isomorphic with zero UI dependencies, and every backend
 subsystem is independently gated by config.
 
@@ -131,7 +131,7 @@ The same files are consumed twice:
 - **frontend**, at build time, via `virtual:rebase-collections`
   (`rebaseCollectionsPlugin` from `@rebasepro/app/vitePlugin`)
 
-Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/admin`, `@rebasepro/ui`,
+Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/cms`, `@rebasepro/ui`,
 `@rebasepro/forms`.
 
 ### One definition of "the collections"
@@ -196,13 +196,13 @@ works and is what the visual collection editor writes, since ts-morph can emit a
 literal but not a thunk — prefer the thunk when authoring by hand.
 
 `@rebasepro/types` declares **no `admin` field** — not on a collection, not on a
-property. In a BaaS project, writing one is a type error. `@rebasepro/admin-types` adds
+property. In a BaaS project, writing one is a type error. `@rebasepro/cms-types` adds
 it back by declaration merging, so installing that package is what makes the admin
 surface exist:
 
 ```ts
-// config/admin.d.ts — one line, once per project
-/// <reference types="@rebasepro/admin-types" />
+// config/cms.d.ts — one line, once per project
+/// <reference types="@rebasepro/cms-types" />
 ```
 
 ```ts
@@ -232,7 +232,7 @@ Custom React components are referenced **by string path** (`Field: "./MyField"`)
 by import. The Vite plugin rewrites those strings into lazy dynamic imports for the
 browser, so the backend never evaluates React. Anything the admin UI needs to inject
 into a collection (for example the reset-password entity action on auth collections)
-is injected **frontend-side** by `@rebasepro/admin`, not imported into config.
+is injected **frontend-side** by `@rebasepro/cms`, not imported into config.
 
 This rule is enforced in CI by `pnpm run check:headless`, which imports every
 collection file and every server package under a Node loader hook that throws if the
@@ -243,7 +243,7 @@ module graph reaches `react`, `react-dom`, or any `@rebasepro/{admin,ui,app,stud
 Studio is the **BaaS console**: SQL editor, schema visualizer, RLS editor, storage
 browser, logs, API explorer, API keys, backups, cron. Its views target the BaaS
 control plane, not the CMS — it talks to the backend over HTTP through
-`@rebasepro/client`, and `@rebasepro/admin` is an *optional* peer dependency it never
+`@rebasepro/client`, and `@rebasepro/cms` is an *optional* peer dependency it never
 imports.
 
 Where Studio wants CMS capabilities (jumping from a SQL result to an entity, say) it

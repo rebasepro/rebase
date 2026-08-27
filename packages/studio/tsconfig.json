@@ -42,7 +42,7 @@
       "@rebasepro/types": [
         "../types/src"
       ],
-      "@rebasepro/admin": [
+      "@rebasepro/cms": [
         "../admin/src"
       ],
       "@rebasepro/inference": [

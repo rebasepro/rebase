@@ -2,7 +2,7 @@
 type EntityCustomView<M extends Record<string, unknown> = Record<string, unknown>> = { key: string; [key: string]: unknown };
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
 import { getSubcollections } from "@rebasepro/common";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 export type NavigationViewInternal<M extends Record<string, unknown> = Record<string, unknown>> =
     | NavigationViewEntityInternal<M>

@@ -16,7 +16,7 @@ Every collection can be displayed in four view modes:
 ## Configuration
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     // `orderProperty` and `kanban.columnProperty` are checked against these
@@ -84,7 +84,7 @@ Control row height with `defaultSize`:
 Configure a Kanban board by specifying which enum property to use as columns:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const tasksCollection = defineCollection({
     slug: "tasks",
     name: "Tasks",
@@ -194,7 +194,7 @@ a board fed by a backend it is a fix that undoes itself every run.
 Cards display entities as visual cards — useful for image-heavy content:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",

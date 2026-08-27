@@ -7,7 +7,7 @@
         "@rebasepro/app": "workspace:*",
         "@rebasepro/plugin-ai": "workspace:*",
         "@rebasepro/client": "workspace:*",
-        "@rebasepro/admin": "workspace:*",
+        "@rebasepro/cms": "workspace:*",
         "@rebasepro/studio": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "@rebasepro/ui": "workspace:*",

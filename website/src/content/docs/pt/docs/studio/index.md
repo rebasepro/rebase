@@ -22,11 +22,11 @@ Um editor visual de esquemas que permite criar e modificar coleções através d
 ![Editor de coleção](/img/collection_editor.png)
 
 ```tsx
-import { RebaseAdmin } from "@rebasepro/admin";
+import { RebaseCMS } from "@rebasepro/cms";
 
 // The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseAdmin component
-<RebaseAdmin
+// collectionEditor configuration to your RebaseCMS component
+<RebaseCMS
     collections={collections}
     collectionEditor={{
         getAuthToken: authController.getAuthToken

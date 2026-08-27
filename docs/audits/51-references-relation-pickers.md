@@ -1,6 +1,6 @@
 # Unit 51 — reference and relation UI
 
-Read-only audit, 2026-08-08. Scope: `packages/admin/src/components/ReferenceWidget.tsx`,
+Read-only audit, 2026-08-08. Scope: `packages/cms/src/components/ReferenceWidget.tsx`,
 `RelationSelector.tsx`, `ReferenceTable/**`, `SelectableTable/**`, `UserSelector.tsx`,
 `InlineEntityPreview.tsx`, `EntityPreviewNesting.tsx`, the previews they render
 (`preview/components/RelationPreview.tsx`, `ReferencePreview.tsx`), the hook behind the
@@ -44,8 +44,8 @@ restoration is not.
 
 #### H1. Every relation cell in the table mounts a live picker, which fetches (or subscribes) on mount
 
-`packages/admin/src/components/CollectionTableBinding/table_bindings.tsx:236-247`
-`packages/admin/src/components/CollectionTableBinding/PropertyTableCell.tsx:255-281`
+`packages/cms/src/components/CollectionTableBinding/table_bindings.tsx:236-247`
+`packages/cms/src/components/CollectionTableBinding/PropertyTableCell.tsx:255-281`
 `packages/app/src/hooks/data/useRelationSelector.tsx:233-239`
 
 `getTableBindingForProperty` gates most editors on `selected` — `else if (selected &&
@@ -77,8 +77,8 @@ popover has been opened once — so the same mistake at a future call site costs
 
 #### H2. `relationsCache` / `referencesCache` are never invalidated, so a deleted target keeps rendering as live
 
-`packages/admin/src/preview/components/RelationPreview.tsx:192-196,270`
-`packages/admin/src/preview/components/ReferencePreview.tsx:160-164,238`
+`packages/cms/src/preview/components/RelationPreview.tsx:192-196,270`
+`packages/cms/src/preview/components/ReferencePreview.tsx:160-164,238`
 
 ```
 if (entity) relationsCache.set(relation.pathWithId, entity);
@@ -112,7 +112,7 @@ whenever `useFetch` reports `entity === undefined` for an id it was asked for, c
 
 #### H3. `UserSelector` shows an empty picker for any user outside the loaded page
 
-`packages/admin/src/components/UserSelector.tsx:200-204,112-114`
+`packages/cms/src/components/UserSelector.tsx:200-204,112-114`
 
 ```
 const selectedUser: User | null = value ? getUser(value) ?? null : null;
@@ -141,7 +141,7 @@ is not.
 
 #### H4. `UserSelector` type-ahead has neither debouncing nor request cancellation
 
-`packages/admin/src/components/UserSelector.tsx:50-95,102-106`
+`packages/cms/src/components/UserSelector.tsx:50-95,102-106`
 
 ```
 const search = useCallback((searchStr: string) => {
@@ -176,7 +176,7 @@ near-identical files and will keep diverging.
 
 #### M1. `ReferenceWidget` renders nothing — no preview and no button — for two reachable values
 
-`packages/admin/src/components/ReferenceWidget.tsx:114-153`
+`packages/cms/src/components/ReferenceWidget.tsx:114-153`
 
 ```
 if (Array.isArray(value)) { child = …previews… }
@@ -198,7 +198,7 @@ Two values fall between the two branches:
   every incoming value (`RelationSelector.tsx:192-196`), and `RelationFieldBinding` does
   the same (`RelationFieldBinding.tsx:71,127`); `ReferenceWidget` normalises nothing.
 
-`ReferenceWidget` is exported from `packages/admin/src/index.ts:28` and
+`ReferenceWidget` is exported from `packages/cms/src/index.ts:28` and
 `components/index.ts:27` and has no caller inside the repo, so nothing in the admin
 exercises it — it is a public API component whose two dead paths only a framework user
 will find.
@@ -209,7 +209,7 @@ rather than off `!value`.
 
 #### M2. `ReferenceWidget`'s `useCallback` dependency lists name the wrong callback
 
-`packages/admin/src/components/ReferenceWidget.tsx:75-85,97-104`
+`packages/cms/src/components/ReferenceWidget.tsx:75-85,97-104`
 
 ```
 const onMultipleEntitiesSelected = useCallback((entities) => {
@@ -274,8 +274,8 @@ never deleted, and two editors touching disjoint tags no longer clobber each oth
 
 #### M4. Both previews compute `dataLoadingError` and throw it away
 
-`packages/admin/src/preview/components/RelationPreview.tsx:181-190`
-`packages/admin/src/preview/components/ReferencePreview.tsx:148-157`
+`packages/cms/src/preview/components/RelationPreview.tsx:181-190`
+`packages/cms/src/preview/components/ReferencePreview.tsx:148-157`
 
 `dataLoadingError` is destructured out of `useFetch` in both files and referenced nowhere
 below (grep confirms one occurrence each). `useFetch` sets it and also clears `entity`
@@ -296,7 +296,7 @@ state from "not found", and `InlineEntityPreviewMissing` already takes a `toolti
 #### M5. `RelationSelector` ignores the picker's error, so a failed list reads as an empty one
 
 `packages/app/src/hooks/data/useRelationSelector.tsx:46-54,157-161`
-`packages/admin/src/components/RelationSelector.tsx:143-155,669-674`
+`packages/cms/src/components/RelationSelector.tsx:143-155,669-674`
 
 `RelationSelectorController` declares `error: Error | undefined`, the hook sets it on
 every failure, and the destructure in `RelationSelector` takes `items`, `isLoading`,
@@ -315,8 +315,8 @@ Fix direction: render an error state when `error` is set, with a retry.
 
 #### M6. Neither picker restores focus when it closes
 
-`packages/admin/src/components/RelationSelector.tsx:618-620`
-`packages/admin/src/components/UserSelector.tsx:378-380`
+`packages/cms/src/components/RelationSelector.tsx:618-620`
+`packages/cms/src/components/UserSelector.tsx:378-380`
 
 ```
 onCloseAutoFocus={(e) => { e.preventDefault(); }}
@@ -335,12 +335,12 @@ single-select branch of `onItemClick`).
 
 #### M7. The pickers' Escape handlers do not claim the key, against this repo's own documented idiom
 
-`packages/admin/src/components/RelationSelector.tsx:443-452`
-`packages/admin/src/components/UserSelector.tsx:293-298`
+`packages/cms/src/components/RelationSelector.tsx:443-452`
+`packages/cms/src/components/UserSelector.tsx:293-298`
 
 Both register `document.addEventListener("keydown", handleKey, true)` — the capture-on-
 document half of the idiom — and neither calls `stopPropagation()`.
-`packages/admin/test/components/escape_key_ownership.test.tsx` pins precisely why that is
+`packages/cms/test/components/escape_key_ownership.test.tsx` pins precisely why that is
 not enough: capture-on-document *plus* `stopPropagation` is what stops a window-bubble
 listener on a lower layer. `EntityInspector.tsx:94` does it correctly, and its comment at
 line 82 claims it is "the same idiom the selectors already use to own the key" — which is
@@ -375,7 +375,7 @@ Fix direction: fetch `offset: items.length, limit: pageSize` and append.
 
 #### L2. `fixedFilter` restricts the picker's list and nothing else
 
-`packages/admin/src/components/ReferenceWidget.tsx:28-31` ("Allow selection of entities
+`packages/cms/src/components/ReferenceWidget.tsx:28-31` ("Allow selection of entities
 that pass the given filter only"), `RelationFieldBinding.tsx:100`,
 `useRelationSelector.tsx:148`
 
@@ -390,7 +390,7 @@ point authors at a `securityRules` `WITH CHECK` for the enforcing version.
 
 #### L3. The picker never consults `canRead`
 
-`packages/admin/src/hooks/navigation/useNavigationResolution.ts:20` is the only caller of
+`packages/cms/src/hooks/navigation/useNavigationResolution.ts:20` is the only caller of
 `canReadCollection`; `usePermissions` exposes `canRead`
 (`packages/app/src/hooks/usePermissions.ts:33-43`) and neither `SelectionTableBinding`
 (which does use `canCreate`, line 348) nor `RelationSelector` asks it.
@@ -416,7 +416,7 @@ callback is also exported through the controller and captured into a ref by
 
 #### L5. `UserSelector`'s catch swallows every failure
 
-`packages/admin/src/components/UserSelector.tsx:90-92`
+`packages/cms/src/components/UserSelector.tsx:90-92`
 
 ```
 } catch { setHasMore(false); }

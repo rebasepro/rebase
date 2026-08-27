@@ -24,7 +24,7 @@ A field's width is a **span** over a four-column grid. `4` is the full width of
 the main column.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -65,7 +65,7 @@ On layouts too narrow for two columns — the side panel, the split pane, a phon
 collapsed; an untitled one cannot.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -113,7 +113,7 @@ hide behind a closed heading.
 status, ownership, publication dates, flags.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",

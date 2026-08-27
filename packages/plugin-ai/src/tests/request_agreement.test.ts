@@ -23,7 +23,7 @@ import { InputProperty } from "../types/data_enhancement_controller";
  * `getFieldId` is mocked deterministically; the real one resolves against the
  * admin field registry, which is not what is under test.
  */
-jest.mock("@rebasepro/admin", () => ({
+jest.mock("@rebasepro/cms", () => ({
     getFieldId: (property: { type?: string }) => {
         if (!property?.type) return undefined;
         if (property.type === "string") return "text_field";

@@ -155,7 +155,7 @@ y el rol `admin`. Una colección puede optar por no aplicar esa base y asumir la
 total responsabilidad de su propio RLS:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

@@ -16,7 +16,7 @@ Cada colección puede mostrarse en cuatro modos de vista:
 ## Configuración
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     properties: { /* … */ },
@@ -74,7 +74,7 @@ Controle la altura de la fila con `defaultSize`:
 Configure un tablero Kanban especificando qué propiedad de enumeración usar como columnas:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const tasksCollection = defineCollection({
     slug: "tasks",
     name: "Tasks",
@@ -178,7 +178,7 @@ await tasks.create({
 Las tarjetas muestran las entidades como tarjetas visuales — útiles para contenido con muchas imágenes:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",

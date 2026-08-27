@@ -31,7 +31,7 @@
       "@rebasepro/types": [
         "../types/src"
       ],
-      "@rebasepro/admin": [
+      "@rebasepro/cms": [
         "../types/src/cms"
       ],
       "@rebasepro/common": [

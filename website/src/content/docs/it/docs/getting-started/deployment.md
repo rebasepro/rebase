@@ -159,10 +159,10 @@ in modo che la risoluzione URL⇄collezione tenga conto del prefisso — altrime
 spinner senza recuperare dati:
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Imposta **o** il `basename` del router **o** `RebaseAdmin basePath` — non entrambi, altrimenti il
+Imposta **o** il `basename` del router **o** `RebaseCMS basePath` — non entrambi, altrimenti il
 prefisso viene applicato due volte.
 :::
 
@@ -176,7 +176,7 @@ così ogni app viene caricata in lazy e i visitatori del prodotto non scaricano 
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router

@@ -2,7 +2,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 
 const mockSchemas: Record<string, TableInfo[]> = {
     "public": [

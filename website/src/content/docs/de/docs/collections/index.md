@@ -15,7 +15,7 @@ Eine **Sammlung** ist ein TypeScript-Objekt, das eine Datenbanktabelle beschreib
 - **Lebenszyklus-Hooks** – Callbacks für Erstellungs-, Aktualisierungs- und Löschvorgänge
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const productsCollection = defineCollection({
     slug: "products",              // URL path and API endpoint
@@ -72,7 +72,7 @@ export const productsCollection = defineCollection({
 Umschließen Sie das Literal mit `defineCollection`. Zur Laufzeit ist es die Identitätsfunktion — es gibt das Objekt unverändert zurück und kostet daher nichts. Was es bringt, ist Inferenz: ein `const`-Typparameter erfasst Ihre `properties`-Schlüssel als Literaltypen, wodurch sie in der Editor-Vervollständigung für `admin.display`, `admin.sort` und `admin.propertiesOrder` erscheinen.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const products = defineCollection({
     name: "Products",
@@ -89,7 +89,7 @@ const products = defineCollection({
 });
 ```
 
-Importieren Sie es in einem Projekt mit Admin-Panel aus `@rebasepro/admin-types` — das ist die Variante, die auch den `admin`-Block typprüft. Ein Headless-BaaS-Projekt ohne `admin`-Block und ohne React importiert dieselbe Funktion stattdessen aus `@rebasepro/common`.
+Importieren Sie es in einem Projekt mit Admin-Panel aus `@rebasepro/cms-types` — das ist die Variante, die auch den `admin`-Block typprüft. Ein Headless-BaaS-Projekt ohne `admin`-Block und ohne React importiert dieselbe Funktion stattdessen aus `@rebasepro/common`.
 
 Den Typ direkt zu annotieren funktioniert weiterhin und wird weiterhin geprüft:
 

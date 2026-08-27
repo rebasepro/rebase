@@ -6,7 +6,7 @@ import type { RebaseServerClient } from "@rebasepro/types";
  * This is not a hypothetical. Under the managed runtime it is the NORMAL
  * layout: the image ships the framework at `/app/node_modules`, and a project's
  * bundle installs its own dependencies into `/bundle/node_modules` — where
- * `@rebasepro/server` lands as a transitive dependency of `@rebasepro/admin`
+ * `@rebasepro/server` lands as a transitive dependency of `@rebasepro/cms`
  * and `@rebasepro/server-postgres`. Every custom function imports
  * `defineFunction` from `@rebasepro/server`, so functions hold the bundle's
  * copy while `initializeRebaseBackend()` initializes the image's.

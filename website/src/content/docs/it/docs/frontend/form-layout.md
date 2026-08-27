@@ -20,7 +20,7 @@ Usa `admin.form` quando il risultato derivato non è adatto al tuo dominio.
 La larghezza di un campo è uno **span** su una griglia a quattro colonne. `4` corrisponde all'intera larghezza della colonna principale.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -55,7 +55,7 @@ Su layout troppo stretti per due colonne — il pannello laterale, il riquadro d
 `sections` raggruppa la colonna principale sotto delle intestazioni. Una sezione dotata di titolo può essere compressa; una priva di titolo no.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -99,7 +99,7 @@ Un errore di validazione all'interno di una sezione compressa la espande automat
 `sidebar` sposta i campi fuori dalla colonna principale e li inserisce in un rail stretto al suo fianco — stato, proprietà, date di pubblicazione, flag.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",

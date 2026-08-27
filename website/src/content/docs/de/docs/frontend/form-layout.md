@@ -20,7 +20,7 @@ Verwenden Sie `admin.form`, wenn das abgeleitete Layout nicht zu Ihren Anforderu
 Die Breite eines Feldes ist ein **Span** (Spaltenbereich) über ein vierspaltiges Raster. `4` entspricht der vollen Breite der Hauptspalte.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -55,7 +55,7 @@ Bei Layouts, die zu schmal für zwei Spalten sind — das Seitenpanel, der Split
 `sections` gruppiert die Hauptspalte unter Überschriften. Ein Abschnitt mit Titel kann einklappbar sein; ein unbenannter Abschnitt nicht.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -99,7 +99,7 @@ Ein Validierungsfehler innerhalb eines eingeklappten Abschnitts klappt diesen au
 `sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben — Status, Eigentümerschaft, Veröffentlichungsdaten, Flags.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",

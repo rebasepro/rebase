@@ -18,7 +18,7 @@
  *
  * The cost is that the return type is `unknown` rather than `ReactNode`, so a
  * function that returns something React could not render is accepted here.
- * `@rebasepro/admin-types` re-exports a `ReactComponentRef<P>` narrowed against
+ * `@rebasepro/cms-types` re-exports a `ReactComponentRef<P>` narrowed against
  * the real `React.ComponentType` for authoring and for the admin's internals,
  * which restores that check where it can be enforced.
  */

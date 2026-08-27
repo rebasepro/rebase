@@ -48,7 +48,7 @@ que esta build no conoce se escribe `custom:` — por ejemplo
 Luego, apunta una colección a una de ellas:
 
 ```ts
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",

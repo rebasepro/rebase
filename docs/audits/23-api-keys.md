@@ -375,7 +375,7 @@ permission model enforced on one transport and absent on another is the shape
 this audit was looking for, and here the absent transport refuses rather than
 admits.
 
-**C6 — no admin-UI surface.** Nothing in `packages/admin` or `packages/app`
+**C6 — no admin-UI surface.** Nothing in `packages/cms` or `packages/app`
 references API keys; management is CLI + SDK only. Relevant to M2: the CLI's
 `Permissions: none` line (`cli/src/commands/api-keys.ts:137`) is the only place
 a human sees a key's scope, and it does not print the `admin` flag at all.

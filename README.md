@@ -251,7 +251,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | Package | Description |
 |---|---|
 | `@rebasepro/types` | Core TypeScript type definitions |
-| `@rebasepro/admin-types` | The `admin` block — presentation types, declared as an augmentation so a headless project pays nothing |
+| `@rebasepro/cms-types` | The `admin` block — presentation types, declared as an augmentation so a headless project pays nothing |
 | `@rebasepro/utils` | Shared utility functions |
 | `@rebasepro/common` | Common modules shared across packages |
 | `@rebasepro/forms` | Lightweight form management library |
@@ -262,7 +262,7 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/server` | Server framework and middleware (Hono) |
 | `@rebasepro/server-postgres` | PostgreSQL server adapter with Drizzle |
 | `@rebasepro/server-mongo` | MongoDB server adapter |
-| `@rebasepro/admin` | Full admin panel interface |
+| `@rebasepro/cms` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, RLS editor, schema visualizer, API explorer |
 | `@rebasepro/cli` | CLI for project scaffolding and management |
 | `@rebasepro/codegen` | TypeScript SDK code generation |

@@ -6,7 +6,7 @@ import {
     checkOperation
 } from "../src/util/permissions";
 import { Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/admin-types";
+import { AuthController } from "@rebasepro/cms-types";
 
 // ── Helpers ──────────────────────────────────────────────────
 

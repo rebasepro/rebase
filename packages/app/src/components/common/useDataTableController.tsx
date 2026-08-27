@@ -9,7 +9,7 @@ import { toFindParams } from "../../hooks/data/collectionQuery";
 import { getRelationIncludeParams } from "../../util/previews";
 import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
-import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
+import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
 export const DEFAULT_PAGE_SIZE = 50;

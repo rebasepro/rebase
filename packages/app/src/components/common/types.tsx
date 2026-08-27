@@ -1,5 +1,5 @@
 import type { Property, Entity } from "@rebasepro/types";
-import { CollectionSize, SelectedCellProps } from "@rebasepro/admin-types";
+import { CollectionSize, SelectedCellProps } from "@rebasepro/cms-types";
 
 export type DataCollectionTableController<M extends Record<string, unknown>> = {
 

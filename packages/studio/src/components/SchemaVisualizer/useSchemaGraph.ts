@@ -6,7 +6,7 @@ import type { Relation, ResolvedRelation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
-import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/admin-types";
+import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
 
 // ─── Column info extracted from a collection ──────────────────────────
 

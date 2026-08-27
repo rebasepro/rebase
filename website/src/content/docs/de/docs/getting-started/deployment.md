@@ -159,10 +159,10 @@ mit, damit die URL⇄Collection-Auflösung das Präfix berücksichtigt — ander
 Spinner ohne Datenabruf:
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Setzen Sie **entweder** den Router-`basename` **oder** `RebaseAdmin basePath` — nicht beides, sonst wird das
+Setzen Sie **entweder** den Router-`basename` **oder** `RebaseCMS basePath` — nicht beides, sonst wird das
 Präfix zweimal angewendet.
 :::
 
@@ -176,7 +176,7 @@ sodass jede App lazy geladen wird und Produktbesucher niemals das Admin-Bundle h
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router

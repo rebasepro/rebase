@@ -6,7 +6,7 @@ export * from "./util";
 export * from "./contexts";
 
 // @internal — framework implementation details, exported only because
-// @rebasepro/admin and @rebasepro/studio consume them. Named explicitly
+// @rebasepro/cms and @rebasepro/studio consume them. Named explicitly
 // (not `export *`) so this file is the single place that grows or shrinks
 // the internal surface — see the JSDoc on each symbol for details.
 export { CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH, SIDE_PANEL_DEFAULT_WIDTH } from "./internal/common";

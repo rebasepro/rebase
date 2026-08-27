@@ -20,7 +20,7 @@ Use `admin.form` quando a resposta derivada não for adequada para o seu domíni
 A largura de um campo é um **span** (extensão) em uma grade de quatro colunas. `4` é a largura total da coluna principal.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -55,7 +55,7 @@ Em layouts muito estreitos para duas colunas — o painel lateral, o painel divi
 `sections` agrupa a coluna principal sob títulos. Uma seção com título pode ser recolhida; uma sem título não pode.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -99,7 +99,7 @@ Um erro de validação dentro de uma seção recolhida a expande, para que um er
 `sidebar` move os campos para fora da coluna principal e os coloca em um painel lateral estreito ao lado dela — status, propriedade, datas de publicação, sinalizadores.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",

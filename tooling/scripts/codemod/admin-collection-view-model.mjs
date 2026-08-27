@@ -23,7 +23,7 @@ import path from "node:path";
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
 const dryRun = process.argv.includes("--dry");
 
-const PACKAGES = ["packages/admin/src", "packages/app/src", "packages/studio/src", "packages/admin-types/src"];
+const PACKAGES = ["packages/cms/src", "packages/app/src", "packages/studio/src", "packages/cms-types/src"];
 
 /**
  * Files that mean the authoring shape, not the view model: anything that
@@ -82,7 +82,7 @@ function processFile(file) {
     // admin-types import when there is one, so a file does not end up with two.
     const needed = present.map((n) => RENAMES.get(n));
     const existing = src.match(
-        /^[ \t]*import(\s+type)?\s*\{([^}]*)\}\s*from\s*"@rebasepro\/admin-types";?/m
+        /^[ \t]*import(\s+type)?\s*\{([^}]*)\}\s*from\s*"@rebasepro\/cms-types";?/m
     );
     if (existing) {
         const already = existing[2].split(",").map((s) => s.trim());
@@ -92,7 +92,7 @@ function processFile(file) {
         if (missing.length > 0) {
             src = src.replace(
                 existing[0],
-                `import${existing[1] ?? ""} { ${[...already, ...missing].join(", ")} } from "@rebasepro/admin-types";`
+                `import${existing[1] ?? ""} { ${[...already, ...missing].join(", ")} } from "@rebasepro/cms-types";`
             );
         }
     } else {
@@ -102,7 +102,7 @@ function processFile(file) {
         for (let i = 0; i < lines.length; i++) {
             if (/^\s*(import|export)\b.*from\s*["']/.test(lines[i])) lastImport = i;
         }
-        const statement = `import type { ${needed.join(", ")} } from "@rebasepro/admin-types";`;
+        const statement = `import type { ${needed.join(", ")} } from "@rebasepro/cms-types";`;
         lines.splice(lastImport + 1, 0, statement);
         src = lines.join("\n");
     }

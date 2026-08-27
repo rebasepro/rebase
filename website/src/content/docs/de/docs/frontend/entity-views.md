@@ -16,7 +16,7 @@ Entitätsansichten ermöglichen es Ihnen, benutzerdefinierte **Tabs** zur Entit�
 ## Entitätsansichten hinzufügen
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     table: "articles",
@@ -43,7 +43,7 @@ const articlesCollection = defineCollection({
 ## Eine Entitätsansicht erstellen
 
 ```tsx
-import type { EntityCustomViewParams } from "@rebasepro/admin-types";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 
 function ArticlePreview({
     entity,

@@ -1,5 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { getDisplayPropertyKey } from "./entity-display";
 
 /**

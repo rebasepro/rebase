@@ -15,7 +15,7 @@
  * export-less module is legal, so the error would only surface at use.
  */
 declare const reactIsNotInstalled: {
-    __rebase_react_is_not_installed__: "Install react, or move this type to @rebasepro/admin-types";
+    __rebase_react_is_not_installed__: "Install react, or move this type to @rebasepro/cms-types";
 };
 
 export default reactIsNotInstalled;

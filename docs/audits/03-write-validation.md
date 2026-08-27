@@ -249,7 +249,7 @@ admin-form-only. Publishing an unenforced contract is the worst of the three.
 `packages/types/src/types/properties.ts:279, :351, :389, …` declare a typed
 `defaultValue` on every concrete property type. The only implementation is
 `getDefaultValuesFor` in the admin form
-(`packages/admin/src/form/form_utils.ts:209-210`). A repo-wide grep for
+(`packages/cms/src/form/form_utils.ts:209-210`). A repo-wide grep for
 `defaultValue` under `packages/server/src` and `packages/server-postgres/src`
 returns exactly one hit — the allow-list entry in
 `validate-config.ts:158` — so the server never applies it, and neither generator

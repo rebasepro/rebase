@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import type { EntityCustomViewParams } from "@rebasepro/admin-types";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 import { useStorageSource } from "@rebasepro/app";
 import { Container, Markdown, Typography } from "@rebasepro/ui";
 

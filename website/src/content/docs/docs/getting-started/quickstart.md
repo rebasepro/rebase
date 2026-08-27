@@ -98,7 +98,7 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
 
 ```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",

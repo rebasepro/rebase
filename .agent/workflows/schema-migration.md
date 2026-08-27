@@ -48,7 +48,7 @@ For production deployments, use migrations for version-controlled, reviewable ch
 Edit your collection file (e.g., `config/collections/posts.ts`):
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     name: "Posts",
@@ -151,7 +151,7 @@ Relations are defined **inline on the property**: `type: "relation"` plus a
 `relation` object whose `kind` says what sort of link it is.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 

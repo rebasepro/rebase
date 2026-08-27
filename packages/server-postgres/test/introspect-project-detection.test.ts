@@ -49,7 +49,7 @@ function project(configDeps: Record<string, string> | null, options: {
 
 describe("detectCollectionBuilder", () => {
     it("picks the admin builder for a project that declares admin-types", () => {
-        const out = project({ "@rebasepro/admin-types": "*", "@rebasepro/types": "*" });
+        const out = project({ "@rebasepro/cms-types": "*", "@rebasepro/types": "*" });
         expect(detectCollectionBuilder(out)).toBe("admin-types");
     });
 
@@ -85,7 +85,7 @@ describe("detectCollectionBuilder", () => {
 
     /** A project with both has an admin panel, and that is the flavour with a block. */
     it("prefers the admin builder when both are declared", () => {
-        const out = project({ "@rebasepro/admin-types": "*", "@rebasepro/common": "*" });
+        const out = project({ "@rebasepro/cms-types": "*", "@rebasepro/common": "*" });
         expect(detectCollectionBuilder(out)).toBe("admin-types");
     });
 
@@ -106,7 +106,7 @@ describe("detectCollectionBuilder", () => {
         try {
             fs.writeFileSync(
                 path.join(outer, "package.json"),
-                JSON.stringify({ name: "outer", dependencies: { "@rebasepro/admin-types": "*" } }),
+                JSON.stringify({ name: "outer", dependencies: { "@rebasepro/cms-types": "*" } }),
                 "utf-8"
             );
             root = path.join(outer, "inner");

@@ -21,7 +21,7 @@ Declare the link on the property, nested under `relation`. Pick the `kind` and
 the type offers exactly the fields that kind needs.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",
@@ -47,7 +47,7 @@ For a link with no property of its own — nothing to name it by in the form or 
 a table column — declare it in `relations`:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const usersCollection = defineCollection({
     slug: "users",
     name: "Users",

@@ -11,7 +11,7 @@ import type {
     AdminCollection,
     EntityDisplayResolver,
     EntityDisplayRole
-} from "@rebasepro/admin-types";
+} from "@rebasepro/cms-types";
 
 /**
  * What the collection declares for a role, before deciding which form it is.

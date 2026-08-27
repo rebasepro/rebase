@@ -15,7 +15,7 @@ Una **collezione** è un oggetto TypeScript che descrive una tabella di database
 -   **Hook del ciclo di vita** — Callback per operazioni di creazione, aggiornamento, eliminazione
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const productsCollection = defineCollection({
     slug: "products",              // URL path and API endpoint
@@ -72,7 +72,7 @@ export const productsCollection = defineCollection({
 Racchiudi il literal in `defineCollection`. A runtime è la funzione identità — restituisce l'oggetto invariato — quindi non costa nulla. Ciò che offre è l'inferenza: un parametro di tipo `const` cattura le chiavi di `properties` come tipi literal, ed è questo che le porta nel completamento dell'editor per `admin.display`, `admin.sort` e `admin.propertiesOrder`.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const products = defineCollection({
     name: "Products",
@@ -89,7 +89,7 @@ const products = defineCollection({
 });
 ```
 
-Importala da `@rebasepro/admin-types` in un progetto con pannello di amministrazione — è la copia che controlla anche il blocco `admin`. Un progetto BaaS headless, senza blocco `admin` e senza React, importa la stessa funzione da `@rebasepro/common`.
+Importala da `@rebasepro/cms-types` in un progetto con pannello di amministrazione — è la copia che controlla anche il blocco `admin`. Un progetto BaaS headless, senza blocco `admin` e senza React, importa la stessa funzione da `@rebasepro/common`.
 
 Annotare direttamente il tipo funziona ancora ed è ancora controllato:
 

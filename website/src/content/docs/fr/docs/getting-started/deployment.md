@@ -169,10 +169,10 @@ afin que la résolution URL⇄collection tienne compte du préfixe — sinon les
 spinner sans récupérer de données :
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Définissez **soit** le `basename` du router **soit** `RebaseAdmin basePath` — pas les deux, sinon le
+Définissez **soit** le `basename` du router **soit** `RebaseCMS basePath` — pas les deux, sinon le
 préfixe est appliqué deux fois.
 :::
 
@@ -186,7 +186,7 @@ de sorte que chaque app est chargée en lazy et que les visiteurs du produit ne 
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router

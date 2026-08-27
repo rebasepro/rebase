@@ -1542,7 +1542,7 @@ export function DashboardView() {
 
 ## Rich Text Editor (`RichTextEditor`)
 
-> **IMPORTANT:** `RichTextEditor` lives in `@rebasepro/admin`, NOT in `@rebasepro/ui`. It is a separate heavy entry point (~300 KB) because it bundles ProseMirror.
+> **IMPORTANT:** `RichTextEditor` lives in `@rebasepro/cms`, NOT in `@rebasepro/ui`. It is a separate heavy entry point (~300 KB) because it bundles ProseMirror.
 
 A full-featured, block-based WYSIWYG editor with slash commands, bubble menus, image uploads, tables, AI autocomplete, drag-and-drop reordering, and a raw Markdown toggle. Outputs **Markdown**, **JSON** (ProseMirror document tree), and **HTML**.
 
@@ -1550,10 +1550,10 @@ A full-featured, block-based WYSIWYG editor with slash commands, bubble menus, i
 
 ```ts
 // The component (heavy — code-split / lazy-load when possible)
-import { RichTextEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/cms/editor";
 
 // Types only (lightweight — from the main entry point)
-import type { RichTextEditorProps, JSONContent, EditorAIController } from "@rebasepro/admin";
+import type { RichTextEditorProps, JSONContent, EditorAIController } from "@rebasepro/cms";
 ```
 
 > **Note:** the editor was once exported as `RebaseEditor`. That name is **gone**, not deprecated — nothing in the workspace declares it, so importing it fails. Use `RichTextEditor`.
@@ -1577,7 +1577,7 @@ import type { RichTextEditorProps, JSONContent, EditorAIController } from "@reba
 ### Usage Example
 
 ```tsx
-import { RichTextEditor } from "@rebasepro/admin/editor";
+import { RichTextEditor } from "@rebasepro/cms/editor";
 
 function MyEditor() {
     const [markdown, setMarkdown] = useState("");
@@ -1605,7 +1605,7 @@ import { lazy, Suspense } from "react";
 import { Skeleton } from "@rebasepro/ui";
 
 const RichTextEditor = lazy(() =>
-    import("@rebasepro/admin/editor").then(m => ({ default: m.RichTextEditor }))
+    import("@rebasepro/cms/editor").then(m => ({ default: m.RichTextEditor }))
 );
 
 function LazyEditor(props) {

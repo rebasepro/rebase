@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import authorsCollection from "./authors.js";
 import tagsCollection from "./tags.js";
 

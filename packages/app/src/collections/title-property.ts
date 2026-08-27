@@ -1,6 +1,6 @@
 import { isRelationalCollectionConfig, type Property, type Relation } from "@rebasepro/types";
 import { generateForeignKeyName } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/common";
 import { getPropertyInPath } from "./property-path";
 import { getDisplayPropertyKey, hasDeclaredDisplay } from "./entity-display";

@@ -1,6 +1,6 @@
 import React from "react";
 import { autocompleteStream } from "../api";
-import { EditorAIController } from "@rebasepro/admin";
+import { EditorAIController } from "@rebasepro/cms";
 
 /**
  * Inline continuation for the rich-text editor's slash command.

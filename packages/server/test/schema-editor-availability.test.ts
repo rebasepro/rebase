@@ -86,7 +86,7 @@ beforeEach(() => {
     fs.writeFileSync(
         path.join(collectionsDir, "posts.ts"),
         [
-            "import { defineCollection } from \"@rebasepro/admin-types\";",
+            "import { defineCollection } from \"@rebasepro/cms-types\";",
             "",
             "const postsCollection = defineCollection({",
             "    name: \"Posts\",",

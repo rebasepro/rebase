@@ -45,7 +45,7 @@ uno che questa build non conosce si usa `custom:` — ad esempio
 Quindi indirizza una collezione verso una di esse:
 
 ```ts
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",

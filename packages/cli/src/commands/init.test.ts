@@ -300,7 +300,7 @@ describe("template collections", () => {
             expect(content).toContain("name:");
             expect(content).toContain("properties:");
             expect(content).toContain("defineCollection(");
-            expect(content).toContain("@rebasepro/admin-types");
+            expect(content).toContain("@rebasepro/cms-types");
             // Removed in 0.11 — a template must never reintroduce them.
             expect(content).not.toContain("buildCollection");
             expect(content).not.toContain("buildProperty");
@@ -510,9 +510,9 @@ describe("template package.json contracts", () => {
     it("frontend package.json has required dependencies", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
         expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
-        // `@rebasepro/admin` used to be a second copy of the `app` assertion, so
+        // `@rebasepro/cms` used to be a second copy of the `app` assertion, so
         // the panel package the template actually ships went unchecked.
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/admin");
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/cms");
         expect(pkg.dependencies).toHaveProperty("@rebasepro/client");
         expect(pkg.dependencies).toHaveProperty("react");
         expect(pkg.dependencies).toHaveProperty("react-dom");
@@ -1291,7 +1291,7 @@ runtime: "managed" });
         const backend = JSON.parse(fs.readFileSync(path.join(overlay, "backend", "package.json"), "utf8"));
         const all = JSON.stringify([pkg.dependencies, pkg.devDependencies, backend.dependencies, backend.devDependencies]);
 
-        for (const ui of ["react", "@rebasepro/admin", "@rebasepro/ui", "@rebasepro/app", "@rebasepro/studio"]) {
+        for (const ui of ["react", "@rebasepro/cms", "@rebasepro/ui", "@rebasepro/app", "@rebasepro/studio"]) {
             expect(all).not.toContain(`"${ui}"`);
         }
     });

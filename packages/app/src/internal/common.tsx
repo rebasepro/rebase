@@ -3,7 +3,7 @@
  * dialog sizing logic.
  *
  * @internal Not part of the stable public API — exported only because
- * `@rebasepro/admin` and `@rebasepro/studio` need them to compute the same
+ * `@rebasepro/cms` and `@rebasepro/studio` need them to compute the same
  * dialog widths as the framework. Do not depend on these for app code; they
  * may change shape or be removed without a major version bump.
  */

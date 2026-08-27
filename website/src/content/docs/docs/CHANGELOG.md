@@ -769,7 +769,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   `display` names the roles instead — `title`, `subtitle`, `image`, `status`, `date`, `tags` — and one resolver (`entity-display.ts`, `useEntityDisplay`, cached) answers for every surface: the table, list, board and card bindings, the preview slots, the form, the entity views and `useColumnsIds`. The property paths are checked against your own properties the way the rest of the `admin` block is, so a renamed field is a compile error rather than a column that quietly stops appearing.
 
   ```diff ts
-   import { defineCollection } from "@rebasepro/admin-types";
+   import { defineCollection } from "@rebasepro/cms-types";
 
    export default defineCollection({
        name: "Posts",
@@ -829,11 +829,11 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   | Your project declares | Generated collections use | `admin` block |
   |------|------|------|
-  | `@rebasepro/admin-types` | `defineCollection` from `@rebasepro/admin-types` | yes |
+  | `@rebasepro/cms-types` | `defineCollection` from `@rebasepro/cms-types` | yes |
   | `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
   | neither | a `PostgresCollectionConfig` annotation, with a warning | no |
 
-  **The headless flavours emit no `admin` block, on the collection or on any property.** That is a fix rather than a downgrade: `@rebasepro/types` declares no `admin` field at all — the augmentation in `@rebasepro/admin-types` is what adds it — so the block introspection used to emit was a type error in every headless project it was ever written into. What is dropped is presentation (`icon`, `propertiesOrder`, `multiline`, `readOnly`) for a project with no panel to present it; nothing about the schema, the API or your data depends on it.
+  **The headless flavours emit no `admin` block, on the collection or on any property.** That is a fix rather than a downgrade: `@rebasepro/types` declares no `admin` field at all — the augmentation in `@rebasepro/cms-types` is what adds it — so the block introspection used to emit was a type error in every headless project it was ever written into. What is dropped is presentation (`icon`, `propertiesOrder`, `multiline`, `readOnly`) for a project with no panel to present it; nothing about the schema, the API or your data depends on it.
 
   `@rebasepro/common` is a dependency of the headless config package now, which is what makes that branch reachable. A project scaffolded before this keeps the old annotation and is told what it is missing.
 
@@ -962,7 +962,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **A relation in a card slot drew a card inside a card.** `SlotValue` took `textOnly` as opt-in. The list view passed it; the card and board views did not, so a relation filling their title or subtitle slot rendered its own bordered preview, complete with an id line and a side-panel button, wrapped over three lines of a narrow grid card. It is the default now — a slot is one line of a row, and the one caller that would want a card in one is none of them.
 
-- **Editing `@rebasepro/admin-types` did nothing in dev.** The app's Vite config resolves every workspace package to source, with a comment explaining that the one package left out came from its built `dist` and so ignored edits until it was rebuilt. `admin-types` was added later and missed the list, and repeated the same bug.
+- **Editing `@rebasepro/cms-types` did nothing in dev.** The app's Vite config resolves every workspace package to source, with a comment explaining that the one package left out came from its built `dist` and so ignored edits until it was rebuilt. `admin-types` was added later and missed the list, and repeated the same bug.
 
 - **A monthly cron job spun at 112 iterations a second instead of waiting.** `setTimeout` holds its delay in a 32-bit signed integer: past ~24.8 days Node does not wait and does not throw, it clamps the delay to 1 ms and fires immediately. `scheduleNext` had a floor on the delay and no ceiling, so a job like `0 4 3 * *` — whose next slot sits about 30 days out for most of the month — woke at once, claimed its own future slot, lost the race against that claim on the next wake, logged *claimed by another instance*, and rescheduled into the same overflow. A tenant ran this way for a day and a half: 1.9 GB of logs, a `cron_claims` INSERT every 9 ms, and the job itself never running. Pod restarts did not clear it, because the claim that makes it skip is a persistent row.
 
@@ -1115,11 +1115,11 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   If you are migrating: `≤30 → 1`, `≤55 → 2`, `≤80 → 3`, otherwise `4`. Spans are ignored where the form is too narrow for two columns — the side panel, the split pane, a phone — which was also true of percentages.
 
-- **`RebaseAuthConfig` is gone from `@rebasepro/admin-types` — use `RebaseAuthViewConfig`.** It was a compatibility alias for a name that collides head-on with `RebaseAuthConfig` in `@rebasepro/server`, which configures the *backend* auth: JWT secrets, OAuth providers, password hooks. Two unrelated shapes under one name, exported from two packages whose whole job is to be imported together.
+- **`RebaseAuthConfig` is gone from `@rebasepro/cms-types` — use `RebaseAuthViewConfig`.** It was a compatibility alias for a name that collides head-on with `RebaseAuthConfig` in `@rebasepro/server`, which configures the *backend* auth: JWT secrets, OAuth providers, password hooks. Two unrelated shapes under one name, exported from two packages whose whole job is to be imported together.
 
 - **`react-router` 8, and `react-router-dom` is gone** — react-router 8 deletes the `react-router-dom` package outright. It was only ever a v6-compatibility shim: everything DOM-specific had already collapsed into `react-router` itself in v7.
 
-  `@rebasepro/admin`, `app`, `studio` and `plugin-ai` now peer `react-router ^8.3.0`. Two imports move, and only one of them is a rename:
+  `@rebasepro/cms`, `app`, `studio` and `plugin-ai` now peer `react-router ^8.3.0`. Two imports move, and only one of them is a rename:
 
   ```diff
   - import { createBrowserRouter, RouterProvider } from "react-router-dom";
@@ -1129,7 +1129,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   Everything else — `useNavigate`, `useLocation`, `useSearchParams`, `useParams`, `Link`, `NavLink`, `Outlet`, `Navigate`, `Route`, `Routes`, `MemoryRouter`, `useBlocker` — is the same name from `react-router`. `RouterProvider` is the exception: it lives in `react-router/dom`.
 
-  The floors underneath move with it, because react-router 8 requires them: `react` and `react-dom` peers go to `>=19.2.7` (were `>=19.0.0`), and `engines.node` on `@rebasepro/admin` and `app` to `>=22.22.0` (was `>=20`). Declaring `>=20` while a mandatory peer needs 22.22 is a promise the package cannot keep.
+  The floors underneath move with it, because react-router 8 requires them: `react` and `react-dom` peers go to `>=19.2.7` (were `>=19.0.0`), and `engines.node` on `@rebasepro/cms` and `app` to `>=22.22.0` (was `>=20`). Declaring `>=20` while a mandatory peer needs 22.22 is a promise the package cannot keep.
 
   This closes GHSA-qwww-vcr4-c8h2, which has no fix on the 7.x line. That advisory is an RSC-mode CSRF bypass and nothing here uses RSC mode, so the vulnerable path was unreachable — but 8.3.0 is the only patched release, and the alternative was staying on a package that no longer exists.
 
@@ -1272,7 +1272,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **`rebase.json` is rebuilt around one authored runtime** — the manifest had four unrelated fields named `mode`, an app type (`admin`) with no mechanism behind it, and a managed-vs-custom distinction nobody had written down.
 
-  A backend now declares `runtime: "managed" | "custom"` — who owns the process, independent of where it runs. It used to be *inferred* from the presence of `backend/src/index.ts`, which every scaffolded project had, so every project predating the manifest silently landed on the custom runtime. App types reduce to `backend` and `static`: the admin is an ordinary static app, because `RebaseAdmin` takes its collections as a build-time prop, so a platform-hosted admin was precluded by the component's interface rather than merely unimplemented. Top-level `runtime` becomes `rebase`, so the word means exactly one thing. In the bundle manifest, `mode` becomes `kind: "backend" | "static"`, `entry.static` becomes a list, and `entry.admin` is gone — format-1 bundles still boot, and the format is 2.
+  A backend now declares `runtime: "managed" | "custom"` — who owns the process, independent of where it runs. It used to be *inferred* from the presence of `backend/src/index.ts`, which every scaffolded project had, so every project predating the manifest silently landed on the custom runtime. App types reduce to `backend` and `static`: the admin is an ordinary static app, because `RebaseCMS` takes its collections as a build-time prop, so a platform-hosted admin was precluded by the component's interface rather than merely unimplemented. Top-level `runtime` becomes `rebase`, so the word means exactly one thing. In the bundle manifest, `mode` becomes `kind: "backend" | "static"`, `entry.static` becomes a list, and `entry.admin` is gone — format-1 bundles still boot, and the format is 2.
 
   `backend.mode` (`cms`/`baas`) is deleted outright. Where collections come from was never an independent choice: it is whether `<config>/collections` exists.
 
@@ -1290,7 +1290,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   One behaviour change: declaring collections alongside what used to be `mode: "baas"` now **serves** them instead of discarding them.
 
-- **The CMS-named exports are called what they are** — `useCMSContext`/`CMSContext` → `useAdminContext`/`AdminContext`, `registerCMS`/`unregisterCMS` → `registerAdmin`/`unregisterAdmin`, `CMSBasePropertyNoName` → `AdminBasePropertyNoName`, `CMSNavigationContent` → `AdminNavigationContent`. Smaller than it looks: outside `packages/admin` and `admin-types` these had no consumers.
+- **The CMS-named exports are called what they are** — `useCMSContext`/`CMSContext` → `useAdminContext`/`AdminContext`, `registerCMS`/`unregisterCMS` → `registerAdmin`/`unregisterAdmin`, `CMSBasePropertyNoName` → `AdminBasePropertyNoName`, `CMSNavigationContent` → `AdminNavigationContent`. Smaller than it looks: outside `packages/cms` and `admin-types` these had no consumers.
 
   Seven locale files did say "CMS" in user-visible strings — "CMS Users", "CMS View" and translated sentences in es/pt/de/fr/it/hi — and the two keys carrying it in the public `RebaseTranslations` type are renamed with them. One collision worth knowing about: `studio_sql_admin` already existed as a different string, so `studio_sql_cms` became `studio_sql_collections_label` rather than being merged onto it.
 
@@ -1351,7 +1351,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **An entity action's icon can be a Lucide name** — `EntityAction.icon` was `React.ReactElement`, alone among a collection's icons; `admin.icon` and `entityViews[].icon` were strings already. An element cannot be written in the `config` package at all: it is plain `.ts`, and a backend loads it for its schema, so importing the UI layer just to name an icon drags React into the server's module graph. Both forms are accepted now and resolved through `getIcon` at every render site.
 
-- **A collection's `entityActions` may name an app-level action by key** — `resolveEntityAction` has always accepted `string | EntityAction`, the collection editor stores exactly these keys, and the sibling field `entityViews` is typed `(string | EntityCustomView)[]`. Only this field's type disagreed, so the documented approach — register the action on `<RebaseAdmin entityActions={…}>`, then name it from the collection — required a cast to write.
+- **A collection's `entityActions` may name an app-level action by key** — `resolveEntityAction` has always accepted `string | EntityAction`, the collection editor stores exactly these keys, and the sibling field `entityViews` is typed `(string | EntityCustomView)[]`. Only this field's type disagreed, so the documented approach — register the action on `<RebaseCMS entityActions={…}>`, then name it from the collection — required a cast to write.
 
   It matters most where the action *cannot* be imported. An action carries an `onClick` and usually opens a dialog, so a collection file that imports one pulls the admin bundle into any backend that loads it; naming it costs nothing there.
 
@@ -1463,7 +1463,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   ```diff
   - import { buildCollection, buildProperty } from "@rebasepro/common";
-  + import { defineCollection } from "@rebasepro/admin-types";
+  + import { defineCollection } from "@rebasepro/cms-types";
 
   - export default buildCollection({
   + export default defineCollection({
@@ -1492,18 +1492,18 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   Three non-property forms are still accepted: a dotted path into a `map` property (`"profile.displayName"` — the root is checked, the path below it is not), a child-collection column (`"subcollection:orders"`), and an `additionalFields` key. That last one needs an explicit cast, because `AdditionalFieldDelegate.key` is a plain `string` and nothing carries those keys into the type:
 
   ```diff
-  + import type { AdditionalFieldKey } from "@rebasepro/admin-types";
+  + import type { AdditionalFieldKey } from "@rebasepro/cms-types";
   -     propertiesOrder: ["title", "score"]
   +     propertiesOrder: ["title", "score" as AdditionalFieldKey]
   ```
 
-  Only `defineCollection` turns the check on — it is what supplies `M`. A plain `const x: PostgresCollectionConfig = { … }` annotation infers nothing, so these fields stay permissive there, exactly as before. A type-level test in `packages/admin-types/test/admin_collection.test.ts` now pins all four fields with `@ts-expect-error`, so the seam cannot reopen without a build failure.
+  Only `defineCollection` turns the check on — it is what supplies `M`. A plain `const x: PostgresCollectionConfig = { … }` annotation infers nothing, so these fields stay permissive there, exactly as before. A type-level test in `packages/cms-types/test/admin_collection.test.ts` now pins all four fields with `@ts-expect-error`, so the seam cannot reopen without a build failure.
 
 - **`CollectionConfig` reports Postgres in its type errors** — `CollectionConfig` is a union discriminated on `engine`, and Postgres collections omit `engine` because it defaults to `"postgres"`. An incomplete Postgres literal therefore matched no member, and TypeScript elaborated the failure against the last constituent — MongoDB. Leaving out `name`, the most common mistake there is, told a Postgres user of a Postgres-first framework that they were missing `engine` on a `MongoDBCollectionConfig`. Postgres is now last in the union, so the same mistake names `PostgresCollectionConfig` and only the field actually missing. No runtime or assignability change; error text only.
 
 - **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
 
-  `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/admin-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
+  `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/cms-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
 
   **What to change.** Move presentation fields into `admin`:
 
@@ -1525,7 +1525,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
    };
   ```
 
-  The backend loads the block and never reads inside it, so a project with no admin panel can drop these fields entirely. For completion and checking inside `admin`, author with `defineCollection` from `@rebasepro/admin-types` — it captures the property literals, so `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` complete over your own property keys instead of `string`.
+  The backend loads the block and never reads inside it, so a project with no admin panel can drop these fields entirely. For completion and checking inside `admin`, author with `defineCollection` from `@rebasepro/cms-types` — it captures the property literals, so `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` complete over your own property keys instead of `string`.
 
 - **A relation declares a `kind`, and carries only the fields that kind uses** — a relation was one open interface with every join field optional at once: `cardinality`, `direction`, `localKey`, `foreignKeyOnTarget`, `through`, `joinPath`, `inverseRelationName`. Nothing stopped you combining fields that cannot coexist, so the type accepted several relations that could not work — and two of them corrupted data rather than erroring. `cardinality: "many"` with a `localKey` wrote the foreign key onto the *parent* row, because a to-many has no single row to point at; a many-to-many carrying `foreignKeyOnTarget` claimed a column on the target that the junction table owns. Both compiled, and both were shipped.
 
@@ -1729,7 +1729,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **A collection file that fails to import is now a hard error** — the loader used to log and continue, which turns a broken file into a missing API route and a missing policy, with a successful exit code. Both read as "no data" rather than as a failure.
 
-- **`RebaseCMS` → `RebaseAdmin`** — the component now matches the package it ships from. `mode: "cms"` on `RebaseBackendConfig` is unchanged: it describes where collections come from (config vs database), not the UI.
+- **`RebaseCMS` → `RebaseCMS`** — the component now matches the package it ships from. `mode: "cms"` on `RebaseBackendConfig` is unchanged: it describes where collections come from (config vs database), not the UI.
 
 - **BaaS mode does not serve tables without row-level security** — see Fixes. A table with RLS disabled is skipped and named at boot; `baas: { unprotectedTables: "serve" }` restores the old behavior.
 
@@ -1839,7 +1839,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
 
-- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
+- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/cms`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/cms` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
 
 ### Testing
 
@@ -1925,7 +1925,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   | `"Entity.DetailView"` (override key) | `"DetailView"` |
   | `"Entity.Preview"` (override key) | `"RecordPreview"` |
 
-  **Components (`@rebasepro/admin`)**
+  **Components (`@rebasepro/cms`)**
 
   | Old Name | New Name |
   |----------|----------|
@@ -2297,7 +2297,7 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 | `@rebasepro/server-postgresql` | PostgreSQL server adapter with Drizzle |
 | `@rebasepro/server-mongodb` | MongoDB server adapter |
 | `@rebasepro/auth` | Authentication controllers and views |
-| `@rebasepro/admin` | Full admin panel interface |
+| `@rebasepro/cms` | Full admin panel interface |
 | `@rebasepro/studio` | SQL editor, schema tools, and developer utilities |
 | `@rebasepro/cli` | CLI for project scaffolding and management |
 | `@rebasepro/sdk-generator` | TypeScript SDK code generation |

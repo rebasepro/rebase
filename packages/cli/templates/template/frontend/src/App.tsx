@@ -5,7 +5,7 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
 
 import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
-import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
@@ -35,7 +35,7 @@ export function App() {
                 authController={authController}
             >
                 <RebaseAuth />
-                <RebaseAdmin
+                <RebaseCMS
                     collections={collections}
                 />
                 <RebaseStudio/>

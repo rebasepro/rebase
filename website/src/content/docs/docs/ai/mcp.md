@@ -152,7 +152,7 @@ injects into each collection, granting the trusted server context and the
 responsibility for its own RLS:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

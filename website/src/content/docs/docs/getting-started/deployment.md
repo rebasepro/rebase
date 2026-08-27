@@ -169,10 +169,10 @@ it so URL⇄collection resolution accounts for the prefix — otherwise views ha
 spinner with no data fetch:
 
 ```tsx
-<RebaseAdmin collections={collections} basePath="/admin" />
+<RebaseCMS collections={collections} basePath="/admin" />
 ```
 
-Set **either** the router `basename` **or** `RebaseAdmin basePath` — not both, or the
+Set **either** the router `basename` **or** `RebaseCMS basePath` — not both, or the
 prefix is applied twice.
 :::
 
@@ -186,7 +186,7 @@ so each app is lazy-loaded and product visitors never download the admin bundle:
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
 
 if (isAdmin) {
     // The admin uses useBlocker → needs a data router

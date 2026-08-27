@@ -70,12 +70,12 @@ There is **no separate admin URL** — the admin panel is part of your frontend,
 // frontend/src/main.tsx
 const isAdmin = window.location.pathname.startsWith("/admin");
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseAdmin basePath="/admin" .../>
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" .../>
 
 // route "/admin/*" → AdminApp, everything else → ProductApp
 ```
 
-Set **either** a router `basename="/admin"` **or** `<RebaseAdmin basePath="/admin">` — not both, or the prefix is applied twice.
+Set **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — not both, or the prefix is applied twice.
 
 ---
 

@@ -1,6 +1,6 @@
 import React, { Suspense, useLayoutEffect, useMemo } from "react";
 import { useRebaseRegistryDispatch } from "@rebasepro/app";
-import type { RebaseStudioConfig, AppView } from "@rebasepro/admin-types";
+import type { RebaseStudioConfig, AppView } from "@rebasepro/cms-types";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 // Lazy-loaded studio tools — each fetched only when its route is visited.
@@ -23,9 +23,12 @@ import { StudioHomePage } from "./StudioHomePage";
  * Declarative component to configure the Studio in Rebase.
  * Renders nothing — purely registers config into the RebaseRegistry.
  *
- * The "schema" tool (collection editor view) is now a built-in admin feature.
- * When `<RebaseAdmin collectionEditor={...}>` is used, the schema view is
- * automatically injected into Studio — no manual wiring needed.
+ * The "schema" tool (collection editor view) is a Studio tool, but it is not
+ * registered here: it ships from the panel package because it needs the project's
+ * collection source to write back to. When `<RebaseCMS collectionEditor={...}>`
+ * is used, the schema view is automatically injected into Studio — no manual
+ * wiring needed. Where it is mounted from is an implementation detail; it is a
+ * schema-editing tool and belongs beside SQL and RLS.
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 

@@ -1,5 +1,5 @@
 
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import {
     getTitlePropertyCandidates,
     getTitlePropertyKey,

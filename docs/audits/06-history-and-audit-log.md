@@ -2,8 +2,8 @@
 
 Read-only audit of `packages/server/src/history/`, `packages/server-postgres/src/history/`,
 `packages/server-mongo/src/services/MongoHistoryService.ts`, every `recordHistory` call
-site in both drivers, the admin history UI (`packages/admin/src/components/history/`,
-`packages/admin/src/hooks/useHistory.ts`), and the mount in `packages/server/src/init.ts`.
+site in both drivers, the admin history UI (`packages/cms/src/components/history/`,
+`packages/cms/src/hooks/useHistory.ts`), and the mount in `packages/server/src/init.ts`.
 2026-08-09.
 
 ## Verdict

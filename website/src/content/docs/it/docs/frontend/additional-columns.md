@@ -11,7 +11,7 @@ Le colonne aggiuntive ti permettono di visualizzare dati calcolati o derivati ne
 ## Definizione di Colonne Aggiuntive
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

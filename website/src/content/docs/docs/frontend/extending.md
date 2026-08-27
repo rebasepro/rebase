@@ -140,7 +140,7 @@ Or register the component once and name it by key, which is also what makes it
 selectable from the collection editor:
 
 ```tsx
-<RebaseAdmin
+<RebaseCMS
     collections={collections}
     collectionViews={[{ key: "map", name: "Map", icon: "Map", Builder: MapView }]}
 />

@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from "react";
-import type { OverridableComponentName } from "@rebasepro/admin-types";
+import type { OverridableComponentName } from "@rebasepro/cms-types";
 import { ComponentOverrideContext } from "../contexts/ComponentOverrideContext";
 
 /**

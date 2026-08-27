@@ -572,8 +572,8 @@ function createBooksCollection(projectPath: string) {
 
     // Authored exactly the way the templates are: `PostgresCollectionConfig` from
     // core, with presentation nested under `admin`. There is no separate admin
-    // authoring type — `config/admin.d.ts` carries the one-line
-    // `/// <reference types="@rebasepro/admin-types" />` that declares `admin` onto
+    // authoring type — `config/cms.d.ts` carries the one-line
+    // `/// <reference types="@rebasepro/cms-types" />` that declares `admin` onto
     // the core type for the whole program.
     //
     // This file is compiled by the scaffolded project's `config` package during the

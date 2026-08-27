@@ -280,7 +280,7 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Au lieu de vous appuyer uniquement sur les règles d'authentification par défaut de la base de données, vous pouvez marquer n'importe quelle collection Postgres (comme `users.ts` ou une collection personnalisée `members.ts`) comme la collection d'authentification. Ceci est configuré via la propriété `auth` sur la collection elle-même :
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const membersCollection = defineCollection({
   name: "Members",

@@ -13,7 +13,7 @@ pnpm add @rebasepro/studio
 - `react` >= 19.0.0
 - `react-dom` >= 19.0.0
 - `react-router` ^8.3.0
-- `@rebasepro/admin` (optional)
+- `@rebasepro/cms` (optional)
 
 ## What This Package Does
 
@@ -87,5 +87,5 @@ import { RebaseStudio } from "@rebasepro/studio";
 
 - `@rebasepro/app` — Bridge, registry, and navigation primitives
 - `@rebasepro/ui` — Component library used by Studio tools
-- `@rebasepro/admin` — The CMS layer (optional peer dep)
+- `@rebasepro/cms` — The CMS layer (optional peer dep)
 - `@rebasepro/types` — Shared type definitions

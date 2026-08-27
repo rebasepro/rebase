@@ -27,7 +27,7 @@ import { logger } from "../utils/logger";
  * Everything is reported in one pass. Someone migrating a project wants the
  * whole list once, not fifty-five sequential boots.
  *
- * This is not `validateCollectionJson` in `@rebasepro/admin`. That one parses a
+ * This is not `validateCollectionJson` in `@rebasepro/cms`. That one parses a
  * JSON string pasted into the panel's import dialog and checks value *shapes*
  * against the flat `AdminCollection` view model. This one checks key *identity*
  * against the authoring contract, on live objects, in a package that may not
@@ -88,7 +88,7 @@ export function unknownKeyPolicyFromEnv(
 //
 // Every list below is derived from `packages/types/src/types/*` at the version
 // this file ships with. `ADMIN_COLLECTION_KEYS` and `ADMIN_PROPERTY_KEYS` are
-// imported rather than copied — core owns them and `@rebasepro/admin-types`
+// imported rather than copied — core owns them and `@rebasepro/cms-types`
 // type-checks them against the option types, so those two cannot drift.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -131,7 +131,7 @@ const COLLECTION_KEY_LIST = [
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
-    // Added back by @rebasepro/admin-types through declaration merging. Its
+    // Added back by @rebasepro/cms-types through declaration merging. Its
     // contents belong to the admin panel and are deliberately not checked here.
     "admin"
 ] as const;
@@ -176,7 +176,7 @@ const BASE_PROPERTY_KEYS = [
     "conditions",
     "callbacks",
     "metadata",
-    // as above: added by @rebasepro/admin-types, contents not checked here.
+    // as above: added by @rebasepro/cms-types, contents not checked here.
     "admin"
 ] as const;
 
@@ -710,7 +710,7 @@ function checkCollection(
     }
 
     // Only the keys that were *removed* from the block, never the ones it does
-    // not recognise: the block belongs to `@rebasepro/admin-types` and the panel
+    // not recognise: the block belongs to `@rebasepro/cms-types` and the panel
     // adds to it, so a completeness check here would reject valid config. A
     // removal is different — nothing will read the key again, and a title that
     // silently reverts to the derived one is the failure this prevents.

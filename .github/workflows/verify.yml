@@ -64,8 +64,8 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
-      # The core packages ALONE, with @rebasepro/admin-types absent from the program.
-      # The type check above includes admin-types, and a TypeScript augmentation applies
+      # The core packages ALONE, with @rebasepro/cms-types absent from the program.
+      # The type check above includes cms-types, and a TypeScript augmentation applies
       # to the whole program — so the `admin` field it declares is visible to every core
       # package there, which makes that gate structurally unable to catch a core package
       # using it. `packages/inference` was writing `admin.readOnly`, `pnpm typecheck`

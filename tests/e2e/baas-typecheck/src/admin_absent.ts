@@ -16,7 +16,7 @@ import type { PostgresCollectionConfig, StringProperty } from "@rebasepro/types"
 const property: StringProperty = {
     name: "Title",
     type: "string",
-    // @ts-expect-error — `admin` is declared by @rebasepro/admin-types, which a BaaS
+    // @ts-expect-error — `admin` is declared by @rebasepro/cms-types, which a BaaS
     // project does not install. Writing one here must not compile.
     admin: { multiline: true }
 };
@@ -32,7 +32,7 @@ const collection: PostgresCollectionConfig = {
 };
 
 // And the option types themselves are not reachable from core.
-// @ts-expect-error — AdminPropertyOptions lives in @rebasepro/admin-types now.
+// @ts-expect-error — AdminPropertyOptions lives in @rebasepro/cms-types now.
 import type { AdminPropertyOptions } from "@rebasepro/types";
 
 // @ts-expect-error — as does AdminCollectionOptions.

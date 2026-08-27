@@ -117,7 +117,7 @@ query the type checker approved (SQLSTATE UNCONFIRMED — 22007/22P02 by inspect
 `["!=", null]`, `["in", null]` and `["not-in", null]` lose their null identically,
 and the `in`/`not-in` null branches (`drizzle-conditions.ts:845`, `:895`) carry
 docblocks explaining the admin control they exist for — that control now emits
-`is-null` (`packages/admin/src/components/SelectableTable/filters/null_filter.ts:27`),
+`is-null` (`packages/cms/src/components/SelectableTable/filters/null_filter.ts:27`),
 so those branches are reachable in-process and dead over HTTP.
 
 The JSON dialect disagrees with the dot dialect on the same query:

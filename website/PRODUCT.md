@@ -48,7 +48,7 @@ The docs exist to keep that developer building without leaving.
   `navigation-structure` variant is parked at weight 0 rather than deleted.
 - `/dev/demos` is an internal gallery of the site's live demo components.
 - The site consumes the real product packages (`@rebasepro/ui`,
-  `@rebasepro/admin`, `@rebasepro/app`) as workspace dependencies, so demos run
+  `@rebasepro/cms`, `@rebasepro/app`) as workspace dependencies, so demos run
   the actual components rather than mockups.
 
 ## Capabilities and Constraints

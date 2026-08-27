@@ -27,7 +27,7 @@ const ts = require("typescript");
  * `ts-jest`, resolved from the package under test rather than from here.
  *
  * This file lives at the repo root and the root does not declare `ts-jest` —
- * every consumer does (`packages/admin`, `app`, `plugin-ai`), which is the right
+ * every consumer does (`packages/cms`, `app`, `plugin-ai`), which is the right
  * place for it, since the transform is only reachable from a package whose own
  * Jest config points at it. A bare `require("ts-jest")` therefore resolves by
  * walking up from `scripts/jest/` to the root `node_modules` and finding

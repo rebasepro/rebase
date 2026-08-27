@@ -110,12 +110,12 @@ async function main() {
         const checkFacts = parseCheckConstraints(metadata.checks);
 
         // Which builder the generated files may import — read from the manifests
-        // above `outDir`, because a project without `@rebasepro/admin-types` cannot
+        // above `outDir`, because a project without `@rebasepro/cms-types` cannot
         // resolve that import and has no `admin` block to write into either.
         const builder = detectCollectionBuilder(outDir);
         if (builder === "annotation") {
             outWarn(chalk.yellow(
-                "⚠ Neither @rebasepro/admin-types nor @rebasepro/common is declared above " +
+                "⚠ Neither @rebasepro/cms-types nor @rebasepro/common is declared above " +
                 `${outDir}.`
             ));
             outWarn(chalk.gray(

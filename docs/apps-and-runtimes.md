@@ -1,7 +1,7 @@
 # Apps, runtimes, and the admin
 
 Status: **implemented** — verified against the source 2026-08-01.
-Scope: `packages/types`, `packages/admin`, `packages/admin-types`, `packages/app`,
+Scope: `packages/types`, `packages/cms`, `packages/cms-types`, `packages/app`,
 `packages/cli`, `packages/server`, `saas`, templates
 
 §5's execution plan is history; read §1–§4 for the decisions and §6 for the
@@ -83,8 +83,8 @@ Four axes, one field name, and a vocabulary (`hosted`, `managed`, `bundled`,
 
 ### 2.2 `admin: { mode: "hosted" }` has no mechanism
 
-`RebaseAdmin` takes collections as a **prop**
-(`packages/admin/src/components/RebaseAdmin.tsx:13`), resolved at build time by
+`RebaseCMS` takes collections as a **prop**
+(`packages/cms/src/components/RebaseCMS.tsx:13`), resolved at build time by
 `rebaseCollectionsPlugin` reading `config/collections` during the Vite build.
 
 A platform-built admin therefore cannot know a tenant's collections. This is not
@@ -580,7 +580,7 @@ than its absence.
 
 D9 was deferred once, on the grounds that the rename touches exported API on
 published packages. It is done now, and it was smaller than it looked: the
-CMS-named symbols had **no consumers outside `packages/admin` and
+CMS-named symbols had **no consumers outside `packages/cms` and
 `admin-types`** — the only other references were compiled `dist/`.
 
 | Was | Is |
@@ -621,7 +621,7 @@ a thing this codebase builds.
 ### 4.8 `rebase init` and the templates
 
 **Scaffold one app.** `frontend/` in the template already *is* the admin — it
-renders `RebaseAdmin` — so declare it honestly and delete the entry that did
+renders `RebaseCMS` — so declare it honestly and delete the entry that did
 nothing. A new project stays runnable in thirty seconds, which is what every
 comparable tool does (`rails new`, `create-next-app`, `create-strapi-app`,
 Payload), while Firebase and Supabase hand you config and keep starters in a

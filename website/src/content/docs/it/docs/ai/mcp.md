@@ -152,7 +152,7 @@ ruolo `admin`. Una collezione può disattivare questa base predefinita e assumer
 responsabilità del proprio RLS:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

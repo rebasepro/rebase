@@ -111,7 +111,7 @@ app/uploads/
 .rebase-dev-url
 
 *.d.ts
-!packages/admin/src/editor/markdown-it-plugins.d.ts
+!packages/cms/src/editor/markdown-it-plugins.d.ts
 
 # Hand-written declaration files. The blanket rule above exists for *generated*
 # declarations, and it silently swallowed these — which is worse than it sounds:

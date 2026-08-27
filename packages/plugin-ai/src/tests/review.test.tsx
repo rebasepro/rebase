@@ -44,7 +44,7 @@ import { clearAiStatusCache } from "../api";
  * promise.
  */
 
-jest.mock("@rebasepro/admin", () => ({
+jest.mock("@rebasepro/cms", () => ({
     getFieldId: (property: { type?: string }) => (property?.type === "string" ? "text_field" : "number_field")
 }));
 

@@ -165,7 +165,7 @@ Collection kann diese Baseline abwählen und die volle Verantwortung für ihr
 eigenes RLS übernehmen:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const medicalRecordsCollection = defineCollection({
     slug: "medical_records",

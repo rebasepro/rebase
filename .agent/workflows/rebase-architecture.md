@@ -24,10 +24,10 @@ When working on the Rebase project, adhere to the following architectural guidel
 
 View modes are **presentation**, so they live in the collection's `admin` block,
 not at the top level — the BaaS types know nothing about them, and
-`@rebasepro/admin-types` merges them in:
+`@rebasepro/cms-types` merges them in:
 
 ```ts
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export default defineCollection({
     name: "Posts",
@@ -61,20 +61,20 @@ The frontend uses a declarative composition pattern:
 ```tsx
 <Rebase client={rebaseClient} authController={authController} plugins={plugins}>
     <RebaseAuth/>
-    <RebaseAdmin collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
+    <RebaseCMS collections={collections} collectionEditor={collectionEditor} entityViews={entityViews}/>
     <RebaseStudio/>
     <RebaseShell title="Rebase"/>
 </Rebase>
 ```
 
-`Rebase` and `RebaseAuth` come from `@rebasepro/app`, `RebaseAdmin` and
-`RebaseShell` from `@rebasepro/admin`, `RebaseStudio` from `@rebasepro/studio`.
+`Rebase` and `RebaseAuth` come from `@rebasepro/app`, `RebaseCMS` and
+`RebaseShell` from `@rebasepro/cms`, `RebaseStudio` from `@rebasepro/studio`.
 `app/frontend/src/App.tsx` is the worked version of this.
 
 Key components:
 - `<Rebase>` — Root provider (client, auth, user management, plugins)
 - `<RebaseAuth/>` — Authentication UI (login/register screens)
-- `<RebaseAdmin>` — CMS frontend (collections, entity views, collection editor)
+- `<RebaseCMS>` — CMS frontend (collections, entity views, collection editor)
 - `<RebaseStudio/>` — Admin panel (visual schema editor, settings)
 - `<RebaseShell>` — App shell (drawer, navigation, title)
 

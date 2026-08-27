@@ -23,7 +23,7 @@ fields of the `admin` block are then checked against them. A name that is not on
 your properties is a **compile error**, not just a missing suggestion.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const products = defineCollection({
     name: "Products",
@@ -63,12 +63,12 @@ which extra keys a collection declares. Rather than reopen these fields to every
 the cast makes the exception explicit:
 
 ```typescript
-import type { AdditionalFieldKey } from "@rebasepro/admin-types";
+import type { AdditionalFieldKey } from "@rebasepro/cms-types";
 
 propertiesOrder: ["title", "score" as AdditionalFieldKey]
 ```
 
-Import it from `@rebasepro/admin-types` in a project that has an admin panel — that is
+Import it from `@rebasepro/cms-types` in a project that has an admin panel — that is
 the copy that also typechecks the `admin` block. A headless BaaS project, which has no
 admin block and no React, imports the same function from `@rebasepro/common` instead.
 
@@ -137,19 +137,19 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 ### The `admin` block exists only if you install the admin types
 
 `@rebasepro/types` declares no `admin` field — not on a collection, not on a property. In
-a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
+a BaaS project, writing one is a **type error**. `@rebasepro/cms-types` adds it back by
 declaration merging, so one line per project turns it on:
 
 ```typescript no-verify
-// config/admin.d.ts
-/// <reference types="@rebasepro/admin-types" />
+// config/cms.d.ts
+/// <reference types="@rebasepro/cms-types" />
 ```
 
 After that, plain core types carry a fully typed block — a typo like `icoon` is an error,
 and you get completion:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const posts = defineCollection({
     slug: "posts",
@@ -188,7 +188,7 @@ It reports anything it cannot move safely — notably presentation inside
 `relations[].overrides`, which needs `overrides: { admin: { … } }` by hand.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 export const productsCollection = defineCollection({
     slug: "products",              // URL path and API endpoint

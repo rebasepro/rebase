@@ -594,7 +594,7 @@ export interface GeneratedFile {
  *
  * There are two of them and they are not interchangeable:
  *
- * - `admin-types` — `@rebasepro/admin-types`. Its index side-effect-imports
+ * - `admin-types` — `@rebasepro/cms-types`. Its index side-effect-imports
  *   `augment.ts`, so importing it is also what *declares* the `admin` block. Only a
  *   project that depends on the package can resolve it.
  * - `common` — `@rebasepro/common`. Same key inference, no admin surface, no React
@@ -607,7 +607,7 @@ export interface GeneratedFile {
  * The last two emit **no admin block, on the collection or on any property**. That is
  * not a downgrade: `@rebasepro/types` declares no `admin` field at all, so the block
  * introspection used to emit was a type error in every headless project it was
- * written into. See `packages/admin-types/src/augment.ts`.
+ * written into. See `packages/cms-types/src/augment.ts`.
  */
 export type CollectionBuilder = "admin-types" | "common" | "annotation";
 
@@ -616,12 +616,12 @@ export type CollectionBuilder = "admin-types" | "common" | "annotation";
  *
  * Written as constants rather than inline in the import templates below because
  * `scripts/headless-guard/check-types.mjs` scans core sources for `from
- * "@rebasepro/admin-types"` and cannot tell a real import from one this module
+ * "@rebasepro/cms-types"` and cannot tell a real import from one this module
  * *writes*. It is right to be that blunt — the guard's whole value is that it
  * cannot be reasoned around — so the string simply never appears in that shape
  * here. Inlining them back into the templates re-breaks `check:types-headless`.
  */
-export const ADMIN_TYPES_PACKAGE = "@rebasepro/admin-types";
+export const ADMIN_TYPES_PACKAGE = "@rebasepro/cms-types";
 export const COMMON_PACKAGE = "@rebasepro/common";
 export const TYPES_PACKAGE = "@rebasepro/types";
 

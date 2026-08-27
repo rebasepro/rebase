@@ -390,7 +390,7 @@ next error thrown on that path decides what a caller learns.
   production. `env.ts:227-232` deliberately does not echo the *value* of a
   variable that failed the localhost check, for the same reason.
 - **No secret reaches the client bundle.** No `VITE_`/`import.meta.env` reference
-  to a secret in `packages/admin`, `packages/app`, `packages/client` or
+  to a secret in `packages/cms`, `packages/app`, `packages/client` or
   `saas/frontend`; `saas/frontend/src/test/env-vars.test.ts:217` asserts it.
 - **Boot refuses weak and default values.** `configureJwt`
   (`jwt.ts:47-89`) enforces ≥32 characters and a 19-entry deny-list that includes

@@ -8,7 +8,7 @@
     },
     "dependencies": {
         "{{PROJECT_NAME}}-config": "*",
-        "@rebasepro/admin-types": "workspace:*",
+        "@rebasepro/cms-types": "workspace:*",
         "@rebasepro/server": "workspace:*",
         "@rebasepro/server-postgres": "workspace:*",
         "@rebasepro/types": "workspace:*",

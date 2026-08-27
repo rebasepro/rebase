@@ -60,7 +60,7 @@ function App() {
 Um Komponenten nur für eine bestimmte Collection zu überschreiben, fügen Sie ihrer Definition ein `components`-Objekt hinzu. Dies ist nützlich, um Leerzustände, Karten oder Detailansichten für bestimmte Modelle anzupassen.
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
 const productsCollection = defineCollection({

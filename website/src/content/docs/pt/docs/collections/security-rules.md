@@ -9,7 +9,7 @@ description: Defina políticas de Segurança em Nível de Linha para suas coleç
 As regras de segurança permitem definir políticas de **Segurança em Nível de Linha (RLS)** para suas tabelas PostgreSQL diretamente nas definições de suas coleções. Quando o esquema Drizzle é gerado, o Rebase cria as instruções `CREATE POLICY` correspondentes.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

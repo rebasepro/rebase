@@ -121,7 +121,7 @@ function exportTarget(value) {
  * A **subpath** is a different question, and the honest answer is not "all
  * three". node10 cannot see `exports` at all, so a subpath only works there if
  * the package ships a redirect directory for it — an opt-in, not an oversight.
- * Demanding one everywhere would mean adding files to `@rebasepro/admin` and
+ * Demanding one everywhere would mean adding files to `@rebasepro/cms` and
  * `@rebasepro/app` whose subpaths are imported exclusively from Vite configs
  * and React apps, all of which resolve with `bundler`. The one node10 consumer
  * in this system is the scaffolded backend (`moduleResolution: "node"`), and
@@ -174,7 +174,7 @@ function stageConsumer(packageDir, manifest) {
      * through the *workspace's* nested links, which node10 cannot follow, and
      * the probe reports a TS2307 that no installed consumer would ever see.
      *
-     * That is not hypothetical: it fired on `@rebasepro/admin` the first time
+     * That is not hypothetical: it fired on `@rebasepro/cms` the first time
      * declaration checking was switched on, and it was the probe's fault, not
      * the package's.
      */
@@ -268,7 +268,7 @@ function inspect(consumerDir, specifier, mode, packageDir) {
             // are that dependency's gate run to fail, and scoping here is what
             // keeps one package's defect from being reported against another's
             // name. (An earlier `/packages/` test did both jobs badly: it
-            // reported a sibling's diagnostics under `@rebasepro/admin`, and it
+            // reported a sibling's diagnostics under `@rebasepro/cms`, and it
             // silently exempted any package outside that directory — which is
             // every fixture this gate is tested with.)
             //
@@ -421,7 +421,7 @@ function checkPackage(packageDirInput) {
             // most of what a package like `@rebasepro/types` publishes, and a
             // type-only re-export can vanish without moving the value count at
             // all — which is exactly how a hand-broken specifier in
-            // `@rebasepro/admin` slipped past an earlier version of this.
+            // `@rebasepro/cms` slipped past an earlier version of this.
             const healthy = resolved.filter(one => !one.broken);
             if (healthy.length < 2) continue;
             const best = healthy.reduce((a, b) => (b.names.size > a.names.size ? b : a));

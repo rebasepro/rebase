@@ -211,7 +211,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
     large-file behaviour, CSV injection, partial-failure reporting. **done 2026-08-08** — see [audits/50-data-import-export.md](50-data-import-export.md).
 51. **References & relation pickers** — `ReferenceWidget.tsx`, `RelationSelector.tsx`,
     `ReferenceTable`, `UserSelector.tsx`. Permission-aware listing, pagination, write shape. **done 2026-08-08** — see [audits/51-references-relation-pickers.md](51-references-relation-pickers.md).
-52. **Admin routing, layout & navigation** — `RebaseAdmin.tsx`, `RebaseRouteDefs.tsx`,
+52. **Admin routing, layout & navigation** — `RebaseCMS.tsx`, `RebaseRouteDefs.tsx`,
     `RebaseAuthGate.tsx`, `SideDialogs.tsx`, `RebaseNavigation.tsx`. Deep links, back/forward,
     side-panel stacking, auth-gate flicker. **partial**
 53. **App core & plugin lifecycle** — `packages/app/src/core/*`, `PluginLifecycleManager.tsx`.

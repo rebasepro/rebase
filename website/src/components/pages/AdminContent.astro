@@ -13,10 +13,10 @@ const translatePath = useTranslatedPath(lang);
 
 // Whitespace matters inside <pre>, so the samples live in frontmatter.
 const optInCode = `<span class="text-surface-500"># one dependency more than a headless project</span>
-<span class="text-primary">~</span> pnpm add @rebasepro/admin-types
+<span class="text-primary">~</span> pnpm add @rebasepro/cms-types
 
-<span class="text-surface-500">// config/admin.d.ts — one line, once per project</span>
-<span class="text-surface-500">/// &lt;reference types="@rebasepro/admin-types" /&gt;</span>`;
+<span class="text-surface-500">// config/cms.d.ts — one line, once per project</span>
+<span class="text-surface-500">/// &lt;reference types="@rebasepro/cms-types" /&gt;</span>`;
 
 const adminBlockCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span>: PostgresCollectionConfig = {
   <span class="text-surface-500">// … the backend half: table, properties, securityRules</span>

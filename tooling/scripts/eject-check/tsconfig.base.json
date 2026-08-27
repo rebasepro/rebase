@@ -29,8 +29,8 @@
             "@rebasepro/types": [
                 "../../../packages/types/src"
             ],
-            "@rebasepro/admin-types": [
-                "../../../packages/admin-types/src"
+            "@rebasepro/cms-types": [
+                "../../../packages/cms-types/src"
             ],
             "@rebasepro/common": [
                 "../../../packages/common/src"

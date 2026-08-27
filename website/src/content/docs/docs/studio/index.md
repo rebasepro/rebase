@@ -22,11 +22,11 @@ A visual schema editor that lets you create and modify collections through a dra
 ![Collection editor](/img/collection_editor.png)
 
 ```tsx
-import { RebaseAdmin } from "@rebasepro/admin";
+import { RebaseCMS } from "@rebasepro/cms";
 
 // The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseAdmin component
-<RebaseAdmin
+// collectionEditor configuration to your RebaseCMS component
+<RebaseCMS
     collections={collections}
     collectionEditor={{
         getAuthToken: authController.getAuthToken
@@ -55,9 +55,12 @@ open costs nothing.
 | API Explorer | `api` | API | Interactive API documentation, with a request runner |
 | API Keys | `api-keys` | Access Control | Create and manage scoped service API keys |
 
-The **Collection Editor** is not in this list because it is not a Studio tool: it
-is a built-in admin feature, injected automatically when `RebaseAdmin` is given a
-`collectionEditor` prop.
+The **Collection Editor** is a Studio tool too, but it is not in this list because
+it is registered differently: `RebaseStudio` does not lazy-load it. The panel injects
+it when `RebaseCMS` is given a `collectionEditor` prop, because unlike the tools
+above it needs the project's collection source at hand to write back to. That is a
+difference in how it is mounted, not in what it is — it edits schema, and it belongs
+beside the SQL and RLS editors.
 
 ## Adding Studio Views
 

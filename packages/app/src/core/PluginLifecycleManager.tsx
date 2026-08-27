@@ -1,7 +1,7 @@
 
 import { useEffect, useRef } from "react";
 import type { User } from "@rebasepro/types";
-import type { RebasePlugin, RebaseContext } from "@rebasepro/admin-types";
+import type { RebasePlugin, RebaseContext } from "@rebasepro/cms-types";
 
 /**
  * Render-less component that manages plugin lifecycle hooks.

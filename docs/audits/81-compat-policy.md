@@ -83,7 +83,7 @@ What is absent, verified by grep over the file:
 The barrel rule is also weaker than it reads. `packages/client/src/index.ts` is
 described as curated, and it is — but the same sentence covers 22 published
 packages, and the only one with a machine-checked barrel is
-`@rebasepro/server`. For `@rebasepro/types`, `@rebasepro/admin-types`,
+`@rebasepro/server`. For `@rebasepro/types`, `@rebasepro/cms-types`,
 `@rebasepro/client`, `@rebasepro/ui`, `@rebasepro/utils` and the rest, "public"
 is defined by whatever the barrel happens to re-export on the day you look.
 

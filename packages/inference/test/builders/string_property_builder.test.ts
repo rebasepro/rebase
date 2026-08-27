@@ -80,7 +80,7 @@ describe("buildStringProperty", () => {
         // one-member enum, since the enum heuristic only counts distinct values.
         //
         // This used to assert `admin.readOnly`, which inference no longer sets: this is
-        // a core package and `admin` is declared by @rebasepro/admin-types, so the field
+        // a core package and `admin` is declared by @rebasepro/cms-types, so the field
         // does not exist here. Suppressing the enum is what the detection actually does,
         // and unlike a readOnly hint it affects the generated schema.
         const userIds = Array(10).fill("ABCDEFGHIJKLMNOPQRSTUVWXYZ12");

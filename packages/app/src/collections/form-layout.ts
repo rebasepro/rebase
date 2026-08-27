@@ -16,7 +16,7 @@ import type {
     AdminCollection,
     FormSection,
     PropertySpan
-} from "@rebasepro/admin-types";
+} from "@rebasepro/cms-types";
 import type { Property } from "@rebasepro/types";
 import { getDisplayPropertyKey } from "./entity-display";
 import { isHidden } from "./property_presentation";
@@ -25,7 +25,7 @@ import { isHidden } from "./property_presentation";
  * Columns in the form grid.
  *
  * A local literal rather than an import of `FORM_GRID_COLUMNS`: everything else
- * this module takes from `@rebasepro/admin-types` is a *type*, erased at build
+ * this module takes from `@rebasepro/cms-types` is a *type*, erased at build
  * time, and a runtime value would make this pure function depend on that
  * package's built output — which is exactly what broke the dev server, since
  * `@rebasepro/app` resolves that package to its dist. `satisfies PropertySpan`

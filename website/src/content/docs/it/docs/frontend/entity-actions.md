@@ -11,7 +11,7 @@ Le azioni entità sono pulsanti personalizzati che appaiono sulle singole entit�
 ## Definizione delle Azioni Entità
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -59,7 +59,7 @@ const articlesCollection = defineCollection({
 Per le azioni a livello di barra degli strumenti che operano sulla collezione o sulle entità selezionate:
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;

@@ -32,7 +32,7 @@ import path from "path";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const EN = path.join(ROOT, "packages/app/src/locales/en.ts");
-const SOURCE_ROOTS = ["packages/app/src", "packages/admin/src"];
+const SOURCE_ROOTS = ["packages/app/src", "packages/cms/src"];
 
 /** Top-level keys of the `en` catalogue, which is a flat object literal. */
 function declaredKeys(): Set<string> {

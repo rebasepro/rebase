@@ -11,7 +11,7 @@ Entity actions are custom buttons that appear on individual entities. Use them f
 ## Defining Entity Actions
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -59,7 +59,7 @@ const articlesCollection = defineCollection({
 For toolbar-level actions that work on the collection or selected entities:
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;

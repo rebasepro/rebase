@@ -354,7 +354,7 @@ covers the reserved-prefix rejection.
 ### Phase 4 — the admin from a remote contract *(not built)*
 
 Not required by anything above; a separate admin repository is what wants it.
-`RebaseAdmin` takes collections as a build-time prop, so an admin repo needs
+`RebaseCMS` takes collections as a build-time prop, so an admin repo needs
 definitions rather than the types `generate-sdk --from` produces.
 
 The pieces exist: `/api/meta/contract` serves serialized definitions,

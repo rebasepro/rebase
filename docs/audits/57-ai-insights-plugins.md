@@ -397,7 +397,7 @@ is currently none, which is why the overwrite survived.
 
 `packages/inference/src/builders/string_property_builder.ts` (whole file),
 `packages/inference/src/collection_builder.ts:415`,
-`packages/admin/src/data_import/utils/get_import_inference_type.ts:24`
+`packages/cms/src/data_import/utils/get_import_inference_type.ts:24`
 
 `buildStringProperty` tests for URLs, emails, 28-character ids, enums and media
 file extensions. It has no date test. `inferTypeFromValue` returns `"date"`
@@ -504,7 +504,7 @@ crashes the import mapping dialog instead of showing an empty mapping.
 ### 21. Two inference entry points disagree about `Date`, under a comment asserting they agree
 
 `packages/inference/src/collection_builder.ts:415`,
-`packages/admin/src/data_import/utils/get_import_inference_type.ts:1`
+`packages/cms/src/data_import/utils/get_import_inference_type.ts:1`
 
 `getInferenceType` returns `"date"` for a `Date`; `inferTypeFromValue` returns
 `"map"`. The comment at `get_import_inference_type.ts:5` says "the two entry

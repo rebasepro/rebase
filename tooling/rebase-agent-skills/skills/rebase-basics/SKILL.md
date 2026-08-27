@@ -141,7 +141,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/app` | The frontend runtime: hooks, providers, context, the auth controller (`useRebaseAuthController`) and `LoginView` | Frontend — React integration, hooks, providers, auth flows |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |
-| `@rebasepro/admin` | The CMS: `RebaseAdmin`, collection views, entity forms, collection editor — built from your collection definitions | The admin panel. Needs collection files |
+| `@rebasepro/cms` | The CMS: `RebaseCMS`, collection views, entity forms, collection editor — built from your collection definitions | The admin panel. Needs collection files |
 | `@rebasepro/studio` | The BaaS console: SQL editor, schema visualizer, RLS editor, storage browser, logs, API explorer, API keys, backups, cron | Database tooling. Ships on BaaS with no CMS — `admin` is an optional peer |
 | `@rebasepro/client` | Client SDK for consuming the Rebase API | Any client-side or script-side data operations |
 | `@rebasepro/firebase` | Firebase client adapter | When connecting to a Firebase backend |

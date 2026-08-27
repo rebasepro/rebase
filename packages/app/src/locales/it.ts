@@ -1,4 +1,4 @@
-import { RebaseTranslations } from "@rebasepro/admin-types";
+import { RebaseTranslations } from "@rebasepro/cms-types";
 
 export const it: RebaseTranslations = {
     // ─── Form actions ────────────────────────────────────────────

@@ -11,7 +11,7 @@ Las acciones de entidad son botones personalizados que aparecen en entidades ind
 ## Definición de Acciones de Entidad
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 import { iconSize } from "@rebasepro/ui";
 import { Copy, Upload } from "lucide-react";
 
@@ -59,7 +59,7 @@ const articlesCollection = defineCollection({
 Para acciones a nivel de barra de herramientas que funcionan en la colección o en entidades seleccionadas:
 
 ```tsx
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;

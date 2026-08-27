@@ -1,6 +1,6 @@
-# The remaining import cycles in `@rebasepro/admin`
+# The remaining import cycles in `@rebasepro/cms`
 
-Every other workspace package is now free of import cycles. `packages/admin` is
+Every other workspace package is now free of import cycles. `packages/cms` is
 not, and the three clusters that remain are not import mistakes — they are the
 shape of the code. Breaking them means changing how the admin UI dispatches to
 its own components, which is a design decision rather than a cleanup, so this

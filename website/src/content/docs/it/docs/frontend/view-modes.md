@@ -16,7 +16,7 @@ Ogni collezione può essere visualizzata in quattro modalità:
 ## Configurazione
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     properties: { /* … */ },
@@ -74,7 +74,7 @@ Controlla l'altezza delle righe con `defaultSize`:
 Configura una bacheca Kanban specificando quale proprietà enum utilizzare come colonne:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const tasksCollection = defineCollection({
     slug: "tasks",
     name: "Tasks",
@@ -176,7 +176,7 @@ await tasks.create({
 Le schede mostrano le entità come schede visive — utili per contenuti ricchi di immagini:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",

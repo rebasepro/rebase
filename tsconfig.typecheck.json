@@ -29,17 +29,17 @@
       "node"
     ],
     "paths": {
-      "@rebasepro/admin": [
-        "./packages/admin/src"
+      "@rebasepro/cms": [
+        "./packages/cms/src"
       ],
-      "@rebasepro/admin/*": [
-        "./packages/admin/src/*"
+      "@rebasepro/cms/*": [
+        "./packages/cms/src/*"
       ],
-      "@rebasepro/admin-types": [
-        "./packages/admin-types/src"
+      "@rebasepro/cms-types": [
+        "./packages/cms-types/src"
       ],
-      "@rebasepro/admin-types/*": [
-        "./packages/admin-types/src/*"
+      "@rebasepro/cms-types/*": [
+        "./packages/cms-types/src/*"
       ],
       "@rebasepro/app": [
         "./packages/app/src"
@@ -166,8 +166,8 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "packages/admin/src",
-    "packages/admin-types/src",
+    "packages/cms/src",
+    "packages/cms-types/src",
     // `@rebasepro/app` has had a `paths` entry above for as long as this file
     // has existed, but never a line here — so the package every admin project
     // mounts was read only as far as something else imported it, and the files

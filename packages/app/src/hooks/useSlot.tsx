@@ -1,4 +1,4 @@
-import type { SlotName, SlotRegistry } from "@rebasepro/admin-types";
+import type { SlotName, SlotRegistry } from "@rebasepro/cms-types";
 import React, { useMemo } from "react";
 ;
 import { useCustomizationController } from "./useCustomizationController";

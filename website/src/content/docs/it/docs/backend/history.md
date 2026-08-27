@@ -35,7 +35,7 @@ history: {
 Indica quali collezioni devono tracciare la cronologia:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",

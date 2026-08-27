@@ -1,5 +1,5 @@
 import React from "react";
-import type { RebasePlugin, SlotContribution } from "@rebasepro/admin-types";
+import type { RebasePlugin, SlotContribution } from "@rebasepro/cms-types";
 import type { InsightsPluginConfig } from "./types";
 import { InsightsProvider } from "./engine/InsightsProvider";
 import { HomeCardInsightSlot } from "./components/HomeCardInsightSlot";

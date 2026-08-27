@@ -139,7 +139,7 @@ export default productsCollection;
 > package,
 >
 > ```ts
-> /// <reference types="@rebasepro/admin-types" />
+> /// <reference types="@rebasepro/cms-types" />
 > ```
 >
 > and `admin` is typed on every collection and every property from then on. An
@@ -626,7 +626,7 @@ full-width inputs.
 Reach for `admin.form` when that answer is wrong for the domain:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",
@@ -684,7 +684,7 @@ title: {
 | `isId` | `boolean \| "manual" \| "uuid" \| "cuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
 | `admin.multiline` | `boolean` | `false` | Multi-line text area |
-| `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/admin/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
+| `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/cms/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
 | `url` | `boolean \| PreviewType` | — | Render as link. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
 | `email` | `boolean` | — | Email field rendering |
 | `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |
@@ -1561,7 +1561,7 @@ The `onClick` and `isEnabled` handlers receive:
 Collections support `entityViews` — custom React components that appear as **tabs** in the entity detail view. Use these for previews, analytics, related items, or any custom UI per entity.
 
 Entity views can be registered:
-1. **Globally** in the `<RebaseAdmin>` component via the `entityViews` prop
+1. **Globally** in the `<RebaseCMS>` component via the `entityViews` prop
 2. **Per-collection** by referencing view keys in the collection's `entityViews` array
 
 ```tsx
@@ -1575,7 +1575,7 @@ const entityViews = [
     }
 ];
 
-<RebaseAdmin collections={collections} entityViews={entityViews}/>
+<RebaseCMS collections={collections} entityViews={entityViews}/>
 
 // Per-collection reference in collection definition
 const postsCollection: PostgresCollectionConfig = {
@@ -1695,7 +1695,7 @@ const productsCollection: PostgresCollectionConfig = {
 ### Collection-Scoped Overridable Components
 
 The keys are the `CollectionComponentName` union in
-`@rebasepro/admin-types`. They are string keys, not exported components — see the
+`@rebasepro/cms-types`. They are string keys, not exported components — see the
 **rebase-admin** skill.
 
 | Component Key | Description |

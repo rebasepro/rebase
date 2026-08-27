@@ -160,7 +160,7 @@ const TSCONFIG = {
         baseUrl: ".",
         paths: {
             "@rebasepro/types": [`${repoRoot}/packages/types/src`],
-            "@rebasepro/admin-types": [`${repoRoot}/packages/admin-types/src`],
+            "@rebasepro/cms-types": [`${repoRoot}/packages/cms-types/src`],
             "@rebasepro/common": [`${repoRoot}/packages/common/src`],
             "@rebasepro/utils": [`${repoRoot}/packages/utils/src`],
             "@rebasepro/client": [`${repoRoot}/packages/client/src`],
@@ -180,7 +180,7 @@ const TSCONFIG = {
 
 /**
  * The `admin` block reaches a collection file only if the config package can resolve
- * `@rebasepro/admin-types` — the augmentation is what declares the field, and a
+ * `@rebasepro/cms-types` — the augmentation is what declares the field, and a
  * `/// <reference types>` needs the package to be a real dependency.
  *
  * The typecheck below maps `@rebasepro/*` through `paths`, so it would compile happily
@@ -193,13 +193,13 @@ function checkAdminTypesDeclared() {
     const problems = [];
 
     const hasRef = fs.existsSync(ref)
-        && /reference\s+types\s*=\s*["']@rebasepro\/admin-types["']/.test(fs.readFileSync(ref, "utf8"));
-    if (!hasRef) problems.push("config/admin.d.ts is missing its /// <reference types=\"@rebasepro/admin-types\" />");
+        && /reference\s+types\s*=\s*["']@rebasepro\/cms-types["']/.test(fs.readFileSync(ref, "utf8"));
+    if (!hasRef) problems.push("config/cms.d.ts is missing its /// <reference types=\"@rebasepro/cms-types\" />");
 
     const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (!deps["@rebasepro/admin-types"]) {
-        problems.push("config/package.json does not depend on @rebasepro/admin-types, so the reference cannot resolve");
+    if (!deps["@rebasepro/cms-types"]) {
+        problems.push("config/package.json does not depend on @rebasepro/cms-types, so the reference cannot resolve");
     }
     return problems;
 }
@@ -209,7 +209,7 @@ function checkAdminTypesDeclared() {
  *
  * `rebase schema introspect` writes its collections against `defineCollection`, and
  * which one it imports is *detected* from the manifests above the output directory —
- * `@rebasepro/admin-types` for a CMS project, `@rebasepro/common` for this one. Drop
+ * `@rebasepro/cms-types` for a CMS project, `@rebasepro/common` for this one. Drop
  * the dependency and the detection silently falls back to a plain
  * `PostgresCollectionConfig` annotation, which widens the property keys to `string`
  * and takes the checking on `propertiesOrder` and friends away again.
@@ -305,7 +305,7 @@ function checkPinnedTypesAreDeclared() {
  * admin layer at all.
  *
  * A typecheck cannot show this. `materializeBaas` symlinks `node_modules` at the pnpm
- * store, so `@rebasepro/admin-types` resolves there no matter what `paths` says —
+ * store, so `@rebasepro/cms-types` resolves there no matter what `paths` says —
  * dropping the mapping and importing the package anyway still compiled cleanly. And
  * one import is enough to matter: the package index side-effect-imports `augment.ts`,
  * which declares `admin` for the whole program, so a single stray import in the
@@ -324,8 +324,8 @@ function checkBaasHasNoAdminTypes() {
             }
             if (!/\.(ts|tsx|json|mjs|js)$/.test(entry.name)) continue;
             const source = fs.readFileSync(full, "utf8");
-            if (source.includes("@rebasepro/admin-types")) {
-                problems.push(`${path.relative(repoRoot, full)} references @rebasepro/admin-types`);
+            if (source.includes("@rebasepro/cms-types")) {
+                problems.push(`${path.relative(repoRoot, full)} references @rebasepro/cms-types`);
             }
         }
     };
@@ -355,10 +355,10 @@ if (pinnedTypeProblems.length > 0) {
 const declarationProblems = checkAdminTypesDeclared();
 if (declarationProblems.length > 0) {
     failed++;
-    console.log("  FAIL admin-types wiring");
+    console.log("  FAIL cms-types wiring");
     for (const p of declarationProblems) console.error(`    ${p}`);
 } else {
-    console.log("  ok   admin-types wiring");
+    console.log("  ok   cms-types wiring");
 }
 
 const headlessBuilderProblems = checkHeadlessBuilderDeclared();
@@ -373,17 +373,17 @@ if (headlessBuilderProblems.length > 0) {
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));
 
 /**
- * Make `@rebasepro/admin-types` resolvable the way a scaffolded project resolves
+ * Make `@rebasepro/cms-types` resolvable the way a scaffolded project resolves
  * it — as a dependency in `node_modules`, found by walking up from the file.
  *
- * `config/admin.d.ts` opts the project in with
- * `/// <reference types="@rebasepro/admin-types" />`, and a triple-slash type
+ * `config/cms.d.ts` opts the project in with
+ * `/// <reference types="@rebasepro/cms-types" />`, and a triple-slash type
  * reference is resolved through `typeRoots` and `node_modules` — **not** through
  * tsconfig `paths`. The `paths` entry below therefore does nothing for it.
  *
  * This check happened to pass on a developer machine anyway, because pnpm's hoisted
  * store (`node_modules/.pnpm/node_modules`, which the per-preset symlink points at)
- * had an `@rebasepro/admin-types` entry left in it. A fresh `pnpm install
+ * had an `@rebasepro/cms-types` entry left in it. A fresh `pnpm install
  * --frozen-lockfile` has no such entry, so CI failed with twelve `'admin' does not
  * exist` errors on files that compile locally. A gate that depends on a stray link
  * in someone's store is not a gate.
@@ -393,22 +393,22 @@ const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-")
  * points at `src` rather than the package directory on purpose: `check:templates`
  * runs before `pnpm build` in CI, so `dist` may not exist yet.
  */
-function linkAdminTypes(into) {
-    const shim = path.join(into, "node_modules", "@rebasepro", "admin-types");
+function linkCmsTypes(into) {
+    const shim = path.join(into, "node_modules", "@rebasepro", "cms-types");
     fs.mkdirSync(shim, { recursive: true });
     fs.writeFileSync(
         path.join(shim, "package.json"),
-        JSON.stringify({ name: "@rebasepro/admin-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
+        JSON.stringify({ name: "@rebasepro/cms-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
         "utf8"
     );
     fs.writeFileSync(
         path.join(shim, "index.d.ts"),
-        `export * from ${JSON.stringify(path.join(repoRoot, "packages/admin-types/src/index"))};\n`,
+        `export * from ${JSON.stringify(path.join(repoRoot, "packages/cms-types/src/index"))};\n`,
         "utf8"
     );
 }
 
-linkAdminTypes(workRoot);
+linkCmsTypes(workRoot);
 
 try {
     for (const preset of [...PRESETS, BAAS]) {
@@ -438,7 +438,7 @@ try {
                     // narrowed include then matched an EMPTY directory, which tsc
                     // reports as TS18003 rather than as "nothing to do".
                     //
-                    // Note this program can still *resolve* @rebasepro/admin-types,
+                    // Note this program can still *resolve* @rebasepro/cms-types,
                     // and deliberately so — dropping the `paths` entry changes
                     // nothing, because resolution falls through to the pnpm store
                     // that `node_modules` is symlinked to. What keeps the admin layer

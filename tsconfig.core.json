@@ -1,6 +1,6 @@
 {
-    "//": "Typechecks the core packages ALONE, with @rebasepro/admin-types deliberately absent from the program. Run via `pnpm check:core-types`.",
-    "//why": "tsconfig.typecheck.json includes packages/admin-types/src, and a TypeScript augmentation applies to the whole program — so the `admin` field it declares is visible to every core package there. That makes the root typecheck structurally incapable of catching a core package that reads or writes `admin`, which is the exact thing the split forbids. `packages/inference` was doing it, `pnpm typecheck` reported 0 errors, and only a per-package `tsc` found it. This config is that per-package check as one fast gate.",
+    "//": "Typechecks the core packages ALONE, with @rebasepro/cms-types deliberately absent from the program. Run via `pnpm check:core-types`.",
+    "//why": "tsconfig.typecheck.json includes packages/cms-types/src, and a TypeScript augmentation applies to the whole program — so the `admin` field it declares is visible to every core package there. That makes the root typecheck structurally incapable of catching a core package that reads or writes `admin`, which is the exact thing the split forbids. `packages/inference` was doing it, `pnpm typecheck` reported 0 errors, and only a per-package `tsc` found it. This config is that per-package check as one fast gate.",
     "compilerOptions": {
         "noEmit": true,
         "composite": false,
@@ -29,7 +29,7 @@
             "node"
         ],
         // `jsx` is unset on purpose: real JSX in a core package must fail here too.
-        // No @rebasepro/admin-types mapping below — a core package that imports it
+        // No @rebasepro/cms-types mapping below — a core package that imports it
         // fails to resolve, which is the point.
         "paths": {
             "@rebasepro/types": [

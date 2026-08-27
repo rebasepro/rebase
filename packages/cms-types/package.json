@@ -1,0 +1,104 @@
+{
+  "name": "@rebasepro/cms-types",
+  "type": "module",
+  "version": "0.16.0",
+  "description": "Rebase admin-panel type definitions — the React-flavoured half of the type surface",
+  "funding": {
+    "url": "https://github.com/sponsors/rebaseco"
+  },
+  "author": "Rebase",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/cms-types"
+  },
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "rebase",
+    "admin",
+    "cms",
+    "typescript",
+    "react",
+    "headless cms"
+  ],
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "watch": "vite build --watch",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
+    "test:lint": "eslint \"src/**\" --quiet",
+    "test": "jest --passWithNoTests",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+  },
+  "dependencies": {
+    "@rebasepro/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "@types/object-hash": "^3.0.6",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-measure": "^2.0.12",
+    "@vitejs/plugin-react": "^6.0.4",
+    "hono": "^4.13.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.5"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.es.js",
+      "import": "./dist/index.es.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/bivariance/"
+    ],
+    "moduleNameMapper": {
+      "\\\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
+    }
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  }
+}

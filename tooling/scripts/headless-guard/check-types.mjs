@@ -58,9 +58,9 @@ const FORBIDDEN_MODULES = [
     "react-router-dom",
     "@rebasepro/ui",
     "@rebasepro/app",
-    "@rebasepro/admin",
-    "@rebasepro/admin-types",
-    "@rebasepro/admin-common",
+    "@rebasepro/cms",
+    "@rebasepro/cms-types",
+    "@rebasepro/cms-common",
     "@rebasepro/studio",
     "@rebasepro/forms"
 ];
@@ -150,9 +150,9 @@ function manifestViolations(packageDir) {
         "@vitejs/plugin-react",
         "@rebasepro/ui",
         "@rebasepro/app",
-        "@rebasepro/admin",
-        "@rebasepro/admin-types",
-        "@rebasepro/admin-common",
+        "@rebasepro/cms",
+        "@rebasepro/cms-types",
+        "@rebasepro/cms-common",
         "@rebasepro/studio",
         "@rebasepro/forms"
     ];
@@ -211,7 +211,7 @@ if (report.length > 0) {
         `${fileFailures} file reference(s) and ${manifestFailures} manifest entry(ies) in ` +
             `${report.length} package(s).\n\n` +
             "A core package must not name React or an admin package, even in a type position.\n" +
-            "React-flavoured types belong in @rebasepro/admin-types.\n" +
+            "React-flavoured types belong in @rebasepro/cms-types.\n" +
             "See MODULAR-ARCHITECTURE.md."
     );
     process.exit(1);

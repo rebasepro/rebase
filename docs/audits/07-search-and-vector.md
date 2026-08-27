@@ -277,7 +277,7 @@ is the property `SearchHighlight.offSlotMatch` depends on. **UNCONFIRMED** — c
 
 ### L5. Record text can forge a highlight
 
-`packages/admin/src/components/CollectionViewBinding/SearchHighlight.tsx:20,68-86` splits the server
+`packages/cms/src/components/CollectionViewBinding/SearchHighlight.tsx:20,68-86` splits the server
 snippet on `/(<mark>.*?<\/mark>)/`. `ts_headline` does not escape the document, so a record whose own
 text contains `<mark>…</mark>` renders as a highlight in someone else's search results. Not XSS — the
 component deliberately splits and renders rather than using `dangerouslySetInnerHTML`, and the

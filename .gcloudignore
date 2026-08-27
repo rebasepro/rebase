@@ -28,8 +28,8 @@
 **/.terraform.tfstate.lock.info
 
 # Exclude untracked WIP admin components that fail Cloud Build compilation
-/packages/admin/src/components/LogsExplorer.tsx
-/packages/admin/src/components/SchemaVisualizer.tsx
+/packages/cms/src/components/LogsExplorer.tsx
+/packages/cms/src/components/SchemaVisualizer.tsx
 
 # Exclude large logs and reports
 /eslint_report.json

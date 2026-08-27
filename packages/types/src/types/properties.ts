@@ -712,7 +712,7 @@ export interface MapProperty extends BaseProperty {
      * rest of the map's presentation options: `sortProperties` in
      * `@rebasepro/common` reads it recursively, and `@rebasepro/firebase` calls
      * that when it builds collections. A core package cannot read the admin
-     * block — the field exists only once `@rebasepro/admin-types` is installed.
+     * block — the field exists only once `@rebasepro/cms-types` is installed.
      */
     propertiesOrder?: string[];
     /**

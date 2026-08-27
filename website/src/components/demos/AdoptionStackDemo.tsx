@@ -46,8 +46,8 @@ const DEPS: { name: string; layer: Layer }[] = [
     { name: "@rebasepro/server", layer: "backend" },
     { name: "@rebasepro/server-postgres", layer: "backend" },
     { name: "@rebasepro/client", layer: "backend" },
-    { name: "@rebasepro/admin", layer: "admin" },
-    { name: "@rebasepro/admin-types", layer: "admin" },
+    { name: "@rebasepro/cms", layer: "admin" },
+    { name: "@rebasepro/cms-types", layer: "admin" },
     { name: "@rebasepro/studio", layer: "studio" }
 ];
 

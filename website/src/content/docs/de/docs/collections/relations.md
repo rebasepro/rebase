@@ -20,7 +20,7 @@ Beziehungen können entweder inline innerhalb der Eigenschaft oder explizit im `
 Sie können die Beziehung direkt in der Eigenschaft definieren. Das Framework extrahiert diese zur Normalisierungszeit automatisch in das `relations[]` der Sammlung, sodass Sie keinen separaten `relations[]`-Eintrag mehr für Eigenschaften benötigen.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",
@@ -46,7 +46,7 @@ const postsCollection = defineCollection({
 Für fortgeschrittene Anwendungsfälle oder wenn eine Beziehung nicht direkt einem Formularfeld zugeordnet werden kann, können Sie sie im `relations`-Array definieren:
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",

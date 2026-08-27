@@ -43,7 +43,7 @@ signups.subscription("send-welcome", async (event) => {
 Then point a collection at one:
 
 ```ts
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",

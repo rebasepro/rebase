@@ -7,7 +7,7 @@
     // The parent pins `types: ["node"]`, which leaves `describe`/`it`/`expect`
     // undeclared. In the whole-monorepo program they happened to resolve anyway,
     // because some other package pulled `@types/jest` in and global types leak
-    // across a program — not something to rely on. admin-types runs on jest; a
+    // across a program — not something to rely on. cms-types runs on jest; a
     // vitest package added to `include` would want `"vitest/globals"` here too.
     "types": [
       "node",
@@ -15,13 +15,13 @@
     ]
   },
   "include": [
-    "packages/admin-types/test",
+    "packages/cms-types/test",
     // `augment.ts` only declares `admin` if it is *in the program*, and the test
     // imports `../src/admin_collection` directly, not the package index that
     // side-effect-imports it. Without this line every `admin` in the fixtures is
     // an error — the same program-scoping rule the templates deal with via
-    // `config/admin.d.ts`.
-    "packages/admin-types/src",
+    // `config/cms.d.ts`.
+    "packages/cms-types/src",
     // The engine gates: which property primitives and which collection fields
     // each driver admits. Every assertion there is a `@ts-expect-error`, so the
     // file is inert unless tsc reads it — and for as long as it was not listed
@@ -119,18 +119,18 @@
     // wire-shaped fixtures — a paginated `find` that clamps the way the REST
     // ingress does, an `ImportSaveError` read for the row it names — and a
     // fixture that drifts from those shapes is the whole failure mode they
-    // exist to stop. The rest of `packages/admin/test` carries pre-existing
+    // exist to stop. The rest of `packages/cms/test` carries pre-existing
     // errors (fixtures declaring properties with no `name`), and clearing those
     // is what would earn the directory its own line here.
     // Same reasoning, one directory over: the relation picker's create-in-place
     // path is asserted through the props it hands the side panel, and a prop
     // name that drifts is exactly what the test would stop reporting.
-    "packages/admin/test/components/relation-selector-create.test.tsx",
-    "packages/admin/test/components/selection-dialog-create.test.tsx",
-    "packages/admin/test/data_export/fetch_export_data.test.ts",
-    "packages/admin/test/data_import/csv.test.ts",
-    "packages/admin/test/data_import/prototype_pollution.test.ts",
-    "packages/admin/test/data_import/save_entities.test.ts"
+    "packages/cms/test/components/relation-selector-create.test.tsx",
+    "packages/cms/test/components/selection-dialog-create.test.tsx",
+    "packages/cms/test/data_export/fetch_export_data.test.ts",
+    "packages/cms/test/data_import/csv.test.ts",
+    "packages/cms/test/data_import/prototype_pollution.test.ts",
+    "packages/cms/test/data_import/save_entities.test.ts"
   ],
   "exclude": [
     "**/node_modules",

@@ -51,7 +51,7 @@ function UserMenu() {
 Apre entità programmaticamente in un pannello laterale:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/admin";
+import { useSidePanel } from "@rebasepro/cms";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -143,7 +143,7 @@ function ThemeToggle() {
 Apre un dialogo laterale per la selezione di entità da una collezione. Questo è lo stesso hook utilizzato internamente quando viene renderizzata una proprietà di relazione:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/admin";
+import { useSelectionDialog } from "@rebasepro/cms";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({
@@ -163,7 +163,7 @@ function SelectProduct() {
 Accede allo stato di navigazione e alle collezioni risolte:
 
 ```typescript
-import { useNavigationStateController } from "@rebasepro/admin";
+import { useNavigationStateController } from "@rebasepro/cms";
 
 function MyComponent() {
     const navigation = useNavigationStateController();

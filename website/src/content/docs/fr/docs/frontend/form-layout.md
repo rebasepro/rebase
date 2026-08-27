@@ -20,7 +20,7 @@ Utilisez `admin.form` lorsque le résultat déduit ne convient pas à votre doma
 La largeur d'un champ est une **étendue** (span) sur une grille de quatre colonnes. `4` correspond à la largeur totale de la colonne principale.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const productsCollection = defineCollection({
     slug: "products",
@@ -55,7 +55,7 @@ Sur les dispositions trop étroites pour deux colonnes — le panneau latéral, 
 `sections` regroupe la colonne principale sous des en-têtes. Une section intitulée peut être repliée ; une section sans titre ne le peut pas.
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const ordersCollection = defineCollection({
     slug: "orders",
@@ -99,7 +99,7 @@ Une erreur de validation à l'intérieur d'une section repliée la développe, d
 `sidebar` déplace les champs hors de la colonne principale vers un volet étroit à côté d'elle — statut, propriété, dates de publication, indicateurs (flags).
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
+import { defineCollection } from "@rebasepro/cms-types";
 
 const postsCollection = defineCollection({
     slug: "posts",
