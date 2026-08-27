@@ -430,10 +430,18 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <h3 class="text-base font-semibold tracking-tight">The developer who owns the database</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
                             Writes one collection file and gets a schema, REST, an SDK and policies.
-                            Never leaves the editor, and never opens the panel.
+                            Mostly stays in the editor — and when a question is faster to answer in
+                            SQL, opens Studio rather than a second tool.
                         </p>
+                        {/* This used to end "never opens the panel", which reads well and is
+                            wrong: Studio is IN the panel, and it is built for exactly this
+                            person. The page then had no route to Studio at all except a link
+                            buried in the security section. */}
                         <a href={translatePath("/backend")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
                             The backend <ArrowRight size={14} />
+                        </a>
+                        <a href={translatePath("/studio")} class="accent-link mt-2 !text-surface-300 hover:!text-white">
+                            Studio <ArrowRight size={14} />
                         </a>
                     </div>
                     <div class="md:border-r border-white/8 py-9 md:px-8 border-t md:border-t-0">
