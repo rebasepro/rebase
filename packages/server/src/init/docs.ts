@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { CollectionConfig } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
+import { createRequireAuth } from "../auth/middleware";
+import { requireAdmin } from "../auth";
+
+/** Bound once the generator is imported; the route closes over it. */
+let generateOpenApiSpecFn: typeof import("../api/openapi-generator").generateOpenApiSpec | null = null;
 
 /**
  * Serve the OpenAPI document, and Swagger UI outside production.
@@ -19,19 +24,40 @@ export async function mountOpenApiDocs(
     serverCollections: CollectionConfig[],
     requireAuth: boolean
 ): Promise<void> {
-    if (enableSwagger === false || serverCollections.length === 0) {
+    if (serverCollections.length === 0) {
         return;
     }
 
-    const { generateOpenApiSpec } = await import("../api/openapi-generator");
+    // `false` means "do not publish this", not "do not have it".
+    //
+    // `resolveEnableSwagger` returns false in production whenever
+    // REBASE_ENABLE_SWAGGER is unset, which is every managed tenant — so this
+    // used to return early and the route did not exist at all. Rebase Cloud's
+    // console has an API Explorer tab that fetches exactly this path, and it
+    // therefore answered 404 for every project on the platform, permanently,
+    // with no way for the operator to tell that from a project that had no API.
+    //
+    // A spec is a description of routes the caller can already discover by
+    // reading their own collections, so the risk of publishing it is small —
+    // but it is not zero, and it was a deliberate decision to keep it off the
+    // public surface. Both things are satisfied by serving it to a caller who
+    // proves they are an admin of this project, which is precisely who the
+    // console is asking on behalf of.
+    const isPublic = enableSwagger !== false;
 
-    app.get(`${basePath}/docs`, (c) => {
-        const spec = generateOpenApiSpec(serverCollections, {
-            basePath,
-            requireAuth
-        });
-        return c.json(spec);
-    });
+    const spec = (c: { json: (v: unknown) => Response }) =>
+        c.json(generateOpenApiSpecFn!(serverCollections, { basePath, requireAuth }));
+
+    const { generateOpenApiSpec } = await import("../api/openapi-generator");
+    generateOpenApiSpecFn = generateOpenApiSpec;
+
+    if (isPublic) {
+        app.get(`${basePath}/docs`, (c) => spec(c));
+    } else {
+        // The same two middlewares every other admin surface uses, so "admin"
+        // means one thing across the runtime.
+        app.get(`${basePath}/docs`, createRequireAuth({}), requireAdmin, (c) => spec(c));
+    }
 
     if (process.env.NODE_ENV !== "production") {
         app.get(`${basePath}/swagger`, (c) => {
