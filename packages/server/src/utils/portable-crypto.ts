@@ -84,6 +84,11 @@ export function randomHex(bytes: number): string {
  * draw is biased towards the low values whenever the range does not divide
  * 2^32, and these draws are one-time passcodes. The loop retries with
  * probability under 1/2 per iteration for any range, so it terminates.
+ *
+ * The bound stops at 2^32 where `node:crypto`'s goes to 2^48, because one
+ * `Uint32Array` draw is all any caller has ever needed and a wider one is only
+ * worth writing when something needs it. A bound past the ceiling throws
+ * rather than silently narrowing.
  */
 export function randomInt(maxExclusive: number): number {
     if (!Number.isInteger(maxExclusive) || maxExclusive <= 0 || maxExclusive > 2 ** 32) {

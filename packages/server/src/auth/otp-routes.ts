@@ -41,7 +41,7 @@
  */
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { randomInt } from "node:crypto";
+import { randomInt } from "../utils/portable-crypto";
 import { z } from "zod";
 
 import type { AuthModuleConfig } from "./routes";
@@ -71,7 +71,7 @@ const OTP_ATTEMPTS_PER_WINDOW = 5;
  * and one of them is the classic modulo bias.
  */
 export function generateOtpCode(): string {
-    return String(randomInt(0, 10 ** OTP_DIGITS)).padStart(OTP_DIGITS, "0");
+    return String(randomInt(10 ** OTP_DIGITS)).padStart(OTP_DIGITS, "0");
 }
 
 /**
