@@ -307,6 +307,15 @@ jobs:
       - name: Documented imports exist
         run: pnpm run check:docs-imports
 
+      # The pre-1.0 RLS constants look like dead compatibility and are not: on
+      # 2026-08-27 five of six managed tenants wrote every or nearly every policy
+      # in the `auth.uid()` form — dadaki 64 of 64. Whoever eventually deletes
+      # them will grep for usages, find two readers, and conclude from the code
+      # that nothing depends on them. The dependency is in five databases, and
+      # this is where that gets said. Exit condition is in the script.
+      - name: Pre-1.0 RLS compatibility is intact
+        run: pnpm run check:legacy-rls
+
       # Whether the *published* types survive being resolved. Every other gate
       # in this file maps `@rebasepro/*` onto source, so all of them were blind
       # to the state the packages were actually shipped in: extensionless
