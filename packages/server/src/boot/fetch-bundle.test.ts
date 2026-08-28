@@ -11,6 +11,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
 import {
     fetchBundle,
     shouldFetchBundle,
@@ -570,5 +571,60 @@ describe("dedupeRuntimePackages", () => {
         fs.mkdirSync(bundle, { recursive: true });
         expect(dedupeRuntimePackages(bundle, undefined)).toEqual([]);
         expect(fs.existsSync(path.join(bundle, "node_modules"))).toBe(false);
+    });
+});
+
+
+/**
+ * The default extractor, running the real `tar`.
+ *
+ * Every other test in this file stubs `extract`, so none of them exercise the
+ * command that actually runs in production — which is how a broken flag set
+ * shipped and crash-looped managed pods on every start.
+ */
+describe("the default extractor, running real tar", () => {
+    /** Pack a bundle rooted at `.`, as a build script does, from a dir of `mode`. */
+    const packTarball = (rootMode: number): Uint8Array => {
+        const src = fs.mkdtempSync(path.join(scratch, "src-"));
+        fs.writeFileSync(path.join(src, MANIFEST_FILENAME), JSON.stringify({ kind: "backend" }));
+        fs.mkdirSync(path.join(src, "config"));
+        fs.writeFileSync(path.join(src, "config", "collections.js"), "export default [];");
+        fs.chmodSync(src, rootMode);
+        const tarball = path.join(scratch, `bundle-${rootMode.toString(8)}.tar.gz`);
+        execFileSync("tar", ["-czf", tarball, "-C", src, "."]);
+        // Readable again, so the afterEach cleanup can descend into it.
+        fs.chmodSync(src, 0o755);
+        return fs.readFileSync(tarball);
+    };
+
+    it("leaves the destination's own permissions alone", async () => {
+        // An archive rooted at `.` carries the mode of the directory it was
+        // packed from, and `tar` restores that onto the destination last. In a
+        // managed pod the destination is a mount the runtime does not own, so
+        // that chmod is refused and `tar` exits non-zero having already written
+        // every file — a complete bundle reported as a corrupt one. Here the
+        // test owns the directory, so the chmod would succeed silently; the
+        // mode left behind is what gives the behaviour away.
+        const body = packTarball(0o700);
+        const destination = path.join(scratch, "dest-mode");
+        fs.mkdirSync(destination);
+        fs.chmodSync(destination, 0o755);
+
+        await fetchBundle({ url: URL_, destination, fetchImpl: okFetch(body), ...noInstall });
+
+        expect(fs.statSync(destination).mode & 0o777).toBe(0o755);
+    });
+
+    it("unpacks a real tarball into a root the bundle loader accepts", async () => {
+        const body = packTarball(0o755);
+        const destination = path.join(scratch, "dest-contents");
+        fs.mkdirSync(destination);
+
+        const root = await fetchBundle({
+            url: URL_, destination, fetchImpl: okFetch(body), ...noInstall
+        });
+
+        expect(fs.existsSync(path.join(root, MANIFEST_FILENAME))).toBe(true);
+        expect(fs.existsSync(path.join(root, "config", "collections.js"))).toBe(true);
     });
 });

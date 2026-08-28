@@ -127,11 +127,44 @@ export function shouldFetchBundle(env: NodeJS.ProcessEnv = process.env): boolean
     return Boolean(env[BUNDLE_URL_ENV]) && !env.REBASE_BUNDLE;
 }
 
+/**
+ * Whether the system `tar` is GNU tar.
+ *
+ * Asked rather than assumed, because the answer differs between a developer's
+ * machine and the Linux image the same code runs in, and the flags below are
+ * GNU spellings that bsdtar rejects outright. Probed once per process.
+ */
+let gnuTar: Promise<boolean> | undefined;
+function isGnuTar(): Promise<boolean> {
+    gnuTar ??= run("tar", ["--version"])
+        .then(({ stdout }) => /GNU tar/.test(String(stdout)))
+        .catch(() => false);
+    return gnuTar;
+}
+
 /** Untar with the system `tar`, which every base image has. */
 async function extractWithTar(tarball: string, destination: string): Promise<void> {
     // `-m` (do not restore mtimes) because some sandboxes reject utimes on
     // extracted files and the failure looks like a corrupt archive.
-    await run("tar", ["-xzmf", tarball, "-C", destination]);
+    const args = ["-xzmf", tarball, "-C", destination];
+
+    // The rest is about `destination` itself, not the entries inside it. An
+    // archive rooted at `.` carries the mode of the directory it was packed
+    // from, and GNU tar restores that onto `destination` as its last act. Where
+    // the process does not own that directory the chmod is refused and tar
+    // exits non-zero *after* having written every file — a complete bundle
+    // reported as a corrupt one, which nothing downstream can tell apart from a
+    // real truncation. A Kubernetes emptyDir is exactly that case: `root:node`,
+    // 0775 with setgid, while the runtime is uid 1000.
+    //
+    // Only GNU needs this. bsdtar already leaves the destination's metadata
+    // alone, so it gets the command it has always had rather than flags it
+    // would refuse.
+    if (await isGnuTar()) {
+        args.push("--no-same-owner", "--no-same-permissions", "--no-overwrite-dir");
+    }
+
+    await run("tar", args);
 }
 
 /**
