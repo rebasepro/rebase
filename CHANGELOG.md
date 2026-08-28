@@ -34,6 +34,14 @@
 
 ### Added
 
+- **`pnpm check:portable-core` — what the request path depends on Node for.** A request this server can answer without touching the database pool is a request an isolate could answer, and that set is larger than it looks: token verification, rate limiting, idempotency, storage URL signing, and every custom function. Eight modules on that path needed a Node process, for nine separate reasons. Five of those modules needed it for no reason anyone had chosen: `randomUUID` from `node:crypto` where the `crypto` global would do, `node:path` to fold `.` out of a storage key that never touches a filesystem, SHA-256 and a constant-time compare that WebCrypto does just as well.
+
+  Those five are gone, and the gate records what is left in `contracts/portable-core.txt`. It is a ratchet rather than a wall: the file may shrink and may never grow, so a branch that puts a fresh dependency on Node in front of every request has to say so in review instead of a year later. Nothing has to reach zero for that to be worth having — `drizzle-orm` and `pg` need a TCP socket, and that is a driver decision. What it buys is that a later port is a scoping exercise against a list, not an excavation.
+
+  Three lines remain, each with its reasoning in the file: the JWT library, PEM key parsing, and the client's socket address — a per-adapter capability rather than something a portable module can reach, since Hono has no runtime-agnostic `getConnInfo`.
+
+  The SSRF guard joined the same list and needed two changes to clear it. `net.isIP` became `utils/ip-address.ts`, a transcription of Node's own grammar held to it by a property test comparing the two directly — a validator that is stricter than `net.isIP` sends a literal down the resolution path, and one that is looser judges bytes nobody else agrees with. And its default resolver is loaded on use rather than imported, so a runtime with no `node:dns` can be handed one instead of being unable to load the module at all. A host with neither fails closed and says which of the two it is missing: the alternative to resolving a name is not "allow it", it is "do not send".
+
 - **Custom functions have their own entry point: `@rebasepro/server/functions`.** `import { defineFunction } from "@rebasepro/server"` reaches the whole framework — the boot sequence, the collection loader, the backup routes, the SPA server, `@hono/node-server`, `ws`, `jsonwebtoken`, Drizzle. On Node that costs a little start-up time and nothing else, which is why it stood. It also meant a function file could only ever resolve inside a Node process, however portable the function's own code was — and since that import line is in every function file, every template and every documentation page, it is not a thing that can be changed later without breaking everyone who wrote one.
 
   The new entry point carries the authoring surface and nothing else: `defineFunction`, the `rebase` singleton, route guards, typed context accessors, configuration readers, `waitUntil`, `ApiError`, `HonoEnv`. Its published bundle imports exactly two things, `hono` and `hono/adapter`, and the build refuses to ship it otherwise — a test walks the import graph from source and names the chain that broke the rule, and a second check evaluates the emitted file in a context holding web globals and no `process`, `Buffer` or `require` at all. Importing from the package root still works and still behaves identically; it is now the second-best way to write a function rather than the only one.
@@ -274,6 +282,14 @@
   through it.
 
 ### Changed
+
+- **JWT verification and signing are asynchronous.** `verifyAccessToken`, `generateAccessToken`, `verifyDownloadToken`, `generateDownloadToken`, `hashRefreshToken` and `extractUserFromToken` return promises. Nothing about their behaviour moved; the signatures did, and on purpose, before anything forced it.
+
+  Every portable JWT implementation is asynchronous, because `crypto.subtle` is. So a later swap of `jsonwebtoken` — for `jose`, or for WebCrypto directly — is not the expensive part: the expensive part is going from synchronous to asynchronous verification, which touches every caller of every function that reads a token. That was 22 call sites in `src` and about 190 in the suite. Paying it now, with the tests green and nothing else moving, costs a day; paying it as a line item inside a runtime port, on top of everything else changing at once, is how a port stalls.
+
+  `jsonwebtoken` is now confined to one module, `auth/jwt-crypto.ts`, which is what makes the eventual swap a one-file change with no caller affected. The one trap in that swap is written down where the swap will happen: `jsonwebtoken` stamps `iat` on every token it signs and `jose` does not, and `iat` is what the revocation watermark is compared against — tokens minted without it would verify perfectly and simply stop being revocable.
+
+  `RateLimiterOptions.keyGenerator` and `resolveLimit` accept a promise as well as a value, since a limiter that buckets by user has to verify a token to find one. Passing a synchronous function is unchanged.
 
 - **`EmailService.send()` reports what the provider said, and carries headers.** It returned `Promise<void>`, which meant an application that sent a message could not learn the id the server assigned it — so threading a reply back to the message that prompted it was impossible through this interface, and any app that needed it had to bypass the service and hold its own transport. It now resolves with `{ messageId, accepted, rejected }`, every field optional because not every backend reports them: an absent `messageId` means "not reported", never "not sent", which is still signalled by a throw. `messageId` comes back **without** angle brackets, since it is a value to store and compare against a reply's `In-Reply-To`, and one that sometimes carries brackets is a bug waiting in every comparison.
 

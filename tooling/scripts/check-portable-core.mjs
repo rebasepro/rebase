@@ -35,6 +35,17 @@
  * therefore everything on the way *in*, up to the first database call, plus the
  * portable functions entry as the anchor that must never regress.
  *
+ * ## What counts
+ *
+ * Static imports only. A `node:` module reached through a lazy `await
+ * import()` — the idiom `sharp`, `nodemailer` and this guard's own default
+ * resolver already use — leaves the module *loadable* everywhere and fails
+ * only if that path is taken with nothing else supplied. That is the shape a
+ * portable module with an optional Node capability is supposed to have, so it
+ * is not a finding. It is also not a loophole: the deferred call still has to
+ * do something sensible where the module is missing, and every one of them
+ * fails closed and says what to pass instead.
+ *
  * Run: pnpm run check:portable-core        (verify)
  *      pnpm run check:portable-core --write (re-record the baseline)
  */
@@ -78,7 +89,12 @@ const ROOTS = [
     "packages/server/src/storage/path-pattern.ts",
     "packages/server/src/storage/policies.ts",
     "packages/server/src/storage/cache-headers.ts",
-    "packages/server/src/storage/range.ts"
+    "packages/server/src/storage/range.ts",
+    // The check between a stored URL and the internal network. Not an inbound
+    // route, but it runs inside one, and a module that cannot be *imported* on
+    // a host cannot be given that host's resolver either — which would leave
+    // the deployment running without the guard.
+    "packages/server/src/services/outbound-url-guard.ts"
 ];
 
 /** Node built-ins, bare and `node:`-prefixed alike. */
