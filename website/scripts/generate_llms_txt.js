@@ -356,6 +356,7 @@ const PRODUCT_PAGES = [
     ["Admin panel (Studio)", "https://rebase.pro/studio", "The admin UI your non-technical teammates use, generated from the collections."],
     ["Pricing", "https://rebase.pro/pricing", "Open source and self-hosted, plus Rebase Cloud (private beta), priced per resource rather than per seat."],
     ["Security", "https://rebase.pro/security", "Row-level security compiled from code to real Postgres policies, and how it is enforced."],
+    ["rls-check (free tool)", "https://rebase.pro/rls-check", "A free, read-only Row-Level Security audit for ANY Postgres database — Supabase, Neon, RDS, anything. Fourteen checks, one command, no account, no Rebase required."],
     ["For agencies", "https://rebase.pro/agencies", "Shipping a client-ready admin panel from the backend you were going to build anyway."],
     ["CLI", "https://rebase.pro/cli", "`npm i -g @rebasepro/cli` — scaffold, run, migrate and deploy a project."],
     ["Compare", "https://rebase.pro/compare", "Side-by-side against the alternatives, including where a competitor is the better call."]

@@ -31,14 +31,20 @@ interface Faq {
 }
 
 interface Props {
-    /** Competitor name, used in the heading. */
+    /** Competitor name, used in the default heading. */
     competitor: string;
     faqs: Faq[];
     /** Absolute URL of the page, so the schema is self-identifying. */
     pageUrl?: string;
+    /**
+     * Overrides the heading where "Rebase and X, answered" does not read.
+     * The block is not only for competitors — the rls-check page uses it for
+     * questions about a tool, where the default phrasing is nonsense.
+     */
+    heading?: string;
 }
 
-const { competitor, faqs, pageUrl } = Astro.props as Props;
+const { competitor, faqs, pageUrl, heading } = Astro.props as Props;
 
 /**
  * FAQPage structured data.
@@ -73,7 +79,7 @@ const faqSchema = {
                 Questions
             </span>
             <h2 class="mt-4 text-display-2 text-white">
-                Rebase and {competitor}, answered
+                {heading ?? `Rebase and ${competitor}, answered`}
             </h2>
         </div>
 
