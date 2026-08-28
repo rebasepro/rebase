@@ -19,7 +19,8 @@ import {
     installBundleDependencies,
     dedupeRuntimePackages,
     BUNDLE_URL_ENV,
-    BUNDLE_TOKEN_ENV
+    BUNDLE_TOKEN_ENV,
+    unpackedBundleSource
 } from "./fetch-bundle";
 import { MANIFEST_FILENAME, loadBundle } from "./bundle";
 
@@ -626,5 +627,70 @@ describe("the default extractor, running real tar", () => {
 
         expect(fs.existsSync(path.join(root, MANIFEST_FILENAME))).toBe(true);
         expect(fs.existsSync(path.join(root, "config", "collections.js"))).toBe(true);
+    });
+
+    it("records which URL the unpacked tree came from", async () => {
+        const destination = path.join(scratch, "dest-marked");
+        fs.mkdirSync(destination);
+
+        await fetchBundle({
+            url: URL_, destination, fetchImpl: okFetch(packTarball(0o755)), ...noInstall
+        });
+
+        expect(unpackedBundleSource(destination)).toBe(URL_);
+    });
+
+    it("discards a tree left by a different bundle instead of unpacking onto it", async () => {
+        // The failure this exists for: something else filled the directory from
+        // another bundle, and files that bundle had but this one does not used
+        // to survive the unpack — stale assets beside fresh ones, and a
+        // node_modules the install step would then consider already done.
+        const destination = path.join(scratch, "dest-stale");
+        fs.mkdirSync(destination);
+
+        await fetchBundle({
+            url: "https://example.test/bundle/OLD",
+            destination,
+            fetchImpl: okFetch(packTarball(0o755)),
+            ...noInstall
+        });
+        fs.writeFileSync(path.join(destination, "only-in-the-old-bundle.js"), "stale");
+
+        await fetchBundle({
+            url: URL_, destination, fetchImpl: okFetch(packTarball(0o755)), ...noInstall
+        });
+
+        expect(fs.existsSync(path.join(destination, "only-in-the-old-bundle.js"))).toBe(false);
+        expect(unpackedBundleSource(destination)).toBe(URL_);
+    });
+
+    it("keeps what is there when the same bundle is fetched again", async () => {
+        const destination = path.join(scratch, "dest-same");
+        fs.mkdirSync(destination);
+
+        await fetchBundle({
+            url: URL_, destination, fetchImpl: okFetch(packTarball(0o755)), ...noInstall
+        });
+        fs.writeFileSync(path.join(destination, "installed-marker"), "kept");
+
+        await fetchBundle({
+            url: URL_, destination, fetchImpl: okFetch(packTarball(0o755)), ...noInstall
+        });
+
+        expect(fs.existsSync(path.join(destination, "installed-marker"))).toBe(true);
+    });
+
+    it("does not vouch for a tree whose unpack failed", async () => {
+        const destination = path.join(scratch, "dest-badunpack");
+        fs.mkdirSync(destination);
+
+        await expect(fetchBundle({
+            url: URL_,
+            destination,
+            fetchImpl: okFetch(Buffer.from("not a tarball")),
+            ...noInstall
+        })).rejects.toThrow();
+
+        expect(unpackedBundleSource(destination)).toBeNull();
     });
 });
