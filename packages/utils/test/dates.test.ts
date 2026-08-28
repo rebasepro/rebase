@@ -89,7 +89,16 @@ describe("formatRelativeTime", () => {
     });
 
     it("defaults `now` to the current time", () => {
-        expect(formatRelativeTime(new Date(Date.now() - 5 * MINUTE))).toBe("5m ago");
-        expect(formatRelativeTime(new Date(Date.now() + 5 * MINUTE))).toBe("in 5m");
+        // Half a minute off the boundary in each direction, because the
+        // function reads `Date.now()` AFTER the test does and the gap between
+        // them is real: `now + 5 * MINUTE` measured a few milliseconds later is
+        // 4m59.99s, and `Math.floor` makes that "in 4m". This failed exactly
+        // once in CI and passed on every rerun, which is the worst shape a test
+        // can have — it teaches people to rerun instead of read.
+        //
+        // The assertion still exercises the DEFAULT `now`, which is the whole
+        // point of the case; it just no longer sits on the edge of a bucket.
+        expect(formatRelativeTime(new Date(Date.now() - 5.5 * MINUTE))).toBe("5m ago");
+        expect(formatRelativeTime(new Date(Date.now() + 5.5 * MINUTE))).toBe("in 5m");
     });
 });
