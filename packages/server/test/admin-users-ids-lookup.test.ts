@@ -41,8 +41,8 @@ offset: 0 })
 getUserWithRoles };
 }
 
-function bearer(userId: string, roles: string[] = ["admin"]): Record<string, string> {
-    return { authorization: `Bearer ${generateAccessToken(userId, roles)}` };
+async function bearer(userId: string, roles: string[] = ["admin"]): Promise<Record<string, string>> {
+    return { authorization: `Bearer ${await generateAccessToken(userId, roles)}` };
 }
 
 describe("GET /users?ids=", () => {
@@ -55,7 +55,7 @@ accessExpiresIn: "1h" });
         const { repo } = mockRepo([user("u1", "Priscila"), user("u2", "Ada"), user("u3")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users?ids=u1,u3", { headers: bearer("admin-1") });
+        const res = await app.request("/users?ids=u1,u3", { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(200);
         const body = await res.json() as { users: { uid: string; displayName: string | null }[] };
@@ -67,7 +67,7 @@ accessExpiresIn: "1h" });
         const { repo } = mockRepo([user("u1")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users?ids=u1,missing", { headers: bearer("admin-1") });
+        const res = await app.request("/users?ids=u1,missing", { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(200);
         const body = await res.json() as { users: { uid: string }[] };
@@ -80,7 +80,7 @@ accessExpiresIn: "1h" });
         const app = createAdminUsersRoute({ authRepo: repo });
 
         const ids = [...many.map(u => u.id), "u0", "u1"].join(",");
-        const res = await app.request(`/users?ids=${ids}`, { headers: bearer("admin-1") });
+        const res = await app.request(`/users?ids=${ids}`, { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(200);
         expect(getUserWithRoles).toHaveBeenCalledTimes(100);
@@ -105,7 +105,7 @@ accessExpiresIn: "1h" });
         const { repo, getUserWithRoles } = mockRepo([user("u1", "Priscila")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users?ids=u1", { headers: bearer("editor-1", ["editor"]) });
+        const res = await app.request("/users?ids=u1", { headers: await bearer("editor-1", ["editor"]) });
 
         expect(res.status).toBe(403);
         const raw = await res.text();

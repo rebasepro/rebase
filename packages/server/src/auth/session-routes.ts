@@ -94,7 +94,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
         if (refreshToken) {
-            const tokenHash = hashRefreshToken(refreshToken);
+            const tokenHash = await hashRefreshToken(refreshToken);
             // Kill the whole sign-in, not just the token that happened to be
             // presented. Rotation can leave siblings alive (a second tab, a
             // replay inside the reuse window), and deleting one row would
@@ -117,7 +117,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const accessToken = extractBearerToken(c.req.header("authorization"));
         if (ops.afterLogout && accessToken !== undefined) {
             const { verifyAccessToken } = await import("./jwt");
-            const payload = verifyAccessToken(accessToken);
+            const payload = await verifyAccessToken(accessToken);
             if (payload) {
                 ops.afterLogout(payload.uid).catch((err: unknown) => {
                     logger.error("[AuthHooks] afterLogout error", {
@@ -141,7 +141,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         }
 
         const currentRefreshToken = c.req.header("x-refresh-token") as string;
-        const currentTokenHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null;
+        const currentTokenHash = currentRefreshToken ? await hashRefreshToken(currentRefreshToken) : null;
 
         const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid);
 

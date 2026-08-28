@@ -29,7 +29,7 @@ accessExpiresIn: "1h" });
 
         it("passes with valid Bearer token", async () => {
             const app = createApp();
-            const token = generateAccessToken("user-1", ["admin"]);
+            const token = await generateAccessToken("user-1", ["admin"]);
             const res = await app.request("/protected/resource", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -73,7 +73,7 @@ accessExpiresIn: "1h" });
                 const user = c.get("user");
                 return c.json({ user });
             });
-            const token = generateAccessToken("user-2", ["editor"]);
+            const token = await generateAccessToken("user-2", ["editor"]);
             const res = await app.request(`/protected/resource?token=${token}`);
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -88,8 +88,8 @@ accessExpiresIn: "1h" });
                 const user = c.get("user");
                 return c.json({ user });
             });
-            const bearerToken = generateAccessToken("bearer-user", ["admin"]);
-            const queryToken = generateAccessToken("query-user", ["viewer"]);
+            const bearerToken = await generateAccessToken("bearer-user", ["admin"]);
+            const queryToken = await generateAccessToken("query-user", ["viewer"]);
             const res = await app.request(`/protected/resource?token=${queryToken}`, {
                 headers: { Authorization: `Bearer ${bearerToken}` }
             });
@@ -110,7 +110,7 @@ accessExpiresIn: "1h" });
 
         it("allows admin users", async () => {
             const app = createApp();
-            const token = generateAccessToken("admin-1", ["admin"]);
+            const token = await generateAccessToken("admin-1", ["admin"]);
             const res = await app.request("/admin/dashboard", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -119,7 +119,7 @@ accessExpiresIn: "1h" });
 
         it("allows schema-admin users", async () => {
             const app = createApp();
-            const token = generateAccessToken("schema-admin-1", ["schema-admin"]);
+            const token = await generateAccessToken("schema-admin-1", ["schema-admin"]);
             const res = await app.request("/admin/dashboard", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -128,7 +128,7 @@ accessExpiresIn: "1h" });
 
         it("returns 403 for non-admin users", async () => {
             const app = createApp();
-            const token = generateAccessToken("user-1", ["editor"]);
+            const token = await generateAccessToken("user-1", ["editor"]);
             const res = await app.request("/admin/dashboard", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -162,7 +162,7 @@ user: user ?? null });
 
         it("sets user when valid token is present", async () => {
             const app = createApp();
-            const token = generateAccessToken("opt-user", ["viewer"]);
+            const token = await generateAccessToken("opt-user", ["viewer"]);
             const res = await app.request("/public/feed", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -254,7 +254,7 @@ requireAuth: false }));
                 return c.json({ user });
             });
 
-            const token = generateAccessToken("jwt-user", ["admin"]);
+            const token = await generateAccessToken("jwt-user", ["admin"]);
             const res = await app.request("/test", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -362,7 +362,7 @@ isScopedDriver: true };
                 return c.json({ scoped: !!driver?.isScopedDriver });
             });
 
-            const token = generateAccessToken("rls-user", ["editor"]);
+            const token = await generateAccessToken("rls-user", ["editor"]);
             const res = await app.request("/test", {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -439,7 +439,7 @@ roles: ["editor"] })
         });
 
         it("still accepts valid JWT tokens when service key is configured", async () => {
-            const token = generateAccessToken("jwt-user", ["editor"]);
+            const token = await generateAccessToken("jwt-user", ["editor"]);
             const app = new Hono<HonoEnv>();
             app.use("/*", createAuthMiddleware({
                 driver: mockDriver,
@@ -549,7 +549,7 @@ roles: user?.roles });
         });
 
         it("falls back to valid JWT when service key doesn't match", async () => {
-            const token = generateAccessToken("user-123", ["admin"]);
+            const token = await generateAccessToken("user-123", ["admin"]);
             const app = new Hono<HonoEnv>();
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {

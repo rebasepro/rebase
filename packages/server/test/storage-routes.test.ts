@@ -560,7 +560,7 @@ describe("Storage routes — scoped download token under AuthAdapter", () => {
     });
 
     it("serves a private file via a valid scoped ?token=", async () => {
-        const token = generateDownloadToken("default/author_pictures/logo.png", 300);
+        const token = await generateDownloadToken("default/author_pictures/logo.png", 300);
         const res = await app.fetch(
             new Request(`http://localhost/api/storage/file/author_pictures/logo.png?token=${token}`)
         );
@@ -577,7 +577,7 @@ describe("Storage routes — scoped download token under AuthAdapter", () => {
     });
 
     it("rejects a scoped token for a different path", async () => {
-        const token = generateDownloadToken("default/author_pictures/other.png", 300);
+        const token = await generateDownloadToken("default/author_pictures/other.png", 300);
         const res = await app.fetch(
             new Request(`http://localhost/api/storage/file/author_pictures/logo.png?token=${token}`)
         );

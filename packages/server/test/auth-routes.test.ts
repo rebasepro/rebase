@@ -228,8 +228,8 @@ function storedToken(overrides: Record<string, unknown> = {}) {
     } as any;
 }
 
-function authHeader(uid = "user-1", roles = ["editor"]) {
-    return { Authorization: `Bearer ${generateAccessToken(uid, roles)}` };
+async function authHeader(uid = "user-1", roles = ["editor"]) {
+    return { Authorization: `Bearer ${await generateAccessToken(uid, roles)}` };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -611,9 +611,9 @@ withEmail: false }); // Hack to pass empty list of providers
     //
     // The escape hatch the EMAIL_NOT_VERIFIED rejection points users at.
     describe("POST /auth/link/google", () => {
-        function linkRequest(uid: string, idToken: string) {
+        async function linkRequest(uid: string, idToken: string) {
             const req = json({ idToken });
-            return { ...req, headers: { ...req.headers, ...authHeader(uid) } };
+            return { ...req, headers: { ...req.headers, ...(await authHeader(uid)) } };
         }
 
         it("requires authentication", async () => {
@@ -628,7 +628,7 @@ withEmail: false }); // Hack to pass empty list of providers
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
 
             // Same credential the sign-in route refuses with EMAIL_NOT_VERIFIED.
-            const res = await app.request("/auth/link/google", linkRequest("pw-user-1", "unverified-token"));
+            const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "unverified-token"));
 
             expect(res.status).toBe(200);
             // Verification status is irrelevant here: the session proves
@@ -642,7 +642,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(mockUser({ id: "other-user" }));
 
-            const res = await app.request("/auth/link/google", linkRequest("pw-user-1", "valid-token"));
+            const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "valid-token"));
 
             expect(res.status).toBe(409);
             const body = await res.json() as any;
@@ -654,7 +654,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp();
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(mockUser({ id: "pw-user-1" }));
 
-            const res = await app.request("/auth/link/google", linkRequest("pw-user-1", "valid-token"));
+            const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "valid-token"));
 
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -664,7 +664,7 @@ withEmail: false }); // Hack to pass empty list of providers
 
         it("rejects an invalid provider credential", async () => {
             const app = createApp();
-            const res = await app.request("/auth/link/google", linkRequest("pw-user-1", "bad-token"));
+            const res = await app.request("/auth/link/google", await linkRequest("pw-user-1", "bad-token"));
             expect(res.status).toBe(401);
             expect(mockAuthRepo.linkUserIdentity).not.toHaveBeenCalled();
         });
@@ -695,7 +695,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const req = json({ oldPassword: "anything", newPassword: "NewPassword123!" });
             const res = await app.request("/auth/change-password", {
                 ...req,
-                headers: { ...req.headers, ...authHeader(googleUser.id) }
+                headers: { ...req.headers, ...await authHeader(googleUser.id) }
             });
 
             // The supported route for a provider-only account to gain a
@@ -1156,7 +1156,7 @@ password: "weak" }));
                 ...json({ oldPassword: "OldPass1",
 newPassword: "NewPass1" }),
                 headers: { ...json({}).headers,
-...authHeader() }
+...await authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.updatePassword).toHaveBeenCalled();
@@ -1170,7 +1170,7 @@ newPassword: "NewPass1" }),
                 ...json({ oldPassword: "Old1",
 newPassword: "New1Pass" }),
                 headers: { ...json({}).headers,
-...authHeader() }
+...await authHeader() }
             });
             expect(mockAuthRepo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("user-1");
         });
@@ -1184,7 +1184,7 @@ newPassword: "New1Pass" }),
                 ...json({ oldPassword: "Wrong1",
 newPassword: "New1Pass" }),
                 headers: { ...json({}).headers,
-...authHeader() }
+...await authHeader() }
             });
             expect(res.status).toBe(401);
         });
@@ -1199,7 +1199,7 @@ errors: ["Too short"] });
                 ...json({ oldPassword: "Old1",
 newPassword: "x" }),
                 headers: { ...json({}).headers,
-...authHeader() }
+...await authHeader() }
             });
             expect(res.status).toBe(400);
         });
@@ -1219,7 +1219,7 @@ newPassword: "New1Pass" }));
                 ...json({ oldPassword: "Old1",
 newPassword: "New1Pass" }),
                 headers: { ...json({}).headers,
-...authHeader() }
+...await authHeader() }
             });
             expect(res.status).toBe(400);
             const body = await res.json() as any;
@@ -1236,7 +1236,7 @@ newPassword: "New1Pass" }),
 
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() }
+                    headers: { ...await authHeader() }
                 });
                 expect(res.status).toBe(200);
                 expect(mockAuthRepo.setVerificationToken).toHaveBeenCalled();
@@ -1249,7 +1249,7 @@ newPassword: "New1Pass" }),
 
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() }
+                    headers: { ...await authHeader() }
                 });
                 expect(res.status).toBe(400);
                 const body = await res.json() as any;
@@ -1266,7 +1266,7 @@ newPassword: "New1Pass" }),
                 const app = createApp({ withEmail: false });
                 const res = await app.request("/auth/send-verification", {
                     method: "POST",
-                    headers: { ...authHeader() }
+                    headers: { ...await authHeader() }
                 });
                 expect(res.status).toBe(503);
             });
@@ -1305,7 +1305,7 @@ newPassword: "New1Pass" }),
         it("returns authenticated user with roles", async () => {
             const app = createApp();
             const res = await app.request("/auth/me", {
-                headers: { ...authHeader("user-1", ["admin"]) }
+                headers: { ...await authHeader("user-1", ["admin"]) }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -1324,7 +1324,7 @@ newPassword: "New1Pass" }),
             mockAuthRepo.getUserWithRoles.mockResolvedValueOnce(null);
 
             const res = await app.request("/auth/me", {
-                headers: { ...authHeader() }
+                headers: { ...await authHeader() }
             });
             expect(res.status).toBe(404);
         });
@@ -1338,7 +1338,7 @@ newPassword: "New1Pass" }),
             const res = await app.request("/auth/me", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json",
-...authHeader() },
+...await authHeader() },
                 body: JSON.stringify({ displayName: "New Name" })
             });
             expect(res.status).toBe(200);
@@ -1372,7 +1372,7 @@ userAgent: "Chrome",
 ipAddress: "1.2.3.4" }
             ]);
 
-            const res = await app.request("/auth/sessions", { headers: { ...authHeader() } });
+            const res = await app.request("/auth/sessions", { headers: { ...await authHeader() } });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
             expect(body.sessions).toHaveLength(1);
@@ -1383,7 +1383,7 @@ ipAddress: "1.2.3.4" }
             const app = createApp();
             const res = await app.request("/auth/sessions", {
                 method: "DELETE",
-                headers: { ...authHeader() }
+                headers: { ...await authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("user-1");
@@ -1393,7 +1393,7 @@ ipAddress: "1.2.3.4" }
             const app = createApp();
             const res = await app.request("/auth/sessions/s123", {
                 method: "DELETE",
-                headers: { ...authHeader() }
+                headers: { ...await authHeader() }
             });
             expect(res.status).toBe(200);
             expect(mockAuthRepo.deleteRefreshTokenById).toHaveBeenCalledWith("s123", "user-1");
@@ -1433,7 +1433,7 @@ createdAt: new Date() }
 
             const res = await app.request("/auth/sessions/tok-phone", {
                 method: "DELETE",
-                headers: { ...authHeader() }
+                headers: { ...await authHeader() }
             });
 
             expect(res.status).toBe(200);
@@ -1459,7 +1459,7 @@ createdAt: new Date() }
 
             const res = await app.request("/auth/sessions/tok-someone-else", {
                 method: "DELETE",
-                headers: { ...authHeader() }
+                headers: { ...await authHeader() }
             });
 
             expect(res.status).toBe(200);
@@ -1486,11 +1486,11 @@ factorId: "factor-1" });
             return app;
         }
 
-        function challenge(app: ReturnType<typeof createApp>, uid = "user-1") {
+        async function challenge(app: ReturnType<typeof createApp>, uid = "user-1") {
             return app.request("/auth/mfa/challenge", {
                 ...json({ factorId: "factor-1" }),
                 headers: { "Content-Type": "application/json",
-...authHeader(uid) }
+...await authHeader(uid) }
             });
         }
 
@@ -1660,7 +1660,7 @@ verified: true });
             const app = createApp(); // allowUserLookup defaults to false
             const res = await app.request("/auth/find-user", {
                 ...json({ email: "someone@test.com" }),
-                headers: { ...json({}).headers, ...authHeader() }
+                headers: { ...json({}).headers, ...await authHeader() }
             });
             expect(res.status).toBe(404);
         });
@@ -1678,7 +1678,7 @@ verified: true });
             );
             const res = await app.request("/auth/find-user", {
                 ...json({ email: "teammate@test.com" }),
-                headers: { ...json({}).headers, ...authHeader() }
+                headers: { ...json({}).headers, ...await authHeader() }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
@@ -1693,7 +1693,7 @@ verified: true });
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
             const res = await app.request("/auth/find-user", {
                 ...json({ email: "nobody@test.com" }),
-                headers: { ...json({}).headers, ...authHeader() }
+                headers: { ...json({}).headers, ...await authHeader() }
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;

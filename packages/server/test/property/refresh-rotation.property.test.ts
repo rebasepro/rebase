@@ -195,8 +195,8 @@ describe("refresh rotation — invariants across random operation sequences", ()
 
             // Two sessions for one user: one to act on, one that must survive
             // everything done to the other.
-            await store.createRefreshToken("u1", hashRefreshToken("seed-a"), future(), "", "", { id: "sess-a", startedAt: new Date() });
-            await store.createRefreshToken("u1", hashRefreshToken("seed-b"), future(), "", "", { id: "sess-b", startedAt: new Date() });
+            await store.createRefreshToken("u1", await hashRefreshToken("seed-a"), future(), "", "", { id: "sess-a", startedAt: new Date() });
+            await store.createRefreshToken("u1", await hashRefreshToken("seed-b"), future(), "", "", { id: "sess-b", startedAt: new Date() });
 
             const held: Held[] = [
                 { token: "seed-a", sessionId: "sess-a", state: "live" },

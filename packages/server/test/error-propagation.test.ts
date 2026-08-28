@@ -53,7 +53,7 @@ accessExpiresIn: "1h" });
 
         it("surfaces an ApiError as structured JSON with its own status", async () => {
             const app = mountOnBareParent();
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/missing-user/reset-password", {
                 method: "POST",

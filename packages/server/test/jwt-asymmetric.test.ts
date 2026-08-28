@@ -80,32 +80,32 @@ describe("access tokens signed asymmetrically", () => {
         });
     });
 
-    it("round-trips a token through the public key", () => {
-        const token = generateAccessToken("user-1", ["admin"]);
-        const payload = verifyAccessToken(token);
+    it("round-trips a token through the public key", async () => {
+        const token = await generateAccessToken("user-1", ["admin"]);
+        const payload = await verifyAccessToken(token);
 
         expect(payload?.uid).toBe("user-1");
         expect(payload?.roles).toEqual(["admin"]);
     });
 
-    it("names the signing key in the header, so a verifier knows which to fetch", () => {
-        const header = jwt.decode(generateAccessToken("user-1", []), { complete: true })?.header;
+    it("names the signing key in the header, so a verifier knows which to fetch", async () => {
+        const header = jwt.decode(await generateAccessToken("user-1", []), { complete: true })?.header;
 
         expect(header?.kid).toBe("key-a");
         expect(header?.alg).toBe("ES256");
     });
 
-    it("signs RSA keys as RS256 without being told to", () => {
+    it("signs RSA keys as RS256 without being told to", async () => {
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "rsa", privateKey: RSA.privateKey }] });
-        const header = jwt.decode(generateAccessToken("user-1", []), { complete: true })?.header;
+        const header = jwt.decode(await generateAccessToken("user-1", []), { complete: true })?.header;
 
         expect(header?.alg).toBe("RS256");
-        expect(verifyAccessToken(generateAccessToken("user-1", []))?.uid).toBe("user-1");
+        expect((await verifyAccessToken(await generateAccessToken("user-1", [])))?.uid).toBe("user-1");
     });
 
-    it("stays HS256 when no keys are configured, and says so", () => {
+    it("stays HS256 when no keys are configured, and says so", async () => {
         configureJwt({ secret: SECRET });
-        const header = jwt.decode(generateAccessToken("user-1", []), { complete: true })?.header;
+        const header = jwt.decode(await generateAccessToken("user-1", []), { complete: true })?.header;
 
         expect(header?.alg).toBe("HS256");
         expect(header?.kid).toBeUndefined();
@@ -114,9 +114,9 @@ describe("access tokens signed asymmetrically", () => {
 });
 
 describe("rotation", () => {
-    it("keeps verifying tokens signed by the previous key", () => {
+    it("keeps verifying tokens signed by the previous key", async () => {
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-a", privateKey: KEY_A.privateKey }] });
-        const beforeRotation = generateAccessToken("user-1", ["admin"]);
+        const beforeRotation = await generateAccessToken("user-1", ["admin"]);
 
         // The new key goes in front and becomes active; the old one stays in
         // the list exactly as long as tokens it signed can still be presented.
@@ -128,20 +128,20 @@ describe("rotation", () => {
             ]
         });
 
-        expect(verifyAccessToken(beforeRotation)?.uid).toBe("user-1");
-        expect(jwt.decode(generateAccessToken("user-2", []), { complete: true })?.header.kid).toBe("key-b");
+        expect((await verifyAccessToken(beforeRotation))?.uid).toBe("user-1");
+        expect(jwt.decode(await generateAccessToken("user-2", []), { complete: true })?.header.kid).toBe("key-b");
     });
 
-    it("stops accepting a key once it is dropped from the list", () => {
+    it("stops accepting a key once it is dropped from the list", async () => {
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-a", privateKey: KEY_A.privateKey }] });
-        const oldToken = generateAccessToken("user-1", []);
+        const oldToken = await generateAccessToken("user-1", []);
 
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-b", privateKey: KEY_B.privateKey }] });
 
-        expect(verifyAccessToken(oldToken)).toBeNull();
+        expect(await verifyAccessToken(oldToken)).toBeNull();
     });
 
-    it("honours activeKid rather than list order", () => {
+    it("honours activeKid rather than list order", async () => {
         configureJwt({
             secret: SECRET,
             activeKid: "key-b",
@@ -151,7 +151,7 @@ describe("rotation", () => {
             ]
         });
 
-        expect(jwt.decode(generateAccessToken("u", []), { complete: true })?.header.kid).toBe("key-b");
+        expect(jwt.decode(await generateAccessToken("u", []), { complete: true })?.header.kid).toBe("key-b");
     });
 
     it("refuses to boot when activeKid names no configured key", () => {
@@ -162,14 +162,14 @@ describe("rotation", () => {
         })).toThrow(/not among the configured signing keys/);
     });
 
-    it("still verifies HS256 tokens minted before any key existed", () => {
+    it("still verifies HS256 tokens minted before any key existed", async () => {
         configureJwt({ secret: SECRET });
-        const legacy = generateAccessToken("user-1", ["admin"]);
+        const legacy = await generateAccessToken("user-1", ["admin"]);
 
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-a", privateKey: KEY_A.privateKey }] });
 
         // Otherwise turning the feature on is a mass sign-out.
-        expect(verifyAccessToken(legacy)?.uid).toBe("user-1");
+        expect((await verifyAccessToken(legacy))?.uid).toBe("user-1");
     });
 });
 
@@ -178,7 +178,7 @@ describe("the algorithm is the key's, never the token's", () => {
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-a", privateKey: KEY_A.privateKey }] });
     });
 
-    it("rejects an HS256 token forged with the published public key as the secret", () => {
+    it("rejects an HS256 token forged with the published public key as the secret", async () => {
         // Exactly what an attacker can do with nothing but /.well-known/jwks.json
         // and the public key it serves.
         const forged = jwt.sign(
@@ -187,28 +187,28 @@ describe("the algorithm is the key's, never the token's", () => {
             { algorithm: "HS256", keyid: "key-a" }
         );
 
-        expect(verifyAccessToken(forged)).toBeNull();
+        expect(await verifyAccessToken(forged)).toBeNull();
     });
 
-    it("rejects an unsigned `alg: none` token", () => {
+    it("rejects an unsigned `alg: none` token", async () => {
         const unsigned = jwt.sign({ uid: "attacker", roles: ["admin"] }, "", { algorithm: "none" });
 
-        expect(verifyAccessToken(unsigned)).toBeNull();
+        expect(await verifyAccessToken(unsigned)).toBeNull();
     });
 
-    it("rejects a token signed by a key we do not hold, even under a known kid", () => {
+    it("rejects a token signed by a key we do not hold, even under a known kid", async () => {
         const wrongKey = jwt.sign({ uid: "attacker" }, KEY_B.privateKey, { algorithm: "ES256", keyid: "key-a" });
 
-        expect(verifyAccessToken(wrongKey)).toBeNull();
+        expect(await verifyAccessToken(wrongKey)).toBeNull();
     });
 
-    it("rejects an ES256 token whose kid we have never seen", () => {
+    it("rejects an ES256 token whose kid we have never seen", async () => {
         const unknown = jwt.sign({ uid: "attacker" }, KEY_B.privateKey, { algorithm: "ES256", keyid: "nope" });
 
-        expect(verifyAccessToken(unknown)).toBeNull();
+        expect(await verifyAccessToken(unknown)).toBeNull();
     });
 
-    it("will not let the shared secret mint a session once a key names itself", () => {
+    it("will not let the shared secret mint a session once a key names itself", async () => {
         // The one case the library does not cover for us, and the reason
         // `verifyAccessToken` resolves the key by `kid` *first* and never falls
         // back to the secret when it finds one.
@@ -225,7 +225,7 @@ describe("the algorithm is the key's, never the token's", () => {
             { algorithm: "HS256", keyid: "key-a" }
         );
 
-        expect(verifyAccessToken(downgraded)).toBeNull();
+        expect(await verifyAccessToken(downgraded)).toBeNull();
     });
 });
 
@@ -319,13 +319,13 @@ describe("key configuration is checked at boot", () => {
             .toThrow(/curve P-384, but ES256 requires P-256/);
     });
 
-    it("leaves the previous configuration standing when a new one is bad", () => {
+    it("leaves the previous configuration standing when a new one is bad", async () => {
         configureJwt({ secret: SECRET, signingKeys: [{ kid: "key-a", privateKey: KEY_A.privateKey }] });
-        const token = generateAccessToken("user-1", []);
+        const token = await generateAccessToken("user-1", []);
 
         expect(() => configureJwt({ secret: SECRET, signingKeys: [{ kid: "bad", privateKey: "nope" }] })).toThrow();
 
-        expect(verifyAccessToken(token)?.uid).toBe("user-1");
+        expect((await verifyAccessToken(token))?.uid).toBe("user-1");
     });
 });
 

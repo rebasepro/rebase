@@ -155,7 +155,7 @@ code } } }));
                             // Adapter threw — treat as invalid token
                         }
                     } else {
-                        const jwtPayload = extractUserFromToken(token);
+                        const jwtPayload = await extractUserFromToken(token);
                         if (jwtPayload) {
                             verifiedUser = {
                                 uid: jwtPayload.uid,

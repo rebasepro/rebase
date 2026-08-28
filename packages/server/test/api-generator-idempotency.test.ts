@@ -30,6 +30,22 @@ function createKeyStore(clock: { now: number }) {
     const rows = new Map<string, Stored>();
     const at = (uid: unknown, key: unknown) => `${String(uid)}::${String(key)}`;
 
+    /**
+     * How many claims have been attempted, and a way to wait for the nth.
+     *
+     * The two racing tests below need one request to still be *inside* its
+     * write when the other arrives. That used to fall out of how many
+     * microtasks each request happened to take, which is not a property of the
+     * code under test: making `requestFingerprint` async — one extra await, on
+     * the way to removing `node:crypto` from the request path — was enough to
+     * let the first request finish before the second claimed, so the second
+     * replayed a stored answer instead of colliding with a live claim. Both
+     * outcomes are correct behaviour; only one of them is the behaviour those
+     * tests exist to pin.
+     */
+    let claimAttempts = 0;
+    const claimWaiters: Array<{ nth: number; resolve: () => void }> = [];
+
     /** The `INTERVAL 'N unit'` guarding one branch of the takeover predicate. */
     const windowMs = (sql: string, guard: string, unit: "seconds" | "hours"): number => {
         const found = new RegExp(`${guard}[\\s\\S]*?INTERVAL '(\\d+) ${unit}'`).exec(sql);
@@ -39,10 +55,20 @@ function createKeyStore(clock: { now: number }) {
 
     return {
         rows,
+        /** Resolves once `nth` claims have been attempted against this store. */
+        whenClaimed(nth: number): Promise<void> {
+            if (claimAttempts >= nth) return Promise.resolve();
+            return new Promise<void>(resolve => { claimWaiters.push({ nth, resolve }); });
+        },
         async executeSql(sql: string, options?: { params?: unknown[] }) {
             const params = options?.params ?? [];
             // claim: INSERT … ON CONFLICT DO UPDATE … WHERE <expired> RETURNING
             if (/^\s*INSERT INTO/i.test(sql)) {
+                claimAttempts += 1;
+                for (const waiter of claimWaiters.splice(0)) {
+                    if (claimAttempts >= waiter.nth) waiter.resolve();
+                    else claimWaiters.push(waiter);
+                }
                 const [key, uid, fingerprint] = params;
                 const composite = at(uid, key);
                 const claim = () => {
@@ -91,6 +117,11 @@ describe("create with an Idempotency-Key", () => {
         failFirstSave?: boolean;
         /** First save never settles: the request that claimed the key is gone. */
         hangFirstSave?: boolean;
+        /**
+         * Hold the first save open until a second claim has been attempted, so
+         * a "two requests race" test races for real rather than by accident.
+         */
+        gateFirstSaveOnSecondClaim?: boolean;
         uid?: () => string | undefined;
     }) {
         let nextId = 1;
@@ -107,6 +138,9 @@ describe("create with an Idempotency-Key", () => {
                 saveAttempts += 1;
                 if (options?.failFirstSave && saveAttempts === 1) {
                     throw new Error("connection reset");
+                }
+                if (options?.gateFirstSaveOnSecondClaim && saveAttempts === 1) {
+                    await admin.whenClaimed(2);
                 }
                 if (options?.hangFirstSave && saveAttempts === 1) {
                     // Never settles, and never throws: the pod was killed
@@ -207,7 +241,7 @@ describe("create with an Idempotency-Key", () => {
         // Recalling and then writing is not atomic: both requests missed the
         // recall, both wrote, and the second insert into the key table was the
         // only thing `ON CONFLICT DO NOTHING` protected.
-        const { app, saved } = createHarness();
+        const { app, saved } = createHarness({ gateFirstSaveOnSecondClaim: true });
 
         const [first, second] = await Promise.all([
             post(app, { title: "hello" }, "mut-1"),
@@ -220,7 +254,7 @@ describe("create with an Idempotency-Key", () => {
     });
 
     it("says a key is in progress rather than reporting a conflicting row", async () => {
-        const { app } = createHarness();
+        const { app } = createHarness({ gateFirstSaveOnSecondClaim: true });
 
         const [a, b] = await Promise.all([
             post(app, { title: "hello" }, "mut-1"),

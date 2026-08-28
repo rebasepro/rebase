@@ -29,8 +29,8 @@ function mockRepo() {
     return { repo, listUsersPaginated };
 }
 
-function bearer(userId: string, roles: string[] = ["admin"]): Record<string, string> {
-    return { authorization: `Bearer ${generateAccessToken(userId, roles)}` };
+async function bearer(userId: string, roles: string[] = ["admin"]): Promise<Record<string, string>> {
+    return { authorization: `Bearer ${await generateAccessToken(userId, roles)}` };
 }
 
 describe("GET /users — list limit", () => {
@@ -42,7 +42,7 @@ describe("GET /users — list limit", () => {
         const { repo, listUsersPaginated } = mockRepo();
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users?limit=100000000", { headers: bearer("admin-1") });
+        const res = await app.request("/users?limit=100000000", { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(400);
         const body = await res.json() as { error: { code: string; message: string } };
@@ -55,7 +55,7 @@ describe("GET /users — list limit", () => {
         const { repo, listUsersPaginated } = mockRepo();
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users", { headers: bearer("admin-1") });
+        const res = await app.request("/users", { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(200);
         expect(listUsersPaginated).toHaveBeenCalledWith(
@@ -67,7 +67,7 @@ describe("GET /users — list limit", () => {
         const { repo, listUsersPaginated } = mockRepo();
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/users?limit=100", { headers: bearer("admin-1") });
+        const res = await app.request("/users?limit=100", { headers: await bearer("admin-1") });
 
         expect(res.status).toBe(200);
         expect(listUsersPaginated).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));

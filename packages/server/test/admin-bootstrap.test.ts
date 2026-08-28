@@ -37,8 +37,8 @@ function mockRepo(users: UserData[], adminIds: string[] = []) {
     return { repo, setUserRoles };
 }
 
-function bearer(userId: string): Record<string, string> {
-    return { authorization: `Bearer ${generateAccessToken(userId, [])}` };
+async function bearer(userId: string): Promise<Record<string, string>> {
+    return { authorization: `Bearer ${await generateAccessToken(userId, [])}` };
 }
 
 describe("POST /bootstrap", () => {
@@ -51,7 +51,7 @@ describe("POST /bootstrap", () => {
         const { repo, setUserRoles } = mockRepo(users);
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/bootstrap", { method: "POST", headers: bearer("u1") });
+        const res = await app.request("/bootstrap", { method: "POST", headers: await bearer("u1") });
 
         expect(res.status).toBe(200);
         expect(setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
@@ -62,7 +62,7 @@ describe("POST /bootstrap", () => {
         const { repo, setUserRoles } = mockRepo(users);
         const app = createAdminUsersRoute({ authRepo: repo });
 
-        const res = await app.request("/bootstrap", { method: "POST", headers: bearer("u2") });
+        const res = await app.request("/bootstrap", { method: "POST", headers: await bearer("u2") });
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { code: string } };
@@ -76,7 +76,7 @@ describe("POST /bootstrap", () => {
         const app = createAdminUsersRoute({ authRepo: repo });
 
         // Even the earliest user is refused once someone is admin.
-        const res = await app.request("/bootstrap", { method: "POST", headers: bearer("u1") });
+        const res = await app.request("/bootstrap", { method: "POST", headers: await bearer("u1") });
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { code: string } };
@@ -104,7 +104,7 @@ describe("POST /bootstrap", () => {
             const { repo, setUserRoles } = mockRepo(users, []);
             const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
 
-            const staleAdminToken = generateAccessToken("u1", ["admin"]);
+            const staleAdminToken = await generateAccessToken("u1", ["admin"]);
             const res = await app.request("/users", {
                 headers: { authorization: `Bearer ${staleAdminToken}` }
             });
@@ -120,7 +120,7 @@ describe("POST /bootstrap", () => {
             const app = createAdminUsersRoute({ authRepo: repo, serviceKey: "svc-key-not-used-here" } as never);
 
             // Token carries no roles at all; the database is the authority.
-            const res = await app.request("/users", { headers: bearer("u1") });
+            const res = await app.request("/users", { headers: await bearer("u1") });
 
             expect(res.status).not.toBe(403);
         });
@@ -143,7 +143,7 @@ describe("POST /bootstrap", () => {
             const { repo, setUserRoles } = mockRepo(users);
             const app = createAdminUsersRoute({ authRepo: repo });
 
-            const res = await app.request("/bootstrap", { method: "POST", headers: bearer(anonId) });
+            const res = await app.request("/bootstrap", { method: "POST", headers: await bearer(anonId) });
 
             expect(res.status).toBe(403);
             const body = await res.json() as { error: { code: string } };
@@ -159,7 +159,7 @@ describe("POST /bootstrap", () => {
             const { repo, setUserRoles } = mockRepo(users);
             const app = createAdminUsersRoute({ authRepo: repo });
 
-            const res = await app.request("/bootstrap", { method: "POST", headers: bearer("u1") });
+            const res = await app.request("/bootstrap", { method: "POST", headers: await bearer("u1") });
 
             expect(res.status).toBe(200);
             expect(setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
@@ -172,10 +172,10 @@ describe("POST /bootstrap", () => {
         const app = createAdminUsersRoute({ authRepo: repo });
 
         // u1 < u2 lexicographically, so u1 wins the tie.
-        const denied = await app.request("/bootstrap", { method: "POST", headers: bearer("u2") });
+        const denied = await app.request("/bootstrap", { method: "POST", headers: await bearer("u2") });
         expect(denied.status).toBe(403);
 
-        const allowed = await app.request("/bootstrap", { method: "POST", headers: bearer("u1") });
+        const allowed = await app.request("/bootstrap", { method: "POST", headers: await bearer("u1") });
         expect(allowed.status).toBe(200);
         expect(setUserRoles).toHaveBeenCalledWith("u1", ["admin"]);
     });

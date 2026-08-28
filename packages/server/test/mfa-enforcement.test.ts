@@ -420,7 +420,7 @@ enrolled: true });
 
             expect(res.status).toBe(200);
             const { tokens } = await res.json() as { tokens: { accessToken: string } };
-            expect(verifyAccessToken(tokens.accessToken)?.aal).toBe("aal2");
+            expect((await verifyAccessToken(tokens.accessToken))?.aal).toBe("aal2");
             expect((h.state.refreshTokens[0].session as { aal: string }).aal).toBe("aal2");
         });
 
@@ -432,14 +432,14 @@ enrolled: true });
             const res = await h.app.request("/auth/refresh", post({ refreshToken: "the-token" }));
 
             const { tokens } = await res.json() as { tokens: { accessToken: string } };
-            expect(verifyAccessToken(tokens.accessToken)?.aal).toBe("aal1");
+            expect((await verifyAccessToken(tokens.accessToken))?.aal).toBe("aal1");
         });
     });
 
     // ── H1 ──────────────────────────────────────────────────────────────
     describe("changing enrolled factors requires the existing factor", () => {
-        function session(uid: string, aal: "aal1" | "aal2" = "aal1") {
-            return { Authorization: `Bearer ${generateAccessToken(uid, ["editor"], aal)}` };
+        async function session(uid: string, aal: "aal1" | "aal2" = "aal1") {
+            return { Authorization: `Bearer ${await generateAccessToken(uid, ["editor"], aal)}` };
         }
 
         it("refuses to enrol a second factor from an aal1 session", async () => {
@@ -448,7 +448,7 @@ enrolled: true });
             const h = createHarness({ uid: "h1-enrol",
 enrolled: true });
 
-            const res = await h.app.request("/auth/mfa/enroll", post({}, session("h1-enrol")));
+            const res = await h.app.request("/auth/mfa/enroll", post({}, await session("h1-enrol")));
 
             expect(res.status).toBe(403);
             expect((await res.json() as { error: { code: string } }).error.code).toBe("AAL2_REQUIRED");
@@ -475,7 +475,7 @@ enrolled: true });
             const res = await h.app.request(
                 "/auth/mfa/verify",
                 post({ factorId: "factor-attacker",
-code: await currentCode(h.totpSecret) }, session("h1-verify"))
+code: await currentCode(h.totpSecret) }, await session("h1-verify"))
             );
 
             expect(res.status).toBe(403);
@@ -485,7 +485,7 @@ code: await currentCode(h.totpSecret) }, session("h1-verify"))
         it("allows the first enrolment on an account with no factor", async () => {
             const h = createHarness({ uid: "h1-first" });
 
-            const res = await h.app.request("/auth/mfa/enroll", post({}, session("h1-first")));
+            const res = await h.app.request("/auth/mfa/enroll", post({}, await session("h1-first")));
 
             expect(res.status).toBe(201);
             expect(h.state.createdFactors).toBe(1);
@@ -495,7 +495,7 @@ code: await currentCode(h.totpSecret) }, session("h1-verify"))
             const h = createHarness({ uid: "h1-stepped",
 enrolled: true });
 
-            const res = await h.app.request("/auth/mfa/enroll", post({}, session("h1-stepped", "aal2")));
+            const res = await h.app.request("/auth/mfa/enroll", post({}, await session("h1-stepped", "aal2")));
 
             expect(res.status).toBe(201);
         });
@@ -506,7 +506,7 @@ enrolled: true });
         it("refuses the same code on a second challenge inside its window", async () => {
             const h = createHarness({ uid: "h3-replay",
 enrolled: true });
-            const pre = { Authorization: `Bearer ${generateAccessToken("h3-replay", ["editor"])}` };
+            const pre = { Authorization: `Bearer ${await generateAccessToken("h3-replay", ["editor"])}` };
             const code = await currentCode(h.totpSecret);
 
             const first = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, pre));
@@ -535,7 +535,7 @@ code }, pre));
         it("counts failures and refuses a spent challenge even with the right code", async () => {
             const h = createHarness({ uid: "h2-attempts",
 enrolled: true });
-            const pre = { Authorization: `Bearer ${generateAccessToken("h2-attempts", ["editor"])}` };
+            const pre = { Authorization: `Bearer ${await generateAccessToken("h2-attempts", ["editor"])}` };
 
             const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, pre));
             const challengeId = (await opened.json() as { challengeId: string }).challengeId;
@@ -564,7 +564,7 @@ code: await currentCode(h.totpSecret) }, pre)
             // address, and they must still be counted together.
             const h = createHarness({ uid: "h2-limit",
 enrolled: true });
-            const pre = { Authorization: `Bearer ${generateAccessToken("h2-limit", ["editor"])}` };
+            const pre = { Authorization: `Bearer ${await generateAccessToken("h2-limit", ["editor"])}` };
 
             const opened = await h.app.request("/auth/mfa/challenge", post({ factorId: h.factorId }, pre));
             const challengeId = (await opened.json() as { challengeId: string }).challengeId;

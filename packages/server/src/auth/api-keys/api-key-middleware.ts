@@ -22,7 +22,6 @@
  * @module
  */
 
-import { createHash } from "crypto";
 import type { Context, MiddlewareHandler } from "hono";
 import type { DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../../api/types";
@@ -32,6 +31,7 @@ import { scopeDataDriver } from "../rls-scope";
 import { extractBearerToken } from "../bearer-token";
 import { httpMethodToOperation, isFunctionAllowed, isStorageAllowed } from "./api-key-permission-guard";
 import { logger } from "../../utils/logger";
+import { sha256Hex } from "../../utils/portable-crypto";
 
 /**
  * Check whether a token looks like a Rebase API key.
@@ -42,9 +42,12 @@ export function isApiKeyToken(token: string): boolean {
 
 /**
  * Hash a plaintext API key token for database lookup.
+ *
+ * Async because it hashes with WebCrypto rather than `node:crypto` — the sole
+ * caller was already awaiting the store lookup this feeds.
  */
-function hashToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
+function hashToken(token: string): Promise<string> {
+    return sha256Hex(token);
 }
 
 /**
@@ -71,7 +74,7 @@ export async function validateApiKey(
 ): Promise<Response | true> {
     const { store, driver } = options;
 
-    const hash = hashToken(token);
+    const hash = await hashToken(token);
     const apiKey = await store.findByKeyHash(hash);
 
     if (!apiKey) {

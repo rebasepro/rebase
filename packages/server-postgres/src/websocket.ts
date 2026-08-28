@@ -273,7 +273,7 @@ code } }
                         verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true };
                     } else {
                         // Standard JWT path
-                        const jwtPayload = extractUserFromToken(token);
+                        const jwtPayload = await extractUserFromToken(token);
                         if (jwtPayload) {
                             verifiedUser = {
                                 uid: jwtPayload.uid,

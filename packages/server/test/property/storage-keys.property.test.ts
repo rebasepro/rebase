@@ -19,6 +19,7 @@ import { isPublicStoragePath, PUBLIC_STORAGE_PREFIX } from "@rebasepro/types";
 import {
     canonicalStorageKey,
     tryCanonicalStorageKey,
+    normalizePosix,
     InvalidStorageKeyError,
     MAX_STORAGE_KEY_LENGTH
 } from "../../src/storage/keys";
@@ -279,6 +280,34 @@ describe("public prefix agreement", () => {
             // key (the trailing slash is how the folder route names a prefix)
             // and it resolves *to* the directory rather than inside it.
             expect(resolved === publicDir || resolved.startsWith(publicDir + path.sep)).toBe(true);
+        }), { numRuns: RUNS });
+    });
+
+
+    /**
+     * `normalizePosix` replaced `path.posix.normalize` so that the module every
+     * storage read and audit line goes through stops needing a Node process
+     * (see `contracts/portable-core.txt`). A transcription of an algorithm is
+     * only worth having if it is the *same* algorithm, and "looks right" is not
+     * a standard that a key canonicalizer gets to be held to — a divergence
+     * here is a key that authorizes as one string and writes as another, which
+     * is the exact bug this whole file exists because of.
+     *
+     * So the two are compared directly, over the same adversarial key shapes,
+     * plus the absolute and `..`-carrying inputs that `canonicalStorageKey`
+     * refuses before it ever calls this — those paths are unreachable in
+     * production and would therefore be exactly where a transcription error
+     * could hide indefinitely.
+     */
+    it("normalizePosix is path.posix.normalize", () => {
+        const anyPath = fc.oneof(
+            storageKey,
+            storageKey.map(key => `/${key}`),
+            fc.array(fc.constantFrom("..", ".", "a", "", "b"), { maxLength: 8 }).map(parts => parts.join("/"))
+        );
+
+        fc.assert(fc.property(anyPath, (input) => {
+            expect(normalizePosix(input)).toBe(path.posix.normalize(input));
         }), { numRuns: RUNS });
     });
 

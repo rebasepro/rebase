@@ -240,6 +240,13 @@ jobs:
       - name: Derived database identifiers
         run: pnpm run check:derived-names
 
+      # What the request path depends on Node for. A ratchet, not a wall: the
+      # baseline may shrink and may never grow, so a branch that puts a new
+      # `node:crypto` or a new Node-only package in front of every request has
+      # to say so here rather than a year from now, inside a runtime port.
+      - name: Portable request path
+        run: pnpm run check:portable-core
+
       # The checked-in `schema.generated.ts` can stop describing the schema
       # without anybody editing anything — a library upgrade moves a derived
       # foreign-key name, the collections watcher never fires, and boot-ensure

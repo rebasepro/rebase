@@ -22,7 +22,7 @@ describe("fileTokenAuth Middleware", () => {
     });
 
     it("should allow a valid scoped download token with exact path match", async () => {
-        const token = generateDownloadToken("default/uploads/image.png");
+        const token = await generateDownloadToken("default/uploads/image.png");
         const res = await app.fetch(
             new Request("http://localhost/api/storage/file/default/uploads/image.png?token=" + token)
         );
@@ -35,7 +35,7 @@ describe("fileTokenAuth Middleware", () => {
 
     it("should allow folder-prefix based scoped download token", async () => {
         // Token is scoped to "default/uploads/"
-        const token = generateDownloadToken("default/uploads/");
+        const token = await generateDownloadToken("default/uploads/");
         const res = await app.fetch(
             new Request("http://localhost/api/storage/file/default/uploads/subfolder/nested.txt?token=" + token)
         );
@@ -59,7 +59,7 @@ describe("fileTokenAuth Middleware", () => {
      */
     describe("a request cannot read outside the token's grant via traversal", () => {
         it("denies `..` climbing out of the token's folder", async () => {
-            const token = generateDownloadToken("default/uploads/");
+            const token = await generateDownloadToken("default/uploads/");
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/uploads/../secret/data.txt?token=" + token)
             );
@@ -68,7 +68,7 @@ describe("fileTokenAuth Middleware", () => {
         });
 
         it("denies `..` when the token is scoped to an exact file", async () => {
-            const token = generateDownloadToken("default/uploads/image.png");
+            const token = await generateDownloadToken("default/uploads/image.png");
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/uploads/image.png/../../secret/data.txt?token=" + token)
             );
@@ -79,7 +79,7 @@ describe("fileTokenAuth Middleware", () => {
         it("denies percent-encoded `..`", async () => {
             // `%2e` is a dot for normalization purposes per the WHATWG URL
             // spec, so this resolves exactly like the plain `..` above.
-            const token = generateDownloadToken("default/uploads/");
+            const token = await generateDownloadToken("default/uploads/");
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/uploads/%2e%2e/secret/data.txt?token=" + token)
             );
@@ -88,7 +88,7 @@ describe("fileTokenAuth Middleware", () => {
         });
 
         it("denies `..` presented in the Authorization header too", async () => {
-            const token = generateDownloadToken("default/uploads/");
+            const token = await generateDownloadToken("default/uploads/");
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/uploads/../secret/data.txt", {
                     headers: { Authorization: `Bearer ${token}` }
@@ -100,7 +100,7 @@ describe("fileTokenAuth Middleware", () => {
 
         it("still allows a file whose name merely contains dots", async () => {
             // `..` is only a traversal as a whole segment; `..hidden` is a name.
-            const token = generateDownloadToken("default/uploads/");
+            const token = await generateDownloadToken("default/uploads/");
             const res = await app.fetch(
                 new Request("http://localhost/api/storage/file/default/uploads/..hidden.txt?token=" + token)
             );
@@ -142,7 +142,7 @@ describe("fileTokenAuth Middleware", () => {
     });
 
     it("should deny access if token path does not match requested path", async () => {
-        const token = generateDownloadToken("default/secret/data.txt");
+        const token = await generateDownloadToken("default/secret/data.txt");
         const res = await app.fetch(
             new Request("http://localhost/api/storage/file/default/uploads/image.png?token=" + token)
         );
@@ -169,13 +169,13 @@ describe("fileTokenAuth Middleware", () => {
             (storageId === undefined ? "" : `&storageId=${encodeURIComponent(storageId)}`);
 
         it("grants a read on the source it names", async () => {
-            const token = generateDownloadToken(key, 300, "media");
+            const token = await generateDownloadToken(key, 300, "media");
             const res = await app.fetch(new Request(url("media", token)));
             expect(res.status).toBe(200);
         });
 
         it("refuses the same key in another source", async () => {
-            const token = generateDownloadToken(key, 300, "media");
+            const token = await generateDownloadToken(key, 300, "media");
             const res = await app.fetch(new Request(url("backups", token)));
 
             expect(res.status).toBe(403);
@@ -186,13 +186,13 @@ describe("fileTokenAuth Middleware", () => {
         it("refuses a named-source token used against the default source", async () => {
             // The bypass is symmetric, and dropping the parameter is the
             // cheapest way to try it.
-            const token = generateDownloadToken(key, 300, "media");
+            const token = await generateDownloadToken(key, 300, "media");
             const res = await app.fetch(new Request(url(undefined, token)));
             expect(res.status).toBe(403);
         });
 
         it("refuses a default-source token used against a named source", async () => {
-            const token = generateDownloadToken(key, 300);
+            const token = await generateDownloadToken(key, 300);
             const res = await app.fetch(new Request(url("media", token)));
             expect(res.status).toBe(403);
         });
@@ -201,7 +201,7 @@ describe("fileTokenAuth Middleware", () => {
             // A client that sends `storageId=(default)` explicitly, or an empty
             // one, is asking for the same controller the omitted parameter
             // resolves to — so it must not 403.
-            const token = generateDownloadToken(key, 300);
+            const token = await generateDownloadToken(key, 300);
             for (const spelling of [undefined, "", "(default)"]) {
                 const res = await app.fetch(new Request(url(spelling, token)));
                 expect([spelling, res.status]).toEqual([spelling, 200]);
@@ -211,7 +211,7 @@ describe("fileTokenAuth Middleware", () => {
         it("scopes a Bearer-presented token the same way", async () => {
             // Two code paths presented the same grant, and the check has to be
             // the same in both.
-            const token = generateDownloadToken(key, 300, "media");
+            const token = await generateDownloadToken(key, 300, "media");
             const res = await app.fetch(
                 new Request(`http://localhost/api/storage/file/${key}?storageId=backups`, {
                     headers: { Authorization: "Bearer " + token }
@@ -222,7 +222,7 @@ describe("fileTokenAuth Middleware", () => {
     });
 
     it("should reject full access JWT in query parameter ?token=", async () => {
-        const fullAccessJwt = generateAccessToken("user-1", ["admin"]);
+        const fullAccessJwt = await generateAccessToken("user-1", ["admin"]);
         const res = await app.fetch(
             new Request("http://localhost/api/storage/file/default/uploads/image.png?token=" + fullAccessJwt)
         );
@@ -233,7 +233,7 @@ describe("fileTokenAuth Middleware", () => {
     });
 
     it("should reject full access JWT in Authorization header for file serving routes", async () => {
-        const fullAccessJwt = generateAccessToken("user-1", ["admin"]);
+        const fullAccessJwt = await generateAccessToken("user-1", ["admin"]);
         const res = await app.fetch(
             new Request("http://localhost/api/storage/file/default/uploads/image.png", {
                 headers: {
@@ -248,7 +248,7 @@ describe("fileTokenAuth Middleware", () => {
     });
 
     it("should pass full access JWT in Authorization header for non-file (metadata) routes", async () => {
-        const fullAccessJwt = generateAccessToken("user-1", ["admin"]);
+        const fullAccessJwt = await generateAccessToken("user-1", ["admin"]);
         const res = await app.fetch(
             new Request("http://localhost/api/storage/metadata/default/uploads/image.png", {
                 headers: {

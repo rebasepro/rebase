@@ -43,7 +43,7 @@ const jwtAdapter: AuthAdapter = {
         const header = request.headers.get("authorization");
         const token = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
         if (!token) return null;
-        const payload = verifyAccessToken(token);
+        const payload = await verifyAccessToken(token);
         return payload ? { uid: payload.uid, email: "", roles: payload.roles ?? [], isAdmin: false } : null;
     }
 } as unknown as AuthAdapter;
@@ -81,7 +81,7 @@ describe.each(["builtin", "adapter"] as const)("%s auth middleware, requireAuth:
     });
 
     it("lets a valid token through", async () => {
-        const token = generateAccessToken("user-1", []);
+        const token = await generateAccessToken("user-1", []);
         const res = await app(which).request("/", { headers: { Authorization: `Bearer ${token}` } });
 
         expect(res.status).toBe(200);

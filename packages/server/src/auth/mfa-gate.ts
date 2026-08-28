@@ -56,7 +56,7 @@ export async function assertMfaSatisfied(authRepo: AuthRepository, uid: string):
 
     const factors = (await authRepo.getMfaFactors(uid)).filter(f => f.verified);
     const details: MfaRequiredDetails = {
-        mfaToken: generateMfaPendingToken(uid),
+        mfaToken: await generateMfaPendingToken(uid),
         factors: factors.map(f => ({ id: f.id,
 factorType: f.factorType,
 friendlyName: f.friendlyName }))

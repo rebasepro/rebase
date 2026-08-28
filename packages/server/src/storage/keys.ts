@@ -31,8 +31,52 @@
  * exactly right. Only a real `..` segment is refused.
  */
 
-import path from "node:path";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+
+/**
+ * `path.posix.normalize`, without `node:path`.
+ *
+ * A storage key is a POSIX-shaped string that never touches a filesystem, so
+ * reaching for `node:path` to fold `.` and `//` out of it was always a little
+ * wrong on its own terms — on Windows the platform `path` would have applied
+ * different rules to the same key. It also put the module that every storage
+ * read, ownership row and audit line goes through on the list of things that
+ * only run in a Node process.
+ *
+ * This is the algorithm Node implements, transcribed: segments are folded left
+ * to right, `..` pops unless it would climb past the root of a relative path,
+ * and both the leading and the trailing separator survive the round trip. The
+ * `..` branch is unreachable from {@link canonicalStorageKey}, which refuses
+ * those keys outright before it gets here — it exists so that this function is
+ * *the* normalizer rather than a subset of one, and
+ * `storage-keys.property.test.ts` holds it to that with a property test against
+ * `path.posix.normalize` itself. Exported for exactly that — nothing outside
+ * this module should be normalizing a key.
+ */
+export function normalizePosix(input: string): string {
+    if (input.length === 0) return ".";
+    const isAbsolute = input.startsWith("/");
+    const trailingSeparator = input.endsWith("/");
+
+    const segments: string[] = [];
+    for (const segment of input.split("/")) {
+        if (segment === "" || segment === ".") continue;
+        if (segment === "..") {
+            if (segments.length > 0 && segments[segments.length - 1] !== "..") segments.pop();
+            else if (!isAbsolute) segments.push("..");
+            continue;
+        }
+        segments.push(segment);
+    }
+
+    const joined = segments.join("/");
+    if (joined === "") {
+        if (isAbsolute) return "/";
+        return trailingSeparator ? "./" : ".";
+    }
+    const withTrailing = trailingSeparator ? `${joined}/` : joined;
+    return isAbsolute ? `/${withTrailing}` : withTrailing;
+}
 
 /** Longest key accepted, in UTF-16 code units. Matches the previous cap. */
 export const MAX_STORAGE_KEY_LENGTH = 1024;
@@ -90,7 +134,7 @@ export function canonicalStorageKey(rawKey: string): string {
     // Whether the key names a *directory* rather than an object: it ends with a
     // separator, or its last segment is the `.` that means "this directory".
     //
-    // Recorded before normalizing, because `path.posix.normalize` drops the
+    // Recorded before normalizing, because normalization drops the
     // distinction in one of those two spellings and not the other: `public/.`
     // becomes `public` while `public/./` stays `public/`. That asymmetry breaks
     // the rule this module states — a trailing slash is preserved, because it is
@@ -101,12 +145,14 @@ export function canonicalStorageKey(rawKey: string): string {
 
     // Safe now: with no `..` segment in the input, `normalize` can only collapse
     // `.` and duplicate slashes — it cannot climb.
-    const normalized = path.posix.normalize(withoutLeadingSlashes);
+    const normalized = normalizePosix(withoutLeadingSlashes);
 
     // `normalize(".")`, and `normalize("./")` → `./`; neither names an object.
     if (normalized === "." || normalized === "./") return "";
 
-    // `normalize` re-introduces a leading `./` for keys like `.//a`.
+    // Defensive: nothing reaching here still carries a leading `./`, since the
+    // leading slashes are already gone and `normalize` only emits `./` for a
+    // key that normalizes to nothing — which returned above.
     const key = normalized.replace(/^\.\//, "").replace(/^\/+/, "");
     if (key === "") return "";
     return denotesDirectory && !key.endsWith("/") ? `${key}/` : key;

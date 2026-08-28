@@ -426,7 +426,7 @@ export class RestApiGenerator {
             // Claimed before the write, not after: the two-step
             // recall-then-write let concurrent replays of one key both through.
             const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid, requestFingerprint(c.req.method, c.req.path, body))
+                ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
                 : undefined;
             if (claimed?.status === "replay") {
                 return respond(claimed.response);
@@ -744,7 +744,7 @@ values: entity as Record<string, unknown> },
             // recall-then-write let concurrent replays of one key both
             // through, which is the duplicate this exists to stop.
             const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid, requestFingerprint(c.req.method, c.req.path, body))
+                ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
                 : undefined;
             if (claimed?.status === "replay") {
                 return c.json(claimed.response as never, 201);

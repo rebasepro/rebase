@@ -46,8 +46,8 @@ offset: 0 }),
 deleteUser };
 }
 
-function bearer(userId: string): Record<string, string> {
-    return { authorization: `Bearer ${generateAccessToken(userId, ["admin"])}` };
+async function bearer(userId: string): Promise<Record<string, string>> {
+    return { authorization: `Bearer ${await generateAccessToken(userId, ["admin"])}` };
 }
 
 describe("DELETE /users/:uid", () => {
@@ -62,7 +62,7 @@ accessExpiresIn: "1h" });
 
         const res = await app.request("/users/admin-1", {
             method: "DELETE",
-            headers: bearer("admin-1")
+            headers: await bearer("admin-1")
         });
 
         expect(res.status).toBe(400);
@@ -80,7 +80,7 @@ accessExpiresIn: "1h" });
 
         const res = await app.request("/users/editor-1", {
             method: "DELETE",
-            headers: bearer("admin-1")
+            headers: await bearer("admin-1")
         });
 
         expect(res.status).toBe(200);
@@ -94,7 +94,7 @@ accessExpiresIn: "1h" });
 
         const res = await app.request("/users/ghost", {
             method: "DELETE",
-            headers: bearer("admin-1")
+            headers: await bearer("admin-1")
         });
 
         expect(res.status).toBe(404);
@@ -113,7 +113,7 @@ accessExpiresIn: "1h" });
 
         const res = await app.request("/users/admin-2", {
             method: "DELETE",
-            headers: bearer("admin-1")
+            headers: await bearer("admin-1")
         });
 
         expect(res.status).toBe(403);
@@ -127,7 +127,7 @@ accessExpiresIn: "1h" });
 
         const res = await app.request("/users/editor-1", {
             method: "DELETE",
-            headers: { authorization: `Bearer ${generateAccessToken("editor-1", ["editor"])}` }
+            headers: { authorization: `Bearer ${await generateAccessToken("editor-1", ["editor"])}` }
         });
 
         expect(res.status).toBe(403);

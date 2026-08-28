@@ -19,8 +19,15 @@ interface RateLimiterOptions {
     windowMs?: number;
     /** Maximum requests per window (default: 100) */
     limit?: number;
-    /** Key generator function. Defaults to IP-based keying. */
-    keyGenerator?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => string;
+    /**
+     * Key generator function. Defaults to IP-based keying.
+     *
+     * May return a promise: a generator that buckets by the *user* has to
+     * verify a token to find one, and verification is asynchronous (see
+     * `jwt-crypto.ts`). Returning a plain string is still fine, and is what
+     * every IP-keyed generator does.
+     */
+    keyGenerator?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => string | Promise<string>;
     /** Custom message for rate limit responses */
     message?: string;
     /**
@@ -33,7 +40,8 @@ interface RateLimiterOptions {
      * than config (an API key's own `rate_limit`). Returning `undefined` uses
      * `limit`; returning `null` skips the limiter for this request.
      */
-    resolveLimit?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) => number | null | undefined;
+    resolveLimit?: (c: Parameters<MiddlewareHandler<HonoEnv>>[0]) =>
+        number | null | undefined | Promise<number | null | undefined>;
     /**
      * Number of trusted reverse-proxy hops in front of this server. Each hop
      * appends the address it saw to `X-Forwarded-For`, so the real client IP is
@@ -120,13 +128,13 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
     } = options;
 
     return async (c, next) => {
-        const effectiveLimit = resolveLimit ? resolveLimit(c) : limit;
+        const effectiveLimit = resolveLimit ? await resolveLimit(c) : limit;
         // `null` means "not my bucket" — e.g. an API-key limiter looking at a
         // request that carries no API key.
         if (effectiveLimit === null) return next();
         const activeLimit = effectiveLimit ?? limit;
 
-        const decision = await store.hit(keyGenerator(c), windowMs, activeLimit);
+        const decision = await store.hit(await keyGenerator(c), windowMs, activeLimit);
 
         c.header("X-RateLimit-Limit", String(activeLimit));
         c.header("X-RateLimit-Remaining", String(decision.remaining));
@@ -377,7 +385,7 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
      * to the context; an identity that fails to verify simply buckets by IP,
      * exactly as before.
      */
-    const identify = (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | undefined => {
+    const identify = async (c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<string | undefined> => {
         const user = c.get("user") as { uid?: string } | undefined;
         if (user?.uid) return isAnonymousUid(user.uid) ? undefined : user.uid;
 
@@ -387,7 +395,7 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         if (!isJwtConfigured()) return undefined;
         const token = extractBearerToken(c.req.header("authorization"));
         if (token === undefined) return undefined;
-        const payload = verifyAccessToken(token);
+        const payload = await verifyAccessToken(token);
         if (!payload?.uid || isAnonymousUid(payload.uid)) return undefined;
         return payload.uid;
     };
@@ -396,17 +404,17 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         windowMs,
         store,
         message: "Too many requests, please try again later.",
-        keyGenerator: (c) => {
+        keyGenerator: async (c) => {
             const key = c.get("apiKey") as { id: string } | undefined;
             if (key) return `api-key:${key.id}`;
-            const uid = identify(c);
+            const uid = await identify(c);
             if (uid) return `user:${uid}`;
             return `ip:${defaultKeyGenerator(c, trustedProxyHops)}`;
         },
-        resolveLimit: (c) => {
+        resolveLimit: async (c) => {
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
             if (key) return key.rate_limit ?? apiKeyLimit;
-            return identify(c) ? userLimit : anonLimit;
+            return (await identify(c)) ? userLimit : anonLimit;
         }
     });
 }
