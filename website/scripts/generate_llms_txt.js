@@ -231,7 +231,11 @@ async function buildSlugMap(directoryPath, slugMap) {
 
                         slugMap[slug] = {
                             path: fullPath,
-                            title: frontmatter?.title || slug
+                            title: frontmatter?.title || slug,
+                            // Used only by the index file. A page with no
+                            // description still gets listed — a bare link is
+                            // worth more than an omission.
+                            description: frontmatter?.description || ""
                         };
                     }
                 }
@@ -248,7 +252,17 @@ async function buildSlugMap(directoryPath, slugMap) {
 (async () => {
     const rootDirectory = "./src/content/docs/docs"; // Root directory to start processing
     const configFilePath = "../astro.config.mjs"; // Path to astro.config.mjs
-    const outputFilePath = "./public/llms.txt"; // Single output file
+    // Two files, per the llms.txt convention, and the split is not cosmetic.
+    //
+    // This script used to write the entire documentation set — some 18,000
+    // lines — to /llms.txt. Anything fetching that URL truncates long before
+    // the end, so every page after the first few was invisible to exactly the
+    // readers the file exists for: the admin panel, RLS, and Rebase Cloud were
+    // all past the cut. The convention answers this directly — /llms.txt is a
+    // short index of links, /llms-full.txt is the corpus — and we were
+    // publishing the corpus under the index's name.
+    const indexFilePath = "./public/llms.txt";
+    const outputFilePath = "./public/llms-full.txt";
 
     try {
         // Extract sidebar slugs from astro config
@@ -260,9 +274,9 @@ async function buildSlugMap(directoryPath, slugMap) {
         await buildSlugMap(rootDirectory, slugMap);
         console.log(`Processing ${Object.keys(slugMap).length} documentation files...`);
 
-        // Clear the output file if it already exists
-        if (fs.existsSync(outputFilePath)) {
-            fs.unlinkSync(outputFilePath);
+        // Clear the output files if they already exist
+        for (const stale of [outputFilePath, indexFilePath]) {
+            if (fs.existsSync(stale)) fs.unlinkSync(stale);
         }
 
         let result = "";
@@ -304,8 +318,11 @@ async function buildSlugMap(directoryPath, slugMap) {
                 .replaceAll("](../", "](https://rebase.pro/docs/"));
 
         await fs.promises.appendFile(outputFilePath, result, "utf-8");
-
         console.log(`✓ Successfully generated ${outputFilePath} with ${processedCount} pages`);
+
+        const index = buildIndex(sidebarSlugs, slugMap);
+        await fs.promises.writeFile(indexFilePath, index, "utf-8");
+        console.log(`✓ Successfully generated ${indexFilePath} (${index.split("\n").length} lines)`);
     } catch (error) {
         console.error("An unexpected error occurred during processing:", error.message);
     }
@@ -322,3 +339,91 @@ const intro = `# Rebase Documentation
 > autonomous agents to read and write production data.
 
 `;
+
+/**
+ * The pages a model should read before it answers a question about Rebase.
+ *
+ * Hand-maintained, and short on purpose. The docs list below is generated from
+ * the sidebar and will grow on its own; this list is the answer to "what is
+ * this product and how does it compare", which is the question an AI is
+ * actually being asked when it reaches for this file. The comparison pages earn
+ * their place here for the same reason they exist at all: "X vs Y" is the shape
+ * of page a model quotes when someone asks it which to use.
+ */
+const PRODUCT_PAGES = [
+    ["Rebase", "https://rebase.pro/", "What Rebase is: a Postgres backend with an admin panel generated from the same schema."],
+    ["Backend", "https://rebase.pro/backend", "The backend on its own — REST API, auth, RLS, realtime, storage, functions, cron."],
+    ["Admin panel (Studio)", "https://rebase.pro/studio", "The admin UI your non-technical teammates use, generated from the collections."],
+    ["Pricing", "https://rebase.pro/pricing", "Open source and self-hosted, plus Rebase Cloud (private beta), priced per resource rather than per seat."],
+    ["Security", "https://rebase.pro/security", "Row-level security compiled from code to real Postgres policies, and how it is enforced."],
+    ["For agencies", "https://rebase.pro/agencies", "Shipping a client-ready admin panel from the backend you were going to build anyway."],
+    ["CLI", "https://rebase.pro/cli", "`npm i -g @rebasepro/cli` — scaffold, run, migrate and deploy a project."],
+    ["Compare", "https://rebase.pro/compare", "Side-by-side against the alternatives, including where a competitor is the better call."]
+];
+
+/** Comparison pages, listed separately because they answer a distinct question. */
+const COMPARISON_PAGES = [
+    ["Rebase vs Supabase", "https://rebase.pro/rebase-vs-supabase"],
+    ["Rebase vs Firebase", "https://rebase.pro/rebase-vs-firebase"],
+    ["Rebase vs Directus", "https://rebase.pro/rebase-vs-directus"],
+    ["Rebase vs Strapi", "https://rebase.pro/rebase-vs-strapi"],
+    ["Rebase vs Payload", "https://rebase.pro/rebase-vs-payload"],
+    ["Rebase vs Retool", "https://rebase.pro/rebase-vs-retool"],
+    ["Rebase vs Hasura", "https://rebase.pro/rebase-vs-hasura"],
+    ["Rebase vs Django", "https://rebase.pro/rebase-vs-django"]
+];
+
+/** One `- [title](url): description` line, with the description trimmed. */
+function link(title, url, description) {
+    const summary = (description || "").replace(/\s+/g, " ").trim();
+    return summary ? `- [${title}](${url}): ${summary}` : `- [${title}](${url})`;
+}
+
+/**
+ * Build /llms.txt: an H1, a blockquote summary, then lists of links.
+ *
+ * That shape is the whole specification, and the reason for it is bandwidth —
+ * a reader fetches this to decide what *else* to fetch. Anything long enough to
+ * be truncated defeats the purpose, so nothing here is a page's content, only
+ * its address and a sentence saying what is at it.
+ */
+function buildIndex(sidebarSlugs, slugMap) {
+    const lines = [intro.trimEnd(), ""];
+
+    lines.push("## Product");
+    lines.push("");
+    for (const [title, url, description] of PRODUCT_PAGES) lines.push(link(title, url, description));
+    lines.push("");
+
+    lines.push("## Comparisons");
+    lines.push("");
+    for (const [title, url] of COMPARISON_PAGES) {
+        lines.push(link(title, url, "Where each one wins, and where the other is the better call."));
+    }
+    lines.push("");
+
+    lines.push("## Documentation");
+    lines.push("");
+    for (const slug of sidebarSlugs) {
+        const entry = slugMap[slug];
+        if (!entry) continue;
+        lines.push(link(entry.title, `https://rebase.pro/${slug}`, entry.description));
+    }
+    lines.push("");
+
+    lines.push("## Optional");
+    lines.push("");
+    lines.push(link(
+        "llms-full.txt",
+        "https://rebase.pro/llms-full.txt",
+        "Every documentation page above, concatenated. Large — fetch a single page from the list instead unless you need the whole corpus."
+    ));
+    lines.push(link(
+        "sitemap.md",
+        "https://rebase.pro/sitemap.md",
+        "Every page on the site, as markdown."
+    ));
+    lines.push("");
+
+    return lines.join("\n");
+}
