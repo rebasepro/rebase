@@ -1,0 +1,117 @@
+---
+/**
+ * The question-and-answer block at the foot of a comparison page.
+ *
+ * ── Why every comparison page needs one ──────────────────────────────────────
+ * A buyer choosing between two backends does not read a feature grid. They ask
+ * six questions — can I migrate, what breaks, who is this actually for, what
+ * does it cost — and whichever page answers those in the buyer's own words is
+ * the page that gets quoted. That is true of a person skimming and it is
+ * doubly true of an AI assembling an answer, which reaches for text already
+ * shaped as a question and a reply.
+ *
+ * Before this component the comparison pages made an argument and stopped. The
+ * argument is good; it just was not in the shape anyone was looking for.
+ *
+ * ── Why `<details>` and not a JavaScript accordion ───────────────────────────
+ * A collapsed `<details>` still has its answer in the DOM, so a crawler that
+ * does not run scripts reads every word. A JS accordion that renders the answer
+ * on click publishes a page of questions with no answers to exactly the readers
+ * this block exists to reach. It also means the block costs no JavaScript.
+ *
+ * ── Honesty is the point, not a caveat ───────────────────────────────────────
+ * At least one answer on every page should say plainly where the competitor is
+ * the better choice. A comparison that never concedes anything is read as
+ * marketing and cited by nobody; the `/compare` page already takes this line,
+ * and this block follows it.
+ */
+interface Faq {
+    q: string;
+    a: string;
+}
+
+interface Props {
+    /** Competitor name, used in the default heading. */
+    competitor: string;
+    faqs: Faq[];
+    /** Absolute URL of the page, so the schema is self-identifying. */
+    pageUrl?: string;
+    /**
+     * Overrides the heading where "Rebase and X, answered" does not read.
+     * The block is not only for competitors — the rls-check page uses it for
+     * questions about a tool, where the default phrasing is nonsense.
+     */
+    heading?: string;
+}
+
+const { competitor, faqs, pageUrl, heading } = Astro.props as Props;
+
+/**
+ * FAQPage structured data.
+ *
+ * The one schema type in this market that is quoted verbatim rather than
+ * summarised — it is a machine-readable list of exactly the questions a buyer
+ * asks, with an answer attached to each. The prose below and this object are
+ * built from the same array, so they can never disagree.
+ */
+const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    ...(pageUrl ? { "@id": `${pageUrl}#faq` } : {}),
+    mainEntity: faqs.map((faq) => ({
+        "@type": "Question",
+        name: faq.q,
+        acceptedAnswer: { "@type": "Answer", text: faq.a }
+    }))
+};
+---
+
+<section class="relative isolate bg-page-ground py-20 sm:py-28 border-t border-surface-900/60 overflow-hidden">
+    <div
+        class="absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+        style="background: radial-gradient(circle at 50% 0%, rgba(0, 112, 244, 0.05) 0%, transparent 65%);"
+    ></div>
+
+    <div class="mx-auto max-w-3xl px-6 lg:px-8 relative z-10">
+        <div class="text-center mb-12">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
+                Questions
+            </span>
+            <h2 class="mt-4 text-display-2 text-white">
+                {heading ?? `Rebase and ${competitor}, answered`}
+            </h2>
+        </div>
+
+    <!--
+      `.frame` is a Tailwind `@utility` that sets the `background` shorthand, so
+      a `bg-*` utility for the open state would be an equal-specificity coin
+      flip against it. The open state is signalled by the rotating icon and the
+      answer appearing, which needs no background of its own.
+    -->
+        <div class="space-y-3">
+            {faqs.map((faq) => (
+                <details class="frame group px-6 py-5">
+                    <summary class="flex items-start justify-between gap-4 cursor-pointer list-none text-white font-medium leading-snug marker:content-none [&::-webkit-details-marker]:hidden">
+                        <span>{faq.q}</span>
+                        <svg
+                            class="mt-1 h-4 w-4 flex-none text-surface-500 transition-transform duration-200 group-open:rotate-45"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                    </summary>
+                    <p class="mt-4 text-surface-400 leading-relaxed text-sm sm:text-base">{faq.a}</p>
+                </details>
+            ))}
+        </div>
+    </div>
+</section>
+
+<script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />

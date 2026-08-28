@@ -99,6 +99,7 @@
     "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true",
     "smoke:baas": "pnpm --filter @rebasepro/server-postgres smoke:baas",
     "check:docs-imports": "node tooling/scripts/check-docs-imports.mjs",
+    "check:glued-code": "node tooling/scripts/check-glued-code.mjs",
     "check:legacy-rls": "node tooling/scripts/check-legacy-rls-removable.mjs"
   },
   "devDependencies": {

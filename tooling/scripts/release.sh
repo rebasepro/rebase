@@ -99,7 +99,18 @@ ok "All preflight checks passed"
 # ── Calculate version ───────────────────────────────────────
 step "Calculating version"
 
-LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+# The last release *on this history*, not the highest version string in the tag
+# namespace. `--sort=-v:refname` answers the second question, and the two differ:
+# this repository descends from a lineage that reached v3.x before versioning
+# restarted at 0.x, and a clone can still carry those tags locally. Sorted by
+# version, v3.3.0 wins and `minor` computes 3.4.0 — a number that would be
+# published to npm and cannot be taken back.
+#
+# `git describe` walks back from HEAD instead, so it can only return a tag this
+# commit descends from, and returns the nearest one. CI never hit this because
+# the v3 tags were never pushed; a release run from a developer's clone would
+# have.
+LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
 if [ -z "$LATEST_TAG" ]; then
   err "No semver tags found. Create an initial tag first: git tag -a v0.0.0 -m 'Initial version'"
   exit 1
@@ -107,6 +118,17 @@ fi
 
 CURRENT_VERSION="${LATEST_TAG#v}"
 info "Current version: ${BOLD}$CURRENT_VERSION${RESET} (from tag $LATEST_TAG)"
+
+# The tag and the packages are bumped by the same release, so they agree unless
+# the tag came from somewhere else. Disagreeing means the version about to be
+# computed is not this project's — stop before it reaches npm.
+PKG_VERSION=$(node -p "require('$ROOT_DIR/packages/server/package.json').version")
+if [ "$PKG_VERSION" != "$CURRENT_VERSION" ]; then
+  err "Tag $LATEST_TAG disagrees with packages/server at $PKG_VERSION."
+  err "Releasing would compute the next version from the wrong baseline."
+  err "Check for stray tags: git tag -l 'v[0-9]*' --sort=-v:refname | head"
+  exit 1
+fi
 
 if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
   NEW_VERSION="$BUMP"

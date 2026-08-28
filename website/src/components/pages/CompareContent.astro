@@ -93,6 +93,7 @@ const headToHead = [
     { name: "Django", href: "/rebase-vs-django" },
 ];
 import { imgDims } from "../../utils/imageDimensions";
+import { ALTERNATIVES_PAGES } from "../../data/alternatives";
 import ClosingCta from "../ClosingCta.astro";
 ---
 
@@ -334,6 +335,37 @@ import ClosingCta from "../ClosingCta.astro";
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Round-ups.
+         The head-to-heads above only work on somebody who already knows our
+         name. These are the pages for the much larger group who do not: they
+         start from the incumbent and the reason for leaving it, and Rebase is
+         one entry among several. Generated from the same data as the pages
+         themselves, so this list cannot advertise one that is not built. -->
+    <section class="py-16 sm:py-24 border-t border-surface-900/60">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">Or start from what you are replacing</h2>
+            <p class="text-surface-400 mb-10 leading-relaxed max-w-2xl">
+                Round-ups of the whole field around each incumbent — what else is out there, what each one is
+                actually good at, and which to pick for the specific reason you are looking. Several of the
+                recommendations are not us.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ALTERNATIVES_PAGES.map((page) => (
+                    <a href={translatePath(`/alternatives/${page.slug}`)}
+                       class="frame group p-6 transition-colors hover:border-primary/30">
+                        <h3 class="text-white font-semibold mb-2 flex items-center justify-between gap-2">
+                            <span>{page.name} alternatives</span>
+                            <span class="text-surface-600 group-hover:text-primary-light transition-colors">&rarr;</span>
+                        </h3>
+                        <p class="text-sm text-surface-400 leading-relaxed">
+                            {page.alternatives.length} options, ordered by the reason you are leaving.
+                        </p>
+                    </a>
+                ))}
             </div>
         </div>
     </section>

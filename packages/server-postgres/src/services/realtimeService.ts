@@ -462,6 +462,23 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             }
         }
 
+        // The shared rows go before the announcement, not after it. Every
+        // `removePresence` below publishes a departure — to local members and
+        // over the bus — while `sendPresenceState` answers a *newly arriving*
+        // subscriber from this table. Announcing first leaves a window where the
+        // table still lists someone who has left: a client hydrating inside it is
+        // handed the ghost, and the diff that would have corrected it was
+        // broadcast before that client existed, so it holds the ghost until the
+        // TTL sweep rather than for the length of one statement.
+        //
+        // One statement for every channel the client was in, rather than one per
+        // channel below — a disconnect is the common case, not a rare one. The
+        // subscription and timer cleanup above stays synchronous on purpose: it
+        // is what leaks if the database is slow, and it owes nothing to the
+        // shared table. With no bus configured this is a no-op that never awaits
+        // a query.
+        await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+
         // Remove from all broadcast channels
         for (const [channel, members] of this.channels.entries()) {
             if (members.has(clientId)) {
@@ -475,10 +492,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         for (const [channel] of this.presence) {
             this.removePresence(clientId, channel, { skipStore: true });
         }
-
-        // One statement for every channel the client was in, rather than one
-        // per channel above — a disconnect is the common case, not a rare one.
-        void this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
     }
 
     private async handleMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext) {

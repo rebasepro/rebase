@@ -10,6 +10,8 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
 
 
 
+import ComparisonFaq from "../ComparisonFaq.astro";
+import { COMPARISON_FAQS } from "../../data/comparison-faqs";
 import ClosingCta from "../ClosingCta.astro";
 ---
 
@@ -537,6 +539,10 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
       </div>
     </section>
+
+  
+    <ComparisonFaq competitor="Strapi" faqs={COMPARISON_FAQS.strapi} pageUrl="https://rebase.pro/rebase-vs-strapi" />
+
 
   
     <ClosingCta title="Don't take our word for it." blurb="The comparison that matters is the one you run. Point Rebase at a Postgres database you already have and see how it holds up next to Strapi." trackId="vs-strapi" />

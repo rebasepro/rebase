@@ -214,6 +214,15 @@ jobs:
       - name: Untranslated-string ratchet
         run: pnpm run check:untranslated
 
+      # Astro and JSX drop the newline between a word and an adjacent tag rather
+      # than collapsing it to a space, so a paragraph broken across two source
+      # lines at that boundary renders "or runrebase dev". Invisible in the
+      # source and in the diff; seven instances were shipping across three
+      # marketing pages, all found by measuring the rendered gap between two
+      # boxes rather than by reading.
+      - name: Prose glued to an inline tag
+        run: pnpm run check:glued-code
+
       # The docs verifier existed but ran in no pipeline at all, and defaulted to
       # exit 0, so documented APIs could drift from the source indefinitely — and
       # had: a wiring example that could not compile and a `userManagement` prop
