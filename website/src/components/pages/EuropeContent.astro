@@ -177,16 +177,15 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
                     <h3 class="mb-4 text-2xl font-semibold text-white">Small enough to read in one sitting</h3>
                     <p class="mb-4 text-base leading-relaxed text-surface-400">
                         That is the entire production deployment, minus the secrets. Two services, one volume,
-                        three environment variables. The runtime refuses to start in production without
-                        <code class="font-mono text-surface-300">DATABASE_URL</code>,
-                        <code class="font-mono text-surface-300">JWT_SECRET</code> and
-                        <code class="font-mono text-surface-300">CORS_ORIGINS</code> rather than guessing them.
+                        three environment variables. The runtime refuses to start in production
+                        without <code class="font-mono text-surface-300">DATABASE_URL</code>, <code class="font-mono text-surface-300">JWT_SECRET</code> and <code class="font-mono text-surface-300">CORS_ORIGINS</code> rather
+                        than guessing them.
                     </p>
                     <p class="text-base leading-relaxed text-surface-400">
                         Mount the bundle read-only and a compromised hook cannot rewrite the code that runs after
-                        the next restart. Point your orchestrator's liveness probe at
-                        <code class="font-mono text-surface-300">/livez</code> and readiness at
-                        <code class="font-mono text-surface-300">/health</code>; the first never touches the database,
+                        the next restart. Point your orchestrator's liveness probe
+                        at <code class="font-mono text-surface-300">/livez</code> and readiness
+                        at <code class="font-mono text-surface-300">/health</code>; the first never touches the database,
                         so a brief hiccup does not restart a perfectly healthy process.
                     </p>
                 </div>
