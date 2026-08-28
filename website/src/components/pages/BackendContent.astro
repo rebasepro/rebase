@@ -110,6 +110,7 @@ const routes = [
 ];
 
 const alsoShipped = [
+    { title: "Topics and jobs", desc: "Publish an event, subscribe by name. One durable row per subscriber, each retrying on its own schedule — and a publish inside a transaction that rolls back never happened." },
     { title: "Webhooks", desc: "HMAC-signed outbound calls on insert, update and delete, with retries." },
     { title: "Entity history", desc: "An audit trail per collection: who changed what, when, and a revert." },
     { title: "Database branching", desc: "Isolated copies of the whole database for a feature or a test run." },
@@ -133,9 +134,10 @@ const alsoShipped = [
                 The backend,<br/>on its own.
             </h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-                Point it at a Postgres database and you get REST, a typed SDK, realtime over WebSocket, auth,
-                storage and an OpenAPI spec — with every access rule enforced by the database itself.
-                No admin panel required. No React in the dependency tree.
+                REST, a typed SDK, realtime over WebSocket, auth, storage and an OpenAPI spec — with every access
+                rule enforced by the database itself. Point it at your own Postgres, or
+                run <code class="font-mono text-surface-200">rebase dev</code> and get one without installing
+                anything. No admin panel required. No React in the dependency tree.
             </p>
             <div class="mt-4 max-w-xl">
                 <HeroConnectionWidget client:load/>
@@ -203,6 +205,10 @@ const alsoShipped = [
                     </p>
                     <p class="text-base text-surface-400 leading-relaxed mb-6">
                         Rename a column in the collection and the call sites turn red before anything ships.
+                        The repository that consumes the API does not need to be the one that defines
+                        it: <code class="font-mono text-surface-300">--from &lt;url&gt;</code> generates the same client
+                        from a running backend, in a project with no schema of its own. Your web app, admin and
+                        mobile client each stay in their own repo, and CI catches a stale client before a user does.
                     </p>
                     <a href={translatePath("/sdk")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
@@ -257,8 +263,8 @@ const alsoShipped = [
                         fetched.
                     </p>
                     <p class="text-base text-surface-400 leading-relaxed">
-                        Writes made outside the API count too — a row changed from
-                        <code class="font-mono text-surface-300">psql</code>, a cron job or Studio's SQL editor emits
+                        Writes made outside the API count too — a row changed
+                        from <code class="font-mono text-surface-300">psql</code>, a cron job or Studio's SQL editor emits
                         the same event, because change capture happens in the database. Across replicas, fan-out
                         rides Postgres <code class="font-mono text-surface-300">LISTEN/NOTIFY</code>.
                     </p>
@@ -341,10 +347,15 @@ const alsoShipped = [
                     <h2 class="text-3xl sm:text-4xl text-white mb-5">
                         Everything mounted, nothing assembled
                     </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
                         This is the routing table of a default project — one process, one deployment, no service
                         mesh to draw. Each of these exists because building it yourself is a week you would
                         rather spend elsewhere.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">
+                        One process is the default, not the ceiling. The same build also boots as an API, a
+                        functions tier and a worker — one variable per process decides which routes mount, which
+                        timers fire and which one owns the schema.
                     </p>
                     <div class="space-y-4">
                         {alsoShipped.map(item => (
@@ -462,7 +473,9 @@ const alsoShipped = [
                 A backend in about a minute
             </h2>
             <p class="text-lg text-surface-400 mb-10">
-                Scaffold a project, point it at a database, and read the OpenAPI spec it generates.
+                Scaffold a project and read the OpenAPI spec it generates. A database comes up with it, so there
+                is nothing to install first — and naming your own <code class="font-mono text-surface-300">DATABASE_URL</code> overrides
+                it at any point.
             </p>
 
             <div class="group relative max-w-md mx-auto mb-10">

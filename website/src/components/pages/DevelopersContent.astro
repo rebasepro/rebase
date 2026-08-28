@@ -25,12 +25,12 @@ const loop = [
     {
         cmd: "rebase generate-sdk",
         title: "Regenerate the types",
-        desc: "Writes database.types.ts. From here a renamed column is a compile error in your app, not a runtime surprise.",
+        desc: "Writes a typed client from your collections — or from a running backend with --from <url>, in a repo that has no schema of its own.",
     },
     {
         cmd: "rebase dev",
-        title: "Run both halves",
-        desc: "Backend and admin panel together with hot reload — the API on :3001, the panel on :5173.",
+        title: "Run it, with no database to install",
+        desc: "Backend and panel together with hot reload. No DATABASE_URL? A managed Postgres starts with them — no install, no Docker, no compose file.",
     },
 ];
 
@@ -80,6 +80,19 @@ app.<span class="text-amber-400">post</span>(<span class="text-green-400">"/"</s
 <span class="text-blue-400">export default</span> app;
 <span class="text-surface-500">// → POST /api/functions/checkout</span>`;
 
+const resourcesCode = `<span class="text-surface-500">// config/resources.ts</span>
+<span class="text-blue-400">import</span> { database, bucket, topic } <span class="text-blue-400">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
+
+<span class="text-blue-400">export const</span> analytics = <span class="text-amber-400">database</span>(<span class="text-green-400">"analytics"</span>, { engine: <span class="text-green-400">"mongodb"</span> });
+<span class="text-blue-400">export const</span> media     = <span class="text-amber-400">bucket</span>(<span class="text-green-400">"media"</span>, { engine: <span class="text-green-400">"s3"</span>, transport: <span class="text-green-400">"direct"</span> });
+<span class="text-blue-400">export const</span> signups   = <span class="text-amber-400">topic</span>&lt;{ userId: <span class="text-blue-300">string</span> }&gt;(<span class="text-green-400">"signups"</span>);
+
+signups.<span class="text-amber-400">subscription</span>(<span class="text-green-400">"send-welcome"</span>, <span class="text-primary-light">async</span> (event) =&gt; {
+  <span class="text-surface-500">// durable, at-least-once, retried on its own schedule</span>
+});
+
+<span class="text-primary-light">await</span> signups.<span class="text-amber-400">publish</span>({ userId });`;
+
 const deployTargets = [
     { name: "Docker", note: "A Dockerfile ships with every scaffolded backend." },
     { name: "Railway", note: "Push the repo, set DATABASE_URL, done." },
@@ -106,9 +119,10 @@ const deployTargets = [
                         Schema as code.<br/>Everything else follows.
                     </h1>
                     <p class="mb-8 text-lg leading-8 text-surface-300">
-                        You write collections in TypeScript and run four commands. Rebase keeps the database, the
-                        API, the types and — if you opted in — the admin panel in agreement with that one file.
-                        No generated code to babysit, no UI to re-draw.
+                        You write collections in TypeScript. Rebase keeps the database, the API, the types and —
+                        if you opted in — the admin panel in agreement with that one file. Clone the repo,
+                        run <code class="font-mono text-surface-200">rebase dev</code>, and it is already up: no
+                        Postgres to install, no Docker, no compose file to maintain.
                     </p>
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                         <a href="/docs/getting-started/quickstart"
@@ -201,8 +215,8 @@ const deployTargets = [
                     <p class="text-base text-surface-400 leading-relaxed">
                         Delete <code class="font-mono text-surface-300">frontend/</code> and you have a headless
                         backend. Nothing under <code class="font-mono text-surface-300">backend/</code> imports
-                        React, and the type system enforces it — an
-                        <code class="font-mono text-surface-300">admin</code> key in a project that never opted in
+                        React, and the type system enforces it —
+                        an <code class="font-mono text-surface-300">admin</code> key in a project that never opted in
                         is a compile error.
                     </p>
                 </div>
@@ -304,7 +318,48 @@ const deployTargets = [
         </div>
     </section>
 
-    <!-- ═══════════════════════ 04 · ARCHITECTURE ═══════════════════════ -->
+    <!-- ═══════════════════════ 04 · RESOURCES ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
+                        Resources
+                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
+                        Declare what you need. In code, once.
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        Databases, buckets and topics are constructors, not YAML. Each one names its own engine —
+                        Postgres, MongoDB, Firestore, SQLite; local disk, S3, GCS, Azure — and an engine we have
+                        never heard of is spelled <code class="font-mono text-surface-300">custom:</code> and accepted,
+                        so it fails at the call site instead of looking like a typo.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed">
+                        <code class="font-mono text-surface-300">rebase resources</code> generates the graph a host
+                        reads before it builds anything, and <code class="font-mono text-surface-300">--check</code> fails
+                        CI when the committed graph and your code disagree. There is no second place to declare a
+                        bucket, which is the point: two homes for one fact means one of them is silently losing.
+                    </p>
+                </div>
+                <div class="lg:col-span-7">
+                    <div class="frame overflow-hidden">
+                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                            <span class="font-mono text-xs text-surface-400">config/resources.ts</span>
+                            <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">declared once</span>
+                        </div>
+                        <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={resourcesCode}></code></pre>
+                        <p class="px-5 pb-5 text-sm text-surface-400">
+                            Publishing inside a transaction that rolls back was never published. Each subscriber
+                            retries on its own schedule, and one that gives up is a row you can look at.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 05 · ARCHITECTURE ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
@@ -337,6 +392,13 @@ const deployTargets = [
                     <p class="text-base text-surface-400 leading-relaxed mb-4">
                         The backend builds to a bundle and runs behind whatever you already use. The admin panel
                         is a static SPA — serve it from the same process or from a CDN.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        One process is the default and stays the default. When you outgrow it, the same bundle
+                        boots as an API, a functions tier and a worker — <code class="font-mono text-surface-300">REBASE_ROLE</code> per
+                        process, and which routes mount, which timers fire and who owns the schema all follow from
+                        it. Exactly one process migrates; the rest check themselves against the database and say so
+                        if they disagree.
                     </p>
                     <p class="text-base text-surface-400 leading-relaxed mb-6">
                         Rebase Cloud, our managed hosting, has not launched yet. Until it does, every deployment
@@ -423,8 +485,9 @@ const deployTargets = [
         <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
             <h2 class="text-3xl sm:text-4xl text-white mb-4">Ready to build?</h2>
             <p class="text-lg text-surface-400 mb-10">
-                One command scaffolds the whole thing. It runs against a local Postgres, or the one you already
-                have.
+                One command scaffolds the whole thing, and it runs on a managed database straight away. Name
+                a <code class="font-mono text-surface-300">DATABASE_URL</code> — your own Postgres, a colleague's
+                staging box, a Neon branch — and Rebase steps aside and uses exactly that.
             </p>
 
             <div class="group relative max-w-md mx-auto mb-10">
