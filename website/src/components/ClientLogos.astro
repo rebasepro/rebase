@@ -34,19 +34,15 @@ const INTRINSIC: Record<string, [number, number]> = {
     "/img/logos/swissmilk.svg": [300, 59],
     "/img/logos/shiftinc.svg": [300, 71],
     "/img/logos/recharge.svg": [300, 38],
-    "/img/logos/aquileia.svg": [140, 59],
     "/img/logos/hubx.svg": [300, 79],
     "/img/logos/bettha.svg": [87, 22],
     "/img/logos/colearn.svg": [120, 30],
-    "/img/logos/lovevolve.png": [400, 59],
-    "/img/logos/seesight.png": [477, 121],
     "/img/logos/teamdrs.svg": [108, 31],
     "/img/logos/yalantis.svg": [116, 26],
     "/img/logos/rush.svg": [219, 80],
     "/img/logos/inoxoft.svg": [128, 30],
     "/img/logos/nerdzlab.svg": [113, 30],
     "/img/logos/polymorph.png": [244, 48],
-    "/img/logos/gorin.webp": [374, 51],
     "/img/logos/holition.svg": [222, 59],
     "/img/logos/accurat.svg": [300, 27]
 };
@@ -334,17 +330,6 @@ const allLogos = [
         type: "companies"
     },
     {
-        key: "aquileia",
-        // FireCMS Cloud customer, verified from signup + project activity.
-        product: "firecms" as LogoProduct,
-        alt: "Basilica di Aquileia",
-        href: "https://www.basilicadiaquileia.it/",
-        src: "/img/logos/aquileia.svg",
-        invert: false,
-        height: 40,
-        type: "companies"
-    },
-    {
         key: "hubx",
         // FireCMS Cloud customer, verified from signup + project activity.
         product: "firecms" as LogoProduct,
@@ -385,39 +370,6 @@ const allLogos = [
         src: "/img/logos/colearn.svg",
         invert: true,
         height: 28,
-        type: "startups"
-    },
-    {
-        key: "lovevolve",
-        // FireCMS Cloud customer, verified from signup + project activity.
-        product: "firecms" as LogoProduct,
-        alt: "LovEvolve",
-        href: "https://lovevolve.com/",
-        src: "/img/logos/lovevolve.png",
-        invert: true,
-        height: 21,
-        type: "startups"
-    },
-    {
-        key: "seesight",
-        // FireCMS Cloud customer, verified from signup + project activity.
-        product: "firecms" as LogoProduct,
-        alt: "See Sight Tours",
-        href: "https://www.seesight-tours.com/",
-        src: "/img/logos/seesight.png",
-        invert: true,
-        height: 33,
-        type: "startups"
-    },
-    {
-        key: "declutterthemind",
-        // FireCMS Cloud customer, verified from signup + project activity.
-        product: "firecms" as LogoProduct,
-        alt: "Declutter The Mind",
-        href: "https://declutterthemind.com/",
-        text: "Declutter The Mind",
-        textClass: "text-base leading-tight",
-        invert: false,
         type: "startups"
     },
     {
@@ -487,17 +439,6 @@ const allLogos = [
         type: "agencies"
     },
     {
-        key: "gorinsystems",
-        // FireCMS Cloud customer, verified from signup + project activity.
-        product: "firecms" as LogoProduct,
-        alt: "Gorin Systems",
-        href: "https://gorinsystems.com/",
-        src: "/img/logos/gorin.webp",
-        invert: true,
-        height: 20,
-        type: "agencies"
-    },
-    {
         key: "holition",
         // FireCMS Cloud customer, verified from signup + project activity.
         product: "firecms" as LogoProduct,
@@ -512,8 +453,8 @@ const allLogos = [
         key: "accurat",
         // FireCMS Cloud customer, verified from signup + project activity.
         product: "firecms" as LogoProduct,
-        alt: "Accurat",
-        href: "https://www.accurat.it/",
+        alt: "Accurat Tech",
+        href: "https://tech.accurat.it/",
         src: "/img/logos/accurat.svg",
         invert: true,
         height: 13,
@@ -569,7 +510,7 @@ const initialLogos = filteredLogos.slice(0, 5);
                         ]}
                 />}
                 {logo.text && <span
-                        class:list={[LOGO_TEXT_CLASSES, logo.textClass ?? "text-2xl"]}>{logo.text}</span>}
+                        class:list={[LOGO_TEXT_CLASSES, "text-2xl"]}>{logo.text}</span>}
             </a>
     ))}
 </div>
@@ -650,7 +591,7 @@ const initialLogos = filteredLogos.slice(0, 5);
                     newElement.appendChild(img);
                 } else if (newLogo.text) {
                     const span = document.createElement('span');
-                    span.className = `${LOGO_TEXT_CLASSES} ${newLogo.textClass ?? 'text-2xl'}`;
+                    span.className = `${LOGO_TEXT_CLASSES} text-2xl`;
                     span.textContent = newLogo.text;
                     newElement.appendChild(span);
                 }
