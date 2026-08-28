@@ -21,6 +21,15 @@
     --color-page-ink: #f7f8f8;
     --color-page-copy: #b4b8bd;
 
+    /* The height of the sticky site header. A token rather than a measurement
+       because two places need to agree on it: the header pins its nav to this
+       height, and a hero that wants its art to run *behind* the bar pulls itself
+       up by exactly the same amount (see IndexV2Content). Deriving one from the
+       other at runtime would mean a layout read on every paint; declaring it
+       once means the nav can never quietly outgrow what the hero compensates
+       for. Change it here and both sides follow. */
+    --header-h: 60px;
+
     /* Chroma — the six-hue accent set. Added 2026-08-24.
 
        Not new colours: this is the exact palette `NeatBackground` has been

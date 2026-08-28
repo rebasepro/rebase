@@ -174,8 +174,8 @@ const flatNavLinks = [
     { href: translatePath("/docs"), label: t("nav.docs") }
 ];
 ---
-<header class="bg-page-ground/40 backdrop-blur sticky top-0 z-20">
-    <nav class="mx-auto flex max-w-6xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
+<header class="site-header sticky top-0 z-20">
+    <nav class="mx-auto flex min-h-(--header-h) max-w-6xl items-center justify-between py-2 px-4 lg:px-8" aria-label="Global">
         <div class="flex items-center">
             <a id="header-logo-link" href={translatePath("/")} class="flex items-center -m-1.5 p-1.5 relative z-50 mr-6" transition:name="site-logo">
                 <!-- Intrinsic size is declared so the header reserves the box before
@@ -430,6 +430,36 @@ const flatNavLinks = [
 </header>
 
 <style is:global>
+    /* ── The bar at the top of the page ──
+       At the very top of a page the header is a bar over nothing: the hero owns
+       that band, and on the home page its Neat canvas runs up behind the nav, so
+       a tinted plate there cuts a horizontal seam across a continuous piece of
+       art. Once the page has moved, the header IS over content and needs to
+       separate itself from it — that is what the tint and the blur are for.
+
+       The blur is kept at 0 rather than removed in the top state on purpose.
+       `backdrop-filter` makes the header a containing block for its own
+       fixed-position descendants (the mobile menu), so toggling the property on
+       and off would move the menu's containing block with the scroll position.
+       A zero-radius blur is invisible and keeps that constant — and, unlike
+       `none`, it interpolates, so the transition runs on both properties. */
+    .site-header {
+        background-color: transparent;
+        -webkit-backdrop-filter: blur(0);
+        backdrop-filter: blur(0);
+        transition: background-color 200ms ease, backdrop-filter 200ms ease, -webkit-backdrop-filter 200ms ease;
+    }
+
+    html[data-scrolled] .site-header {
+        background-color: color-mix(in oklab, var(--color-page-ground) 40%, transparent);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .site-header { transition: none; }
+    }
+
     /* ── Navigation-structure AB test ──
        Default: control (dropdown mega-nav) is shown; flat-nav is hidden.
        When the AB engine assigns "flat-nav", the html data attribute flips them.
@@ -448,6 +478,43 @@ const flatNavLinks = [
 </style>
 
 <script is:inline>
+    // Whether the header shows its plate is a property of the *page*, not of this
+    // element: with view transitions the header node is replaced on every
+    // navigation, and a listener bound to it would either die with it or leak.
+    // The attribute lives on <html>, the listener binds once per document, and
+    // both survive a swap.
+    (function watchScrollState() {
+        if (window.__rebaseHeaderScrollBound) return;
+        window.__rebaseHeaderScrollBound = true;
+
+        var root = document.documentElement;
+        var ticking = false;
+
+        function apply() {
+            ticking = false;
+            // A few pixels of slack: iOS rubber-banding reports small positive
+            // offsets at rest, and toggling on those flickers the bar.
+            root.toggleAttribute('data-scrolled', window.scrollY > 8);
+        }
+
+        window.addEventListener('scroll', function () {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(apply);
+        }, { passive: true });
+
+        // Scroll restoration lands the reader mid-page *after* this script has
+        // run, and the restore does not always fire a scroll event — so a reload
+        // deep in the page left the bar transparent over content until the next
+        // wheel tick. Recompute at every point the position can have changed
+        // underneath us: first paint, after restoration, and after a view
+        // transition swaps the page.
+        document.addEventListener('astro:after-swap', apply);
+        document.addEventListener('astro:page-load', apply);
+        window.addEventListener('load', apply);
+        apply();
+    })();
+
     function setupHeader() {
         const mobileMenuButton = document.getElementById('mobile-menu-button');
         if (!mobileMenuButton || mobileMenuButton.dataset.initialized) {

@@ -39,7 +39,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
         {/* Top padding is what buys the CTA row its place above the fold on a
             1440x900 window — the smallest laptop size that still matters here.
             Measured, not guessed: at pt-28 the CTAs landed 42px under. */}
-        <section class="relative isolate overflow-hidden flex items-center pt-20 pb-24 sm:pt-20 sm:pb-28">
+        {/* The section starts *behind* the header rather than under it. The bar is
+            transparent at the top of the page (see Header.astro), so the Neat
+            canvas — which fills this section — has to reach up into that band or
+            the art stops at a horizontal line the reader can see. Pulling the
+            section up by the header's height and giving the padding the same
+            amount back leaves every piece of type exactly where it was measured
+            to sit; only the art grows. */}
+        <section class="relative isolate overflow-hidden flex items-center -mt-(--header-h) pt-[calc(--spacing(20)+var(--header-h))] pb-24 sm:pb-28">
             <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
                 <NeatBackground client:idle randomize={false} />
             </div>
