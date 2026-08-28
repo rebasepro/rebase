@@ -185,6 +185,37 @@
     background: var(--color-page-raised);
 }
 
+/* ── The band behind the nav ─────────────────────────────────────────────────
+   The header is transparent until the page scrolls (see Header.astro), so at
+   the top of every route the bar is a window onto whatever the first section
+   paints. A hero that starts *below* the header leaves that window showing bare
+   page ground, and the seam where the two meet is plainly visible on anything
+   with art in it — which is most of these, since the heroes carry a Neat canvas.
+
+   So the hero starts behind the bar and hands the space straight back as
+   padding: the art grows by exactly the header's height and the type does not
+   move. The top scale lives here rather than at twenty-five call sites because
+   the compensation is only correct RELATIVE to `--header-h` — a hand-written
+   `-mt-20` next to a hand-written `pt-44` is a pair that drifts, and the pricing
+   hero had already drifted 20px by the time this was written.
+
+   `components`, not a `@utility`, so a page that wants a different top scale can
+   still say `pt-…` and win: the utilities layer sorts after this one. */
+@layer components {
+    .hero-under-nav {
+        margin-top: calc(var(--header-h) * -1);
+        padding-top: calc(--spacing(24) + var(--header-h));
+    }
+
+    @media (min-width: 40rem) {
+        .hero-under-nav { padding-top: calc(--spacing(32) + var(--header-h)); }
+    }
+
+    @media (min-width: 64rem) {
+        .hero-under-nav { padding-top: calc(--spacing(40) + var(--header-h)); }
+    }
+}
+
 /* ── Bleed ───────────────────────────────────────────────────────────────────
    A product artifact may run past the shell toward the viewport edge. COPY
    NEVER MAY. §6 asks for one shell width so left edges agree, and that rule is
