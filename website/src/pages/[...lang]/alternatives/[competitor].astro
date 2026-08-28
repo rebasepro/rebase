@@ -1,0 +1,41 @@
+---
+import { languages, defaultLang, useTranslations } from '../../../i18n/ui';
+import Layout from '../../../layouts/Layout.astro';
+import AlternativesContent from '../../../components/pages/AlternativesContent.astro';
+import { ALTERNATIVES_PAGES } from '../../../data/alternatives';
+
+/**
+ * One page per competitor, per locale.
+ *
+ * The content is English at every locale path, which is what the hand-built
+ * `rebase-vs-*` pages already do — this follows that precedent rather than
+ * inventing a second convention for the same kind of page. Translating the
+ * comparison copy is a separate job, and doing it for one page shape and not
+ * the other would be worse than doing it for neither.
+ */
+export function getStaticPaths() {
+    return Object.keys(languages).flatMap((lang) =>
+        ALTERNATIVES_PAGES.map((page) => ({
+            params: {
+                lang: lang === defaultLang ? undefined : lang,
+                competitor: page.slug
+            },
+            props: { page }
+        }))
+    );
+}
+
+const { lang } = Astro.params;
+const { page } = Astro.props;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Compare", url: "https://rebase.pro/compare" },
+    { name: `${page.name} alternatives`, url: `https://rebase.pro/alternatives/${page.slug}` }
+];
+---
+<Layout title={page.title} description={page.description} breadcrumbs={breadcrumbs}>
+    <AlternativesContent page={page} lang={currentLang} t={t} />
+</Layout>

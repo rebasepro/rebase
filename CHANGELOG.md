@@ -2,6 +2,111 @@
 
 ## [Unreleased]
 
+### Breaking
+
+Under 0.x the minor is the breaking position: `^0.16.0` resolves
+`>=0.16.0 <0.17.0`, so nothing here reaches a project until it deliberately moves
+to 0.17. The entries below say what stops working and what to do; the reasoning
+for each is in the detailed section it links to.
+
+- **`@rebasepro/admin` is now `@rebasepro/cms`, and `@rebasepro/admin-types` is
+  `@rebasepro/cms-types`.** "Admin" named two things at once — the whole panel,
+  and the content-management half of it — and the ambiguity had already cost
+  something: spreadsheet views, entity history, users & roles and CSV import were
+  being sold as Studio features because there was no other name for the half they
+  actually belong to. The structure is now three peers under Rebase — Backend,
+  CMS, Studio — rather than a parent with two children. "Admin panel" survives
+  only as a lowercase phrase for CMS and Studio rendered together.
+
+  ```diff ts
+  - import { RebaseAdmin } from "@rebasepro/admin";
+  - import { defineCollection } from "@rebasepro/admin-types";
+  + import { RebaseCMS } from "@rebasepro/cms";
+  + import { defineCollection } from "@rebasepro/cms-types";
+  ```
+
+  **Who this breaks, and what to do.** Anyone importing either package: change the
+  specifier, and `RebaseAdmin` to `RebaseCMS`. There is no alias and no
+  deprecation period — a shim would keep both meanings of "admin" alive, which is
+  the defect being fixed. `@rebasepro/admin` and `@rebasepro/admin-types` stop at
+  0.16.0 on npm and receive nothing after it, so a range like `^0.16.0` keeps
+  resolving to the last release rather than breaking; it simply stops moving.
+
+  **Your collection files do not change.** The `admin:` config key is deliberately
+  untouched, along with every identifier named after it (`AdminCollection*`,
+  `Admin*Options`, `ADMIN_COLLECTION_KEYS`), `DatabaseAdmin`/`databaseAdmin`,
+  `wsAdmin`, the `admin` auth role, and `/api/admin`. Those name something other
+  than the CMS product: the `admin:` block feeds a nav drawer Studio shares, and
+  `/api/admin` serves the RLS audit and API keys, both of which are Studio's.
+  Renaming them would have doubled the churn to no one's benefit.
+
+  The panel's mode value moved with the package, `"content"` → `"cms"`. It is
+  persisted per browser and migrates on read, so a browser that used the panel
+  before this keeps working instead of holding a mode nothing matches and
+  rendering neither half of the drawer.
+
+- **Resources are declared, not configured.** `RebaseBackendConfig`'s
+  `dataSources` and `storageSources` are gone; declare them in `rebase.json` and
+  the config package instead. **A bundle built before this will not boot on a
+  current runtime — rebuild it with `rebase build`.** The runtime contract stays
+  at 1 deliberately; see the note under *Removed*.
+
+- **A collection still carrying `admin.titleProperty` is rejected at boot.**
+  Use `admin.display.title` — the same string works there. This can stop a project
+  that starts today, which is the point: silence would mean a title quietly
+  reverting to the derived one with nothing to explain why. Details under
+  *Removed*.
+
+- **`ctx.client` in a cron handler is now `ctx.rebase`**, and `userId` is no
+  longer an accepted identity spelling anywhere — `uid` everywhere. Both under
+  *Removed*, with the reason each alias was more dangerous than the rename.
+
+- **`rebase eject infra` is gone**, along with `rebase.infra.json` and the
+  `{"$env": "..."}` indirection. Resources bind from the environment on the
+  `<BASE>__<KEY>` convention, which is the path every deployment already used.
+
+- **`rebase build --legacy` and `rebase start --legacy` are now `--workspace`.**
+  The mode is supported, not retired, and the old name said otherwise.
+
+- **Every deprecated API alias is deleted rather than warned about**, including
+  `WhereValue<T>` (use `WhereValueFor`) and `RENAMED_SLOTS`. The full list is
+  under *Removed*.
+
+- **An incoherent Kanban board now fails at boot.** A board is two declarations
+  that have to agree, and every way of getting it wrong used to parse, boot,
+  serve rows and render — the only symptom being that dragging did not stick.
+  `checkBoardConfig` now runs wherever collections load, so the runtime,
+  `rebase schema generate`, the policy generator and `rebase doctor` all say it.
+  An `orderProperty` naming a property that does not exist, **or one that is not
+  a string, is fatal**; `kanban` with no `orderProperty` only warns, and the
+  board still boots without reordering.
+
+  **This can stop a project that boots today, and the docs are why.** An order
+  key is a `fractional-indexing` key in base36 (`"i0"`, `"i1"`, `"i0i"`), so a
+  `number` can never hold one — but the documentation said
+  `sortOrder: { type: "number" }` in every locale, and five translated copies
+  additionally nested `orderProperty` inside `kanban`, where nothing reads it.
+  All of that is corrected. If you followed it, change the property to a string:
+
+  ```diff ts
+  - sortOrder: { type: "number" }
+  + sortOrder: { type: "string" }
+  ```
+
+- **A static app can no longer claim a path the backend serves.** One process
+  serves the API and however many static apps a project declares, and mounting is
+  longest-path-first — so an app declaring `path: "/api"` outranked the API
+  itself, and every request to it was answered with that app's `index.html`: a
+  200 carrying HTML where the caller wanted JSON, from a project that looked
+  deployed and healthy. `rebase.json` validation, the control plane at deploy
+  intake, and the router's own mount ordering now enforce the same reserved list
+  from `@rebasepro/types`. Matching is at segment boundaries, exactly as the
+  router matches: `/apidocs` is still fine, `/api/v2` is not.
+
+`PUT` on the data API is **not** in this list: it was removed during this cycle
+and put back before release, because every published SDK still sends it. See
+*`PATCH` is the update verb* under Changed.
+
 ### Removed
 
 - **`rebase eject infra` and `rebase.infra.json`.** The command wrote a file
@@ -281,6 +386,56 @@
   keeps its direct connection. `SET LOCAL` survives, so RLS behaves identically
   through it.
 
+- **The runtime keeps a little history of itself, and `rebase cloud metrics`
+  prints it.** Drawing "CPU over the last hour" from Cloud Monitoring would have
+  made the panel unportable the day the platform moves, for a feature every
+  self-hoster also wants; metrics-server cannot help either, since it stores only
+  the latest sample by design. So the process samples *itself* —
+  `process.cpuUsage()` and `process.memoryUsage()`, no cluster and no vendor —
+  into its own database, and anything that can read the database can draw the
+  chart. A laptop, a Hetzner box and a Cloud tenant keep the same history from
+  the same code. One row per series per minute, five series, swept to a
+  fourteen-day window at boot, beside the job and cron stores and for their
+  reason: it is the moment the schema is reachable and nobody is mid-request.
+
+- **`rebase cloud resources set --replicas` and `--autoscale-max`.** Autoscaling
+  had columns and no flags, so the console form was the only way to reach it.
+  Two flags on the command that already writes every other dial, rather than a
+  `rebase scale` verb — a second CLI surface writing the same row, whose
+  `--size medium` form would have had to carry a t-shirt→cpu/memory mapping
+  client-side, which is exactly what substrate differences (Autopilot's
+  250m/512Mi floor and 1:1–6.5:1 band do not exist on Hetzner or EKS) make
+  wrong. `--replicas` is the floor and the spend a project is guaranteed to
+  incur; `--autoscale-max` is the ceiling and the worst case it may be billed.
+  There is deliberately no `--autoscale on|off`, which would admit the
+  incoherent state where autoscaling is on and the range is a single point.
+
+- **A Terraform module for Hetzner**, and a Hetzner page that is true. The old
+  page described a Rebase that no longer exists — Docker building a Node.js
+  backend from a local Dockerfile, and boot creating only auth tables so
+  collections 404 until someone runs `db push`. Both were wrong, in all six
+  locales, and that page is where a reader lands from `/docs/deployment`. It is
+  rewritten against the contract the self-host compose file implements, and
+  points at that file rather than carrying a copy that can drift again. The
+  module provisions the host — server, firewall, a primary IP that survives a
+  rebuild, and a volume holding Postgres data, Caddy's certificates and the
+  bundle cache. The volume is the reason it exists: replacing the host must not
+  destroy the database, which the shell recipe cannot promise.
+
+- **Live schema editing works on MongoDB.** `isSchemaEditingAdmin` is a
+  structural check — a driver either offers `planSchemaChange` or it does not —
+  and the Mongo driver did not, so a Mongo project fell back to the source-only
+  editor, which is off in production. A schemaless database is the one place
+  where changing a collection against a running backend cannot fail, and it was
+  the one place it did not work. `planMongoSchemaChange` is short by the whole of
+  its difficulty: no table to alter, so every change is applicable, nothing is
+  refused, and there are no statements. What each change still carries is what
+  happens to the **data**, because that is where a reader imports the wrong
+  intuition — removing a property on Postgres is refused because it would drop a
+  column, while on MongoDB the field stays in every document that has it and the
+  API stops serving it. Saying so is the difference between knowing the data is
+  there and assuming it is gone.
+
 ### Changed
 
 - **JWT verification and signing are asynchronous.** `verifyAccessToken`, `generateAccessToken`, `verifyDownloadToken`, `generateDownloadToken`, `hashRefreshToken` and `extractUserFromToken` return promises. Nothing about their behaviour moved; the signatures did, and on purpose, before anything forced it.
@@ -305,7 +460,9 @@
 
   In the payload itself, `registration` and `registrationEnabled` were the same boolean under two names, both advertised. `registrationEnabled` is the only one now, and it is required rather than optional: it says whether self-registration is open *right now*, first-user bootstrap window included. `anonymousLogin` is required for the same reason. `AuthConfig` in `@rebasepro/client` and `AuthConfigResponse` in `@rebasepro/app` are aliases of `AuthAdapterCapabilities` instead of near-copies of it — the SDK's copy listed an `emailServiceEnabled` flag no backend has ever sent, and marked as optional fields every backend always sends. A test pins the exact key set, because the drift that started this was a field *name*, and no per-field assertion can see one.
 
-- **`PATCH` is the update verb for the data API.** `PUT` was mounted on the same handler and the generated OpenAPI spec described the operation twice — once as `patch`, once as `put` marked `deprecated` — so a client generated from the spec had to choose, and the verb it chose meant "replace" for a handler that merges. The `PUT` route is gone and the SDK's `update()` sends `PATCH`, which is what the spec has advertised since 0.14. `updateMany` was already on `PATCH`. Upgrade both halves together: a client from before this release sends `PUT` and now gets a 404, and a client from after it sends `PATCH`, which any backend from 0.14 on already serves.
+- **`PATCH` is the update verb for the data API.** `PUT` was mounted on the same handler and the generated OpenAPI spec described the operation twice — once as `patch`, once as `put` marked `deprecated` — so a client generated from the spec had to choose, and the verb it chose meant "replace" for a handler that merges. The SDK's `update()` now sends `PATCH`, which is what the spec has advertised since 0.14; `updateMany` was already there.
+
+  `PUT` still answers, on the same handler, carrying `Deprecation: true` (RFC 8594). It was removed during this cycle and put back: every published SDK up to and including 0.16.0 sends `PUT`, so removing it broke clients that had no fixed version to upgrade *to* — see *`PUT` on a collection answers again* under Fixed. There is no `Sunset` date, because the removal is gated on which SDKs are in the field rather than on a calendar.
 
 ### Removed
 

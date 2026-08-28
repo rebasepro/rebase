@@ -1,0 +1,177 @@
+---
+/**
+ * An "alternatives to X" page.
+ *
+ * ── The shape, and why it is this shape ──────────────────────────────────────
+ * Three blocks, in this order, and the order is the argument:
+ *
+ *   1. **What the incumbent is**, said fairly. A page that opens by attacking
+ *      the tool the reader currently uses is telling them they were stupid,
+ *      which is not a good opening move on somebody mid-decision.
+ *   2. **Pick by reason.** The reader is not here for a ranking, they are here
+ *      because one specific thing broke. This table maps the real reasons to
+ *      the tool that answers each — and on several rows that tool is not us,
+ *      because a list where the publisher wins every row is one nobody
+ *      believes and nobody quotes.
+ *   3. **The alternatives**, each with what it is good at before anything else.
+ *
+ * ── The disclosure is not decoration ─────────────────────────────────────────
+ * The whole genre is compromised, and readers know it. Saying plainly who
+ * published the page is the cheapest credibility available, and it costs
+ * nothing that was real.
+ */
+import type { AlternativesPage } from "../../data/alternatives";
+import ComparisonFaq from "../ComparisonFaq.astro";
+import ClosingCta from "../ClosingCta.astro";
+
+interface Props {
+    page: AlternativesPage;
+}
+
+const { page } = Astro.props as Props;
+const pageUrl = `https://rebase.pro/alternatives/${page.slug}`;
+
+/**
+ * `ItemList` structured data.
+ *
+ * The schema type for "here is an ordered set of things" — the machine-readable
+ * form of exactly what this page is. Generated from the same array as the
+ * markup, so the list a crawler reads and the list a person reads cannot
+ * disagree about what is on it or in what order.
+ */
+const listSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${pageUrl}#alternatives`,
+    name: `Alternatives to ${page.name}`,
+    numberOfItems: page.alternatives.length,
+    itemListElement: page.alternatives.map((alt, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        item: {
+            "@type": "SoftwareApplication",
+            name: alt.name,
+            url: alt.href,
+            applicationCategory: "DeveloperApplication",
+            description: alt.bestFor
+        }
+    }))
+};
+---
+
+<div class="flex flex-col isolate">
+    <!-- Hero -->
+    <section class="relative isolate overflow-hidden pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40">
+        <div
+            class="absolute inset-0 pointer-events-none"
+            aria-hidden="true"
+            style="background: radial-gradient(circle at 50% -10%, rgba(0, 112, 244, 0.10) 0%, transparent 60%);"
+        ></div>
+
+        <div class="px-6 mx-auto max-w-4xl lg:px-8 relative z-10">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
+                Alternatives
+            </span>
+            <h1 class="mt-5 mb-6 text-display-2 text-white">
+                Alternatives to {page.name}
+            </h1>
+            <p class="text-lg leading-8 text-surface-300 lg:text-xl">{page.what}</p>
+
+            <p class="mt-8 text-sm text-surface-500 leading-relaxed border-l-2 border-surface-800 pl-4">
+                Published by <a href="/" class="text-surface-300 underline underline-offset-2">Rebase</a>, which is
+                one of the tools on this page. Every other entry is described by what it is good at, several of the
+                recommendations below are not us, and there are no prices anywhere — competitor pricing changes
+                quarterly and a stale number is worse than none.
+            </p>
+        </div>
+    </section>
+
+    <!-- Pick by reason -->
+    <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
+        <div class="mx-auto max-w-4xl px-6 lg:px-8">
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">Start from why you are leaving</h2>
+            <p class="text-surface-400 mb-10 leading-relaxed">
+                Almost nobody wants "the best alternative". They want the one that fixes the specific thing that
+                broke. Find your row.
+            </p>
+
+            <div class="space-y-3">
+                {page.reasons.map((reason) => (
+                    <div class="frame p-6">
+                        <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
+                            <p class="text-white font-medium leading-snug">“{reason.reason}”</p>
+                            <span class="flex-none inline-flex items-center px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary-light text-xs font-semibold">
+                                {reason.answer}
+                            </span>
+                        </div>
+                        <p class="text-sm text-surface-400 leading-relaxed">{reason.why}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </section>
+
+    <!-- The list -->
+    <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
+        <div class="mx-auto max-w-4xl px-6 lg:px-8">
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">
+                {page.alternatives.length} alternatives to {page.name}
+            </h2>
+            <p class="text-surface-400 mb-10 leading-relaxed">
+                Ordered roughly by how often each one turns out to be the answer, not by any score. Where a
+                head-to-head exists, it is linked.
+            </p>
+
+            <ol class="space-y-4">
+                {page.alternatives.map((alt, index) => (
+                    <li class="frame p-6 sm:p-7">
+                        <div class="flex items-start gap-4">
+                            <span class="flex-none mt-0.5 h-7 w-7 rounded-lg bg-surface-900 border border-surface-700 flex items-center justify-center text-xs font-semibold text-surface-400">
+                                {index + 1}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 mb-1">
+                                    <h3 class="text-lg font-semibold text-white">{alt.name}</h3>
+                                    {alt.isUs && (
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary-light text-2xs font-semibold uppercase tracking-wide">
+                                            That's us
+                                        </span>
+                                    )}
+                                    <span class="text-2xs text-surface-500 uppercase tracking-wide">{alt.licence}</span>
+                                    <span class="text-2xs text-surface-500 uppercase tracking-wide">· {alt.hosting}</span>
+                                </div>
+
+                                <p class="text-sm text-primary-light/90 mb-3">Best for: {alt.bestFor}</p>
+                                <p class="text-surface-400 leading-relaxed text-sm sm:text-base">{alt.description}</p>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                                    <a
+                                        href={alt.href}
+                                        class="text-surface-300 hover:text-white underline underline-offset-2"
+                                        rel={alt.isUs ? undefined : "nofollow noopener"}
+                                        target={alt.isUs ? undefined : "_blank"}
+                                    >{alt.isUs ? "Read more" : `${alt.name} →`}</a>
+                                    {alt.compare && (
+                                        <a href={alt.compare} class="text-primary-light hover:text-white underline underline-offset-2">
+                                            Rebase vs {alt.name} →
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+        </div>
+    </section>
+
+    <ComparisonFaq competitor={page.name} faqs={page.faqs} pageUrl={pageUrl} />
+
+    <ClosingCta
+        title="Don't take our word for it."
+        blurb={`The comparison that matters is the one you run. Point Rebase at a Postgres database you already have and see how it holds up next to ${page.name}.`}
+        trackId={`alternatives-${page.slug}`}
+    />
+</div>
+
+<script type="application/ld+json" set:html={JSON.stringify(listSchema)} />

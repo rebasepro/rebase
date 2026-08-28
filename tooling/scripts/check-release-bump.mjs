@@ -73,9 +73,23 @@ function gitShow(rev, file) {
     }
 }
 
+/**
+ * The last release this commit descends from.
+ *
+ * Not the highest version in the tag namespace: this repository descends from a
+ * lineage that reached v3.x before versioning restarted at 0.x, and a clone can
+ * carry those tags locally. Sorting by version picked v3.3.0, where none of the
+ * contract artifacts below existed yet — so every axis reported "unguarded" and
+ * the check passed anything, which is the failure it exists to prevent. Walking
+ * back from HEAD can only return a tag this commit actually descends from.
+ */
 export function latestTag() {
-    const tags = git(["tag", "-l", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-v:refname"]).trim().split("\n");
-    return tags[0] || null;
+    try {
+        const tag = git(["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*.[0-9]*.[0-9]*"]).trim();
+        return tag || null;
+    } catch {
+        return null;
+    }
 }
 
 /** patch | minor | major, from two x.y.z strings. */

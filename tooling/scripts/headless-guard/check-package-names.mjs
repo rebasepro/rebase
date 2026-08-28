@@ -115,12 +115,20 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "p
 // `@rebasepro/app | @rebasepro/app`, and the next `prebuild` would restore it
 // anyway. Nothing is lost by skipping it: it holds no text of its own, and the
 // pages it is built from are scanned individually.
+//
+// `llms-full.txt` is the other half of that same write — the generator emits a
+// short index of links to `llms.txt` and the whole corpus to `llms-full.txt`.
+// Only the index was exempted, so the moment a sidebar change pulled
+// `upgrading.mdx` into the corpus the table arrived with it and the guard went
+// red on a file no edit can fix. Both halves are the same artifact of the same
+// pages; neither is a place a name can go stale on its own.
 const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
     "pnpm-lock.yaml",
     "docs/MODULAR-ARCHITECTURE.md",
     "website/public/llms.txt",
+    "website/public/llms-full.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
     "tooling/scripts/deprecate-old-packages.sh"
 ]);
