@@ -227,6 +227,10 @@ async function renderClip(page, name, build, opts = {}) {
         "-y", "-v", "error",
         "-framerate", String(FPS),
         "-i", path.join(dir, "%05d.png"),
+        // h264 refuses odd dimensions, and a viewport is just a number someone
+        // typed — a height of 629 failed the whole encode with "height not
+        // divisible by 2" after the frames had already been rendered.
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-c:v", "libx264", "-crf", "16", "-preset", "slow",
         "-pix_fmt", "yuv420p", mp4,
     ]);
@@ -341,12 +345,12 @@ const CLIPS = {
 
    Two viewports, and both are SMALL on purpose. A tile shows its capture at
    roughly two thirds width, and the app has to look bigger in the tile than a
-   1280 capture ever can — at 820 and 700 it drops its nav rail and lays out
+   1280 capture ever can — at 680 and 600 it drops its nav rail and lays out
    with fewer, larger rows, which is exactly what a small tile needs. They are
    also cut to the tiles' aspect ratios so `objectFit: cover` crops nothing:
    a 16:9 capture in a portrait tile throws away half the frame. */
-const WIDE = { width: 820, height: 420 };   // for a 576x296 tile
-const TALL = { width: 700, height: 734 };   // for a 576x604 tile
+const WIDE = { width: 680, height: 348 };   // for a 576x296 tile
+const TALL = { width: 600, height: 628 };   // for a 576x604 tile
 
 /* Each tile does something DIFFERENT. Seven tiles all scrolling reads as one
    view scrolled seven times, however varied the content is — the panel has
@@ -365,7 +369,7 @@ Object.assign(CLIPS, {
     b_record: {
         viewport: TALL,
         run: async ({ page, hold, scrollBy, clickOn }) => {
-            await settleGrid(page, `${BASE}/c/products`, 12);
+            await settleGrid(page, `${BASE}/c/products`, 4);
             await hold(0.8);
             await clickOn("Italian coffee maker", 2.4, 1.0);
             await scrollBy(700, 5.5, 350);
@@ -390,8 +394,9 @@ Object.assign(CLIPS, {
             await scrollBy(300, 2.4, 200);
             await clickOn("Bugs", 1.8);
             await clickOn("Urgent & High priority", 3.2);
+            await scrollBy(300, 2.8, 200);
             await clickOn("Urgent & High priority", 1.8);
-            await hold(0.6);
+            await scrollBy(-300, 2.6, 200);
         },
     },
 
@@ -400,7 +405,7 @@ Object.assign(CLIPS, {
     b_posts: {
         viewport: WIDE,
         run: async ({ page, hold, scrollBy, clickOn }) => {
-            await settleGrid(page, `${BASE}/c/posts`, 10);
+            await settleGrid(page, `${BASE}/c/posts`, 6);
             await hold(0.7);
             await clickOn("Cards", 1.3);          // the view menu
             await clickOn("Table", 2.6);
@@ -429,11 +434,13 @@ Object.assign(CLIPS, {
         },
     },
 
-    /* Select rows. The rows light up and the toolbar grows an action. */
-    b_users: {
+    /* Select rows; they light up and the toolbar grows an action. Authors
+       rather than users: the users collection masks its names and emails,
+       and a tile of d***@gmail.com is not worth showing. */
+    b_authors: {
         viewport: WIDE,
         run: async ({ page, hold, scrollBy, clickOn }) => {
-            await settleGrid(page, `${BASE}/c/users`);
+            await settleGrid(page, `${BASE}/c/authors`, 4);
             await hold(0.7);
             const box = (n) => () => page.locator("[role=checkbox], input[type=checkbox]").nth(n);
             await clickOn(box(1), 0.9, 0.8);
@@ -449,7 +456,7 @@ Object.assign(CLIPS, {
     b_exercises: {
         viewport: WIDE,
         run: async ({ page, hold, scrollBy, clickOn }) => {
-            await settleGrid(page, `${BASE}/c/exercises`, 10);
+            await settleGrid(page, `${BASE}/c/exercises`, 6);
             await hold(0.7);
             await clickOn("Beginner bodyweight", 3.0);
             await scrollBy(420, 3.0);
@@ -459,18 +466,37 @@ Object.assign(CLIPS, {
         },
     },
 
-    /* Filter a list. Same idea as the table and the board, and it looks
-       different on each — which is the point of showing all three. */
-    b_orders: {
+    /* A LIST, and one row opened out into the whole record — the expansion IS
+       the shot. Deliberately a different shape from b_record: rows rather than
+       cards, and what matters is the opening rather than what is inside.
+       (There is no slide-out drawer to use; this panel opens records as full
+       pages, and that is the expansion.) */
+    b_expand: {
         viewport: WIDE,
         run: async ({ page, hold, scrollBy, clickOn }) => {
             await settleGrid(page, `${BASE}/c/orders`);
-            await hold(0.7);
-            await clickOn("Shipped orders", 3.0);
-            await scrollBy(460, 3.2);
-            await clickOn("Pending & paid", 3.0);
-            await clickOn("Shipped orders", 2.4);
+            await hold(0.4);
+            await scrollBy(280, 2.0);      // past the stat cards, down to the rows
+            await clickOn(() => page.getByText(/^ORD-/).first(), 1.6, 0.9);
+            /* Work the PANEL, do not try to scroll it. Its content fits, so a
+               scroll moved zero pixels and the tile sat frozen for its last
+               nine seconds — measured, not guessed. Its tabs and its close are
+               the things that actually move.
+               Settles are SHORT here on purpose: a three-second dwell after
+               each click is fine in a full-frame clip and reads as a frozen
+               tile at a sixth of the screen with six others moving. */
+            await clickOn(() => page.getByRole("tab", { name: /order items/i }).first(), 1.6, 0.7);
+            await clickOn(() => page.getByRole("tab", { name: /^order$/i }).first(), 1.2, 0.5);
+            await page.keyboard.press("Escape");
+            await hold(0.9);
+            await clickOn(() => page.getByText(/^ORD-/).nth(2), 1.4, 0.9);
+            /* End on movement. A window whose tail lands on a settle shows a
+               frozen tile, and which part of the clip a tile lands on is set
+               in Bento.tsx, not here — so the clip should not have a still
+               ending to land on. */
+            await page.keyboard.press("Escape");
             await hold(0.6);
+            await scrollBy(-240, 2.2);
         },
     },
 });

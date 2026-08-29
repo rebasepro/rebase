@@ -17,9 +17,10 @@ import { GROUND, INK } from "../theme";
  * that make the grid read as a grid.)
  *
  * Every tile does something DIFFERENT, and that is the point of the piece:
- * open a record, filter a board, switch a view from cards to a table, search,
- * select rows, filter a table, filter a list. Seven tiles all scrolling read
- * as one view scrolled seven times however varied the content was.
+ * search, filter a table, open a record OUT OF A LIST, filter a board, switch
+ * a view from cards to a table, select rows, read a form. Seven tiles all
+ * scrolling read as one view scrolled seven times however varied the content
+ * underneath happens to be.
  */
 
 const W = 1920;
@@ -28,7 +29,7 @@ export const BENTO_DURATION = 420;
 
 /** Slightly under real time — seven tiles is a lot to take in at once, and it
  *  buys headroom against the clip lengths. */
-const RATE = 0.85;
+const RATE = 0.8;
 
 interface Tile {
     file: string;
@@ -52,18 +53,20 @@ interface Tile {
    is regular at its edges and irregular inside. Every tile's aspect ratio is
    matched by the viewport its clip was captured at — see render-demo.mjs. */
 const TILES: Tile[] = [
-    /* `at` is chosen so each tile's 14s window CONTAINS that tile's action —
-       there is no point capturing a filter being applied and then showing the
-       ten seconds either side of it. */
+    /* `at` is chosen so each tile's window CONTAINS that tile's action — there
+       is no point capturing a filter being applied and then showing the ten
+       seconds either side of it. The bottom row is deliberately three unlike
+       things: a record opening out of a list, a view mode changing, and a form
+       being read. */
     { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 60, length: 469 },
-    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 90, length: 462 },
-    { file: "users", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 55, length: 422 },
+    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 80, length: 462 },
+    { file: "expand", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 30, length: 456 },
 
-    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 100, length: 527 },
-    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 90, length: 572 },
+    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 200, length: 671 },
+    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 80, length: 572 },
 
-    { file: "orders", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 100, length: 474 },
-    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 60, length: 427 },
+    { file: "authors", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 50, length: 422 },
+    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 45, length: 427 },
 ];
 
 const ENTRY = 32;
