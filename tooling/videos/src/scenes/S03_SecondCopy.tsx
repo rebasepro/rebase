@@ -3,7 +3,7 @@ import { useCurrentFrame, useVideoConfig } from "remotion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Code } from "../components/Code";
-import { pop, ramp, SPRING } from "../components/motion";
+import { drift, pop, ramp, SPRING } from "../components/motion";
 import { FONT, FRAME, INK } from "../theme";
 
 /**
@@ -69,6 +69,7 @@ export const S03_SecondCopy: React.FC = () => {
        with its own label. They now converge toward the centre and fade out
        completely, so five visibly become one. */
     const recede = ramp(frame, COLLAPSE, 30);
+    const five = drift(frame, COLLAPSE, 0);
     const single = pop(frame, fps, COLLAPSE + 10, SPRING.card);
 
     return (
@@ -85,6 +86,11 @@ export const S03_SecondCopy: React.FC = () => {
                             display: "grid",
                             gridTemplateColumns: "repeat(5, 1fr)",
                             gap: 16,
+                            /* The row drifts as a whole. The per-card bob below is
+                               3.5px, which is life at full size and nothing at all
+                               as a proportion of the frame — a slow scale is what
+                               actually reads, because it moves the edges. */
+                            transform: `translateY(${five.y}px) scale(${five.scale})`,
                         }}
                     >
                         {COPIES.map((copy, i) => {
@@ -92,13 +98,19 @@ export const S03_SecondCopy: React.FC = () => {
                             // Each card slides toward the middle of the row as it
                             // goes, so the five collapse rather than blink out.
                             const toCentre = (2 - i) * 90 * recede;
+                            /* Each card breathes on its own phase. Five things
+                               sitting perfectly still for four seconds is the
+                               flattest stretch in the film, and five things
+                               drifting slightly out of step read as five
+                               separate files rather than one graphic. */
+                            const bob = Math.sin((frame + i * 47) / 72) * 3.5;
                             return (
                                 <div
                                     key={copy.file}
                                     style={{
                                         opacity: t * (1 - recede),
                                         transform:
-                                            `translate(${toCentre}px, ${(1 - t) * 16}px) ` +
+                                            `translate(${toCentre}px, ${(1 - t) * 16 + bob}px) ` +
                                             `scale(${1 - recede * 0.12})`,
                                     }}
                                 >

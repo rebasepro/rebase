@@ -1,4 +1,6 @@
+import { useCurrentFrame } from "remotion";
 import React from "react";
+import { drift } from "../components/motion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, Lead, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
@@ -12,7 +14,10 @@ import { Terminal } from "../components/Terminal";
  * the ports are the real ports — a demo terminal that invents its own output
  * is the fastest way to lose a developer watching this.
  */
-export const S02_OneCommand: React.FC = () => (
+export const S02_OneCommand: React.FC = () => {
+    const frame = useCurrentFrame();
+    const d = drift(frame, 205, 0);
+    return (
     <Scene>
         <Stage>
             <div style={{ display: "flex", alignItems: "center", gap: 96 }}>
@@ -36,10 +41,10 @@ export const S02_OneCommand: React.FC = () => (
                     </Lead>
                 </div>
 
+                <div style={{ flex: 1, transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                 <Frame
                     title="zsh · ~/work"
                     delay={12}
-                    style={{ flex: 1 }}
                     bodyStyle={{ padding: "34px 38px 40px" }}
                 >
                     <Terminal
@@ -55,7 +60,9 @@ export const S02_OneCommand: React.FC = () => (
                         ]}
                     />
                 </Frame>
+                </div>
             </div>
         </Stage>
     </Scene>
-);
+    );
+};

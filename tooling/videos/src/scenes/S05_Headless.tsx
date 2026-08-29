@@ -4,7 +4,7 @@ import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
 import { Code, CodeCaption } from "../components/Code";
-import { ramp } from "../components/motion";
+import { ramp, drift } from "../components/motion";
 import { FONT } from "../theme";
 import { useTone } from "../Plane";
 
@@ -51,12 +51,20 @@ const INCLUDED = [
 
 export const S05_Headless: React.FC = () => {
     const frame = useCurrentFrame();
+    const d = drift(frame, 200, 120);
     const tone = useTone();
 
     return (
         <Scene>
             <Stage>
-                <div style={{ display: "flex", gap: 84, alignItems: "center" }}>
+                {/* MIRRORED. Five scenes in this film are a 520 column of type
+                    beside one object, and laid out the same way every time they
+                    read as one slide shown five times. Two of the five put the
+                    object first instead — the measure is unchanged, so the block
+                    still starts at STAGE_INSET; it is the order inside it that
+                    flips. Here it also reads better: this scene's whole argument
+                    is the evidence, so the evidence leads. */}
+                <div style={{ display: "flex", flexDirection: "row-reverse", gap: 84, alignItems: "center" }}>
                     <div style={{ width: 520, flexShrink: 0 }}>
                         <Chapter n="04" label="Headless" delay={2} />
                         <div style={{ marginTop: 24 }}>
@@ -114,9 +122,11 @@ export const S05_Headless: React.FC = () => {
 
                     <div style={{ flex: 1 }}>
                         <CodeCaption delay={16}>app/orders.ts</CodeCaption>
+                        <div style={{ transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                         <Frame delay={18} style={{ marginTop: 12 }} bodyStyle={{ padding: "26px 30px" }}>
                             <Code code={SDK} delay={30} step={2} size={19} />
                         </Frame>
+                        </div>
                     </div>
                 </div>
             </Stage>

@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
-import { ramp } from "../components/motion";
+import { ramp, drift } from "../components/motion";
 import { FONT, INK } from "../theme";
 
 /**
@@ -61,6 +61,7 @@ const REPORT: Line[] = [
 
 export const S05_Proof: React.FC = () => {
     const frame = useCurrentFrame();
+    const d = drift(frame, 200, 80);
     const CMD = "npx @rebasepro/rls-check $DATABASE_URL";
 
     // Typed at a readable rate, then the report streams under it.
@@ -70,7 +71,14 @@ export const S05_Proof: React.FC = () => {
     return (
         <Scene>
             <Stage>
-                <div style={{ display: "flex", gap: 84, alignItems: "center" }}>
+                {/* MIRRORED. Five scenes in this film are a 520 column of type
+                    beside one object, and laid out the same way every time they
+                    read as one slide shown five times. Two of the five put the
+                    object first instead — the measure is unchanged, so the block
+                    still starts at STAGE_INSET; it is the order inside it that
+                    flips. Here it also reads better: this scene's whole argument
+                    is the evidence, so the evidence leads. */}
+                <div style={{ display: "flex", flexDirection: "row-reverse", gap: 84, alignItems: "center" }}>
                     <div style={{ width: 520, flexShrink: 0 }}>
                         <Chapter n="08" label="Don't take our word for it" delay={4} />
                         <div style={{ marginTop: 26 }}>
@@ -104,11 +112,11 @@ export const S05_Proof: React.FC = () => {
                         </div>
                     </div>
 
+                    <div style={{ flex: 1, transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                     <Frame
                         title="rls-check · production"
                         delay={10}
-                        style={{ flex: 1 }}
-                        bodyStyle={{ padding: "28px 34px 34px" }}
+                            bodyStyle={{ padding: "28px 34px 34px" }}
                     >
                         <div style={{ fontFamily: FONT.mono, fontSize: 19, lineHeight: 1.7 }}>
                             <div style={{ color: C.white }}>
@@ -135,6 +143,7 @@ export const S05_Proof: React.FC = () => {
                             })}
                         </div>
                     </Frame>
+                    </div>
                 </div>
             </Stage>
         </Scene>

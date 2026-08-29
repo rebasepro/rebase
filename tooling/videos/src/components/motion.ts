@@ -84,3 +84,28 @@ export function pop(
 /** Successive delays. `stagger(i)` reads better at the call site than
  *  `delay + i * 4` repeated eleven times. */
 export const stagger = (index: number, step = 4, base = 0) => base + index * step;
+
+/**
+ * A slow, continuous move for an artifact that would otherwise freeze.
+ *
+ * Most scenes in this film are a column of type beside one object — a
+ * terminal, a code frame, a window. The object arrives, finishes typing, and
+ * then sits perfectly still for the rest of the scene. Nine scenes doing that
+ * in a row is what makes a film read as a slide deck rather than as footage,
+ * and no amount of retiming fixes it: the problem is that nothing is moving,
+ * not that it is on screen too long.
+ *
+ * The amounts are deliberately below the threshold of being noticed as an
+ * effect. It should read as a camera that has not quite settled, not as a
+ * zoom. `phase` offsets the vertical so adjacent scenes do not drift in step.
+ */
+export function drift(frame: number, duration: number, phase = 0) {
+    const t = interpolate(frame, [0, duration], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+    });
+    return {
+        scale: 1 + 0.022 * t,
+        y: (0.5 - t) * 9 + Math.sin((frame + phase) / 90) * 2,
+    };
+}
