@@ -19,9 +19,9 @@ sound like a way to generate REST routes.
 |-----|--------|-------|
 | I · Premise | 00–02 | What Rebase is: a Postgres backend, running in one command. |
 | II · Insight | 03–04 | You have written this table five times. Now once. |
-| III · The offer | 05–07 | Take the backend / add the panel / add Studio. |
-| IV · Guarantee | 08–10 | Whichever layers you took, RLS holds — provably. |
-| V · Ownership | 11–12 | MIT, self-hosted, nobody holds your credentials. |
+| III · The offer | 05–08 | Take the backend / add the panel / add Studio — and here is all of it at once. |
+| IV · Guarantee | 09–11 | Whichever layers you took, RLS holds — provably. |
+| V · Ownership | 12–13 | MIT, self-hosted, nobody holds your credentials. |
 
 ## The script
 
@@ -35,11 +35,12 @@ sound like a way to generate REST routes.
 | 05 | Headless | 300 | 10.0 | Take only that and you are done — REST, a typed SDK, realtime, auth, storage, functions, cron, backups. The SDK is generated from your collections, so a collection is a type rather than a string in a path. |
 | 06 | The panel | 360 | 12.0 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. Spreadsheet editing, every field type, import, export, and your own React where you need it. |
 | 07 | Studio | 270 | 9.0 | Add Studio and you run the database from the same app — SQL, the schema, policies, logs. |
-| 08 | Row-level security | 300 | 10.0 | Whichever layers you took, authorization is in the database. Generated from that same file, applied by migration. You cannot forget middleware that was never in your code. |
-| 09 | The proof | 240 | 8.0 | rls-check reads any Postgres — Supabase, Neon, RDS, your own — and reports which tables are actually exposed. |
-| 10 | Agent-native | 210 | 7.0 | An agent gets the same authorization you do. Not a way around it. One definition, three audiences. |
-| 11 | Yours | 270 | 9.0 | All of it is MIT. Run it on your laptop, your server, your cloud. Nobody else holds your credentials, and nothing here can be taken away. |
-| 12 | The ask | 210 | 7.0 | Rebase. Open source, Postgres-native, self-hosted. |
+| 08 | Every view | 300 | 10.0 | Lists, boards, tables, forms, a board you drag cards across — every one of them generated, and every one reading through the same policies. |
+| 09 | Row-level security | 300 | 10.0 | Whichever layers you took, authorization is in the database. Generated from that same file, applied by migration. You cannot forget middleware that was never in your code. |
+| 10 | The proof | 240 | 8.0 | rls-check reads any Postgres — Supabase, Neon, RDS, your own — and reports which tables are actually exposed. |
+| 11 | Agent-native | 210 | 7.0 | An agent gets the same authorization you do. Not a way around it. One definition, three audiences. |
+| 12 | Yours | 270 | 9.0 | All of it is MIT. Run it on your laptop, your server, your cloud. Nobody else holds your credentials, and nothing here can be taken away. |
+| 13 | The ask | 210 | 7.0 | Rebase. Open source, Postgres-native, self-hosted. |
 
 ## Notes for the read
 

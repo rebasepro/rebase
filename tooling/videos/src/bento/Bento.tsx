@@ -4,43 +4,73 @@ import { ENTER, ramp } from "../components/motion";
 import { GROUND, INK } from "../theme";
 
 /**
- * The bento. Its own composition, not a beat in the film.
+ * The bento: seven live views of the product in one rectangle.
  *
- * A RECTANGLE: three columns of differing heights that partition 1760x920
- * exactly, so the block has a straight edge on all four sides. An earlier cut
- * scattered tiles around a large centre one and left ragged gaps top and
- * bottom, which reads as a collage rather than a bento.
+ * It exists twice — as its own composition (`Bento`, 14s, full frame) and as a
+ * beat in the film (see S07b_Everything), which is why the grid is a function
+ * of a box rather than seven hard-coded rectangles. Both use the same clips.
  *
- * No gradient behind it and no drift on the tiles. The clips are the only
- * moving thing, which is the whole idea — seven views of the product, live.
- * (Per-tile drift was tried and had to go: any wobble breaks the 16px gutters
- * that make the grid read as a grid.)
+ * The layout PARTITIONS its box exactly, so the block has a straight edge on
+ * all four sides; an earlier cut scattered tiles around a large centre one and
+ * left ragged gaps, which reads as a collage. Column one is three equal rows,
+ * the other two are one tall tile and one short, mirrored — regular at the
+ * edges, irregular inside.
  *
- * Every tile does something DIFFERENT, and that is the point of the piece:
- * search, filter a table, switch a view from cards to a table, read a form and
- * its relations, DRAG A CARD BETWEEN COLUMNS, select rows, and open a record
- * out of a list. Seven tiles all scrolling read as one view scrolled seven
- * times however varied the content underneath happens to be.
+ * Every tile does something DIFFERENT, and that is the point: search, filter a
+ * table, switch a view from cards to a table, read a form and its relations,
+ * drag a card between board columns, select rows, and open a record out of a
+ * list. Seven tiles all scrolling read as one view scrolled seven times.
+ *
+ * Scaling the box uniformly keeps every tile's aspect ratio, which matters:
+ * each clip is captured at the viewport that matches its tile, so `cover`
+ * crops nothing.
  */
 
-const W = 1920;
-const H = 1080;
 export const BENTO_DURATION = 420;
 
 /** Slightly under real time — seven tiles is a lot to take in at once, and it
  *  buys headroom against the clip lengths. */
 const RATE = 0.8;
 
-interface Tile {
-    file: string;
+export interface Box {
     x: number;
     y: number;
     w: number;
     h: number;
+    gap: number;
+}
+
+/** The whole frame, for the standalone composition. */
+export const FULL: Box = { x: 80, y: 80, w: 1760, h: 920, gap: 16 };
+
+/** How much of the box's height the tall tiles take. */
+const TALL_FRAC = 604 / 920;
+
+/** Seven rectangles that exactly fill the box, in tile order. */
+export function bentoRects({ x, y, w, h, gap }: Box) {
+    const col = Math.round((w - 2 * gap) / 3);
+    const third = Math.round((h - 2 * gap) / 3);
+    const tall = Math.round(h * TALL_FRAC);
+    const short = h - tall - gap;
+    const cx = [x, x + col + gap, x + 2 * (col + gap)];
+    return [
+        { x: cx[0], y, w: col, h: third },
+        { x: cx[0], y: y + third + gap, w: col, h: third },
+        { x: cx[0], y: y + 2 * (third + gap), w: col, h: h - 2 * (third + gap) },
+        { x: cx[1], y, w: col, h: tall },
+        { x: cx[1], y: y + tall + gap, w: col, h: short },
+        { x: cx[2], y, w: col, h: short },
+        { x: cx[2], y: y + short + gap, w: col, h: tall },
+    ];
+}
+
+interface Tile {
+    file: string;
     /** Which edge it arrives from. The middle column rises instead. */
     from: "left" | "right" | "up";
     delay: number;
-    /** Source frame to start on, so no two tiles are in step. */
+    /** Source frame to start on, so no two tiles are in step, and so each
+     *  tile's window CONTAINS its action. */
     at: number;
     /** Frames the clip actually has — `startAt` clamps against it, because a
      *  video asked for a frame past its end holds its LAST one and the tile
@@ -48,51 +78,42 @@ interface Tile {
     length: number;
 }
 
-/* The grid: x 80..1840, y 80..1000, 16px gutters. Column one is three equal
-   rows; the other two are one tall tile and one short, mirrored, so the block
-   is regular at its edges and irregular inside. Every tile's aspect ratio is
-   matched by the viewport its clip was captured at — see render-demo.mjs. */
-const TILES: Tile[] = [
-    /* The board is NOT the centre tile. A board wants width for its columns,
-       so it sits in a wide slot and is captured wider than everything else,
-       which lands it smaller in the same space — the right trade for a shot
-       whose subject is a card crossing between columns.
-
-       `at` puts each tile's action inside its window; there is no point
-       capturing a drag and then showing the ten seconds either side of it. */
-    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 20, length: 396 },
-    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 80, length: 462 },
-    { file: "posts", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 80, length: 572 },
-
-    { file: "record", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 45, length: 427 },
-    { file: "tickets", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 30, length: 480 },
-
-    { file: "authors", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 50, length: 422 },
-    { file: "expand", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 30, length: 455 },
+/** In slot order: three down the left, tall-then-short, short-then-tall. */
+export const TILES: Tile[] = [
+    { file: "customers", from: "left", delay: 14, at: 20, length: 396 },
+    { file: "exercises", from: "left", delay: 20, at: 80, length: 462 },
+    { file: "posts", from: "left", delay: 26, at: 80, length: 572 },
+    { file: "record", from: "up", delay: 0, at: 45, length: 427 },
+    { file: "tickets", from: "up", delay: 8, at: 30, length: 480 },
+    { file: "authors", from: "right", delay: 18, at: 50, length: 422 },
+    { file: "expand", from: "right", delay: 24, at: 30, length: 455 },
 ];
 
 const ENTRY = 32;
-const SIDE = 240;
-const LIFT = 44;
 
-const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
+const Cell: React.FC<{
+    tile: Tile;
+    rect: { x: number; y: number; w: number; h: number };
+    travel: number;
+    lift: number;
+    duration: number;
+}> = ({ tile, rect, travel, lift, duration }) => {
     const frame = useCurrentFrame();
     const t = ramp(frame, tile.delay, ENTRY, ENTER);
     const away = 1 - t;
 
-    const dx = tile.from === "left" ? -SIDE * away : tile.from === "right" ? SIDE * away : 0;
-    const dy = tile.from === "up" ? LIFT * away : 0;
-
-    const startAt = Math.min(tile.at, Math.max(0, tile.length - BENTO_DURATION * RATE - 6));
+    const dx = tile.from === "left" ? -travel * away : tile.from === "right" ? travel * away : 0;
+    const dy = tile.from === "up" ? lift * away : 0;
+    const startAt = Math.min(tile.at, Math.max(0, tile.length - duration * RATE - 6));
 
     return (
         <div
             style={{
                 position: "absolute",
-                left: tile.x,
-                top: tile.y,
-                width: tile.w,
-                height: tile.h,
+                left: rect.x,
+                top: rect.y,
+                width: rect.w,
+                height: rect.h,
                 borderRadius: 16,
                 border: `1px solid ${INK.rule}`,
                 background: "#000",
@@ -100,13 +121,13 @@ const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
                 opacity: Math.min(1, t * 1.6),
                 // No shadow: seven of them across a grid this tight muddies the
                 // gutters instead of lifting the tiles off the ground.
-                transform: `translate(${dx}px, ${dy}px)`,
+                ...(t < 1 ? { transform: `translate(${dx}px, ${dy}px)` } : {}),
             }}
         >
             {/* Own clock per tile. An OffthreadVideo with no Sequence plays
                 against the COMPOSITION's frame, so `at` would count from the
                 wrong zero — see the note in S06_Panel. */}
-            <Sequence from={0} durationInFrames={BENTO_DURATION} layout="none">
+            <Sequence from={0} durationInFrames={duration} layout="none">
                 <OffthreadVideo
                     src={staticFile(`demo/bento/b_${tile.file}.mp4`)}
                     startFrom={startAt}
@@ -119,10 +140,33 @@ const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
     );
 };
 
+export const BentoTiles: React.FC<{
+    box?: Box;
+    duration?: number;
+    /** How far a tile starts from its resting place. The film scene arrives
+     *  with a push of its own, so it asks for much less than the standalone. */
+    travel?: number;
+    lift?: number;
+}> = ({ box = FULL, duration = BENTO_DURATION, travel = 240, lift = 44 }) => {
+    const rects = bentoRects(box);
+    return (
+        <>
+            {TILES.map((tile, i) => (
+                <Cell
+                    key={tile.file}
+                    tile={tile}
+                    rect={rects[i]}
+                    travel={travel}
+                    lift={lift}
+                    duration={duration}
+                />
+            ))}
+        </>
+    );
+};
+
 export const Bento: React.FC = () => (
-    <AbsoluteFill style={{ width: W, height: H, background: GROUND.base }}>
-        {TILES.map((tile) => (
-            <Cell key={tile.file} tile={tile} />
-        ))}
+    <AbsoluteFill style={{ width: 1920, height: 1080, background: GROUND.base }}>
+        <BentoTiles />
     </AbsoluteFill>
 );

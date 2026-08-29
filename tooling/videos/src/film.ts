@@ -6,6 +6,7 @@ import { S03_SecondCopy } from "./scenes/S03_SecondCopy";
 import { S03_OneDefinition } from "./scenes/S03_OneDefinition";
 import { S05_Headless } from "./scenes/S05_Headless";
 import { S07_Studio } from "./scenes/S07_Studio";
+import { S07b_Everything } from "./scenes/S07b_Everything";
 import { S11_Ownership } from "./scenes/S11_Ownership";
 import { S04_Claim } from "./scenes/S04_Claim";
 import { S05_Proof } from "./scenes/S05_Proof";
@@ -135,31 +136,37 @@ export const SCENES: SceneEntry[] = [
         enter: "push",
     },
     {
-        id: "Claim", title: "08 · Row-level security", component: S04_Claim,
+        id: "Everything", title: "08 · Every view", component: S07b_Everything,
+        durationInFrames: 300, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
+        enter: "descend",
+    },
+    {
+        id: "Claim", title: "09 · Row-level security", component: S04_Claim,
         durationInFrames: 300, ground: "claim",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "Proof", title: "09 · The proof", component: S05_Proof,
+        id: "Proof", title: "10 · The proof", component: S05_Proof,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.30 },
         enter: "descend",
     },
     {
-        id: "Agent", title: "10 · Agent-native", component: S07_Agent,
+        id: "Agent", title: "11 · Agent-native", component: S07_Agent,
         durationInFrames: 210, ground: "deep",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.30 },
         enter: "push",
     },
     {
-        id: "Ownership", title: "11 · Yours", component: S11_Ownership,
+        id: "Ownership", title: "12 · Yours", component: S11_Ownership,
         durationInFrames: 270, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "Close", title: "12 · The ask", component: S08_Close,
+        id: "Close", title: "13 · The ask", component: S08_Close,
         durationInFrames: 210, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.30 },
         enter: "scale",

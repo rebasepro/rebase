@@ -72,7 +72,7 @@ export const S05_Proof: React.FC = () => {
             <Stage>
                 <div style={{ display: "flex", gap: 84, alignItems: "center" }}>
                     <div style={{ width: 520, flexShrink: 0 }}>
-                        <Chapter n="08" label="Don't take our word for it" delay={4} />
+                        <Chapter n="09" label="Don't take our word for it" delay={4} />
                         <div style={{ marginTop: 26 }}>
                             <DisplayLine size={DISPLAY.split} delay={10}>Point it at</DisplayLine>
                             <DisplayLine size={DISPLAY.split} delay={16}>any Postgres.</DisplayLine>
