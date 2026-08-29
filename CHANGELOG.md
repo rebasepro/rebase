@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-29
+
 ### Breaking
 
 Under 0.x the minor is the breaking position: `^0.16.0` resolves

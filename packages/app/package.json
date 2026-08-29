@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/app",
   "type": "module",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Rebase core — framework-agnostic runtime for data-driven admin panels",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
