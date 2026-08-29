@@ -48,10 +48,16 @@ const ONE = `export const orders = defineCollection({
 /** When the five give way to the one.
  *
  *  The last card lands at ~86, so this holds all five at full strength for
- *  about five seconds. That is the whole point of the scene: the viewer is
+ *  about three seconds. That is half the point of the scene — the viewer is
  *  being asked to READ five fragments and recognise their own week in them,
- *  and at the old value of 104 they had 2.6 seconds to do it. */
-const COLLAPSE = 200;
+ *  and at the old value of 104 they had 2.6 seconds to do it.
+ *
+ *  The other half is the card that REPLACES them, and that is what a flat cut
+ *  to every scene broke: at COLLAPSE 200 with a 250-frame scene the single
+ *  collection finished typing at frame 242 and the slide began leaving at 232.
+ *  It was still being typed as it slid away. Both halves need their seconds;
+ *  the scene is timed from them rather than the other way round. */
+const COLLAPSE = 180;
 
 export const S03_SecondCopy: React.FC = () => {
     const frame = useCurrentFrame();
@@ -170,7 +176,7 @@ export const S03_SecondCopy: React.FC = () => {
                                         padding: "22px 28px",
                                     }}
                                 >
-                                    <Code code={ONE} size={17} delay={COLLAPSE + 18} step={1.6} />
+                                    <Code code={ONE} size={17} delay={COLLAPSE + 14} step={1.2} />
                                 </div>
                             </div>
                         </div>
