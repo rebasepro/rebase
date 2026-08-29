@@ -1,98 +1,76 @@
 import React from "react";
-import {
-    AbsoluteFill,
-    OffthreadVideo,
-    Sequence,
-    interpolate,
-    staticFile,
-    useCurrentFrame,
-} from "remotion";
-import { NeatCanvas } from "../gradient/NeatCanvas";
+import { AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../components/motion";
-import { FRAME, GROUND } from "../theme";
+import { GROUND, INK } from "../theme";
 
 /**
- * The bento. A separate piece from the film, not a scene in it.
+ * The bento. Its own composition, not a beat in the film.
  *
- * One view held big in the middle and six smaller ones arriving from the sides,
- * all of them live. The point is VARIETY: a board, cards over photographs, a
- * table of illustrations, two different list shapes and the schema editor. Six
- * scrolling lists would read as one thing scrolled six times, which is the trap
- * a grid of product screenshots usually falls into.
+ * A RECTANGLE: three columns of differing heights that partition 1760x920
+ * exactly, so the block has a straight edge on all four sides. An earlier cut
+ * scattered tiles around a large centre one and left ragged gaps top and
+ * bottom, which reads as a collage rather than a bento.
  *
- * Every clip is rendered by scripts/render-demo.mjs at a true 30fps rather than
- * screen-recorded at 25 — see the note in that file. The side tiles are also
- * captured at a SMALLER viewport than the centre: a tile shows its capture at
- * roughly a third of full width, and 1280-wide app type does not survive that.
+ * No gradient behind it and no drift on the tiles. The clips are the only
+ * moving thing, which is the whole idea — seven views of the product, live.
+ * (Per-tile drift was tried and had to go: any wobble breaks the 16px gutters
+ * that make the grid read as a grid.)
  */
 
 const W = 1920;
 const H = 1080;
-
 export const BENTO_DURATION = 420;
+
+/** Slightly under real time — seven tiles is a lot to take in at once, and it
+ *  buys headroom against the clip lengths. */
+const RATE = 0.85;
 
 interface Tile {
     file: string;
-    /** Where it comes to rest. */
     x: number;
     y: number;
     w: number;
     h: number;
-    /** Which edge it flies in from. The centre tile scales up instead. */
-    from: "left" | "right" | "center";
-    /** Frames after the start. */
+    /** Which edge it arrives from. The middle column rises instead. */
+    from: "left" | "right" | "up";
     delay: number;
-    /** Source frame to start the clip on, so no two tiles are in step. */
+    /** Source frame to start on, so no two tiles are in step. */
     at: number;
-    /** How many frames the clip actually has. Not decoration: a video asked
-     *  for a frame past its end holds its LAST one, so a tile whose window
-     *  overruns freezes for the rest of the piece while everything around it
-     *  keeps moving. `startAt` below clamps against this rather than trusting
-     *  the offsets to have been chosen carefully. */
+    /** Frames the clip actually has — `startAt` clamps against it, because a
+     *  video asked for a frame past its end holds its LAST one and the tile
+     *  would sit frozen while everything around it kept moving. */
     length: number;
 }
 
-/* Sizes deliberately differ per tile — a bento whose cells are all one size is
-   a grid. The two columns do not line up with each other either. */
+/* The grid: x 80..1840, y 80..1000, 16px gutters. Column one is three equal
+   rows; the other two are one tall tile and one short, mirrored, so the block
+   is regular at its edges and irregular inside. Every tile's aspect ratio is
+   matched by the viewport its clip was captured at — see render-demo.mjs. */
 const TILES: Tile[] = [
-    { file: "demo/panel.mp4", x: 516, y: 232, w: 888, h: 596, from: "center", delay: 0, at: 210, length: 574 },
+    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 30, length: 477 },
+    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 70, length: 477 },
+    { file: "users", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 50, length: 477 },
 
-    { file: "demo/tickets.mp4",   x: 56, y: 96,  w: 432, h: 310, from: "left", delay: 14, at: 30, length: 495 },
-    { file: "demo/customers.mp4", x: 56, y: 438, w: 432, h: 252, from: "left", delay: 24, at: 60, length: 462 },
-    { file: "demo/schema.mp4",    x: 56, y: 722, w: 432, h: 262, from: "left", delay: 34, at: 96, length: 426 },
+    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 40, length: 477 },
+    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 90, length: 477 },
 
-    { file: "demo/posts.mp4",     x: 1432, y: 76,  w: 432, h: 280, from: "right", delay: 20, at: 45, length: 462 },
-    { file: "demo/exercises.mp4", x: 1432, y: 388, w: 432, h: 312, from: "right", delay: 30, at: 75, length: 462 },
-    { file: "demo/users.mp4",     x: 1432, y: 732, w: 432, h: 252, from: "right", delay: 40, at: 40, length: 447 },
+    { file: "orders", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 60, length: 477 },
+    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 20, length: 473 },
 ];
 
-/** Slightly under real time. The tiles are small and the eye has seven of them
- *  to take in, so the app reads better a touch slower — and it buys headroom
- *  against the clip lengths. */
-const RATE = 0.82;
-
-const ENTRY = 34;
-/** How far off its resting place a tile starts. Past the frame edge, so it is
- *  genuinely arriving rather than sliding out of a crop. */
-const TRAVEL = 620;
+const ENTRY = 32;
+const SIDE = 240;
+const LIFT = 44;
 
 const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
     const frame = useCurrentFrame();
     const t = ramp(frame, tile.delay, ENTRY, ENTER);
+    const away = 1 - t;
 
-    /* Nothing rests dead still: after arriving, every tile keeps a slow drift
-       on its own phase, so the composition breathes instead of freezing into a
-       screenshot the moment the entrance finishes. */
-    const drift = Math.sin((frame + tile.delay * 7) / 74) * 7;
+    const dx = tile.from === "left" ? -SIDE * away : tile.from === "right" ? SIDE * away : 0;
+    const dy = tile.from === "up" ? LIFT * away : 0;
 
-    /* Never ask for a frame the clip does not have. */
     const startAt = Math.min(tile.at, Math.max(0, tile.length - BENTO_DURATION * RATE - 6));
-    const dx = tile.from === "left" ? -TRAVEL : tile.from === "right" ? TRAVEL : 0;
-
-    const scale =
-        tile.from === "center"
-            ? interpolate(t, [0, 1], [0.93, 1])
-            : interpolate(t, [0, 1], [0.88, 1]);
 
     return (
         <div
@@ -102,22 +80,22 @@ const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
                 top: tile.y,
                 width: tile.w,
                 height: tile.h,
-                borderRadius: FRAME.radius,
-                border: FRAME.border,
-                background: FRAME.background,
-                boxShadow: FRAME.boxShadow,
+                borderRadius: 16,
+                border: `1px solid ${INK.rule}`,
+                background: "#000",
                 overflow: "hidden",
-                opacity: Math.min(1, t * 1.5),
-                transform: `translate(${dx * (1 - t)}px, ${drift}px) scale(${scale})`,
+                opacity: Math.min(1, t * 1.6),
+                // No shadow: seven of them across a grid this tight muddies the
+                // gutters instead of lifting the tiles off the ground.
+                transform: `translate(${dx}px, ${dy}px)`,
             }}
         >
-            {/* Each clip runs on its own clock — see the note in S06_Panel: an
-                OffthreadVideo with no Sequence of its own plays against the
-                COMPOSITION's frame, so `at` would be an offset from the wrong
-                zero and the tiles would drift out of the windows chosen here. */}
-            <Sequence from={0} durationInFrames={100000} layout="none">
+            {/* Own clock per tile. An OffthreadVideo with no Sequence plays
+                against the COMPOSITION's frame, so `at` would count from the
+                wrong zero — see the note in S06_Panel. */}
+            <Sequence from={0} durationInFrames={BENTO_DURATION} layout="none">
                 <OffthreadVideo
-                    src={staticFile(tile.file)}
+                    src={staticFile(`demo/bento/b_${tile.file}.mp4`)}
                     startFrom={startAt}
                     muted
                     playbackRate={RATE}
@@ -128,39 +106,10 @@ const Cell: React.FC<{ tile: Tile }> = ({ tile }) => {
     );
 };
 
-export const Bento: React.FC = () => {
-    const frame = useCurrentFrame();
-
-    /* One very slow push across the whole board. It is the difference between
-       a composition that is playing and one that is merely on. */
-    const push = interpolate(frame, [0, 420], [1, 1.035], { extrapolateRight: "clamp" });
-
-    return (
-        <AbsoluteFill style={{ width: W, height: H }}>
-            <AbsoluteFill style={{ background: GROUND.base }} />
-            {/* The backdrop carries this piece — there is no copy and no cut to
-                supply rhythm, so the ribbon has to be present and it has to
-                move. It rolls about 11 degrees across the fourteen seconds,
-                which at this station stays on the coverage plateau rather than
-                turning broadside and swamping the tiles. */}
-            <NeatCanvas
-                framing="hero"
-                opacity={0.5}
-                camera={{
-                    cameraX: 0,
-                    cameraY: -12,
-                    cameraZoom: 2.05,
-                    cameraRotationZ: interpolate(frame, [0, BENTO_DURATION], [0.34, 0.53]),
-                }}
-                time={frame / 30}
-                style={{ mixBlendMode: "screen" }}
-            />
-            <AbsoluteFill style={{ transform: `scale(${push})` }}>
-                {TILES.map((tile) => (
-                    <Cell key={tile.file} tile={tile} />
-                ))}
-            </AbsoluteFill>
-        </AbsoluteFill>
-    );
-};
-
+export const Bento: React.FC = () => (
+    <AbsoluteFill style={{ width: W, height: H, background: GROUND.base }}>
+        {TILES.map((tile) => (
+            <Cell key={tile.file} tile={tile} />
+        ))}
+    </AbsoluteFill>
+);

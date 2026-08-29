@@ -312,75 +312,56 @@ const CLIPS = {
 };
 
 /* ── the bento tiles ─────────────────────────────────────────────────────────
-   A separate piece from the film: one big view in the middle and smaller ones
-   flying in beside it, so what matters here is VARIETY — a board, a table of
-   pictures, cards, two different list shapes and the schema editor, rather
-   than five scrolling lists that read as one.
+   A separate piece from the film, and a separate SET of captures — the film's
+   panel.mp4 and schema.mp4 are 1280x800 and must not be overwritten. Render
+   these into their own directory:
 
-   The two image-heavy ones run FIRST and with a pause between them, because
-   the demo signs its image URLs per request and its storage endpoint answers
-   a burst of misses with 429. */
-const TILE = { width: 900, height: 620 };
+     node scripts/render-demo.mjs <state> public/demo/bento \
+       b_record b_tickets b_customers b_users b_posts b_exercises b_schema
+
+   Two viewports, and both are SMALL on purpose. A tile shows its capture at
+   roughly two thirds width, and the app has to look bigger in the tile than a
+   1280 capture ever can — at 820 and 700 it drops its nav rail and lays out
+   with fewer, larger rows, which is exactly what a small tile needs. They are
+   also cut to the tiles' aspect ratios so `objectFit: cover` crops nothing:
+   a 16:9 capture in a portrait tile throws away half the frame. */
+const WIDE = { width: 820, height: 420 };   // for a 576x296 tile
+const TALL = { width: 700, height: 734 };   // for a 576x604 tile
+
+/** ~16s each, so a tile can start at an offset and still never run out. */
+const sweep = (down, up, px = 1200) => async ({ page, hold, scrollBy }) => {
+    await hold(0.5);
+    await scrollBy(px, down);
+    await hold(0.5);
+    await scrollBy(-Math.round(px * 0.62), up);
+    await hold(0.4);
+};
 
 Object.assign(CLIPS, {
-    posts: {
-        viewport: TILE,
-        run: async ({ page, hold, scrollBy }) => {
-            await settleGrid(page, `${BASE}/c/posts`, 14);
+    b_record: {
+        viewport: TALL,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/products`, 12);
+            await hold(0.8);
+            await clickOn("Italian coffee maker", 2.4, 1.0);
+            await scrollBy(700, 6.0, 350);
             await hold(0.5);
-            await scrollBy(1500, 8.5);
+            await scrollBy(-700, 4.5, 350);
             await hold(0.5);
-            await scrollBy(-900, 5.5);
-            await hold(0.4);
         },
     },
-    exercises: {
-        viewport: TILE,
-        run: async ({ page, hold, scrollBy }) => {
-            await settleGrid(page, `${BASE}/c/exercises`, 12);
-            await hold(0.5);
-            await scrollBy(1300, 8.5);
-            await hold(0.5);
-            await scrollBy(-800, 5.5);
-            await hold(0.4);
-        },
-    },
-    /* The board is the one view whose SHAPE is different — columns, not rows. */
-    tickets: {
-        viewport: { width: 1180, height: 720 },
-        run: async ({ page, hold, scrollBy }) => {
-            await settleGrid(page, `${BASE}/c/tickets`);
-            await hold(0.6);
-            await scrollBy(620, 6.5, 200);
-            await hold(0.5);
-            await scrollBy(-620, 4.5, 200);
-            await hold(0.5);
-            await scrollBy(420, 3.5, 200);
-            await hold(0.4);
-        },
-    },
-    customers: {
-        viewport: TILE,
-        run: async ({ page, hold, scrollBy }) => {
-            await settleGrid(page, `${BASE}/c/customers`);
-            await hold(0.5);
-            await scrollBy(1300, 8.5);
-            await hold(0.5);
-            await scrollBy(-800, 5.5);
-            await hold(0.4);
-        },
-    },
-    users: {
-        viewport: TILE,
-        run: async ({ page, hold, scrollBy }) => {
-            await settleGrid(page, `${BASE}/c/users`);
-            await hold(0.5);
-            await scrollBy(900, 8.0);
-            await hold(0.5);
-            await scrollBy(-620, 5.5);
-            await hold(0.4);
-        },
-    },
+    b_tickets:   { viewport: TALL, run: async (c) => { await settleGrid(c.page, `${BASE}/c/tickets`);   await sweep(8.5, 6.0, 900)(c); } },
+    b_posts:     { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/posts`, 10); await sweep(8.5, 6.0, 1400)(c); } },
+    b_exercises: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/exercises`, 10); await sweep(8.5, 6.0, 1200)(c); } },
+    b_customers: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/customers`); await sweep(8.5, 6.0, 1300)(c); } },
+    b_users:     { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/users`);     await sweep(8.5, 6.0, 900)(c); } },
+    /* The schema editor is NOT in this set. Below about 1024 wide it stops
+       being a list beside an editor pane and becomes a modal that covers the
+       list — which is a fine thing for the app to do and a poor thing to put
+       in a tile. It needs a wide viewport, and a wide capture cropped into a
+       portrait tile throws away half the frame. The film's Studio scene shows
+       it properly; here the seventh tile is the orders list instead. */
+    b_orders: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/orders`); await sweep(8.5, 6.0, 1300)(c); } },
 });
 
 const browser = await chromium.launch({ headless: true });
