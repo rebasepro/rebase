@@ -200,7 +200,27 @@ async function renderClip(page, name, build, opts = {}) {
         await clickAt(x, y, settle, loc ? () => loc.click({ timeout: 8000 }) : undefined);
     };
 
-    await build({ page, shoot, hold, moveTo, clickAt, scrollBy, cursor, clickOn });
+    /* Typing, one character per few frames, so the field fills at a readable
+       speed rather than appearing complete between two frames. */
+    const typeInto = async (target, text, s = 1.8) => {
+        const { x, y, loc } = await at_(target);
+        await moveTo(x, y, 0.7);
+        await clickAt(x, y, 0.25, loc ? () => loc.click({ timeout: 8000 }) : undefined);
+        const per = Math.max(1, Math.round((s * FPS) / text.length));
+        for (const ch of text) {
+            await page.keyboard.type(ch);
+            for (let i = 0; i < per; i++) await shoot();
+        }
+    };
+    const clearField = async (s = 0.7) => {
+        await page.keyboard.press("ControlOrMeta+A");
+        await page.keyboard.press("Backspace");
+        await hold(s);
+    };
+
+    await build({
+        page, shoot, hold, moveTo, clickAt, scrollBy, cursor, clickOn, typeInto, clearField,
+    });
 
     const mp4 = path.join(outDir, `${name}.mp4`);
     execFileSync("ffmpeg", [
@@ -328,41 +348,134 @@ const CLIPS = {
 const WIDE = { width: 820, height: 420 };   // for a 576x296 tile
 const TALL = { width: 700, height: 734 };   // for a 576x604 tile
 
-/** ~16s each, so a tile can start at an offset and still never run out. */
-const sweep = (down, up, px = 1200) => async ({ page, hold, scrollBy }) => {
-    await hold(0.5);
-    await scrollBy(px, down);
-    await hold(0.5);
-    await scrollBy(-Math.round(px * 0.62), up);
-    await hold(0.4);
-};
+/* Each tile does something DIFFERENT. Seven tiles all scrolling reads as one
+   view scrolled seven times, however varied the content is — the panel has
+   filters, search, view modes, selection and navigation, and the bento is the
+   one place they can all be shown at once.
+
+   Everything here is read-only. Nothing types into a record, toggles a field
+   or drags a card between board columns: this is a live public demo, and a
+   capture has no business changing its data to look good. */
+
+/** A gentle scroll to fill the rest of a tile's ~16s after its action. */
+const drift = (px, s) => async ({ scrollBy }) => { await scrollBy(px, s); };
 
 Object.assign(CLIPS, {
+    /* Open a record. The one navigation in the set. */
     b_record: {
         viewport: TALL,
         run: async ({ page, hold, scrollBy, clickOn }) => {
             await settleGrid(page, `${BASE}/c/products`, 12);
             await hold(0.8);
             await clickOn("Italian coffee maker", 2.4, 1.0);
-            await scrollBy(700, 6.0, 350);
-            await hold(0.5);
-            await scrollBy(-700, 4.5, 350);
+            await scrollBy(700, 5.5, 350);
+            await hold(0.4);
+            await clickOn(() => page.getByRole("tab", { name: /orders/i }).first(), 2.6, 0.8);
+            await hold(0.6);
+        },
+    },
+
+    /* Filter a board. The columns repopulate, which no list can show. */
+    b_tickets: {
+        viewport: TALL,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/tickets`);
+            await hold(0.7);
+            /* One filter at a time, each turned off before the next. Stacking
+               them intersects to almost nothing and a column showing "No items"
+               reads as a broken board rather than a filtered one. Feature
+               requests was the other candidate and empties In Progress on its
+               own — the data simply has none in flight. */
+            await clickOn("Bugs", 3.2);
+            await scrollBy(300, 2.4, 200);
+            await clickOn("Bugs", 1.8);
+            await clickOn("Urgent & High priority", 3.2);
+            await clickOn("Urgent & High priority", 1.8);
+            await hold(0.6);
+        },
+    },
+
+    /* Change the view mode: cards become a table. The biggest single change
+       any of these views can make. */
+    b_posts: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/posts`, 10);
+            await hold(0.7);
+            await clickOn("Cards", 1.3);          // the view menu
+            await clickOn("Table", 2.6);
+            await page.keyboard.press("Escape");  // the menu stays open otherwise
+            await hold(1.6);
+            await scrollBy(700, 4.5);
+            await clickOn("Table", 1.3);
+            await clickOn("Cards", 2.4);
+            await page.keyboard.press("Escape");
+            await hold(0.8);
+        },
+    },
+
+    /* Search. Typed a character at a time so the result narrowing is legible. */
+    b_customers: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, typeInto, clearField }) => {
+            await settleGrid(page, `${BASE}/c/customers`);
+            await hold(0.7);
+            await scrollBy(420, 3.0);
+            await typeInto(() => page.getByPlaceholder(/search/i).first(), "Karen", 2.0);
+            await hold(2.8);
+            await clearField(2.2);
+            await scrollBy(500, 3.4);
             await hold(0.5);
         },
     },
-    b_tickets:   { viewport: TALL, run: async (c) => { await settleGrid(c.page, `${BASE}/c/tickets`);   await sweep(8.5, 6.0, 900)(c); } },
-    b_posts:     { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/posts`, 10); await sweep(8.5, 6.0, 1400)(c); } },
-    b_exercises: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/exercises`, 10); await sweep(8.5, 6.0, 1200)(c); } },
-    b_customers: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/customers`); await sweep(8.5, 6.0, 1300)(c); } },
-    b_users:     { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/users`);     await sweep(8.5, 6.0, 900)(c); } },
-    /* The schema editor is NOT in this set. Below about 1024 wide it stops
-       being a list beside an editor pane and becomes a modal that covers the
-       list — which is a fine thing for the app to do and a poor thing to put
-       in a tile. It needs a wide viewport, and a wide capture cropped into a
-       portrait tile throws away half the frame. The film's Studio scene shows
-       it properly; here the seventh tile is the orders list instead. */
-    b_orders: { viewport: WIDE, run: async (c) => { await settleGrid(c.page, `${BASE}/c/orders`); await sweep(8.5, 6.0, 1300)(c); } },
+
+    /* Select rows. The rows light up and the toolbar grows an action. */
+    b_users: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/users`);
+            await hold(0.7);
+            const box = (n) => () => page.locator("[role=checkbox], input[type=checkbox]").nth(n);
+            await clickOn(box(1), 0.9, 0.8);
+            await clickOn(box(2), 0.9, 0.5);
+            await clickOn(box(3), 2.6, 0.5);
+            await scrollBy(520, 4.0);
+            await clickOn(box(1), 1.6, 0.7);
+            await hold(0.6);
+        },
+    },
+
+    /* Filter a table. */
+    b_exercises: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/exercises`, 10);
+            await hold(0.7);
+            await clickOn("Beginner bodyweight", 3.0);
+            await scrollBy(420, 3.0);
+            await clickOn("Published strength", 3.0);
+            await clickOn("Beginner bodyweight", 2.2);
+            await hold(0.6);
+        },
+    },
+
+    /* Filter a list. Same idea as the table and the board, and it looks
+       different on each — which is the point of showing all three. */
+    b_orders: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/orders`);
+            await hold(0.7);
+            await clickOn("Shipped orders", 3.0);
+            await scrollBy(460, 3.2);
+            await clickOn("Pending & paid", 3.0);
+            await clickOn("Shipped orders", 2.4);
+            await hold(0.6);
+        },
+    },
 });
+
+
 
 const browser = await chromium.launch({ headless: true });
 /* ONE context for every clip, so the HTTP cache is shared. The demo's image

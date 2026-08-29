@@ -15,6 +15,11 @@ import { GROUND, INK } from "../theme";
  * moving thing, which is the whole idea — seven views of the product, live.
  * (Per-tile drift was tried and had to go: any wobble breaks the 16px gutters
  * that make the grid read as a grid.)
+ *
+ * Every tile does something DIFFERENT, and that is the point of the piece:
+ * open a record, filter a board, switch a view from cards to a table, search,
+ * select rows, filter a table, filter a list. Seven tiles all scrolling read
+ * as one view scrolled seven times however varied the content was.
  */
 
 const W = 1920;
@@ -47,15 +52,18 @@ interface Tile {
    is regular at its edges and irregular inside. Every tile's aspect ratio is
    matched by the viewport its clip was captured at — see render-demo.mjs. */
 const TILES: Tile[] = [
-    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 30, length: 477 },
-    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 70, length: 477 },
-    { file: "users", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 50, length: 477 },
+    /* `at` is chosen so each tile's 14s window CONTAINS that tile's action —
+       there is no point capturing a filter being applied and then showing the
+       ten seconds either side of it. */
+    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 60, length: 469 },
+    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 90, length: 462 },
+    { file: "users", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 55, length: 422 },
 
-    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 40, length: 477 },
-    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 90, length: 477 },
+    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 100, length: 527 },
+    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 90, length: 572 },
 
-    { file: "orders", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 60, length: 477 },
-    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 20, length: 473 },
+    { file: "orders", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 100, length: 474 },
+    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 60, length: 427 },
 ];
 
 const ENTRY = 32;
