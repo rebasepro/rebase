@@ -2043,6 +2043,9 @@ importers:
 
   tooling/videos:
     dependencies:
+      '@firecms/neat':
+        specifier: 1.0.2
+        version: 1.0.2
       '@remotion/cli':
         specifier: 4.0.500
         version: 4.0.500(postcss@8.5.24)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)

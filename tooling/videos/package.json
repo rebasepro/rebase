@@ -5,6 +5,7 @@
     "private": true,
     "type": "module",
     "dependencies": {
+        "@firecms/neat": "1.0.2",
         "@remotion/cli": "4.0.500",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
@@ -18,8 +19,13 @@
     },
     "scripts": {
         "dev": "remotion studio",
+        "intro": "remotion render RebaseIntro out/rebase-intro.mp4",
+        "intro:poster": "remotion still RebaseIntro out/rebase-intro-poster.png --frame=230",
+        "scene": "remotion render",
         "render": "remotion render",
         "build": "remotion bundle",
+        "logo": "node scripts/extract-logo.mjs",
+        "neat:config": "node scripts/extract-neat-config.mjs",
         "upgrade": "remotion upgrade"
     },
     "sideEffects": [
