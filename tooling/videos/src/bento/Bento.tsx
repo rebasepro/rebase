@@ -17,10 +17,10 @@ import { GROUND, INK } from "../theme";
  * that make the grid read as a grid.)
  *
  * Every tile does something DIFFERENT, and that is the point of the piece:
- * search, filter a table, open a record OUT OF A LIST, filter a board, switch
- * a view from cards to a table, select rows, read a form. Seven tiles all
- * scrolling read as one view scrolled seven times however varied the content
- * underneath happens to be.
+ * search, filter a table, switch a view from cards to a table, read a form and
+ * its relations, DRAG A CARD BETWEEN COLUMNS, select rows, and open a record
+ * out of a list. Seven tiles all scrolling read as one view scrolled seven
+ * times however varied the content underneath happens to be.
  */
 
 const W = 1920;
@@ -53,20 +53,22 @@ interface Tile {
    is regular at its edges and irregular inside. Every tile's aspect ratio is
    matched by the viewport its clip was captured at — see render-demo.mjs. */
 const TILES: Tile[] = [
-    /* `at` is chosen so each tile's window CONTAINS that tile's action — there
-       is no point capturing a filter being applied and then showing the ten
-       seconds either side of it. The bottom row is deliberately three unlike
-       things: a record opening out of a list, a view mode changing, and a form
-       being read. */
-    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 60, length: 469 },
-    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 80, length: 462 },
-    { file: "expand", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 30, length: 456 },
+    /* The board is NOT the centre tile. A board wants width for its columns,
+       so it sits in a wide slot and is captured wider than everything else,
+       which lands it smaller in the same space — the right trade for a shot
+       whose subject is a card crossing between columns.
 
-    { file: "tickets", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 200, length: 671 },
-    { file: "posts", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 80, length: 572 },
+       `at` puts each tile's action inside its window; there is no point
+       capturing a drag and then showing the ten seconds either side of it. */
+    { file: "customers", x: 80, y: 80, w: 576, h: 296, from: "left", delay: 14, at: 20, length: 396 },
+    { file: "exercises", x: 80, y: 392, w: 576, h: 296, from: "left", delay: 20, at: 80, length: 462 },
+    { file: "posts", x: 80, y: 704, w: 576, h: 296, from: "left", delay: 26, at: 80, length: 572 },
+
+    { file: "record", x: 672, y: 80, w: 576, h: 604, from: "up", delay: 0, at: 45, length: 427 },
+    { file: "tickets", x: 672, y: 700, w: 576, h: 300, from: "up", delay: 8, at: 30, length: 480 },
 
     { file: "authors", x: 1264, y: 80, w: 576, h: 300, from: "right", delay: 18, at: 50, length: 422 },
-    { file: "record", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 45, length: 427 },
+    { file: "expand", x: 1264, y: 396, w: 576, h: 604, from: "right", delay: 24, at: 30, length: 455 },
 ];
 
 const ENTRY = 32;

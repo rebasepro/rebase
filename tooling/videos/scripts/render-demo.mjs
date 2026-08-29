@@ -200,6 +200,33 @@ async function renderClip(page, name, build, opts = {}) {
         await clickAt(x, y, settle, loc ? () => loc.click({ timeout: 8000 }) : undefined);
     };
 
+    /* Drag, rendered frame by frame like everything else. The pointer has to
+       travel with real mouse.move calls — dnd-kit tracks pointer events, not
+       element positions — and it needs a few pixels of movement before it
+       activates, which is what the nudge after mouse.down is for. */
+    const dragTo = async (target, dx, dy, s = 1.7) => {
+        const { x, y } = await at_(target);
+        await moveTo(x, y, 0.8);
+        await cursor(x, y, true);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + 6, y + 2);
+        await shoot();
+        const N = sec(s);
+        for (let i = 1; i <= N; i++) {
+            const t = easeInOut(i / N);
+            const px = x + dx * t;
+            const py = y + dy * t;
+            await page.mouse.move(px, py);
+            await cursor(px, py, true);
+            await shoot();
+        }
+        await page.mouse.up();
+        at = { x: x + dx, y: y + dy };
+        await cursor(at.x, at.y, false);
+        await hold(1.3);
+    };
+
     /* Typing, one character per few frames, so the field fills at a readable
        speed rather than appearing complete between two frames. */
     const typeInto = async (target, text, s = 1.8) => {
@@ -211,6 +238,14 @@ async function renderClip(page, name, build, opts = {}) {
             await page.keyboard.type(ch);
             for (let i = 0; i < per; i++) await shoot();
         }
+        /* Typing alone does not run this panel's search. Every keystroke lands
+           — focus is right, the field shows the word — and the list never
+           filters, which reads as search being broken. It reacts to a
+           COMMITTED value, so fill() re-commits the same string and the query
+           runs. The characters above are still really typed; this only ends
+           the edit the way a person leaving the field would. */
+        if (loc) await loc.fill(text);
+        await page.waitForTimeout(1200);
     };
     const clearField = async (s = 0.7) => {
         await page.keyboard.press("ControlOrMeta+A");
@@ -220,6 +255,7 @@ async function renderClip(page, name, build, opts = {}) {
 
     await build({
         page, shoot, hold, moveTo, clickAt, scrollBy, cursor, clickOn, typeInto, clearField,
+        dragTo,
     });
 
     const mp4 = path.join(outDir, `${name}.mp4`);
@@ -281,7 +317,13 @@ const settleGrid = async (page, url, needImages = 0) => {
         const got = await loaded();
         if (got < needImages) console.warn(`    (only ${got}/${needImages} images loaded)`);
     }
-    await page.waitForTimeout(1500);
+    /* Three seconds, not one and a half. The grid renders its rows well before
+       it is ready to answer a query: typing into the search box earlier than
+       this put the term in the field, left focus correct and the value correct,
+       and the list simply never filtered — the request had been set up against
+       a view that was still initialising. It looks exactly like search being
+       broken, and it is the capture being impatient. */
+    await page.waitForTimeout(3000);
     const text = await page.evaluate(() => document.body.innerText);
     if (/privacy policy|sign in with email/i.test(text))
         throw new Error("NOT SIGNED IN — run scripts/demo-login.mjs");
@@ -351,6 +393,10 @@ const CLIPS = {
    a 16:9 capture in a portrait tile throws away half the frame. */
 const WIDE = { width: 680, height: 348 };   // for a 576x296 tile
 const TALL = { width: 600, height: 628 };   // for a 576x604 tile
+/* The board gets its own, WIDER than the other wide tiles on purpose: it
+   needs three columns on screen to read as a board at all, and a wider
+   capture lands smaller in the same tile, which is what that shot wants. */
+const BOARD = { width: 900, height: 470 };  // also for a 576x300 tile
 
 /* Each tile does something DIFFERENT. Seven tiles all scrolling reads as one
    view scrolled seven times, however varied the content is — the panel has
@@ -381,22 +427,22 @@ Object.assign(CLIPS, {
 
     /* Filter a board. The columns repopulate, which no list can show. */
     b_tickets: {
-        viewport: TALL,
-        run: async ({ page, hold, scrollBy, clickOn }) => {
+        viewport: BOARD,
+        run: async ({ page, hold, clickOn, dragTo }) => {
             await settleGrid(page, `${BASE}/c/tickets`);
+            await hold(0.6);
+            /* The one thing only a board can do — and the only action in this
+               whole set that WRITES, because a card's column IS its status. So
+               it is dragged straight back afterwards and the capture leaves the
+               demo exactly as it found it; checked on the column counts, 11/16
+               before and 11/16 after. */
+            await dragTo("Checkout page freezes on mobile", 250, 0, 1.7);
+            await hold(0.8);
+            await dragTo("Checkout page freezes on mobile", -250, 0, 1.7);
             await hold(0.7);
-            /* One filter at a time, each turned off before the next. Stacking
-               them intersects to almost nothing and a column showing "No items"
-               reads as a broken board rather than a filtered one. Feature
-               requests was the other candidate and empties In Progress on its
-               own — the data simply has none in flight. */
-            await clickOn("Bugs", 3.2);
-            await scrollBy(300, 2.4, 200);
-            await clickOn("Bugs", 1.8);
-            await clickOn("Urgent & High priority", 3.2);
-            await scrollBy(300, 2.8, 200);
-            await clickOn("Urgent & High priority", 1.8);
-            await scrollBy(-300, 2.6, 200);
+            await clickOn("Bugs", 2.2);
+            await clickOn("Bugs", 1.6);
+            await hold(0.5);
         },
     },
 
@@ -424,12 +470,20 @@ Object.assign(CLIPS, {
         viewport: WIDE,
         run: async ({ page, hold, scrollBy, typeInto, clearField }) => {
             await settleGrid(page, `${BASE}/c/customers`);
-            await hold(0.7);
-            await scrollBy(420, 3.0);
-            await typeInto(() => page.getByPlaceholder(/search/i).first(), "Karen", 2.0);
-            await hold(2.8);
-            await clearField(2.2);
-            await scrollBy(500, 3.4);
+            await hold(0.5);
+            /* Search FIRST, scroll after — scrolling first parks the list far
+               down while the matching rows render at the TOP, so the filter
+               applies and the tile goes on showing unfiltered rows.
+
+               And then WAIT. This search takes three to four seconds to come
+               back, so a 2.8s hold cleared the field at almost the same frame
+               the results arrived: the filter worked the whole time and never
+               once appeared on screen. Measured against the row text, not the
+               field, which is what made it look like search was broken. */
+            await typeInto(() => page.getByPlaceholder(/search/i).first(), "Karen", 1.6);
+            await hold(5.5);
+            await clearField(1.2);
+            await scrollBy(380, 2.8);
             await hold(0.5);
         },
     },
@@ -472,7 +526,7 @@ Object.assign(CLIPS, {
        (There is no slide-out drawer to use; this panel opens records as full
        pages, and that is the expansion.) */
     b_expand: {
-        viewport: WIDE,
+        viewport: TALL,
         run: async ({ page, hold, scrollBy, clickOn }) => {
             await settleGrid(page, `${BASE}/c/orders`);
             await hold(0.4);
