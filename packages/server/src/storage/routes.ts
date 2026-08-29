@@ -881,7 +881,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
                 // hook above was asked about one object; a key is only unique
                 // within its own source, so a token that named the path alone
                 // would spend against the same key in every other one.
-                downloadConfig.metadata.token = generateDownloadToken(scopedPath, 300, storageId);
+                downloadConfig.metadata.token = await generateDownloadToken(scopedPath, 300, storageId);
                 downloadConfig.metadata.tokenExpiresIn = 300;
             }
         }

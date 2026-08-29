@@ -29,24 +29,28 @@ describe("JWT Utilities", () => {
     });
 
     describe("configureJwt", () => {
-        it("should configure JWT with provided secret", () => {
+        it("should configure JWT with provided secret", async () => {
             configureJwt({ secret: "new-secret-key-that-is-at-least-32-chars" });
-            // Configuration is internal, but we can verify it works by generating a token
-            expect(() => generateAccessToken("user-1", ["admin"])).not.toThrow();
+            // Configuration is internal, but we can verify it works by generating a
+            // token. Asserted as a resolution, not as "does not throw": signing is
+            // asynchronous now, so an `async` callback passed to `.not.toThrow()`
+            // never throws synchronously and the assertion would hold no matter
+            // what the mint did.
+            await expect(generateAccessToken("user-1", ["admin"])).resolves.toEqual(expect.any(String));
         });
 
-        it("should allow partial configuration updates", () => {
+        it("should allow partial configuration updates", async () => {
             configureJwt({ secret: testSecret,
 accessExpiresIn: "2h" });
             // Token generation should still work
-            const token = generateAccessToken("user-1", ["admin"]);
+            const token = await generateAccessToken("user-1", ["admin"]);
             expect(token).toBeTruthy();
         });
     });
 
     describe("generateAccessToken", () => {
-        it("should generate a valid JWT token", () => {
-            const token = generateAccessToken("user-123", ["admin", "editor"]);
+        it("should generate a valid JWT token", async () => {
+            const token = await generateAccessToken("user-123", ["admin", "editor"]);
             expect(token).toBeTruthy();
             expect(typeof token).toBe("string");
             // JWT tokens have 3 parts separated by dots
@@ -58,9 +62,9 @@ accessExpiresIn: "2h" });
                 .toThrow("JWT secret is too short");
         });
 
-        it("should include uid and roles in payload", () => {
-            const token = generateAccessToken("user-456", ["viewer"]);
-            const payload = verifyAccessToken(token);
+        it("should include uid and roles in payload", async () => {
+            const token = await generateAccessToken("user-456", ["viewer"]);
+            const payload = await verifyAccessToken(token);
             expect(payload).toEqual({
                 uid: "user-456",
                 roles: ["viewer"],
@@ -71,17 +75,17 @@ accessExpiresIn: "2h" });
             });
         });
 
-        it("should handle empty roles array", () => {
-            const token = generateAccessToken("user-789", []);
-            const payload = verifyAccessToken(token);
+        it("should handle empty roles array", async () => {
+            const token = await generateAccessToken("user-789", []);
+            const payload = await verifyAccessToken(token);
             expect(payload?.roles).toEqual([]);
         });
     });
 
     describe("verifyAccessToken", () => {
-        it("should verify and decode a valid token", () => {
-            const token = generateAccessToken("user-123", ["admin"]);
-            const payload = verifyAccessToken(token);
+        it("should verify and decode a valid token", async () => {
+            const token = await generateAccessToken("user-123", ["admin"]);
+            const payload = await verifyAccessToken(token);
             expect(payload).toEqual({
                 uid: "user-123",
                 roles: ["admin"],
@@ -92,28 +96,28 @@ accessExpiresIn: "2h" });
             });
         });
 
-        it("should return null for invalid token", () => {
-            const payload = verifyAccessToken("invalid-token");
+        it("should return null for invalid token", async () => {
+            const payload = await verifyAccessToken("invalid-token");
             expect(payload).toBeNull();
         });
 
-        it("refuses a download token, which is validly signed but is not a session", () => {
+        it("refuses a download token, which is validly signed but is not a session", async () => {
             // Same secret signs both, so the signature proves nothing about what
             // the token is *for*. A download token travels in URLs and is scoped
             // to one file; it must never come back as a user.
-            const download = generateDownloadToken("default/uploads/image.png");
-            expect(verifyAccessToken(download)).toBeNull();
+            const download = await generateDownloadToken("default/uploads/image.png");
+            expect(await verifyAccessToken(download)).toBeNull();
         });
 
-        it("should return null for token signed with different secret", () => {
-            const token = generateAccessToken("user-123", ["admin"]);
+        it("should return null for token signed with different secret", async () => {
+            const token = await generateAccessToken("user-123", ["admin"]);
             configureJwt({ secret: "different-secret-that-is-at-least-32-chars-long" });
-            const payload = verifyAccessToken(token);
+            const payload = await verifyAccessToken(token);
             expect(payload).toBeNull();
         });
 
-        it("should return null for malformed JWT", () => {
-            const payload = verifyAccessToken("not.a.valid.jwt.token");
+        it("should return null for malformed JWT", async () => {
+            const payload = await verifyAccessToken("not.a.valid.jwt.token");
             expect(payload).toBeNull();
         });
 
@@ -140,21 +144,21 @@ accessExpiresIn: "2h" });
     });
 
     describe("hashRefreshToken", () => {
-        it("should hash a token consistently", () => {
+        it("should hash a token consistently", async () => {
             const token = "test-refresh-token";
-            const hash1 = hashRefreshToken(token);
-            const hash2 = hashRefreshToken(token);
+            const hash1 = await hashRefreshToken(token);
+            const hash2 = await hashRefreshToken(token);
             expect(hash1).toBe(hash2);
         });
 
-        it("should produce different hashes for different tokens", () => {
-            const hash1 = hashRefreshToken("token1");
-            const hash2 = hashRefreshToken("token2");
+        it("should produce different hashes for different tokens", async () => {
+            const hash1 = await hashRefreshToken("token1");
+            const hash2 = await hashRefreshToken("token2");
             expect(hash1).not.toBe(hash2);
         });
 
-        it("should return a SHA256 hash (64 hex characters)", () => {
-            const hash = hashRefreshToken("any-token");
+        it("should return a SHA256 hash (64 hex characters)", async () => {
+            const hash = await hashRefreshToken("any-token");
             expect(hash).toHaveLength(64);
             expect(/^[a-f0-9]+$/.test(hash)).toBe(true);
         });
@@ -359,7 +363,7 @@ refreshExpiresIn: "7d" });
 
     // ── Expired token ────────────────────────────────────────
     describe("expired token handling", () => {
-        it("should return null for an expired token", () => {
+        it("should return null for an expired token", async () => {
             // This test asserted that the token was *valid* and left a comment
             // saying expiry could not easily be waited for. It can: the clock
             // `jsonwebtoken` compares `exp` against is `Date.now()`, which fake
@@ -367,16 +371,16 @@ refreshExpiresIn: "7d" });
             // passed `ignoreExpiration`, used to pass this.
             configureJwt({ secret: testSecret,
 accessExpiresIn: "1s" });
-            const token = generateAccessToken("user-1", ["admin"]);
+            const token = await generateAccessToken("user-1", ["admin"]);
 
-            const payload = verifyAccessToken(token);
+            const payload = await verifyAccessToken(token);
             expect(payload).not.toBeNull();
             expect(payload!.uid).toBe("user-1");
             expect(payload!.roles).toEqual(["admin"]);
 
             jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
             try {
-                expect(verifyAccessToken(token)).toBeNull();
+                expect(await verifyAccessToken(token)).toBeNull();
             } finally {
                 jest.useRealTimers();
             }
@@ -385,39 +389,39 @@ accessExpiresIn: "1s" });
 
     // ── Access token round-trip with various roles ────────────
     describe("access token round-trip", () => {
-        it("should preserve multiple roles through encode/decode", () => {
+        it("should preserve multiple roles through encode/decode", async () => {
             const roles = ["admin", "editor", "viewer", "moderator"];
-            const token = generateAccessToken("user-multi", roles);
-            const payload = verifyAccessToken(token);
+            const token = await generateAccessToken("user-multi", roles);
+            const payload = await verifyAccessToken(token);
             expect(payload!.uid).toBe("user-multi");
             expect(payload!.roles).toEqual(roles);
         });
 
-        it("should handle special characters in uid", () => {
-            const token = generateAccessToken("user@example.com", ["admin"]);
-            const payload = verifyAccessToken(token);
+        it("should handle special characters in uid", async () => {
+            const token = await generateAccessToken("user@example.com", ["admin"]);
+            const payload = await verifyAccessToken(token);
             expect(payload!.uid).toBe("user@example.com");
         });
 
-        it("should handle UUID-style uid", () => {
+        it("should handle UUID-style uid", async () => {
             const uuid = "550e8400-e29b-41d4-a716-446655440000";
-            const token = generateAccessToken(uuid, []);
-            const payload = verifyAccessToken(token);
+            const token = await generateAccessToken(uuid, []);
+            const payload = await verifyAccessToken(token);
             expect(payload!.uid).toBe(uuid);
         });
     });
 
     // ── Scoped Download Tokens ────────────────────────────────
     describe("Scoped Download Tokens", () => {
-        it("should generate a valid scoped download token", () => {
-            const token = generateDownloadToken("default/photos/file.jpg", 100);
+        it("should generate a valid scoped download token", async () => {
+            const token = await generateDownloadToken("default/photos/file.jpg", 100);
             expect(token).toBeTruthy();
             expect(typeof token).toBe("string");
         });
 
-        it("should verify and decode a valid scoped download token", () => {
-            const token = generateDownloadToken("default/photos/file.jpg", 100);
-            const decoded = verifyDownloadToken(token);
+        it("should verify and decode a valid scoped download token", async () => {
+            const token = await generateDownloadToken("default/photos/file.jpg", 100);
+            const decoded = await verifyDownloadToken(token);
             expect(decoded).toEqual({
                 purpose: "file-read",
                 path: "default/photos/file.jpg",
@@ -425,24 +429,24 @@ accessExpiresIn: "1s" });
             });
         });
 
-        it("carries the storage source it was minted for", () => {
+        it("carries the storage source it was minted for", async () => {
             // The path alone does not identify an object: the same key exists
             // independently in every configured source.
-            const token = generateDownloadToken("default/photos/file.jpg", 100, "media");
-            expect(verifyDownloadToken(token)!.storageId).toBe("media");
+            const token = await generateDownloadToken("default/photos/file.jpg", 100, "media");
+            expect((await verifyDownloadToken(token))!.storageId).toBe("media");
         });
 
-        it("spells the default source one way, however it was asked for", () => {
+        it("spells the default source one way, however it was asked for", async () => {
             // `?storageId=` omitted, empty, and `(default)` all resolve to the
             // same controller, so all three must produce the same grant — else
             // the check either 403s a legitimate read or gets skipped.
             for (const asked of [undefined, null, "", "   ", "(default)"] as const) {
-                const token = generateDownloadToken("default/photos/file.jpg", 100, asked);
-                expect(verifyDownloadToken(token)!.storageId).toBe("(default)");
+                const token = await generateDownloadToken("default/photos/file.jpg", 100, asked);
+                expect((await verifyDownloadToken(token))!.storageId).toBe("(default)");
             }
         });
 
-        it("reads a token minted before the storageId claim as a default-source grant", () => {
+        it("reads a token minted before the storageId claim as a default-source grant", async () => {
             // Fail-closed for the five minutes an old token can still be in
             // flight after a deploy: it grants the default source, not all of
             // them. Signed by hand because the current minter cannot omit the
@@ -452,31 +456,31 @@ accessExpiresIn: "1s" });
                 testSecret,
                 { expiresIn: 100, algorithm: "HS256" }
             );
-            expect(verifyDownloadToken(legacy)!.storageId).toBe("(default)");
+            expect((await verifyDownloadToken(legacy))!.storageId).toBe("(default)");
         });
 
-        it("should return null when verifying an access token as a download token", () => {
-            const accessToken = generateAccessToken("user-1", ["admin"]);
-            const decoded = verifyDownloadToken(accessToken);
+        it("should return null when verifying an access token as a download token", async () => {
+            const accessToken = await generateAccessToken("user-1", ["admin"]);
+            const decoded = await verifyDownloadToken(accessToken);
             expect(decoded).toBeNull();
         });
 
-        it("should return null for a malformed download token", () => {
-            expect(verifyDownloadToken("invalid.download.token")).toBeNull();
+        it("should return null for a malformed download token", async () => {
+            expect(await verifyDownloadToken("invalid.download.token")).toBeNull();
         });
 
-        it("should return null for expired download tokens", () => {
+        it("should return null for expired download tokens", async () => {
             // Expiry is the whole point of a download token: it travels in a URL
             // that ends up in logs, Referer headers and chat messages, so the
             // window in which a leaked one is useful has to be short. This test
             // used to hand in a malformed string, which the signature check
             // rejects long before `exp` is ever looked at.
-            const token = generateDownloadToken("default/photos/file.jpg", 1);
-            expect(verifyDownloadToken(token)).not.toBeNull();
+            const token = await generateDownloadToken("default/photos/file.jpg", 1);
+            expect(await verifyDownloadToken(token)).not.toBeNull();
 
             jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
             try {
-                expect(verifyDownloadToken(token)).toBeNull();
+                expect(await verifyDownloadToken(token)).toBeNull();
             } finally {
                 jest.useRealTimers();
             }

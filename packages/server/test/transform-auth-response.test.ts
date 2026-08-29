@@ -225,7 +225,7 @@ accessExpiresIn: "1h" });
 
             // Setup: valid refresh token exists
             const rawRefreshToken = "a".repeat(80);
-            const hashedToken = hashRefreshToken(rawRefreshToken);
+            const hashedToken = await hashRefreshToken(rawRefreshToken);
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
                 id: "rt-1",
                 uid: "user-1",

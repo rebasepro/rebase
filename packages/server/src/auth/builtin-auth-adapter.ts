@@ -162,7 +162,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // JWT verification
-            const payload = verifyAccessToken(token);
+            const payload = await verifyAccessToken(token);
             if (!payload) {
                 return null;
             }
@@ -212,7 +212,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             }
 
             // JWT verification
-            const payload = verifyAccessToken(token);
+            const payload = await verifyAccessToken(token);
             if (!payload) {
                 return null;
             }

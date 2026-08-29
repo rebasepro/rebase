@@ -1,5 +1,5 @@
-import jwt from "jsonwebtoken";
-import { createHash, randomBytes } from "crypto";
+import { decodeProtectedHeader, signJwt, verifyJwt } from "./jwt-crypto";
+import { randomHex, sha256Hex } from "../utils/portable-crypto";
 import { logger } from "../utils/logger";
 // A leaf module (node:path and `@rebasepro/types` only), so this does not close
 // an import cycle. Same reason the key canonicalizer lives there: the value a
@@ -52,7 +52,8 @@ export interface AccessTokenPayload {
     aal?: "aal1" | "aal2";
     /**
      * When the token was issued, in seconds since the epoch — the standard JWT
-     * `iat` claim, which `jsonwebtoken` sets on every token it signs.
+     * `iat` claim, which the signer behind `jwt-crypto.ts` sets on every token
+     * it mints — see the note there before replacing that implementation.
      *
      * Carried through verification because revocation needs it: `logout`,
      * `change-password`, `reset-password` and `DELETE /auth/sessions` all stamp
@@ -197,12 +198,12 @@ export function isJwtConfigured(): boolean {
 /**
  * Generate an access token (short-lived, 1 hour by default)
  */
-export function generateAccessToken(
+export async function generateAccessToken(
     uid: string,
     roles: string[],
     aal: "aal1" | "aal2" = "aal1",
     customClaims?: Record<string, unknown>
-): string {
+): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
@@ -224,15 +225,15 @@ export function generateAccessToken(
     // JWKS, and what lets the previous key keep working while tokens signed by
     // it are still in circulation.
     if (activeSigningKey) {
-        return jwt.sign(payload, activeSigningKey.privateKey, {
-            expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
+        return signJwt(payload, activeSigningKey.privateKey, {
+            expiresIn: jwtConfig.accessExpiresIn,
             algorithm: activeSigningKey.algorithm,
             keyid: activeSigningKey.kid
         });
     }
 
-    return jwt.sign(payload, jwtConfig.secret, {
-        expiresIn: jwtConfig.accessExpiresIn as jwt.SignOptions["expiresIn"],
+    return signJwt(payload, jwtConfig.secret, {
+        expiresIn: jwtConfig.accessExpiresIn,
         algorithm: "HS256"
     });
 }
@@ -282,7 +283,7 @@ export function getAccessTokenExpiry(): number {
  * checked explicitly: a token minted for reading a file is not a token for
  * being a user.
  */
-export function verifyAccessToken(token: string): AccessTokenPayload | null {
+export async function verifyAccessToken(token: string): Promise<AccessTokenPayload | null> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
@@ -292,21 +293,21 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         // `kid` and by nothing else in the token.
         //
         // The alternative, passing every algorithm we support and letting
-        // `jsonwebtoken` read `alg` from the header, is the canonical JWT
+        // the verifier read `alg` from the header, is the canonical JWT
         // vulnerability: an attacker takes the RSA public key we publish at
         // `/.well-known/jwks.json`, HMACs a payload of their choosing with it,
         // sets `alg: HS256`, and the verifier — holding that same public key as
         // "the secret" — agrees. Any uid, any roles. So a token naming a key we
         // hold is verified with that key's algorithm alone, and a token naming
         // none never reaches the asymmetric path at all.
-        const header = jwt.decode(token, { complete: true })?.header;
-        const namedKey = resolveVerificationKey(signingKeys, header?.kid);
+        const header = decodeProtectedHeader(token);
+        const namedKey = resolveVerificationKey(signingKeys, header.kid);
 
         // A token with a `kid` we do not recognise falls through to the secret
         // and fails there, which is what a retired key should do.
         const decoded = (namedKey
-            ? jwt.verify(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
-            : jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] })
+            ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
+            : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
         ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
@@ -336,14 +337,14 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
  * Generate a random refresh token (long-lived, 30 days by default)
  */
 export function generateRefreshToken(): string {
-    return randomBytes(40).toString("hex");
+    return randomHex(40);
 }
 
 /**
  * Hash a refresh token for database storage (don't store raw tokens)
  */
-export function hashRefreshToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
+export function hashRefreshToken(token: string): Promise<string> {
+    return sha256Hex(token);
 }
 
 /**
@@ -407,13 +408,12 @@ export const MFA_PENDING_PURPOSE = "mfa-pending";
  * first factor may present the second, not a session to be carried around. Five
  * minutes matches the challenge TTL.
  */
-export function generateMfaPendingToken(uid: string, expiresInSeconds = 300): string {
+export async function generateMfaPendingToken(uid: string, expiresInSeconds = 300): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
-    return jwt.sign({ purpose: MFA_PENDING_PURPOSE,
-uid }, jwtConfig.secret, {
+    return signJwt({ purpose: MFA_PENDING_PURPOSE, uid }, jwtConfig.secret, {
         expiresIn: expiresInSeconds,
         algorithm: "HS256"
     });
@@ -425,13 +425,13 @@ uid }, jwtConfig.secret, {
  * Returns `null` for anything else — including a perfectly valid *access*
  * token, which must not be interchangeable with this one in either direction.
  */
-export function verifyMfaPendingToken(token: string): { uid: string } | null {
+export async function verifyMfaPendingToken(token: string): Promise<{ uid: string } | null> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string };
+        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as { purpose?: string; uid?: string };
         if (decoded.purpose !== MFA_PENDING_PURPOSE || !decoded.uid) return null;
         return { uid: decoded.uid };
     } catch {
@@ -468,11 +468,11 @@ export interface DownloadTokenPayload {
  * site that forgets to pass a named source produces a default-scoped token,
  * which fails closed at `/file/*` rather than over-granting.
  */
-export function generateDownloadToken(
+export async function generateDownloadToken(
     path: string,
     expiresInSeconds: number = 300,
     storageId?: string | null
-): string {
+): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
@@ -483,7 +483,7 @@ export function generateDownloadToken(
         storageId: canonicalStorageId(storageId)
     };
 
-    return jwt.sign(payload, jwtConfig.secret, {
+    return signJwt({ ...payload }, jwtConfig.secret, {
         expiresIn: expiresInSeconds,
         algorithm: "HS256"
     });
@@ -499,13 +499,13 @@ export function generateDownloadToken(
  * five-minute TTL — for at most that long after a deploy, an in-flight token
  * for a *named* source is refused and the client re-fetches `/metadata`.
  */
-export function verifyDownloadToken(token: string): DownloadTokenPayload | null {
+export async function verifyDownloadToken(token: string): Promise<DownloadTokenPayload | null> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
     try {
-        const decoded = jwt.verify(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
         if (decoded && decoded.purpose === "file-read" && typeof decoded.path === "string") {
             return {
                 purpose: "file-read",

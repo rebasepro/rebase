@@ -24,16 +24,16 @@ describe("access token revocation", () => {
     });
 
     /** A verified payload, as the middleware would hold it. */
-    const payloadFor = (uid: string) => verifyAccessToken(generateAccessToken(uid, []))!;
+    const payloadFor = async (uid: string) => (await verifyAccessToken(await generateAccessToken(uid, [])))!;
 
-    it("carries `iat` through verification", () => {
+    it("carries `iat` through verification", async () => {
         // Without it nothing downstream can place the token against the mark —
         // the payload used to be rebuilt from three claims and drop this one.
-        expect(typeof payloadFor("u1").iat).toBe("number");
+        expect(typeof (await payloadFor("u1")).iat).toBe("number");
     });
 
     it("refuses a token issued before the watermark", async () => {
-        const payload = payloadFor("u1");
+        const payload = await payloadFor("u1");
         const revokedAt = new Date((payload.iat! + 60) * 1000); // a minute later
         expect(await isAccessTokenRevoked(repoWith(revokedAt), payload)).toBe(true);
     });
@@ -41,7 +41,7 @@ describe("access token revocation", () => {
     it("allows a token issued after the watermark", async () => {
         // The control: a check that refused everything would satisfy the case
         // above. This is the token minted by signing back in.
-        const payload = payloadFor("u1");
+        const payload = await payloadFor("u1");
         const revokedAt = new Date((payload.iat! - 60) * 1000);
         expect(await isAccessTokenRevoked(repoWith(revokedAt), payload)).toBe(false);
     });
@@ -49,7 +49,7 @@ describe("access token revocation", () => {
     it("treats the same second as revoked", async () => {
         // `iat` is whole seconds and the watermark is milliseconds; a token
         // must not survive on a rounding artefact.
-        const payload = payloadFor("u1");
+        const payload = await payloadFor("u1");
         const sameSecond = new Date(payload.iat! * 1000 + 400);
         expect(await isAccessTokenRevoked(repoWith(sameSecond), payload)).toBe(false);
 
@@ -58,18 +58,18 @@ describe("access token revocation", () => {
     });
 
     it("allows when no watermark is set", async () => {
-        expect(await isAccessTokenRevoked(repoWith(null), payloadFor("u1"))).toBe(false);
+        expect(await isAccessTokenRevoked(repoWith(null), await payloadFor("u1"))).toBe(false);
     });
 
     it("allows when the repository cannot answer", async () => {
         // Fails open on purpose: the token is already verified, and refusing
         // everything on a database blip would sign out a whole deployment.
         const broken = { getTokensValidAfter: async () => { throw new Error("db down"); } };
-        expect(await isAccessTokenRevoked(broken, payloadFor("u1"))).toBe(false);
+        expect(await isAccessTokenRevoked(broken, await payloadFor("u1"))).toBe(false);
     });
 
     it("allows when the repository does not implement the watermark", async () => {
-        expect(await isAccessTokenRevoked({} as never, payloadFor("u1"))).toBe(false);
+        expect(await isAccessTokenRevoked({} as never, await payloadFor("u1"))).toBe(false);
     });
 
     it("allows a token with no `iat`", async () => {
@@ -133,8 +133,8 @@ describe("every entry point that turns a token into a user reads the watermark",
     it.each(ENTRY_POINTS.map(e => [e.name, e] as const))(
         "%s refuses a token issued before the watermark",
         async (_name, entry) => {
-            const token = generateAccessToken("u1", []);
-            const iat = verifyAccessToken(token)!.iat!;
+            const token = await generateAccessToken("u1", []);
+            const iat = (await verifyAccessToken(token))!.iat!;
             const adapter = createBuiltinAuthAdapter({ authRepository: revokedRepo(iat) } as never);
             await expect(entry.call(adapter, token)).resolves.toBeNull();
         }
@@ -144,7 +144,7 @@ describe("every entry point that turns a token into a user reads the watermark",
         "%s still admits a live token",
         async (_name, entry) => {
             // The other direction, so "refuses everything" cannot pass the above.
-            const token = generateAccessToken("u1", []);
+            const token = await generateAccessToken("u1", []);
             const adapter = createBuiltinAuthAdapter({ authRepository: liveRepo() } as never);
             const user = await entry.call(adapter, token) as { uid?: string } | null;
             expect(user?.uid).toBe("u1");

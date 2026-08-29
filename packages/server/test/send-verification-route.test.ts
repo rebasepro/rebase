@@ -77,10 +77,10 @@ resetPasswordUrl: "https://app.test" }
     return app;
 }
 
-function post(app: Hono<HonoEnv>, uid: string) {
+async function post(app: Hono<HonoEnv>, uid: string) {
     return app.request("/auth/send-verification", {
         method: "POST",
-        headers: { Authorization: `Bearer ${generateAccessToken(uid, ["editor"])}` }
+        headers: { Authorization: `Bearer ${await generateAccessToken(uid, ["editor"])}` }
     });
 }
 

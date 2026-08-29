@@ -105,7 +105,7 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
         }, 401);
     }
 
-    const payload = verifyAccessToken(token);
+    const payload = await verifyAccessToken(token);
 
     if (!payload) {
         return c.json({
@@ -186,7 +186,7 @@ roles: ["admin"] } as AccessTokenPayload);
         }
 
         // Fall back to JWT verification
-        const payload = verifyAccessToken(token);
+        const payload = await verifyAccessToken(token);
 
         if (!payload) {
             return c.json({
@@ -286,7 +286,7 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
     // that had already accepted anonymous callers into a 500 for every
     // request that happens to carry a bearer token. Anonymous is the answer.
     if (token !== undefined && isJwtConfigured()) {
-        const payload = verifyAccessToken(token);
+        const payload = await verifyAccessToken(token);
         if (payload) {
             c.set("user", payload);
         }
@@ -298,7 +298,7 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
 /**
  * Extract user from token - for WebSocket authentication
  */
-export function extractUserFromToken(token: string): AccessTokenPayload | null {
+export async function extractUserFromToken(token: string): Promise<AccessTokenPayload | null> {
     // Returns "nobody" rather than throwing on a backend with no JWT of its
     // own — the socket then closes as unauthenticated, which is the outcome
     // this function already describes.
@@ -409,7 +409,7 @@ code: "INTERNAL_ERROR" } }, 500);
                     }
                 } else {
                     // ── JWT verification ───────────────────────────────────
-                    const payload = extractUserFromToken(token);
+                    const payload = await extractUserFromToken(token);
 
                     if (payload) {
                         c.set("user", payload);
@@ -481,7 +481,7 @@ export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
     const queryToken = c.req.query("token");
     if (queryToken && isJwtConfigured()) {
-        const payload = verifyAccessToken(queryToken);
+        const payload = await verifyAccessToken(queryToken);
         if (payload) {
             c.set("user", payload);
         }
@@ -642,7 +642,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const bearerToken = extractBearerToken(authHeader);
     if (bearerToken !== undefined) {
         const token = bearerToken;
-        const payload = verifyDownloadToken(token);
+        const payload = await verifyDownloadToken(token);
 
         if (payload) {
             const outcome = evaluateGrant(payload);
@@ -664,7 +664,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
     // 2. Query param: ?token=<token>
     if (queryToken) {
-        const payload = verifyDownloadToken(queryToken);
+        const payload = await verifyDownloadToken(queryToken);
 
         if (payload) {
             const outcome = evaluateGrant(payload);

@@ -1,0 +1,35 @@
+# Modules on the request path that still need Node — a RATCHET.
+#
+# Rendered by tooling/scripts/check-portable-core.mjs. Re-record with
+# `pnpm run check:portable-core --write`, and read that file's header for
+# what the roots are and why.
+#
+# Every line is one reason one module cannot run outside a Node process. The
+# file may SHRINK freely and may never grow: a new line means a branch put a
+# fresh dependency on Node in front of every request, which is the moment to
+# reconsider it rather than a year from now.
+#
+# Removing the last reason for a module removes its line. Nothing here has to
+# reach zero — `drizzle-orm` and `pg` need a TCP socket, and that is a driver
+# decision, not a code-hygiene one.
+#
+# Why each of these is still here:
+#
+# packages/server/src/auth/jwt-crypto.ts
+#   The JWT library, and deliberately the only module that names one. Its own
+#   functions are already async, so replacing `jsonwebtoken` with `jose` is a
+#   one-file change that touches no caller.
+#
+# packages/server/src/auth/jwt-keys.ts
+#   PEM parsing into `KeyObject`s. The portable form is `jose`'s `importSPKI`
+#   and `importPKCS8`; it moves when jwt-crypto.ts does, and not before.
+#
+# packages/server/src/auth/rate-limiter.ts
+#   The client's socket address — a per-adapter capability rather than
+#   something a portable module can reach: Hono has no runtime-agnostic
+#   `getConnInfo`, and an isolate host would read `CF-Connecting-IP` or
+#   whatever its own proxy sets. Binding it belongs to the host adapter.
+
+packages/server/src/auth/jwt-crypto.ts node-only-package jsonwebtoken (node:crypto)
+packages/server/src/auth/jwt-keys.ts node-builtin crypto
+packages/server/src/auth/rate-limiter.ts node-only-package @hono/node-server (the Node HTTP adapter)

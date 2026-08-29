@@ -122,7 +122,7 @@ async function openAndRewrap(
     return secret;
 }
 
-function resolveStepUpPrincipal(c: Context<HonoEnv>): StepUpPrincipal | null {
+async function resolveStepUpPrincipal(c: Context<HonoEnv>): Promise<StepUpPrincipal | null> {
     // Respect a principal an upstream middleware already resolved, exactly as
     // `requireAuth` does.
     const existing = c.get("user") as AccessTokenPayload | undefined;
@@ -135,14 +135,14 @@ pending: false };
     const token = extractBearerToken(c.req.header("authorization"));
     if (token === undefined) return null;
 
-    const session = verifyAccessToken(token);
+    const session = await verifyAccessToken(token);
     if (session) {
         return { uid: session.uid,
 aal: session.aal === "aal2" ? "aal2" : "aal1",
 pending: false };
     }
 
-    const pending = verifyMfaPendingToken(token);
+    const pending = await verifyMfaPendingToken(token);
     if (pending) {
         return { uid: pending.uid,
 aal: "aal1",
@@ -163,7 +163,7 @@ pending: true };
 const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
     windowMs: 15 * 60 * 1000,
     limit: MFA_VERIFICATION_ATTEMPTS_PER_WINDOW,
-    keyGenerator: (c) => `mfa-verify:${resolveStepUpPrincipal(c as Context<HonoEnv>)?.uid ?? "unidentified"}`,
+    keyGenerator: async (c) => `mfa-verify:${(await resolveStepUpPrincipal(c as Context<HonoEnv>))?.uid ?? "unidentified"}`,
     message: "Too many verification attempts for this account, please try again later."
 });
 
@@ -322,7 +322,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * `MFA_REQUIRED`, or to step an existing session up to `aal2`.
      */
     router.post("/mfa/challenge", strictAuthLimiter, async (c) => {
-        const principal = resolveStepUpPrincipal(c);
+        const principal = await resolveStepUpPrincipal(c);
         if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -358,7 +358,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * minted, at `aal2`.
      */
     router.post("/mfa/challenge/verify", strictAuthLimiter, mfaVerificationLimiter, async (c) => {
-        const principal = resolveStepUpPrincipal(c);
+        const principal = await resolveStepUpPrincipal(c);
         if (!principal) {
             throw ApiError.unauthorized("Not authenticated");
         }

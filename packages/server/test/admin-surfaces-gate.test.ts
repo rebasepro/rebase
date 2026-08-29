@@ -157,14 +157,14 @@ describe("admin surfaces on a backend with a public data plane", () => {
 
     it("still lets an admin JWT through", async () => {
         const app = await bootTracked(publicDataPlane);
-        const token = generateAccessToken("admin-1", ["admin"]);
+        const token = await generateAccessToken("admin-1", ["admin"]);
 
         expect((await app.request("/api/cron", bearer(token))).status).toBe(200);
     });
 
     it("refuses a signed-in non-admin with 403, not 401", async () => {
         const app = await bootTracked(publicDataPlane);
-        const token = generateAccessToken("editor-1", ["editor"]);
+        const token = await generateAccessToken("editor-1", ["editor"]);
 
         expect((await app.request("/api/cron", bearer(token))).status).toBe(403);
     });
@@ -195,7 +195,7 @@ describe("admin surfaces on a backend with a public data plane", () => {
         // used to disappear on exactly these deployments — taking typed client
         // generation with it.
         const app = await bootTracked(publicDataPlane);
-        const token = generateAccessToken("admin-1", ["admin"]);
+        const token = await generateAccessToken("admin-1", ["admin"]);
 
         expect((await app.request("/api/meta/contract")).status).toBe(401);
         expect((await app.request("/api/meta/contract", bearer(token))).status).toBe(200);

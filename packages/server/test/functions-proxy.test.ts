@@ -143,7 +143,7 @@ describe("the api role forwarding /api/functions", () => {
     it("shows the function the same caller it would see directly", async () => {
         // The assertion this file exists for. Not a status code: an identity
         // lost on the way through leaves every handler running, just anonymous.
-        const token = generateAccessToken("user-42", ["editor"]);
+        const token = await generateAccessToken("user-42", ["editor"]);
 
         const direct = await (await fetch(`${upstream.url}/api/functions/echo/whoami`, bearer(token))).json();
         const proxied = await (await callApi("/api/functions/echo/whoami", bearer(token))).json();

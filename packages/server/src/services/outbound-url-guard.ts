@@ -1,5 +1,4 @@
-import { lookup as dnsLookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { ipVersion } from "../utils/ip-address";
 
 /**
  * Refusal to send a request to a destination the guard does not allow.
@@ -34,8 +33,32 @@ export interface OutboundUrlGuardOptions {
 /** Names that mean "this machine" or "this network" before DNS is even asked. */
 const BLOCKED_HOST_SUFFIXES = [".localhost", ".local", ".internal", ".home.arpa"];
 
+/**
+ * The resolver when the caller supplies none: Node's.
+ *
+ * Loaded on use rather than imported at the top, which is what keeps this
+ * module — the check standing between a stored URL and the pod's own metadata
+ * endpoint — loadable on a runtime that has no `node:dns`. There the caller
+ * passes {@link OutboundUrlGuardOptions.lookup} instead, pointing at whatever
+ * the host resolves names with.
+ *
+ * A host with neither fails **closed**, and says which of the two it is
+ * missing: the alternative to resolving a name is not "allow it", it is "do
+ * not send".
+ */
 async function defaultLookup(hostname: string): Promise<string[]> {
-    const entries = await dnsLookup(hostname, { all: true, verbatim: true });
+    let dns: typeof import("node:dns/promises");
+    try {
+        dns = await import("node:dns/promises");
+    } catch {
+        throw new BlockedUrlError(
+            `Cannot check where "${hostname}" points: this runtime has no \`node:dns\`, and no ` +
+            "`lookup` was supplied to the outbound URL guard. Pass one — the guard cannot be " +
+            "skipped, because skipping it is what makes a stored URL a way to reach the " +
+            "internal network."
+        );
+    }
+    const entries = await dns.lookup(hostname, { all: true, verbatim: true });
     return entries.map(e => e.address);
 }
 
@@ -56,7 +79,7 @@ function parseIpv6(address: string): number[] | null {
     const lastColon = text.lastIndexOf(":");
     const maybeV4 = text.slice(lastColon + 1);
     if (maybeV4.includes(".")) {
-        if (isIP(maybeV4) !== 4) return null;
+        if (ipVersion(maybeV4) !== 4) return null;
         tail = maybeV4.split(".").map(Number);
         text = text.slice(0, lastColon);
         // `::1.2.3.4` leaves a lone ":" — the compression marker, halved.
@@ -107,7 +130,7 @@ function blockedIpv4Reason(bytes: number[]): string | null {
  * outbound call whose destination comes from data.
  */
 export function blockedAddressReason(address: string): string | null {
-    const version = isIP(address);
+    const version = ipVersion(address);
     if (version === 4) return blockedIpv4Reason(address.split(".").map(Number));
     if (version !== 6) return `not an IP address: ${address}`;
 
@@ -178,7 +201,7 @@ export async function assertAllowedOutboundUrl(
         throw new BlockedUrlError(`Webhook URL host "${hostname}" is an internal name`);
     }
 
-    const addresses = isIP(hostname) ? [hostname] : await (options.lookup ?? defaultLookup)(hostname);
+    const addresses = ipVersion(hostname) ? [hostname] : await (options.lookup ?? defaultLookup)(hostname);
     if (addresses.length === 0) {
         throw new BlockedUrlError(`Webhook URL host "${hostname}" resolved to no addresses`);
     }

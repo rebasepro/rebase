@@ -353,7 +353,7 @@ aal };
             }
         }
 
-        const accessToken = generateAccessToken(uid, roleIds, aal, customClaims);
+        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims);
         const refreshToken = generateRefreshToken();
 
         // A sign-in opens a session; every token later rotated out of it
@@ -363,7 +363,7 @@ aal };
         // revocation forever simply by refreshing.
         await authRepo.createRefreshToken(
             uid,
-            hashRefreshToken(refreshToken),
+            await hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,
@@ -1038,7 +1038,7 @@ message: "Email verified successfully" });
             throw ApiError.unauthenticated("No refresh token presented", "NO_SESSION");
         }
 
-        const tokenHash = hashRefreshToken(refreshToken);
+        const tokenHash = await hashRefreshToken(refreshToken);
         const storedToken = await authRepo.findRefreshTokenByHash(tokenHash);
 
         if (!storedToken) {
@@ -1135,7 +1135,7 @@ aal: sessionAal };
             customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
-        const newAccessToken = generateAccessToken(storedToken.uid, roleIds, sessionAal, customClaims);
+        const newAccessToken = await generateAccessToken(storedToken.uid, roleIds, sessionAal, customClaims);
         const newRefreshToken = generateRefreshToken();
 
         // Rotate: mark the presented token superseded and mint its successor
@@ -1167,7 +1167,7 @@ aal: sessionAal };
 
         await authRepo.createRefreshToken(
             storedToken.uid,
-            hashRefreshToken(newRefreshToken),
+            await hashRefreshToken(newRefreshToken),
             getRefreshTokenExpiry(),
             userAgent,
             ipAddress,

@@ -97,7 +97,7 @@ async function boot(): Promise<Hono> {
 }
 
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
-const adminToken = () => generateAccessToken("admin-1", ["admin"]);
+const adminToken = async () => await generateAccessToken("admin-1", ["admin"]);
 
 /** A sink holding one message that looks like a real magic-link mail. */
 function sinkWithOneMessage() {
@@ -127,7 +127,7 @@ describe("GET /api/admin/dev/emails", () => {
         registerDevEmailSink(await sinkWithOneMessage());
         const app = await boot();
 
-        const response = await app.request("/api/admin/dev/emails", bearer(adminToken()));
+        const response = await app.request("/api/admin/dev/emails", bearer(await adminToken()));
         expect(response.status).toBe(200);
 
         const body = await response.json() as {
@@ -152,7 +152,7 @@ describe("GET /api/admin/dev/emails", () => {
     it("answers 403 to a signed-in non-admin", async () => {
         registerDevEmailSink(await sinkWithOneMessage());
         const app = await boot();
-        const token = generateAccessToken("editor-1", ["editor"]);
+        const token = await generateAccessToken("editor-1", ["editor"]);
 
         expect((await app.request("/api/admin/dev/emails", bearer(token))).status).toBe(403);
     });
@@ -163,7 +163,7 @@ describe("GET /api/admin/dev/emails", () => {
         // reads as a broken deploy and gets debugged as one.
         const app = await boot();
 
-        const response = await app.request("/api/admin/dev/emails", bearer(adminToken()));
+        const response = await app.request("/api/admin/dev/emails", bearer(await adminToken()));
         expect(response.status).toBe(501);
         expect((await response.json() as { error: { code: string } }).error.code)
             .toBe("DEV_MAILBOX_UNAVAILABLE");
@@ -177,7 +177,7 @@ describe("GET /api/admin/dev/emails", () => {
         const app = await boot();
         process.env.NODE_ENV = "production";
 
-        const response = await app.request("/api/admin/dev/emails", bearer(adminToken()));
+        const response = await app.request("/api/admin/dev/emails", bearer(await adminToken()));
         expect(response.status).toBe(501);
     });
 });
@@ -187,7 +187,7 @@ describe("DELETE /api/admin/dev/emails", () => {
         const sink = registerDevEmailSink(await sinkWithOneMessage());
         const app = await boot();
 
-        expect((await app.request("/api/admin/dev/emails", { method: "DELETE", ...bearer(adminToken()) })).status)
+        expect((await app.request("/api/admin/dev/emails", { method: "DELETE", ...bearer(await adminToken()) })).status)
             .toBe(200);
         expect(sink.list()).toHaveLength(0);
     });

@@ -75,7 +75,7 @@ accessExpiresIn: "1h" });
 
         it("rejects a signed-in non-admin with 403", async () => {
             const app = createApp();
-            const editorToken = generateAccessToken("editor-user", ["editor", "viewer"]);
+            const editorToken = await generateAccessToken("editor-user", ["editor", "viewer"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",
@@ -102,7 +102,7 @@ accessExpiresIn: "1h" });
         } as any);
 
         const app = createApp();
-        const adminToken = generateAccessToken("admin-user", ["admin"]);
+        const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
         const res = await app.request("/api/admin/users/user-123/reset-password", {
             method: "POST",
@@ -134,7 +134,7 @@ accessExpiresIn: "1h" });
         const app = createApp({
             onAdminResetPassword: onAdminResetPasswordMock
         });
-        const adminToken = generateAccessToken("admin-user", ["admin"]);
+        const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
         const res = await app.request("/api/admin/users/user-123/reset-password", {
             method: "POST",
@@ -173,7 +173,7 @@ accessExpiresIn: "1h" });
             mockEmailService.send.mockRejectedValue(new Error("SMTP 421 try again later"));
 
             const app = createApp();
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",
@@ -192,7 +192,7 @@ accessExpiresIn: "1h" });
             mockEmailService.isConfigured.mockReturnValue(false);
 
             const app = createApp();
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",
@@ -219,7 +219,7 @@ accessExpiresIn: "1h" });
 
         it("updates the password without sending an email or returning a temporary one", async () => {
             const app = createApp();
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",
@@ -245,7 +245,7 @@ accessExpiresIn: "1h" });
 
         it("rejects a weak password without touching the stored one", async () => {
             const app = createApp();
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",
@@ -269,7 +269,7 @@ accessExpiresIn: "1h" });
             });
 
             const app = createApp({ onAdminResetPassword: onAdminResetPasswordMock });
-            const adminToken = generateAccessToken("admin-user", ["admin"]);
+            const adminToken = await generateAccessToken("admin-user", ["admin"]);
 
             const res = await app.request("/api/admin/users/user-123/reset-password", {
                 method: "POST",

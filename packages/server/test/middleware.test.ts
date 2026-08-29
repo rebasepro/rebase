@@ -59,7 +59,7 @@ describe("Auth Middleware", () => {
 
     describe("requireAuth", () => {
         it("should call next() and set user for valid token", async () => {
-            const token = generateAccessToken("user-123", ["admin", "editor"]);
+            const token = await generateAccessToken("user-123", ["admin", "editor"]);
             const { c, getUser } = createMockContext({ authHeader: `Bearer ${token}` });
 
             await requireAuth(c, nextFn);
@@ -115,7 +115,7 @@ describe("Auth Middleware", () => {
         });
 
         it("should return 401 for token signed with different secret", async () => {
-            const token = generateAccessToken("user-123", ["admin"]);
+            const token = await generateAccessToken("user-123", ["admin"]);
             configureJwt({ secret: "different-secret-that-is-at-least-32-chars-long" });
             const { c, getStatus } = createMockContext({ authHeader: `Bearer ${token}` });
 
@@ -134,7 +134,7 @@ describe("Auth Middleware", () => {
             // deviation into a documented guarantee. Behaviour change: `bearer`,
             // `BEARER` and any other casing are now accepted, and the token is
             // taken verbatim after the first space.
-            const token = generateAccessToken("user-123", ["admin"]);
+            const token = await generateAccessToken("user-123", ["admin"]);
             const { c, getStatus, getUser } = createMockContext({ authHeader: `bearer ${token}` });
 
             await requireAuth(c, nextFn);
@@ -148,7 +148,7 @@ iat: expect.any(Number) });
         });
 
         it("should handle an uppercase BEARER prefix", async () => {
-            const token = generateAccessToken("user-123", ["admin"]);
+            const token = await generateAccessToken("user-123", ["admin"]);
             const { c, getUser } = createMockContext({ authHeader: `BEARER ${token}` });
 
             await requireAuth(c, nextFn);
@@ -172,7 +172,7 @@ iat: expect.any(Number) });
         });
 
         it("should not treat a scheme merely starting with 'bearer' as Bearer", async () => {
-            const token = generateAccessToken("user-123", ["admin"]);
+            const token = await generateAccessToken("user-123", ["admin"]);
             const { c, getStatus } = createMockContext({ authHeader: `Bearerish ${token}` });
 
             await requireAuth(c, nextFn);
@@ -182,7 +182,7 @@ iat: expect.any(Number) });
         });
 
         it("should NOT accept token from query parameter by default", async () => {
-            const token = generateAccessToken("user-123", ["viewer"]);
+            const token = await generateAccessToken("user-123", ["viewer"]);
             const { c, getStatus } = createMockContext({ queryToken: token });
 
             await requireAuth(c, nextFn);
@@ -194,7 +194,7 @@ iat: expect.any(Number) });
 
     describe("queryTokenAuth", () => {
         it("should accept token from query parameter", async () => {
-            const token = generateAccessToken("user-123", ["viewer"]);
+            const token = await generateAccessToken("user-123", ["viewer"]);
             const { c, getUser } = createMockContext({ queryToken: token });
 
             await queryTokenAuth(c, nextFn);
@@ -229,7 +229,7 @@ iat: expect.any(Number) });
 
     describe("optionalAuth", () => {
         it("should set user for valid token", async () => {
-            const token = generateAccessToken("user-456", ["viewer"]);
+            const token = await generateAccessToken("user-456", ["viewer"]);
             const { c, getUser } = createMockContext({ authHeader: `Bearer ${token}` });
 
             await optionalAuth(c, nextFn);
@@ -349,9 +349,9 @@ roles: ["schema-adminstration", "admins", "admin "] } });
     });
 
     describe("extractUserFromToken", () => {
-        it("should extract user from valid token", () => {
-            const token = generateAccessToken("ws-user-123", ["admin"]);
-            const payload = extractUserFromToken(token);
+        it("should extract user from valid token", async () => {
+            const token = await generateAccessToken("ws-user-123", ["admin"]);
+            const payload = await extractUserFromToken(token);
 
             expect(payload).toEqual({
                 uid: "ws-user-123",
@@ -363,19 +363,19 @@ roles: ["schema-adminstration", "admins", "admin "] } });
             });
         });
 
-        it("should return null for invalid token", () => {
-            const payload = extractUserFromToken("invalid-token");
+        it("should return null for invalid token", async () => {
+            const payload = await extractUserFromToken("invalid-token");
             expect(payload).toBeNull();
         });
 
-        it("should return null for empty token", () => {
-            const payload = extractUserFromToken("");
+        it("should return null for empty token", async () => {
+            const payload = await extractUserFromToken("");
             expect(payload).toBeNull();
         });
 
-        it("should work with tokens having empty roles", () => {
-            const token = generateAccessToken("user-no-roles", []);
-            const payload = extractUserFromToken(token);
+        it("should work with tokens having empty roles", async () => {
+            const token = await generateAccessToken("user-no-roles", []);
+            const payload = await extractUserFromToken(token);
 
             expect(payload).toEqual({
                 uid: "user-no-roles",

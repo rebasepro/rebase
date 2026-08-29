@@ -117,12 +117,12 @@ driver: bareDriver }));
     });
 
     it("still accepts an admin JWT through the same chain", async () => {
-        const res = await request(generateAccessToken("user-1", ["admin"]));
+        const res = await request(await generateAccessToken("user-1", ["admin"]));
         expect(res.status).toBe(200);
     });
 
     it("still rejects a non-admin JWT with 403", async () => {
-        const res = await request(generateAccessToken("user-2", ["editor"]));
+        const res = await request(await generateAccessToken("user-2", ["editor"]));
         expect(res.status).toBe(403);
     });
 
@@ -155,7 +155,7 @@ describe("builtin auth adapter query-token rejection", () => {
     });
 
     it("does NOT authenticate a valid JWT passed as ?token=", async () => {
-        const token = generateAccessToken("user-1", ["admin"]);
+        const token = await generateAccessToken("user-1", ["admin"]);
         const user = await adapter.verifyRequest(new Request(`http://localhost/api/data/users?token=${token}`));
         expect(user).toBeNull();
     });
@@ -168,7 +168,7 @@ describe("builtin auth adapter query-token rejection", () => {
     });
 
     it("still authenticates a JWT via the Authorization header", async () => {
-        const token = generateAccessToken("user-1", ["admin"]);
+        const token = await generateAccessToken("user-1", ["admin"]);
         const user = await adapter.verifyRequest(new Request("http://localhost/api/data/users", {
             headers: { Authorization: `Bearer ${token}` }
         }));

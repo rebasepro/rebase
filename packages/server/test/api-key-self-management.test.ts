@@ -138,7 +138,7 @@ describe("API keys cannot manage API keys", () => {
 
     it("still allows an admin user's JWT to manage keys", async () => {
         const store = makeStore();
-        const token = generateAccessToken("admin-user", ["admin"]);
+        const token = await generateAccessToken("admin-user", ["admin"]);
         const res = await buildApp(store).request("/api/admin/api-keys", {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -149,7 +149,7 @@ describe("API keys cannot manage API keys", () => {
 
     it("still allows an admin user's JWT to mint a key", async () => {
         const store = makeStore();
-        const token = generateAccessToken("admin-user", ["admin"]);
+        const token = await generateAccessToken("admin-user", ["admin"]);
         const res = await buildApp(store).request("/api/admin/api-keys", {
             method: "POST",
             body: CREATE_BODY,

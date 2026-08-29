@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
 import { DataDriver, isSQLAdmin } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
+import { sha256Hex } from "../../utils/portable-crypto";
 
 /**
  * Remembering what a write already answered, so replaying it does not do it twice.
@@ -108,10 +108,8 @@ function stableStringify(value: unknown): string {
  * difference between "here is your earlier answer" and silently discarding a
  * correction.
  */
-export function requestFingerprint(method: string, path: string, body: unknown): string {
-    return createHash("sha256")
-        .update(`${method.toUpperCase()} ${path}\n${stableStringify(body)}`)
-        .digest("hex");
+export function requestFingerprint(method: string, path: string, body: unknown): Promise<string> {
+    return sha256Hex(`${method.toUpperCase()} ${path}\n${stableStringify(body)}`);
 }
 
 /**

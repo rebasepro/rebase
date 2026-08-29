@@ -65,21 +65,21 @@ refreshExpiresIn: "30d" });
 
     // ── Token generation ────────────────────────────────────
     describe("token generation", () => {
-        it("generates valid JWT with 3 parts", () => {
-            const token = generateAccessToken("user-1", ["admin"]);
+        it("generates valid JWT with 3 parts", async () => {
+            const token = await generateAccessToken("user-1", ["admin"]);
             expect(token.split(".")).toHaveLength(3);
         });
 
-        it("embeds uid and roles in payload", () => {
-            const token = generateAccessToken("user-42", ["admin", "editor"]);
-            const payload = verifyAccessToken(token);
+        it("embeds uid and roles in payload", async () => {
+            const token = await generateAccessToken("user-42", ["admin", "editor"]);
+            const payload = await verifyAccessToken(token);
             expect(payload?.uid).toBe("user-42");
             expect(payload?.roles).toEqual(["admin", "editor"]);
         });
 
-        it("generates different tokens for different users", () => {
-            const t1 = generateAccessToken("user-1", ["admin"]);
-            const t2 = generateAccessToken("user-2", ["admin"]);
+        it("generates different tokens for different users", async () => {
+            const t1 = await generateAccessToken("user-1", ["admin"]);
+            const t2 = await generateAccessToken("user-2", ["admin"]);
             expect(t1).not.toBe(t2);
         });
 
@@ -100,73 +100,80 @@ refreshExpiresIn: "30d" });
          * from a second copy of the package whose config had never been set, and
          * every request that hit it failed with this message.
          */
-        it("throws when the secret was never configured", () => {
+        it("throws when the secret was never configured", async () => {
+            // Signing is asynchronous (see `jwt-crypto.ts`), so an unconfigured
+            // mint *rejects* rather than throwing synchronously. The guard is
+            // the same one; `isolateModules` still has to be entered
+            // synchronously, so the fresh copy is captured there and awaited
+            // out here.
+            let freshJwt: typeof import("../src/auth/jwt") | undefined;
             jest.isolateModules(() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-                const freshJwt = require("../src/auth/jwt");
-
-                expect(() => freshJwt.generateAccessToken("user-1", ["admin"]))
-                    .toThrow("JWT secret not configured");
+                freshJwt = require("../src/auth/jwt");
             });
+
+            await expect(freshJwt!.generateAccessToken("user-1", ["admin"]))
+                .rejects.toThrow("JWT secret not configured");
         });
 
-        it("refuses to verify a token when the secret was never configured", () => {
+        it("refuses to verify a token when the secret was never configured", async () => {
             // The verify side has its own guard, and it is the one an
             // unconfigured *reader* hits — a server that mints tokens elsewhere
             // and only checks them here.
-            const token = generateAccessToken("user-1", ["admin"]);
+            const token = await generateAccessToken("user-1", ["admin"]);
 
+            let freshJwt: typeof import("../src/auth/jwt") | undefined;
             jest.isolateModules(() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-                const freshJwt = require("../src/auth/jwt");
-
-                expect(() => freshJwt.verifyAccessToken(token))
-                    .toThrow("JWT secret not configured");
+                freshJwt = require("../src/auth/jwt");
             });
+
+            await expect(freshJwt!.verifyAccessToken(token))
+                .rejects.toThrow("JWT secret not configured");
         });
     });
 
     // ── Token verification ──────────────────────────────────
     describe("token verification", () => {
-        it("verifies a valid token", () => {
-            const token = generateAccessToken("user-1", ["editor"]);
-            const payload = verifyAccessToken(token);
+        it("verifies a valid token", async () => {
+            const token = await generateAccessToken("user-1", ["editor"]);
+            const payload = await verifyAccessToken(token);
             expect(payload).not.toBeNull();
             expect(payload!.uid).toBe("user-1");
         });
 
-        it("returns null for tampered token", () => {
-            const token = generateAccessToken("user-1", ["admin"]);
+        it("returns null for tampered token", async () => {
+            const token = await generateAccessToken("user-1", ["admin"]);
             const tampered = token.slice(0, -5) + "XXXXX";
-            expect(verifyAccessToken(tampered)).toBeNull();
+            expect(await verifyAccessToken(tampered)).toBeNull();
         });
 
-        it("returns null for garbage string", () => {
-            expect(verifyAccessToken("not.a.jwt")).toBeNull();
+        it("returns null for garbage string", async () => {
+            expect(await verifyAccessToken("not.a.jwt")).toBeNull();
         });
 
-        it("returns null for empty string", () => {
-            expect(verifyAccessToken("")).toBeNull();
+        it("returns null for empty string", async () => {
+            expect(await verifyAccessToken("")).toBeNull();
         });
 
-        it("returns null for token signed with different secret", () => {
-            const token = generateAccessToken("user-1", ["admin"]);
+        it("returns null for token signed with different secret", async () => {
+            const token = await generateAccessToken("user-1", ["admin"]);
             // Reconfigure with different secret
             configureJwt({ secret: "another-secret-that-is-at-least-32-chars-long-for-test" });
-            expect(verifyAccessToken(token)).toBeNull();
+            expect(await verifyAccessToken(token)).toBeNull();
             // Reset
             configureJwt({ secret: STRONG_SECRET });
         });
 
-        it("extracts roles as array", () => {
-            const token = generateAccessToken("u", ["admin", "editor", "viewer"]);
-            const payload = verifyAccessToken(token);
+        it("extracts roles as array", async () => {
+            const token = await generateAccessToken("u", ["admin", "editor", "viewer"]);
+            const payload = await verifyAccessToken(token);
             expect(payload!.roles).toEqual(["admin", "editor", "viewer"]);
         });
 
-        it("handles empty roles array", () => {
-            const token = generateAccessToken("u", []);
-            const payload = verifyAccessToken(token);
+        it("handles empty roles array", async () => {
+            const token = await generateAccessToken("u", []);
+            const payload = await verifyAccessToken(token);
             expect(payload!.roles).toEqual([]);
         });
     });
@@ -180,17 +187,17 @@ refreshExpiresIn: "30d" });
             expect(t1.length).toBe(80); // 40 bytes in hex
         });
 
-        it("hashes deterministically (SHA-256)", () => {
+        it("hashes deterministically (SHA-256)", async () => {
             const token = "test-refresh-token";
-            const h1 = hashRefreshToken(token);
-            const h2 = hashRefreshToken(token);
+            const h1 = await hashRefreshToken(token);
+            const h2 = await hashRefreshToken(token);
             expect(h1).toBe(h2);
             expect(h1.length).toBe(64); // SHA-256 hex
         });
 
-        it("different tokens produce different hashes", () => {
-            const h1 = hashRefreshToken("token-a");
-            const h2 = hashRefreshToken("token-b");
+        it("different tokens produce different hashes", async () => {
+            const h1 = await hashRefreshToken("token-a");
+            const h2 = await hashRefreshToken("token-b");
             expect(h1).not.toBe(h2);
         });
     });

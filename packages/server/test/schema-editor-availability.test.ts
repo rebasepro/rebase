@@ -134,7 +134,7 @@ async function boot(config: Record<string, unknown> = {}): Promise<Hono> {
 }
 
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
-const adminToken = () => generateAccessToken("admin-1", ["admin"]);
+const adminToken = async () => await generateAccessToken("admin-1", ["admin"]);
 
 const SAVE = "/api/schema-editor/collection/save";
 
@@ -147,7 +147,7 @@ function save(app: Hono, init: Record<string, unknown> = {}) {
 }
 
 async function status(app: Hono): Promise<Record<string, unknown>> {
-    const res = await app.request("/api/schema-editor/status", bearer(adminToken()));
+    const res = await app.request("/api/schema-editor/status", bearer(await adminToken()));
     expect(res.status).toBe(200);
     return await res.json() as Record<string, unknown>;
 }
@@ -169,7 +169,7 @@ describe("the schema editor is admin-only", () => {
     it("refuses a signed-in non-admin with 403", async () => {
         const app = await boot({ collectionsDir });
 
-        const res = await save(app, { headers: { authorization: `Bearer ${generateAccessToken("editor-1", ["editor"])}` } });
+        const res = await save(app, { headers: { authorization: `Bearer ${await generateAccessToken("editor-1", ["editor"])}` } });
 
         expect(res.status).toBe(403);
     }, BOOTS_A_BACKEND);
@@ -183,7 +183,7 @@ describe("the schema editor is admin-only", () => {
     it("lets an admin through to the editor", async () => {
         const app = await boot({ collectionsDir });
 
-        const res = await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+        const res = await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
 
         expect(res.status).toBe(200);
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toContain("Renamed");
@@ -256,7 +256,7 @@ describe("when the editor cannot write, it says why", () => {
     it.each(cases)("refuses the write with that reason instead of a 404 — %s", async (_name, buildConfig, code) => {
         const app = await bootCase(buildConfig);
 
-        const res = await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+        const res = await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
 
         expect(res.status).toBe(501);
         expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
@@ -276,7 +276,7 @@ describe("when the editor cannot write, it says why", () => {
         const app = await boot({ collectionsDir });
         const before = fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8");
 
-        await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+        await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
 
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
     }, BOOTS_A_BACKEND);

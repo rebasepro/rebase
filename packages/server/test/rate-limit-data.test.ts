@@ -253,7 +253,7 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
     it("gives a bearer-token caller the user allowance, not the anonymous one", async () => {
         const { configureJwt, generateAccessToken } = await import("../src/auth/jwt");
         configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
-        const token = generateAccessToken("user-with-token", []);
+        const token = await generateAccessToken("user-with-token", []);
 
         const app = bareApp({ anonymous: 1, user: 3 });
 
@@ -268,8 +268,8 @@ describe("createDataRateLimiter — identity with no auth middleware ahead of it
     it("buckets two signed-in callers separately even from one address", async () => {
         const { configureJwt, generateAccessToken } = await import("../src/auth/jwt");
         configureJwt({ secret: "test-secret-for-rate-limiter-identity-0123456789" });
-        const one = generateAccessToken("caller-one", []);
-        const two = generateAccessToken("caller-two", []);
+        const one = await generateAccessToken("caller-one", []);
+        const two = await generateAccessToken("caller-two", []);
 
         const app = bareApp({ anonymous: 1, user: 1 });
 

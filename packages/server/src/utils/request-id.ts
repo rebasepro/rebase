@@ -18,7 +18,6 @@
  * app.use("/*", requestId());
  * ```
  */
-import { randomUUID } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
 
@@ -29,7 +28,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function requestId(): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
         const incoming = c.req.header(REQUEST_ID_HEADER);
-        const id = incoming && UUID_RE.test(incoming) ? incoming : randomUUID();
+        // `crypto` is a global on every runtime this could run on, Node
+        // included since 20 — `node:crypto` bought nothing here except an
+        // import that only resolves in one of them.
+        const id = incoming && UUID_RE.test(incoming) ? incoming : crypto.randomUUID();
 
         c.set("requestId", id);
 

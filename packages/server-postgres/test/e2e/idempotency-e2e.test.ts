@@ -101,7 +101,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("claims a free key, refuses the second claimant, and replays once it has answered", async () => {
-        const fingerprint = fingerprintOf({ title: "hello" });
+        const fingerprint = await fingerprintOf({ title: "hello" });
 
         expect(await store.claim("mut-1", UID, fingerprint)).toEqual({ status: "claimed" });
         // The claim is the whole mechanism: the loser must not write.
@@ -115,7 +115,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("separates a stored null body from a claim that has not answered", async () => {
-        const fingerprint = fingerprintOf({ title: "null-body" });
+        const fingerprint = await fingerprintOf({ title: "null-body" });
         await store.claim("mut-null", UID, fingerprint);
         await store.complete("mut-null", UID, null);
 
@@ -132,7 +132,7 @@ describe("Idempotency key store (E2E)", () => {
         // killed between the write and the answer, so no release ever runs and
         // the row was never written. Before the lease, every retry was refused
         // for the full 24-hour replay window.
-        const fingerprint = fingerprintOf({ title: "hello" });
+        const fingerprint = await fingerprintOf({ title: "hello" });
         await store.claim("mut-crashed", UID, fingerprint);
 
         await backdate("mut-crashed", "30 seconds");
@@ -143,7 +143,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("keeps replaying an answered key for the full replay window, not the lease", async () => {
-        const fingerprint = fingerprintOf({ title: "hello" });
+        const fingerprint = await fingerprintOf({ title: "hello" });
         await store.claim("mut-answered", UID, fingerprint);
         await store.complete("mut-answered", UID, { id: 1 });
 
@@ -160,7 +160,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("refuses a live key presented for a different request", async () => {
-        await store.claim("import-7", UID, fingerprintOf({ rows: [1, 2] }));
+        await store.claim("import-7", UID, await fingerprintOf({ rows: [1, 2] }));
         await store.complete("import-7", UID, { written: 2 });
 
         // A different route or a different body under the same key is a reused
@@ -168,15 +168,15 @@ describe("Idempotency key store (E2E)", () => {
         // that never happened.
         expect(await store.claim("import-7", UID, requestFingerprint("POST", "/data/posts/bulk/delete", { ids: [1] })))
             .toEqual({ status: "mismatch" });
-        expect(await store.claim("import-7", UID, fingerprintOf({ rows: [1, 2, 3] })))
+        expect(await store.claim("import-7", UID, await fingerprintOf({ rows: [1, 2, 3] })))
             .toEqual({ status: "mismatch" });
         // The identical request still replays.
-        expect(await store.claim("import-7", UID, fingerprintOf({ rows: [1, 2] })))
+        expect(await store.claim("import-7", UID, await fingerprintOf({ rows: [1, 2] })))
             .toEqual({ status: "replay", response: { written: 2 } });
     });
 
     it("scopes a key to its principal", async () => {
-        const fingerprint = fingerprintOf({ title: "mine" });
+        const fingerprint = await fingerprintOf({ title: "mine" });
         await store.claim("shared", UID, fingerprint);
         await store.complete("shared", UID, { id: 1, title: "mine" });
 
@@ -186,7 +186,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("ignores a key from an unauthenticated caller instead of pooling them all", async () => {
-        const fingerprint = fingerprintOf({ message: "hi" });
+        const fingerprint = await fingerprintOf({ message: "hi" });
         expect(await store.claim("submission-1", undefined, fingerprint)).toEqual({ status: "claimed" });
         await store.complete("submission-1", undefined, { id: 1 });
         // Nothing is stored, so the next anonymous caller to send that key
@@ -198,7 +198,7 @@ describe("Idempotency key store (E2E)", () => {
     });
 
     it("releases an unanswered claim and leaves an answered one alone", async () => {
-        const fingerprint = fingerprintOf({ title: "hello" });
+        const fingerprint = await fingerprintOf({ title: "hello" });
 
         await store.claim("mut-failed", UID, fingerprint);
         await store.release("mut-failed", UID);
@@ -235,7 +235,7 @@ describe("Idempotency key store (E2E)", () => {
         );
 
         const upgraded = makeStore();
-        expect(await upgraded.claim("legacy", UID, fingerprintOf({ anything: true }))).toEqual({
+        expect(await upgraded.claim("legacy", UID, await fingerprintOf({ anything: true }))).toEqual({
             status: "replay",
             response: { id: 1 }
         });
@@ -250,7 +250,7 @@ describe("Idempotency key store (E2E)", () => {
     it("lets exactly one of many concurrent claimants through", async () => {
         // The case the mechanism exists for: a shared offline queue replayed by
         // several tabs, or several pods answering the same retry.
-        const fingerprint = fingerprintOf({ title: "race" });
+        const fingerprint = await fingerprintOf({ title: "race" });
         const claims = await Promise.all(
             Array.from({ length: 8 }, () => makeStore().claim("mut-race", UID, fingerprint))
         );

@@ -111,7 +111,7 @@ headers: bearer("not.a.token") });
     });
 
     it("lets a signed-in caller through to the requireAuth route", async () => {
-        const token = generateAccessToken("user-1", []);
+        const token = await generateAccessToken("user-1", []);
         const res = await mount().request("/hello", { method: "POST",
 headers: bearer(token) });
         expect(res.status).toBe(200);
@@ -121,13 +121,13 @@ headers: bearer(token) });
     it("401s the admin route anonymously and 403s a signed-in non-admin", async () => {
         expect((await mount().request("/hello/stats")).status).toBe(401);
 
-        const token = generateAccessToken("user-1", ["editor"]);
+        const token = await generateAccessToken("user-1", ["editor"]);
         const res = await mount().request("/hello/stats", { headers: bearer(token) });
         expect(res.status).toBe(403);
     });
 
     it("lets an admin through the admin route", async () => {
-        const token = generateAccessToken("admin-1", ["admin"]);
+        const token = await generateAccessToken("admin-1", ["admin"]);
         const res = await mount().request("/hello/stats", { headers: bearer(token) });
         expect(res.status).toBe(200);
         expect((await res.json() as any).admin).toBe("admin-1");

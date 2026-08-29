@@ -25,7 +25,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
     const admin = (id = "admin-1"): UserData =>
         ({ id, email: `${id}@test.com`, createdAt: new Date(), updatedAt: new Date() }) as UserData;
 
-    function harness(authHooks: Record<string, unknown>) {
+    async function harness(authHooks: Record<string, unknown>) {
         const deleted: string[] = [];
         const created: Record<string, unknown>[] = [];
         const repo = {
@@ -40,13 +40,13 @@ describe("auth hooks fire on the admin paths the docs name", () => {
         } as unknown as AuthRepository;
 
         const app = createAdminUsersRoute({ authRepo: repo, authHooks: authHooks as never });
-        const auth = { authorization: `Bearer ${generateAccessToken("admin-1", ["admin"])}` };
+        const auth = { authorization: `Bearer ${await generateAccessToken("admin-1", ["admin"])}` };
         return { app, auth, deleted, created };
     }
 
     it("fires beforeUserDelete, and lets it veto the deletion", async () => {
         const beforeUserDelete = jest.fn(async () => { throw new Error("not this one"); });
-        const { app, auth, deleted } = harness({ beforeUserDelete });
+        const { app, auth, deleted } = await harness({ beforeUserDelete });
 
         const res = await app.request("/users/victim", { method: "DELETE", headers: auth });
 
@@ -58,7 +58,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
 
     it("fires afterUserDelete once the row is gone", async () => {
         const afterUserDelete = jest.fn(async () => undefined);
-        const { app, auth, deleted } = harness({ afterUserDelete });
+        const { app, auth, deleted } = await harness({ afterUserDelete });
 
         await app.request("/users/victim", { method: "DELETE", headers: auth });
 
@@ -69,7 +69,7 @@ describe("auth hooks fire on the admin paths the docs name", () => {
     it("fires beforeUserCreate on the admin create path, and honours what it returns", async () => {
         const beforeUserCreate = jest.fn(async (data: Record<string, unknown>) =>
             ({ ...data, displayName: "set by hook" }));
-        const { app, auth, created } = harness({ beforeUserCreate });
+        const { app, auth, created } = await harness({ beforeUserCreate });
 
         await app.request("/users", {
             method: "POST",

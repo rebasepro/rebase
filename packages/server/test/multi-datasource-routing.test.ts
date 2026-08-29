@@ -52,21 +52,21 @@ describe("Multi-data-source request routing (middleware)", () => {
     }
 
     it("scopes the Postgres delegate for a Postgres collection path", async () => {
-        const token = generateAccessToken("u1", ["admin"]);
+        const token = await generateAccessToken("u1", ["admin"]);
         const res = await createApp().request("/products", { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json() as { key: string };
         expect(body.key).toBe("postgres");
     });
 
     it("scopes the Mongo delegate for a Mongo collection path", async () => {
-        const token = generateAccessToken("u1", ["admin"]);
+        const token = await generateAccessToken("u1", ["admin"]);
         const res = await createApp().request("/events", { headers: { Authorization: `Bearer ${token}` } });
         const body = await res.json() as { key: string };
         expect(body.key).toBe("mongodb");
     });
 
     it("routes per request based on the resolver, not a fixed driver", async () => {
-        const token = generateAccessToken("u1", ["admin"]);
+        const token = await generateAccessToken("u1", ["admin"]);
         const app = createApp();
         const a = await (await app.request("/events", { headers: { Authorization: `Bearer ${token}` } })).json() as { key: string };
         const b = await (await app.request("/products", { headers: { Authorization: `Bearer ${token}` } })).json() as { key: string };
@@ -84,7 +84,7 @@ describe("Multi-data-source request routing (middleware)", () => {
     });
 
     it("routes a nested/subcollection path by its top-level segment", async () => {
-        const token = generateAccessToken("u1", ["admin"]);
+        const token = await generateAccessToken("u1", ["admin"]);
         const app = new Hono<HonoEnv>();
         app.use("/*", createAuthMiddleware({ driver: pg, resolveDriver, requireAuth: false }));
         app.get("/events/:id/attendees", (c: Context<HonoEnv>) =>
