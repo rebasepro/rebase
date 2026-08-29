@@ -30,17 +30,61 @@ const BUNDLE = process.env.REBASE_BUNDLE || "/bundle";
  * bundle.mode=url` and the Cloud Run substrate both set the URL and both got
  * `No bundle found at /bundle.` before `@rebasepro/server` was even imported.
  */
-const FETCH_MODE =
-    Boolean(process.env.REBASE_BUNDLE_URL) &&
-    !fs.existsSync(path.join(BUNDLE, "manifest.json"));
+/**
+ * Which bundle the tree on disk came from, or null if nothing recorded it.
+ *
+ * Written by `fetchBundle` (`BUNDLE_SOURCE_FILENAME` in
+ * packages/server/src/boot/fetch-bundle.ts) once an unpack has succeeded. Keep
+ * the filename in step with that constant.
+ */
+function unpackedSource() {
+    try {
+        return fs.readFileSync(path.join(BUNDLE, ".rebase-bundle-source"), "utf8").trim();
+    } catch {
+        return null;
+    }
+}
+
+const WANTED_URL = process.env.REBASE_BUNDLE_URL;
+const ON_DISK = fs.existsSync(path.join(BUNDLE, "manifest.json"));
+const UNPACKED_FROM = unpackedSource();
+
+/**
+ * A bundle already on disk is only worth keeping if it is the one we were told
+ * to run.
+ *
+ * This used to ask "is there a manifest?" — whether *a* bundle is there, rather
+ * than whether it is *the* bundle. Anything filling the directory behind the
+ * runtime's back therefore won over the URL, and something did: tenants
+ * provisioned before the `fetch-bundle` init container was removed kept an
+ * orphaned one, because a merge patch that omits `initContainers` leaves the
+ * existing list alone. It unpacked whatever bundle id was frozen into it on
+ * every pod start, the manifest existed, this said "already here", and the
+ * runtime never downloaded the bundle the deploy had just uploaded. Every
+ * deploy to such a tenant reported success, rolled the pods, and served the
+ * previous code.
+ *
+ * An unmarked tree counts as stale on purpose: it predates the marker, so it
+ * cannot be shown to match, and one extra download is cheaper than serving the
+ * wrong code.
+ */
+const STALE_ON_DISK = ON_DISK && Boolean(WANTED_URL) && UNPACKED_FROM !== WANTED_URL;
+const FETCH_MODE = Boolean(WANTED_URL) && (!ON_DISK || STALE_ON_DISK);
 
 if (FETCH_MODE) {
     // `shouldFetchBundle` treats REBASE_BUNDLE as "a bundle is already on disk"
-    // and lets it win over a URL. Reaching here means it is not on disk, so an
-    // inherited value would only stop the fetch that is about to be the whole
-    // point of this container.
+    // and lets it win over a URL. Reaching here means what is on disk is either
+    // absent or not what we were asked for, so an inherited value would only
+    // stop the fetch that is the whole point of this container.
     delete process.env.REBASE_BUNDLE;
-    log(`no bundle on disk; the runtime will fetch one from REBASE_BUNDLE_URL`);
+    if (STALE_ON_DISK) {
+        log(
+            `the bundle on disk came from ${UNPACKED_FROM ?? "an unrecorded source"}, ` +
+                `not REBASE_BUNDLE_URL; re-fetching`
+        );
+    } else {
+        log(`no bundle on disk; the runtime will fetch one from REBASE_BUNDLE_URL`);
+    }
 }
 
 function log(message) {

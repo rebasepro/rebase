@@ -82,6 +82,31 @@ export const BUNDLE_TOKEN_ENV = "REBASE_BUNDLE_TOKEN";
  */
 export const BUNDLE_FETCH_DIR_ENV = "REBASE_BUNDLE_FETCH_DIR";
 
+/**
+ * Records which URL produced the tree sitting in the fetch directory.
+ *
+ * Reusing an already-unpacked bundle is what makes a restart cheap, but "there
+ * is a bundle here" is not the same question as "is it the bundle we were told
+ * to run". Anything that fills the directory behind the runtime's back — an
+ * orphaned `fetch-bundle` init container left on a Deployment, a stale volume —
+ * used to win over the URL, and the pod then served whatever it found while
+ * every deploy reported success. The URL is the instruction; this is how a
+ * restart tells whether the disk already satisfies it.
+ *
+ * `infra/docker/entrypoint.mjs` reads this file by the same name to decide
+ * whether to fetch at all — keep the two in step.
+ */
+export const BUNDLE_SOURCE_FILENAME = ".rebase-bundle-source";
+
+/** What the tree in `destination` was fetched from, or null if unknown. */
+export function unpackedBundleSource(destination: string): string | null {
+    try {
+        return fs.readFileSync(path.join(destination, BUNDLE_SOURCE_FILENAME), "utf8").trim();
+    } catch {
+        return null;
+    }
+}
+
 export interface FetchBundleOptions {
     url: string;
     token?: string;
@@ -127,11 +152,44 @@ export function shouldFetchBundle(env: NodeJS.ProcessEnv = process.env): boolean
     return Boolean(env[BUNDLE_URL_ENV]) && !env.REBASE_BUNDLE;
 }
 
+/**
+ * Whether the system `tar` is GNU tar.
+ *
+ * Asked rather than assumed, because the answer differs between a developer's
+ * machine and the Linux image the same code runs in, and the flags below are
+ * GNU spellings that bsdtar rejects outright. Probed once per process.
+ */
+let gnuTar: Promise<boolean> | undefined;
+function isGnuTar(): Promise<boolean> {
+    gnuTar ??= run("tar", ["--version"])
+        .then(({ stdout }) => /GNU tar/.test(String(stdout)))
+        .catch(() => false);
+    return gnuTar;
+}
+
 /** Untar with the system `tar`, which every base image has. */
 async function extractWithTar(tarball: string, destination: string): Promise<void> {
     // `-m` (do not restore mtimes) because some sandboxes reject utimes on
     // extracted files and the failure looks like a corrupt archive.
-    await run("tar", ["-xzmf", tarball, "-C", destination]);
+    const args = ["-xzmf", tarball, "-C", destination];
+
+    // The rest is about `destination` itself, not the entries inside it. An
+    // archive rooted at `.` carries the mode of the directory it was packed
+    // from, and GNU tar restores that onto `destination` as its last act. Where
+    // the process does not own that directory the chmod is refused and tar
+    // exits non-zero *after* having written every file — a complete bundle
+    // reported as a corrupt one, which nothing downstream can tell apart from a
+    // real truncation. A Kubernetes emptyDir is exactly that case: `root:node`,
+    // 0775 with setgid, while the runtime is uid 1000.
+    //
+    // Only GNU needs this. bsdtar already leaves the destination's metadata
+    // alone, so it gets the command it has always had rather than flags it
+    // would refuse.
+    if (await isGnuTar()) {
+        args.push("--no-same-owner", "--no-same-permissions", "--no-overwrite-dir");
+    }
+
+    await run("tar", args);
 }
 
 /**
@@ -450,6 +508,24 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
         );
     }
 
+    // A tree left by a *different* bundle is not a base to unpack onto. Files
+    // the new bundle no longer has would survive it — stale assets sitting
+    // beside fresh ones, and a `node_modules` the install step below would then
+    // consider already done. Reuse is only safe when the source matches
+    // exactly, and reaching here means it does not.
+    const previous = unpackedBundleSource(destination);
+    if (previous !== null && previous !== options.url) {
+        logger.info("Discarding a bundle unpacked from a different source", {
+            previous,
+            replacing: options.url
+        });
+        for (const entry of fs.readdirSync(destination)) {
+            const victim = path.join(destination, entry);
+            if (victim === tarball) continue;
+            fs.rmSync(victim, { recursive: true, force: true });
+        }
+    }
+
     const { size } = fs.statSync(tarball);
     try {
         await extract(tarball, destination);
@@ -474,6 +550,11 @@ export async function fetchBundle(options: FetchBundleOptions): Promise<string> 
                 `It is not a Rebase bundle, or it was truncated.`
         );
     }
+
+    // Stamped only once the unpack is known good: a marker written any earlier
+    // would vouch for a tree that does not exist yet, and the next boot would
+    // believe it and skip the fetch it needed.
+    fs.writeFileSync(path.join(destination, BUNDLE_SOURCE_FILENAME), options.url);
 
     if (options.installDependencies ?? true) {
         await (options.installImpl ?? installBundleDependencies)(root);
