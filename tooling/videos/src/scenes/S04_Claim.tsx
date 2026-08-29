@@ -40,7 +40,7 @@ export const S04_Claim: React.FC = () => (
             whose size matched no tier. The claim is the point of the scene, so
             it gets the full measure and the evidence sits beneath it. */}
         <Stage>
-            <Chapter n="08" label="Row-level security" delay={4} />
+            <Chapter n="07" label="Row-level security" delay={4} />
             <div style={{ marginTop: 24 }}>
                 <DisplayLine size={DISPLAY.statement} delay={10}>Security lives in the database.</DisplayLine>
             </div>

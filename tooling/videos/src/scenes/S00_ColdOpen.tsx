@@ -22,7 +22,7 @@ export const S00_ColdOpen: React.FC = () => {
 
     // A slow push-in on the whole frame. 3% over the scene: below the threshold
     // where anyone notices a zoom, above the one where the shot feels locked off.
-    const push = interpolate(frame, [0, 105], [1, 1.03], { extrapolateRight: "clamp" });
+    const push = interpolate(frame, [0, 72], [1, 1.03], { extrapolateRight: "clamp" });
 
     // The name arrives after the mark has finished assembling.
     const word = ramp(frame, 52, 26);

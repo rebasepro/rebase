@@ -34,7 +34,7 @@ const V = 300;
  *  22, not 16: at 16 the whole move is 0.53s, and a slide that has to be read
  *  as a DIRECTION rather than a flicker needs closer to three quarters of a
  *  second. */
-export const TRANSITION_FRAMES = 22;
+export const TRANSITION_FRAMES = 18;
 
 interface Move {
     /** Where the incoming slide starts, relative to rest. */

@@ -51,14 +51,14 @@ const SHOTS: Shot[] = [
        429 — the second take is always a field of grey placeholder tiles. So
        the grid is loaded once and never left, and the cut here is a cut in the
        edit rather than a second recording. */
-    { file: "demo/panel.mp4", label: "Cards", from: 24, frames: 76 },
+    { file: "demo/panel.mp4", label: "Cards", from: 24, frames: 58 },
     /* The click-through, and the reason the montage stopped reading as static:
        a product picked out of the grid and the record that opens. The window
        starts on held grid so the cursor is seen travelling to the card — the
        cut lands about 40 frames in, which is what makes it read as a click
        rather than as an edit. */
-    { file: "demo/panel.mp4", label: "Open a record", from: 244, frames: 160 },
-    { file: "demo/orders.mp4", label: "Every view", from: 20, frames: 96 },
+    { file: "demo/panel.mp4", label: "Open a record", from: 244, frames: 122 },
+    { file: "demo/orders.mp4", label: "Every view", from: 20, frames: 72 },
 ];
 
 const DISSOLVE = 14;
@@ -76,7 +76,7 @@ export const S06_Panel: React.FC = () => {
     // One slow push across the whole montage rather than one per shot: the
     // cuts already supply the rhythm, and re-zooming on every cut is the thing
     // that makes a product montage feel like an ad.
-    const push = interpolate(frame, [FIRST_SHOT_AT, 360], [1.0, 1.06], {
+    const push = interpolate(frame, [FIRST_SHOT_AT, 280], [1.0, 1.06], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });

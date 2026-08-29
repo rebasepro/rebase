@@ -19,9 +19,16 @@ export const S02_OneCommand: React.FC = () => (
                 <div style={{ width: 520, flexShrink: 0 }}>
                     <Chapter n="01" label="The first five minutes" delay={4} />
                     <div style={{ marginTop: 26 }}>
-                        <DisplayLine size={DISPLAY.split} delay={10}>Init.</DisplayLine>
-                        <DisplayLine size={DISPLAY.split} delay={16}>Push.</DisplayLine>
-                        <DisplayLine size={DISPLAY.split} delay={22}>Run.</DisplayLine>
+                        {/* `statement`, not `split`, even though a terminal sits
+                            beside it. The tier is chosen by ROLE and these three
+                            words ARE the slide — and optically the rule needs the
+                            exception: its siblings at 56 ("Run the database from
+                            the same app.") fill the 520 column, while three
+                            one-word lines fill a third of it and read as a caption
+                            next to a large terminal rather than as the headline. */}
+                        <DisplayLine size={DISPLAY.statement} delay={8}>Init.</DisplayLine>
+                        <DisplayLine size={DISPLAY.statement} delay={13}>Push.</DisplayLine>
+                        <DisplayLine size={DISPLAY.statement} delay={18}>Run.</DisplayLine>
                     </div>
                     <Lead delay={34} size={25} width={470} style={{ marginTop: 28 }}>
                         It reads your schema — tables, relations,

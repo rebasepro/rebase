@@ -31,7 +31,7 @@ export const S07_Studio: React.FC = () => {
     const frame = useCurrentFrame();
     const tone = useTone();
     const enter = ramp(frame, 12, 30, ENTER);
-    const push = interpolate(frame, [12, 270], [1, 1.03], {
+    const push = interpolate(frame, [12, 215], [1, 1.03], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });
@@ -49,7 +49,7 @@ export const S07_Studio: React.FC = () => {
      *
      * The pan on top is a slow reading drift, not a substitute for interaction.
      * It is deliberately small — the scroll is the motion now. */
-    const pan = interpolate(frame, [12, 270], [6, -6], {
+    const pan = interpolate(frame, [12, 215], [6, -6], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });

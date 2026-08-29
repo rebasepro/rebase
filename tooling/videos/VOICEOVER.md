@@ -19,7 +19,7 @@ sound like a way to generate REST routes.
 |-----|--------|-------|
 | I · Premise | 00–02 | What Rebase is: a Postgres backend, running in one command. |
 | II · Insight | 03–04 | You have written this table five times. Now once. |
-| III · The offer | 05–08 | Take the backend / add the panel / add Studio — and here is all of it at once. |
+| III · The offer | 05–08 | Take the backend / add the panel — here is all of it — add Studio. |
 | IV · Guarantee | 09–11 | Whichever layers you took, RLS holds — provably. |
 | V · Ownership | 12–13 | MIT, self-hosted, nobody holds your credentials. |
 
@@ -27,20 +27,20 @@ sound like a way to generate REST routes.
 
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
-| 00 | Cold open | 90 | 3.0 | *(silent — the mark assembles)* |
-| 01 | Headline | 200 | 6.7 | Rebase is a backend for Postgres. The one you already run, or a new one. |
-| 02 | One command | 240 | 8.0 | One command, and the backend is running — REST, auth, realtime, storage, the lot. It reads the schema and serves it. |
-| 03 | The second copy | 330 | 11.0 | But you have described that table before. In the schema. Again in your types. Again in a validator, in your route handlers, in a form. Four of those can drift. |
-| 04 | One definition | 280 | 9.3 | With Rebase there is one. It compiles to a Drizzle schema, REST routes, an OpenAPI spec, a typed SDK, and row-level security policies. |
-| 05 | Headless | 300 | 10.0 | Take only that and you are done — REST, a typed SDK, realtime, auth, storage, functions, cron, backups. The SDK is generated from your collections, so a collection is a type rather than a string in a path. |
-| 06 | The panel | 360 | 12.0 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. Spreadsheet editing, every field type, import, export, and your own React where you need it. |
-| 07 | Studio | 270 | 9.0 | Add Studio and you run the database from the same app — SQL, the schema, policies, logs. |
-| 08 | Every view | 300 | 10.0 | Lists, boards, tables, forms, a board you drag cards across — every one of them generated, and every one reading through the same policies. |
-| 09 | Row-level security | 300 | 10.0 | Whichever layers you took, authorization is in the database. Generated from that same file, applied by migration. You cannot forget middleware that was never in your code. |
-| 10 | The proof | 240 | 8.0 | rls-check reads any Postgres — Supabase, Neon, RDS, your own — and reports which tables are actually exposed. |
-| 11 | Agent-native | 210 | 7.0 | An agent gets the same authorization you do. Not a way around it. One definition, three audiences. |
-| 12 | Yours | 270 | 9.0 | All of it is MIT. Run it on your laptop, your server, your cloud. Nobody else holds your credentials, and nothing here can be taken away. |
-| 13 | The ask | 210 | 7.0 | Rebase. Open source, Postgres-native, self-hosted. |
+| 00 | Cold open | 72 | 2.4 | *(silent — the mark assembles)* |
+| 01 | Headline | 160 | 5.3 | Rebase is a backend for Postgres — one you run, or a new one. |
+| 02 | One command | 190 | 6.3 | One command, and it is running. REST, auth, realtime, storage — read straight from your schema. |
+| 03 | The second copy | 250 | 8.3 | You have described that table before. In the schema. Again in your types, a validator, a route, a form. |
+| 04 | One definition | 220 | 7.3 | With Rebase there is one. It compiles to a schema, REST, an OpenAPI spec, a typed SDK, and policies. |
+| 05 | Headless | 235 | 7.8 | Take only that and you are done — REST, a typed SDK, realtime, auth, storage, functions, cron, backups. |
+| 06 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
+| 07 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one of them generated, every one reading through the same policies. |
+| 08 | Studio | 215 | 7.2 | Add Studio and you run the database from the same app — SQL, the schema, policies, logs. |
+| 09 | Row-level security | 235 | 7.8 | Authorization lives in the database, generated from that same file. You cannot forget middleware that was never in your code. |
+| 10 | The proof | 190 | 6.3 | rls-check reads any Postgres — Supabase, Neon, RDS, your own — and reports what is exposed. |
+| 11 | Agent-native | 170 | 5.7 | An agent gets the same authorization you do. Not a way around it. |
+| 12 | Yours | 210 | 7.0 | All of it is MIT. Your laptop, your server, your cloud. Nobody else holds your credentials. |
+| 13 | The ask | 165 | 5.5 | Rebase. Open source, Postgres-native, self-hosted. |
 
 ## Notes for the read
 
