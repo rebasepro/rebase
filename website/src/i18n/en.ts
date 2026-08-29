@@ -54,17 +54,17 @@ export const en = {
   "agentera.card.desc":
     "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore all AI & Agent features",
-  // This beat proves claim 3 — the panel is a separate product and the API
+  // This beat proves claim 3 — the panel is a client of the same API and the
   // response does not move — which is what its figure actually models. The
   // English had drifted onto claim 2 ("one definition, everything generated"),
   // which beat 02 already owns two sections earlier, and opened on "Everything"
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.badge": "Two products, one definition",
+  "modes.badge": "One definition, either half",
   "modes.title": 'Take only the half you actually need.',
   "modes.subtitle":
-    "The backend and the panel are separate products that share a schema. Ship headless today and add the panel the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
+    "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
   "modes.baas.title":
     "Backend",
   "modes.baas.desc":
@@ -666,7 +666,7 @@ export const en = {
   "about.join.discord": "Join our Discord",
   "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & CMS",
   "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, deploy anywhere.",
-  "cms.meta.title": "Rebase CMS — a separate product from the Rebase backend",
+  "cms.meta.title": "Rebase CMS — the optional admin panel for your Rebase backend",
   "cms.meta.description": "A generated back office on top of any Rebase backend: spreadsheet editing, media, roles and history — opt-in, extensible with your own React, and never required by the API.",
   "backend.meta.title": "Backend & APIs — Rebase App Engine",
   "backend.meta.description": "Get an auto-generated backend powered by Hono and Drizzle ORM. Complete with REST and WebSockets.",
