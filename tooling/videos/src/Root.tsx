@@ -9,7 +9,7 @@ import { HowItWorks } from "./components/HowItWorks";
 import { FeatureShowcase } from "./components/FeatureShowcase";
 import { ProductUIReveal } from "./components/ProductUIReveal";
 import { RealProductVideo } from "./components/RealProductVideo";
-import { BentoBoxAnimation } from "./components/BentoBoxAnimation";
+import { Bento, BENTO_DURATION } from "./bento/Bento";
 
 loadFonts();
 
@@ -27,7 +27,6 @@ const ProductVideo: React.FC = () => (
         <Series.Sequence durationInFrames={150}><HeroIntro /></Series.Sequence>
         <Series.Sequence durationInFrames={300}><RealProductVideo /></Series.Sequence>
         <Series.Sequence durationInFrames={150}><ProductUIReveal /></Series.Sequence>
-        <Series.Sequence durationInFrames={150}><BentoBoxAnimation /></Series.Sequence>
         <Series.Sequence durationInFrames={120}><HowItWorks /></Series.Sequence>
         <Series.Sequence durationInFrames={120}><FeatureShowcase /></Series.Sequence>
     </Series>
@@ -43,6 +42,17 @@ export const RemotionRoot: React.FC = () => (
             id="RebaseIntro"
             component={RebaseIntro}
             durationInFrames={INTRO_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        {/* The bento. Its own piece, not a beat in the film — one view held
+            big and six arriving from the sides, all of them live. */}
+        <Composition
+            id="Bento"
+            component={Bento}
+            durationInFrames={BENTO_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}

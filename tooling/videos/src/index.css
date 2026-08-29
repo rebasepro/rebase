@@ -15,7 +15,8 @@ body {
 /* ── The OLDER ProductVideo's palette ────────────────────────────────────────
    RebaseIntro and everything under src/scenes takes its colours from
    `src/theme.ts`, which is the shipped design system. These variables are the
-   pre-2026-08 set, kept only because `BentoBoxAnimation` reads them and that
+   pre-2026-08 set, kept only because the legacy ProductVideo components read
+   them and that
    composition still renders.
 
    Do not extend this block, and do not reach for it from a new component: the

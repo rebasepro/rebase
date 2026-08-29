@@ -72,10 +72,15 @@ const CURSOR = () => {
     };
 };
 
-async function renderClip(page, name, build) {
+async function renderClip(page, name, build, opts = {}) {
     const dir = path.join(outDir, name);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
+
+    /* A bento tile renders a capture at about a third of its width, where
+       1280-wide app type is unreadable. Capturing those at a smaller viewport
+       makes the app lay itself out denser, so the type survives the scale. */
+    await page.setViewportSize(opts.viewport ?? { width: 1280, height: 800 });
 
     let n = 0;
     let at = { x: 640, y: 420 };
@@ -306,6 +311,78 @@ const CLIPS = {
     },
 };
 
+/* ── the bento tiles ─────────────────────────────────────────────────────────
+   A separate piece from the film: one big view in the middle and smaller ones
+   flying in beside it, so what matters here is VARIETY — a board, a table of
+   pictures, cards, two different list shapes and the schema editor, rather
+   than five scrolling lists that read as one.
+
+   The two image-heavy ones run FIRST and with a pause between them, because
+   the demo signs its image URLs per request and its storage endpoint answers
+   a burst of misses with 429. */
+const TILE = { width: 900, height: 620 };
+
+Object.assign(CLIPS, {
+    posts: {
+        viewport: TILE,
+        run: async ({ page, hold, scrollBy }) => {
+            await settleGrid(page, `${BASE}/c/posts`, 14);
+            await hold(0.5);
+            await scrollBy(1500, 8.5);
+            await hold(0.5);
+            await scrollBy(-900, 5.5);
+            await hold(0.4);
+        },
+    },
+    exercises: {
+        viewport: TILE,
+        run: async ({ page, hold, scrollBy }) => {
+            await settleGrid(page, `${BASE}/c/exercises`, 12);
+            await hold(0.5);
+            await scrollBy(1300, 8.5);
+            await hold(0.5);
+            await scrollBy(-800, 5.5);
+            await hold(0.4);
+        },
+    },
+    /* The board is the one view whose SHAPE is different — columns, not rows. */
+    tickets: {
+        viewport: { width: 1180, height: 720 },
+        run: async ({ page, hold, scrollBy }) => {
+            await settleGrid(page, `${BASE}/c/tickets`);
+            await hold(0.6);
+            await scrollBy(620, 6.5, 200);
+            await hold(0.5);
+            await scrollBy(-620, 4.5, 200);
+            await hold(0.5);
+            await scrollBy(420, 3.5, 200);
+            await hold(0.4);
+        },
+    },
+    customers: {
+        viewport: TILE,
+        run: async ({ page, hold, scrollBy }) => {
+            await settleGrid(page, `${BASE}/c/customers`);
+            await hold(0.5);
+            await scrollBy(1300, 8.5);
+            await hold(0.5);
+            await scrollBy(-800, 5.5);
+            await hold(0.4);
+        },
+    },
+    users: {
+        viewport: TILE,
+        run: async ({ page, hold, scrollBy }) => {
+            await settleGrid(page, `${BASE}/c/users`);
+            await hold(0.5);
+            await scrollBy(900, 8.0);
+            await hold(0.5);
+            await scrollBy(-620, 5.5);
+            await hold(0.4);
+        },
+    },
+});
+
 const browser = await chromium.launch({ headless: true });
 /* ONE context for every clip, so the HTTP cache is shared. The demo's image
    endpoint rate-limits, and a fresh context per clip pays that toll again from
@@ -324,7 +401,7 @@ console.log("rendering:");
 for (const [name, build] of Object.entries(CLIPS)) {
     if (only.length && !only.includes(name)) continue;
     try {
-        await renderClip(page, name, build);
+        await renderClip(page, name, build.run ?? build, build.run ? build : {});
     } catch (e) {
         console.warn(`  ${name}: ${e.message.slice(0, 120)}`);
     }

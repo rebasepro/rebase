@@ -26,7 +26,8 @@
         "build": "remotion bundle",
         "logo": "node scripts/extract-logo.mjs",
         "neat:config": "node scripts/extract-neat-config.mjs",
-        "upgrade": "remotion upgrade"
+        "upgrade": "remotion upgrade",
+        "bento": "remotion render src/index.ts Bento out/bento.mp4"
     },
     "sideEffects": [
         "*.css"
