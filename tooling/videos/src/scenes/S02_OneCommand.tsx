@@ -24,7 +24,7 @@ export const S02_OneCommand: React.FC = () => (
                         <DisplayLine size={DISPLAY.split} delay={22}>Run.</DisplayLine>
                     </div>
                     <Lead delay={34} size={25} width={470} style={{ marginTop: 28 }}>
-                        It reads the schema you already wrote — tables, relations,
+                        It reads your schema — tables, relations,
                         constraints — and starts serving it.
                     </Lead>
                 </div>

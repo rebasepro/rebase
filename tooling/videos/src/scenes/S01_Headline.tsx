@@ -46,12 +46,12 @@ export const S01_Headline: React.FC = () => {
                     Open-source · Deploy anywhere · Postgres-native
                 </div>
 
-                <DisplayLine size={DISPLAY.bookend} delay={16}>The Postgres you already have.</DisplayLine>
-                <DisplayLine size={DISPLAY.bookend} delay={26}>The backend you always wanted.</DisplayLine>
+                <DisplayLine size={DISPLAY.bookend} delay={16}>The backend you always wanted.</DisplayLine>
+                <DisplayLine size={DISPLAY.bookend} delay={26}>On the Postgres you choose.</DisplayLine>
 
                 <Lead delay={52} size={28} width={860} style={{ marginTop: 34 }}>
-                    Point it at the database you already run. Nothing to provision,
-                    nothing copied, nothing migrated.
+                    Point it at a database you already run, or let it start one.
+                    Nothing to provision, nothing copied, nothing migrated.
                 </Lead>
             </Stage>
         </Scene>
