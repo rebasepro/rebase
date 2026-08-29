@@ -597,6 +597,52 @@ const SELFHOST_COMMAND = "docker compose up -d";
         <!-- ROADMAP -->
         <RoadmapSection />
 
+        <!-- CHAPTER 09 — OWNERSHIP. Claim 5 (SITE-STORY §2), and the page's
+             last argument before the ask.
+
+             This is a RESTORATION, not a new section. The copy has existed and
+             been translated into all four locales the whole time
+             (`opensource.*`); it rendered on `IndexContent.astro` and was
+             simply not carried across in the V2 rework, which is how the one
+             claim no competitor in this category can answer came to be absent
+             from the page that argues against them.
+
+             It sits here, immediately before the CTA, because it is a fact
+             about the TERMS rather than about the software: worth nothing to a
+             reader who has not yet decided the product is good, and worth more
+             than any of the other four to one who has. -->
+        <div>
+            <section class="chapter relative border-t border-white/8 py-24 sm:py-32">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                        <div class="lg:col-span-5">
+                            <p class="eyebrow">
+                                <span class="font-mono">09</span>
+                                <span class="mx-2 opacity-40">·</span>{t("opensource.badge")}
+                            </p>
+                            <h2 class="mt-4 font-headers text-display-2 text-balance"
+                                set:html={t("opensource.title")}></h2>
+                        </div>
+                        <div class="lg:col-span-7">
+                            <p class="text-lg leading-relaxed text-[#b4b8bd] max-w-measure-lead">
+                                {t("opensource.desc")}
+                            </p>
+                            <div class="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+                                <a href={translatePath("/developers")} class="accent-link">
+                                    {t("opensource.link1")}
+                                    <ArrowRight size={15} />
+                                </a>
+                                <a href={translatePath("/compare")}
+                                   class="text-sm font-semibold text-surface-400 transition-colors hover:text-white">
+                                    {t("opensource.link2")}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
         {/* FINAL CTA — the three lanes, as one band, and the page's second and
             last chroma ground.
 

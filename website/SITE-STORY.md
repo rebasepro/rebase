@@ -33,14 +33,71 @@ Ranked. Anything below the line is a feature, not a claim.
 2. **One definition, every surface.** A collection compiles to a Drizzle schema,
    REST routes, an OpenAPI spec, typed SDK accessors, RLS policies — and, if you
    want it, an admin panel. There is no second data model.
-3. **The panel is a separate product.** It is a React app that talks to the same
-   public API under the same policies. Add it, skip it, or delete it; the API
-   response does not move. Nobody else in this category can say that.
+3. **The panel is a client, not a back door.** It is the same definition
+   rendered for people: a React app reading your data through the same public
+   API, in the same `rebase_user` role, under the same row-level security.
+   Whatever it can see, your policies said so — and you can read them. Add it,
+   skip it, or delete it; no API response moves. Nobody else in this category
+   can say that.
+
+   > Revised 2026-08-28. This claim used to read "the panel is a separate
+   > product", which is true of the architecture and wrong as a claim. It is a
+   > PACKAGING fact, and packaging is the least interesting thing about it: it
+   > makes the panel sound like a second thing to buy and the backend sound
+   > like it ships with an afterthought attached. What competitors actually
+   > cannot say is the security fact underneath — their studio is privileged,
+   > ours is a client with no more reach than the user holding it. Stated that
+   > way the claim leans on claim 1 instead of standing apart from it.
+   >
+   > "Separate product" survives as internal vocabulary for the architecture.
+   > It does not appear in customer-facing copy.
+   >
+   > **The boundary, so nobody overstates this later.** The claim is about the
+   > DATA PLANE, and only that. The panel's reads and writes go through
+   > `withAuth` → `rebase_user` → RLS, exactly like any other client, and it
+   > has no privileged data path. It is NOT true that the panel can reach
+   > nothing a user can: `/api/admin/*` exists — backups, rls-audit, the schema
+   > editor, cron, logs — and an admin in the panel reaches those. It is also
+   > not true that an admin sees the same ROWS as everyone else; the injected
+   > `default_admin_read` policy grants them more. The point is that this is a
+   > POLICY the customer can read in their own database, not a service role
+   > quietly bypassing it. Claiming more than that would fail the standard
+   > claim 1 sets.
 4. **Agent-native.** MCP server, scoped API keys, installable agent skills. An
    agent can operate the backend through the same authorization the humans get.
+5. **It is yours.** MIT, end to end — the schema editor, the generated APIs, the
+   typed SDK, all of it. Self-hosted on your own infrastructure, holding your own
+   credentials. *Added 2026-08-29.*
 
 Below the line (true, useful, never the headline): kanban boards, the block
 editor, import/export, branding.
+
+### Why claim 5 is fifth, and why that is not a demotion
+
+Claims 1-4 are things the software does. Claim 5 is a fact about the TERMS, and
+it is the only one no alternative in this category can answer: Supabase,
+Directus, Payload and Strapi are all services you rent or open cores with a paid
+centre. It ranks last because it is worth nothing to a reader who has not yet
+decided the product is good — and it is worth more than any of the others to one
+who has. **It belongs at the close, not the open.** The copy for it already
+existed (`opensource.*`, translated in all four locales) and was dropped in the
+V2 rework; see §5.
+
+### The three adoption modes are the page's spine, not a feature list
+
+`docs/PRODUCT.md` calls BaaS / CMS / Full *"the shape of the offer"*, and it is
+the most useful structure the product has for explaining itself:
+
+| Mode | What it is | Who it is for |
+|------|------------|---------------|
+| **BaaS** | REST, typed SDK, realtime, auth, storage, functions, cron, backups. The panel's packages are never installed. | The developer who owns the database |
+| **CMS** | The above plus a schema-driven panel — spreadsheet, every field type, import/export, custom React views. | The operator team |
+| **Full** | The above plus Studio — SQL editor, schema visualizer, RLS editor, logs, API explorer. | The developer, again, day to day |
+
+Told in that order it is ADDITIVE, which carries claim 3 structurally instead of
+asserting it: the panel is obviously optional because the reader was shown what
+came before it. It also stops the product reading as "a way to generate REST
+routes", which is what happens when only the middle mode is described.
 
 ## 3. The three-act shape, reused everywhere
 
@@ -119,11 +176,25 @@ the competitor audit in `COMPETITOR-AUDIT-2026-08-10.md`.
 | 01 | `s-collection-power` | Claim 2 — one definition, every surface |
 | 02 | `s-backend-engine` | What that definition generates |
 | 03 | `s-security` | **Claim 1** — security lives in the database |
-| 04 | `s-modes` | Claim 3 — the panel is a separate product |
+| 04 | `s-modes` | Claim 3 — the panel is a client, not a back door |
 | 05 | `s-demo-carousel` | The panel itself |
 | 06 | `s-personas` | Developer / support / agent, one scenario each |
 | 07 | `s-agent-era` | Claim 4 — agent-native |
 | 08 | `s-case-study` | Real products |
+
+**Two beats the page is missing.** Recorded 2026-08-29 while rebuilding the
+intro film against `docs/PRODUCT.md`; neither is on the page today.
+
+- **Recognition, before the argument starts.** Every beat above is an assertion
+  — here is what it does, here is what it generates, here is why that is safe.
+  Nothing asks the reader to recognise a problem they already have, so "there is
+  no second data model" arrives as a feature rather than as relief. The film
+  opens its argument by showing the same table declared five times (a schema, a
+  type, a validator, a route file, a form field) and collapsing them into one.
+  That beat belongs here too, above 01.
+- **Ownership, at the close.** Claim 5. The copy is written and translated;
+  the section was simply not carried over from `IndexContent.astro` into
+  `IndexV2Content.astro`.
 
 Three rules are encoded in that table and should not be quietly undone:
 
@@ -293,7 +364,7 @@ there once. Do not re-implement any of them inline on a page.
   | | | |
   |---|---|---|
   | **BASE** `#08090A` | evidence | the logo wall, the panel, the people, the customers, the roadmap. You are being shown, not argued at. |
-  | **RAISED** `#14161B` | mechanism | 01 the collection and what it generates, 02 the running backend, 04 the two products, 07 what an agent can reach. The lift says *a machine is being opened*. |
+  | **RAISED** `#14161B` | mechanism | 01 the collection and what it generates, 02 the running backend, 04 the two halves, 07 what an agent can reach. The lift says *a machine is being opened*. |
   | **LIT** Neat | transition | the hero and the dividers, where the page changes subject. The only register with the full palette. |
   | **CHROMA** flat hue | remember this | twice, and only twice. |
 
