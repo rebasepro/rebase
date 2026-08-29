@@ -1,5 +1,5 @@
 /**
- * Sign in to demo.rebase.pro and save the session for scripts/capture-demo.mjs.
+ * Sign in to demo.rebase.pro and save the session for scripts/render-demo.mjs.
  *
  * This exists because a stale session is the single most expensive failure in
  * this pipeline and it fails SILENTLY: the demo serves its login page, the
@@ -8,7 +8,7 @@
  * and both times the wrong conclusion was drawn about the app ("nothing is
  * scrollable", "the schema editor cannot move") from footage of a login form.
  *
- * Run it whenever capture-demo.mjs reports "not signed in":
+ * Run it whenever render-demo.mjs reports "NOT SIGNED IN":
  *   node scripts/demo-login.mjs [state.json]
  *
  * The demo pre-fills its own credentials — this script never types any, and

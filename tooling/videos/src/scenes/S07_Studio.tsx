@@ -118,7 +118,7 @@ export const S07_Studio: React.FC = () => {
                         <AbsoluteFill>
                             <OffthreadVideo
                                 src={staticFile("demo/schema.mp4")}
-                                startFrom={30}
+                                startFrom={90}
                                 muted
                                 style={{
                                     width: "100%",

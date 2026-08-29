@@ -38,23 +38,27 @@ interface Shot {
     frames: number;
 }
 
-/* Captured fresh from the live demo at demo.rebase.pro rather than reused from
-   the site's media library — recorded in dark mode at 1280x800, which is the
-   size that keeps the app's own type readable once it sits in a window filling
-   two thirds of a 1920 frame.
-   See scripts/capture-demo.mjs. */
+/* Rendered from the live demo at demo.rebase.pro rather than reused from the
+   site's media library — dark mode at 1280x800, which is the size that keeps
+   the app's own type readable once it sits in a window filling two thirds of a
+   1920 frame. Rendered, not recorded: Playwright's recordVideo is locked to
+   25fps and this film runs at 30, and no rate divides both.
+   See scripts/render-demo.mjs. */
 const SHOTS: Shot[] = [
-    { file: "demo/products.mp4", label: "Cards", from: 150, frames: 76 },
-    /* The one that shows the panel being USED, and the reason the montage
-       stopped reading as static: the grid, a product picked out of it, and the
-       record that opens. It gets by far the longest hold because it is three
-       beats where a scrolling list is one — the cut lands 35 frames in, so it
-       needs a real lead on the grid before it and room to read after.
-       A fourth shot of filter chips used to sit after this one and was cut: it
-       measured 3.15 mean delta against this clip's beats, and four shots left
-       none of them long enough to land. */
-    { file: "demo/record.mp4", label: "Open a record", from: 205, frames: 160 },
-    { file: "demo/orders.mp4", label: "Every view", from: 180, frames: 96 },
+    /* Shots 1 and 2 are two windows onto ONE take. They have to be: the demo
+       signs its image URLs per request, so a second visit to the grid is forty
+       cache misses at once and its storage endpoint answers that burst with
+       429 — the second take is always a field of grey placeholder tiles. So
+       the grid is loaded once and never left, and the cut here is a cut in the
+       edit rather than a second recording. */
+    { file: "demo/panel.mp4", label: "Cards", from: 24, frames: 76 },
+    /* The click-through, and the reason the montage stopped reading as static:
+       a product picked out of the grid and the record that opens. The window
+       starts on held grid so the cursor is seen travelling to the card — the
+       cut lands about 40 frames in, which is what makes it read as a click
+       rather than as an edit. */
+    { file: "demo/panel.mp4", label: "Open a record", from: 244, frames: 160 },
+    { file: "demo/orders.mp4", label: "Every view", from: 20, frames: 96 },
 ];
 
 const DISSOLVE = 14;
@@ -117,7 +121,7 @@ export const S06_Panel: React.FC = () => {
                                     (1 - ramp(frame, at + shot.frames, 10));
                                 return (
                                     <div
-                                        key={shot.file}
+                                        key={shot.label}
                                         style={{
                                             position: "absolute",
                                             inset: 0,
@@ -161,7 +165,7 @@ export const S06_Panel: React.FC = () => {
                                     : 1 - ramp(frame, at + shot.frames, DISSOLVE));
                             if (o <= 0.001) return null;
                             return (
-                                <AbsoluteFill key={shot.file} style={{ opacity: o }}>
+                                <AbsoluteFill key={shot.label} style={{ opacity: o }}>
                                     {/* The Sequence is load-bearing, not tidiness.
                                         Without it every clip plays against the
                                         SCENE clock, so the fourth shot opened 9s
