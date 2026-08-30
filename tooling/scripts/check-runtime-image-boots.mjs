@@ -224,6 +224,42 @@ check("mode=url", !/not a Rebase bundle|unpacked without a/.test(fetched),
 check("mode=url", /listening on port/i.test(fetched),
     `never started serving:\n${fetched.slice(-1500)}`);
 
+// ── 4b. mode=url into a directory the runtime does not own ───────────────────
+//
+// The case above unpacks into `/bundle` as it exists in the image, which the
+// runtime user owns. Every managed pod is the opposite: the bundle directory is
+// a Kubernetes emptyDir, `root:node` 0775 setgid, while the runtime is uid 1000.
+//
+// That difference is not cosmetic, it is a whole class of failure. An archive
+// rooted at `.` carries the mode of the directory it was packed from, and GNU
+// tar applies it to the extraction root as its last act — refused where the
+// process does not own that directory, *after* every file has been written. A
+// complete bundle is then reported as a corrupt one, and no flag prevents it:
+// `--no-overwrite-dir`, `--no-same-permissions`, `--delay-directory-restore`
+// and `--exclude=./` were each measured against GNU tar 1.34 and all four still
+// fail on the root.
+//
+// 0.17.0 shipped a fix for this that did not work, and nothing here noticed,
+// because a gate that only ever unpacks into a directory it owns cannot see the
+// bug. The whole fleet crashlooped on the first roll. The tmpfs below is the
+// emptyDir's shape — owner 0, group 1000, 0775 — so this boots the way a
+// managed pod boots rather than the way a laptop does.
+console.log(`${DIM}booting mode=url into a directory the runtime does not own…${NC}`);
+const foreign = bootLogs("rebase-boot-foreign-dir", [
+    "--tmpfs", "/bundle:rw,mode=0775,uid=0,gid=1000",
+    "-e", "REBASE_BUNDLE_URL=http://rebase-boot-files:8000/bundle.tar.gz",
+    "-e", "REBASE_BUNDLE_FETCH_DIR=/bundle"
+]);
+
+check("mode=url foreign dir", !/Cannot change mode|Exiting with failure status/.test(foreign),
+    "tar failed setting the mode of a bundle directory the runtime does not own. It had " +
+    "already written every file, so this is a complete bundle reported as corrupt — unpack " +
+    `into a directory the process creates instead:\n${foreign.slice(-1200)}`);
+check("mode=url foreign dir", !/could not be unpacked/.test(foreign),
+    `the bundle downloaded but would not unpack into a foreign-owned directory:\n${foreign.slice(-1200)}`);
+check("mode=url foreign dir", /listening on port/i.test(foreign),
+    `never started serving:\n${foreign.slice(-1500)}`);
+
 // ── 5. And the failure that should still fail ────────────────────────────────
 //
 // A gate that only proves things start can be satisfied by an entrypoint that

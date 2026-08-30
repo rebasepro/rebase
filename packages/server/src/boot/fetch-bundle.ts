@@ -169,27 +169,56 @@ function isGnuTar(): Promise<boolean> {
 
 /** Untar with the system `tar`, which every base image has. */
 async function extractWithTar(tarball: string, destination: string): Promise<void> {
-    // `-m` (do not restore mtimes) because some sandboxes reject utimes on
-    // extracted files and the failure looks like a corrupt archive.
-    const args = ["-xzmf", tarball, "-C", destination];
-
-    // The rest is about `destination` itself, not the entries inside it. An
-    // archive rooted at `.` carries the mode of the directory it was packed
-    // from, and GNU tar restores that onto `destination` as its last act. Where
-    // the process does not own that directory the chmod is refused and tar
-    // exits non-zero *after* having written every file — a complete bundle
+    // Extract into a directory this process creates, then move the entries up.
+    //
+    // An archive rooted at `.` carries the mode of the directory it was packed
+    // from, and GNU tar applies that to the extraction root as its last act.
+    // Where the process does not own that directory the chmod is refused and
+    // tar exits non-zero *after* having written every file — a complete bundle
     // reported as a corrupt one, which nothing downstream can tell apart from a
     // real truncation. A Kubernetes emptyDir is exactly that case: `root:node`,
-    // 0775 with setgid, while the runtime is uid 1000.
+    // 0775 setgid, while the runtime is uid 1000.
     //
-    // Only GNU needs this. bsdtar already leaves the destination's metadata
-    // alone, so it gets the command it has always had rather than flags it
-    // would refuse.
-    if (await isGnuTar()) {
-        args.push("--no-same-owner", "--no-same-permissions", "--no-overwrite-dir");
-    }
+    // No flag avoids it. `--no-overwrite-dir`, `--no-same-permissions`,
+    // `--delay-directory-restore` and `--exclude=./` were each measured against
+    // GNU tar 1.34 extracting into a directory owned by another uid, and all
+    // four still fail on the root — it is not treated as an entry the archive
+    // may be told to skip. It fails even when the mode being set is the mode the
+    // directory already has, because the refusal is about ownership, not change.
+    //
+    // Staging sidesteps the question instead of arguing with it: the root tar
+    // chmods is one we just made, so the chmod succeeds. `staging` sits inside
+    // `destination` so the moves are renames within one filesystem — no second
+    // copy of the tree, which matters where the bundle is already the largest
+    // thing in an ephemeral-storage grant.
+    const staging = path.join(destination, ".rebase-unpack");
+    fs.rmSync(staging, { recursive: true, force: true });
+    fs.mkdirSync(staging, { recursive: true });
 
-    await run("tar", args);
+    try {
+        // `-m` (do not restore mtimes) because some sandboxes reject utimes on
+        // extracted files and the failure looks like a corrupt archive.
+        const args = ["-xzmf", tarball, "-C", staging];
+
+        // Only meaningful when the runtime is root, where restoring owner and
+        // mode is the default; as any other uid tar already declines both. Kept
+        // because the image does not promise which one it runs as. GNU
+        // spellings, so bsdtar gets the command it has always had.
+        if (await isGnuTar()) {
+            args.push("--no-same-owner", "--no-same-permissions");
+        }
+
+        await run("tar", args);
+
+        for (const entry of fs.readdirSync(staging)) {
+            const from = path.join(staging, entry);
+            const to = path.join(destination, entry);
+            fs.rmSync(to, { recursive: true, force: true });
+            fs.renameSync(from, to);
+        }
+    } finally {
+        fs.rmSync(staging, { recursive: true, force: true });
+    }
 }
 
 /**

@@ -22,25 +22,79 @@ export function generateMarkdownForPage(page: string, lang: string): string {
       .replace(/<[^>]*>/g, "");
   };
 
+  /**
+   * `cleanHtml` turns `<br/>` into a newline, which is right in a paragraph and
+   * wrong inside a bullet — a title carrying one split the list item across two
+   * lines and broke the list. This also drops a trailing full stop, because
+   * these titles are followed by a colon and "already running.:" is not a
+   * sentence anyone wrote.
+   */
+  const inline = (text: string): string =>
+    cleanHtml(text).replace(/\s+/g, " ").replace(/\s*[.:]\s*$/, "").trim();
+
+
   if (page === "index" || page === "") {
+    /*
+     * This is what an agent reads about Rebase — `/index.md` is what `llms.txt`
+     * is assembled from — so it must say what the page says. It did not.
+     *
+     * It built "Key Benefits" from `howitworks.*`, copy that renders on NO page
+     * (grep it), and whose bold term in each bullet is the PROBLEM rather than
+     * the benefit. The rendered result read:
+     *
+     *     ## Key Benefits
+     *     - **Boilerplate admin UIs**: ...
+     *     - **Hand-rolled API layers**: ...
+     *     - **Brittle auth & permissions**: ...
+     *
+     * — which tells a model that Rebase's key benefits are boilerplate admin
+     * UIs and brittle auth. It then opened its feature list with kanban boards,
+     * the first item SITE-STORY §2 puts BELOW the line as never-the-headline.
+     *
+     * It now mirrors the home page's beats in the page's own order, from keys
+     * the page actually renders, so the two cannot drift without someone
+     * noticing. See PRODUCT.md: "when a home-page beat changes, change the
+     * generator in the same commit".
+     */
     return `# ${cleanHtml(tr("index.meta.title"))}
 
 ${cleanHtml(tr("index.meta.description"))}
 
-## Key Benefits
-- **${cleanHtml(tr("howitworks.step1.title"))}**: ${cleanHtml(tr("howitworks.step1.desc"))}
-- **${cleanHtml(tr("howitworks.step2.title"))}**: ${cleanHtml(tr("howitworks.step2.desc"))}
-- **${cleanHtml(tr("howitworks.step3.title"))}**: ${cleanHtml(tr("howitworks.step3.desc"))}
+## What Rebase is
 
-## Generated Platform Features
-Define your schema in TypeScript, and Rebase automatically generates:
-- **${cleanHtml(tr("features.kanban.title"))}** (Badge: ${cleanHtml(tr("features.kanban.badge"))}): ${cleanHtml(tr("features.kanban.desc"))}
-- **${cleanHtml(tr("features.customization.title"))}** (Badge: ${cleanHtml(tr("features.customization.badge"))}): ${cleanHtml(tr("features.customization.desc"))}
-- **${cleanHtml(tr("features.history.title"))}** (Badge: ${cleanHtml(tr("features.history.badge"))}): ${cleanHtml(tr("features.history.desc"))}
-- **${cleanHtml(tr("features.import.title"))}** (Badge: ${cleanHtml(tr("features.import.badge"))}): ${cleanHtml(tr("features.import.desc"))}
+${cleanHtml(tr("hero.title.part1"))} ${cleanHtml(tr("hero.title.part2"))}
+
+${cleanHtml(tr("hero.subtitle"))}
+
+## The claims, in the order the page makes them
+
+1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
+2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
+3. **Take only the half you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
+5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
+
+## Three adoption modes
+
+Rebase is adopted in layers, and each one is additive:
+
+- **BaaS** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
+- **CMS** — the above, plus a schema-driven admin panel generated from the same collection definitions.
+- **Full** — the above, plus Studio: SQL editor, schema visualizer, RLS editor, logs and an API explorer.
+
+Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check $DATABASE_URL\` audits any Postgres, read-only, with nothing installed.
+
+## In the admin panel
+
+Below the headline claims, and never a substitute for them:
+
 - **${cleanHtml(tr("features.api.title"))}** (Badge: ${cleanHtml(tr("features.api.badge"))}): ${cleanHtml(tr("features.api.desc"))}
 - **${cleanHtml(tr("features.sdk.title"))}** (Badge: ${cleanHtml(tr("features.sdk.badge"))}): ${cleanHtml(tr("features.sdk.desc"))}
 - **${cleanHtml(tr("features.realtime.title"))}** (Badge: ${cleanHtml(tr("features.realtime.badge"))}): ${cleanHtml(tr("features.realtime.desc"))}
+- **${cleanHtml(tr("features.customization.title"))}** (Badge: ${cleanHtml(tr("features.customization.badge"))}): ${cleanHtml(tr("features.customization.desc"))}
+- **${cleanHtml(tr("features.history.title"))}** (Badge: ${cleanHtml(tr("features.history.badge"))}): ${cleanHtml(tr("features.history.desc"))}
+- **${cleanHtml(tr("features.import.title"))}** (Badge: ${cleanHtml(tr("features.import.badge"))}): ${cleanHtml(tr("features.import.desc"))}
+- **${cleanHtml(tr("features.kanban.title"))}** (Badge: ${cleanHtml(tr("features.kanban.badge"))}): ${cleanHtml(tr("features.kanban.desc"))}
 
 ## Frequently Asked Questions
 - **${cleanHtml(tr("faq.q1"))}**
@@ -57,10 +111,6 @@ Define your schema in TypeScript, and Rebase automatically generates:
   ${cleanHtml(tr("faq.a6"))}
 - **${cleanHtml(tr("faq.q7"))}**
   ${cleanHtml(tr("faq.a7"))}
-
-## Security & Open-Source Infrastructure
-- **${cleanHtml(tr("security.title"))}** (Badge: ${cleanHtml(tr("security.badge"))}): ${cleanHtml(tr("security.desc"))}
-- **${cleanHtml(tr("opensource.title"))}** (Badge: ${cleanHtml(tr("opensource.badge"))}): ${cleanHtml(tr("opensource.desc"))}
 `;
   }
 
@@ -145,7 +195,7 @@ Define your collections in TypeScript and get a production-ready API server.
   if (page === "admin") {
     return `# Rebase — Admin panel
 
-A generated back office that sits on top of a Rebase backend, as a separate, optional product.
+A generated back office that sits on top of a Rebase backend — optional, and a client of the same API.
 
 ## How it relates to the backend
 - **Opt-in**: the \`admin\` block on a collection only type-checks once \`@rebasepro/cms-types\` is added to the project.

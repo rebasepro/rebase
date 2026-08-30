@@ -42,10 +42,10 @@ export const es = {
   "agentera.card.title": "El boilerplate se deprecia. Las garantías se revalorizan.",
   "agentera.card.desc": "Los agentes abarataron el código del primer día. Lo que sigue siendo caro son los problemas del día 30: corrección de las políticas RLS, copias de seguridad, migraciones, consistencia en tiempo real. Rebase no es el boilerplate que tu agente habría escrito de todos modos: son las garantías operativas que él no puede darte.",
   "agentera.link": "Explora todas las funciones de IA y agentes",
-  "modes.badge": "Dos productos, una definición",
+  "modes.badge": "Una definición, la mitad que quieras",
   "modes.title": "Quédate con la mitad que de verdad necesitas.",
   "modes.subtitle":
-    "El backend y el panel son productos separados que comparten esquema. Lanza headless hoy y añade el panel el día en que una persona necesite tocar los datos — o nunca. Sea cual sea la mitad que dejes fuera, la API responde exactamente igual.",
+    "El panel lee tus datos a través de la misma API y las mismas políticas que usa tu aplicación. Lanza headless hoy y añádelo el día en que una persona necesite tocar los datos — o nunca. Sea cual sea la mitad que dejes fuera, la API responde exactamente igual.",
   "modes.baas.title":
     "Backend",
   "modes.baas.desc":
@@ -574,7 +574,7 @@ export const es = {
   "about.join.discord": "Únete a nuestro Discord",
   "index.meta.title": "Rebase — El backend open-source para Postgres: APIs, auth, tiempo real y CMS",
   "index.meta.description": "Apunta Rebase a tu Postgres y obtén APIs REST, auth, storage, tiempo real y backups — más un panel admin generado desde tu esquema cuando lo quieras. Protegido por row-level security. Open-source, despliégalo donde quieras.",
-  "cms.meta.title": "Panel de administración — un producto aparte del backend de Rebase",
+  "cms.meta.title": "Panel de administración — la capa opcional sobre tu backend de Rebase",
   "cms.meta.description": "Un back office generado sobre cualquier backend de Rebase: edición tipo hoja de cálculo, medios, roles e historial — opcional, ampliable con tu propio React y nunca requerido por la API.",
   "backend.meta.title": "Backend y APIs — Rebase App Engine",
   "backend.meta.description": "Obtén un backend generado automáticamente impulsado por Hono y Drizzle ORM. Completo con REST y WebSockets.",

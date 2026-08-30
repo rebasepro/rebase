@@ -165,6 +165,53 @@ describe("fetchBundle", () => {
         })).rejects.toThrow(/could not be unpacked/);
     });
 
+    it("unpacks a real archive rooted at `.` without leaving staging behind", async () => {
+        // The default extractor, not an injected one — the thing under test is
+        // the `tar` invocation itself.
+        //
+        // GNU tar applies the archive root's mode to the extraction root as its
+        // last act, and where the process does not own that directory the chmod
+        // is refused *after* every file is written: a complete bundle reported
+        // as corrupt, which is what a Kubernetes emptyDir (root:node 0775
+        // setgid, runtime uid 1000) produced on every managed pod. No flag
+        // avoids it, so the extractor stages into a directory it creates and
+        // moves the entries up.
+        //
+        // The ownership half cannot be reproduced in-process without root; what
+        // this holds is the move: everything the archive carried arrives,
+        // dotfiles included, an existing entry is replaced rather than merged
+        // with, and no staging directory survives.
+        const src = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-src-"));
+        fs.writeFileSync(path.join(src, MANIFEST_FILENAME), JSON.stringify({ kind: "backend" }));
+        fs.writeFileSync(path.join(src, ".hidden"), "dot");
+        fs.mkdirSync(path.join(src, "sub"));
+        fs.writeFileSync(path.join(src, "sub", "f"), "nested");
+        // Outside `src`, not in it: archiving a directory that contains the
+        // archive being written is an error under GNU tar, and passes under the
+        // bsdtar on a developer's Mac. This suite runs on both.
+        const tarball = path.join(scratch, "..", `bundle-${path.basename(src)}.tar.gz`);
+        execFileSync("tar", ["-czf", tarball, "-C", src, "."]);
+
+        // A stale file the archive also carries: the move must replace it.
+        fs.writeFileSync(path.join(scratch, MANIFEST_FILENAME), "stale");
+
+        await fetchBundle({
+            url: URL_,
+            destination: scratch,
+            fetchImpl: okFetch(new Uint8Array(fs.readFileSync(tarball))),
+            ...noInstall
+        });
+
+        expect(fs.existsSync(path.join(scratch, ".rebase-unpack"))).toBe(false);
+        expect(fs.readFileSync(path.join(scratch, ".hidden"), "utf8")).toBe("dot");
+        expect(fs.readFileSync(path.join(scratch, "sub", "f"), "utf8")).toBe("nested");
+        expect(JSON.parse(fs.readFileSync(path.join(scratch, MANIFEST_FILENAME), "utf8")))
+            .toEqual({ kind: "backend" });
+
+        fs.rmSync(src, { recursive: true, force: true });
+        fs.rmSync(tarball, { force: true });
+    });
+
     it("refuses something that unpacked without a manifest", async () => {
         // Not a Rebase bundle, or truncated. Booting on it would surface much
         // later as an empty schema.

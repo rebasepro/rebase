@@ -55,9 +55,15 @@ Four claims, ranked. Anything below them is a feature, not a claim.
 4. **Agent-native.** MCP server, scoped API keys, installable agent skills.
 
 Three adoption modes are the shape of the offer (see
-[MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md)): **BaaS** (API only, no React
-in the dependency tree), **CMS** (BaaS + schema-driven admin panel), and **Full**
-(CMS + Studio).
+[MODULAR-ARCHITECTURE.md](MODULAR-ARCHITECTURE.md)): **BaaS** (the API and typed
+SDK alone — the panel's packages are never installed), **CMS** (BaaS +
+schema-driven admin panel), and **Full** (CMS + Studio).
+
+*Phrasing note, 2026-08-29:* this used to read "API only, no React in the
+dependency tree". That is accurate and it does not survive being quoted at a
+reader — outside this file nobody has been told React was ever on the table, so
+it answers a question nobody asked and reads as defensive. The dependency fact
+is the useful part; keep it stated as a fact about what gets installed.
 
 ## Operating Context
 

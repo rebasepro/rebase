@@ -1,29 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-:root {
-  --primary: #0070F4;
-  --primary-dark: #0058C4;
-  --accent-pink: #FF3773;
-  --accent-orange: #FFA400;
-  --surface-950: #0a0a0a;
-  --surface-900: #171717;
-  --surface-800: #262626;
-  --surface-700: #404040;
-  --surface-500: #737373;
-  --surface-400: #a3a3a3;
-  --surface-300: #d4d4d4;
-  --white: #ffffff;
-}
-
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #000;
-  color: var(--white);
-  -webkit-font-smoothing: antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #08090A;
+    color: #F7F8F8;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+}
+
+/* ── The OLDER ProductVideo's palette ────────────────────────────────────────
+   RebaseIntro and everything under src/scenes takes its colours from
+   `src/theme.ts`, which is the shipped design system. These variables are the
+   pre-2026-08 set, kept only because the legacy ProductVideo components read
+   them and that
+   composition still renders.
+
+   Do not extend this block, and do not reach for it from a new component: the
+   accent hues here (`--accent-pink`, `--accent-orange`) are from the old
+   three-colour mark and are not in the system any more. Anything new belongs
+   in `theme.ts`.
+
+   Fonts are NOT declared here — see `src/fonts.ts` for why a stylesheet cannot
+   do that job in a renderer. */
+:root {
+    --primary: #0070F4;
+    --primary-dark: #0058C4;
+    --accent-pink: #FF3773;
+    --accent-orange: #FFA400;
+    --surface-950: #0a0a0a;
+    --surface-900: #171717;
+    --surface-800: #262626;
+    --surface-700: #404040;
+    --surface-500: #737373;
+    --surface-400: #a3a3a3;
+    --surface-300: #d4d4d4;
+    --white: #ffffff;
 }
