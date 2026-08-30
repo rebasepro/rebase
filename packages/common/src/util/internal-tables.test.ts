@@ -96,6 +96,18 @@ describe("internal table access", () => {
             expect(revokeInternalTableSql("rebase", "cron_logs")).toContain("to_regclass");
         });
 
+        it("skips a table with RLS enabled, because that is somebody's collection", () => {
+            // The names in the list are unqualified and the boot sweep applies
+            // them to every project schema, so `public.jobs` — a job board's
+            // vacancies — was being revoked on every boot by the entry meant for
+            // `rebase.jobs`, the background queue. RLS is what tells them apart:
+            // collections have it, framework tables do not.
+            const sql = revokeInternalTableSql("public", "jobs");
+
+            expect(sql).toContain("relrowsecurity");
+            expect(sql).toMatch(/NOT \(SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass\('"public"\."jobs"'\)\)/);
+        });
+
         it("is a single statement, for handles that reject multi-statement strings", () => {
             // The semicolons inside the block are PL/pgSQL's, not the protocol's:
             // what matters is that the whole string is one dollar-quoted DO,

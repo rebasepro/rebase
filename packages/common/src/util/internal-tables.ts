@@ -60,7 +60,10 @@ export const REBASE_USER_ROLE = "rebase_user";
  *
  * Deliberately NOT including `users`: the auth user table is also a collection,
  * with `securityRules`, RLS enabled and policies applied. Users read their own
- * row through it — revoking there would break sign-in.
+ * row through it — revoking there would break sign-in. `revokeInternalTableSql`
+ * now skips any table with RLS enabled, so that exception is enforced rather
+ * than merely remembered — and so is the same hazard for every other name here,
+ * any of which a project may legitimately use for a collection of its own.
  *
  * `atlas_schema_revisions` is Atlas's migration ledger, which lands in `rebase`
  * because `db migrate apply` passes `--revisions-schema rebase`.
@@ -71,8 +74,16 @@ export const REBASE_USER_ROLE = "rebase_user";
  * list is what the boot-time sweep in `ensureAppRole` iterates, and the sweep
  * is the only thing that can repair an already-granted table. A table revoked
  * at creation but missing here is therefore permanently stranded on any
- * database that predates its revoke — which is exactly what happened to
- * `jobs`, added here after a scan of a pre-0.14 database found it.
+ * database that predates its revoke.
+ *
+ * These names are unqualified, and the boot-time sweep applies them to every
+ * schema a project uses — so an entry here is a claim on that name in `public`
+ * as much as in `rebase`. `jobs` is Rebase's queue at `rebase.jobs` AND a
+ * perfectly ordinary collection name, and revoking `public.jobs` from a project
+ * that owns it leaves every read failing 42501 with correct policies applied
+ * and nothing in the RLS logs to explain it. The `relrowsecurity` guard in
+ * `revokeInternalTableSql` is what makes a common noun safe here — it is not a
+ * licence to claim more of them.
  */
 export const REBASE_INTERNAL_TABLES: readonly string[] = [
     // auth
@@ -120,6 +131,25 @@ const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
  *  - the table may not exist yet — `cron_logs` never appears in a project with
  *    no cron jobs — and `to_regclass` returning NULL has to be tolerated too.
  *
+ * The third guard is the one that decides whether the *right* table is being
+ * revoked. The names in {@link REBASE_INTERNAL_TABLES} are unqualified, and the
+ * boot-time sweep in `ensureAppRole` applies all of them to every schema a
+ * project uses — including the schema its own collections live in. A project is
+ * free to call a collection `jobs`, `branches` or `api_keys`, and when it does,
+ * the sweep was revoking `rebase_user`'s DML on the project's table on every
+ * single boot. That is not a subtle degradation: the collection's whole API
+ * answers 500 `permission denied for table …` from then on, which is what
+ * happened to a public job board whose vacancies live in `public.jobs`.
+ *
+ * `relrowsecurity` separates the two cleanly, and it is the same fact this
+ * module already relies on. Framework-internal tables carry no RLS — that is the
+ * premise stated at the top of this file, and the reason a revoke is needed at
+ * all. Every collection table has it enabled, because that is how Rebase
+ * enforces `securityRules`. So "RLS is off" is exactly "this is not somebody's
+ * collection", and the guard also subsumes the hand-carved `users` exception:
+ * the auth user table is a collection, has RLS, and would now be skipped on its
+ * own merits rather than by being kept off a list.
+ *
  * One command, so it is safe on handles that speak the extended query protocol
  * and reject multi-statement strings.
  */
@@ -135,7 +165,8 @@ export function revokeInternalTableSql(schema: string, table: string): string {
         DO $rebase_revoke$
         BEGIN
             IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}')
-               AND to_regclass('${qualified}') IS NOT NULL THEN
+               AND to_regclass('${qualified}') IS NOT NULL
+               AND NOT (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('${qualified}')) THEN
                 EXECUTE 'REVOKE ALL ON ${qualified} FROM ${REBASE_USER_ROLE}';
             END IF;
         END
