@@ -26,13 +26,19 @@ const SURFACE_BEFORE = [
 
 const MANIFEST_TEXT = "export const BUNDLE_FORMAT_VERSION = 2;\nexport const RUNTIME_CONTRACT_VERSION = 1;\n";
 
-/** A release whose only change is `<what>`, run through the gate quietly. */
-function run({ version, now }) {
+/**
+ * A release whose only change is `<what>`, run through the gate quietly.
+ *
+ * `before` overrides the previous tag's artifacts, for the cases where the
+ * baseline itself is what the test is about rather than the change to it.
+ */
+function run({ version, now, before: baseline }) {
     const before = {
         [SURFACE]: SURFACE_BEFORE,
         [DERIVED_NAMES]: "posts_pkey\nposts_author_id_fkey\n",
         [MANIFEST]: MANIFEST_TEXT,
-        [CHANGELOG]: "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- something\n"
+        [CHANGELOG]: "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- something\n",
+        ...baseline
     };
     const silence = () => {};
     const { log, error } = console;
@@ -107,10 +113,42 @@ test("a ### Breaking heading in an older section does not count", () => {
     }), 1);
 });
 
-test("a derived identifier changing at all is breaking", () => {
+test("a derived identifier re-derived under a new spelling is breaking", () => {
+    // The case the axis exists for, and it reaches the check as a REMOVAL: the
+    // old name is gone from the file, and every database in the field still
+    // carries it.
     assert.equal(run({
         version: "0.13.1",
         now: { [DERIVED_NAMES]: "posts_pkey\nposts_authorId_fkey\n" }
+    }), 1);
+});
+
+test("a derived identifier disappearing is breaking", () => {
+    assert.equal(run({
+        version: "0.13.1",
+        now: { [DERIVED_NAMES]: "posts_pkey\n" }
+    }), 1);
+});
+
+test("a NEW derived identifier is not breaking", () => {
+    // A name no release has emitted cannot be carried by any database, so it
+    // disagrees with nothing. This axis used to compare the file byte-for-byte
+    // and fail here, which forced a purely additive release to be cut as a minor
+    // AND to carry a `### Breaking` section describing a break that did not
+    // exist — 0.17.2 hit exactly that, on one added line for `extension vector`.
+    assert.equal(run({
+        version: "0.13.1",
+        now: { [DERIVED_NAMES]: "posts_pkey\nposts_author_id_fkey\nposts_slug_key\n" }
+    }), 0);
+});
+
+test("a derived identifier that changes producers is breaking", () => {
+    // Same name, emitted by a different path: a database provisioned by boot no
+    // longer matches one provisioned by push.
+    assert.equal(run({
+        version: "0.13.1",
+        before: { [DERIVED_NAMES]: "posts_pkey [boot,push]\n" },
+        now: { [DERIVED_NAMES]: "posts_pkey [push]\n" }
     }), 1);
 });
 

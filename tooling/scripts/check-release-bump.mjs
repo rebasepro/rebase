@@ -14,9 +14,12 @@
  *
  *   * `api-surface/server.api.txt`   — a REMOVED export, or an export that lost a
  *                                      member. Additions are not breaking.
- *   * `contracts/derived-names.txt`  — any change at all. These identifiers are
- *                                      frozen, not "frozen until the next major"
- *                                      (docs/compatibility.md:117).
+ *   * `contracts/derived-names.txt`  — a name that DISAPPEARED, or one whose
+ *                                      producers changed. Additions are not
+ *                                      breaking. Frozen means frozen, not
+ *                                      "frozen until the next major", but what
+ *                                      is frozen is a name a release already
+ *                                      emitted — see below.
  *   * BUNDLE_FORMAT_VERSION,         — either constant moving is a coordinated
  *     RUNTIME_CONTRACT_VERSION         release by definition.
  *
@@ -62,6 +65,56 @@ const bold = s => `\x1b[1m${s}\x1b[0m`;
 
 function git(args) {
     return execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+}
+
+/**
+ * Split a derived-names diff into names that vanished, changed producers, or
+ * are simply new.
+ *
+ * The distinction the earlier version of this axis did not draw. It compared the
+ * two files byte-for-byte and called any difference a break, which reads as the
+ * cautious choice and is not: a purely additive release then has to be cut as a
+ * minor *and* carry a `### Breaking` section describing a break that does not
+ * exist. Guards that demand an untrue note are how notes stop being read.
+ *
+ * What is frozen is a name a release already emitted, because a database in the
+ * field carries it and no release can reach in and rename it. A name that has
+ * never been emitted cannot be carried by anybody, so adding one disagrees with
+ * nothing. `contracts/derived-names.txt` says exactly this in its own header —
+ * "A line that CHANGES or DISAPPEARS is a break" — and `docs/compatibility.md`
+ * contract 6 says "a name a release emitted is never re-derived".
+ *
+ * Re-derivation is still caught, and caught as a REMOVAL: changing how a name is
+ * built (`products_created_at_ix_2af5183` → `..._ix_9c11f04`) drops the old line
+ * and adds a new one, so the old name shows up here as gone. That is the case
+ * this axis exists for and it still fails the release.
+ *
+ * The key is the identifier; the value is the `[boot,push]` tag naming which
+ * producers write it. A name that stays but changes producers is a change, not
+ * an addition: it means a database provisioned by one path no longer matches one
+ * provisioned by the other.
+ */
+export function classifyDerivedNames(before, after) {
+    const parse = text => {
+        const entries = new Map();
+        for (const line of (text ?? "").split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) continue;
+            // `<kind> <name> [<producers>]` — the tag is always last, and a name
+            // never contains a space, so the split is unambiguous.
+            const match = /^(.*?)\s*(\[[^\]]*\])$/.exec(trimmed);
+            if (match) entries.set(match[1], match[2]);
+            else entries.set(trimmed, "");
+        }
+        return entries;
+    };
+
+    const from = parse(before);
+    const to = parse(after);
+    const removed = [...from.keys()].filter(k => !to.has(k));
+    const changed = [...from.keys()].filter(k => to.has(k) && to.get(k) !== from.get(k));
+    const added = [...to.keys()].filter(k => !from.has(k));
+    return { removed, changed, added };
 }
 
 /** File content at a rev, or null when the file did not exist there yet. */
@@ -161,11 +214,21 @@ export function checkReleaseBump({
     const namesBefore = readAtTag(DERIVED_NAMES);
     if (namesBefore === null) {
         unguarded.push(DERIVED_NAMES);
-    } else if (namesBefore !== readNow(DERIVED_NAMES)) {
-        breaks.push(
-            `${DERIVED_NAMES}: changed. These identifiers are frozen — every aged database in the ` +
-            "field disagrees with the code the moment it upgrades."
-        );
+    } else {
+        const { removed, changed } = classifyDerivedNames(namesBefore, readNow(DERIVED_NAMES));
+        for (const name of removed) {
+            breaks.push(
+                `${DERIVED_NAMES}: GONE ${name}. These identifiers are frozen — every aged database ` +
+                "in the field carries this name and no release can reach in and rename it. A name " +
+                "re-derived rather than dropped shows up here too, as the old spelling going missing."
+            );
+        }
+        for (const name of changed) {
+            breaks.push(
+                `${DERIVED_NAMES}: ${name} changed producers. A database provisioned by one path no ` +
+                "longer matches one provisioned by the other."
+            );
+        }
     }
 
     // ── Axis 3: the two contract constants ──────────────────────
