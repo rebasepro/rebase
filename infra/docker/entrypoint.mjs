@@ -67,6 +67,19 @@ const UNPACKED_FROM = unpackedSource();
  * An unmarked tree counts as stale on purpose: it predates the marker, so it
  * cannot be shown to match, and one extra download is cheaper than serving the
  * wrong code.
+ *
+ * "Cheaper" assumed the download works. On a tenant provisioned before the
+ * marker existed it had never run, and on 2026-08-30 it turned out not to:
+ * runtime 1.19.0 took a healthy tenant to failing every rollout, twice, with
+ *
+ *     [entrypoint] the bundle on disk came from an unrecorded source,
+ *                  not REBASE_BUNDLE_URL; re-fetching
+ *     Failed to start the Rebase runtime
+ *
+ * while a complete, working bundle sat unused at /bundle. The staleness rule
+ * itself is right — this is still a re-fetch — but the on-disk tree is now
+ * handed to the runtime as a fallback, so a failed download degrades to
+ * possibly-stale code with a loud error instead of no code at all.
  */
 const STALE_ON_DISK = ON_DISK && Boolean(WANTED_URL) && UNPACKED_FROM !== WANTED_URL;
 const FETCH_MODE = Boolean(WANTED_URL) && (!ON_DISK || STALE_ON_DISK);
@@ -388,4 +401,12 @@ if (!["none", "ensure"].includes(migrateMode)) {
 const { runFromBundle } = await import("@rebasepro/server");
 // No `bundleDir` in fetch mode: `bootFromBundle` reads it as "a bundle is
 // already located" and skips the download that has not happened yet.
-await runFromBundle(FETCH_MODE ? {} : { bundleDir });
+//
+// `bundleFallbackDir` is different: it is consulted ONLY if the download
+// throws. Passing the same path as `bundleDir` would suppress the fetch; this
+// keeps the fetch first and keeps the tree we already have as a last resort.
+await runFromBundle(
+    FETCH_MODE
+        ? (ON_DISK ? { bundleFallbackDir: bundleDir } : {})
+        : { bundleDir }
+);

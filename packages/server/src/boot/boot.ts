@@ -42,7 +42,7 @@ import { resolveDataSources, resolveStorageSources } from "./sources";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
-import { fetchBundle, shouldFetchBundle, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
+import { fetchBundle, shouldFetchBundle, usableBundleFallback, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 
 /** A running runtime, and the handle to stop it. */
@@ -100,6 +100,19 @@ export interface BootOptions {
      * rather than which of its processes does.
      */
     provisionSchema?: boolean;
+    /**
+     * A bundle already on disk to fall back to if the fetch fails.
+     *
+     * Set by the container entrypoint when it decides to re-fetch a bundle that
+     * is *already there* — see `STALE_ON_DISK` in `infra/docker/entrypoint.mjs`.
+     * Without it, a failed download means the runtime dies holding a complete,
+     * working bundle it was told to ignore.
+     *
+     * Only consulted when the fetch throws. A successful fetch always wins,
+     * because preferring the freshly-downloaded copy is the entire point of the
+     * staleness check.
+     */
+    bundleFallbackDir?: string;
 }
 
 /**
@@ -125,13 +138,42 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // This runs on EVERY cold start — a scale-from-zero, an instance recycled
     // after an hour idle — which is why the URL it is given is a stable endpoint
     // rather than a signed one that would have expired.
-    const fetchedDir = !options.bundleDir && !options.bundle && shouldFetchBundle()
-        ? await fetchBundle({
-            url: process.env[BUNDLE_URL_ENV]!,
-            token: process.env[BUNDLE_TOKEN_ENV],
-            destination: process.env[BUNDLE_FETCH_DIR_ENV] || undefined
-        })
-        : undefined;
+    let fetchedDir: string | undefined;
+    if (!options.bundleDir && !options.bundle && shouldFetchBundle()) {
+        try {
+            fetchedDir = await fetchBundle({
+                url: process.env[BUNDLE_URL_ENV]!,
+                token: process.env[BUNDLE_TOKEN_ENV],
+                destination: process.env[BUNDLE_FETCH_DIR_ENV] || undefined
+            });
+        } catch (error) {
+            // A failed download must not throw away a bundle that is sitting
+            // right there.
+            //
+            // The entrypoint re-fetches when the tree on disk cannot be shown to
+            // match the URL — including when it carries no source marker at all,
+            // which is every tenant provisioned before the marker existed. On
+            // those, this was the first time the fetch path had ever run, and it
+            // does not work: runtime 1.19.0 took rebase-growth from serving fine
+            // to failing every rollout with two log lines and no stack trace,
+            // while a complete bundle sat unused at /bundle.
+            //
+            // Falling back is strictly better than the alternative on offer. The
+            // risk the staleness check guards against is serving code older than
+            // the deploy just uploaded; the risk here is serving nothing at all.
+            // So: serve what we have, and say loudly that it may be stale.
+            const fallback = usableBundleFallback(options.bundleFallbackDir);
+            if (!fallback) throw error;
+
+            logger.error(
+                "Could not fetch the bundle, so the copy already on disk is being served — "
+                + "it may be older than the deployment that started this pod. "
+                + `Fetch error: ${error instanceof Error ? error.message : String(error)}`,
+                { url: process.env[BUNDLE_URL_ENV], fallback }
+            );
+            fetchedDir = fallback;
+        }
+    }
 
     const bundleDir = options.bundleDir
         || fetchedDir

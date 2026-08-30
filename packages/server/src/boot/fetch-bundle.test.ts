@@ -20,7 +20,8 @@ import {
     dedupeRuntimePackages,
     BUNDLE_URL_ENV,
     BUNDLE_TOKEN_ENV,
-    unpackedBundleSource
+    unpackedBundleSource,
+    usableBundleFallback
 } from "./fetch-bundle";
 import { MANIFEST_FILENAME, loadBundle } from "./bundle";
 
@@ -186,7 +187,10 @@ describe("fetchBundle", () => {
         fs.writeFileSync(path.join(src, ".hidden"), "dot");
         fs.mkdirSync(path.join(src, "sub"));
         fs.writeFileSync(path.join(src, "sub", "f"), "nested");
-        const tarball = path.join(src, "b.tar.gz");
+        // Outside `src`, not in it: archiving a directory that contains the
+        // archive being written is an error under GNU tar, and passes under the
+        // bsdtar on a developer's Mac. This suite runs on both.
+        const tarball = path.join(scratch, "..", `bundle-${path.basename(src)}.tar.gz`);
         execFileSync("tar", ["-czf", tarball, "-C", src, "."]);
 
         // A stale file the archive also carries: the move must replace it.
@@ -206,6 +210,7 @@ describe("fetchBundle", () => {
             .toEqual({ kind: "backend" });
 
         fs.rmSync(src, { recursive: true, force: true });
+        fs.rmSync(tarball, { force: true });
     });
 
     it("refuses something that unpacked without a manifest", async () => {
@@ -735,5 +740,40 @@ describe("the default extractor, running real tar", () => {
         })).rejects.toThrow();
 
         expect(unpackedBundleSource(destination)).toBeNull();
+    });
+});
+
+describe("usableBundleFallback", () => {
+    /**
+     * The last resort when a download fails.
+     *
+     * The entrypoint re-fetches whenever the tree on disk cannot be shown to
+     * match the URL, which includes every tenant provisioned before the source
+     * marker existed. On those the fetch path had never run, and on 2026-08-30
+     * it turned out not to work: runtime 1.19.0 failed every rollout with
+     * "Failed to start the Rebase runtime" while a complete bundle sat unused
+     * at /bundle. Serving possibly-stale code with a loud error beats serving
+     * none at all.
+     */
+    it("accepts a directory that actually holds a bundle", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fallback-"));
+        fs.writeFileSync(path.join(dir, MANIFEST_FILENAME), JSON.stringify({ kind: "backend" }));
+        expect(usableBundleFallback(dir)).toBe(dir);
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("rejects a directory with no manifest — that is a second failure, not a fallback", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fallback-empty-"));
+        expect(usableBundleFallback(dir)).toBeUndefined();
+        fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("rejects a path that does not exist", () => {
+        expect(usableBundleFallback(path.join(os.tmpdir(), "definitely-not-here-9d3f"))).toBeUndefined();
+    });
+
+    it("rejects nothing at all, so the caller rethrows the fetch error", () => {
+        expect(usableBundleFallback(undefined)).toBeUndefined();
+        expect(usableBundleFallback("")).toBeUndefined();
     });
 });
