@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-08-30
+
 ### Fixed
 
 - **A managed pod could not unpack its own bundle.** 0.17.0 shipped a fix for a
