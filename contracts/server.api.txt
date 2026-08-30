@@ -365,7 +365,7 @@ const ANONYMOUS_USER_IDS
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
-const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile }
+const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
 const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
 const DEFAULT_FUZZY_THRESHOLD
@@ -404,6 +404,7 @@ function computeSchemaVersion
 function database
 function declareResource
 function declaredDataSources
+function declaredDatabaseExtensions
 function declaredResources
 function declaredStorageSources
 function declaredSubscriptions
@@ -536,7 +537,7 @@ interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
 interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type }
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, introspectCollections, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
-interface DatabaseOptions { databaseId, engine, label, migrations, transport }
+interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }
 interface DateProperty { autoValue, callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
 interface DatePropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface DeclareOptions { engine, label, transport }
@@ -653,7 +654,7 @@ interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
 interface SchemaChange { collection, detail, kind, property, remedy, verdict }
 interface SchemaChangeFile { contents, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
-interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile }
+interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
 interface SchemaEditingAdmin { planSchemaChange }
 interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, unaccent }
 interface SearchField { path, weight }
