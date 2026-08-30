@@ -28,6 +28,7 @@ import {
     fail,
     warn,
     reportError,
+    resolveTimeoutMs,
     type CloudClient
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
@@ -205,6 +206,10 @@ async function deployBundle(opts: {
     appName?: string;
     /** Compile without type checking, exactly as `rebase build` does. */
     skipTypeCheck?: boolean;
+    /** Follow the deployment to a terminal state. Default on; `--no-follow` off. */
+    follow: boolean;
+    /** Ceiling on the follow, in milliseconds. */
+    timeoutMs: number;
 }): Promise<void> {
     // Nothing here reads client/url/projectId/projectRef any more: everything
     // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
@@ -335,6 +340,8 @@ async function uploadAndTrigger(opts: {
     bundleDir: string;
     message?: string;
     appName?: string;
+    follow: boolean;
+    timeoutMs: number;
 }): Promise<void> {
     const { client, url, projectId, projectRef, bundleDir } = opts;
     const manifest = readBundleManifest(bundleDir);
@@ -394,6 +401,8 @@ app: opts.appName,
 message: opts.message,
 declaredApps });
 
+    let deploymentId: string;
+    let managed: boolean;
     try {
         const res = await client.functions.invoke<{
             success: boolean;
@@ -401,17 +410,51 @@ declaredApps });
             managed?: boolean;
         }>("deploy", body);
         if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
-        if (isJsonMode()) {
-            printJson({ success: true,
-deploymentId: String(res.deployment.id),
-managed: res.managed === true });
-        } else {
-            console.log(chalk.green(`  ✓ Managed deploy started (deployment ${res.deployment.id}).`));
-            console.log(chalk.gray("    Track it with `rebase cloud logs` or in the console."));
-        }
+        deploymentId = String(res.deployment.id);
+        managed = res.managed === true;
     } catch (e) {
         reportError(e, "Managed deploy failed to start");
     }
+
+    // Followed to a terminal state, like the source path beside it.
+    //
+    // This half used to stop at "deploy started" and print "track it with
+    // `rebase cloud logs`", so `rebase cloud deploy` meant two different things
+    // depending on which runtime the project happened to declare: on one path
+    // it waited and the exit code was the verdict, on the other it returned 0
+    // the moment the trigger was accepted — including for builds that went on
+    // to fail. Every caller then wrote its own poll loop, with its own timeout,
+    // against the same two fields this function already had in hand.
+    //
+    // One rule now: `deploy` follows unless told not to. `--no-follow` is that
+    // instruction and keeps the old shape for anyone who wants it.
+    if (!opts.follow) {
+        emit(
+            () => {
+                console.log(chalk.green(`  ✓ Managed deploy started (deployment ${deploymentId}).`));
+                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
+            },
+            { success: true,
+deploymentId,
+managed,
+following: false }
+        );
+        return;
+    }
+
+    if (!isJsonMode()) {
+        console.log(chalk.green(`  ✓ Managed deploy started (deployment ${deploymentId}).`));
+        console.log(chalk.gray("    Streaming build logs (Ctrl-C to stop watching — the build keeps running):"));
+        console.log("");
+    }
+
+    const status = await streamBuildLogs(client, deploymentId, { quiet: isJsonMode(),
+timeoutMs: opts.timeoutMs });
+    emit(() => {}, { success: true,
+deploymentId,
+managed,
+following: true,
+status });
 }
 
 /* ─── what a deploy with nothing attached is actually going to build ─────────
@@ -723,6 +766,45 @@ function declaresManagedRuntime(appName?: string): boolean {
 }
 
 /**
+ * Every flag `rebase cloud deploy` accepts.
+ *
+ * Hoisted out of the `parseCloudArgs` call so that one declaration serves three
+ * readers: the parser, `action-help.ts`'s page for this command, and the test
+ * that holds the two to each other. A flag added here with no line in the help
+ * page is a failing test rather than a flag nobody can discover.
+ */
+export const DEPLOY_FLAGS = {
+    "--no-follow": Boolean,
+    /* `--wait` is the explicit spelling of what this command already does — it
+       follows the deployment to a terminal state and exits non-zero if that
+       state is a failure. It exists because *asking* for that was the only way
+       to find out it was the default, and because the managed-bundle path did
+       not do it: that half returned as soon as the trigger was accepted, so
+       every caller wrote its own poll loop against `cloud logs`. Both paths
+       follow now; `--wait` is here so a script can say so, and so a reader
+       looking for it in `--help` finds it rather than concluding it is absent. */
+    "--wait": Boolean,
+    /* Seconds. Bounds the follow on both paths — without it the only ceiling
+       was a hardcoded 15 minutes, which is the wrong number for a CI step and
+       for an overnight build alike. */
+    "--timeout": String,
+    "--source": String,
+    "--message": String,
+    "--bundle": Boolean,
+    "--bundle-dir": String,
+    /* Same flag `rebase build` has, for the same reason. Without it here, the
+       only way to deploy a bundle without type checking was to run the build
+       by hand and then point `--bundle-dir` at the result. */
+    "--skip-type-check": Boolean,
+    /* Leave the managed runtime on purpose. The ONLY way to build a container
+       image for a project the platform runs as managed — for the bare form and
+       for `--source` alike, because neither of those says so by itself. See
+       `ejectRefusal`. */
+    "--force": Boolean,
+    "-m": "--message"
+} as const;
+
+/**
  * `rebase cloud deploy [app]` — its flags, and which app of this repository the
  * line named.
  *
@@ -746,21 +828,7 @@ function declaresManagedRuntime(appName?: string): boolean {
  */
 export function resolveDeployArgs(rawArgs: string[]) {
     const { flags, positionals } = parseCloudArgs({
-        spec: { "--no-follow": Boolean,
-"--source": String,
-"--message": String,
-"--bundle": Boolean,
-"--bundle-dir": String,
-/* Same flag `rebase build` has, for the same reason. Without it here, the
-   only way to deploy a bundle without type checking was to run the build
-   by hand and then point `--bundle-dir` at the result. */
-"--skip-type-check": Boolean,
-/* Leave the managed runtime on purpose. The ONLY way to build a container
-   image for a project the platform runs as managed — for the bare form and
-   for `--source` alike, because neither of those says so by itself. See
-   `ejectRefusal`. */
-"--force": Boolean,
-"-m": "--message" },
+        spec: DEPLOY_FLAGS,
         rawArgs,
         commandWords: 2, // cloud deploy
         command: "cloud deploy",
@@ -772,6 +840,18 @@ appName: positionals[0] as string | undefined };
 
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const { flags: args, appName } = resolveDeployArgs(rawArgs);
+
+    // Refused rather than resolved in one direction or the other: they are
+    // opposite instructions, and either interpretation makes the command do
+    // something the line explicitly asked it not to.
+    if (args["--wait"] && args["--no-follow"]) {
+        fail(
+            "--wait and --no-follow ask for opposite things.",
+            "`deploy` follows by default — pass neither, or `--no-follow` to return as soon as the build is triggered.",
+            "usage"
+        );
+    }
+
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
@@ -810,7 +890,9 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             bundleDir: args["--bundle-dir"],
             message: args["--message"],
             appName,
-            skipTypeCheck: args["--skip-type-check"] === true
+            skipTypeCheck: args["--skip-type-check"] === true,
+            follow: args["--no-follow"] !== true,
+            timeoutMs: resolveDeployTimeout(args["--timeout"])
         });
         return;
     }
@@ -920,7 +1002,10 @@ following: false,
     // result object would make neither parseable. The deploy is still followed
     // to completion — a caller waiting on the exit code still waits — and the
     // one object printed at the end carries the outcome.
-    const status = await streamBuildLogs(client, deploymentId, { quiet: isJsonMode() });
+    const status = await streamBuildLogs(client, deploymentId, {
+        quiet: isJsonMode(),
+        timeoutMs: resolveDeployTimeout(args["--timeout"])
+    });
     emit(
         () => {},
         { deploymentId,
@@ -930,6 +1015,12 @@ following: true,
 status,
 ...warningPayload(warnings) }
     );
+}
+
+/** `--timeout <seconds>` for a deploy, or the 15-minute default. */
+export function resolveDeployTimeout(value: string | undefined): number {
+    return resolveTimeoutMs(value, { fallbackMs: POLL_TIMEOUT_MS,
+command: "cloud deploy" });
 }
 
 /**
@@ -1013,9 +1104,10 @@ deduplicated: true };
 async function streamBuildLogs(
     client: CloudClient,
     deploymentId: string,
-    opts: { quiet?: boolean } = {}
+    opts: { quiet?: boolean; timeoutMs?: number } = {}
 ): Promise<string> {
     const quiet = opts.quiet === true;
+    const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
     let printed = 0;
     const started = Date.now();
 
@@ -1063,10 +1155,10 @@ async function streamBuildLogs(
             return dep.status;
         }
 
-        if (Date.now() - started > POLL_TIMEOUT_MS) {
+        if (Date.now() - started > timeoutMs) {
             if (!quiet) console.log("");
             fail(
-                "Timed out waiting for the build to finish.",
+                `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the build to finish.`,
                 "The deployment may still be running — check `rebase cloud logs`.",
                 "timeout"
             );

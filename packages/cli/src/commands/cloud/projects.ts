@@ -19,6 +19,7 @@ import {
     projectHost,
     success,
     fail,
+    warn,
     reportError,
     emit,
     note,
@@ -27,6 +28,7 @@ import {
     type CloudClient
 } from "./context";
 import { buildDialPatch } from "./resources";
+import { attachDatabaseRow } from "./databases";
 
 interface ProjectRow {
     id: string | number;
@@ -200,6 +202,23 @@ export const CREATE_PROJECT_FLAGS = {
     "--region": String,
     "--org": String,
     "--link": Boolean,
+    /**
+     * Which database the new project gets — `managed` (the default), `byodb`,
+     * or `none`.
+     *
+     * A default rather than a prompt, and `managed` rather than `none`, because
+     * the state this removes is not a missing convenience: a project with no
+     * database is written `status: "provisioning"` and can never deploy, and
+     * nothing in that word says a second command is owed. Attaching one here
+     * means the two-command sequence that every project needs is one command,
+     * and `--db none` is there for the case that genuinely wants to decide later.
+     *
+     * Distinct from `--db-mode`/`--db-cpu` next to it, which are resource dials
+     * on a database that exists. This is whether there is one.
+     */
+    "--db": String,
+    /** For `--db byodb`. Same spelling as `rebase cloud db create` uses. */
+    "--connection-string": String,
     "-n": "--name",
     // The resource dials, same spelling as `rebase cloud resources set`. Every
     // one is optional: a project that names none takes the platform default.
@@ -279,6 +298,21 @@ message: "Subdomain:" });
     const dials = buildDialPatch(rawArgs, { requireOne: false });
     if (dials.error) fail(dials.error, undefined, "bad_request");
 
+    // Validated before the project row is written, not after: a typo'd `--db`
+    // discovered afterwards leaves a project that exists and cannot deploy —
+    // exactly the state this flag is here to remove.
+    const dbChoice = (args["--db"] ?? "managed").trim().toLowerCase();
+    if (!["managed", "byodb", "none"].includes(dbChoice)) {
+        fail(`--db must be managed, byodb or none (got "${args["--db"]}").`, undefined, "bad_request");
+    }
+    if (dbChoice === "byodb" && !args["--connection-string"]) {
+        fail(
+            "--db byodb needs the database to point at.",
+            `Pass ${chalk.bold("--connection-string <url>")}.`,
+            "input_required"
+        );
+    }
+
     if (!name || !subdomain) {
         fail(
             "Name and subdomain are required.",
@@ -333,6 +367,20 @@ projectName: name,
 orgId: String(org) });
         }
 
+        // Attached in its own try, and reported separately, because the two
+        // halves fail independently. A project that exists with no database is
+        // the state worth naming loudly — reporting the whole command as failed
+        // would hide a project that was in fact created, and reporting it as
+        // succeeded would hide that the project cannot deploy.
+        const database = await attachRequestedDatabase(client, {
+            projectId: String(created.id),
+            choice: dbChoice,
+            connectionString: args["--connection-string"],
+            projectRef: created.subdomain ?? String(created.id)
+        });
+
+        if (database.warning) warn(database.warning[0], database.warning[1]);
+
         success(`Created project ${chalk.bold(name)}`);
         emit(
             () => {
@@ -340,10 +388,12 @@ orgId: String(org) });
                     ["Slug", String(created.subdomain ?? "")],
                     ["URL", host],
                     ["Provider", provider],
-                    ["Branch", gitBranch]
+                    ["Branch", gitBranch],
+                    ["Database", database.line]
                 ]);
                 if (linked) note(chalk.gray("Linked this directory to the new project."));
                 noteBlank();
+                for (const line of database.notes) note(chalk.gray(line));
                 note(chalk.gray(`Deploy it with:  ${chalk.bold(`rebase cloud deploy --project ${created.subdomain ?? created.id}`)}`));
                 noteBlank();
             },
@@ -358,11 +408,83 @@ orgId: String(org) });
                 dials: dials.patch,
                 branch: gitBranch,
                 org: String(org),
-                linked
+                linked,
+                database: database.payload
             }
         );
     } catch (e) {
         reportError(e, "Failed to create project");
+    }
+}
+
+/**
+ * Attach the database `--db` asked for, and describe what happened.
+ *
+ * Never throws. The project already exists by the time this runs, so a failure
+ * here is a *partial* success and has to be reported as one — with the exact
+ * command that finishes the job. Turning it into an exception would report the
+ * whole `projects create` as failed and leave a real project behind, which is
+ * the worst of both readings.
+ */
+async function attachRequestedDatabase(
+    client: CloudClient,
+    input: { projectId: string; choice: string; connectionString?: string; projectRef: string }
+): Promise<{
+    line: string;
+    notes: string[];
+    /** `[message, hint]` — raised through `warn`, so it survives JSON mode. */
+    warning?: [string, string];
+    payload: Record<string, unknown>;
+}> {
+    if (input.choice === "none") {
+        return {
+            line: chalk.yellow("none"),
+            // A note, not a warning: the caller asked for this, and the only
+            // thing owed is the command that undoes it.
+            notes: [
+                "No database attached (--db none). This project cannot deploy until one is:",
+                "  rebase cloud db create --type managed"
+            ],
+            payload: { attached: false,
+type: null,
+reason: "requested_none" }
+        };
+    }
+
+    try {
+        const row = await attachDatabaseRow(client, {
+            projectId: input.projectId,
+            type: input.choice,
+            connectionString: input.connectionString
+        });
+        return {
+            line: input.choice === "managed"
+                ? `managed ${chalk.gray("· created at the first deploy")}`
+                : `byodb ${chalk.gray("· not tested (`rebase cloud db test`)")}`,
+            notes: [],
+            payload: { attached: true,
+id: String(row.id),
+type: input.choice,
+materializedAt: input.choice === "managed" ? "first_deploy" : "now" }
+        };
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return {
+            line: chalk.red("not attached"),
+            notes: [],
+            // A warning, because the caller did NOT ask for this: they now hold
+            // a project that exists and cannot deploy. `warn` writes to stderr
+            // in every output mode, so a piped run still sees it beside the
+            // `database.attached: false` in the payload.
+            warning: [
+                `The project was created, but attaching its ${input.choice} database failed: ${message}`,
+                `Finish it with:  rebase cloud db create --type ${input.choice} --project ${input.projectRef}`
+            ],
+            payload: { attached: false,
+type: input.choice,
+reason: "attach_failed",
+error: message }
+        };
     }
 }
 

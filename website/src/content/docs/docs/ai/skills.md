@@ -1,11 +1,11 @@
 ---
 title: Agent Skills
 sidebar_label: Agent Skills
-description: rebase skills install writes 20 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
+description: rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 ---
 
 An AI assistant that has read Rebase's documentation writes better Rebase code
-than one guessing from the shape of the API. `rebase skills install` copies 20
+than one guessing from the shape of the API. `rebase skills install` copies 21
 Markdown skill files into your repository, in whatever layout your assistant
 expects:
 
@@ -77,7 +77,7 @@ your repo; only files that still exist get rewritten.
 The command also works outside a Rebase project, falling back to the working
 directory — useful for a separate frontend repo that talks to a Rebase backend.
 
-## The 20 skills
+## The 21 skills
 
 | Skill | Covers |
 |---|---|
@@ -99,7 +99,8 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | `rebase-ui-components` | The `@rebasepro/ui` component library |
 | `rebase-design-language` | The UI design language: tokens, color, typography, spacing, anti-patterns |
 | `rebase-studio` | The Studio developer tools layer — SQL, RLS, storage, cron, schema visualizer, logs |
-| `rebase-deployment` | Rebase Cloud, Docker, and self-hosting on AWS, GCP, Hetzner, Railway and Render |
+| `rebase-cloud` | Deploying and operating on Rebase Cloud — projects, managed databases, env vars, domains, logs, rollbacks |
+| `rebase-deployment` | Self-hosting: Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway and Render |
 | `rebase-local-env-setup` | First-time setup: Node.js, pnpm, PostgreSQL, Docker |
 
 Two of these ask to be read unprompted. `rebase-basics` says it should be used
@@ -111,9 +112,9 @@ codebase.
 ## What a run looks like
 
 ```text
-  Found 20 Rebase skills
+  Found 21 Rebase skills
 
-  ✓ Claude Code — 20 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
 ```
 
 Skills ship from the `@rebasepro/agent-skills` package, which the CLI depends on,

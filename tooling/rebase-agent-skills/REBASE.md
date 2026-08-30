@@ -76,7 +76,8 @@ For specific topics, see:
 - `rebase-security` — Backend security architecture, RLS, API keys, threat model
 - `rebase-api` — Auto-generated REST API
 - `rebase-studio` — Visual admin panel, collection editor, custom views
-- `rebase-deployment` — Rebase Cloud, Docker, Firebase Hosting
+- `rebase-cloud` — Rebase Cloud: projects, managed databases, env vars, domains, logs, rollbacks
+- `rebase-deployment` — Self-hosting: Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway, Render
 - `rebase-storage` — File uploads, S3, local storage
 - `rebase-custom-functions` — Custom Hono API routes + frontend invocation via `client.functions.invoke()`
 - `rebase-cron-jobs` — Scheduled background jobs

@@ -1,10 +1,10 @@
 ---
 title: Agent Skills
 sidebar_label: Agent Skills
-description: rebase skills install scrive 20 skill di riferimento di Rebase nel tuo repository, nel formato previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
+description: rebase skills install scrive 21 skill di riferimento di Rebase nel tuo repository, nel formato previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
 ---
 
-Un assistente IA che ha letto la documentazione di Rebase scrive codice Rebase migliore rispetto a uno che cerca di indovinare dalla struttura dell'API. `rebase skills install` copia 20 file di skill Markdown nel tuo repository, nel formato previsto dal tuo assistente:
+Un assistente IA che ha letto la documentazione di Rebase scrive codice Rebase migliore rispetto a uno che cerca di indovinare dalla struttura dell'API. `rebase skills install` copia 21 file di skill Markdown nel tuo repository, nel formato previsto dal tuo assistente:
 
 ```bash
 rebase skills install
@@ -55,7 +55,7 @@ Due conseguenze dell'avverbio "incondizionatamente": le modifiche locali apporta
 
 Il comando funziona anche all'esterno di un progetto Rebase, ricorrendo alla directory di lavoro corrente — utile per un repository frontend separato che comunica con un backend Rebase.
 
-## Le 20 skill
+## Le 21 skill
 
 | Skill | Argomenti trattati |
 |---|---|
@@ -77,7 +77,8 @@ Il comando funziona anche all'esterno di un progetto Rebase, ricorrendo alla dir
 | `rebase-ui-components` | La libreria di componenti `@rebasepro/ui` |
 | `rebase-design-language` | Il design language della UI: token, colori, tipografia, spaziatura, anti-pattern |
 | `rebase-studio` | Il layer degli strumenti per sviluppatori di Studio — SQL, RLS, storage, cron, visualizzatore di schemi, log |
-| `rebase-deployment` | Rebase Cloud, Docker e self-hosting su AWS, GCP, Hetzner, Railway e Render |
+| `rebase-cloud` | Deploy e gestione su Rebase Cloud — progetti, database gestiti, variabili d'ambiente, domini, log, rollback |
+| `rebase-deployment` | Self-hosting: Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway e Render |
 | `rebase-local-env-setup` | Configurazione iniziale dell'ambiente: Node.js, pnpm, PostgreSQL, Docker |
 
 Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifica di dover essere utilizzata ogni volta che un assistente interagisce con Rebase, mentre `rebase-design-language` richiede che un agent la legga prima di creare o modificare qualsiasi interfaccia visiva — quest'ultima esiste perché le UI generate tendono ad allontanarsi da un design system più rapidamente di qualunque altra cosa in un codebase.
@@ -85,9 +86,9 @@ Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifi
 ## Esempio di esecuzione
 
 ```text
-  Found 20 Rebase skills
+  Found 21 Rebase skills
 
-  ✓ Claude Code — 20 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
 ```
 
 Le skill vengono distribuite tramite il pacchetto `@rebasepro/agent-skills`, dal quale dipende la CLI, quindi il set ottenuto corrisponde alla versione della CLI installata.

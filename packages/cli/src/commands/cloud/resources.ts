@@ -92,6 +92,83 @@ export function describeDatabaseState(db: Record<string, unknown> | undefined): 
     return `${type} ${chalk.gray("· not tested (`rebase cloud db test`)")}`;
 }
 
+/* ─── what a project is waiting for ────────────────────────────── */
+
+/**
+ * The one thing standing between this project and a live URL, if anything is.
+ *
+ * `status` alone cannot answer that, and the gap is not cosmetic. A project
+ * created through `projects create` is written `status: "provisioning"` and has
+ * no database until one is attached — so the platform is not provisioning
+ * anything, it is waiting for a second command that nothing in the output names.
+ * "Provisioning" reads as *work in progress*, and the correct response to work
+ * in progress is to wait. So the correct response to this state, for a person
+ * and an agent alike, is the one thing that is guaranteed never to resolve it.
+ *
+ * That cost 43 minutes of polling on a first deploy, and an unattended agent
+ * would still be polling: nothing about the state changes, ever, so there is no
+ * timeout short enough to be wrong and no timeout long enough to be right.
+ *
+ * `blockedOn: null` is therefore load-bearing — it is the CLI saying "waiting is
+ * the correct thing to do here", which is the only condition under which a
+ * caller should poll. Everything else names a command.
+ */
+export interface BlockedState {
+    /** A stable slug, or `null` when the platform genuinely is working. */
+    blockedOn: string | null;
+    /** The exact command that unblocks it. `null` when nothing is blocked. */
+    nextAction: string | null;
+}
+
+/** Deployment states that mean the platform is still doing something. */
+const IN_FLIGHT = new Set(["deploying", "building", "pending", "queued"]);
+
+export function resolveBlockedState(input: {
+    projectStatus?: string | null;
+    /** The project's database row, or undefined when none is attached. */
+    database?: { connectionStatus?: string | null } | undefined;
+    lastDeploy?: { status?: string | null } | undefined;
+}): BlockedState {
+    // First, because it is the state that never resolves itself. A project
+    // with no database cannot deploy, and no amount of waiting attaches one.
+    if (!input.database) {
+        return {
+            blockedOn: "no_database",
+            nextAction: "rebase cloud db create --type managed"
+        };
+    }
+
+    // A deploy in flight is the one case where waiting is right. Said
+    // explicitly rather than by omission, so a caller can tell "nothing to do"
+    // apart from "this CLI has no opinion".
+    if (input.lastDeploy && IN_FLIGHT.has(String(input.lastDeploy.status))) {
+        return { blockedOn: null,
+nextAction: null };
+    }
+
+    if (!input.lastDeploy) {
+        return { blockedOn: "never_deployed",
+nextAction: "rebase cloud deploy" };
+    }
+
+    // A failed deploy is not a wait either: the project stays exactly as it is
+    // until someone reads the log and deploys again.
+    if (input.lastDeploy.status && input.lastDeploy.status !== "success") {
+        return { blockedOn: "last_deploy_failed",
+nextAction: "rebase cloud logs" };
+    }
+
+    // A database that has been attached but never reached — the deploy
+    // succeeded and the app cannot talk to its own store.
+    if (input.database.connectionStatus === "failed") {
+        return { blockedOn: "database_unreachable",
+nextAction: "rebase cloud db test" };
+    }
+
+    return { blockedOn: null,
+nextAction: null };
+}
+
 /**
  * One line describing what engine is serving this project.
  *
@@ -168,6 +245,11 @@ path: projectId })
 
         const storageLine = describeStorageState(storage);
         const databaseLine = describeDatabaseState(db);
+        const blocked = resolveBlockedState({
+            projectStatus: project.status,
+            database: db as { connectionStatus?: string | null } | undefined,
+            lastDeploy: deploy as { status?: string | null } | undefined
+        });
 
         emit(
             () => {
@@ -182,6 +264,14 @@ path: projectId })
                     ["Database", databaseLine],
                     ["Storage", storageLine]
                 ]);
+                // The same fact the JSON carries, in the place a person reads.
+                // Below the rows rather than inside them: it is not another
+                // property of the project, it is what to do next.
+                if (blocked.blockedOn) {
+                    console.log("");
+                    console.log(`  ${chalk.yellow("Waiting on you")} ${chalk.gray(`— ${blocked.blockedOn}`)}`);
+                    console.log(`  ${chalk.bold(blocked.nextAction ?? "")}`);
+                }
                 console.log("");
             },
             {
@@ -189,6 +279,11 @@ path: projectId })
                 name: project.name ?? null,
                 subdomain: project.subdomain ?? null,
                 status: project.status ?? null,
+                // Siblings of `status` on purpose: a caller reading `status`
+                // has to read these to know what it means. `blockedOn: null` is
+                // the only value under which polling `status` is correct.
+                blockedOn: blocked.blockedOn,
+                nextAction: blocked.nextAction,
                 url: projectHost(project, baseDomain) ?? null,
                 branch: project.gitBranch ?? null,
                 lastDeploy: deploy ? { id: String(deploy.id),
@@ -773,12 +868,46 @@ export async function clustersCommand(action: string | undefined, rawArgs: strin
  * answered by a customer's first deploy failing halfway through provisioning,
  * with an error they cannot act on and half a tenant already created.
  */
+/**
+ * Which cluster `clusters verify` was asked about, and whether `--baseline`
+ * was given.
+ *
+ * Resolved against a real spec, not scanned out of `rawArgs` by hand — and this
+ * is not a tidy-up. `rawArgs` is the whole `process.argv`, so the old scan
+ * ("the first token that is not `--…` and is neither `clusters` nor `verify`")
+ * matched `argv[0]`, the **node binary path**. Every `rebase cloud clusters
+ * verify <id>` therefore asked the control plane about a cluster called
+ * `/usr/local/bin/node`, and came back 404.
+ *
+ * So the one diagnostic that reports `permissions.allowed` /
+ * `permissions.denied` was unreachable, and its 404 read as "this command is
+ * not deployed yet" rather than "the id never left this machine intact". It is
+ * the command that names a missing `cronjobs.batch` grant in a single call
+ * instead of a twenty-minute A/B against a live project.
+ *
+ * Same failure as `cloud deploy` reading `_[0]` as `"cloud"`, and the same fix:
+ * one parser, exported so its test drives the real thing rather than a copy.
+ */
+export function resolveClusterVerifyArgs(rawArgs: string[]): { id?: string; baseline: boolean } {
+    const { flags, positionals } = parseCloudArgs({
+        spec: { "--baseline": Boolean },
+        rawArgs,
+        commandWords: 2, // cloud clusters — `verify` is the action positional
+        command: "cloud clusters verify",
+        maxPositionals: 2
+    });
+    return { id: positionals[1],
+baseline: flags["--baseline"] === true };
+}
+
 async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
-    const { client } = await requireClient(rawArgs);
-    const id = rawArgs.find((a) => !a.startsWith("--") && a !== "clusters" && a !== "verify");
+    const { id, baseline: withBaseline } = resolveClusterVerifyArgs(rawArgs);
     if (!id) fail("Usage: rebase cloud clusters verify <cluster-id> [--baseline]", undefined, "bad_request");
 
-    const withBaseline = rawArgs.includes("--baseline");
+    // Parsed before authenticating: a usage error is answerable without a
+    // session, and asking for one first turns "you forgot the id" into "log in".
+    const { client } = await requireClient(rawArgs);
+
     let report: {
         reachable: boolean; version?: string; unreachableReason?: string;
         permissions: { allowed: string[]; denied: { permission: string; consequence: string }[];
@@ -788,7 +917,10 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
     try {
         report = await client.functions.invoke("cluster-baseline", undefined, {
             method: "GET",
-            path: `verify/${id}${withBaseline ? "?baseline=1" : ""}`
+            // Encoded: the id is user input landing in a URL path, and `path`
+            // is appended verbatim by the SDK (only the *function name* is
+            // encoded for it).
+            path: `verify/${encodeURIComponent(id)}${withBaseline ? "?baseline=1" : ""}`
         }) as never;
     } catch (error: unknown) {
         reportError(error, "Could not verify the cluster");

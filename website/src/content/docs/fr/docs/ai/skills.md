@@ -1,7 +1,7 @@
 ---
 title: Compétences d'agent (Agent Skills)
 sidebar_label: Agent Skills
-description: rebase skills install écrit 20 compétences de référence Rebase dans votre dépôt, dans la structure attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
+description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, dans la structure attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
 ---
 
 Un assistant IA qui a lu la documentation de Rebase écrit un meilleur code Rebase
@@ -77,7 +77,7 @@ votre dépôt ; seuls les fichiers qui existent encore sont réécrits.
 La commande fonctionne également en dehors d'un projet Rebase, en se rabattant sur le répertoire
 de travail — ce qui est utile pour un dépôt frontend séparé communiquant avec un backend Rebase.
 
-## Les 20 compétences
+## Les 21 compétences
 
 | Compétence | Couvre |
 |---|---|
@@ -99,7 +99,8 @@ de travail — ce qui est utile pour un dépôt frontend séparé communiquant a
 | `rebase-ui-components` | La bibliothèque de composants `@rebasepro/ui` |
 | `rebase-design-language` | Le langage de conception d'interface utilisateur : tokens, couleur, typographie, espacement, anti-patterns |
 | `rebase-studio` | La couche d'outils de développement Studio — SQL, RLS, stockage, cron, visualiseur de schéma, journaux |
-| `rebase-deployment` | Rebase Cloud, Docker et auto-hébergement sur AWS, GCP, Hetzner, Railway et Render |
+| `rebase-cloud` | Déploiement et exploitation sur Rebase Cloud — projets, bases de données gérées, variables d'environnement, domaines, journaux, rollbacks |
+| `rebase-deployment` | Auto-hébergement : Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway et Render |
 | `rebase-local-env-setup` | Première configuration : Node.js, pnpm, PostgreSQL, Docker |
 
 Deux d'entre elles demandent à être lues spontanément. `rebase-basics` indique qu'elle doit être utilisée
@@ -111,9 +112,9 @@ codebase.
 ## À quoi ressemble une exécution
 
 ```text
-  Found 20 Rebase skills
+  Found 21 Rebase skills
 
-  ✓ Claude Code — 20 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
 ```
 
 Les compétences sont fournies par le paquet `@rebasepro/agent-skills`, dont dépend le CLI,

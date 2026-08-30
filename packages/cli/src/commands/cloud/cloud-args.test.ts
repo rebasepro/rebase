@@ -49,7 +49,7 @@ import { resolveDomainArg } from "./domains";
 import { resolveExtensionArgs } from "./extensions";
 import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
-import { resolveWebhookIdArg, webhooksCommand } from "./resources";
+import { resolveWebhookIdArg, webhooksCommand, resolveClusterVerifyArgs } from "./resources";
 import { resolveProjectArg } from "./projects";
 import { resolveDeployArgs } from "./deploy";
 
@@ -335,6 +335,15 @@ describe("cloud deploy", () => {
         expect(flags["--url"]).toBe("http://localhost:3000");
     });
 
+    it("takes --wait and --timeout", () => {
+        // Both are new, and both are in the skill and the help page. A strict
+        // parser that did not declare them would refuse the exact lines the
+        // documentation tells an agent to run.
+        const { flags } = resolveDeployArgs(argv("deploy", "--wait", "--timeout", "300"));
+        expect(flags["--wait"]).toBe(true);
+        expect(flags["--timeout"]).toBe("300");
+    });
+
     it("refuses an undeclared flag rather than deploying an app named after it", async () => {
         const err = await refusalOf(() => resolveDeployArgs(argv("deploy", "--bundel")));
         expect(err.code).toBe("usage");
@@ -396,5 +405,52 @@ pendingRedeploy: true }));
 
         expect(del).toHaveBeenCalledTimes(1);
         expect(del.mock.calls[0][0]).toBe("42");
+    });
+});
+
+/**
+ * `rebase cloud clusters verify <id>` — the id has to survive the parse.
+ *
+ * It did not. The handler picked its id with
+ *
+ *   rawArgs.find(a => !a.startsWith("--") && a !== "clusters" && a !== "verify")
+ *
+ * and `rawArgs` is the whole `process.argv`, so the first match was **`argv[0]`,
+ * the node binary path**. Every invocation asked the control plane about a
+ * cluster called `/usr/bin/node`, got 404, and the 404 read as "this diagnostic
+ * is not deployed yet". It is the one command that reports
+ * `permissions.allowed` / `permissions.denied` — which is what names a missing
+ * RBAC grant in a single call, rather than by A/B-ing a live project for twenty
+ * minutes.
+ *
+ * The first assertion is the regression, and no fixture can paper over it: the
+ * old resolver returned a path, not a name.
+ */
+describe("cloud clusters verify", () => {
+    it("reads the id from the line, not from argv[0]", () => {
+        expect(resolveClusterVerifyArgs(argv("clusters", "verify", "gke-eu")).id).toBe("gke-eu");
+    });
+
+    it("is unshifted by --baseline, wherever it sits", () => {
+        expect(resolveClusterVerifyArgs(argv("clusters", "verify", "gke-eu", "--baseline")))
+            .toEqual({ id: "gke-eu",
+baseline: true });
+        expect(resolveClusterVerifyArgs(argv("clusters", "--baseline", "verify", "gke-eu")))
+            .toEqual({ id: "gke-eu",
+baseline: true });
+    });
+
+    it("reads no id from a declared flag's value", () => {
+        // The `--project acme` trap: a plain word in argument position.
+        expect(resolveClusterVerifyArgs(argv("clusters", "verify", "-p", "acme")).id).toBeUndefined();
+    });
+
+    it("names no id when the line names none", () => {
+        expect(resolveClusterVerifyArgs(argv("clusters", "verify")).id).toBeUndefined();
+    });
+
+    it("refuses an undeclared flag rather than verifying a cluster named after it", async () => {
+        const err = await refusalOf(() => resolveClusterVerifyArgs(argv("clusters", "verify", "--baselin")));
+        expect(err.code).toBe("usage");
     });
 });

@@ -177,6 +177,20 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
+    // A second line of defence, and not a redundant one. `rebase db` answers
+    // `--help` before it ever spawns this file, but this file is also its own
+    // CLI — the driver is spawned directly by `resolvePluginCliScript`, and is
+    // executable on its own — so a `--help` reaching here means nobody upstream
+    // caught it. Only `branch` had a case for it; `push`, `migrate` and
+    // `restore` all took `--help` as an ordinary flag and did the work.
+    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+        out("");
+        out(chalk.bold(`  rebase db ${subcommand}`));
+        out(chalk.gray("  Run `rebase db --help` for the full page — this is the driver's own entry point."));
+        out("");
+        return;
+    }
+
     if (subcommand === "branch") {
         await branchCommand(rawArgs);
         return;

@@ -1,11 +1,11 @@
 ---
 title: Agent Skills
 sidebar_label: Agent Skills
-description: O comando rebase skills install grava 20 skills de referência do Rebase no seu repositório, no layout esperado pelo seu assistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
+description: O comando rebase skills install grava 21 skills de referência do Rebase no seu repositório, no layout esperado pelo seu assistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
 ---
 
 Um assistente de IA que leu a documentação do Rebase escreve um código Rebase melhor
-do que um que tenta adivinhar com base no formato da API. O comando `rebase skills install` copia 20
+do que um que tenta adivinhar com base no formato da API. O comando `rebase skills install` copia 21
 arquivos de skill em Markdown para o seu repositório, no layout que o seu assistente
 espera:
 
@@ -77,7 +77,7 @@ seu repositório; apenas os arquivos que ainda existem são reescritos.
 O comando também funciona fora de um projeto Rebase, usando o diretório de trabalho
 como fallback — útil para um repositório de frontend separado que se comunica com um backend Rebase.
 
-## As 20 skills
+## As 21 skills
 
 | Skill | O que aborda |
 |---|---|
@@ -99,7 +99,8 @@ como fallback — útil para um repositório de frontend separado que se comunic
 | `rebase-ui-components` | A biblioteca de componentes `@rebasepro/ui` |
 | `rebase-design-language` | A linguagem de design da UI: tokens, cores, tipografia, espaçamento, anti-padrões |
 | `rebase-studio` | A camada de ferramentas para desenvolvedores do Studio — SQL, RLS, storage, cron, visualizador de schema, logs |
-| `rebase-deployment` | Rebase Cloud, Docker e auto-hospedagem na AWS, GCP, Hetzner, Railway e Render |
+| `rebase-cloud` | Deploy e operação no Rebase Cloud — projetos, bancos de dados gerenciados, variáveis de ambiente, domínios, logs, rollbacks |
+| `rebase-deployment` | Auto-hospedagem: Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway e Render |
 | `rebase-local-env-setup` | Configuração inicial do ambiente: Node.js, pnpm, PostgreSQL, Docker |
 
 Duas delas solicitam leitura automática (unprompted). O `rebase-basics` indica que deve ser usado
@@ -111,9 +112,9 @@ base de código.
 ## Como é uma execução
 
 ```text
-  Found 20 Rebase skills
+  Found 21 Rebase skills
 
-  ✓ Claude Code — 20 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
 ```
 
 As skills são distribuídas a partir do pacote `@rebasepro/agent-skills`, do qual a CLI depende,

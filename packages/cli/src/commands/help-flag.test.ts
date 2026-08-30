@@ -40,13 +40,33 @@ vi.mock("../utils/project", async importOriginal => {
             SERVICE_KEY: "svc_test",
             REBASE_BASE_URL: "http://127.0.0.1:9"
         }),
-        resolveTsx: () => "/bin/true"
+        resolveTsx: () => "/bin/true",
+        // Enough for `db push` to reach the child process, so the assertion
+        // below is "the spawn did not happen" rather than "the command failed
+        // earlier for an unrelated reason".
+        getActiveBackendPlugin: () => "@rebasepro/server-postgres",
+        resolvePluginCliScript: () => "/tmp/rebase-test-plugin-cli.js"
     };
 });
+
+// The two doors out of `rebase db <action>`: resolving (and starting) a
+// database, and spawning the driver. Both are watched, because `--help` must
+// go through neither.
+vi.mock("execa", () => ({ execa: vi.fn(async () => ({ exitCode: 0 })) }));
+vi.mock("../dev-db/prepare", () => ({
+    prepareDatabaseEnv: vi.fn(async () => ({ env: {} })),
+    managedNotices: () => []
+}));
 
 import { apiKeysCommand } from "./api-keys";
 import { authCommand } from "./auth";
 import { skillsCommand } from "./skills";
+import { dbCommand } from "./db";
+import { execa } from "execa";
+import { prepareDatabaseEnv } from "../dev-db/prepare";
+
+const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
+const prepareSpy = prepareDatabaseEnv as unknown as ReturnType<typeof vi.fn>;
 
 /** A full `process.argv`, the way `cli.ts` hands it to a command. */
 function argv(...line: string[]): string[] {
@@ -120,5 +140,39 @@ describe("--help never runs the command", () => {
 
         expect(fetchSpy).not.toHaveBeenCalled();
         expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The worst of the set, and the one still shipping at 0.17.0.
+     *
+     * `cli.ts` rewrites the subcommand to `"--help"` only when the user named
+     * none, so `rebase db --help` printed a page and `rebase db push --help`
+     * did not: the flag travelled through `runDriverDbCommand`, which resolves
+     * — and will START — the development database, and then handed the whole
+     * line to the driver, whose dispatch has no `--help` case for `push`. It
+     * applied the schema. A help flag that mutates a database is a different
+     * order of problem from one that prints the wrong page.
+     *
+     * Asserted as "nothing ran": no child process, no database resolution, no
+     * exit. `execa` and `prepare` are the two doors out of this command and
+     * both are watched, so a future refactor that reintroduces the path fails
+     * here rather than on someone's database.
+     */
+    it.each([["push"], ["migrate"], ["generate"], ["restore"], ["backup"]])(
+        "rebase db %s --help touches no database",
+        async (action) => {
+            await dbCommand(action, argv("db", action, "--help"));
+
+            expect(execaSpy).not.toHaveBeenCalled();
+            expect(prepareSpy).not.toHaveBeenCalled();
+            expect(exitSpy).not.toHaveBeenCalled();
+        }
+    );
+
+    it("still runs the command without the flag", async () => {
+        // The guard must not swallow real invocations: a `--help` check that
+        // matched too eagerly would disable `db push` instead of fixing help.
+        await dbCommand("push", argv("db", "push"));
+        expect(execaSpy).toHaveBeenCalled();
     });
 });

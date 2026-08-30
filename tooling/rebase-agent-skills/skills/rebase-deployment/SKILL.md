@@ -23,59 +23,27 @@ Rebase supports multiple deployment strategies — from fully managed Rebase Clo
 
 ## Rebase Cloud
 
-The simplest deployment path. Sign up at [app.rebase.pro](https://app.rebase.pro).
+The simplest deployment path — a managed project at
+`https://<subdomain>.rebase.website`, with a managed PostgreSQL database, TLS,
+custom domains and rollbacks. Sign up at
+[app.rebase.pro](https://app.rebase.pro).
 
 ```bash
-# 1. Authenticate
 rebase cloud login
-
-# 2. Initialize (if new project)
-rebase init
-
-# 3. Link this directory to a cloud project
-rebase cloud link
-
-# 4. Deploy
+rebase cloud projects create --name "My App" --subdomain my-app --link
 rebase cloud deploy
-
-# Deploy and label the release
-rebase cloud deploy --message "add search to posts"
 ```
 
-<!-- docs-verify: ignore -->
-> Every cloud command lives under the `cloud` namespace — there is no bare
-> `rebase deploy` or `rebase login`, and a mistyped one exits 1. Run
-> `rebase cloud --help` for the full list.
+> **📖 Use the `rebase-cloud` skill for anything hosted.** It carries the first-deploy
+> sequence, what a managed database actually is and when it comes into
+> existence, `blockedOn`/`nextAction`, build-time vs run-time variables,
+> extensions on a shared pool, domains, logs, rollbacks, and how to tell a
+> platform failure from a project one. This section is a pointer on purpose:
+> two copies of that material would drift, and the version an agent reads
+> decides whether a deploy takes four minutes or forty.
 
-### What a Cloud Deployment Serves
-
-`rebase cloud deploy` ships **one container** per project, served at `https://<project>.rebase.website`. That container runs your backend, which handles:
-
-- **`/api/*`** — the data API, auth, realtime, storage
-- **everything else** — your built `frontend/` as a static SPA (via `serveSPA()`, see below)
-
-There is **no separate admin URL** — the admin panel is part of your frontend, so where it appears depends on what your frontend is:
-
-| Project type | What the root URL shows | Where the admin is |
-|--------------|------------------------|--------------------|
-| Default scaffold (`rebase init`) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
-| Custom product frontend | Your product app | Wherever you mount it — commonly `/admin` (see below) |
-| Backend-only (`rebase init --headless`) | Nothing (API only) | Not deployed |
-
-> **IMPORTANT FOR AGENTS:** On the **first visit** to a freshly deployed project's admin, Rebase shows the bootstrap screen ("Create your admin account"). The earliest-registered account receives admin privileges — the project owner should claim it immediately after deploying. Never fill this form on the user's behalf.
-
-**Mounting the admin at `/admin` alongside a product app** — a single Vite entry can serve both, split by URL, so visitors never download the admin bundle:
-
-```tsx
-// frontend/src/main.tsx
-const isAdmin = window.location.pathname.startsWith("/admin");
-const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" .../>
-
-// route "/admin/*" → AdminApp, everything else → ProductApp
-```
-
-Set **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — not both, or the prefix is applied twice.
+Everything below this line is for **self-hosting** — Docker, Kubernetes, and
+running the image yourself on a cloud provider.
 
 ---
 
@@ -564,6 +532,22 @@ if (isProduction) {
 ```
 
 > **IMPORTANT FOR AGENTS:** Call `serveSPA()` **after** `initializeRebaseBackend()` and after mounting the `/health` endpoint. The SPA catch-all route (`*`) must be the last route registered to avoid intercepting API or health check requests.
+
+### Serving a product app and the admin from one frontend
+
+A single Vite entry can serve both, split by URL, so visitors never download the
+admin bundle:
+
+```tsx no-verify
+// frontend/src/main.tsx
+const isAdmin = window.location.pathname.startsWith("/admin");
+const ProductApp = lazy(() => import("./App"));
+const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" .../>
+
+// route "/admin/*" → AdminApp, everything else → ProductApp
+```
+
+Set **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — not both, or the prefix is applied twice.
 
 ---
 
