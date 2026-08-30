@@ -107,6 +107,22 @@ export function unpackedBundleSource(destination: string): string | null {
     }
 }
 
+/**
+ * A bundle directory worth falling back to, or undefined.
+ *
+ * "Worth" means it has a manifest — the same test the entrypoint and
+ * `loadBundle` use for "there is a bundle here". A path that points at an empty
+ * or half-unpacked directory is not a fallback, it is a second failure.
+ *
+ * Extracted so the decision can be tested: the code path that uses it only runs
+ * when a download has already failed, which is not a state a boot test can
+ * reach without a database.
+ */
+export function usableBundleFallback(dir: string | undefined): string | undefined {
+    if (!dir) return undefined;
+    return fs.existsSync(path.join(dir, "manifest.json")) ? dir : undefined;
+}
+
 export interface FetchBundleOptions {
     url: string;
     token?: string;
