@@ -158,12 +158,12 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
     if (result.empty) {
         fs.rmSync(file);
         out(chalk.gray(
-            `  ✓ Dropped ${newest} — it planned nothing but the removal of the search column,\n` +
-            "    which Atlas cannot see and Rebase applies itself."
+            `  ✓ Dropped ${newest} — it planned nothing but the removal of columns\n` +
+            "    Atlas cannot see and Rebase applies itself."
         ));
     } else {
         fs.writeFileSync(file, result.sql, "utf-8");
-        out(chalk.gray(`  ✓ Kept the search column out of ${newest} (${result.removed.length} statement(s))`));
+        out(chalk.gray(`  ✓ Kept Rebase's own columns out of ${newest} (${result.removed.length} statement(s))`));
     }
 
     await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
