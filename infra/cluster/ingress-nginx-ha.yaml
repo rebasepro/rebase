@@ -1,0 +1,67 @@
+# Ingress-nginx high availability for the managed fleet.
+#
+# ## Why this file exists
+#
+# The controller was ONE replica with no PodDisruptionBudget on a GKE Autopilot
+# cluster, where Google's autoscaler decides when to evict a pod. Nothing stopped
+# it evicting the only ingress, and while it rescheduled every tenant returned
+# CONNECTION_REFUSED regardless of its own pods being healthy — the ingress is in
+# front of all of them.
+#
+# That is not a hypothetical: on 2026-08-29 the autoscaler consolidated a node,
+# evicted an ingress pod, and the uptime check on app.rebase.pro fell to 0.861.
+# It was partial rather than total only because a second replica had been added
+# hours earlier.
+#
+# ## Why a PDB is the actual fix, not the replica count
+#
+# `externalTrafficPolicy: Local` means the load balancer forwards only to nodes
+# running an ingress pod, so a pod moving nodes requires the LB's host list to be
+# reconciled. On that date the reconcile lagged the move by ~30 minutes, and
+# traffic to the stale node black-holed for the whole window. Replicas alone do
+# not prevent that; what prevents the *outage* is never dropping to zero healthy
+# backends, which is what `minAvailable: 1` guarantees against every voluntary
+# disruption — autoscaler consolidation, node upgrade, drain.
+#
+# A PDB does NOT cover involuntary disruption. A node hard-failing takes whatever
+# is on it, which is why the topology spread below matters: without it both
+# replicas can be scheduled onto one node and share its fate.
+#
+# ## Applying this to a live cluster, in this order
+#
+# The controller ships `maxUnavailable: 1`. Against ONE replica that is 100%, so
+# changing the pod template before scaling up takes the ingress to zero and every
+# tenant with it. Scale first, then the budget, then the strategy — none of those
+# three touch the pod template, so nothing restarts:
+#
+#   kubectl scale deploy ingress-nginx-controller -n ingress-nginx --replicas=2
+#   kubectl apply -f infra/cluster/ingress-nginx-ha.yaml
+#   kubectl patch deploy ingress-nginx-controller -n ingress-nginx \
+#     -p '{"spec":{"strategy":{"rollingUpdate":{"maxUnavailable":0,"maxSurge":1}}}}'
+#
+# Only then the spread constraint, which DOES change the template and therefore
+# rolls the controller — safe once two replicas, a budget and maxUnavailable 0
+# are in place, and unsafe before:
+#
+#   kubectl patch deploy ingress-nginx-controller -n ingress-nginx \
+#     --type=strategic -p "$(cat infra/cluster/ingress-nginx-spread.yaml)"
+#
+# The controller itself is applied from the upstream ingress-nginx manifests and
+# is not managed by Helm here, so nothing reconciles this file automatically. It
+# is the record of what a rebuilt cluster needs, and the thing to re-apply after
+# an upstream controller upgrade, which will not carry it.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: controller
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: ingress-nginx
