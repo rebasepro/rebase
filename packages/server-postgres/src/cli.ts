@@ -16,7 +16,6 @@ import {
     applySearchDdl,
     getSearchExcludes,
     readSearchDdl,
-    seedDevDatabaseSearchHelpers,
     getTableExcludes,
     getForeignIndexExcludes,
     ExcludeIntrospectionError,
@@ -26,6 +25,8 @@ import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
+import { stripCarvedOutStatements } from "./schema/carved-out-migration";
+import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +91,73 @@ function listMigrationFiles(): string[] {
     return fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
 }
 
+/**
+ * Take Atlas's carve-outs back out of the migration `migrate diff` just wrote.
+ *
+ * The apply path hands Atlas `--exclude` and it never sees the search column.
+ * The diff path has no such flag — `atlas migrate diff` rejects `--exclude`
+ * outright, and an `atlas.hcl` `env` block's `exclude` is accepted and then
+ * ignored — so Atlas replays the migration directory (which builds the column,
+ * because the search DDL is appended to migrations), does not find the column
+ * in `schema.sql`, and plans `DROP COLUMN`. Applied, that would take search
+ * away from every database the migration reaches.
+ *
+ * Returns whether a migration Atlas just wrote is still there afterwards: a
+ * file whose only content was the spurious drop is deleted, because an empty
+ * migration is worse than none — it takes a slot in the revision history and
+ * the caller would append the search DDL and the policies to it.
+ *
+ * @returns true when a new migration survives and may be appended to.
+ */
+async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promise<boolean> {
+    const patterns = await getSearchExcludes(collectionsPath);
+    if (patterns.length === 0) return true;
+
+    const newest = listMigrationFiles().at(-1);
+    if (!newest) return false;
+    const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
+
+    const result = stripCarvedOutStatements(fs.readFileSync(file, "utf-8"), patterns);
+
+    // Fail CLOSED, and loudly. A drop this could not rewrite stays in the file
+    // exactly as Atlas wrote it, and the file is one somebody applies next week
+    // — by which time the column is gone and nothing connects it to this run.
+    // The destructive gate does not cover it either: that reads the *push*
+    // plan. So `db generate` stops here rather than hand back a migration that
+    // destroys a column the developer never asked to lose.
+    if (result.unhandled.length > 0) {
+        outError(chalk.red(
+            `\n  ✗ ${newest} drops an object Rebase manages outside Atlas, in a form the CLI`
+        ));
+        outError(chalk.red("    could not remove:"));
+        for (const statement of result.unhandled) {
+            outError(chalk.gray(`       ${statement.replace(/\s+/g, " ")}`));
+        }
+        outError(chalk.gray(
+            "    Left as Atlas wrote it. Delete those statements by hand before running\n" +
+            "    `rebase db migrate` — and please report them: rewriting this is meant to\n" +
+            "    be automatic."
+        ));
+        process.exit(1);
+    }
+
+    if (result.removed.length === 0) return true;
+
+    if (result.empty) {
+        fs.rmSync(file);
+        out(chalk.gray(
+            `  ✓ Dropped ${newest} — it planned nothing but the removal of the search column,\n` +
+            "    which Atlas cannot see and Rebase applies itself."
+        ));
+    } else {
+        fs.writeFileSync(file, result.sql, "utf-8");
+        out(chalk.gray(`  ✓ Kept the search column out of ${newest} (${result.removed.length} statement(s))`));
+    }
+
+    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
+    return !result.empty;
+}
+
 async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const VALID_ACTIONS = ["push", "generate", "migrate", "branch", "backup", "restore", "backups"];
     if (!subcommand || !VALID_ACTIONS.includes(subcommand)) {
@@ -138,12 +206,27 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", "file://drizzle/schema.sql"], collectionsPath);
-        const wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
+        // The diff cannot be told to ignore the carved-out objects the way the
+        // apply can, so the drop it plans for them is taken back out of the
+        // file it just wrote. A migration that was nothing else is deleted.
+        let wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
+        if (wroteNewMigration) {
+            wroteNewMigration = await stripCarvedOutFromNewestMigration(collectionsPath);
+        }
         
-        // Post-process the newest migration file
+        // Post-process the migration Atlas just wrote.
+        //
+        // `wroteNewMigration` gates the whole block, and that gate is the point.
+        // "The newest migration file" is only Atlas's when Atlas wrote one;
+        // otherwise it is a migration that has already run in production, and
+        // appending to it changes a hash Atlas has recorded while the appended
+        // SQL never runs anywhere. The search half already said so and checked;
+        // the `CREATE SCHEMA` rewrite and the policy append did not, so every
+        // `db generate` that found nothing to diff still grew the last
+        // migration by another copy of the policies.
         try {
             const migrationsDir = path.resolve(process.cwd(), "drizzle", "migrations");
-            if (fs.existsSync(migrationsDir)) {
+            if (fs.existsSync(migrationsDir) && wroteNewMigration) {
                 const files = fs.readdirSync(migrationsDir);
                 const sqlFiles = files
                     .filter(f => f.endsWith(".sql"))
@@ -165,25 +248,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // that makes search work. Appending, because these are
                     // `ALTER TABLE ... ADD COLUMN` over the tables the
                     // migration just created.
-                    //
-                    // Only into a migration Atlas just wrote. The file picked
-                    // here is simply the newest one, which when there was no
-                    // diff is a migration that has already run in production:
-                    // editing it changes a hash Atlas has recorded, and the
-                    // appended SQL would never be applied anywhere.
                     const searchContent = readSearchDdl();
-                    if (searchContent && wroteNewMigration) {
+                    if (searchContent) {
                         migrationContent = `${migrationContent}\n\n${searchContent}`;
                         out(chalk.gray("  ✓ Appended search DDL to the migration"));
-                    } else if (searchContent) {
-                        // Reachable whenever a `search` block is the *only*
-                        // thing that changed: Atlas cannot see one, so it finds
-                        // nothing to diff and writes no file.
-                        out(chalk.gray(
-                            "  ℹ Search DDL not written to a migration — this change produced none.\n" +
-                            "    It is applied by `rebase db push`, and at boot by the schema ensure.\n" +
-                            "    For a migration-only deployment, add drizzle/search.sql to a migration by hand."
-                        ));
                     }
 
                     fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
@@ -207,6 +275,19 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             }
         } catch (err) {
             outWarn(chalk.yellow(`  ⚠️  Failed to append policies or re-hash migration: ${err instanceof Error ? err.message : String(err)}`));
+        }
+
+        if (!wroteNewMigration) {
+            // Reachable whenever the only thing that changed is something Atlas
+            // cannot see — a `search` block, or a `securityRules` edit. There is
+            // no new file to carry it, and the previous migration must not be
+            // reopened: it has already run wherever this project is deployed.
+            out(chalk.gray(
+                "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
+                "    Search DDL and RLS policies are applied by `rebase db push`, and at boot by\n" +
+                "    the schema ensure. For a migration-only deployment, add drizzle/search.sql\n" +
+                "    and drizzle/policies.sql to a migration by hand."
+            ));
         }
 
         out("");
@@ -812,9 +893,6 @@ async function runAtlas(
 
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
     await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);
-    if (collectionsPath) {
-        await seedDevDatabaseSearchHelpers(devDatabaseUrl, collectionsPath);
-    }
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
     // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
@@ -822,43 +900,26 @@ async function runAtlas(
     const atlasUrl = forLibpq(databaseUrl);
     const atlasDevUrl = forLibpq(devDatabaseUrl);
 
-    const atlasArgs = [domain, ...args];
+    // Everything Atlas must keep its hands off, in one list.
+    //
+    // Gathered only for the invocations that accept the flag — which is
+    // `schema apply` and nothing else. `atlas migrate diff` rejects
+    // `--exclude` outright with `unknown flag`, and passing it there took
+    // `rebase db generate` down for every project declaring a `search` block;
+    // the diff keeps the same objects out of the migration afterwards instead,
+    // with `stripCarvedOutStatements`. See `acceptsExcludeFlag`.
+    const excludes: string[] = [];
+    if (collectionsPath && acceptsExcludeFlag(domain, args)) {
+        // Search objects are Rebase's, not Atlas's: the desired state does not
+        // carry them, so an apply left to itself would drop them.
+        excludes.push(...await getSearchExcludes(collectionsPath));
 
-    if (domain === "schema") {
-        if (args.includes("apply")) {
-            atlasArgs.push("--url", atlasUrl, "--dev-url", atlasDevUrl);
-        } else if (args.includes("clean") || args.includes("inspect")) {
-            atlasArgs.push("--url", atlasUrl);
-        }
-    } else if (domain === "migrate") {
-        if (args.includes("diff")) {
-            atlasArgs.push("--dev-url", atlasDevUrl);
-        } else if (args.includes("apply") || args.includes("status")) {
-            atlasArgs.push("--url", atlasUrl, "--revisions-schema", "rebase");
-            if (args.includes("apply")) {
-                atlasArgs.push("--allow-dirty");
-            }
-        }
-    }
-
-    // Search objects are Rebase's, not Atlas's — on both paths. `schema apply`
-    // would drop them as absent from the desired state; `migrate diff` would
-    // write that same drop into the next migration file, where it would sit
-    // waiting to be applied later.
-    if (collectionsPath && (args.includes("apply") || args.includes("diff"))) {
-        for (const exc of await getSearchExcludes(collectionsPath)) {
-            atlasArgs.push("--exclude", exc);
-        }
-    }
-
-    if (domain === "schema" && args.includes("apply") && collectionsPath) {
         // Fail CLOSED: the exclude list is the only thing shielding
         // non-collection tables from the auto-approved apply. If we can't
         // introspect the database to build it, abort rather than proceed with
         // a partial list that would let Atlas drop unmanaged tables.
-        let excludes: string[];
         try {
-            excludes = await getTableExcludes(databaseUrl, collectionsPath);
+            excludes.push(...await getTableExcludes(databaseUrl, collectionsPath));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
                 outError(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
@@ -870,16 +931,12 @@ async function runAtlas(
             }
             throw err;
         }
-        for (const exc of excludes) {
-            atlasArgs.push("--exclude", exc);
-        }
 
         // And the indexes on those tables that Rebase did not create. Same
         // fail-closed contract as the table list above, for the same reason: a
         // partial answer here silently drops somebody's index.
-        let indexExcludes: string[];
         try {
-            indexExcludes = await getForeignIndexExcludes(databaseUrl, collectionsPath);
+            excludes.push(...await getForeignIndexExcludes(databaseUrl, collectionsPath));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
                 outError(chalk.red("\n✗ Aborting push: could not determine which indexes to protect."));
@@ -891,10 +948,9 @@ async function runAtlas(
             }
             throw err;
         }
-        for (const exc of indexExcludes) {
-            atlasArgs.push("--exclude", exc);
-        }
     }
+
+    const atlasArgs = buildAtlasArgs({ domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes });
 
     // Stream stdout live but tee stderr so we can inspect Atlas's error text
     // for known, actionable failure modes (e.g. a dependency-drop that leaves

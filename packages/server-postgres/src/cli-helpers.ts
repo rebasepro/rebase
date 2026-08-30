@@ -264,45 +264,6 @@ export async function getSearchExcludes(collectionsPath: string): Promise<string
 }
 
 /**
- * Give the dev database the search helper functions before Atlas plans.
- *
- * Excluding the search column keeps Atlas from *diffing* it, but not from
- * materialising the inspected schema — column and all — in the dev database to
- * analyse the plan against. That replay is where a push against an
- * already-searchable database died with `function public.rebase_search_text
- * (jsonb) does not exist`: the column came across, the function it calls did
- * not, because Atlas will not carry a function at all.
- *
- * Only the extensions and functions, never the tables: the dev database holds
- * whatever Atlas puts there and nothing of ours.
- *
- * Best-effort by design. Failing here would block a push for a project whose
- * collections merely failed to import, and if the functions really are needed
- * and really are missing, Atlas says so a moment later in its own words.
- */
-export async function seedDevDatabaseSearchHelpers(
-    devDatabaseUrl: string,
-    collectionsPath: string
-): Promise<void> {
-    try {
-        const { searchPrerequisiteStatements } = await import("./schema/generate-postgres-ddl-logic");
-        const statements = searchPrerequisiteStatements(await loadCollectionsForCli(collectionsPath));
-        if (statements.length === 0) return;
-
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: devDatabaseUrl });
-        await client.connect();
-        try {
-            await client.query(statements.join("\n"));
-        } finally {
-            await client.end();
-        }
-    } catch {
-        // See above: not worth failing a push over.
-    }
-}
-
-/**
  * Query the live database for every user table/view outside the system
  * catalogs. Separated from {@link getTableExcludes} so its failure mode can
  * be handled explicitly (fail closed) and so tests can inject a stub.

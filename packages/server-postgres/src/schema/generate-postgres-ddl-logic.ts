@@ -297,22 +297,15 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
  * appended to migrations that run against databases at any stage of their
  * life. Empty when nothing opted in — the caller writes no file then.
  *
- * The leading half — extensions and helpers, without the table-shaped
- * statements — is available on its own as {@link searchPrerequisiteStatements},
- * for the dev database Atlas analyses plans against. That database has none of
- * the project's tables, so it wants the functions and nothing else.
+ * The dev database Atlas plans against needs none of this. `searchExcludePatterns`
+ * removes the search column from the *inspected* state, so the state Atlas
+ * replays there never mentions the column and never calls a helper. Seeding the
+ * helpers into that database was tried and removed: measured on Atlas 1.2.3, a
+ * `schema apply --dry-run` produces byte-identical output seeded or not, and
+ * Atlas wipes the dev database before it plans anyway — so a seed could not have
+ * helped even where the excludes are missing, which is the case that really does
+ * fail with `function public.rebase_search_unaccent(text) does not exist`.
  */
-export const searchPrerequisiteStatements = (allCollections: CollectionConfig[]): string[] => {
-    const specs = relationalCollections(allCollections)
-        .map(c => buildSearchColumnSpec(c))
-        .filter((s): s is SearchColumnSpec => s !== undefined);
-    if (specs.length === 0) return [];
-    return [
-        ...new Set(specs.flatMap(searchExtensionStatements)),
-        ...new Set(specs.flatMap(searchHelperFunctions))
-    ];
-};
-
 export const generatePostgresSearchDdl = (allCollections: CollectionConfig[]): string => {
     const collections = relationalCollections(allCollections);
     const specs = collections
