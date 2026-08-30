@@ -210,7 +210,7 @@ interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackupRoutesConfig { getDestination, storage }
-interface BootOptions { bundle, bundleDir, handleSignals, listen, provisionSchema }
+interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
 interface BuiltinAuthAdapterConfig { allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, captcha, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableEmailOtp, enableMagicLink, oauthProviders, serviceKey }
 interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storageSources }

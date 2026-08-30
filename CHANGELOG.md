@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A managed pod could not unpack its own bundle.** 0.17.0 shipped a fix for a
+  `tar` failure and the fix did not work; every managed pod rolled onto that
+  image crashlooped on the bug it was meant to close. An archive rooted at `.`
+  carries the mode of the directory it was packed from, and GNU tar applies that
+  to the extraction root as its last act — refused where the process does not own
+  the directory, and refused *after* every file has been written, so a complete
+  bundle is reported as a corrupt one. A Kubernetes emptyDir is exactly that
+  case: `root:node` 0775 setgid against a runtime running as uid 1000.
+
+  No flag avoids it. `--no-overwrite-dir`, `--no-same-permissions`,
+  `--delay-directory-restore` and `--exclude=./` were each measured against GNU
+  tar 1.34 extracting into a directory owned by another uid, and all four still
+  fail on the root: it is not an entry the archive can be told to skip, and it
+  fails even when the mode being set is the mode the directory already has,
+  because the refusal is about ownership rather than change.
+
+  The runtime now unpacks into a directory it creates and moves the entries up,
+  so the root `tar` chmods is one it owns. Staging sits inside the destination,
+  which keeps the moves renames within a single filesystem rather than a second
+  copy of a tree that is already the largest thing in a pod's ephemeral-storage
+  grant.
+
+- **A failed fetch no longer discards a bundle that works.** The runtime threw
+  away the bundle already on disk when a download or unpack failed and then
+  exited, so a pod holding something serviceable died anyway. It now falls back
+  to it. Had this been in 0.17.0 the unpack bug above would have degraded the
+  fleet rather than crashlooping it.
+
+- **A collection whose name collides with an internal table keeps its grants.**
+  Such a collection had them revoked.
+
+### Changed
+
+- `check:runtime-image:boots` boots the image a fourth way: `mode=url` into a
+  directory the runtime does not own, which is the shape every managed pod
+  actually has. The gate previously only ever unpacked into `/bundle` as the
+  image ships it — the one arrangement in which the failure above cannot occur,
+  which is why it stayed green through 0.17.0.
+
 ## [0.17.0] - 2026-08-29
 
 ### Breaking
