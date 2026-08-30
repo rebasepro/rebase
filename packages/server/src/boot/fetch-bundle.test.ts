@@ -186,7 +186,10 @@ describe("fetchBundle", () => {
         fs.writeFileSync(path.join(src, ".hidden"), "dot");
         fs.mkdirSync(path.join(src, "sub"));
         fs.writeFileSync(path.join(src, "sub", "f"), "nested");
-        const tarball = path.join(src, "b.tar.gz");
+        // Outside `src`, not in it: archiving a directory that contains the
+        // archive being written is an error under GNU tar, and passes under the
+        // bsdtar on a developer's Mac. This suite runs on both.
+        const tarball = path.join(scratch, "..", `bundle-${path.basename(src)}.tar.gz`);
         execFileSync("tar", ["-czf", tarball, "-C", src, "."]);
 
         // A stale file the archive also carries: the move must replace it.
@@ -206,6 +209,7 @@ describe("fetchBundle", () => {
             .toEqual({ kind: "backend" });
 
         fs.rmSync(src, { recursive: true, force: true });
+        fs.rmSync(tarball, { force: true });
     });
 
     it("refuses something that unpacked without a manifest", async () => {
