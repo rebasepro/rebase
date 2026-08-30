@@ -24,7 +24,9 @@ import {
     reportError,
     note,
     noteBlank,
-    requireInteractive
+    requireInteractive,
+    resolveTimeoutMs,
+    type CloudClient
 } from "./context";
 
 interface DatabaseRow {
@@ -116,18 +118,81 @@ async function listDatabases(rawArgs: string[]): Promise<void> {
     }
 }
 
+/**
+ * The database already attached to a project, if any.
+ *
+ * `limit: 1` deliberately mirrors what the control plane's own `db-test`,
+ * `db-info` and `backup` do — asking the same question the same way is the
+ * point, since the answer decides which row a deploy will actually use.
+ */
+async function firstAttachedDatabase(
+    client: CloudClient,
+    projectId: string
+): Promise<DatabaseRow | undefined> {
+    const rows = (await client.data.collection("databases").find({
+        where: { project: ["==", projectId] },
+        limit: 1
+    })).data as unknown as DatabaseRow[];
+    return rows[0];
+}
+
+/**
+ * Attach a database row to a project.
+ *
+ * Extracted so `rebase cloud projects create` can do it in the same breath as
+ * creating the project — see `--db` there. Two call sites, one insert, so the
+ * shape of the row cannot drift between "attached at creation" and "attached
+ * afterwards".
+ */
+export async function attachDatabaseRow(
+    client: CloudClient,
+    input: { projectId: string; type: string; connectionString?: string }
+): Promise<DatabaseRow> {
+    return (await client.data.collection("databases").create({
+        project: input.projectId,
+        type: input.type,
+        connectionString: input.type === "byodb" ? input.connectionString : undefined,
+        connectionStatus: "untested"
+    })) as unknown as DatabaseRow;
+}
+
+/** What `rebase cloud db create` parses. Exported so its help page cannot drift. */
+export const CREATE_DATABASE_FLAGS = {
+    "--type": String,
+    "--connection-string": String,
+    "--wait": Boolean,
+    "--timeout": String,
+    "--project": String,
+    "-p": "--project"
+} as const;
+
 async function createDatabase(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--type": String,
-"--connection-string": String,
-"--project": String,
-"-p": "--project" },
-        { argv: rawArgs.slice(4),
-permissive: true }
-    );
+    const args = arg(CREATE_DATABASE_FLAGS, { argv: rawArgs.slice(4),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
+
+    // A project has exactly one database, and the platform is built on that:
+    // `db-test`, `db-info` and `backup` all read `databases` with `limit: 1`
+    // and take whichever row comes back first. A second row therefore does not
+    // add a database — it makes it *undefined* which one the project is
+    // deployed against, silently, with no error anywhere.
+    //
+    // Cheap to reach now that `projects create` attaches one by default: the
+    // obvious way to move a project to a bring-your-own database was to run
+    // `db create --type byodb`, which used to be the only row and is now the
+    // second. So this refuses rather than inserts, and names what is already
+    // there.
+    const existing = await firstAttachedDatabase(client, projectId);
+    if (existing) {
+        fail(
+            `Project ${projectRef} already has a ${existing.type ?? "database"} attached (${existing.id}).`,
+            "A project has exactly one database. Remove that one first, or run "
+            + "`rebase cloud db info` to see what it points at.",
+            "database_exists"
+        );
+    }
 
     let type = args["--type"];
     if (!type) {
@@ -166,32 +231,104 @@ message: "PostgreSQL connection string:" }
         }
     }
 
+    let created: DatabaseRow;
     try {
-        const created = (await client.data.collection("databases").create({
-            project: projectId,
-            type,
-            connectionString: type === "byodb" ? connectionString : undefined,
-            connectionStatus: "untested"
-        })) as unknown as DatabaseRow;
-        success(`Attached ${type} database to project ${projectRef}`);
-        emit(
-            () => {
-                keyValues([["ID", String(created.id)]]);
-                if (type === "byodb") {
-                    note(chalk.gray("Verify it with `rebase cloud db test`."));
-                    noteBlank();
-                }
-            },
-            {
-                success: true,
-                id: String(created.id),
-                projectId,
-                type,
-                connectionStatus: "untested"
-            }
-        );
+        created = await attachDatabaseRow(client, { projectId,
+type: type!,
+connectionString });
     } catch (e) {
         reportError(e, "Failed to attach database");
+    }
+
+    // `--wait`, and the one honest thing it can do per type.
+    //
+    // A managed database is NOT provisioned here: the CloudNativePG cluster is
+    // materialised at the project's first deploy. So there is nothing to poll,
+    // and a `--wait` that polled would be the same trap this flag exists to
+    // remove — a loop over a value that cannot change. It reports that instead,
+    // and exits 0, because the attach did succeed.
+    //
+    // A bring-your-own database is the opposite: it exists right now, and
+    // whether it is reachable is a real question with a real answer, so `--wait`
+    // asks it until it gets one.
+    const waited = args["--wait"] === true
+        ? await waitForDatabase(client, {
+            projectId,
+            type: type!,
+            timeoutMs: resolveTimeoutMs(args["--timeout"], {
+                fallbackMs: DEFAULT_WAIT_MS,
+                command: "cloud db create"
+            })
+        })
+        : undefined;
+
+    success(`Attached ${type} database to project ${projectRef}`);
+    emit(
+        () => {
+            keyValues([["ID", String(created.id)]]);
+            if (waited?.note) note(chalk.gray(waited.note));
+            else if (type === "byodb") note(chalk.gray("Verify it with `rebase cloud db test`."));
+            else note(chalk.gray("It is created at your first deploy — run `rebase cloud deploy` next."));
+            noteBlank();
+        },
+        {
+            success: true,
+            id: String(created.id),
+            projectId,
+            type,
+            connectionStatus: waited?.connectionStatus ?? "untested",
+            // What `--wait` actually waited for, so a caller can tell an
+            // answered question from an unanswerable one.
+            waited: waited ? waited.waited : false,
+            materializedAt: type === "managed" ? "first_deploy" : "now"
+        }
+    );
+}
+
+/** How long `db create --wait` waits by default, and `--timeout` overrides. */
+const DEFAULT_WAIT_MS = 5 * 60 * 1000;
+
+const WAIT_POLL_MS = 3000;
+
+/**
+ * Wait for an attached database to become usable, where "usable" means
+ * something.
+ *
+ * Returns `waited: false` for the managed case, and says why — the caller then
+ * knows the state it is looking at is final rather than early.
+ */
+export async function waitForDatabase(
+    client: CloudClient,
+    opts: { projectId: string; type: string; timeoutMs: number; pollMs?: number }
+): Promise<{ waited: boolean; connectionStatus: string; note?: string }> {
+    if (opts.type !== "byodb") {
+        return {
+            waited: false,
+            connectionStatus: "untested",
+            note: "Nothing to wait for: a managed database is created at the project's first deploy. "
+                + "Run `rebase cloud deploy` next; `rebase cloud db test` only answers after that."
+        };
+    }
+
+    const started = Date.now();
+    for (;;) {
+        try {
+            const res = await client.functions.invoke<{ success: boolean }>("db-test", { projectId: opts.projectId });
+            if (res.success) return { waited: true,
+connectionStatus: "connected" };
+        } catch {
+            // A transport failure is indistinguishable from a database that is
+            // not up yet, and both are answered by trying again until the
+            // deadline. The deadline is what makes that safe.
+        }
+        if (Date.now() - started > opts.timeoutMs) {
+            fail(
+                `The database did not become reachable within ${Math.round(opts.timeoutMs / 1000)}s.`,
+                "Run `rebase cloud db test` for the connection log.",
+                "timeout"
+            );
+        }
+        await new Promise(resolve => setTimeout(resolve, opts.pollMs ?? WAIT_POLL_MS));
     }
 }
 

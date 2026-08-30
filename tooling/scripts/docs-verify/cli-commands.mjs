@@ -91,26 +91,44 @@ export function loadCliFlags(root) {
      */
     const argSpecs = source => {
         const specs = [];
-        // `arg(` and the CLI's two wrappers around it. A command that parses
-        // through `parseCloudArgs({ spec: { … } })` still declares its flags as
-        // quoted keys, and the brace matcher below reaches them just as well —
-        // but the pattern has to name the call, or the whole command's flag set
-        // silently disappears.
+        // Two shapes, and BOTH are needed.
         //
-        // That is not hypothetical: `cloud deploy` moved from `arg(` to
-        // `parseCloudArgs(` on 2026-08-25, and this check lost all eight of its
-        // flags. It then reported `rebase cloud deploy --message "…"` — a
-        // documented line that works — as a command a reader cannot run, and
-        // named the wrong culprit. A checker that cannot find a spec must not
-        // conclude the spec is empty.
-        for (const m of source.matchAll(/\b(?:arg|parseCloudArgs|parseCommandArgs)\(\s*\{/g)) {
-            let depth = 1;
-            let i = m.index + m[0].length;
-            for (; i < source.length && depth > 0; i++) {
-                if (source[i] === "{") depth++;
-                else if (source[i] === "}") depth--;
+        // The first is the spec written inline at the call: `arg({ … })` and the
+        // CLI's two wrappers around it. The pattern has to name the call, or a
+        // command's whole flag set silently disappears — that is not
+        // hypothetical: `cloud deploy` moved from `arg(` to `parseCloudArgs(` on
+        // 2026-08-25 and this check lost all eight of its flags, then reported a
+        // documented line that works as a command a reader cannot run.
+        //
+        // The second is the spec hoisted to a named constant —
+        // `const DEPLOY_FLAGS = { … }`, passed as `parseCloudArgs({ spec:
+        // DEPLOY_FLAGS, … })`. Seven of them exist in the cloud family alone,
+        // and hoisting is the direction the code is moving, because a spec has
+        // to be exported for its help page and its tests to be checked against
+        // it. Reading only the call site would therefore make the checker
+        // *quieter* the more carefully a command is written, which is exactly
+        // backwards — the same failure as the `parseCloudArgs` one above,
+        // re-arriving through a different door.
+        //
+        // Restricted to identifiers ending in `FLAGS`, and matched by balanced
+        // braces from the opening one, so nothing outside an object literal is
+        // read. A whole-file scan for flag-shaped quoted keys would also match
+        // `case "--help":` in a dispatch switch, and conclude that `--help` is
+        // the only flag a command accepts.
+        const openers = [
+            /\b(?:arg|parseCloudArgs|parseCommandArgs)\(\s*\{/g,
+            /\bconst\s+[A-Za-z_$][\w$]*FLAGS\s*(?::[^=]+)?=\s*\{/g
+        ];
+        for (const re of openers) {
+            for (const m of source.matchAll(re)) {
+                let depth = 1;
+                let i = m.index + m[0].length;
+                for (; i < source.length && depth > 0; i++) {
+                    if (source[i] === "{") depth++;
+                    else if (source[i] === "}") depth--;
+                }
+                if (depth === 0) specs.push(source.slice(m.index + m[0].length, i - 1));
             }
-            if (depth === 0) specs.push(source.slice(m.index + m[0].length, i - 1));
         }
         return specs;
     };

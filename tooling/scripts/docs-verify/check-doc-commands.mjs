@@ -87,8 +87,16 @@ const PM_BUILTINS = new Set([
     "dedupe", "ci", "login", "logout", "whoami", "version", "cache", "help"
 ]);
 
-/** Flags accepted anywhere by `arg`, and by the package managers themselves. */
-const UNIVERSAL_FLAGS = new Set(["--help", "-h", "--version", "-v"]);
+/**
+ * Flags accepted anywhere by `arg`, and by the package managers themselves.
+ *
+ * `--debug` is here rather than in a command's spec because no command reads
+ * it: `bin/rebase.js` takes it off `process.argv` to print a stack trace, and
+ * it is what the CLI itself tells you to re-run with after any failure. It is
+ * therefore valid on every line, and declared per-command only so that strict
+ * parsers do not reject the flag their own error message just recommended.
+ */
+const UNIVERSAL_FLAGS = new Set(["--help", "-h", "--version", "-v", "--debug"]);
 
 /** Line number of an offset, for a clickable `file:line`. */
 function lineAt(text, index) {
@@ -166,9 +174,20 @@ function* invocations(text) {
     }
 }
 
-/** Flags written in an invocation's tail. */
+/**
+ * Flags written in an invocation's tail — this command's, and not the next
+ * one's.
+ *
+ * The tail is cut at the first shell operator, because everything past it
+ * belongs to a different program. `rebase cloud status --json | jq -r '.x'`
+ * contributed `-r` to `rebase cloud`'s flags and was reported as a flag the
+ * CLI does not accept — a finding against a line that works, which is worse
+ * than no finding: it sends a reader to "fix" correct documentation, and the
+ * fix is to make the example worse.
+ */
 function flagsIn(rest) {
-    return [...rest.matchAll(/(?:^|\s)(-{1,2}[A-Za-z][\w-]*)/g)].map(m => m[1]);
+    const upToOperator = rest.split(/\s(?:\||\|\||&&|;|>|>>|2>)\s/)[0];
+    return [...upToOperator.matchAll(/(?:^|\s)(-{1,2}[A-Za-z][\w-]*)/g)].map(m => m[1]);
 }
 
 /**

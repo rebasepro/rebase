@@ -18,6 +18,7 @@ import {
     ejectRefusal,
     warningPayload,
     ejectWarning,
+    resolveDeployTimeout,
     EJECTS_MANAGED_RUNTIME
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
@@ -274,5 +275,37 @@ describe("timeAgo", () => {
         expect(timeAgo("not a date", NOW)).toBeUndefined();
         // A row stamped in the future is skew, not an age.
         expect(timeAgo("2026-08-01T12:00:00.000Z", NOW)).toBeUndefined();
+    });
+});
+
+/**
+ * `--timeout <seconds>`.
+ *
+ * The value bounds a wait that a caller has its own deadline for, so a value
+ * this cannot read is refused rather than replaced with the default. Silently
+ * substituting fifteen minutes for a misspelled `--timeout 30s` is how a wait
+ * outlives the job that asked for it.
+ */
+describe("resolveDeployTimeout", () => {
+    afterEach(() => {
+        setJsonModeForTest(false);
+        vi.restoreAllMocks();
+    });
+
+    it("defaults to the 15-minute ceiling", () => {
+        expect(resolveDeployTimeout(undefined)).toBe(15 * 60 * 1000);
+    });
+
+    it("reads seconds", () => {
+        expect(resolveDeployTimeout("300")).toBe(300_000);
+    });
+
+    it.each([["0"], ["-5"], ["30s"], ["soon"]])("refuses %s", (value) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        expect(() => resolveDeployTimeout(value)).toThrow("__exit__");
+        exit.mockRestore();
     });
 });

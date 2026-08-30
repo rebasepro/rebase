@@ -23,6 +23,7 @@ import inquirer from "inquirer";
 import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
 import { parseCommandArgs } from "../../utils/args";
+import { summarizeError, wantsRawError } from "./errors";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants & paths
@@ -864,6 +865,34 @@ positionals: parsed.positionals };
 }
 
 /**
+ * `--timeout <seconds>` as milliseconds, or `fallbackMs` when it was not given.
+ *
+ * One function rather than one per command, because two commands take this flag
+ * and a second copy is where the two would come to disagree about what
+ * `--timeout 0` means.
+ *
+ * A value this cannot read is a refusal, not a fall back to the default. The
+ * whole reason a caller passes a timeout is that it has a deadline of its own;
+ * quietly substituting a different one is how a fifteen-minute wait turns up
+ * inside a five-minute CI step, having been asked for `--timeout 30s`.
+ */
+export function resolveTimeoutMs(
+    value: string | undefined,
+    opts: { fallbackMs: number; command: string }
+): number {
+    if (value === undefined) return opts.fallbackMs;
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        fail(
+            `--timeout takes a number of seconds (got "${value}").`,
+            `Run \`rebase ${opts.command} --help\`.`,
+            "usage"
+        );
+    }
+    return seconds * 1000;
+}
+
+/**
  * Announce an outcome — "Logged in as …", "Deleted project …".
  *
  * On **stderr**, in both modes. It reads like a result and is not one: the
@@ -951,26 +980,41 @@ export function keyValues(rows: Array<[string, string | null | undefined]>): voi
 /**
  * Surface an SDK/HTTP error consistently. The SDK throws RebaseApiError with
  * a `.status` and `.message`; anything else falls back to its string form.
+ *
+ * The message is summarised rather than printed — see `summarizeError`. What
+ * arrives here is routinely a whole Kubernetes `Status` object with the request
+ * headers appended, and the one sentence worth reading is inside it. The
+ * untouched body is still available, behind `--debug`, on stderr where it
+ * cannot corrupt the JSON value on stdout.
  */
 export function reportError(e: unknown, context: string): never {
     const err = e as { status?: number; message?: string; code?: string };
+    const summary = summarizeError(e, context);
+
+    if (wantsRawError()) {
+        process.stderr.write(`\n${summary.raw}\n\n`);
+    }
+
     if (JSON_MODE) {
         printJson({
             error: {
-                message: err?.message ? stripAnsi(err.message) : String(e),
+                message: stripAnsi(summary.message),
                 // The SDK supplies a code for errors the API classified. When it
                 // does not, the HTTP status still classifies it well enough to
                 // branch on — `http_401` and `http_502` want very different
-                // handling, and both used to arrive as `null`.
-                code: err?.code ?? (err?.status ? `http_${err.status}` : "request_failed"),
+                // handling, and both used to arrive as `null`. A cluster
+                // refusal classifies itself, and `platform` below says whether
+                // acting on it is even the caller's business.
+                code: summary.code,
                 status: err?.status ?? null,
+                hint: summary.hint ? stripAnsi(summary.hint) : undefined,
+                platform: summary.platform,
                 context
             }
         });
         process.exit(1);
     }
-    const status = err?.status ? ` (${err.status})` : "";
-    fail(`${context}${status}: ${err?.message ?? String(e)}`);
+    fail(summary.message, summary.hint, summary.code);
 }
 
 /**

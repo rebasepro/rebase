@@ -32,6 +32,7 @@ import {
     printStorageHelp
 } from "./resources";
 import { requireProjectRef, initOutputMode, emitHelp, fail, GLOBAL_CLOUD_FLAGS } from "./context";
+import { ACTION_HELP, printActionHelp } from "./action-help";
 
 /**
  * Positional tokens after `rebase cloud` (group, action, …).
@@ -133,7 +134,19 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // reach a handler, so it cannot prompt, call the API, or need a linked
     // project. A group without its own page falls back to the index rather than
     // to running something.
+    //
+    // Resolved most-specific-first. Group-level was all there was, so `rebase
+    // cloud projects create --help` and `rebase cloud deploy --help` printed the
+    // index — a list of groups, no flags — and `--name`, `--subdomain` and
+    // `--type` had no discoverable spelling anywhere in the CLI. They were found
+    // on a real first deploy by reading `dist/index.es.js.map`.
     if (wantsHelp) {
+        const forAction = action ? ACTION_HELP[`${group} ${action}`] : undefined;
+        const page = forAction ?? ACTION_HELP[group];
+        if (page) {
+            printActionHelp(page);
+            return;
+        }
         (GROUP_HELP[group] ?? printCloudHelp)();
         return;
     }

@@ -155,6 +155,24 @@ describe("rebase cloud <group> --help", () => {
         expect(env.printEnvHelp).not.toHaveBeenCalled();
     });
 
+    it.each([
+        ["projects", "create", "--subdomain"],
+        ["db", "create", "--type"],
+        ["deploy", undefined, "--timeout"],
+        ["clusters", "verify", "--baseline"]
+    ] as const)("prints %s %s's own flags, not the index page", async (group, action, flag) => {
+        // The gap the action pages close. Group-level help was all there was,
+        // so these printed a list of groups and no flags at all — which is how
+        // `--name`, `--subdomain` and `--type` came to be found by reading a
+        // sourcemap on a real first deploy.
+        const line = action ? [group, action, "--help"] : [group, "--help"];
+        await cloudCommand(group, argv(...line));
+
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        expect(printed).toContain(flag);
+        for (const handler of allHandlers()) expect(handler).not.toHaveBeenCalled();
+    });
+
     it("falls back to the index page for a group with no page of its own", async () => {
         await cloudCommand("logs", argv("logs", "--help"));
         // printCloudHelp is module-local, so its output is the observable.
