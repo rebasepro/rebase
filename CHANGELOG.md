@@ -2,6 +2,104 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rebase db push` was impossible for any collection declaring a
+  `{ type: "vector" }` property.** The column compiled to `VECTOR(n)` in
+  `drizzle/schema.sql`, and Atlas computes its desired state by materialising
+  that file in a scratch database it creates empty and empties again at the
+  start of every run — so the type was resolved against a database that
+  structurally cannot have pgvector, and every push died with
+  `pq: type "vector" does not exist`. Not intermittently: permanently, for the
+  framework's own embedding property.
+
+  Nothing in userland got past it. Seeding the extension does not survive
+  Atlas's clean (measured: present before the run, gone after), a
+  `CREATE EXTENSION` in the desired state is refused as a paid feature, an
+  extension in a non-`public` schema makes the scratch database "not clean",
+  and `--exclude` filters the diff only after the file has been parsed and
+  applied.
+
+  Vector now takes the carve-out full-text search already had. The column, its
+  ANN indexes and the extension are generated into `drizzle/vector.sql`, Atlas
+  is told to exclude them, and Rebase applies the file itself after
+  `schema apply` and appends it to migrations. Excluding the column turns out
+  to be enough on its own — a `NOT NULL` or `UNIQUE` on it is a property *of*
+  the column and goes with it.
+
+- **`rebase db generate` and `rebase db migrate` were both down for any project
+  with a `search` block.** `--exclude` is accepted by `atlas schema apply` and
+  by nothing else, and the guard that added it read as a subcommand test
+  without being one: `migrate apply` matches `args.includes("apply")` exactly
+  as `schema apply` does. Atlas rejects an unknown flag before doing any work,
+  so both commands exited with `unknown flag: --exclude`. Present since the
+  same commit that started appending search DDL to migrations, which means that
+  append had never once run.
+
+- **A migration could carry a `DROP COLUMN` for a search or vector column
+  nobody asked to lose.** `migrate diff` computes the current state by
+  replaying the migration directory — which builds those columns, because that
+  DDL is appended to migrations — and diffs it against a `schema.sql` that
+  deliberately omits them, so Atlas plans a drop. Nothing caught it: the
+  destructive gate reads the *push* plan, and this is a file applied days
+  later. Those statements are now removed from the file Atlas writes, clause by
+  clause because Atlas folds the phantom drop into whatever real change shares
+  the table. A drop the CLI cannot rewrite stops `db generate` rather than
+  being guessed at.
+
+- **A no-op `rebase db generate` grew the last migration every time it ran.**
+  The `CREATE SCHEMA` rewrite and the RLS policy append were not gated on Atlas
+  having written a new file, so a run that found nothing to diff appended
+  another copy of the policies to a migration that had already been applied in
+  production — changing a hash Atlas had recorded, while the appended SQL ran
+  nowhere.
+
+- **Live schema editing left behind a `schema.sql` that `db push` chokes on.**
+  The commit generated it whole, so it carried the RLS policies, the search
+  helpers Atlas will not parse, and the vector column. It now writes the same
+  split `rebase db generate` does.
+
+- **`rebase dev` could not host a vector column at all.** The managed
+  development database derived every extension bundle's module path as
+  `@electric-sql/pglite/contrib/<name>`, which does not exist for pgvector — it
+  is a package of its own, and it was not declared. `CREATE EXTENSION vector`
+  failed there with `extension "vector" is not available`, which reads like a
+  broken database rather than a missing import.
+
+### Added
+
+- **`database({ extensions: ["vector"] })`.** Declared in `config/resources.ts`,
+  it lets `rebase db push` and the boot schema-ensure run
+  `CREATE EXTENSION IF NOT EXISTS vector` for you.
+
+  A permission rather than a request: the statement is issued only where
+  something in the schema needs it, so naming an extension nothing uses
+  installs nothing. It is opt-in because everything that decides whether the
+  install can succeed — the image shipping the library, the role's grant, a
+  managed provider's allow-list — is invisible from inside the connection.
+  Saying nothing withholds the install, never the column, so a database where
+  pgvector was installed by hand keeps working with no configuration.
+
+  `database()` also accepts options in place of a key, since the default
+  database has no name to pass.
+
+### Changed
+
+- A changed `dimensions` on a vector property is no longer silent. Atlas used
+  to own the column and plan the type change; now that it cannot see it,
+  `ADD COLUMN IF NOT EXISTS` would have done nothing and left the old width
+  behind a config that says otherwise. The generated DDL widens the column when
+  it holds no values and refuses — naming the statement to run — when it does.
+
+### Removed
+
+- `seedDevDatabaseSearchHelpers`, which never did anything. Its docstring
+  claimed an excluded column is still materialised in Atlas's scratch database;
+  it is not. Measured with a real generated `tsvector` column: a seeded scratch
+  database and an empty one produce byte-identical output in every
+  configuration, and Atlas wipes that database before it plans. The `--exclude`
+  patterns were always the whole protection.
+
 ## [0.17.1] - 2026-08-30
 
 ### Fixed
