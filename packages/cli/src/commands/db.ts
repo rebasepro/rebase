@@ -193,8 +193,24 @@ export async function runDriverDbCommand(
 }
 
 export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    if (!subcommand || subcommand === "--help") {
-        printDbHelp();
+    // `--help` is answered here, before anything else, and never by a
+    // subcommand.
+    //
+    // `cli.ts` rewrites the subcommand to `"--help"` only when the user named
+    // none, so `rebase db --help` was covered and `rebase db push --help` was
+    // not: the flag went through to `runDriverDbCommand`, which resolves (and
+    // will START) the development database and then hands the whole line to the
+    // driver, whose own dispatch has no `--help` case for `push`. **It ran the
+    // push.** A flag whose entire job is to print text applied a schema to a
+    // database — the single most dangerous shape a help flag can have, and the
+    // same class as `skills install --help` writing files and `auth
+    // reset-password --help` running an UPDATE.
+    //
+    // Answering before `requireProjectRoot` and before the driver spawn makes
+    // it structurally impossible rather than conditionally safe: no subcommand
+    // can act on `--help`, because no subcommand is reached.
+    if (!subcommand || subcommand === "--help" || rawArgs.includes("--help") || rawArgs.includes("-h")) {
+        printDbHelp(subcommand === "--help" ? undefined : subcommand);
         return;
     }
 
@@ -405,7 +421,72 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     }
 }
 
-function printDbHelp() {
+/**
+ * What each `rebase db <action>` does and takes.
+ *
+ * Kept here rather than delegated to the driver because the driver is reached
+ * by *running* it — which is exactly what `--help` must not do. The page is
+ * deliberately short: the authority on a flag is the command's own spec, and
+ * `check-doc-commands.mjs` holds every command written in this repository's
+ * markdown to it. What a reader needs from here is which subcommands exist and
+ * what the destructive ones want before they will run.
+ */
+const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
+    push: {
+        usage: "rebase db push [--collections <dir>] [--allow-destructive] [--yes]",
+        summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
+        notes: ["A change that would drop data needs --allow-destructive."]
+    },
+    generate: {
+        usage: "rebase db generate [--collections <dir>]",
+        summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections."
+    },
+    migrate: {
+        usage: "rebase db migrate",
+        summary: "Run the pending migration files against the database."
+    },
+    branch: {
+        usage: "rebase db branch <create|list|delete|info> [name]",
+        summary: "Database branching."
+    },
+    backup: {
+        usage: "rebase db backup [--out <path|s3://…>]",
+        summary: "Create a pg_dump backup. --out is resolved against the directory you are standing in."
+    },
+    backups: { usage: "rebase db backups", summary: "List stored backups." },
+    restore: {
+        usage: "rebase db restore <dump> [--target-db <name>] [--create-db] --yes",
+        summary: "Restore a backup with pg_restore.",
+        notes: ["Destructive, and refuses to run without --yes."]
+    },
+    pull: {
+        usage: "rebase db pull --from <url> [--schema <name>] [--anonymize] [--yes]",
+        summary: "Copy another database into local development. One-directional by design — it can never push."
+    },
+    stop: { usage: "rebase db stop", summary: "Stop the managed development database. Data is kept." },
+    reset: {
+        usage: "rebase db reset [--yes]",
+        summary: "Delete the managed development database and start over.",
+        notes: ["Destructive, and the data exists only on this machine."]
+    }
+};
+
+function printDbHelp(action?: string) {
+    const entry = action ? DB_ACTION_HELP[action] : undefined;
+    if (entry) {
+        console.log(`
+${chalk.bold(`rebase db ${action}`)}
+
+  ${entry.summary}
+
+${chalk.green.bold("Usage")}
+  ${chalk.blue(entry.usage)}
+${entry.notes?.length ? `\n${chalk.green.bold("Notes")}\n${entry.notes.map(n => `  ${chalk.gray(`• ${n}`)}`).join("\n")}\n` : ""}
+${chalk.gray("Run `rebase db --help` for every subcommand.")}
+`);
+        return;
+    }
+
     console.log(`
 ${chalk.bold("rebase db")} — Database management commands
 
