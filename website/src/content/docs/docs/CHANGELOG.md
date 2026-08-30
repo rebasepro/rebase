@@ -71,7 +71,62 @@ description: Every released change to Rebase — new features, fixes, and the br
   failed there with `extension "vector" is not available`, which reads like a
   broken database rather than a missing import.
 
+- **`rebase db push --help` applied the schema.** The flag printed usage and
+  then ran the command it was documenting, against whatever database the project
+  was pointed at. Asking what a destructive command does is the one moment you
+  are most certain not to want it to happen.
+
+- **A first deploy deadlocked on a step nothing named.** A project created with
+  `rebase cloud projects create` had no database, was written
+  `status: "provisioning"`, and stayed there: nothing was in progress, the
+  platform was waiting for `rebase cloud db create`, and no output, help page or
+  skill named that command. "Provisioning" reads as work underway, and the
+  correct response to work underway is to wait — so the correct response to this
+  state was the one thing guaranteed never to resolve it. Measured at 43 minutes
+  of polling on a real first deploy; an unattended agent would still be polling.
+
+- **`cloud deploy` meant two different things depending on the runtime.** The
+  managed-bundle path stopped at "deploy started" and told you to run
+  `cloud logs`, while the source path waited and made its exit code the verdict —
+  so the same command returned 0 for builds that went on to fail. It now follows
+  on both paths unless `--no-follow` says otherwise, and takes `--wait` and
+  `--timeout`.
+
+- **A cluster's refusal was printed as if it were yours.** Failures arrived as a
+  whole Kubernetes `Status` object with request headers, an audit id and a
+  flowschema uid. Worse than the noise: a `403` naming a
+  `system:serviceaccount:` is the control plane's OWN credentials being refused,
+  which nothing in a user's project can grant — and printed raw in a failed
+  deploy it reads exactly like a project fault. Someone acting on that reading
+  deletes working code. Failures are now classified before they are summarised,
+  carry `platform: true` in the JSON, and say in words when retrying and
+  changing the project will not help. The untouched body stays behind `--debug`.
+
+- **`clusters verify` never saw the id it was given.** It selected one from
+  `rawArgs`, which is the whole of `process.argv`, so the first match was the
+  node binary path: every invocation asked about a cluster called
+  `/usr/bin/node`, got a 404, and read as "this diagnostic is not deployed yet".
+  It is the one command that reports `permissions.allowed` / `permissions.denied`
+  for a cluster, so the diagnostic for a missing RBAC grant was itself
+  unavailable.
+
 ### Added
+
+- **`rebase cloud projects create --db managed|byodb|none`**, defaulting to
+  `managed`, so the sequence every project needs is one command rather than two.
+  `--db none` is the deliberate opt-out and still prints the command that
+  finishes the job.
+
+- **`blockedOn` and `nextAction` on `cloud status`.** `blockedOn: null` is the
+  load-bearing value — it is the CLI saying that waiting is correct, and the only
+  condition under which polling `status` makes sense. Every other value names a
+  command.
+
+- **`db create --wait`**, which polls a bring-your-own database until it answers.
+  For a managed one it reports that there is nothing to wait for and returns,
+  since a loop there would be the same non-terminating wait in a new place.
+
+- **A `rebase-cloud` agent skill**, and `rebase-deployment` now points at it.
 
 - **`database({ extensions: ["vector"] })`.** Declared in `config/resources.ts`,
   it lets `rebase db push` and the boot schema-ensure run
