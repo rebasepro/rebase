@@ -72,7 +72,8 @@ describe("relocating the commit paths", () => {
             schemaFile: "app/backend/src/schema.generated.ts",
             ddlFile: "app/drizzle/schema.sql",
             policiesFile: "app/drizzle/policies.sql",
-            searchFile: "app/drizzle/search.sql"
+            searchFile: "app/drizzle/search.sql",
+            vectorFile: "app/drizzle/vector.sql"
         });
     });
 

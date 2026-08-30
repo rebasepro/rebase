@@ -76,12 +76,13 @@ Cela est déjà documenté à deux endroits différents :
 Trois choses à savoir avant de concevoir votre architecture autour de cela.
 **Rebase stocke et recherche des embeddings ; il ne les calcule pas** — il n'y a
 aucun fournisseur d'embeddings, paramètre de modèle ou clé d'API dans Rebase, la
-génération des vecteurs est donc de votre ressort. **pgvector est un prérequis.**
-L'image de base de données du scaffold l'embarque, un projet créé par
-`rebase init` n'a donc rien à faire ici ; pointé vers une base provisionnée par
-quelqu'un d'autre, il vous faut une image portant l'extension et un rôle
-autorisé à exécuter `CREATE EXTENSION vector;` une fois — Rebase n'installe pas
-d'extensions à votre place. Et **chaque colonne vectorielle reçoit un index HNSW
+génération des vecteurs est donc de votre ressort. **pgvector est un prérequis, et son installation se demande explicitement.**
+`database({ extensions: ["vector"] })` dans `config/resources.ts` autorise
+`rebase db push` et la vérification de schéma au démarrage à exécuter
+`CREATE EXTENSION IF NOT EXISTS vector` ; sans cette ligne, ils créent la colonne
+et vous laissent l'extension. Dans les deux cas, le serveur a besoin d'une image
+portant la bibliothèque et d'un rôle autorisé à l'installer.
+Et **chaque colonne vectorielle reçoit un index HNSW
 pour la distance cosinus**, car c'est avec le cosinus que `vectorSearch` mesure
 sauf si vous passez `distance` — un index ne sert qu'un seul opérateur. Réglez-le,
 ou désactivez-le, sur la propriété : voir

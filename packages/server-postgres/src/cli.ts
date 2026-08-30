@@ -16,6 +16,9 @@ import {
     applySearchDdl,
     getSearchExcludes,
     readSearchDdl,
+    applyVectorDdl,
+    getVectorExcludes,
+    readVectorDdl,
     getTableExcludes,
     getForeignIndexExcludes,
     ExcludeIntrospectionError,
@@ -94,23 +97,32 @@ function listMigrationFiles(): string[] {
 /**
  * Take Atlas's carve-outs back out of the migration `migrate diff` just wrote.
  *
- * The apply path hands Atlas `--exclude` and it never sees the search column.
- * The diff path has no such flag — `atlas migrate diff` rejects `--exclude`
- * outright, and an `atlas.hcl` `env` block's `exclude` is accepted and then
- * ignored — so Atlas replays the migration directory (which builds the column,
- * because the search DDL is appended to migrations), does not find the column
- * in `schema.sql`, and plans `DROP COLUMN`. Applied, that would take search
- * away from every database the migration reaches.
+ * The apply path hands Atlas `--exclude` and it never sees the search or vector
+ * columns. The diff path has no such flag — `atlas migrate diff` rejects
+ * `--exclude` outright, and an `atlas.hcl` `env` block's `exclude` is accepted
+ * and then ignored — so Atlas replays the migration directory (which builds
+ * both columns, because that DDL is appended to migrations), does not find them
+ * in `schema.sql`, and plans `DROP COLUMN`. Applied, that would take search and
+ * the embeddings away from every database the migration reaches.
  *
  * Returns whether a migration Atlas just wrote is still there afterwards: a
  * file whose only content was the spurious drop is deleted, because an empty
  * migration is worse than none — it takes a slot in the revision history and
- * the caller would append the search DDL and the policies to it.
+ * the caller would append the carved-out DDL and the policies to it.
  *
  * @returns true when a new migration survives and may be appended to.
  */
 async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promise<boolean> {
-    const patterns = await getSearchExcludes(collectionsPath);
+    // Both carve-outs, for one reason: they are the same problem. Search is out
+    // of Atlas's sight because its free tier will not parse a function; vector
+    // is out because Atlas resolves the desired state in a dev database that
+    // can never have pgvector. What follows from that is identical — the diff
+    // replays a migration directory holding objects `schema.sql` omits, and
+    // plans a drop for every one.
+    const patterns = [
+        ...await getSearchExcludes(collectionsPath),
+        ...await getVectorExcludes(collectionsPath)
+    ];
     if (patterns.length === 0) return true;
 
     const newest = listMigrationFiles().at(-1);
@@ -242,12 +254,23 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         /CREATE SCHEMA (?!IF NOT EXISTS)("[^"]+");/g,
                         "CREATE SCHEMA IF NOT EXISTS $1;"
                     );
-                    // Atlas never writes the search objects into a migration —
-                    // it is not shown them — so a migration replayed against a
-                    // fresh database would build every table except the part
-                    // that makes search work. Appending, because these are
-                    // `ALTER TABLE ... ADD COLUMN` over the tables the
-                    // migration just created.
+                    // Atlas never writes the search or vector objects into a
+                    // migration — it is not shown them — so a migration
+                    // replayed against a fresh database would build every table
+                    // except the parts that make search and vector search work.
+                    // Appending, because these are `ALTER TABLE ... ADD COLUMN`
+                    // over the tables the migration just created.
+                    //
+                    // Vector first: `vector.sql` may open with
+                    // `CREATE EXTENSION vector`, so prerequisites lead, which is
+                    // the order a reader of the migration expects. Nothing in
+                    // search depends on it either way.
+                    const vectorContent = readVectorDdl();
+                    if (vectorContent) {
+                        migrationContent = `${migrationContent}\n\n${vectorContent}`;
+                        out(chalk.gray("  ✓ Appended vector DDL to the migration"));
+                    }
+
                     const searchContent = readSearchDdl();
                     if (searchContent) {
                         migrationContent = `${migrationContent}\n\n${searchContent}`;
@@ -265,7 +288,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         const policiesContent = fs.readFileSync(policiesFile, "utf-8");
                         fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
                         out(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
-                        
+
                         // Re-hash the migration directory
                         out(chalk.gray("  Re-hashing migration files..."));
                         await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
@@ -279,14 +302,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
         if (!wroteNewMigration) {
             // Reachable whenever the only thing that changed is something Atlas
-            // cannot see — a `search` block, or a `securityRules` edit. There is
-            // no new file to carry it, and the previous migration must not be
-            // reopened: it has already run wherever this project is deployed.
+            // cannot see — a `search` block, a `vector` property, or a
+            // `securityRules` edit. There is no new file to carry it, and the
+            // previous migration must not be reopened: it has already run
+            // wherever this project is deployed.
             out(chalk.gray(
                 "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
-                "    Search DDL and RLS policies are applied by `rebase db push`, and at boot by\n" +
-                "    the schema ensure. For a migration-only deployment, add drizzle/search.sql\n" +
-                "    and drizzle/policies.sql to a migration by hand."
+                "    Search, vector and RLS DDL are applied by `rebase db push`, and at boot by\n" +
+                "    the schema ensure. For a migration-only deployment, add drizzle/search.sql,\n" +
+                "    drizzle/vector.sql and drizzle/policies.sql to a migration by hand."
             ));
         }
 
@@ -364,9 +388,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             
             if (databaseUrl) {
                 await ensureAuthTables(databaseUrl, collectionsPath);
-                // After the tables exist and before the policies: the search
-                // column is `ALTER TABLE ... ADD COLUMN`, and a policy may
-                // reference the table it is added to.
+                // After the tables exist and before the policies: the vector and
+                // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
+                // may reference the table they are added to.
+                await applyVectorDdl(databaseUrl);
                 await applySearchDdl(databaseUrl);
                 await applyPolicies(databaseUrl);
                 await reconcilePolicies(databaseUrl, collectionsPath);
@@ -903,16 +928,18 @@ async function runAtlas(
     // Everything Atlas must keep its hands off, in one list.
     //
     // Gathered only for the invocations that accept the flag — which is
-    // `schema apply` and nothing else. `atlas migrate diff` rejects
-    // `--exclude` outright with `unknown flag`, and passing it there took
-    // `rebase db generate` down for every project declaring a `search` block;
-    // the diff keeps the same objects out of the migration afterwards instead,
-    // with `stripCarvedOutStatements`. See `acceptsExcludeFlag`.
+    // `schema apply` and nothing else. `atlas migrate diff` and `migrate apply`
+    // both reject `--exclude` outright with `unknown flag`, and passing it there
+    // took `rebase db generate` and `rebase db migrate` down for every project
+    // declaring a `search` block; the diff keeps the same objects out of the
+    // migration afterwards instead, with `stripCarvedOutStatements`. See
+    // `acceptsExcludeFlag`.
     const excludes: string[] = [];
     if (collectionsPath && acceptsExcludeFlag(domain, args)) {
-        // Search objects are Rebase's, not Atlas's: the desired state does not
-        // carry them, so an apply left to itself would drop them.
+        // Search and vector objects are Rebase's, not Atlas's: the desired state
+        // does not carry them, so an apply left to itself would drop them.
         excludes.push(...await getSearchExcludes(collectionsPath));
+        excludes.push(...await getVectorExcludes(collectionsPath));
 
         // Fail CLOSED: the exclude list is the only thing shielding
         // non-collection tables from the auto-approved apply. If we can't

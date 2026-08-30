@@ -143,6 +143,37 @@ describe("the managed database", () => {
         expect((await pool.query<{ v: string }>("select unaccent('Málagá') v")).rows[0].v).toBe("Malaga");
     });
 
+    /**
+     * pgvector arrives from a package of its own rather than from PGlite's
+     * `contrib/` subpath, and deriving the module path from the extension name
+     * is what left it off the bundle list entirely — so `rebase dev` could not
+     * host a `{ type: "vector" }` property at all, and the failure read as
+     * `extension "vector" is not available`.
+     *
+     * The ANN index is part of the assertion because the bundle can load
+     * without it: `hnsw` is an access method, and a column that stores but
+     * cannot index is a different, quieter kind of broken.
+     */
+    it("can store, index and search a vector column", { timeout: BOOT_TIMEOUT }, async () => {
+        const database = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
+        const pool = connect(database.url);
+
+        await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
+        await pool.query("CREATE TABLE observations (id text PRIMARY KEY, embedding vector(3))");
+        await pool.query("CREATE INDEX observations_embedding_hnsw_cosine ON observations USING hnsw (embedding vector_cosine_ops)");
+        await pool.query("INSERT INTO observations VALUES ('near', '[1,2,3]'), ('far', '[-1,-2,-3]')");
+
+        const nearest = await pool.query<{ id: string }>(
+            "SELECT id FROM observations ORDER BY embedding <=> '[1,2,3]' LIMIT 1"
+        );
+        expect(nearest.rows[0].id).toBe("near");
+
+        const indexes = await pool.query<{ indexname: string }>(
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'observations'"
+        );
+        expect(indexes.rows.map(r => r.indexname)).toContain("observations_embedding_hnsw_cosine");
+    });
+
     it("enforces row-level security under SET LOCAL ROLE", { timeout: BOOT_TIMEOUT }, async () => {
         const database = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
         const pool = connect(database.url);

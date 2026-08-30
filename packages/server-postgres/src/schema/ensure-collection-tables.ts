@@ -25,7 +25,12 @@
  * Because of that, this is safe to run on every boot, and re-running it is a
  * no-op.
  */
-import { type CollectionConfig, type Property, isPostgresCollectionConfig } from "@rebasepro/types";
+import {
+    declaredDatabaseExtensions,
+    isPostgresCollectionConfig,
+    type CollectionConfig,
+    type Property
+} from "@rebasepro/types";
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
 import {
@@ -48,7 +53,15 @@ import {
     planJunctionTables,
     quoteSqlLiteral
 } from "./generate-postgres-ddl-logic";
-import { buildVectorIndexPlan, vectorIndexStatement, type SkippedVectorIndex } from "./vector-index";
+import {
+    buildVectorColumnSpecs,
+    buildVectorIndexPlan,
+    vectorExtensionDeclared,
+    vectorExtensionHint,
+    vectorExtensionStatement,
+    vectorIndexStatement,
+    type SkippedVectorIndex
+} from "./vector-index";
 import { buildCollectionIndexPlan, collectionIndexStatement } from "./collection-index";
 import {
     AUTH_USERS_COLUMNS,
@@ -147,6 +160,18 @@ export type ConstraintPolicy = "additive" | "converge";
 export interface EnsureOptions {
     /** Defaults to `additive`. See {@link ConstraintPolicy}. */
     constraints?: ConstraintPolicy;
+    /**
+     * Server extensions the project's databases gave Rebase leave to install —
+     * `declaredDatabaseExtensions()`. Absent means none, which is a refusal and
+     * is the right default for a planner given no configuration at all.
+     *
+     * Explicit rather than read from the resource registry in here, because
+     * this function is pure and several callers plan against fixtures: reaching
+     * for a process-wide registry would make the plan depend on whatever some
+     * other module happened to import. `ensureCollectionTables` is the boundary
+     * that reads the world.
+     */
+    databaseExtensions?: readonly string[];
 }
 
 export interface EnsureAction {
@@ -397,12 +422,28 @@ export function planCollectionSchemaEnsure(
         .filter((spec): spec is SearchColumnSpec => spec !== undefined);
 
     const plannedExtensions = new Set<string>();
+    const planExtension = (statement: string): void => {
+        if (plannedExtensions.has(statement)) return;
+        plannedExtensions.add(statement);
+        actions.push({ kind: "create-extension", target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""), sql: statement });
+    };
     for (const spec of searchSpecs) {
-        for (const statement of searchExtensionStatements(spec)) {
-            if (plannedExtensions.has(statement)) continue;
-            plannedExtensions.add(statement);
-            actions.push({ kind: "create-extension", target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""), sql: statement });
-        }
+        for (const statement of searchExtensionStatements(spec)) planExtension(statement);
+    }
+
+    // pgvector, for collections that declared a `vector` property — and only
+    // when a database gave leave to install it. Unlike the search extensions
+    // above, which are contrib modules every Postgres carries, pgvector is a
+    // separate build behind an image, a grant and a provider allow-list, so
+    // whether Rebase may install it is not Rebase's to decide. See
+    // `DatabaseOptions.extensions`.
+    //
+    // Boot has to make the same call `rebase db push` makes, or the two produce
+    // different databases from one commit — which is the rule
+    // `contracts/derived-names.txt` enforces.
+    if (vectorExtensionDeclared(options.databaseExtensions)
+        && collections.some(c => buildVectorColumnSpecs(c, resolveColumnName).length > 0)) {
+        planExtension(vectorExtensionStatement());
     }
     const plannedFunctions = new Set<string>();
     for (const spec of searchSpecs) {
@@ -1009,29 +1050,6 @@ function searchDriftMessage(drift: SearchColumnDrift[]): string {
     );
 }
 
-/**
- * The missing-pgvector explanation, appended to the error that reveals it.
- *
- * A `{ type: "vector" }` property compiles to `VECTOR(n)`, and nothing in the
- * OSS pipeline installs pgvector — not this ensure, not `db push`. Installing
- * an extension on someone's database is a decision with a deployment behind it
- * (image, superuser, cloud allow-list), so this path stays a refusal; what it
- * must not stay is a bare `type "vector" does not exist` on a crash-looping
- * pod, which names nothing the reader can act on.
- *
- * The scaffold now ships `pgvector/pgvector:pg18`, so this is reached by a
- * project pointed at a database someone else provisioned — which is exactly
- * the case where naming the extension and the image is worth the words.
- */
-function vectorExtensionHint(message: string): string {
-    if (!/type "(vector|halfvec|sparsevec)" does not exist/i.test(message)) return "";
-    return (
-        "\n  pgvector is not installed on this database, and Rebase does not install it: it is a server extension, " +
-        "so it needs an image that ships it (the scaffold's `pgvector/pgvector:pg18` does; a stock `postgres:18` " +
-        "does not) and a role allowed to run `CREATE EXTENSION vector;`. Install it once, then boot again. " +
-        "Rebase then creates an ANN index for the column automatically — see the `index` option on the property."
-    );
-}
 
 /**
  * Read what the database looks like, for the schemas a set of collections
@@ -1065,7 +1083,8 @@ export async function readSchemaFactsFor(
 export async function ensureCollectionTables(
     client: Queryable,
     collections: CollectionConfig[],
-    log?: (message: string) => void
+    log?: (message: string) => void,
+    options: EnsureOptions = {}
 ): Promise<EnsureOutcome> {
     // Junctions live alongside the collections that declare them, so their
     // schema has to be read too — otherwise an existing junction reads as
@@ -1082,7 +1101,15 @@ export async function ensureCollectionTables(
     }
 
     const existing = await readExistingSchema(client, schemas);
-    const plan = planCollectionSchemaEnsure(collections, existing);
+    // This is the boundary, so this is where the world is read: the planner
+    // itself takes the permission as an argument and never reaches for the
+    // registry. By the time boot gets here `loadBundleResourceGraph` has
+    // evaluated the project's `resources.ts`, so the declarations are there —
+    // and a caller that already knows them can still say so.
+    const plan = planCollectionSchemaEnsure(collections, existing, {
+        ...options,
+        databaseExtensions: options.databaseExtensions ?? declaredDatabaseExtensions()
+    });
     const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and

@@ -75,13 +75,16 @@ export interface SchemaCommitPaths {
     ddlFile: string;
     policiesFile: string;
     searchFile: string;
+    /** Vector columns and ANN indexes — like search, applied by Rebase not Atlas. */
+    vectorFile: string;
 }
 
 export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
     schemaFile: "backend/src/schema.generated.ts",
     ddlFile: "drizzle/schema.sql",
     policiesFile: "drizzle/policies.sql",
-    searchFile: "drizzle/search.sql"
+    searchFile: "drizzle/search.sql",
+    vectorFile: "drizzle/vector.sql"
 };
 
 /** One file the commit writes, as content rather than as a path on a disk. */

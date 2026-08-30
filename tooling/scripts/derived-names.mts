@@ -31,7 +31,9 @@
  * and a slug long enough to hit Postgres's 63-byte identifier limit. It is run
  * through both producers of schema DDL —
  *
- *   * `push` — `generatePostgresDdl`, what `rebase db push` writes, and
+ *   * `push` — `generatePostgresDdl` plus the two files Atlas is not shown,
+ *     `generatePostgresSearchDdl` and `generatePostgresVectorDdl`; together,
+ *     what `rebase db push` writes — and
  *   * `boot` — `planCollectionSchemaEnsure` / `planCollectionPolicies`, what the
  *     managed runtime applies at boot against an empty database
  *
@@ -64,6 +66,18 @@ export const BASELINE = path.join(ROOT, "contracts/derived-names.txt");
 
 /** Loose on purpose — this is a fixture, not a consumer of the config types. */
 type Fixture = Record<string, unknown>;
+
+/**
+ * What the fixture project's database gives Rebase leave to install.
+ *
+ * `vector` is here so the extension stays *rendered*. It is opt-in
+ * (`DatabaseOptions.extensions`), and a fixture that declined it would emit no
+ * `CREATE EXTENSION` from either producer — quietly dropping a frozen
+ * identifier from the baseline, which is the one thing this file exists to
+ * prevent. The fixture opts into everything, for the same reason it declares
+ * every naming rule at once.
+ */
+const FIXTURE_DATABASE_EXTENSIONS = ["vector"] as const;
 
 const uuidId = { id: { name: "ID", type: "string", isId: "uuid" } };
 const serialId = { id: { name: "ID", type: "number", isId: "increment" } };
@@ -344,8 +358,18 @@ function readStatement(surface: Surface, producer: Producer, statement: string):
     if (/^DROP POLICY IF EXISTS/i.test(sql)) return;                 // paired with CREATE POLICY
     if (/^ALTER TABLE .* ENABLE ROW LEVEL SECURITY/i.test(sql)) return;
     if (/^(SET|COMMENT|GRANT|REVOKE|BEGIN|COMMIT)\b/i.test(sql)) return;
+    // The drift guards `search.sql` and `vector.sql` open with. They create
+    // nothing — they read a column that the `ADD COLUMN` beside them has
+    // already recorded, and raise. Their bodies are prose, so freezing them
+    // would make this contract fire on a reworded error message.
+    if (/^DO \$rebase_[a-z_]+\$/i.test(sql)) return;
 
     let m: RegExpMatchArray | null;
+
+    if ((m = sql.match(/^CREATE EXTENSION(?: IF NOT EXISTS)? "?([A-Za-z0-9_]+)"?/i))) {
+        record(surface, producer, "extension", m[1]);
+        return;
+    }
 
     if ((m = sql.match(/^CREATE SCHEMA(?: IF NOT EXISTS)? "([^"]+)"/i))) {
         record(surface, producer, "schema", m[1]);
@@ -418,21 +442,67 @@ function readStatement(surface: Surface, producer: Producer, statement: string):
     record(surface, producer, "unhandled", sql.slice(0, 90));
 }
 
+/** `$$` or `$tag$`, anchored — a dollar-quote delimiter and nothing else. */
+const DOLLAR_QUOTE = /\$\$|\$[A-Za-z_][A-Za-z0-9_]*\$/y;
+
 /**
  * Statements, from a DDL blob.
  *
  * Comment lines go first: a `--` line can contain a semicolon, and the split
  * below is naive by design — a real SQL parser here would be a second
  * implementation of the thing under test.
+ *
+ * Naive but not *blind*: it tracks dollar quoting, because `vector.sql` and
+ * `search.sql` open with `DO $rebase_…$ … $rebase_…$;` blocks whose bodies
+ * contain semicolons. Splitting through one shreds it into half a dozen
+ * fragments, each recorded as its own `unhandled` line carrying a slice of an
+ * error message — so the baseline would churn on prose and say nothing about
+ * names.
  */
-const statementsOf = (ddl: string): string[] =>
-    ddl
+const statementsOf = (ddl: string): string[] => {
+    const source = ddl
         .split("\n")
         .filter(line => !line.trim().startsWith("--"))
-        .join("\n")
-        .split(";")
-        .map(s => s.trim())
-        .filter(Boolean);
+        .join("\n");
+
+    const statements: string[] = [];
+    let current = "";
+    let openTag: string | null = null;
+    let i = 0;
+
+    while (i < source.length) {
+        if (openTag) {
+            if (source.startsWith(openTag, i)) {
+                current += openTag;
+                i += openTag.length;
+                openTag = null;
+                continue;
+            }
+            current += source[i++];
+            continue;
+        }
+        if (source[i] === "$") {
+            DOLLAR_QUOTE.lastIndex = i;
+            const tag = DOLLAR_QUOTE.exec(source);
+            if (tag) {
+                openTag = tag[0];
+                current += tag[0];
+                i += tag[0].length;
+                continue;
+            }
+        }
+        if (source[i] === ";") {
+            statements.push(current.trim());
+            current = "";
+            i++;
+            continue;
+        }
+        current += source[i++];
+    }
+    if (current.trim()) statements.push(current.trim());
+
+    return statements.filter(Boolean);
+};
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
@@ -475,21 +545,45 @@ async function assertResolvesToSource(): Promise<void> {
 export async function render(): Promise<string> {
     await assertResolvesToSource();
 
-    const { generatePostgresDdl, planCollectionPolicies, planRelationalColumns, planJunctionTables } =
-        await import(`${ROOT}/packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts`);
+    const {
+        generatePostgresDdl,
+        generatePostgresSearchDdl,
+        generatePostgresVectorDdl,
+        planCollectionPolicies,
+        planRelationalColumns,
+        planJunctionTables
+    } = await import(`${ROOT}/packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts`);
     const { planCollectionSchemaEnsure } =
         await import(`${ROOT}/packages/server-postgres/src/schema/ensure-collection-tables.ts`);
 
     const surface: Surface = new Map();
 
-    // `db push`: the whole file, policies included.
-    const pushDdl: string = await generatePostgresDdl(FIXTURE, { includePolicies: true });
-    for (const statement of statementsOf(pushDdl)) readStatement(surface, "push", statement);
+    // `db push`: every file it writes, not just `schema.sql`. The search and
+    // vector objects are Atlas-excluded and applied from their own files, so a
+    // renderer reading only the desired state would report them boot-only —
+    // which this file's own header calls a defect — and would miss
+    // `CREATE EXTENSION vector` entirely, since that is the one statement
+    // `schema.sql` must never carry.
+    const pushDdl: string = await generatePostgresDdl(FIXTURE, {
+        includePolicies: true,
+        includeSearch: false,
+        includeVector: false
+    });
+    const pushFiles = [
+        pushDdl,
+        generatePostgresSearchDdl(FIXTURE) as string,
+        generatePostgresVectorDdl(FIXTURE, { extensions: FIXTURE_DATABASE_EXTENSIONS }) as string
+    ];
+    for (const file of pushFiles) {
+        for (const statement of statementsOf(file)) readStatement(surface, "push", statement);
+    }
 
     // Boot, against a database with nothing in it — the managed first-deploy
     // case, and the only starting state where boot emits its full surface.
     const emptyDb = { tables: new Map(), enums: new Set(), constraints: new Set() };
-    for (const action of planCollectionSchemaEnsure(FIXTURE, emptyDb).actions) {
+    for (const action of planCollectionSchemaEnsure(FIXTURE, emptyDb, {
+        databaseExtensions: FIXTURE_DATABASE_EXTENSIONS
+    }).actions) {
         readStatement(surface, "boot", action.sql);
     }
     for (const plan of planCollectionPolicies(FIXTURE)) {
