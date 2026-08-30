@@ -88,26 +88,80 @@ describe("a database without pgvector", () => {
         }
     };
 
-    it("fails the boot with something the reader can act on", async () => {
-        const client = {
-            query: jest.fn(async (sql: string) => {
-                if (/ADD COLUMN .*"embedding"/.test(sql)) {
-                    throw new Error(`type "vector" does not exist`);
-                }
-                return { rows: [] };
-            })
+    /** A client that answers every catalogue read empty and every DDL fine. */
+    const clientThat = (fail: (sql: string) => string | undefined) => {
+        const ran: string[] = [];
+        return {
+            ran,
+            client: {
+                query: jest.fn(async (sql: string) => {
+                    ran.push(sql);
+                    const message = fail(sql);
+                    if (message) throw new Error(message);
+                    return { rows: [] };
+                })
+            }
         };
+    };
+
+    const optedIn = { databaseExtensions: ["vector"] };
+
+    it("installs nothing unless a database gave leave to", async () => {
+        // Opt-in: the image, the grant and the provider's allow-list are all
+        // invisible from inside the connection, so Rebase does not decide this.
+        const { ran, client } = clientThat(() => undefined);
+        await ensureCollectionTables(client as never, [withVector]);
+        expect(ran.some(s => /CREATE EXTENSION .*vector/i.test(s))).toBe(false);
+    });
+
+    it("installs it when a database declared it", async () => {
+        const { ran, client } = clientThat(() => undefined);
+        await ensureCollectionTables(client as never, [withVector], undefined, optedIn);
+        expect(ran.some(s => /CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public/.test(s))).toBe(true);
+    });
+
+    /**
+     * The reader here never opted in, so the fix is one line of config they
+     * cannot guess. Naming the option *is* the hint — `type "vector" does not
+     * exist` names nothing.
+     */
+    it("names the opt-in when nobody declared the extension", async () => {
+        const failColumn = () => `type "vector" does not exist`;
+        const { client } = clientThat(sql => /ADD COLUMN .*"embedding"/.test(sql) ? failColumn() : undefined);
 
         await expect(ensureCollectionTables(client as never, [withVector]))
-            .rejects.toThrow(/pgvector is not installed/);
-        // The three things missing from `type "vector" does not exist`: what to
-        // install, that Rebase will not do it, and an image that carries it —
-        // which is now the scaffold's own, so anyone reaching this is pointed at
-        // a database somebody else provisioned and needs the image named.
+            .rejects.toThrow(/database\(\{ extensions: \["vector"\] \}\)/);
         await expect(ensureCollectionTables(client as never, [withVector]))
-            .rejects.toThrow(/CREATE EXTENSION vector/);
+            .rejects.toThrow(/config\/resources\.ts/);
+        // And the other way out, for somebody who would rather not grant it.
+        await expect(ensureCollectionTables(client as never, [withVector]))
+            .rejects.toThrow(/CREATE EXTENSION vector;/);
         await expect(ensureCollectionTables(client as never, [withVector]))
             .rejects.toThrow(/pgvector\/pgvector/);
+    });
+
+    /**
+     * The opposite reader: their config is already right, and repeating the
+     * option would send them to edit a correct line. What is missing is the
+     * library or the grant, so that is what the message has to be about.
+     */
+    it("says so when the library is not on the server at all", async () => {
+        const { client } = clientThat(sql =>
+            /CREATE EXTENSION .*vector/.test(sql) ? `extension "vector" is not available` : undefined);
+
+        await expect(ensureCollectionTables(client as never, [withVector], undefined, optedIn))
+            .rejects.toThrow(/pgvector was declared and could not be installed/);
+        await expect(ensureCollectionTables(client as never, [withVector], undefined, optedIn))
+            .rejects.not.toThrow(/config\/resources\.ts/);
+    });
+
+    it("says so when the role is not allowed to install it", async () => {
+        const { client } = clientThat(sql =>
+            /CREATE EXTENSION .*vector/.test(sql)
+                ? "permission denied to create extension \"vector\""
+                : undefined);
+        await expect(ensureCollectionTables(client as never, [withVector], undefined, optedIn))
+            .rejects.toThrow(/allowed to run `CREATE EXTENSION vector;`/);
     });
 
     it("leaves every other DDL failure worded as it was", async () => {

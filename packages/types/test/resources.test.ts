@@ -15,6 +15,7 @@ import {
     declareResource,
     declaredResources,
     declaredDataSources,
+    declaredDatabaseExtensions,
     declaredStorageSources,
     declaredSubscriptions,
     findEnvSuffixCollision,
@@ -237,5 +238,69 @@ describe("handing declarations to the frontend", () => {
         bucket("uploads");
         expect(declaredStorageSources().map(s => [s.key, s.transport]))
             .toEqual([["cdn", "direct"], ["uploads", "server"]]);
+    });
+});
+
+describe("extensions a database allows", () => {
+    /**
+     * A permission, not a request. Installing a server extension depends on the
+     * image carrying the library, the role's grant and a managed provider's
+     * allow-list — none of which Rebase can see from inside the connection — so
+     * the answer comes from whoever chose the database. `db push` and the boot
+     * schema-ensure both read this before issuing `CREATE EXTENSION`.
+     */
+    it("is empty for a project that declared none, which is a refusal", () => {
+        database();
+        expect(declaredDatabaseExtensions()).toEqual([]);
+    });
+
+    it("is empty when nothing is declared at all", () => {
+        expect(declaredDatabaseExtensions()).toEqual([]);
+    });
+
+    it("reports what a database named", () => {
+        database({ extensions: ["vector"] });
+        expect(declaredDatabaseExtensions()).toEqual(["vector"]);
+    });
+
+    /**
+     * The default database has no name to pass, so the options have to be
+     * reachable without one. Before the overload the only way in was
+     * `database("(default)", …)` — writing out an internal sentinel.
+     */
+    it("takes options in place of a key, and still means the default database", () => {
+        const handle = database({ extensions: ["vector"] });
+        expect(handle.key).toBe(DEFAULT_RESOURCE_KEY);
+        expect(declaredResources("database")).toHaveLength(1);
+    });
+
+    it("still takes a key and options together", () => {
+        const handle = database("analytics", { extensions: ["vector"] });
+        expect(handle.key).toBe("analytics");
+        expect(declaredDatabaseExtensions()).toEqual(["vector"]);
+    });
+
+    it("unions across databases, and dedupes", () => {
+        // `db push` drives one connection and generates one schema for every
+        // collection regardless of `dataSource`, so the permission is not split
+        // by database either — a false precision would be worse than none.
+        database({ extensions: ["vector"] });
+        database("analytics", { extensions: ["vector", "postgis"] });
+        expect(declaredDatabaseExtensions()).toEqual(["postgis", "vector"]);
+    });
+
+    it("survives the graph round-trip, which is what a host reads", () => {
+        database({ extensions: ["vector"] });
+        const declaration = buildResourceGraph().resources.find(r => r.kind === "database");
+        expect(declaration?.options.extensions).toEqual(["vector"]);
+    });
+
+    it("is refused as an unknown option on a kind that has no such thing", () => {
+        expect(() => bucket("media", { extensions: ["vector"] })).toThrow(/extensions/);
+    });
+
+    it("ignores an entry that is not a usable name", () => {
+        declareResource("database", DEFAULT_RESOURCE_KEY, { extensions: ["vector", "", "  ", 7] });
+        expect(declaredDatabaseExtensions()).toEqual(["vector"]);
     });
 });

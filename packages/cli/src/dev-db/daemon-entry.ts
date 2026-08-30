@@ -24,7 +24,7 @@ import net from "net";
 
 import {
     MANAGED_SERVER_MAX_CONNECTIONS,
-    PGLITE_EXTENSION_NAMES
+    PGLITE_EXTENSIONS
 } from "./constraints";
 import { NotificationProxy } from "./notification-proxy";
 import { clearState, dataDir, findFreePort, writeState } from "./state";
@@ -76,25 +76,39 @@ export function parseDaemonArgs(argv: readonly string[]): DaemonArgs {
 }
 
 /**
- * Load the extension bundles PGlite needs by name.
+ * Load the extension bundles PGlite needs.
  *
  * `CREATE EXTENSION pg_trgm` cannot install anything on its own here — PGlite
  * resolves extensions from bundles handed to the constructor, and a missing one
  * fails at migration time with `extension "pg_trgm" is not available`, which
  * reads like a broken database rather than a missing import.
+ *
+ * Every failure here is loud for that reason, including the one that is new:
+ * pgvector arrives from a package of its own, so unlike the contrib bundles it
+ * can be absent while PGlite itself is fine.
  */
 async function loadExtensions(): Promise<Record<string, unknown>> {
     const extensions: Record<string, unknown> = {};
-    for (const name of PGLITE_EXTENSION_NAMES) {
-        const module = (await import(`@electric-sql/pglite/contrib/${name}`)) as Record<string, unknown>;
-        const bundle = module[name];
+    for (const extension of PGLITE_EXTENSIONS) {
+        let module: Record<string, unknown>;
+        try {
+            module = (await import(extension.module)) as Record<string, unknown>;
+        } catch (err) {
+            throw new Error(
+                `Could not load "${extension.module}", which supplies the ${extension.name} extension: ` +
+                `${err instanceof Error ? err.message : String(err)}\n` +
+                "It is an optional dependency of @rebasepro/cli — reinstall the project, " +
+                "or run `rebase dev --docker` to use a real Postgres instead."
+            );
+        }
+        const bundle = module[extension.export];
         if (!bundle) {
             throw new Error(
-                `@electric-sql/pglite/contrib/${name} did not export "${name}". ` +
+                `${extension.module} did not export "${extension.export}". ` +
                 "The installed PGlite version may not ship this extension."
             );
         }
-        extensions[name] = bundle;
+        extensions[extension.name] = bundle;
     }
 
     return extensions;

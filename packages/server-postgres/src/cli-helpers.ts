@@ -264,42 +264,70 @@ export async function getSearchExcludes(collectionsPath: string): Promise<string
 }
 
 /**
- * Give the dev database the search helper functions before Atlas plans.
+ * The generated SQL for the project's `vector` properties, if it has any.
  *
- * Excluding the search column keeps Atlas from *diffing* it, but not from
- * materialising the inspected schema — column and all — in the dev database to
- * analyse the plan against. That replay is where a push against an
- * already-searchable database died with `function public.rebase_search_text
- * (jsonb) does not exist`: the column came across, the function it calls did
- * not, because Atlas will not carry a function at all.
- *
- * Only the extensions and functions, never the tables: the dev database holds
- * whatever Atlas puts there and nothing of ours.
- *
- * Best-effort by design. Failing here would block a push for a project whose
- * collections merely failed to import, and if the functions really are needed
- * and really are missing, Atlas says so a moment later in its own words.
+ * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
+ *        under the working directory.
  */
-export async function seedDevDatabaseSearchHelpers(
-    devDatabaseUrl: string,
-    collectionsPath: string
-): Promise<void> {
-    try {
-        const { searchPrerequisiteStatements } = await import("./schema/generate-postgres-ddl-logic");
-        const statements = searchPrerequisiteStatements(await loadCollectionsForCli(collectionsPath));
-        if (statements.length === 0) return;
+export function readVectorDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
+    const vectorFile = path.join(drizzleDir, "vector.sql");
+    if (!fs.existsSync(vectorFile)) return "";
+    return fs.readFileSync(vectorFile, "utf-8").trim();
+}
 
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: devDatabaseUrl });
-        await client.connect();
-        try {
-            await client.query(statements.join("\n"));
-        } finally {
-            await client.end();
-        }
-    } catch {
-        // See above: not worth failing a push over.
+/**
+ * Install pgvector and bring the vector columns and their ANN indexes up to
+ * date.
+ *
+ * Runs *after* Atlas, like {@link applySearchDdl} and for the same reason: the
+ * statements are `ALTER TABLE … ADD COLUMN`, so the table has to exist. Atlas
+ * is told to ignore these objects entirely ({@link getVectorExcludes}) — it
+ * cannot manage a type its dev database is structurally incapable of having,
+ * and left to itself it would plan a `DROP COLUMN` for every one.
+ *
+ * A no-op when no collection declares a `vector` property. A failure is *not*
+ * swallowed: a push that reported success while the embedding column never
+ * appeared is how a project ends up with vector search configured, no error
+ * anywhere, and no results.
+ */
+export async function applyVectorDdl(
+    databaseUrl: string,
+    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+): Promise<void> {
+    const sql = readVectorDdl(drizzleDir);
+    if (!sql) return;
+
+    const { vectorExtensionHint } = await import("./schema/vector-index");
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        await client.query(sql);
+    } catch (err) {
+        // The boot ensure explains this failure and the push has to as well —
+        // it is the same missing extension, and a push is the *more* likely
+        // place to meet it. Without this the developer gets a bare
+        // `type "vector" does not exist`, which names nothing they can act on
+        // and reads like a broken database rather than a line of config.
+        const message = err instanceof Error ? err.message : String(err);
+        const hint = vectorExtensionHint(message);
+        if (!hint) throw err;
+        throw new Error(`${message}${hint}`, { cause: err });
+    } finally {
+        await client.end();
     }
+    out(chalk.gray("  ✓ Applied vector columns and ANN indexes"));
+}
+
+/**
+ * Glob patterns keeping Atlas away from the vector objects.
+ *
+ * Returns an empty list — and so changes nothing — for a project with no
+ * `vector` property, which is every project that has not opted in.
+ */
+export async function getVectorExcludes(collectionsPath: string): Promise<string[]> {
+    const { vectorExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    return vectorExcludePatterns(await loadCollectionsForCli(collectionsPath));
 }
 
 /**
@@ -405,16 +433,19 @@ export async function getForeignIndexExcludes(
  */
 async function managedIndexNames(collectionsPath: string): Promise<Set<string>> {
     const collections = await loadCollectionsForCli(collectionsPath);
-    const { resolveColumnName, searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    const { resolveColumnName, searchExcludePatterns, vectorExcludePatterns } =
+        await import("./schema/generate-postgres-ddl-logic");
     const { buildCollectionIndexPlan } = await import("./schema/collection-index");
 
     const names = new Set<string>(
         buildCollectionIndexPlan(collections, resolveColumnName).map(spec => spec.indexName)
     );
-    // Search objects are excluded from Atlas wholesale by their own patterns;
-    // listing them here too is harmless and keeps this the single answer to
-    // "is this index one of ours".
-    for (const pattern of searchExcludePatterns(collections)) {
+    // Search and vector objects are excluded from Atlas wholesale by their own
+    // patterns; listing them here too is harmless and keeps this the single
+    // answer to "is this index one of ours". The doc comment above claimed
+    // vector was here long before it was — so an ANN index answered that
+    // question with "somebody else's".
+    for (const pattern of [...searchExcludePatterns(collections), ...vectorExcludePatterns(collections)]) {
         names.add(pattern.slice(pattern.lastIndexOf(".") + 1));
     }
     return names;

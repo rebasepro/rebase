@@ -34,7 +34,7 @@ registerResourceKind({
     // No per-engine narrowing: every engine binds from the same three, and the
     // driver package that differs between them is named by REBASE_DRIVER either
     // way.
-    optionKeys: ["databaseId", "migrations"],
+    optionKeys: ["databaseId", "migrations", "extensions"],
     // A backend without a database is not a backend, so one exists whether or
     // not a project says so.
     implicitDefault: true
@@ -49,6 +49,35 @@ export interface DatabaseOptions extends DeclareOptions {
     databaseId?: string;
     /** Directory of migration files, relative to the config directory. */
     migrations?: string;
+    /**
+     * Server extensions Rebase may install on this database.
+     *
+     * A permission, not a request: naming one grants leave to run
+     * `CREATE EXTENSION IF NOT EXISTS <name>`, and Rebase issues it only when
+     * something in the schema actually needs it. Naming an extension nothing
+     * needs installs nothing.
+     *
+     * It has to be said out loud because installing an extension is a decision
+     * with a deployment behind it — the image has to ship the library, the role
+     * has to be allowed to install it, and a managed provider has to have it on
+     * an allow-list. Rebase cannot see any of that from inside the connection,
+     * so the answer comes from whoever chose the database.
+     *
+     * Today `vector` is the one that matters: a `{ type: "vector" }` property
+     * compiles to a `VECTOR(n)` column, which does not exist until pgvector is
+     * installed. Without this, Rebase creates the column and lets Postgres
+     * refuse, naming the option.
+     *
+     * ```ts
+     * export const main = database({ extensions: ["vector"] });
+     * ```
+     *
+     * `pg_trgm` and `unaccent` are not on this list and need no permission: a
+     * `search` block installs them unasked, because they are contrib modules
+     * present in every Postgres distribution. pgvector is a separate build that
+     * a stock `postgres:18` does not carry.
+     */
+    extensions?: string[];
 }
 
 /** A database handle. Collections point at it via `dataSource`. */
@@ -58,12 +87,49 @@ export type DatabaseHandle = ResourceHandle;
  * Declare a database.
  *
  * ```ts
- * export const main      = database();               // the default one
- * export const analytics = database("analytics");    // reads DATABASE_URL__ANALYTICS
+ * export const main      = database();                          // the default one
+ * export const analytics = database("analytics");               // reads DATABASE_URL__ANALYTICS
+ * export const withPgv   = database({ extensions: ["vector"] }); // the default one, configured
  * ```
+ *
+ * The third form exists because the default database has no name to pass, and
+ * the alternative was `database("(default)", { … })` — writing out an internal
+ * sentinel to reach the options. A key is a string and options are an object,
+ * so the two can never be confused for one another.
  */
-export function database(key: string = DEFAULT_RESOURCE_KEY, options: DatabaseOptions = {}): DatabaseHandle {
-    return declareResource("database", key, options);
+export function database(options?: DatabaseOptions): DatabaseHandle;
+export function database(key?: string, options?: DatabaseOptions): DatabaseHandle;
+export function database(
+    keyOrOptions: string | DatabaseOptions = DEFAULT_RESOURCE_KEY,
+    options: DatabaseOptions = {}
+): DatabaseHandle {
+    return typeof keyOrOptions === "string"
+        ? declareResource("database", keyOrOptions, options)
+        : declareResource("database", DEFAULT_RESOURCE_KEY, keyOrOptions);
+}
+
+/**
+ * The extensions the project's databases gave Rebase leave to install.
+ *
+ * A flat union rather than a per-database answer, because the surfaces that ask
+ * — `rebase db push` and the boot schema-ensure — drive one connection and
+ * generate one `schema.sql` for every collection regardless of `dataSource`.
+ * Splitting the permission by data source would be a distinction the rest of
+ * that pipeline does not make, and a false precision is worse than none.
+ *
+ * Empty for a project that declared nothing, which is every project that has
+ * not opted in — so this reads as a refusal by default, on purpose.
+ */
+export function declaredDatabaseExtensions(): readonly string[] {
+    const names = new Set<string>();
+    for (const declaration of declaredResources("database")) {
+        const declared = declaration.options.extensions;
+        if (!Array.isArray(declared)) continue;
+        for (const name of declared) {
+            if (typeof name === "string" && name.trim()) names.add(name.trim());
+        }
+    }
+    return [...names].sort();
 }
 
 // ── bucket ───────────────────────────────────────────────────────────────────

@@ -467,12 +467,38 @@ searches embeddings, it does not compute them.
 ### What you have to provide
 
 - **pgvector.** A `vector` property compiles to a `VECTOR(n)` column, and that
-  type comes from the `vector` extension. The scaffold's database image
-  (`pgvector/pgvector:pg18`) ships it, so a project created by `rebase init`
-  needs nothing here. Pointed at a database someone else provisioned, you need
-  an image that carries the extension and a role allowed to run
-  `CREATE EXTENSION vector;` once — Rebase does not install extensions on your
-  behalf. Without it the first boot fails, naming this.
+  type comes from the `vector` extension. Rebase will install it for you, but
+  only where you say it may:
+
+  ```ts
+  // config/resources.ts
+  export const main = database({ extensions: ["vector"] });
+  ```
+
+  That line is a permission rather than a request — Rebase runs
+  `CREATE EXTENSION IF NOT EXISTS vector` only when something in your schema
+  needs it. It is opt-in because installing an extension depends on things
+  Rebase cannot see from inside the connection: the image has to ship the
+  library (the scaffold's `pgvector/pgvector:pg18` does, a stock `postgres:18`
+  does not), the role has to be allowed to install it, and a managed provider
+  has to have it on an allow-list.
+
+  Say nothing and Rebase installs nothing — install it once by hand instead.
+  Either way the column is created, and Postgres refuses it with
+  `type "vector" does not exist` on a database that has neither, naming both
+  ways out.
+
+The column, its ANN index and that `CREATE EXTENSION` are generated into
+`drizzle/vector.sql`, next to `schema.sql` and `policies.sql`, and `rebase db
+push` applies them for you. They have a file of their own because Atlas — the
+engine behind `db push` — computes its diff by materialising `schema.sql` in a
+scratch database it wipes at the start of every run, so a `VECTOR(n)` in there
+is resolved against a database that can never have pgvector.
+
+`rebase db generate` appends that file to the migration it writes, so a
+migration replayed against a fresh database builds the column too. A change to
+the vector property alone produces no migration, because the schema Atlas diffs
+is unchanged — `db generate` says so when it happens.
 
 ### The index
 

@@ -54,14 +54,35 @@
  *    ordinary `LISTEN` over ordinary libpq.
  */
 
+/** One extension bundle, and where to import it from. */
+export interface PgliteExtension {
+    /** The name `CREATE EXTENSION` uses, and the key PGlite is handed. */
+    name: string;
+    /** Module the bundle is imported from. */
+    module: string;
+    /** The named export carrying the bundle. */
+    export: string;
+}
+
 /**
  * Extensions to hand PGlite's constructor.
  *
  * `CREATE EXTENSION` alone cannot install these — PGlite resolves them from
  * bundles supplied at construction time, so anything missing here is missing
  * from the database no matter what the migration says.
+ *
+ * The module is spelled out per extension rather than derived from the name,
+ * because they do not all live in the same place: the two contrib ones are
+ * subpaths of PGlite itself, and pgvector is a package of its own. Deriving the
+ * path is what left `vector` off this list — `@electric-sql/pglite/contrib/vector`
+ * does not exist, so a project declaring a `{ type: "vector" }` property could
+ * not use the managed dev database at all.
  */
-export const PGLITE_EXTENSION_NAMES = ["pg_trgm", "unaccent"] as const;
+export const PGLITE_EXTENSIONS: readonly PgliteExtension[] = [
+    { name: "pg_trgm", module: "@electric-sql/pglite/contrib/pg_trgm", export: "pg_trgm" },
+    { name: "unaccent", module: "@electric-sql/pglite/contrib/unaccent", export: "unaccent" },
+    { name: "vector", module: "@electric-sql/pglite-pgvector", export: "vector" }
+];
 
 /**
  * Client connections the managed database tolerates: exactly one.

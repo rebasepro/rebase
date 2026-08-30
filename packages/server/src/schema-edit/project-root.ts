@@ -82,7 +82,8 @@ export function commitPathsFor(
         schemaFile: relocate(DEFAULT_COMMIT_PATHS.schemaFile),
         ddlFile: relocate(DEFAULT_COMMIT_PATHS.ddlFile),
         policiesFile: relocate(DEFAULT_COMMIT_PATHS.policiesFile),
-        searchFile: relocate(DEFAULT_COMMIT_PATHS.searchFile)
+        searchFile: relocate(DEFAULT_COMMIT_PATHS.searchFile),
+        vectorFile: relocate(DEFAULT_COMMIT_PATHS.vectorFile)
     };
 }
 

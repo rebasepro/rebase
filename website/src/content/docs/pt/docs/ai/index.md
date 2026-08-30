@@ -71,11 +71,12 @@ Isso já está documentado, em dois lugares em vez de um:
 Três coisas para saber antes de projetar sua solução em torno disso. **O Rebase armazena
 e busca embeddings; ele não os calcula** — não há provedor de embeddings, configuração
 de modelo ou chave de API em nenhum lugar no Rebase, portanto, produzir os vetores é
-tarefa sua. **O pgvector é um pré-requisito.** A imagem de banco de dados do scaffold já o
-traz, então um projeto criado com `rebase init` não precisa de nada aqui;
-apontado para um banco provisionado por outra pessoa, você precisa de uma imagem
-que carregue a extensão e de um papel autorizado a executar
-`CREATE EXTENSION vector;` uma vez — o Rebase não instala extensões por você. E
+tarefa sua. **O pgvector é um pré-requisito, e instalá-lo é opcional (opt-in).**
+`database({ extensions: ["vector"] })` em `config/resources.ts` permite que o
+`rebase db push` e a verificação de esquema do boot executem
+`CREATE EXTENSION IF NOT EXISTS vector`; sem essa linha eles criam a coluna e
+deixam a extensão por sua conta. De qualquer forma o servidor precisa de uma
+imagem que carregue a biblioteca e de um papel autorizado a instalá-la. E
 **cada coluna de vetor ganha um índice HNSW para distância de cosseno**, porque é
 com cosseno que `vectorSearch` mede a menos que você passe `distance` — um índice
 serve exatamente um operador. Ajuste-o, ou desligue-o, na propriedade: veja
