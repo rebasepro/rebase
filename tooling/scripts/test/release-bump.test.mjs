@@ -121,7 +121,7 @@ test("either contract constant moving is breaking", () => {
     }), 1);
 });
 
-test("a missing artifact at the previous tag is reported, not passed over", () => {
+test("a missing artifact at the previous tag stops the release", () => {
     const messages = [];
     const { log, error } = console;
     console.log = console.error = (...args) => messages.push(args.join(" "));
@@ -137,9 +137,31 @@ test("a missing artifact at the previous tag is reported, not passed over", () =
         console.log = log;
         console.error = error;
     }
-    assert.equal(code, 0);
+    // Reported AND fatal. It used to be reported and pass, which reads in a log
+    // as "· unguarded" followed by "✓ Nothing breaking" — a blind axis and a
+    // clean one, indistinguishable. For 0.17.0 `server.api.txt` had moved
+    // `api-surface/` → `contracts/`, so that axis compared nothing while the
+    // release removed two members of `RebaseBackendConfig`.
+    assert.equal(code, 1);
     for (const file of [SURFACE, DERIVED_NAMES, MANIFEST]) {
         assert.match(messages.join("\n"), new RegExp(`${file.replace(/[.\/]/g, "\\$&")}.*unguarded`));
+    }
+});
+
+test("--allow-unguarded is how someone says they checked it another way", () => {
+    const { log, error } = console;
+    console.log = console.error = () => {};
+    try {
+        assert.equal(checkReleaseBump({
+            version: "0.13.1",
+            from: "v0.13.0",
+            allowUnguarded: true,
+            readAtTag: () => null,
+            readNow: () => "whatever"
+        }), 0);
+    } finally {
+        console.log = log;
+        console.error = error;
     }
 });
 

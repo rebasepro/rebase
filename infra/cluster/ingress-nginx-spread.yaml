@@ -1,0 +1,23 @@
+# Strategic-merge patch: keep the two ingress replicas on different nodes.
+#
+# A PodDisruptionBudget only constrains VOLUNTARY disruption. If both replicas
+# are scheduled onto one node — which nothing prevents by default — a node
+# hard-failing takes both, and the budget has no say. `DoNotSchedule` rather than
+# `ScheduleAnyway` because best-effort spreading gives the appearance of
+# redundancy without the guarantee.
+#
+# Changes the pod template, so applying it rolls the controller. Safe only once
+# the deployment has two replicas, a PDB and maxUnavailable 0 — see
+# ingress-nginx-ha.yaml for the order.
+spec:
+  template:
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+              app.kubernetes.io/component: controller
+              app.kubernetes.io/instance: ingress-nginx

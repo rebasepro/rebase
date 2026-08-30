@@ -1,0 +1,24 @@
+# Fleet image only — deliberately NOT the repo's cloudbuild-runtime.yaml.
+#
+# That config also pushes `rebasepro/server:$_VERSION` and `:latest` to Docker
+# Hub, and `latest` is what every self-hoster's scaffolded compose file pulls
+# when they have not pinned. This build exists to unbreak managed deploys on the
+# private fleet registry; moving a public tag to an unreleased canary is a
+# different decision with different consequences, so it is not made here.
+#
+# Same Dockerfile, same digest semantics, one destination.
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build
+    env: ['DOCKER_BUILDKIT=1']
+    args: ['build', '-t', '$_REPO:$_TAG', '--build-arg=BUILDKIT_INLINE_CACHE=1',
+           '-f', 'infra/docker/server.Dockerfile', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-fleet
+    args: ['push', '$_REPO:$_TAG']
+substitutions:
+  _REPO: 'europe-west1-docker.pkg.dev/rebase-578f2/rebase-saas-images/rebasepro/server'
+  _TAG: ''
+options:
+  machineType: 'E2_HIGHCPU_8'
+timeout: '1800s'

@@ -29,7 +29,29 @@ if (!version || !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(version)) {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ROOT_CHANGELOG = path.join(ROOT, "CHANGELOG.md");
 const DOCS_CHANGELOG = path.join(ROOT, "website/src/content/docs/docs/CHANGELOG.md");
-const DOCS_FRONTMATTER = "---\nslug: docs/changelog\ntitle: Changelog\n---\n";
+/**
+ * The mirror's frontmatter, taken from the mirror rather than restated here.
+ *
+ * This was a hardcoded copy — `slug`, `title`, and nothing else — and
+ * `website/scripts/copy_repo_docs.js` writes the same file with a `description`
+ * too. Two writers of one generated file, disagreeing by a line: every stable
+ * release rewrote the mirror without the description, `check:generated`
+ * regenerated it, found the diff and failed. Main went red after 0.17.0, was
+ * fixed, and went red again the moment 0.17.1 cut.
+ *
+ * Reusing the block that is already there means the generator stays the single
+ * author of what the frontmatter contains. The literal is the fallback for a
+ * mirror that does not exist yet, which is the only case it can be right for.
+ */
+const FALLBACK_FRONTMATTER = "---\nslug: docs/changelog\ntitle: Changelog\n---\n";
+function docsFrontmatter() {
+    try {
+        const existing = fs.readFileSync(DOCS_CHANGELOG, "utf8");
+        const end = existing.indexOf("\n---\n", 4);
+        if (existing.startsWith("---\n") && end !== -1) return existing.slice(0, end + 5);
+    } catch { /* no mirror yet */ }
+    return FALLBACK_FRONTMATTER;
+}
 
 const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -65,5 +87,5 @@ if (!unreleasedRe.test(text)) {
 fs.writeFileSync(ROOT_CHANGELOG, text);
 
 // Keep the docs-site changelog in lockstep (frontmatter + root body).
-fs.writeFileSync(DOCS_CHANGELOG, DOCS_FRONTMATTER + text);
+fs.writeFileSync(DOCS_CHANGELOG, docsFrontmatter() + text);
 console.log("✓ Synced docs changelog mirror.");
