@@ -4,7 +4,7 @@ import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
 import { Code, CodeCaption } from "../components/Code";
-import { ramp, drift } from "../components/motion";
+import { ramp } from "../components/motion";
 import { FONT } from "../theme";
 import { useTone } from "../Plane";
 
@@ -51,7 +51,6 @@ const INCLUDED = [
 
 export const S05_Headless: React.FC = () => {
     const frame = useCurrentFrame();
-    const d = drift(frame, 200, 120);
     const tone = useTone();
 
     return (
@@ -122,11 +121,9 @@ export const S05_Headless: React.FC = () => {
 
                     <div style={{ flex: 1 }}>
                         <CodeCaption delay={16}>app/orders.ts</CodeCaption>
-                        <div style={{ transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                         <Frame delay={18} style={{ marginTop: 12 }} bodyStyle={{ padding: "26px 30px" }}>
                             <Code code={SDK} delay={30} step={2} size={19} />
                         </Frame>
-                        </div>
                     </div>
                 </div>
             </Stage>

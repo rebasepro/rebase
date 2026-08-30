@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
-import { ramp, drift } from "../components/motion";
+import { ramp } from "../components/motion";
 import { FONT, INK } from "../theme";
 
 /**
@@ -61,7 +61,6 @@ const REPORT: Line[] = [
 
 export const S05_Proof: React.FC = () => {
     const frame = useCurrentFrame();
-    const d = drift(frame, 200, 80);
     const CMD = "npx @rebasepro/rls-check $DATABASE_URL";
 
     // Typed at a readable rate, then the report streams under it.
@@ -112,11 +111,11 @@ export const S05_Proof: React.FC = () => {
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                     <Frame
                         title="rls-check · production"
                         delay={10}
-                            bodyStyle={{ padding: "28px 34px 34px" }}
+                        style={{ flex: 1 }}
+                        bodyStyle={{ padding: "28px 34px 34px" }}
                     >
                         <div style={{ fontFamily: FONT.mono, fontSize: 19, lineHeight: 1.7 }}>
                             <div style={{ color: C.white }}>
@@ -143,7 +142,6 @@ export const S05_Proof: React.FC = () => {
                             })}
                         </div>
                     </Frame>
-                    </div>
                 </div>
             </Stage>
         </Scene>

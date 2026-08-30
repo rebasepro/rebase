@@ -4,7 +4,7 @@ import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
 import { Code, CodeCaption } from "../components/Code";
-import { ramp, ENTER, drift } from "../components/motion";
+import { ramp, ENTER } from "../components/motion";
 import { FONT, INK, PRIMARY_LIGHT } from "../theme";
 
 /**
@@ -49,7 +49,6 @@ const SURFACES: [string, string][] = [
 
 export const S03_OneDefinition: React.FC = () => {
     const frame = useCurrentFrame();
-    const d = drift(frame, 210, 160);
 
     // The spine draws downward as the surfaces land, so the line is always
     // just ahead of the row it is about to introduce.
@@ -74,7 +73,6 @@ export const S03_OneDefinition: React.FC = () => {
                 <div style={{ display: "flex", gap: 76, alignItems: "stretch" }}>
                     <div style={{ width: 780, flexShrink: 0 }}>
                         <CodeCaption delay={20}>collections/orders.ts</CodeCaption>
-                        <div style={{ transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                         <Frame
                             delay={22}
                             style={{ marginTop: 12 }}
@@ -82,7 +80,6 @@ export const S03_OneDefinition: React.FC = () => {
                         >
                             <Code code={COLLECTION} delay={34} step={2} size={18} />
                         </Frame>
-                        </div>
                     </div>
 
                     <div

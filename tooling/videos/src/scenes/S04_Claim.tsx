@@ -1,6 +1,4 @@
-import { useCurrentFrame } from "remotion";
 import React from "react";
-import { drift } from "../components/motion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, Lead, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
@@ -34,10 +32,7 @@ CREATE POLICY orders_select_9f2c1a4b ON orders
     FOR SELECT TO rebase_user
     USING (customer_id = rebase.uid());`;
 
-export const S04_Claim: React.FC = () => {
-    const frame = useCurrentFrame();
-    const d = drift(frame, 200, 40);
-    return (
+export const S04_Claim: React.FC = () => (
     <Scene>
         {/* A STATEMENT layout, not a split. This ran a 90px headline inside
             a flex column beside the code frame — the largest type in the film
@@ -59,7 +54,6 @@ export const S04_Claim: React.FC = () => {
                 </div>
 
                 <div style={{ flex: 1 }}>
-                    <div style={{ transform: `translateY(${d.y}px) scale(${d.scale})` }}>
                     <Frame
                         title="migrations/0004_orders.sql"
                         delay={26}
@@ -67,7 +61,6 @@ export const S04_Claim: React.FC = () => {
                     >
                         <Code code={POLICY} sql delay={44} step={3.5} size={22} />
                     </Frame>
-                    </div>
                     <div
                         style={{
                             marginTop: 18,
@@ -84,5 +77,4 @@ export const S04_Claim: React.FC = () => {
         </Stage>
 
     </Scene>
-    );
-};
+);

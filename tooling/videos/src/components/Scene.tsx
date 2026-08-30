@@ -37,7 +37,17 @@ export const Scene: React.FC<{
                 slightly differently from one process to the next. One level on
                 glyph edges, invisible, but it is the difference between renders
                 that are byte-identical and renders that are merely
-                indistinguishable. Most frames sit still. */}
+                indistinguishable. Most frames sit still.
+
+                It is also, and more importantly, a VISIBLE problem. A slow
+                transform over type does not read as gentle movement, it reads
+                as vibration: every glyph lands on a new sub-pixel offset each
+                frame and is re-rasterised, so the whole block shimmers. This
+                was tried — a 1.022 scale over a scene, meant as "a camera that
+                has not quite settled" — and measured 87 of 89 frames changing
+                in a code frame that should have been perfectly still. Type in
+                this film moves to a position and then STOPS. Motion belongs to
+                the footage, the gradient and the cuts. */}
             <AbsoluteFill
                 style={
                     still && alpha === 1
