@@ -27,7 +27,8 @@
         "logo": "node scripts/extract-logo.mjs",
         "neat:config": "node scripts/extract-neat-config.mjs",
         "upgrade": "remotion upgrade",
-        "bento": "remotion render src/index.ts Bento out/bento.mp4"
+        "bento": "remotion render src/index.ts Bento out/bento.mp4",
+        "reel": "remotion render src/index.ts Reel-Fanout out/reel-fanout.mp4 && remotion render src/index.ts Reel-TwoUsers out/reel-twousers.mp4 && remotion render src/index.ts Reel-Included out/reel-included.mp4 && remotion render src/index.ts Reel-Refused out/reel-refused.mp4"
     },
     "sideEffects": [
         "*.css"

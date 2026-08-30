@@ -10,6 +10,11 @@ import { FeatureShowcase } from "./components/FeatureShowcase";
 import { ProductUIReveal } from "./components/ProductUIReveal";
 import { RealProductVideo } from "./components/RealProductVideo";
 import { Bento, BENTO_DURATION } from "./bento/Bento";
+import { Reel } from "./reel/Reel";
+import { Fanout, FANOUT_DURATION } from "./reel/Fanout";
+import { TwoUsers, TWO_USERS_DURATION } from "./reel/TwoUsers";
+import { Included, INCLUDED_DURATION } from "./reel/Included";
+import { Refused, REFUSED_DURATION } from "./reel/Refused";
 
 loadFonts();
 
@@ -53,6 +58,60 @@ export const RemotionRoot: React.FC = () => (
             id="Bento"
             component={Bento}
             durationInFrames={BENTO_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        {/* CANDIDATE scenes. Not in the film — each is here to be looked at
+            and judged on whether it earns a place, the way the bento was. */}
+        <Composition
+            id="Reel-Fanout"
+            component={() => (
+                <Reel roll={0.34}>
+                    <Fanout />
+                </Reel>
+            )}
+            durationInFrames={FANOUT_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-TwoUsers"
+            component={() => (
+                <Reel roll={0.7}>
+                    <TwoUsers />
+                </Reel>
+            )}
+            durationInFrames={TWO_USERS_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Included"
+            component={() => (
+                <Reel roll={0.58}>
+                    <Included />
+                </Reel>
+            )}
+            durationInFrames={INCLUDED_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Refused"
+            component={() => (
+                <Reel roll={0.22} ground="#2E0EC7" reveal={0.24}>
+                    <Refused />
+                </Reel>
+            )}
+            durationInFrames={REFUSED_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
