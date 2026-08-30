@@ -126,6 +126,7 @@ export function unreleasedSection(text) {
 export function checkReleaseBump({
     version,
     from,
+    allowUnguarded = false,
     readAtTag = file => gitShow(from, file),
     readNow = file => {
         const abs = path.join(ROOT, file);
@@ -133,7 +134,7 @@ export function checkReleaseBump({
     }
 } = {}) {
     if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-        console.error("usage: node tooling/scripts/check-release-bump.mjs <version> [--from <tag>]");
+        console.error("usage: node tooling/scripts/check-release-bump.mjs <version> [--from <tag>] [--allow-unguarded]");
         return 2;
     }
     if (!from) {
@@ -212,6 +213,33 @@ export function checkReleaseBump({
             ));
             return 1;
         }
+        // An unguarded axis checked NOTHING, so "nothing breaking" is not a
+        // thing this run is entitled to say. Reporting it and passing anyway was
+        // the previous behaviour and it demonstrably does not work: for 0.17.0
+        // `server.api.txt` had moved `api-surface/` → `contracts/`, the axis
+        // reported unguarded, the run printed a clean bill of health, and the
+        // release did remove two members of `RebaseBackendConfig` — found only
+        // by diffing the two paths by hand afterwards.
+        //
+        // So a blind axis stops the release until somebody says they looked.
+        // `--allow-unguarded` is that sentence, and it is deliberately a flag
+        // rather than a heuristic: an artifact that genuinely did not exist yet
+        // is a real and legitimate case, and the only thing that can tell it
+        // apart from a moved file is a person.
+        if (unguarded.length && !allowUnguarded) {
+            console.error(red("\n✗ An axis could not be measured, so this release is not cleared.\n"));
+            for (const file of unguarded) {
+                console.error(red(`  ✗ ${file} did not exist at ${from} — nothing was compared.`));
+            }
+            console.error(red(
+                "\n    Check it by hand before releasing. An artifact that MOVED reads exactly like\n" +
+                "    one that did not exist yet, and the moved case is the one that hides a break:\n" +
+                `      git show ${from}:<old-path>   vs   git show HEAD:<new-path>\n` +
+                "      classify() from tooling/scripts/check-api-surface.mjs compares two surfaces.\n" +
+                "\n    Then re-run with --allow-unguarded to say the axis was checked another way.\n"
+            ));
+            return 1;
+        }
         console.log(green(`✓ Nothing breaking in the tracked contracts — ${level} is fine.`));
         return 0;
     }
@@ -256,6 +284,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const fromIndex = args.indexOf("--from");
     process.exit(checkReleaseBump({
         version: args.find(a => /^\d+\.\d+\.\d+$/.test(a)),
-        from: fromIndex === -1 ? latestTag() : args[fromIndex + 1]
+        from: fromIndex === -1 ? latestTag() : args[fromIndex + 1],
+        allowUnguarded: args.includes("--allow-unguarded")
     }));
 }
