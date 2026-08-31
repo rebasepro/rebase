@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/cms",
   "type": "module",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "Rebase CMS — content management views, forms, and routing",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
