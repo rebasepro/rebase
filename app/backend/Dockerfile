@@ -24,7 +24,12 @@ COPY app ./app
 # Every package's build ends with `node ../../tooling/scripts/assert-build-output.mjs`,
 # so the build fails without it. The build context is the workspace root, but
 # only the directories named here are actually copied in.
-COPY scripts ./scripts
+#
+# `tooling/scripts`, not `scripts`: the directory was moved under `tooling/` and
+# this line kept naming the old path, so `COPY` failed on a context that no
+# longer had it and every demo build died here. The `RUN` below already used the
+# new path — the two halves of the same rename disagreed.
+COPY tooling/scripts ./tooling/scripts
 
 # Populate the served uploads directory from the git-tracked `app/seed-assets/`.
 # `app/uploads/` is gitignored AND excluded by .dockerignore, so it is never
