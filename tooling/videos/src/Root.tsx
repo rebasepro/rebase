@@ -15,6 +15,8 @@ import { Fanout, FANOUT_DURATION } from "./reel/Fanout";
 import { TwoUsers, TWO_USERS_DURATION } from "./reel/TwoUsers";
 import { Included, INCLUDED_DURATION } from "./reel/Included";
 import { Refused, REFUSED_DURATION } from "./reel/Refused";
+import { Drift, DRIFT_DURATION } from "./reel/Drift";
+import { Push, PUSH_DURATION } from "./reel/Push";
 
 loadFonts();
 
@@ -112,6 +114,32 @@ export const RemotionRoot: React.FC = () => (
                 </Reel>
             )}
             durationInFrames={REFUSED_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Drift"
+            component={() => (
+                <Reel roll={0.46}>
+                    <Drift />
+                </Reel>
+            )}
+            durationInFrames={DRIFT_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Push"
+            component={() => (
+                <Reel roll={0.1}>
+                    <Push />
+                </Reel>
+            )}
+            durationInFrames={PUSH_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
