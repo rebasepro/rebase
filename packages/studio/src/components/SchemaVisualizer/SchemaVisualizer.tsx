@@ -14,7 +14,6 @@ import {
 import type { Node, Edge, NodeChange, EdgeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-    Button,
     SearchBar,
     TextField,
     Tooltip,
@@ -61,8 +60,6 @@ function SchemaVisualizerCanvas({
     const {
         nodes: layoutedNodes,
         edges: layoutedEdges,
-        direction,
-        setDirection,
         relayout,
         tableCount,
         relationCount
@@ -108,24 +105,6 @@ function SchemaVisualizerCanvas({
         reactFlowInstance.fitView({ padding: 0.15,
 duration: 400 });
     }, [nodesInitialized, nodes.length, reactFlowInstance]);
-
-    /**
-     * Re-fit after a relayout.
-     *
-     * Switching LR↔TB transposes the graph — a tall column becomes a wide band
-     * — so the viewport that framed the old shape frames the new one badly:
-     * asking for a different layout used to leave most of it off-screen until
-     * you pressed "fit" as a second step. Skipped for the very first layout,
-     * which the initial fit above already handles.
-     */
-    const lastFittedDirection = useRef(direction);
-    useEffect(() => {
-        if (!nodesInitialized || nodes.length === 0) return;
-        if (lastFittedDirection.current === direction) return;
-        lastFittedDirection.current = direction;
-        reactFlowInstance.fitView({ padding: 0.15,
-duration: 400 });
-    }, [direction, nodesInitialized, nodes, reactFlowInstance]);
 
     const handleFitView = useCallback(() => {
         reactFlowInstance.fitView({ padding: 0.15,
@@ -488,34 +467,6 @@ duration: 400 }
                             </Typography>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
-                            {/* Direction toggle */}
-                            <div className="flex items-center bg-surface-100 dark:bg-surface-950 rounded-md border border-surface-200/40 dark:border-surface-700/40">
-                                <Tooltip title="Left to right layout">
-                                    <Button
-                                        size="small"
-                                        variant={direction === "LR" ? "filled" : "text"}
-                                        color={direction === "LR" ? "primary" : "neutral"}
-                                        onClick={() => setDirection("LR")}
-                                        className="!rounded-r-none !px-2 !py-1 !text-[10px] !font-mono"
-                                    >
-                                        LR
-                                    </Button>
-                                </Tooltip>
-                                <Tooltip title="Top to bottom layout">
-                                    <Button
-                                        size="small"
-                                        variant={direction === "TB" ? "filled" : "text"}
-                                        color={direction === "TB" ? "primary" : "neutral"}
-                                        onClick={() => setDirection("TB")}
-                                        className="!rounded-l-none !px-2 !py-1 !text-[10px] !font-mono"
-                                    >
-                                        TB
-                                    </Button>
-                                </Tooltip>
-                            </div>
-
-                            <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-0.5"/>
-
                             {/* Fit view */}
                             <Tooltip title="Fit to view">
                                 <IconButton

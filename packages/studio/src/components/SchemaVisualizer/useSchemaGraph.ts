@@ -1,11 +1,11 @@
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import type { Relation, ResolvedRelation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
-import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
+import type { RelationEdgeData } from "./schema-visualizer.utils";
 import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
 
 // ─── Column info extracted from a collection ──────────────────────────
@@ -119,7 +119,6 @@ const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
 
 const buildGraph = (
     collections: AdminCollection[],
-    direction: LayoutDirection,
     liveRls: Set<string> | null
 ): { nodes: Node[]; edges: Edge[] } => {
     /**
@@ -332,7 +331,7 @@ height: 16 }
         }
     }
     // 3. Apply dagre layout first to get node positions
-    const layoutResult = getLayoutedElements(nodes, edges, direction);
+    const layoutResult = getLayoutedElements(nodes, edges);
 
     // 4. Build a position lookup from the laid-out nodes
     const nodePositions = new Map<string, { x: number }>();
@@ -371,8 +370,6 @@ height: 16 }
 export interface UseSchemaGraphResult {
     nodes: Node[];
     edges: Edge[];
-    direction: LayoutDirection;
-    setDirection: (dir: LayoutDirection) => void;
     relayout: () => void;
     isLoading: boolean;
     tableCount: number;
@@ -387,15 +384,9 @@ export const useSchemaGraph = (
      */
     liveRls: Set<string> | null = null
 ): UseSchemaGraphResult => {
-    const [direction, setDirection] = useState<LayoutDirection>("LR");
     const [version, setVersion] = useState(0);
 
     const relayout = useCallback(() => setVersion((v) => v + 1), []);
-
-    // Re-layout on direction change
-    useEffect(() => {
-        setVersion((v) => v + 1);
-    }, [direction]);
 
     const { nodes, edges, tableCount, relationCount } = useMemo(() => {
         if (!collections || collections.length === 0) {
@@ -404,20 +395,18 @@ edges: [],
 tableCount: 0,
 relationCount: 0 };
         }
-        const result = buildGraph(collections, direction, liveRls);
+        const result = buildGraph(collections, liveRls);
         return {
             ...result,
             tableCount: result.nodes.length,
             relationCount: result.edges.length
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collections, direction, version, liveRls]);
+    }, [collections, version, liveRls]);
 
     return {
         nodes,
         edges,
-        direction,
-        setDirection,
         relayout,
         isLoading: !collections,
         tableCount,

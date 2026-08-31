@@ -38,20 +38,21 @@ export const getColumnRowY = (rowIndex: number, headerHeight: number = HEADER_HE
 
 // ─── Auto-Layout via Dagre ────────────────────────────────────────────
 
-export type LayoutDirection = "TB" | "LR";
-
 /**
  * Compute node positions using the dagre graph layout engine.
  * Returns a new array of nodes with updated `position`.
+ *
+ * The graph always ranks top to bottom: an ERD read as a column of tables
+ * fits the tall, narrow canvas the visualizer is given, and it is the only
+ * layout the visualizer offers.
  */
 export const getLayoutedElements = (
     nodes: Node[],
-    edges: Edge[],
-    direction: LayoutDirection = "LR"
+    edges: Edge[]
 ): { nodes: Node[]; edges: Edge[] } => {
     const g = new dagre.graphlib.Graph();
     g.setGraph({
-        rankdir: direction,
+        rankdir: "TB",
         nodesep: 100,
         ranksep: 180,
         edgesep: 60,
@@ -89,10 +90,6 @@ export const getLayoutedElements = (
         const h = nodeHeights.get(node.id) ?? estimateNodeHeight(3);
         return {
             ...node,
-            data: {
-                ...node.data,
-                layoutDirection: direction
-            },
             position: {
                 x: nodeWithPosition.x - NODE_WIDTH / 2,
                 y: nodeWithPosition.y - h / 2
