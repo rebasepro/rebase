@@ -47,6 +47,59 @@
   publish time and cannot be rewritten after the fact. The next release is what
   puts the skills package back on npm and points the CLI at it.
 
+  A fourth copy of the list surfaced when CI ran against this fix, and it is the
+  one that could not be repaired by correcting a path: the registry-install e2e
+  built its set with `readdirSync("packages")`, so it structurally could not see
+  the package under `tooling/`. `@rebasepro/agent-skills` was therefore never
+  packed, the CLI's dependency on it was never rewritten to a local tarball, and
+  the install fetched it **from the public registry** — which worked only
+  because 0.16.0 is the version this very bug had stranded there. It packs the
+  derived set now, and a first-party package that is not in it is a thrown error
+  rather than a warning: an e2e that reaches the real registry for our own
+  package is not testing the tree it was given.
+
+- **The API key dialog described the widest grant in the product as a narrower
+  one.** A permission row's collection field addresses three namespaces, not
+  one: `*` matches every collection *and* every custom function *and* storage,
+  while `storage` and `functions`/`functions/<name>` reach the other two. The
+  dialog labelled that field "Collection slug or *" and the detail panel
+  rendered the wildcard as "* (all collections)" — so a key granting everything
+  read as a key granting only the collections, and two namespaces were
+  undiscoverable from the UI that creates them.
+
+  `permissions.ts` is now the single place that knows the mapping; the picker
+  labels, row descriptions, grant summary and detail panel all read from it, so
+  they cannot drift from each other or from the server guard. The free-text box
+  became a grouped picker (Everything / registered collections / Functions /
+  Storage / a free-text escape for anything unregistered), and a live read-back
+  under the rows spells the grant out in English as it is built. A row granting
+  nothing used to be dropped silently at submit and now says so, and operation
+  toggles are neutral when off — `delete` rendered red whether or not it was
+  checked, so a read-only key looked destructive.
+
+- **`Select` announced every option list as "Select an option".** Its trigger
+  hardcoded that string whenever `label` was not a string, so every such select
+  in the API key panel was identical to a screen reader. It takes an
+  `aria-label` passthrough now.
+
+- **The demo has been un-deployable, not merely stale.** `scripts/` moved under
+  `tooling/`, and `app/backend/Dockerfile`'s `COPY scripts ./scripts` kept
+  naming the old path while the `RUN` two lines below it already used the new
+  one — the two halves of one rename disagreeing, so every `pnpm deploy:demo`
+  since died at that layer with "file not found in build context". It copies
+  `tooling/scripts` rather than all of `tooling/`, since only the scripts are
+  needed in the image. Same move, same shape as the entry above.
+
+### Added
+
+- **API keys can be created as admin keys, and are labelled as such.** The wire
+  has carried `admin` all along and this view could neither set nor show it: the
+  local `ApiKeyMasked`/`ApiKeyPermission` copies had drifted from
+  `@rebasepro/types` and never gained the field, so an admin key was
+  indistinguishable from a scoped read-only one. The types come from the package
+  now, and admin keys are badged in the list, the detail panel and the
+  created-key confirmation.
+
 ## [0.17.2] - 2026-08-31
 
 ### Fixed
