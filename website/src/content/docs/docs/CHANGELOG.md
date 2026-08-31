@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-08-31
+
 ### Fixed
 
 - **Three releases published without `@rebasepro/agent-skills`, and nothing

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-08-31
+
 ### Fixed
 
 - **Three releases published without `@rebasepro/agent-skills`, and nothing

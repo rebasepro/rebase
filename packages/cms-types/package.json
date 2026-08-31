@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/cms-types",
   "type": "module",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "Rebase admin-panel type definitions — the React-flavoured half of the type surface",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"
