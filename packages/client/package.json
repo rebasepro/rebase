@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/client",
   "type": "module",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "HTTP SDK client for the Rebase custom backend",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"

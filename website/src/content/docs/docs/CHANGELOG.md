@@ -7,6 +7,106 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.17.3] - 2026-08-31
+
+### Fixed
+
+- **Three releases published without `@rebasepro/agent-skills`, and nothing
+  failed.** On 2026-08-24 `rebase-agent-skills/` moved under `tooling/`. Both
+  release paths named their publishable packages as literal paths; the shell
+  loops were updated and four `pnpm --filter './rebase-agent-skills'` were not.
+  pnpm treats a filter that matches nothing as a **warning and exits 0** — it
+  prints `No projects matched the filters "…"`, then does the work for the
+  filters that did match. So the bump ran for `packages/*`, silently skipped the
+  skills package, and every job stayed green.
+
+  The package was last published on 2026-08-23. 0.17.0, 0.17.1 and 0.17.2 each
+  shipped without it. Worse, and far less visible: `packages/cli` depends on it
+  as `workspace:*`, which pnpm resolves at publish time against *that package's
+  own manifest* — so all three published CLIs carry a hard
+  `"@rebasepro/agent-skills": "0.16.0"`, a pin nobody wrote, four versions
+  behind. `rebase skills install` has been writing the 0.16.0 set ever since,
+  which means every agent skill authored or edited in that window — including
+  the whole `rebase-cloud` skill — reached no user at all.
+
+  Nothing in the pipeline could have caught it: every check asked whether the
+  packages it *found* were correct, and none asked whether it had found them
+  all.
+
+  **A release no longer enumerates its own contents.** `publishable-packages.mjs`
+  derives the set from `pnpm-workspace.yaml` — every member that is not
+  `private` — and it is the single derivation used by the workflow, by
+  `release.sh`, and by the workspace-protocol validator, all three of which held
+  their own copy of the list. Publishing takes no `--filter` at all, since
+  `pnpm -r publish` already publishes exactly the non-private members wherever
+  they live, so there is nothing left for a directory move to invalidate.
+
+  `pnpm check:publishable-set` is the guard, and it runs on **every PR** rather
+  than at release time, because a release-time check is discovered during a
+  release. It fails when publishable packages fall out of version lockstep (the
+  symptom), when any release file enumerates packages by hand (the cause), when
+  a publishable `@rebasepro/*` package sits outside the workspace globs where
+  nothing would see it, when a package declares no `files`, or when its
+  `repository.directory` no longer matches where it lives — which the same 2026-08-24
+  move had also left stale.
+
+  This does not repair the published 0.17.2: `workspace:*` was resolved at
+  publish time and cannot be rewritten after the fact. The next release is what
+  puts the skills package back on npm and points the CLI at it.
+
+  A fourth copy of the list surfaced when CI ran against this fix, and it is the
+  one that could not be repaired by correcting a path: the registry-install e2e
+  built its set with `readdirSync("packages")`, so it structurally could not see
+  the package under `tooling/`. `@rebasepro/agent-skills` was therefore never
+  packed, the CLI's dependency on it was never rewritten to a local tarball, and
+  the install fetched it **from the public registry** — which worked only
+  because 0.16.0 is the version this very bug had stranded there. It packs the
+  derived set now, and a first-party package that is not in it is a thrown error
+  rather than a warning: an e2e that reaches the real registry for our own
+  package is not testing the tree it was given.
+
+- **The API key dialog described the widest grant in the product as a narrower
+  one.** A permission row's collection field addresses three namespaces, not
+  one: `*` matches every collection *and* every custom function *and* storage,
+  while `storage` and `functions`/`functions/<name>` reach the other two. The
+  dialog labelled that field "Collection slug or *" and the detail panel
+  rendered the wildcard as "* (all collections)" — so a key granting everything
+  read as a key granting only the collections, and two namespaces were
+  undiscoverable from the UI that creates them.
+
+  `permissions.ts` is now the single place that knows the mapping; the picker
+  labels, row descriptions, grant summary and detail panel all read from it, so
+  they cannot drift from each other or from the server guard. The free-text box
+  became a grouped picker (Everything / registered collections / Functions /
+  Storage / a free-text escape for anything unregistered), and a live read-back
+  under the rows spells the grant out in English as it is built. A row granting
+  nothing used to be dropped silently at submit and now says so, and operation
+  toggles are neutral when off — `delete` rendered red whether or not it was
+  checked, so a read-only key looked destructive.
+
+- **`Select` announced every option list as "Select an option".** Its trigger
+  hardcoded that string whenever `label` was not a string, so every such select
+  in the API key panel was identical to a screen reader. It takes an
+  `aria-label` passthrough now.
+
+- **The demo has been un-deployable, not merely stale.** `scripts/` moved under
+  `tooling/`, and `app/backend/Dockerfile`'s `COPY scripts ./scripts` kept
+  naming the old path while the `RUN` two lines below it already used the new
+  one — the two halves of one rename disagreeing, so every `pnpm deploy:demo`
+  since died at that layer with "file not found in build context". It copies
+  `tooling/scripts` rather than all of `tooling/`, since only the scripts are
+  needed in the image. Same move, same shape as the entry above.
+
+### Added
+
+- **API keys can be created as admin keys, and are labelled as such.** The wire
+  has carried `admin` all along and this view could neither set nor show it: the
+  local `ApiKeyMasked`/`ApiKeyPermission` copies had drifted from
+  `@rebasepro/types` and never gained the field, so an admin key was
+  indistinguishable from a scoped read-only one. The types come from the package
+  now, and admin keys are badged in the list, the detail panel and the
+  created-key confirmation.
+
 ## [0.17.2] - 2026-08-31
 
 ### Fixed

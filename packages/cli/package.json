@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/cli",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "Developer tools for Rebase projects",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
