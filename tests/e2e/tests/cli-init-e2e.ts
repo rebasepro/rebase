@@ -3,6 +3,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { execSync, spawn } from "child_process";
+// The one derivation of what a release ships, shared with the release pipeline
+// itself — see tooling/scripts/publishable-packages.mjs.
+import { publishablePackages } from "../../../tooling/scripts/publishable-packages.mjs";
 
 /**
  * Tracks the detached groups, so that a crash between spawn and killTree still
@@ -221,29 +224,40 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
     const tarballsDir = path.join(projectPath, "tarballs");
     fs.mkdirSync(tarballsDir, { recursive: true });
 
-    const packagesDir = path.join(rootDir, "packages");
-    const packages = fs
-        .readdirSync(packagesDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && fs.existsSync(path.join(packagesDir, e.name, "package.json")))
-        .map((e) => e.name);
-
-    const currentVersion = JSON.parse(fs.readFileSync(path.join(rootDir, "packages/app/package.json"), "utf-8")).version;
+    // The publishable set, DERIVED — not a scan of `packages/`.
+    //
+    // A scan cannot see `tooling/rebase-agent-skills`, so the CLI's dependency
+    // on it was never rewritten to a local tarball. `pnpm pack` resolved the
+    // `workspace:*` to whatever that manifest said and the install fetched it
+    // from the PUBLIC registry — which worked only for as long as the version
+    // happened to exist there. It stopped the moment the package was bumped
+    // into lockstep with the rest, because the release had not published it in
+    // four versions. An e2e that reaches the real registry for a first-party
+    // package is not testing the tree it was given.
+    const publishable = publishablePackages(rootDir) as { name: string; dir: string }[];
+    const currentVersion = JSON.parse(
+        fs.readFileSync(path.join(rootDir, "packages/app/package.json"), "utf-8")
+    ).version;
     const tempVersion = `${currentVersion}-e2e-${Date.now()}`;
     console.log(`📦 Packing local workspace packages with version ${tempVersion}...`);
     const packageTarballs: Record<string, string> = {};
 
-    // 1. Pre-calculate the absolute path to each package's expected tarball
+    // 1. Pre-calculate the absolute path to each package's expected tarball.
+    //    Keyed on the package NAME, never the directory: `@rebasepro/agent-skills`
+    //    lives in `tooling/rebase-agent-skills`, and deriving one from the other
+    //    is the assumption that broke everything upstream of this file.
+    const tarballName = (name: string) => `${name.replace("@", "").replace("/", "-")}-${tempVersion}.tgz`;
     const packageTarballPaths: Record<string, string> = {};
-    for (const pkg of packages) {
-        const tgzFile = `rebasepro-${pkg}-${tempVersion}.tgz`;
-        packageTarballPaths[`@rebasepro/${pkg}`] = `file:${path.join(tarballsDir, tgzFile)}`;
-        packageTarballs[`@rebasepro/${pkg}`] = `file:./tarballs/${tgzFile}`;
+    for (const pkg of publishable) {
+        const tgzFile = tarballName(pkg.name);
+        packageTarballPaths[pkg.name] = `file:${path.join(tarballsDir, tgzFile)}`;
+        packageTarballs[pkg.name] = `file:./tarballs/${tgzFile}`;
     }
 
     // 2. Modify package.json files, run pnpm pack, and restore
-    for (const pkg of packages) {
-        const pkgDir = path.join(rootDir, "packages", pkg);
-        console.log(`  Packing ${pkg}...`);
+    for (const pkg of publishable) {
+        const pkgDir = path.join(rootDir, pkg.dir);
+        console.log(`  Packing ${pkg.name}...`);
 
         const pkgPath = path.join(pkgDir, "package.json");
         const origPkgJson = fs.readFileSync(pkgPath, "utf-8");
@@ -259,7 +273,16 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
                     if (tarballPath) {
                         deps[name] = tarballPath;
                     } else {
-                        console.warn(`⚠️ Warning: No tarball path calculated for ${name}`);
+                        // Loud, and fatal. This used to warn and leave the spec
+                        // alone, so an unpacked first-party package silently
+                        // fell through to the public registry — which is how a
+                        // dependency on a version that was never published went
+                        // unnoticed for four releases.
+                        throw new Error(
+                            `${name} is depended on by ${pkgObj.name} but was not packed. `
+                            + "It is not in the derived publishable set — check pnpm-workspace.yaml "
+                            + "and `private`, and see tooling/scripts/publishable-packages.mjs."
+                        );
                     }
                 }
             }
@@ -271,7 +294,7 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
 
         fs.writeFileSync(pkgPath, JSON.stringify(pkgObj, null, 2), "utf-8");
 
-        const tgzFile = `rebasepro-${pkg}-${tempVersion}.tgz`;
+        const tgzFile = tarballName(pkg.name);
         try {
             // Run pnpm pack
             execSync("pnpm pack", { cwd: pkgDir,
@@ -285,14 +308,14 @@ stdio: "pipe" });
         const destPath = path.join(tarballsDir, tgzFile);
 
         if (!fs.existsSync(srcPath)) {
-            throw new Error(`Failed to find generated tarball for package ${pkg} in ${pkgDir}`);
+            throw new Error(`Failed to find generated tarball for package ${pkg.name} in ${pkgDir}`);
         }
 
         // Copy and delete original
         fs.copyFileSync(srcPath, destPath);
         fs.unlinkSync(srcPath);
 
-        console.log(`  Packed @rebasepro/${pkg} -> ${tgzFile}`);
+        console.log(`  Packed ${pkg.name} -> ${tgzFile}`);
     }
 
     return packageTarballs;
