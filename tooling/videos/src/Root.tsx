@@ -21,6 +21,7 @@ import { Stream, STREAM_DURATION } from "./reel/Stream";
 import { Map as SchemaMap, MAP_DURATION } from "./reel/Map";
 import { Matrix, MATRIX_DURATION } from "./reel/Matrix";
 import { Routes, ROUTES_DURATION } from "./reel/Routes";
+import { Plausible, PLAUSIBLE_DURATION } from "./reel/Plausible";
 
 loadFonts();
 
@@ -196,6 +197,19 @@ export const RemotionRoot: React.FC = () => (
                 </Reel>
             )}
             durationInFrames={ROUTES_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Plausible"
+            component={() => (
+                <Reel roll={0.58} reveal={0.28}>
+                    <Plausible />
+                </Reel>
+            )}
+            durationInFrames={PLAUSIBLE_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
