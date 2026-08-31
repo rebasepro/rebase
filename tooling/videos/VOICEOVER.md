@@ -28,7 +28,7 @@ sound like a way to generate REST routes.
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | The second copy | 270 | 9.0 | You have written this table before. The schema, your types, a validator, a route, a form. Add one column and four go quietly wrong. |
+| 01 | The second copy | 270 | 9.0 | You have written this table five times. Add one column, and four of them go quietly wrong. |
 | 02 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
 | 03 | One definition | 210 | 7.0 | With Rebase there is one definition, and everything else is compiled from it. |
 | 04 | Forty endpoints | 270 | 9.0 | REST over every table, an OpenAPI spec and a typed SDK — none of them written, all of them following the file. |
