@@ -19,6 +19,7 @@ import { Drift, DRIFT_DURATION } from "./reel/Drift";
 import { Push, PUSH_DURATION } from "./reel/Push";
 import { Stream, STREAM_DURATION } from "./reel/Stream";
 import { Map as SchemaMap, MAP_DURATION } from "./reel/Map";
+import { Matrix, MATRIX_DURATION } from "./reel/Matrix";
 
 loadFonts();
 
@@ -168,6 +169,19 @@ export const RemotionRoot: React.FC = () => (
                 </Reel>
             )}
             durationInFrames={MAP_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Matrix"
+            component={() => (
+                <Reel roll={0.5} reveal={0.24}>
+                    <Matrix />
+                </Reel>
+            )}
+            durationInFrames={MATRIX_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}

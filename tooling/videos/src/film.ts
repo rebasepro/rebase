@@ -10,6 +10,8 @@ import { S07b_Everything } from "./scenes/S07b_Everything";
 import { S11_Ownership } from "./scenes/S11_Ownership";
 import { S04_Claim } from "./scenes/S04_Claim";
 import { S08b_TwoUsers } from "./scenes/S08b_TwoUsers";
+import { S05b_Stream } from "./scenes/S05b_Stream";
+import { S08c_Map } from "./scenes/S08c_Map";
 import { S05_Proof } from "./scenes/S05_Proof";
 import { S06_Panel } from "./scenes/S06_Panel";
 import { S07_Agent } from "./scenes/S07_Agent";
@@ -125,55 +127,67 @@ export const SCENES: SceneEntry[] = [
         enter: "push",
     },
     {
-        id: "Panel", title: "06 · The panel", component: S06_Panel,
+        id: "Stream", title: "06 · The wire", component: S05b_Stream,
+        durationInFrames: 240, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.28, reveal: 0.30 },
+        enter: "rise",
+    },
+    {
+        id: "Panel", title: "07 · The panel", component: S06_Panel,
         durationInFrames: 280, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.1, reveal: 0.30 },
         enter: "descend",
     },
     {
-        id: "Everything", title: "07 · Every view", component: S07b_Everything,
+        id: "Everything", title: "08 · Every view", component: S07b_Everything,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
         enter: "descend",
     },
     {
-        id: "Studio", title: "08 · Studio", component: S07_Studio,
+        id: "Studio", title: "09 · Studio", component: S07_Studio,
         durationInFrames: 200, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.46, reveal: 0.30 },
         enter: "push",
     },
     {
-        id: "Claim", title: "09 · Row-level security", component: S04_Claim,
+        id: "SchemaMap", title: "10 · The schema", component: S08c_Map,
+        durationInFrames: 260, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.30 },
+        enter: "push",
+    },
+    {
+        id: "Claim", title: "11 · Row-level security", component: S04_Claim,
         durationInFrames: 170, ground: "claim",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "TwoUsers", title: "10 · The same query, twice", component: S08b_TwoUsers,
+        id: "TwoUsers", title: "12 · The same query, twice", component: S08b_TwoUsers,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
         enter: "push",
     },
     {
-        id: "Proof", title: "11 · The proof", component: S05_Proof,
+        id: "Proof", title: "13 · The proof", component: S05_Proof,
         durationInFrames: 200, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.30 },
         enter: "descend",
     },
     {
-        id: "Agent", title: "12 · Agent-native", component: S07_Agent,
+        id: "Agent", title: "14 · Agent-native", component: S07_Agent,
         durationInFrames: 165, ground: "deep",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.30 },
         enter: "push",
     },
     {
-        id: "Ownership", title: "13 · Yours", component: S11_Ownership,
+        id: "Ownership", title: "15 · Yours", component: S11_Ownership,
         durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "Close", title: "14 · The ask", component: S08_Close,
+        id: "Close", title: "16 · The ask", component: S08_Close,
         durationInFrames: 160, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.30 },
         enter: "scale",

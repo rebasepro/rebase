@@ -86,6 +86,12 @@ export const Stream: React.FC = () => {
                 /* Integer y. Nothing here is ever at a fractional position. */
                 const y = TOP + (VISIBLE - 1 - age) * ROW_H;
                 const born = ramp(frame, START + i * EVERY, 5);
+                /* Rows fade as they RISE, rather than walking into an overlay.
+                   The overlay was a #08090A gradient painted across the top of
+                   the frame, which in the film would have covered the shared
+                   Neat plane and left a dead band exactly where the ribbon
+                   reads. Nothing in this scene paints ground any more. */
+                const rise = Math.max(0, Math.min(1, 1 - (age - (VISIBLE - 5)) / 4));
                 const flash = 1 - ramp(frame, START + i * EVERY, 22);
                 const colour = OP_COLOUR[ev.op];
                 return (
@@ -100,7 +106,7 @@ export const Stream: React.FC = () => {
                             display: "flex",
                             alignItems: "center",
                             gap: 26,
-                            opacity: born,
+                            opacity: born * rise,
                             background: `rgba(255,255,255,${0.05 * flash})`,
                             borderBottom: `1px solid ${INK.ruleSoft}`,
                         }}
@@ -142,15 +148,6 @@ export const Stream: React.FC = () => {
                     </div>
                 );
             })}
-
-            {/* Rows leave by walking into a fade rather than by being clipped —
-                a hard edge at the top would read as a cropped screenshot. */}
-            <AbsoluteFill
-                style={{
-                    background: "linear-gradient(to bottom, #08090A 6%, rgba(8,9,10,0) 30%)",
-                    pointerEvents: "none",
-                }}
-            />
 
             <div
                 style={{
