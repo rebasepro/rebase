@@ -59,7 +59,7 @@ export const S07_Studio: React.FC = () => {
             <Stage>
                 <div style={{ display: "flex", gap: 64, alignItems: "center" }}>
                     <div style={{ width: 520, flexShrink: 0 }}>
-                        <Chapter n="06" label="Studio" delay={2} />
+                        <Chapter n="05" label="Studio" delay={2} />
                         <div style={{ marginTop: 24 }}>
                             <DisplayLine size={DISPLAY.split} delay={8}>Run the database</DisplayLine>
                             <DisplayLine size={DISPLAY.split} delay={13}>from the same app.</DisplayLine>

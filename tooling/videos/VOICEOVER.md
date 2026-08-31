@@ -17,30 +17,35 @@ sound like a way to generate REST routes.
 
 | Act | Scenes | Doing |
 |-----|--------|-------|
-| I · Premise | 00–02 | What Rebase is: a Postgres backend, running in one command. |
-| II · Insight | 03–04 | You have written this table five times. Now once. |
-| III · The offer | 05–08 | Take the backend / add the panel — here is all of it — add Studio. |
-| IV · Guarantee | 09–11 | Whichever layers you took, RLS holds — provably. |
-| V · Ownership | 12–13 | MIT, self-hosted, nobody holds your credentials. |
+| I · Recognition | 00–01 | You have written this table five times. One change breaks four. |
+| II · The turn | 02–04 | One definition, and everything else compiled from it. |
+| III · The offer | 05–10 | Take the backend / add the panel / add Studio. |
+| IV · The guarantee | 11–14 | Authorization is in the database, and provably so. |
+| V · Yours | 15–18 | Agents included, one command, MIT. |
 
 ## The script
 
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
-| 02 | One command | 205 | 6.8 | One command, and it is running. REST, auth, realtime, storage — read straight from your schema. |
-| 03 | The second copy | 325 | 10.8 | You have described that table before. In the schema. Again in your types, a validator, a route, a form. With Rebase there is one. |
-| 04 | One definition | 210 | 7.0 | It compiles to a schema, REST routes, an OpenAPI spec, a typed SDK, and policies. |
-| 05 | Headless | 200 | 6.7 | Take only that and you are done — a typed SDK, realtime, auth, storage, cron, backups. |
-| 06 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
-| 07 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one generated, every one reading through the same policies. |
-| 08 | Studio | 200 | 6.7 | Add Studio and you run the database from the same app — SQL, schema, policies, logs. |
-| 09 | Row-level security | 200 | 6.7 | Authorization lives in the database, generated from the same file. You cannot forget middleware nobody wrote. |
-| 10 | The proof | 200 | 6.7 | rls-check reads any Postgres — Supabase, Neon, RDS, your own — and reports what is exposed. |
-| 11 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. Not a way around it. |
-| 12 | Yours | 175 | 5.8 | MIT, end to end. Your laptop, your server, your cloud. Nobody holds your keys. |
-| 13 | The ask | 160 | 5.3 | Rebase. Open source, Postgres-native, self-hosted. |
+| 01 | The second copy | 270 | 9.0 | You have written this table before. The schema, your types, a validator, a route, a form. Add one column and four go quietly wrong. |
+| 02 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
+| 03 | One definition | 210 | 7.0 | With Rebase there is one definition, and everything else is compiled from it. |
+| 04 | Forty endpoints | 270 | 9.0 | REST over every table, an OpenAPI spec and a typed SDK — none of them written, all of them following the file. |
+| 05 | Headless | 200 | 6.7 | Take only that and you are done: the SDK, auth, storage, functions, cron, backups. |
+| 06 | The wire | 240 | 8.0 | Realtime is not a separate product either. Every write reaches the clients allowed to see it. |
+| 07 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
+| 08 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one generated, every one reading through the same policies. |
+| 09 | Studio | 200 | 6.7 | Add Studio and you run the database from the same app — SQL, schema, policies, logs. |
+| 10 | The schema | 260 | 8.7 | It draws the schema out of the catalogue, so what you are looking at is what is actually there. |
+| 11 | Row-level security | 170 | 5.7 | Authorization lives in the database, generated from that same file. |
+| 12 | Access is not a switch | 240 | 8.0 | Per collection, per operation, per role — and Postgres, not your code, is what enforces it. |
+| 13 | The same query, twice | 240 | 8.0 | The same call, from two people, returning different rows. No branch anywhere in your code. |
+| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres — Supabase, Neon, RDS, your own. |
+| 15 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. Not a way around it. |
+| 16 | One command | 205 | 6.8 | All of it starts with one command, against a database you have or one it creates. |
+| 17 | Yours | 175 | 5.8 | MIT, end to end. Your laptop, your server, your cloud. Nobody holds your keys. |
+| 18 | The ask | 160 | 5.3 | Rebase. Open source, Postgres-native, self-hosted. |
 
 ## Notes for the read
 

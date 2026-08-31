@@ -12,6 +12,8 @@ import { S04_Claim } from "./scenes/S04_Claim";
 import { S08b_TwoUsers } from "./scenes/S08b_TwoUsers";
 import { S05b_Stream } from "./scenes/S05b_Stream";
 import { S08c_Map } from "./scenes/S08c_Map";
+import { S12_Matrix } from "./scenes/S12_Matrix";
+import { S04b_Routes } from "./scenes/S04b_Routes";
 import { S05_Proof } from "./scenes/S05_Proof";
 import { S06_Panel } from "./scenes/S06_Panel";
 import { S07_Agent } from "./scenes/S07_Agent";
@@ -96,100 +98,111 @@ export const SCENES: SceneEntry[] = [
         enter: null,
     },
     {
-        id: "Headline", title: "01 · Headline", component: S01_Headline,
-        durationInFrames: 150, ground: "base",
-        // The site's own hero framing, to the number.
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.30 },
+        id: "SecondCopy", title: "01 · The second copy", component: S03b_Drift,
+        durationInFrames: 270, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.3 },
         enter: "hold",
     },
     {
-        id: "OneCommand", title: "02 · One command", component: S02_OneCommand,
-        durationInFrames: 205, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.30 },
+        id: "Headline", title: "02 · Headline", component: S01_Headline,
+        durationInFrames: 150, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
+        enter: "rise",
+    },
+    {
+        id: "OneDefinition", title: "03 · One definition", component: S03_OneDefinition,
+        durationInFrames: 210, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "SecondCopy", title: "03 · The second copy", component: S03b_Drift,
+        id: "Routes", title: "04 · Forty endpoints", component: S04b_Routes,
         durationInFrames: 270, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.3 },
         enter: "descend",
-    },
-    {
-        id: "OneDefinition", title: "04 · One definition", component: S03_OneDefinition,
-        durationInFrames: 210, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.30 },
-        enter: "rise",
     },
     {
         id: "Headless", title: "05 · Headless", component: S05_Headless,
         durationInFrames: 200, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.3 },
         enter: "push",
     },
     {
         id: "Stream", title: "06 · The wire", component: S05b_Stream,
         durationInFrames: 240, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.28, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.28, reveal: 0.3 },
         enter: "rise",
     },
     {
         id: "Panel", title: "07 · The panel", component: S06_Panel,
         durationInFrames: 280, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.1, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
         enter: "descend",
     },
     {
         id: "Everything", title: "08 · Every view", component: S07b_Everything,
         durationInFrames: 240, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
-        enter: "descend",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
+        enter: "push",
     },
     {
         id: "Studio", title: "09 · Studio", component: S07_Studio,
         durationInFrames: 200, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.46, reveal: 0.30 },
-        enter: "push",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.46, reveal: 0.3 },
+        enter: "rise",
     },
     {
         id: "SchemaMap", title: "10 · The schema", component: S08c_Map,
         durationInFrames: 260, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.74, reveal: 0.3 },
         enter: "push",
     },
     {
         id: "Claim", title: "11 · Row-level security", component: S04_Claim,
         durationInFrames: 170, ground: "claim",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
-        enter: "rise",
-    },
-    {
-        id: "TwoUsers", title: "12 · The same query, twice", component: S08b_TwoUsers,
-        durationInFrames: 240, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
-        enter: "push",
-    },
-    {
-        id: "Proof", title: "13 · The proof", component: S05_Proof,
-        durationInFrames: 200, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.1, reveal: 0.3 },
         enter: "descend",
     },
     {
-        id: "Agent", title: "14 · Agent-native", component: S07_Agent,
-        durationInFrames: 165, ground: "deep",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.30 },
+        id: "Matrix", title: "12 · Access is not a switch", component: S12_Matrix,
+        durationInFrames: 240, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.5, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Ownership", title: "15 · Yours", component: S11_Ownership,
-        durationInFrames: 175, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.30 },
+        id: "TwoUsers", title: "13 · The same query, twice", component: S08b_TwoUsers,
+        durationInFrames: 240, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
         enter: "rise",
     },
     {
-        id: "Close", title: "16 · The ask", component: S08_Close,
+        id: "Proof", title: "14 · The proof", component: S05_Proof,
+        durationInFrames: 200, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
+        enter: "descend",
+    },
+    {
+        id: "Agent", title: "15 · Agent-native", component: S07_Agent,
+        durationInFrames: 165, ground: "deep",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.3 },
+        enter: "push",
+    },
+    {
+        id: "OneCommand", title: "16 · One command", component: S02_OneCommand,
+        durationInFrames: 205, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
+        enter: "rise",
+    },
+    {
+        id: "Ownership", title: "17 · Yours", component: S11_Ownership,
+        durationInFrames: 175, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
+        enter: "descend",
+    },
+    {
+        id: "Close", title: "18 · The ask", component: S08_Close,
         durationInFrames: 160, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.30 },
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.3 },
         enter: "scale",
     },
 ];

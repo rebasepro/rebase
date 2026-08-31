@@ -7,7 +7,12 @@ import { pop, ramp, SPRING } from "../components/motion";
 import { CHROMA, FONT, INK, TRACKING } from "../theme";
 
 /**
- * CANDIDATE — add one column.
+ * The film's opening beat, and its own composition.
+ *
+ * It opens on RECOGNITION — five files the viewer has written — because the
+ * film used to open on a CLI command, which is a thing you do after you have
+ * decided, not a reason to decide. Nobody watches a backend video to find out
+ * how installation works.
  *
  * The film's second-copy scene shows that five declarations of one table
  * exist. It never shows what that COSTS, and the cost is the whole reason
@@ -53,10 +58,10 @@ export const Drift: React.FC = () => {
     return (
         <AbsoluteFill>
             <Stage style={{ justifyContent: "flex-start", paddingTop: 96 }}>
-                <Chapter n="02" label="The second copy" delay={2} />
+                <Chapter n="01" label="The second copy" delay={2} />
                 <div style={{ marginTop: 20 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>
-                        Add one column.
+                        You have written this table before.
                     </DisplayLine>
                 </div>
             </Stage>

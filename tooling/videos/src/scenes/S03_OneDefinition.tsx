@@ -57,7 +57,7 @@ export const S03_OneDefinition: React.FC = () => {
     return (
         <Scene>
             <Stage>
-                <Chapter n="03" label="One definition, every surface" delay={4} />
+                <Chapter n="02" label="One definition, every surface" delay={4} />
                 <div style={{ marginTop: 22, marginBottom: 52 }}>
                     <DisplayLine size={DISPLAY.statement} delay={10}>There is no second data model.</DisplayLine>
                 </div>

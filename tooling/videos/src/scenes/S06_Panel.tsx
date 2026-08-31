@@ -91,7 +91,7 @@ export const S06_Panel: React.FC = () => {
                         the wrong emphasis for a scene whose subject is the
                         window beside it. */}
                     <div style={{ width: 520, flexShrink: 0 }}>
-                        <Chapter n="05" label="The panel" delay={4} />
+                        <Chapter n="04" label="The panel" delay={4} />
                         <div style={{ marginTop: 26 }}>
                             <DisplayLine size={DISPLAY.split} delay={10}>Add the panel.</DisplayLine>
                             <DisplayLine size={DISPLAY.split} delay={16}>It becomes an app.</DisplayLine>

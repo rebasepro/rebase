@@ -17,7 +17,7 @@ export const S02_OneCommand: React.FC = () => (
         <Stage>
             <div style={{ display: "flex", alignItems: "center", gap: 96 }}>
                 <div style={{ width: 520, flexShrink: 0 }}>
-                    <Chapter n="01" label="The first five minutes" delay={4} />
+                    <Chapter n="10" label="The first five minutes" delay={4} />
                     <div style={{ marginTop: 26 }}>
                         {/* `statement`, not `split`, even though a terminal sits
                             beside it. The tier is chosen by ROLE and these three
