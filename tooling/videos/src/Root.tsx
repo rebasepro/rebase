@@ -20,6 +20,7 @@ import { Push, PUSH_DURATION } from "./reel/Push";
 import { Stream, STREAM_DURATION } from "./reel/Stream";
 import { Map as SchemaMap, MAP_DURATION } from "./reel/Map";
 import { Matrix, MATRIX_DURATION } from "./reel/Matrix";
+import { Routes, ROUTES_DURATION } from "./reel/Routes";
 
 loadFonts();
 
@@ -182,6 +183,19 @@ export const RemotionRoot: React.FC = () => (
                 </Reel>
             )}
             durationInFrames={MATRIX_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Routes"
+            component={() => (
+                <Reel roll={0.74} reveal={0.24}>
+                    <Routes />
+                </Reel>
+            )}
+            durationInFrames={ROUTES_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}

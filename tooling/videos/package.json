@@ -28,7 +28,7 @@
         "neat:config": "node scripts/extract-neat-config.mjs",
         "upgrade": "remotion upgrade",
         "bento": "remotion render src/index.ts Bento out/bento.mp4",
-        "reel": "remotion render src/index.ts Reel-Fanout out/reel-fanout.mp4 && remotion render src/index.ts Reel-TwoUsers out/reel-twousers.mp4 && remotion render src/index.ts Reel-Included out/reel-included.mp4 && remotion render src/index.ts Reel-Refused out/reel-refused.mp4 && remotion render src/index.ts Reel-Drift out/reel-drift.mp4 && remotion render src/index.ts Reel-Push out/reel-push.mp4 && remotion render src/index.ts Reel-Stream out/reel-stream.mp4 && remotion render src/index.ts Reel-Map out/reel-map.mp4 && remotion render src/index.ts Reel-Matrix out/reel-matrix.mp4"
+        "reel": "remotion render src/index.ts Reel-Fanout out/reel-fanout.mp4 && remotion render src/index.ts Reel-TwoUsers out/reel-twousers.mp4 && remotion render src/index.ts Reel-Included out/reel-included.mp4 && remotion render src/index.ts Reel-Refused out/reel-refused.mp4 && remotion render src/index.ts Reel-Drift out/reel-drift.mp4 && remotion render src/index.ts Reel-Push out/reel-push.mp4 && remotion render src/index.ts Reel-Stream out/reel-stream.mp4 && remotion render src/index.ts Reel-Map out/reel-map.mp4 && remotion render src/index.ts Reel-Matrix out/reel-matrix.mp4 && remotion render src/index.ts Reel-Routes out/reel-routes.mp4"
     },
     "sideEffects": [
         "*.css"
