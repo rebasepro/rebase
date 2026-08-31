@@ -24,14 +24,51 @@ on:
 permissions:
   contents: read
 
+# ── Why this is seven jobs and not two ────────────────────────────────────────
+#
+# It was `checks` then `e2e`, in series, because `e2e` declared `needs: checks`:
+# 16 minutes plus 18, so every merge and every release waited ~34 minutes on a
+# gate whose two halves never exchanged a byte. `e2e` checks out, installs and
+# builds on its own runner — the dependency was ordering, not data, and what the
+# ordering bought was "don't spend e2e minutes when the types are already red".
+# At half an hour a release that is the wrong trade.
+#
+# So the gate fans out. Every job below is a leaf: none declares `needs`, all
+# start at once, and the wall clock is the slowest one instead of the sum. The
+# split lines are the real couplings, not tidy categories:
+#
+#   static         everything that reads SOURCE — no build, no database.
+#   build-gates    `pnpm run build` and the gates that read what it emitted.
+#   unit           the unit suites, which run serialized by design.
+#   e2e-cli        scaffolds and boots projects; owns the screenshot artifact.
+#   e2e-admin      the browser suite; the only job needing Playwright's deps.
+#   e2e-selfhost   self-host and bundle acceptance, plus the RLS scan that reads
+#                  the database the acceptance step creates — see its comment.
+#   e2e-vitest     the security and integration suites, and the long pole.
+#
+# Every job re-installs and most rebuild. That is deliberate: the install is
+# ~15s against pnpm's cache and the build ~70s, whereas handing `dist/` between
+# jobs as an artifact would reintroduce the barrier this exists to remove. It
+# costs roughly a quarter more runner-minutes and returns two thirds of the wall
+# clock.
+#
+# The timeouts are each set for the reason the old two were: GitHub's default is
+# six hours, so a step that hangs rather than fails holds its runner — and the
+# merge behind it — all afternoon while reporting "pending". Each is roughly 2x
+# the slowest observed run of that job, which passes a genuine slowdown and
+# still catches a hang.
+#
+# A job added here needs no change in publish.yml: it depends on the whole
+# workflow call (`needs: verify-stable`), so a release gates on all of them.
+# ──────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  checks:
+  # Every gate that reads source and needs nothing built, no database and no
+  # browser. Docker appears only for the runtime image, which boots from a
+  # published tag rather than from anything this job produced.
+  static:
     runs-on: ubuntu-latest
-    # Runs to completion in 8-14 minutes. The ceiling is here because GitHub's
-    # default is six hours: a step that hangs rather than fails held the runner
-    # (and the merge behind it) all afternoon, reporting "pending" the whole way.
-    # Roughly 2x the slowest observed run, so a genuine slowdown still passes.
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -271,6 +308,32 @@ jobs:
       - name: Generated Drizzle schema is current
         run: pnpm run check:schema-fresh
 
+  # The build, and only the gates that read what it emitted — published .d.ts,
+  # the template and ejected-project typechecks, the API surface, the eager-JS
+  # budget. Split from `static` because these cannot start before the build
+  # finishes and those never need it at all.
+  build-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Build packages
         run: pnpm run build
         env:
@@ -394,6 +457,40 @@ jobs:
       - name: Generated website artifacts are current
         run: pnpm run check:generated
 
+  # The unit suites. `pnpm -r test` runs with --workspace-concurrency=1, so this
+  # is ~3.5 minutes of strictly serial work; on its own runner it costs nothing,
+  # at the tail of a job it held everything else up.
+  #
+  # It builds first because that is the order these suites have always run in
+  # here. A suite that turns out to read built output would otherwise fail on a
+  # source-only runner in a way that reads as a real regression.
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       - name: Run tests
         run: pnpm test
         env:
@@ -405,13 +502,13 @@ jobs:
       - name: Harness tests
         run: pnpm run test:harness
 
-  e2e:
-    needs: checks
+  # Scaffolding a project and driving it: `init`, the BaaS template, and the
+  # client SDK over a real socket. Playwright is installed because cli-init-e2e
+  # captures its screenshots through it — this job uploads them.
+  e2e-cli:
     runs-on: ubuntu-latest
-    # 14-17 minutes observed. Higher than `checks` because it boots a real
-    # Postgres, scaffolds a project and installs it — the steps most able to
-    # wait forever on something. See the note above.
-    timeout-minutes: 40
+    timeout-minutes: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -504,6 +601,64 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # The Playwright admin suite used to be excluded here, on the grounds that
+      # its `global-setup` needs a demo user that already exists and seeded
+      # collections to render — "a provisioned database, not a workflow step".
+      # That was true and is now handled: see `Admin panel E2E (Playwright)`
+      # above, which provisions and seeds one, and a `global-setup` that drives
+      # the first-run bootstrap when the user does not exist yet.
+      - name: Upload E2E Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: ${{ github.workspace }}/.artifacts/e2e-screenshots/
+          if-no-files-found: ignore
+
+  # The admin panel in a browser, against a database provisioned and seeded here.
+  e2e-admin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
+      # suite scaffolds a project that consumes every package as built output
+      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # own runner, so the `checks` job's build does not reach it — build here. Only
+      # `./packages/*`, not the admin app, which the e2e never boots.
+      - name: Build packages
+        run: pnpm --filter './packages/*' -r run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Start PostgreSQL container
+        run: |
+          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
       # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
       # scaffolded project installs and answers HTTP; nothing until now opened
       # the UI that project exists to provide, so every collection view, the
@@ -553,6 +708,52 @@ jobs:
           path: .artifacts/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Self-host acceptance, the container that ships it, the frozen bundle corpus —
+  # and the RLS scan, which has to stay here: it scans `rebase_acceptance`, the
+  # database `Self-host acceptance` creates and pushes real DDL into. Split apart,
+  # the scan would meet an empty database, and its --min-tables/--min-policies
+  # floors would fail every run. That coupling is the only ordering constraint
+  # left in this file.
+  e2e-selfhost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
+      # suite scaffolds a project that consumes every package as built output
+      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # own runner, so the `checks` job's build does not reach it — build here. Only
+      # `./packages/*`, not the admin app, which the e2e never boots.
+      - name: Build packages
+        run: pnpm --filter './packages/*' -r run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Start PostgreSQL container
+        run: |
+          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
 
       # The self-host acceptance run: build a real bundle from the reference
       # app's collections, fold two static apps in at different paths, boot it
@@ -636,6 +837,77 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=4096"
           CORPUS_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_corpus
 
+      # The gate the whole rls-check package existed for and never had: point it
+      # at a database this pipeline actually generated. `Self-host acceptance`
+      # above runs `rebase db push` over the reference app's collections, so
+      # `rebase_acceptance` holds real generated DDL and a real policies.sql
+      # applied to it — the same artefact a user gets, which is the only thing
+      # worth gating on. A policy that grants more than the collection asked for
+      # fails the build here.
+      #
+      # Findings the collections declare ON PURPOSE (the reference app is
+      # public-read, so its SELECT policies are `USING (true)` and rls-check is
+      # right to say so) live in tooling/scripts/rls-baseline.json, per table, with a
+      # reason. That is deliberately not `--skip policy-always-true`: the same
+      # check on a table nobody baselined — a newly added collection, say — still
+      # fails.
+      #
+      # `--min-tables/--min-policies` are what stop this from being the vacuous
+      # gate this repo has been burned by before: with `if: always()` the step
+      # runs even when the push above failed, and against the empty database that
+      # leaves, rls-check finds nothing and exits 0. The floors turn that into
+      # exit 2. They are floors, not equality — a removed collection is not a
+      # security event — set well below the ~11 tables / ~88 policies the
+      # reference app currently generates.
+      - name: RLS scan of the generated schema
+        if: always()
+        run: pnpm rls:check --min-tables 8 --min-policies 40
+        env:
+          RLS_CHECK_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance?sslmode=disable
+
+  # The security and integration suites. Each test file boots and tears down its
+  # own Postgres and the packages run one after another, which makes this the
+  # longest single job in the gate — so nothing is scheduled behind it.
+  e2e-vitest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
+      # suite scaffolds a project that consumes every package as built output
+      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # own runner, so the `checks` job's build does not reach it — build here. Only
+      # `./packages/*`, not the admin app, which the e2e never boots.
+      - name: Build packages
+        run: pnpm --filter './packages/*' -r run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Start PostgreSQL container
+        run: |
+          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
+
       # The product's real security coverage, orphaned until now (this suite ran
       # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
       # rls-enforcement boots a real Postgres and asserts DB state after every
@@ -665,45 +937,3 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           RLS_CHECK_REQUIRE_DOCKER: "1"
-
-      # The gate the whole rls-check package existed for and never had: point it
-      # at a database this pipeline actually generated. `Self-host acceptance`
-      # above runs `rebase db push` over the reference app's collections, so
-      # `rebase_acceptance` holds real generated DDL and a real policies.sql
-      # applied to it — the same artefact a user gets, which is the only thing
-      # worth gating on. A policy that grants more than the collection asked for
-      # fails the build here.
-      #
-      # Findings the collections declare ON PURPOSE (the reference app is
-      # public-read, so its SELECT policies are `USING (true)` and rls-check is
-      # right to say so) live in tooling/scripts/rls-baseline.json, per table, with a
-      # reason. That is deliberately not `--skip policy-always-true`: the same
-      # check on a table nobody baselined — a newly added collection, say — still
-      # fails.
-      #
-      # `--min-tables/--min-policies` are what stop this from being the vacuous
-      # gate this repo has been burned by before: with `if: always()` the step
-      # runs even when the push above failed, and against the empty database that
-      # leaves, rls-check finds nothing and exits 0. The floors turn that into
-      # exit 2. They are floors, not equality — a removed collection is not a
-      # security event — set well below the ~11 tables / ~88 policies the
-      # reference app currently generates.
-      - name: RLS scan of the generated schema
-        if: always()
-        run: pnpm rls:check --min-tables 8 --min-policies 40
-        env:
-          RLS_CHECK_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance?sslmode=disable
-
-      # The Playwright admin suite used to be excluded here, on the grounds that
-      # its `global-setup` needs a demo user that already exists and seeded
-      # collections to render — "a provisioned database, not a workflow step".
-      # That was true and is now handled: see `Admin panel E2E (Playwright)`
-      # above, which provisions and seeds one, and a `global-setup` that drives
-      # the first-run bootstrap when the user does not exist yet.
-      - name: Upload E2E Screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-screenshots
-          path: ${{ github.workspace }}/.artifacts/e2e-screenshots/
-          if-no-files-found: ignore
