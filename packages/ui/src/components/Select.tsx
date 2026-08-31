@@ -45,6 +45,15 @@ export type SelectProps<T extends SelectValue = string> = {
     children?: React.ReactNode;
     dataType?: "string" | "number" | "boolean";
     portalContainer?: HTMLElement | null; // Explicitly added to props type if missing
+    /**
+     * Accessible name for the trigger, for a select whose `label` is a node
+     * rather than a string — or which shows no label at all.
+     *
+     * Without it such a select announces the literal fallback "Select an
+     * option", which is indistinguishable from every other unlabelled select
+     * on the screen.
+     */
+    "aria-label"?: string;
 };
 
 export const Select = forwardRef<HTMLDivElement, SelectProps>(({
@@ -73,6 +82,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     children,
     dataType = "string",
     portalContainer: manualContainer, // Rename to avoid confusion
+    "aria-label": ariaLabel,
     ...props
 }, ref) => {
 
@@ -158,7 +168,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     id={id}
                     asChild={false}
                     type="button"
-                    aria-label={typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option")}
+                    aria-label={ariaLabel ?? (typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option"))}
                     aria-invalid={error || undefined}
                     className={cls(
                         "h-full",

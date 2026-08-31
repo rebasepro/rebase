@@ -15,12 +15,9 @@ import {
     iconSize,
     KeyRoundIcon,
     RefreshCwIcon,
+    ShieldIcon,
     Tooltip,
     Typography,
-    TextField,
-    Select,
-    SelectItem,
-    Checkbox,
     CopyIcon,
     PlusIcon as AddIcon,
     Trash2Icon as DeleteIcon,
@@ -28,37 +25,17 @@ import {
     CheckCircleIcon
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
-import type { RebaseClient } from "@rebasepro/types";
+import type { ApiKeyMasked, ApiKeyWithSecret, RebaseClient } from "@rebasepro/types";
 
-/* ═══════════════════════════════════════════════════════════════
-   Types — mirrors server api-key-types.ts
-   ═══════════════════════════════════════════════════════════════ */
-
-interface ApiKeyPermission {
-    collection: string;
-    operations: ("read" | "write" | "delete")[];
-}
-
-interface ApiKeyMasked {
-    id: string;
-    name: string;
-    key_prefix: string;
-    permissions: ApiKeyPermission[];
-    rate_limit: number | null;
-    created_by: string;
-    created_at: string;
-    updated_at: string;
-    last_used_at: string | null;
-    expires_at: string | null;
-    revoked_at: string | null;
-}
-
-interface ApiKeyWithSecret extends ApiKeyMasked {
-    key: string;
-}
+import { CreateApiKeyDialog } from "./CreateApiKeyDialog";
+import { permissionSummary, resourceLabel, resourcePhrase } from "./permissions";
 
 /* ═══════════════════════════════════════════════════════════════
    Helpers
+
+   The row types come from `@rebasepro/types`: this view used to declare its
+   own copies, and they had already drifted — neither carried `admin`, so the
+   panel could not tell an admin key from a scoped one.
    ═══════════════════════════════════════════════════════════════ */
 
 function formatRelative(iso: string | null | undefined): string {
@@ -71,18 +48,6 @@ function formatRelative(iso: string | null | undefined): string {
     if (abs < 3600000) { const m = Math.round(abs / 60000); return diff > 0 ? `in ${m}m` : `${m}m ago`; }
     if (abs < 86400000) { const h = Math.round(abs / 3600000); return diff > 0 ? `in ${h}h` : `${h}h ago`; }
     return d.toLocaleDateString();
-}
-
-function permissionSummary(perms: ApiKeyPermission[]): string {
-    if (perms.length === 0) return "No permissions";
-    const wildcard = perms.find(p => p.collection === "*");
-    if (wildcard) {
-        return `All collections (${wildcard.operations.join(", ")})`;
-    }
-    if (perms.length === 1) {
-        return `${perms[0].collection} (${perms[0].operations.join(", ")})`;
-    }
-    return `${perms.length} collections`;
 }
 
 function isExpired(key: ApiKeyMasked): boolean {
@@ -214,7 +179,10 @@ export function ApiKeysView() {
                                 <div className="flex items-center gap-3 min-w-0">
                                     <KeyRoundIcon size={iconSize.small} className="text-primary shrink-0"/>
                                     <div className="min-w-0">
-                                        <Typography variant="subtitle1" className="font-semibold truncate">{selectedKey.name}</Typography>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Typography variant="subtitle1" className="font-semibold truncate">{selectedKey.name}</Typography>
+                                            {selectedKey.admin && <AdminChip/>}
+                                        </div>
                                         <Typography variant="caption" color="secondary" className="font-mono text-[11px]">{selectedKey.key_prefix}•••</Typography>
                                     </div>
                                 </div>
@@ -242,7 +210,12 @@ export function ApiKeysView() {
                                     <StatCard label="Last Used" value={formatRelative(selectedKey.last_used_at)}/>
                                     <StatCard label="Expires" value={selectedKey.expires_at ? formatRelative(selectedKey.expires_at) : "Never"}/>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 mt-3">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
+                                    <StatCard
+                                        label="Role"
+                                        value={selectedKey.admin ? "Admin" : "Service"}
+                                        className={selectedKey.admin ? "text-amber-600 dark:text-amber-400" : undefined}
+                                    />
                                     <StatCard label="Rate Limit" value={selectedKey.rate_limit ? `${selectedKey.rate_limit}/15min` : "Default (1000/15min)"}/>
                                     <StatCard label="Created By" value={selectedKey.created_by} mono/>
                                 </div>
@@ -256,16 +229,31 @@ export function ApiKeysView() {
                                 </Chip>
                             </div>
                             <div className="flex-1 overflow-y-auto px-5 py-3">
+                                {selectedKey.admin && (
+                                    <div className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/[0.06]">
+                                        <ShieldIcon size={iconSize.smallest} className="mt-[3px] shrink-0 text-amber-600 dark:text-amber-400"/>
+                                        <Typography variant="caption" className="text-[12px] leading-snug text-amber-700 dark:text-amber-300">
+                                            This key holds the <span className="font-semibold">admin role</span>: it also passes the
+                                            admin-gated routes — users, roles, cron, backups, logs — and reads through the
+                                            <span className="font-mono"> default_admin</span> RLS policies, beyond the resources listed here.
+                                        </Typography>
+                                    </div>
+                                )}
                                 {selectedKey.permissions.length === 0 ? (
                                     <Typography variant="body2" color="disabled">No permissions configured</Typography>
                                 ) : (
                                     <div className="space-y-2">
                                         {selectedKey.permissions.map((perm, idx) => (
                                             <div key={idx} className={cls("flex items-center gap-3 px-3 py-2 rounded-lg border", defaultBorderMixin)}>
-                                                <Typography variant="body2" className="font-mono text-[13px] font-medium flex-1">
-                                                    {perm.collection === "*" ? "* (all collections)" : perm.collection}
-                                                </Typography>
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex-1 min-w-0">
+                                                    <Typography variant="body2" className="text-[13px] font-medium truncate">
+                                                        {resourceLabel(perm.collection)}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="secondary" className="text-[11px]">
+                                                        {resourcePhrase(perm.collection)}
+                                                    </Typography>
+                                                </div>
+                                                <div className="flex items-center gap-1 shrink-0">
                                                     {perm.operations.map(op => (
                                                         <Chip key={op} size="smallest" className={cls(
                                                             op === "read" && "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
@@ -346,6 +334,27 @@ export function ApiKeysView() {
    List item
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * Marks a key that carries the admin role.
+ *
+ * Not cosmetic: an admin key reaches the admin routes and the `default_admin`
+ * RLS policies, and without this it is indistinguishable in the list from a
+ * read-only one.
+ */
+function AdminChip() {
+    return (
+        <Tooltip title="Carries the admin role: the admin-gated routes and the default_admin RLS policies">
+            <Chip
+                size="smallest"
+                className="shrink-0 bg-amber-500/12 dark:bg-amber-500/12 text-amber-700 dark:text-amber-300 border-amber-500/30 dark:border-amber-500/30"
+            >
+                <ShieldIcon size={10}/>
+                admin
+            </Chip>
+        </Tooltip>
+    );
+}
+
 function KeyListItem({ apiKey, selected, onClick }: { apiKey: ApiKeyMasked; selected: boolean; onClick: () => void }) {
     const status = keyStatus(apiKey);
     return (
@@ -363,7 +372,10 @@ function KeyListItem({ apiKey, selected, onClick }: { apiKey: ApiKeyMasked; sele
                 status.label === "Expired" ? "bg-amber-400" : "bg-red-400"
             )}/>
             <div className="flex-1 min-w-0">
-                <Typography variant="body2" className="truncate font-medium text-[13px]">{apiKey.name}</Typography>
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <Typography variant="body2" className="truncate font-medium text-[13px]">{apiKey.name}</Typography>
+                    {apiKey.admin && <AdminChip/>}
+                </div>
                 <Typography variant="caption" color="secondary" className="truncate text-[11px] font-mono">{apiKey.key_prefix}•••</Typography>
             </div>
             <div className="shrink-0">
@@ -387,166 +399,6 @@ function StatCard({ label, value, mono, className }: { label: string; value: str
                 className
             )}>{value}</Typography>
         </div>
-    );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Create API Key Dialog
-   ═══════════════════════════════════════════════════════════════ */
-
-interface PermissionRow {
-    collection: string;
-    read: boolean;
-    write: boolean;
-    delete: boolean;
-}
-
-function CreateApiKeyDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (key: ApiKeyWithSecret) => void }) {
-    const client = useRebaseClient<RebaseClient>();
-    const snackbar = useSnackbarController();
-    const [name, setName] = useState("");
-    const [permissions, setPermissions] = useState<PermissionRow[]>([{ collection: "*", read: true, write: false, delete: false }]);
-    const [rateLimit, setRateLimit] = useState("");
-    const [expiresIn, setExpiresIn] = useState("never");
-    const [creating, setCreating] = useState(false);
-
-    const addRow = () => setPermissions([...permissions, { collection: "", read: true, write: false, delete: false }]);
-    const removeRow = (idx: number) => setPermissions(permissions.filter((_, i) => i !== idx));
-
-    const updateRow = (idx: number, field: keyof PermissionRow, value: string | boolean) => {
-        setPermissions(permissions.map((row, i) => i === idx ? { ...row, [field]: value } : row));
-    };
-
-    const handleCreate = async () => {
-        if (!client?.apiKeys || !name.trim()) return;
-        const apiPerms: ApiKeyPermission[] = permissions
-            .filter(r => r.collection.trim())
-            .map(r => ({
-                collection: r.collection.trim(),
-                operations: [
-                    ...(r.read ? ["read" as const] : []),
-                    ...(r.write ? ["write" as const] : []),
-                    ...(r.delete ? ["delete" as const] : [])
-                ]
-            }))
-            .filter(p => p.operations.length > 0);
-
-        if (apiPerms.length === 0) {
-            snackbar.open({ type: "error", message: "At least one permission is required" });
-            return;
-        }
-
-        let expires_at: string | null = null;
-        if (expiresIn === "7d") expires_at = new Date(Date.now() + 7 * 86400000).toISOString();
-        else if (expiresIn === "30d") expires_at = new Date(Date.now() + 30 * 86400000).toISOString();
-        else if (expiresIn === "90d") expires_at = new Date(Date.now() + 90 * 86400000).toISOString();
-        else if (expiresIn === "1y") expires_at = new Date(Date.now() + 365 * 86400000).toISOString();
-
-        setCreating(true);
-        try {
-            const res = await client.apiKeys.createKey({
-                name: name.trim(),
-                permissions: apiPerms,
-                rate_limit: rateLimit ? parseInt(rateLimit, 10) : null,
-                expires_at
-            });
-            onCreated(res.key);
-        } catch (e: unknown) {
-            snackbar.open({ type: "error", message: e instanceof Error ? e.message : String(e) });
-        } finally { setCreating(false); }
-    };
-
-    return (
-        <Dialog open onOpenChange={(open) => { if (!open) onClose(); }} maxWidth="lg">
-            <DialogTitle>Create API Key</DialogTitle>
-            <DialogContent className="space-y-4">
-                <TextField
-                    label="Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Analytics Pipeline"
-                    size="small"
-                    autoFocus
-                />
-
-                <div>
-                    <Typography variant="caption" color="secondary" className="text-[11px] uppercase tracking-wider font-medium mb-2 block">
-                        Permissions
-                    </Typography>
-                    <div className="space-y-2">
-                        {permissions.map((row, idx) => (
-                            <div key={idx} className={cls("flex items-center gap-2 p-2 rounded-lg border", defaultBorderMixin)}>
-                                <TextField
-                                    size="small"
-                                    aria-label={`Permission ${idx + 1} collection`}
-                                    value={row.collection}
-                                    onChange={(e) => updateRow(idx, "collection", e.target.value)}
-                                    placeholder="Collection slug or *"
-                                    className="flex-1"
-                                />
-                                <label className="flex items-center gap-1 text-xs cursor-pointer">
-                                    <Checkbox size="small" checked={row.read} onCheckedChange={(v) => updateRow(idx, "read", !!v)}/>
-                                    <span className="text-emerald-600 dark:text-emerald-400">read</span>
-                                </label>
-                                <label className="flex items-center gap-1 text-xs cursor-pointer">
-                                    <Checkbox size="small" checked={row.write} onCheckedChange={(v) => updateRow(idx, "write", !!v)}/>
-                                    <span className="text-blue-600 dark:text-blue-400">write</span>
-                                </label>
-                                <label className="flex items-center gap-1 text-xs cursor-pointer">
-                                    <Checkbox size="small" checked={row.delete} onCheckedChange={(v) => updateRow(idx, "delete", !!v)}/>
-                                    <span className="text-red-600 dark:text-red-400">delete</span>
-                                </label>
-                                {permissions.length > 1 && (
-                                    <IconButton size="small" onClick={() => removeRow(idx)}>
-                                        <DeleteIcon size={iconSize.smallest}/>
-                                    </IconButton>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <Button size="small" variant="text" onClick={addRow} className="mt-1" startIcon={<AddIcon size={iconSize.smallest}/>}>
-                        Add collection
-                    </Button>
-                </div>
-
-                <div className="flex gap-4">
-                    <div className="flex-1">
-                        <Select label="Expires" value={expiresIn} onValueChange={setExpiresIn} size="small" renderValue={(v) =>
-                            v === "never" ? "Never" :
-                            v === "7d" ? "7 days" :
-                            v === "30d" ? "30 days" :
-                            v === "90d" ? "90 days" : "1 year"
-                        }>
-                            <SelectItem value="never">Never</SelectItem>
-                            <SelectItem value="7d">7 days</SelectItem>
-                            <SelectItem value="30d">30 days</SelectItem>
-                            <SelectItem value="90d">90 days</SelectItem>
-                            <SelectItem value="1y">1 year</SelectItem>
-                        </Select>
-                    </div>
-                    <div className="flex-1">
-                        <TextField
-                            label="Rate Limit (per 15 min)"
-                            value={rateLimit}
-                            onChange={(e) => setRateLimit(e.target.value.replace(/\D/g, ""))}
-                            placeholder="Default: 1000"
-                            size="small"
-                        />
-                    </div>
-                </div>
-            </DialogContent>
-            <DialogActions>
-                <Button variant="text" onClick={onClose}>Cancel</Button>
-                <Button
-                    color="primary"
-                    onClick={handleCreate}
-                    disabled={creating || !name.trim()}
-                    startIcon={creating ? <CircularProgress size="smallest"/> : undefined}
-                >
-                    Create Key
-                </Button>
-            </DialogActions>
-        </Dialog>
     );
 }
 
@@ -609,8 +461,14 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
                         <strong>Name:</strong> {keyWithSecret.name}
                     </Typography>
                     <Typography variant="caption" color="secondary">
-                        <strong>Permissions:</strong> {permissionSummary(keyWithSecret.permissions)}
+                        <strong>Access:</strong> {permissionSummary(keyWithSecret.permissions)}
                     </Typography>
+                    {keyWithSecret.admin && (
+                        <Typography variant="caption" className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
+                            <ShieldIcon size={iconSize.smallest} className="shrink-0"/>
+                            <span><strong>Admin role granted</strong> — the admin routes and the default_admin policies</span>
+                        </Typography>
+                    )}
                 </div>
             </DialogContent>
             <DialogActions>
