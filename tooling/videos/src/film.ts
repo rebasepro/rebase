@@ -2,7 +2,6 @@ import React from "react";
 import { S00_ColdOpen } from "./scenes/S00_ColdOpen";
 import { S01_Headline } from "./scenes/S01_Headline";
 import { S02_OneCommand } from "./scenes/S02_OneCommand";
-import { S03b_Drift } from "./scenes/S03b_Drift";
 import { S03_OneDefinition } from "./scenes/S03_OneDefinition";
 import { S05_Headless } from "./scenes/S05_Headless";
 import { S07_Studio } from "./scenes/S07_Studio";
@@ -14,6 +13,7 @@ import { S05b_Stream } from "./scenes/S05b_Stream";
 import { S08c_Map } from "./scenes/S08c_Map";
 import { S12_Matrix } from "./scenes/S12_Matrix";
 import { S04b_Routes } from "./scenes/S04b_Routes";
+import { S01_Plausible } from "./scenes/S01_Plausible";
 import { S05_Proof } from "./scenes/S05_Proof";
 import { S06_Panel } from "./scenes/S06_Panel";
 import { S07_Agent } from "./scenes/S07_Agent";
@@ -98,106 +98,106 @@ export const SCENES: SceneEntry[] = [
         enter: null,
     },
     {
-        id: "SecondCopy", title: "01 · The second copy", component: S03b_Drift,
-        durationInFrames: 270, ground: "base",
+        id: "Plausible", title: "01 · The problem", component: S01_Plausible,
+        durationInFrames: 300, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.3 },
         enter: "hold",
     },
     {
-        id: "Headline", title: "02 · Headline", component: S01_Headline,
-        durationInFrames: 150, ground: "base",
+        id: "Claim", title: "02 · Row-level security", component: S04_Claim,
+        durationInFrames: 170, ground: "claim",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
-        enter: "rise",
+        enter: "descend",
     },
     {
         id: "OneDefinition", title: "03 · One definition", component: S03_OneDefinition,
         durationInFrames: 210, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
-        enter: "push",
+        enter: "rise",
     },
     {
         id: "Routes", title: "04 · Forty endpoints", component: S04b_Routes,
         durationInFrames: 270, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.3 },
+        enter: "push",
+    },
+    {
+        id: "Headline", title: "05 · Headline", component: S01_Headline,
+        durationInFrames: 150, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
         enter: "descend",
     },
     {
-        id: "Headless", title: "05 · Headless", component: S05_Headless,
-        durationInFrames: 200, ground: "base",
+        id: "Headless", title: "06 · Headless", component: S05_Headless,
+        durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Stream", title: "06 · The wire", component: S05b_Stream,
+        id: "Stream", title: "07 · The wire", component: S05b_Stream,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.28, reveal: 0.3 },
         enter: "rise",
     },
     {
-        id: "Panel", title: "07 · The panel", component: S06_Panel,
+        id: "Panel", title: "08 · The panel", component: S06_Panel,
         durationInFrames: 280, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
         enter: "descend",
     },
     {
-        id: "Everything", title: "08 · Every view", component: S07b_Everything,
+        id: "Everything", title: "09 · Every view", component: S07b_Everything,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Studio", title: "09 · Studio", component: S07_Studio,
-        durationInFrames: 200, ground: "base",
+        id: "Studio", title: "10 · Studio", component: S07_Studio,
+        durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.46, reveal: 0.3 },
         enter: "rise",
     },
     {
-        id: "SchemaMap", title: "10 · The schema", component: S08c_Map,
+        id: "SchemaMap", title: "11 · The schema", component: S08c_Map,
         durationInFrames: 260, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.74, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Claim", title: "11 · Row-level security", component: S04_Claim,
-        durationInFrames: 170, ground: "claim",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.1, reveal: 0.3 },
-        enter: "descend",
-    },
-    {
         id: "Matrix", title: "12 · Access is not a switch", component: S12_Matrix,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.5, reveal: 0.3 },
-        enter: "push",
+        enter: "descend",
     },
     {
         id: "TwoUsers", title: "13 · The same query, twice", component: S08b_TwoUsers,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
-        enter: "rise",
+        enter: "push",
     },
     {
         id: "Proof", title: "14 · The proof", component: S05_Proof,
         durationInFrames: 200, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
-        enter: "descend",
+        enter: "rise",
     },
     {
         id: "Agent", title: "15 · Agent-native", component: S07_Agent,
         durationInFrames: 165, ground: "deep",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.3 },
-        enter: "push",
+        enter: "descend",
     },
     {
         id: "OneCommand", title: "16 · One command", component: S02_OneCommand,
         durationInFrames: 205, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
-        enter: "rise",
+        enter: "push",
     },
     {
         id: "Ownership", title: "17 · Yours", component: S11_Ownership,
         durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
-        enter: "descend",
+        enter: "rise",
     },
     {
         id: "Close", title: "18 · The ask", component: S08_Close,

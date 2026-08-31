@@ -17,10 +17,10 @@ sound like a way to generate REST routes.
 
 | Act | Scenes | Doing |
 |-----|--------|-------|
-| I · Recognition | 00–01 | You have written this table five times. One change breaks four. |
-| II · The turn | 02–04 | One definition, and everything else compiled from it. |
-| III · The offer | 05–10 | Take the backend / add the panel / add Studio. |
-| IV · The guarantee | 11–14 | Authorization is in the database, and provably so. |
+| I · The problem | 00–01 | Anyone can ship a backend. Nobody can tell you it is safe. |
+| II · The answer | 02–05 | Authorization in the database, generated from one definition. |
+| III · The offer | 06–11 | Take the backend / add the panel / add Studio. |
+| IV · The proof | 12–14 | The granularity, the behaviour, an audit you run yourself. |
 | V · Yours | 15–18 | Agents included, one command, MIT. |
 
 ## The script
@@ -28,20 +28,20 @@ sound like a way to generate REST routes.
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | The second copy | 270 | 9.0 | You have written this table five times. Add one column, and four of them go quietly wrong. |
-| 02 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
-| 03 | One definition | 210 | 7.0 | With Rebase there is one definition, and everything else is compiled from it. |
-| 04 | Forty endpoints | 270 | 9.0 | REST over every table, an OpenAPI spec and a typed SDK — none of them written, all of them following the file. |
-| 05 | Headless | 200 | 6.7 | Take only that and you are done: the SDK, auth, storage, functions, cron, backups. |
-| 06 | The wire | 240 | 8.0 | Realtime is not a separate product either. Every write reaches the clients allowed to see it. |
-| 07 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
-| 08 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one generated, every one reading through the same policies. |
-| 09 | Studio | 200 | 6.7 | Add Studio and you run the database from the same app — SQL, schema, policies, logs. |
-| 10 | The schema | 260 | 8.7 | It draws the schema out of the catalogue, so what you are looking at is what is actually there. |
-| 11 | Row-level security | 170 | 5.7 | Authorization lives in the database, generated from that same file. |
+| 01 | The problem | 300 | 10.0 | Getting a backend has never been easier. Knowing whether it is safe never got easier at all. Same database, ninety seconds apart. |
+| 02 | Row-level security | 170 | 5.7 | Authorization belongs in the database, where your code cannot forget to ask. |
+| 03 | One definition | 210 | 7.0 | And it is generated from your collection file — the same file that defines everything else. |
+| 04 | Forty endpoints | 270 | 9.0 | REST over every table, an OpenAPI spec, a typed SDK. None of them written, all of them following that file. |
+| 05 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
+| 06 | Headless | 175 | 5.8 | Take only that: the SDK, auth, storage, functions, cron, backups. |
+| 07 | The wire | 240 | 8.0 | Realtime too. Every write reaches the clients your policies allow to see it. |
+| 08 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
+| 09 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one generated, every one reading through the same policies. |
+| 10 | Studio | 175 | 5.8 | Add Studio and you run the database from the same app. |
+| 11 | The schema | 260 | 8.7 | It draws the schema out of the catalogue, so what you are looking at is what is actually there. |
 | 12 | Access is not a switch | 240 | 8.0 | Per collection, per operation, per role — and Postgres, not your code, is what enforces it. |
 | 13 | The same query, twice | 240 | 8.0 | The same call, from two people, returning different rows. No branch anywhere in your code. |
-| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres — Supabase, Neon, RDS, your own. |
+| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres, including one we have never seen. |
 | 15 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. Not a way around it. |
 | 16 | One command | 205 | 6.8 | All of it starts with one command, against a database you have or one it creates. |
 | 17 | Yours | 175 | 5.8 | MIT, end to end. Your laptop, your server, your cloud. Nobody holds your keys. |

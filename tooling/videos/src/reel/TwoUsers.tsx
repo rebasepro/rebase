@@ -148,7 +148,7 @@ export const TwoUsers: React.FC = () => {
     return (
         <AbsoluteFill>
             <Stage style={{ justifyContent: "flex-start", paddingTop: 96 }}>
-                <Chapter n="07" label="The same query, twice" delay={2} />
+                <Chapter n="06" label="The same query, twice" delay={2} />
                 <div style={{ marginTop: 20 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>
                         The same query, twice.

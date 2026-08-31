@@ -7,12 +7,16 @@ import { pop, ramp, SPRING } from "../components/motion";
 import { CHROMA, FONT, INK, TRACKING } from "../theme";
 
 /**
- * The film's opening beat, and its own composition.
+ * CANDIDATE — add one column.
  *
- * It opens on RECOGNITION — five files the viewer has written — because the
- * film used to open on a CLI command, which is a thing you do after you have
- * decided, not a reason to decide. Nobody watches a backend video to find out
- * how installation works.
+ * This opened the film for a while and no longer does. It is claim TWO —
+ * duplication — and the film now opens on claim one, security, which is the
+ * one nobody else in the category can make. Everything from Prisma to Payload
+ * attacks duplication, so leading with it invited "another codegen tool".
+ *
+ * It is kept because the argument is still true and still unshown: the cost of
+ * the second copy is that one change silently invalidates four files. If the
+ * mechanism act ever has room, this is the counterfactual that belongs in it.
  *
  * The film's second-copy scene shows that five declarations of one table
  * exist. It never shows what that COSTS, and the cost is the whole reason
@@ -58,7 +62,7 @@ export const Drift: React.FC = () => {
     return (
         <AbsoluteFill>
             <Stage style={{ justifyContent: "flex-start", paddingTop: 96 }}>
-                <Chapter n="01" label="The second copy" delay={2} />
+                <Chapter n="—" label="The second copy" delay={2} />
                 <div style={{ marginTop: 20 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>
                         You have written this table before.
