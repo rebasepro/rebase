@@ -167,6 +167,7 @@
       "^react-dom$": "<rootDir>/node_modules/react-dom",
       "^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime",
       "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts"
-    }
+    },
+    "testTimeout": 30000
   }
 }

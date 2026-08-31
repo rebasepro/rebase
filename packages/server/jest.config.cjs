@@ -18,5 +18,13 @@ module.exports = {
         // — see test/stubs/cms-types.ts. The server itself may not depend on it.
         "^@rebasepro/cms-types$": "<rootDir>/test/stubs/cms-types.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
+    },
+    // Many suites here boot a whole backend per test — middlewares, boot-time
+    // provisioning, function mounting — which is far more than jest's 5s
+    // default was chosen for. Under `pnpm -r test` that budget is shared with
+    // the other packages' workers, and files like runtime-surfaces.test.ts
+    // failed on `Exceeded timeout of 5000 ms` while passing in ~1.5s alone.
+    // A boot is slow work, not a hung test; 30s matches server-mongo, which
+    // raised it for the same reason.
+    testTimeout: 30000
 };

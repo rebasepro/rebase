@@ -82,6 +82,7 @@
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
-    }
+    },
+    "testTimeout": 30000
   }
 }
