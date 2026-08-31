@@ -17,6 +17,8 @@ import { Included, INCLUDED_DURATION } from "./reel/Included";
 import { Refused, REFUSED_DURATION } from "./reel/Refused";
 import { Drift, DRIFT_DURATION } from "./reel/Drift";
 import { Push, PUSH_DURATION } from "./reel/Push";
+import { Stream, STREAM_DURATION } from "./reel/Stream";
+import { Map as SchemaMap, MAP_DURATION } from "./reel/Map";
 
 loadFonts();
 
@@ -140,6 +142,32 @@ export const RemotionRoot: React.FC = () => (
                 </Reel>
             )}
             durationInFrames={PUSH_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Stream"
+            component={() => (
+                <Reel roll={0.62} reveal={0.22}>
+                    <Stream />
+                </Reel>
+            )}
+            durationInFrames={STREAM_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        <Composition
+            id="Reel-Map"
+            component={() => (
+                <Reel roll={0.38} reveal={0.26}>
+                    <SchemaMap />
+                </Reel>
+            )}
+            durationInFrames={MAP_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}
