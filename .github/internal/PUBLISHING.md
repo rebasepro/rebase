@@ -54,9 +54,9 @@ Commits that don't match a prefix go under "Other".
 ## CI: GitHub Actions
 
 Both releases live in one workflow, `.github/workflows/publish.yml`, as two jobs
-selected by trigger. They are not split into two files because npm allows only
-one trusted publisher per package, naming a single workflow file — two files
-could never both be trusted.
+selected by the **channel** input. They are not split into two files because npm
+allows only one trusted publisher per package, naming a single workflow file —
+two files could never both be trusted.
 
 ### Stable Release (manual trigger)
 
@@ -67,14 +67,23 @@ could never both be trusted.
 
 This does everything the local script does, but in CI.
 
-### Canary Release (automatic)
+### Canary Release (manual trigger)
 
-Every push to `main` runs the canary job in `.github/workflows/publish.yml`, which
-publishes a canary version (or run it manually with **channel** set to `canary`):
+1. Go to **Actions** → **Publish** → **Run workflow**
+2. Set **channel** to `canary`
+3. Pick the branch to publish from — the version is derived from the last release
+   tag plus that commit's short sha
+
+**version** and **dry run** are stable-only and ignored here.
 
 ```
 0.0.1-canary.<short-sha>
 ```
+
+Canary is not automatic. It used to publish on every push to `main`; a canary is
+a release you decide to cut, so it is now triggered the same way stable is. Merges
+to `main` still run the full gate — that is `ci.yml`, which calls the same
+`verify.yml` this job does.
 
 Install the latest canary:
 ```bash

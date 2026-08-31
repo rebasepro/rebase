@@ -10,9 +10,9 @@ name: Verify
 #
 # Canary used to skip it, on the reasoning that a canary publishes if it compiles.
 # That made the canary channel one nobody had checked — 0.13.1-canary.gcd6689e
-# published with `check:hooks` red — so it gates now too. A push to main therefore
-# runs this twice, once for ci.yml and once for the canary publish; the duplicate
-# is compute, whereas copying the steps to avoid it would be drift.
+# published with `check:hooks` red — so it gates now too. Both publish channels
+# are manual, so this no longer runs twice for a merge to main: ci.yml gates the
+# push, and a canary run gates the commit somebody chose to publish.
 #
 # It exists as a reusable workflow rather than copied steps because the copy is the
 # failure mode: the release path is the one that runs rarely, so it is the one that

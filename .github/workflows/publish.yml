@@ -6,8 +6,12 @@ name: Publish
 # both be trusted for the same package — the second `npm trust` call collides
 # with the first. Keeping both jobs here means one trust config covers both.
 #
-#   push to main            → canary
-#   workflow_dispatch       → stable (or canary, via the channel input)
+#   workflow_dispatch       → stable, or canary via the channel input
+#
+# Both channels are manual. Canary used to fire on every push to main, which
+# meant `@canary` moved on merges nobody intended as a release and burned a
+# publish (and a full verify run) on every commit. A canary is a release you
+# choose to cut — just a cheaper one than stable.
 
 on:
   workflow_dispatch:
@@ -28,13 +32,10 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    branches:
-      - main
 
 jobs:
   # ══════════════════════════════════════════════════════════════
-  # Canary — every push to main, and manual runs with channel=canary
+  # Canary — manual runs with channel=canary
   # ══════════════════════════════════════════════════════════════
 
   # The same gate a stable release runs, before a canary publishes.
@@ -48,11 +49,11 @@ jobs:
   # place to find problems — but by testing the release, not by shipping one
   # nobody checked.
   verify-canary:
-    if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    if: ${{ inputs.channel == 'canary' }}
     uses: ./.github/workflows/verify.yml
 
   publish-canary:
-    if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    if: ${{ inputs.channel == 'canary' }}
     needs: verify-canary
     runs-on: ubuntu-latest
     # 4 minutes median across 31 runs, 6.4 at the slowest. The ceiling exists
@@ -64,8 +65,13 @@ jobs:
     # is sized to catch a hang and nothing else.
     timeout-minutes: 30
     concurrency:
+      # Not cancel-in-progress. That was right when a canary fired on every
+      # push and a newer commit genuinely superseded the run it interrupted;
+      # now every run is one somebody asked for, and cancelling one partway
+      # leaves some packages published at the version and some not — the same
+      # half-published state the timeout above is deliberately sized to avoid.
       group: canary-publish-${{ github.ref }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -211,14 +217,12 @@ jobs:
   #
   # This is the same workflow CI runs, called rather than copied — a second copy of
   # the step list on the path that runs least often is how a release gate rots.
-  #
-  # Canary is untouched and still publishes on a green build alone.
   verify-stable:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
+    if: ${{ inputs.channel == 'stable' }}
     uses: ./.github/workflows/verify.yml
 
   publish-stable:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
+    if: ${{ inputs.channel == 'stable' }}
     needs: verify-stable
     runs-on: ubuntu-latest
     # Higher than publish-canary, and not because it is observed to be slower:
