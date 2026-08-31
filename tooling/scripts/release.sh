@@ -16,7 +16,7 @@ set -euo pipefail
 #   2. Stamps the CHANGELOG: promotes "## [Unreleased]" → "## [X.Y.Z] - <date>",
 #      opens a fresh [Unreleased], and syncs the docs-site mirror
 #      (via tooling/scripts/prepare-changelog.mjs)
-#   3. Bumps versions in all publishable packages (packages/* + rebase-agent-skills)
+#   3. Bumps versions in every publishable package (derived from the workspace)
 #   4. Publishes them all to npm
 #   5. Creates a GitHub Release using notes from CHANGELOG.md
 #
@@ -202,7 +202,7 @@ fi
 echo ""
 echo -e "${BOLD}Ready to release ${GREEN}v${NEW_VERSION}${RESET}${BOLD}. This will:${RESET}"
 echo "  1. Stamp CHANGELOG (promote [Unreleased] → [$NEW_VERSION]) + sync docs mirror"
-echo "  2. Bump versions in all packages (packages/* + rebase-agent-skills)"
+echo "  2. Bump versions in every publishable package (derived from the workspace)"
 echo "  3. Record the project upgrade snapshot (needs Docker)"
 echo "  4. Commit, tag v$NEW_VERSION, and push to origin"
 echo "  5. Publish all packages to npm"
@@ -231,15 +231,21 @@ ok "CHANGELOG stamped and docs mirror synced"
 # ── Bump versions ──────────────────────────────────────────
 step "Bumping versions to $NEW_VERSION"
 
-# Bump all publishable packages — MUST match the publish filter below,
-# including rebase-agent-skills, so every published package shares the version.
-pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "
-  const fs = require('fs');
-  const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  p.version = '$NEW_VERSION';
-  fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
-"
+# Bump every publishable package, DERIVED from the workspace.
+#
+# This used to be two `--filter` paths with a comment saying they MUST match the
+# publish filter below — which is the tell: an invariant a comment asks two call
+# sites to hold is one nothing holds. `rebase-agent-skills/` moved under
+# `tooling/` on 2026-08-24, pnpm matched nothing, EXITED 0, and the package fell
+# out of four releases while every job stayed green. There is one derivation now,
+# and the publish below takes no filter at all, so there is nothing left to match.
+node tooling/scripts/publishable-packages.mjs --set-version "$NEW_VERSION"
 ok "Bumped all package versions"
+
+# Fail before anything is published, not after: every publishable package must
+# now be at this version, and the release workflow must still derive its own set.
+node tooling/scripts/check-publishable-set.mjs || err "Publishable set is inconsistent — refusing to release."
+ok "Publishable set verified"
 
 # The chart carries the *same* number as the runtime — its `version` ships with
 # the release and its `appVersion` IS the default image tag, so `helm install`
@@ -317,7 +323,9 @@ ok "Pre-publish validation passed"
 # ── Publish to npm ──────────────────────────────────────────
 step "Publishing to npm"
 
-pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public
+# No `--filter`: `pnpm -r publish` publishes exactly the non-private workspace
+# members, wherever they live, so a directory move cannot silently shrink it.
+pnpm -r publish --no-git-checks --access public
 ok "Published all packages to npm"
 
 # ── GitHub Release ──────────────────────────────────────────

@@ -161,6 +161,16 @@ jobs:
       - name: Declared-dependency guard
         run: pnpm run check:deps
 
+      # The release must not enumerate its own contents. `publish.yml` named its
+      # publishable packages as literal paths; one of those directories moved on
+      # 2026-08-24, pnpm matched nothing, exited 0, and @rebasepro/agent-skills
+      # silently fell out of four releases — while the CLI, which depends on it
+      # as `workspace:*`, baked the stale version into its published manifest.
+      # Every check in the pipeline asked whether the packages it FOUND were
+      # right; none asked whether it had found them all.
+      - name: Publishable-set guard
+        run: pnpm run check:publishable-set
+
       # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
       # a script a human chooses to run, so a lint error could sit on main
       # indefinitely — and one was: a `no-control-regex` error in

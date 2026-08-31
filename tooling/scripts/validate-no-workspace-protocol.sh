@@ -38,12 +38,12 @@ ERRORS=0
 if $QUICK; then
   # ── Quick mode: just warn about workspace: in source package.json ──
   echo -e "${BOLD}Checking source package.json files for workspace: references...${RESET}"
-  for pkg_json in packages/*/package.json tooling/rebase-agent-skills/package.json; do
+  # Derived, never listed — see tooling/scripts/publishable-packages.mjs. The
+  # hand-written list this replaces already skipped private packages itself;
+  # the derivation does that, so a package can only be missed by not existing.
+  for pkg_dir in $(node "$(dirname "$0")/publishable-packages.mjs" --dirs); do
+    pkg_json="$pkg_dir/package.json"
     [ -f "$pkg_json" ] || continue
-
-    # Skip private packages
-    is_private=$(node -e "console.log(require('./$pkg_json').private || false)" 2>/dev/null)
-    [ "$is_private" = "true" ] && continue
 
     if grep -q '"workspace:' "$pkg_json" 2>/dev/null; then
       pkg_name=$(node -e "console.log(require('./$pkg_json').name)" 2>/dev/null)
@@ -61,14 +61,11 @@ trap 'rm -rf "$PACK_DIR"' EXIT
 echo -e "${BOLD}Packing and validating all publishable packages...${RESET}"
 echo ""
 
-# Get list of publishable package directories
+# The publishable set, derived from the workspace rather than restated here.
 PUBLISHABLE_DIRS=()
-for pkg_json in packages/*/package.json tooling/rebase-agent-skills/package.json; do
-  [ -f "$pkg_json" ] || continue
-  is_private=$(node -e "console.log(require('./$pkg_json').private || false)" 2>/dev/null)
-  [ "$is_private" = "true" ] && continue
-  PUBLISHABLE_DIRS+=("$(dirname "$pkg_json")")
-done
+while IFS= read -r pkg_dir; do
+  [ -n "$pkg_dir" ] && PUBLISHABLE_DIRS+=("$pkg_dir")
+done < <(node "$(dirname "$0")/publishable-packages.mjs" --dirs)
 
 for pkg_dir in "${PUBLISHABLE_DIRS[@]}"; do
   pkg_json="$pkg_dir/package.json"
