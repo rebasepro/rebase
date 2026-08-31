@@ -2,13 +2,14 @@ import React from "react";
 import { S00_ColdOpen } from "./scenes/S00_ColdOpen";
 import { S01_Headline } from "./scenes/S01_Headline";
 import { S02_OneCommand } from "./scenes/S02_OneCommand";
-import { S03_SecondCopy } from "./scenes/S03_SecondCopy";
+import { S03b_Drift } from "./scenes/S03b_Drift";
 import { S03_OneDefinition } from "./scenes/S03_OneDefinition";
 import { S05_Headless } from "./scenes/S05_Headless";
 import { S07_Studio } from "./scenes/S07_Studio";
 import { S07b_Everything } from "./scenes/S07b_Everything";
 import { S11_Ownership } from "./scenes/S11_Ownership";
 import { S04_Claim } from "./scenes/S04_Claim";
+import { S08b_TwoUsers } from "./scenes/S08b_TwoUsers";
 import { S05_Proof } from "./scenes/S05_Proof";
 import { S06_Panel } from "./scenes/S06_Panel";
 import { S07_Agent } from "./scenes/S07_Agent";
@@ -106,8 +107,8 @@ export const SCENES: SceneEntry[] = [
         enter: "push",
     },
     {
-        id: "SecondCopy", title: "03 · The second copy", component: S03_SecondCopy,
-        durationInFrames: 325, ground: "base",
+        id: "SecondCopy", title: "03 · The second copy", component: S03b_Drift,
+        durationInFrames: 270, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
         enter: "descend",
     },
@@ -143,30 +144,36 @@ export const SCENES: SceneEntry[] = [
     },
     {
         id: "Claim", title: "09 · Row-level security", component: S04_Claim,
-        durationInFrames: 200, ground: "claim",
+        durationInFrames: 170, ground: "claim",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "Proof", title: "10 · The proof", component: S05_Proof,
+        id: "TwoUsers", title: "10 · The same query, twice", component: S08b_TwoUsers,
+        durationInFrames: 240, ground: "base",
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.30 },
+        enter: "push",
+    },
+    {
+        id: "Proof", title: "11 · The proof", component: S05_Proof,
         durationInFrames: 200, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.30 },
         enter: "descend",
     },
     {
-        id: "Agent", title: "11 · Agent-native", component: S07_Agent,
+        id: "Agent", title: "12 · Agent-native", component: S07_Agent,
         durationInFrames: 165, ground: "deep",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.58, reveal: 0.30 },
         enter: "push",
     },
     {
-        id: "Ownership", title: "12 · Yours", component: S11_Ownership,
+        id: "Ownership", title: "13 · Yours", component: S11_Ownership,
         durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.30 },
         enter: "rise",
     },
     {
-        id: "Close", title: "13 · The ask", component: S08_Close,
+        id: "Close", title: "14 · The ask", component: S08_Close,
         durationInFrames: 160, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.30 },
         enter: "scale",

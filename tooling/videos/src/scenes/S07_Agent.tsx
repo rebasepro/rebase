@@ -36,7 +36,7 @@ export const S07_Agent: React.FC = () => {
     return (
         <Scene>
             <Stage>
-                <Chapter n="09" label="Agent-native" delay={4} />
+                <Chapter n="10" label="Agent-native" delay={4} />
                 <div style={{ marginTop: 24 }}>
                     <DisplayLine size={DISPLAY.statement} delay={10}>
                         An agent gets the same authorization

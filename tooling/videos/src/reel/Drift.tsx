@@ -53,10 +53,10 @@ export const Drift: React.FC = () => {
     return (
         <AbsoluteFill>
             <Stage style={{ justifyContent: "flex-start", paddingTop: 96 }}>
-                <Chapter n="—" label="The second copy" delay={2} />
+                <Chapter n="02" label="The second copy" delay={2} />
                 <div style={{ marginTop: 20 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>
-                        Now add one column.
+                        Add one column.
                     </DisplayLine>
                 </div>
             </Stage>
@@ -111,7 +111,13 @@ export const Drift: React.FC = () => {
                                         sql={copy.file.endsWith(".sql")}
                                         size={13}
                                         delay={26 + i * 6}
-                                        step={1.1}
+                                        /* The source card types SLOWLY, so its
+                                           last line — `currency text` — lands on
+                                           frame 40, with the callout. The others
+                                           are already finished by then: the point
+                                           is that they were written before the
+                                           change and nobody went back. */
+                                        step={isSource ? 3.5 : 1.1}
                                         /* Line 4 is `currency text`; emphasise dims the
                                            others, which is how the new column reads as new
                                            without a colour that means something else. */

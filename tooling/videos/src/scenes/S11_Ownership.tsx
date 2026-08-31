@@ -32,7 +32,7 @@ export const S11_Ownership: React.FC = () => {
     return (
         <Scene>
             <Stage>
-                <Chapter n="10" label="Yours" delay={2} />
+                <Chapter n="11" label="Yours" delay={2} />
                 <div style={{ marginTop: 24 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>Nothing here can be</DisplayLine>
                     <DisplayLine size={DISPLAY.statement} delay={14}>taken away from you.</DisplayLine>
