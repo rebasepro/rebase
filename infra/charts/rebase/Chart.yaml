@@ -11,7 +11,7 @@ type: application
 # held to the runtime's version, and a self-hoster reading two numbers has to
 # work out which pairs with which — so there is one number. `check:runtime-image`
 # holds this and `appVersion` to @rebasepro/server.
-version: 0.17.1
+version: 0.17.2
 
 # The default runtime image tag. A deployment pins its own with
 # `image.tag`; this is what `helm install` uses when nobody says otherwise —
@@ -19,7 +19,7 @@ version: 0.17.1
 # `pnpm run check:runtime-image` holds it to @rebasepro/server's version, because
 # a chart whose default cannot be pulled fails as ImagePullBackOff on the one
 # command the README calls the minimum viable install.
-appVersion: "0.17.1"
+appVersion: "0.17.2"
 
 keywords:
   - baas

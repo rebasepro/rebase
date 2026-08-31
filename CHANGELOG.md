@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-08-31
+
 ### Fixed
 
 - **`rebase db push` was impossible for any collection declaring a

@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-08-31
+
 ### Fixed
 
 - **`rebase db push` was impossible for any collection declaring a
