@@ -135,14 +135,25 @@ jobs:
           echo "CANARY_VERSION=$CANARY_VERSION" >> $GITHUB_ENV
           echo "Publishing canary version: $CANARY_VERSION"
 
-          # Bump version in all publishable packages (node, not npm, to avoid workspace:* validation)
-          pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$CANARY_VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          # Bump every publishable package. The set is DERIVED from the workspace
+          # (see tooling/scripts/publishable-packages.mjs); it used to be two
+          # `--filter` paths, and when one of those directories moved pnpm matched
+          # nothing, exited 0, and quietly dropped a package from four releases.
+          node tooling/scripts/publishable-packages.mjs --set-version "$CANARY_VERSION"
 
           # Commit version changes locally so pnpm publish doesn't complain about dirty git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore: canary version $CANARY_VERSION" --no-verify
+
+      # Fail here rather than at the registry. `check:publishable-set` re-derives
+      # the set from the workspace and refuses to go on unless every publishable
+      # package sits at the version this release claims — which is precisely what
+      # nothing checked when `@rebasepro/agent-skills` was left four versions
+      # behind and its stale number was baked into the CLI's published manifest.
+      - name: Every publishable package is at this version
+        run: node tooling/scripts/check-publishable-set.mjs
 
       - name: Validate no workspace protocol in packed output
         run: |
@@ -151,10 +162,8 @@ jobs:
           trap 'rm -rf "$PACK_DIR"' EXIT
           ERRORS=0
 
-          for pkg_dir in packages/*/ tooling/rebase-agent-skills/; do
+          for pkg_dir in $(node tooling/scripts/publishable-packages.mjs --dirs); do
             [ -f "$pkg_dir/package.json" ] || continue
-            is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
-            [ "$is_private" = "true" ] && continue
             pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)")
 
             (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") > /dev/null 2>&1
@@ -185,7 +194,11 @@ jobs:
       # does per-run, and pnpm prefers it, so its presence would silently mask
       # a broken trust config.
       - name: Publish to npm
-        run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --tag canary --no-git-checks --access public --report-summary
+        run: |
+          # No `--filter`. `pnpm -r publish` already publishes exactly the
+          # non-private workspace members, wherever in the tree they live, so
+          # there is nothing here for a directory move to invalidate.
+          pnpm -r publish --tag canary --no-git-checks --access public --report-summary
 
       - name: Summary
         run: |
@@ -442,13 +455,9 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Bump all publishable packages (working tree only, for npm publish)
-          pnpm --filter './packages/*' --filter './rebase-agent-skills' -r exec node -e "
-            const fs=require('fs');
-            const p=JSON.parse(fs.readFileSync('package.json','utf8'));
-            p.version='$VERSION';
-            fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
-          "
+          # Bump every publishable package. The set is DERIVED from the workspace
+          # (see tooling/scripts/publishable-packages.mjs) rather than listed here.
+          node tooling/scripts/publishable-packages.mjs --set-version "$VERSION"
 
           # The chart ships with the runtime and its appVersion IS the default
           # image tag, so it has to move with them — see tooling/scripts/release.sh,
@@ -467,6 +476,15 @@ jobs:
           "
 
       # ── Pre-publish validation ───────────────────────────────
+
+      # Fail here rather than at the registry. `check:publishable-set` re-derives
+      # the set from the workspace and refuses to go on unless every publishable
+      # package sits at the version this release claims — which is precisely what
+      # nothing checked when `@rebasepro/agent-skills` was left four versions
+      # behind and its stale number was baked into the CLI's published manifest.
+      - name: Every publishable package is at this version
+        run: node tooling/scripts/check-publishable-set.mjs
+
       - name: Validate no workspace protocol in packed output
         run: |
           echo "Packing and validating all publishable packages..."
@@ -474,10 +492,8 @@ jobs:
           trap 'rm -rf "$PACK_DIR"' EXIT
           ERRORS=0
 
-          for pkg_dir in packages/*/ tooling/rebase-agent-skills/; do
+          for pkg_dir in $(node tooling/scripts/publishable-packages.mjs --dirs); do
             [ -f "$pkg_dir/package.json" ] || continue
-            is_private=$(node -e "console.log(require('./$pkg_dir/package.json').private || false)")
-            [ "$is_private" = "true" ] && continue
             pkg_name=$(node -e "console.log(require('./$pkg_dir/package.json').name)")
 
             (cd "$pkg_dir" && pnpm pack --pack-destination "$PACK_DIR") > /dev/null 2>&1
@@ -505,7 +521,9 @@ jobs:
       # No NODE_AUTH_TOKEN — see the canary job's publish step.
       - name: Publish to npm
         if: ${{ !inputs.dry_run }}
-        run: pnpm --filter './packages/*' --filter './rebase-agent-skills' -r publish --no-git-checks --access public --report-summary
+        run: |
+          # No `--filter` — see the canary job's publish step.
+          pnpm -r publish --no-git-checks --access public --report-summary
 
       - name: Commit version bump, tag, and push
         id: bump

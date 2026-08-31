@@ -1,13 +1,13 @@
 {
   "name": "@rebasepro/agent-skills",
-  "version": "0.16.0",
+  "version": "0.17.2",
   "private": false,
   "description": "Bundled AI agent skills for Rebase",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "rebase-agent-skills"
+    "directory": "tooling/rebase-agent-skills"
   },
   "files": [
     "skills/"
