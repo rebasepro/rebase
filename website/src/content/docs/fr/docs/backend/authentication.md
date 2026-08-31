@@ -177,6 +177,60 @@ Tous les endpoints d'authentification sont montés sous `/api/auth/` :
 
 Tous les endpoints de l'API de données nécessitent un en-tête `Authorization: Bearer <token>` valide lorsque `requireAuth: true` (le défaut).
 
+### Format de la réponse
+
+Tous les endpoints qui émettent une session répondent avec la même enveloppe :
+`register`, `login`, chaque fournisseur OAuth, `magic-link/verify`,
+`otp/verify`, `anonymous`, `anonymous/link` et `mfa/challenge/verify`.
+
+```json
+{
+  "user": {
+    "uid": "8f1c2a6e-…",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "photoURL": null,
+    "providerId": "password",
+    "isAnonymous": false,
+    "emailVerified": true,
+    "roles": ["editor"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOi…",
+    "refreshToken": "9b2e…",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+Renvoyez le token d'accès dans `Authorization: Bearer <accessToken>`.
+`accessTokenExpiresAt` est exprimé en millisecondes depuis l'epoch.
+
+`POST /api/auth/refresh` répond avec la même enveloppe, à deux réserves près :
+`user` est entièrement omis lorsque le compte ne peut pas être relu — traitez-le
+donc comme optionnel à cet endroit — et `providerId` vaut toujours `password`,
+quelle que soit la méthode de création initiale de la session.
+
+:::caution[Le SDK client aplatit cette enveloppe — pas le HTTP brut]
+Le JSON ci-dessus est le format transmis sur le réseau, et c'est ce que renvoie
+`fetch("/api/auth/login")` : le token se trouve dans
+**`body.tokens.accessToken`**.
+
+Le [SDK client](/docs/sdk/authentication) déballe `tokens` avant de vous rendre
+la session, si bien que `auth.signInWithEmail()` résout un
+**`{ user, accessToken, refreshToken }`** aplati.
+
+Les deux formes sont réelles ; elles appartiennent à deux couches différentes.
+Lire la forme du SDK depuis un `fetch` brut donne `undefined`, ce qui se
+manifeste par « la connexion a réussi mais il n'y a pas de token d'accès » : la
+connexion allait bien, le token était un niveau plus bas.
+:::
+
+Avec `cookieAuth` activé, le token de rafraîchissement voyage dans un cookie
+`httpOnly` et `tokens.refreshToken` est une chaîne vide dans le corps. Le token
+d'accès n'est pas affecté.
+
 ### Inviter des coéquipiers par e-mail
 
 Les flux d'invitation doivent transformer une adresse e-mail en un ID utilisateur, mais la collection `users`

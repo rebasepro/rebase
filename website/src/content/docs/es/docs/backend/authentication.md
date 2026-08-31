@@ -174,6 +174,59 @@ Todos los endpoints de autenticación se montan en `/api/auth/`:
 
 Todos los endpoints de la API de datos requieren una cabecera `Authorization: Bearer <token>` válida cuando `requireAuth: true` (el valor predeterminado).
 
+### Formato de respuesta
+
+Todos los endpoints que emiten una sesión responden con el mismo envoltorio:
+`register`, `login`, cada proveedor OAuth, `magic-link/verify`, `otp/verify`,
+`anonymous`, `anonymous/link` y `mfa/challenge/verify`.
+
+```json
+{
+  "user": {
+    "uid": "8f1c2a6e-…",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "photoURL": null,
+    "providerId": "password",
+    "isAnonymous": false,
+    "emailVerified": true,
+    "roles": ["editor"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOi…",
+    "refreshToken": "9b2e…",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+Devuelve el token de acceso como `Authorization: Bearer <accessToken>`.
+`accessTokenExpiresAt` son milisegundos desde la época.
+
+`POST /api/auth/refresh` responde con el mismo envoltorio, con dos salvedades:
+`user` se omite por completo cuando la cuenta no se puede releer, así que trátalo
+como opcional ahí, y `providerId` siempre es `password`, sea cual sea el método
+con el que se creó la sesión.
+
+:::caution[El SDK cliente aplana este envoltorio — el HTTP directo no]
+El JSON anterior es el formato tal y como viaja por la red, y es lo que devuelve
+`fetch("/api/auth/login")`: el token vive en **`body.tokens.accessToken`**.
+
+El [SDK cliente](/docs/sdk/authentication) desenvuelve `tokens` antes de
+entregarte la sesión, por lo que `auth.signInWithEmail()` se resuelve en un
+**`{ user, accessToken, refreshToken }`** aplanado.
+
+Ambas formas son reales; pertenecen a dos capas distintas. Leer la forma del SDK
+desde un `fetch` directo produce `undefined`, lo que se manifiesta como «el
+inicio de sesión funcionó pero no hay token de acceso»: el inicio de sesión
+estuvo bien, el token estaba un nivel más abajo.
+:::
+
+Con `cookieAuth` habilitado, el token de refresco viaja como una cookie
+`httpOnly` y `tokens.refreshToken` es una cadena vacía en el cuerpo. El token de
+acceso no se ve afectado.
+
 ### Invitar a compañeros por email
 
 Los flujos de invitación necesitan convertir una dirección de email en un ID de usuario, pero la colección `users`

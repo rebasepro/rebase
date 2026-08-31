@@ -458,6 +458,58 @@ service key:
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
+### Response format
+
+Every endpoint that issues a session answers with the same envelope — `register`,
+`login`, each OAuth provider, `magic-link/verify`, `otp/verify`, `anonymous`,
+`anonymous/link` and `mfa/challenge/verify`:
+
+```json
+{
+  "user": {
+    "uid": "8f1c2a6e-…",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "photoURL": null,
+    "providerId": "password",
+    "isAnonymous": false,
+    "emailVerified": true,
+    "roles": ["editor"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOi…",
+    "refreshToken": "9b2e…",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+Send the access token back as `Authorization: Bearer <accessToken>`.
+`accessTokenExpiresAt` is epoch milliseconds.
+
+`POST /api/auth/refresh` answers with the same envelope, with two caveats: `user`
+is omitted entirely when the account cannot be re-read, so treat it as optional
+there, and `providerId` is always `password` however the session was first
+created.
+
+:::caution[The client SDK flattens this envelope — raw HTTP does not]
+The JSON above is the wire format, and it is what `fetch("/api/auth/login")`
+returns: the token lives at **`body.tokens.accessToken`**.
+
+The [client SDK](/docs/sdk/authentication) unwraps `tokens` before it hands the
+session back, so `auth.signInWithEmail()` resolves to a flattened
+**`{ user, accessToken, refreshToken }`** instead.
+
+Both shapes are real; they belong to two different layers. Reading the SDK's
+shape off a raw `fetch` yields `undefined`, which shows up as "login succeeded
+but there is no access token" — the login was fine, the token was one level down.
+:::
+
+With [`cookieAuth`](#refresh-tokens-in-an-httponly-cookie) enabled the refresh
+token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty
+string in the body. The access token is unaffected.
+
 ### Multi-factor authentication (TOTP)
 
 **A second factor gates sign-in, not just individual operations.** Once an
