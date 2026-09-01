@@ -516,3 +516,229 @@ describe("a simultaneous boot", () => {
         await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
     });
 });
+
+/**
+ * What a failed statement actually says.
+ *
+ * These assert on the *reason*, which is the thing that was missing. The suite
+ * above already builds drizzle-shaped errors and already asserts that a failure
+ * throws and names its target — and every one of those assertions passed while
+ * the reason was being dropped, because "throws" and "explains" are two
+ * different claims and only one of them was being made.
+ *
+ * The cost was measured in the field: four unrelated boot failures on a managed
+ * deployment, each surfacing as an identical 300-second readiness timeout, with
+ * the one line that told them apart discarded here.
+ */
+describe("reporting a statement that failed", () => {
+    /** A driver error shaped the way node-postgres reports one, through drizzle. */
+    function wrapped(inner: Record<string, unknown> & { message: string }): Error {
+        const { message, ...rest } = inner;
+        const pg = Object.assign(new Error(message), rest);
+        return Object.assign(
+            new Error(`Failed query: CREATE TABLE "public"."posts" (...)\nparams: `),
+            { cause: pg }
+        );
+    }
+
+    function failingClient(error: Error, failOn = /^CREATE TABLE/): Queryable {
+        return {
+            async query<T>(sql: string): Promise<{ rows: T[] }> {
+                if (failOn.test(sql)) throw error;
+                return { rows: [] as T[] };
+            }
+        };
+    }
+
+    it("carries the database's own message and SQLSTATE, not the ORM's wrapper", async () => {
+        const client = failingClient(wrapped({
+            message: 'permission denied for schema "public"',
+            code: "42501"
+        }));
+
+        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+            /permission denied for schema "public" \[42501\]/
+        );
+    });
+
+    it("does not report the ORM wrapper as the reason", async () => {
+        const client = failingClient(wrapped({ message: "some real reason", code: "42501" }));
+
+        const failure = await ensureCollectionTables(client, [posts]).catch((e: Error) => e.message);
+
+        // `Failed query:` is the wrapper's own text. It named the statement,
+        // which the thrown error appends itself, and nothing else — so it
+        // pushed the reason off the end of the line for no information.
+        expect(failure).not.toContain("Failed query:");
+        expect(failure).toContain("some real reason");
+        // Named once, by us, at the end.
+        expect(failure!.match(/CREATE TABLE/g)).toHaveLength(1);
+    });
+
+    it("passes Postgres's detail and hint through", async () => {
+        const client = failingClient(wrapped({
+            message: 'could not open extension control file',
+            code: "58P01",
+            detail: "No such file or directory.",
+            hint: "Install the extension package."
+        }));
+
+        const failure = await ensureCollectionTables(client, [posts]).catch((e: Error) => e.message);
+
+        expect(failure).toContain("detail: No such file or directory.");
+        expect(failure).toContain("hint: Install the extension package.");
+    });
+
+    /**
+     * The hint exists precisely for this error, and it is matched against the
+     * message text — so against the wrapper it matched nothing, and the one
+     * explanation written for a missing pgvector never reached the one path
+     * that raises it on a managed tenant.
+     */
+    it("fires the pgvector hint, which the wrapper used to hide", async () => {
+        const client = failingClient(wrapped({
+            message: 'type "vector" does not exist',
+            code: "42704"
+        }));
+
+        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+            /pgvector is not installed on this database/
+        );
+    });
+
+    it("falls back to the deepest cause when nothing carries a SQLSTATE", async () => {
+        const client = failingClient(Object.assign(new Error("Failed query: ..."), {
+            cause: new Error("Connection terminated unexpectedly")
+        }));
+
+        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+            /Connection terminated unexpectedly/
+        );
+    });
+});
+
+/**
+ * An index is not worth a deployment.
+ *
+ * Boot threw on any failed statement, including a `CREATE INDEX`. On a managed
+ * runtime that killed the process, so the pod never went ready, so the platform
+ * reported a 300-second readiness timeout and rolled back — the whole tenant
+ * withheld because one ANN index would not build. An index that is not UNIQUE
+ * changes latency and nothing else: the same rows come back either way.
+ *
+ * UNIQUE is the exception, and the line is drawn there rather than at "index"
+ * because a unique index is not an optimization. It is the collection promising
+ * that two rows cannot share a value, and serving without it serves a promise
+ * the database is not keeping.
+ */
+describe("an index that will not build", () => {
+    const indexed = {
+        ...(posts as unknown as Record<string, unknown>),
+        indexes: [{ on: ["title"], reason: "title lookups" }]
+    } as unknown as CollectionConfig;
+
+    const uniquely = {
+        ...(posts as unknown as Record<string, unknown>),
+        indexes: [{ on: ["title"], unique: true, reason: "one post per title" }]
+    } as unknown as CollectionConfig;
+
+    /** Fails every CREATE INDEX with a real Postgres error, through drizzle. */
+    function indexHostileClient(code = "42704", message = "access method \"hnsw\" does not exist"): Queryable {
+        return {
+            async query<T>(sql: string): Promise<{ rows: T[] }> {
+                if (/CREATE (UNIQUE )?INDEX/i.test(sql)) {
+                    throw Object.assign(new Error("Failed query: ..."), {
+                        cause: Object.assign(new Error(message), { code })
+                    });
+                }
+                return { rows: [] as T[] };
+            }
+        };
+    }
+
+    it("does not fail the boot, and reports what was lost", async () => {
+        const outcome = await ensureCollectionTables(indexHostileClient(), [indexed]);
+
+        const failed = outcome.failures.filter(f => f.kind === "create-index");
+        expect(failed.length).toBeGreaterThan(0);
+        // The database's own reason, so the operator can act on it.
+        expect(failed[0].error).toContain('access method "hnsw" does not exist');
+    });
+
+    it("still applies everything planned after it", async () => {
+        const executed: string[] = [];
+        const client: Queryable = {
+            async query<T>(sql: string): Promise<{ rows: T[] }> {
+                executed.push(sql);
+                if (/CREATE INDEX/i.test(sql)) {
+                    throw Object.assign(new Error("Failed query: ..."), {
+                        cause: Object.assign(new Error("nope"), { code: "42704" })
+                    });
+                }
+                return { rows: [] as T[] };
+            }
+        };
+        await ensureCollectionTables(client, [indexed]);
+        expect(executed.some(s => /CREATE INDEX/i.test(s))).toBe(true);
+    });
+
+    it("does fail the boot on a UNIQUE index, which is a promise and not a speedup", async () => {
+        await expect(ensureCollectionTables(indexHostileClient(), [uniquely])).rejects.toThrow(
+            /access method "hnsw" does not exist/
+        );
+    });
+});
+
+/**
+ * `CREATE INDEX CONCURRENTLY` is the one statement Postgres refuses inside a
+ * transaction block, and whether this connection is inside one is not knowable
+ * from here: the client is whatever handle the caller bootstrapped with, and an
+ * application that builds its own adapter can hand over a connection already in
+ * a transaction. The plain form is always accepted.
+ */
+describe("a connection that turns out to be inside a transaction", () => {
+    const live = (): ExistingSchema => ({
+        tables: new Map([["public.posts", new Set(["id", "title", "views", "status"])]]),
+        enums: new Set(["posts_status_enum"])
+    });
+
+    it("retries the index without CONCURRENTLY instead of giving up on it", async () => {
+        const executed: string[] = [];
+        const client: Queryable = {
+            async query<T>(sql: string): Promise<{ rows: T[] }> {
+                executed.push(sql);
+                if (sql.includes("information_schema.columns")) {
+                    const rows = [...live().tables.get("public.posts")!].map(c => ({
+                        table_schema: "public",
+                        table_name: "posts",
+                        column_name: c,
+                        is_nullable: "YES"
+                    }));
+                    return { rows: rows as unknown as T[] };
+                }
+                if (/CONCURRENTLY/i.test(sql)) {
+                    throw Object.assign(new Error("Failed query: ..."), {
+                        cause: Object.assign(
+                            new Error("CREATE INDEX CONCURRENTLY cannot run inside a transaction block"),
+                            { code: "25001" }
+                        )
+                    });
+                }
+                return { rows: [] as T[] };
+            }
+        };
+
+        const indexed = {
+            ...(posts as unknown as Record<string, unknown>),
+            indexes: [{ on: ["title"], reason: "title lookups" }]
+        } as unknown as CollectionConfig;
+
+        const outcome = await ensureCollectionTables(client, [indexed]);
+
+        // It was attempted concurrently first — the table is live, so that is
+        // the right first choice — and then plainly, and it ended up applied.
+        expect(executed.some(s => /CREATE INDEX CONCURRENTLY/i.test(s))).toBe(true);
+        expect(executed.some(s => /CREATE INDEX IF NOT EXISTS/i.test(s) && !/CONCURRENTLY/i.test(s))).toBe(true);
+        expect(outcome.failures.filter(f => f.kind === "create-index")).toHaveLength(0);
+    });
+});

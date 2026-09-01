@@ -248,6 +248,43 @@ export function isScaffoldedLocalDatabase(connectionString: string | undefined):
  */
 const SCHEMA_META_SCHEMA = "rebase";
 
+/**
+ * One line about a statement the ensure could not apply and chose to survive.
+ *
+ * Each kind degrades differently and the operator's next move differs with it,
+ * so they do not share a sentence. What they share is the shape: what is still
+ * true, what is no longer true, and the database's own reason — never a bare
+ * "failed", which is the version of this that taught nobody anything.
+ */
+function describeEnsureFailure(failure: { kind: string; target: string; error: string }): string {
+    switch (failure.kind) {
+        case "comment-column":
+            // The stamp records which `search` block the generated column was
+            // built from. Without it the next boot cannot tell a changed block
+            // from an unchanged one and adopts the column again instead of
+            // refusing.
+            return (
+                `🔍 [schema] Could not record the search fingerprint on "${failure.target}" — search works, ` +
+                `but a later change to the \`search\` block will not be detected: ${failure.error}`
+            );
+        case "create-index":
+            // Not fatal, on purpose: the collection serves, every query returns
+            // the same rows, and only latency changes. Said at `warn` every boot
+            // because the alternative is a table that is permanently unindexed
+            // and looks exactly like one that is not.
+            return (
+                `🐢 [schema] Could not create an index on "${failure.target}" — the collection serves and returns ` +
+                "the same rows, but queries that would have used this index will scan instead. Boot is not failed " +
+                `over an index: ${failure.error}`
+            );
+        default:
+            return (
+                `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
+                `collection still serves, but rows are not policed by this constraint: ${failure.error}`
+            );
+    }
+}
+
 export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): BackendBootstrapper {
     // Applied at construction rather than threaded through every read: the
     // condition builder's static methods are reached from call sites that
@@ -1008,17 +1045,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 log
             );
             for (const failure of plan.failures) {
-                logger.warn(
-                    failure.kind === "comment-column"
-                        // The stamp records which `search` block the generated
-                        // column was built from. Without it the next boot cannot
-                        // tell a changed block from an unchanged one and adopts
-                        // the column again instead of refusing.
-                        ? `🔍 [schema] Could not record the search fingerprint on "${failure.target}" — search works, ` +
-                          `but a later change to the \`search\` block will not be detected: ${failure.error}`
-                        : `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
-                          `collection still serves, but rows are not policed by this constraint: ${failure.error}`
-                );
+                logger.warn(describeEnsureFailure(failure));
             }
             return { applied: plan.actions.length - plan.failures.length };
         },

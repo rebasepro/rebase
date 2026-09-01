@@ -178,8 +178,13 @@ describe("the two producers describe the same index", () => {
         }
     });
 
-    it("boot plans the same names, in the concurrent form", () => {
-        const ensure = planCollectionSchemaEnsure([c], { tables: new Map(), enums: new Set() });
+    it("boot plans the same names, in the concurrent form, against a live table", () => {
+        // Live, because that is what the concurrent form is for. On a table the
+        // same plan creates, boot plans the plain form — see the case below.
+        const ensure = planCollectionSchemaEnsure([c], {
+            tables: new Map([["public.documents", new Set(["id"])]]),
+            enums: new Set()
+        });
         const indexSql = ensure.actions
             .filter(a => a.kind === "create-index")
             .map(a => a.sql);
@@ -188,6 +193,19 @@ describe("the two producers describe the same index", () => {
             const statement = indexSql.find(sql => sql.includes(`"${name}"`));
             expect(statement).toBeDefined();
             expect(statement).toContain("CREATE INDEX CONCURRENTLY IF NOT EXISTS");
+        }
+    });
+
+    it("boot plans the plain form on a table it is creating", () => {
+        const ensure = planCollectionSchemaEnsure([c], { tables: new Map(), enums: new Set() });
+        const indexSql = ensure.actions
+            .filter(a => a.kind === "create-index")
+            .map(a => a.sql);
+
+        for (const name of vectorIndexNames(plan(c))) {
+            const statement = indexSql.find(sql => sql.includes(`"${name}"`))!;
+            expect(statement).toContain("CREATE INDEX IF NOT EXISTS");
+            expect(statement).not.toContain("CONCURRENTLY");
         }
     });
 

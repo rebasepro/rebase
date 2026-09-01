@@ -14,10 +14,13 @@
  * that adds it.
  */
 import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { ACTION_HELP, GLOBAL_SPEC_KEYS, printActionHelp } from "./action-help";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";
+import { ENV_SET_FLAGS } from "./env";
 
 /**
  * Which spec backs which page.
@@ -31,8 +34,30 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     projects: null,
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
+    "projects delete": {},
     "db create": CREATE_DATABASE_FLAGS,
+    "db backup": { "--yes": Boolean },
+    "db pitr": { "--target": String, "--yes": Boolean },
     deploy: DEPLOY_FLAGS,
+    deployments: null,
+    "deployments list": { "--limit": Number, "--all": Boolean },
+    "domains add": {},
+    "domains remove": {},
+    "env set": ENV_SET_FLAGS,
+    "env pull": { "--output": String, "--out": "--output" },
+    "storage create": {},
+    "storage attach": {
+        "--bucket": String,
+        "--access-key-id": String,
+        "--secret-access-key": String,
+        "--endpoint": String,
+        "--region": String,
+        "--force-path-style": Boolean
+    },
+    webhooks: null,
+    "webhooks create": { "--name": String, "--table": String, "--url": String, "--events": String },
+    "webhooks delete": {},
+    billing: {},
     logs: null,
     status: null,
     "clusters verify": null
@@ -57,7 +82,48 @@ function documentableKeys(spec: Record<string, unknown>): string[] {
         .map(([key]) => key);
 }
 
+/**
+ * Every command that names itself, read out of the source.
+ *
+ * `parseCloudArgs({ command: "cloud storage attach", … })` is a command
+ * declaring, in one place, that it parses its own line — so it is also the list
+ * of commands whose line a reader needs described. Derived rather than
+ * hand-listed, because a hand-listed one is exactly what was missing: thirteen
+ * commands had their own flag spec and no page, `--help` fell through to their
+ * group's index, and nothing failed. `storage attach`'s six flags were read out
+ * of `dist/index.es.js` by somebody deploying a real project.
+ */
+function commandsThatParseTheirOwnLine(): string[] {
+    const dir = __dirname;
+    const found = new Set<string>();
+    for (const file of fs.readdirSync(dir)) {
+        // Not action-help.ts: its own entries carry the same literal, so
+        // including it would make the check compare the list with itself.
+        if (!file.endsWith(".ts") || file.includes(".test.") || file === "action-help.ts") continue;
+        const source = fs.readFileSync(path.join(dir, file), "utf8");
+        for (const match of source.matchAll(/command:\s*"cloud ([^"]+)"/g)) {
+            found.add(match[1]);
+        }
+    }
+    return [...found].sort();
+}
+
 describe("ACTION_HELP", () => {
+    it("has a page for every command that parses its own line", () => {
+        const missing = commandsThatParseTheirOwnLine().filter(command => !ACTION_HELP[command]);
+        expect(
+            missing,
+            `no --help page for: ${missing.join(", ")}. A command with its own flags and no page ` +
+            "falls through to its group's index, which lists sibling actions and not one flag."
+        ).toEqual([]);
+    });
+
+    it("finds the commands it is checking, so an empty sweep cannot pass", () => {
+        // Without this, a rename of `parseCloudArgs`'s `command` field would
+        // make the check above vacuous and silent.
+        expect(commandsThatParseTheirOwnLine().length).toBeGreaterThan(10);
+    });
+
     it("pairs every page with a spec, or with an explicit null", () => {
         // Without this, adding a page and forgetting the pairing would silently
         // exempt it from every check below.

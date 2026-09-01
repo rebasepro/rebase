@@ -131,10 +131,20 @@ code: "INTERNAL_ERROR" } }, 500);
             }
         }
 
-        // Enforce auth if required
+        // Enforce auth if required. Word for word the JWT middleware's message,
+        // for the reason set out there: a bare "Unauthorized" from a collection
+        // whose author wrote `access: "public"` reads as broken RLS, and the two
+        // paths must not explain the same gate differently.
         if (enforceAuth && !c.get("user")) {
-            return c.json({ error: { message: "Unauthorized: Authentication required",
-code: "UNAUTHORIZED" } }, 401);
+            return c.json({
+                error: {
+                    message:
+                        "Unauthorized: Authentication required. This is the API-level gate, not a row " +
+                        "rule — a collection granting public reads still needs a caller. Set " +
+                        "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide.",
+                    code: "UNAUTHORIZED"
+                }
+            }, 401);
         }
 
         return next();

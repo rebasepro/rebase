@@ -60,3 +60,48 @@ describe("functions.invoke — route construction", () => {
         expect(calls[0].path).toBe("/functions/hello");
     });
 });
+
+/**
+ * A name is one path segment, and a sub-path folded into it is silently wrong.
+ *
+ * `invoke("storage-provision/<projectId>")` percent-encoded the slash into
+ * `POST /api/functions/storage-provision%2F<projectId>`, which matches no route.
+ * So the control plane answered a bare `404 Not Found` — no project, no reason —
+ * and `rebase cloud storage create` looked like a feature that had never been
+ * built, to its users and to its author. The route had been live for six weeks.
+ *
+ * The encoding is not the bug; refusing to encode a `/` would break nothing but
+ * would also fix nothing, since the caller still has the wrong URL. What was
+ * missing is the complaint.
+ */
+describe("functions.invoke — a name is one segment", () => {
+    it("refuses a name containing a slash instead of encoding it into a 404", async () => {
+        const { transport, calls } = transportSpy();
+        const client = createFunctionsClient(transport as never);
+
+        await expect(
+            client.invoke("storage-provision/a9d4a559", undefined, { method: "POST" })
+        ).rejects.toThrow(/single path segment/);
+
+        // And it never reached the wire, so nothing has to be undone.
+        expect(calls).toHaveLength(0);
+    });
+
+    it("names the call that would have worked", async () => {
+        const { transport } = transportSpy();
+        const client = createFunctionsClient(transport as never);
+
+        await expect(
+            client.invoke("storage-provision/a9d4a559", undefined, { method: "POST" })
+        ).rejects.toThrow(/invoke\("storage-provision", payload, \{ path: "a9d4a559" \}\)/);
+    });
+
+    it("still encodes a name that needs it", async () => {
+        const { transport, calls } = transportSpy();
+        const client = createFunctionsClient(transport as never);
+
+        await client.invoke("weird name", undefined, { method: "GET" });
+
+        expect(calls[0].path).toBe("/functions/weird%20name");
+    });
+});

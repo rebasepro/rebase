@@ -73,6 +73,20 @@ permissive: true })._;
  *
  * A group absent from this map has no page of its own; the index lists it.
  */
+/**
+ * The second spelling of a group, mapped to the one the pages are keyed on.
+ *
+ * The dispatch below accepts both (`case "db": case "database":`), so help has
+ * to as well, or half the spellings of a command have no page.
+ */
+const GROUP_ALIASES: Record<string, string> = {
+    database: "db",
+    domain: "domains",
+    extension: "extensions",
+    org: "orgs",
+    project: "projects"
+};
+
 const GROUP_HELP: Record<string, () => void> = {
     env: printEnvHelp,
     domains: printDomainsHelp,
@@ -141,8 +155,13 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // `--type` had no discoverable spelling anywhere in the CLI. They were found
     // on a real first deploy by reading `dist/index.es.js.map`.
     if (wantsHelp) {
-        const forAction = action ? ACTION_HELP[`${group} ${action}`] : undefined;
-        const page = forAction ?? ACTION_HELP[group];
+        // Through the alias, because the dispatch accepts both spellings and a
+        // page keyed on one of them is not a page for the other: `rebase cloud
+        // database create --help` reached the group index while
+        // `rebase cloud db create --help` printed the flags.
+        const canonical = GROUP_ALIASES[group] ?? group;
+        const forAction = action ? ACTION_HELP[`${canonical} ${action}`] : undefined;
+        const page = forAction ?? ACTION_HELP[canonical];
         if (page) {
             printActionHelp(page);
             return;

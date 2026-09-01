@@ -114,10 +114,28 @@ describe("the helper functions exist before anything that calls them", () => {
         expect(kinds.indexOf("create-extension")).toBeLessThan(kinds.indexOf("create-function"));
     });
 
-    it("the ensure builds its indexes concurrently, since it meets live tables", () => {
-        const plan = planCollectionSchemaEnsure(collections, emptySchema);
+    // CONCURRENTLY exists to keep an index build off a live table's writers. A
+    // table this same plan is creating has no writers and no rows, so the
+    // concurrent form buys nothing there and costs the one thing it costs
+    // everywhere: it is the only index form Postgres refuses inside a
+    // transaction block. Which form is planned therefore depends on which
+    // situation boot is actually in.
+    it("builds concurrently on a table that already exists", () => {
+        const live = {
+            tables: new Map([["public.talents", new Set(["id", "full_name"])]]),
+            enums: new Set<string>(),
+            constraints: new Set<string>()
+        };
+        const plan = planCollectionSchemaEnsure(collections, live);
         const index = plan.actions.find(a => a.kind === "create-index")!;
         expect(index.sql).toContain("CREATE INDEX CONCURRENTLY");
+    });
+
+    it("builds plainly on a table it is creating in the same pass", () => {
+        const plan = planCollectionSchemaEnsure(collections, emptySchema);
+        const index = plan.actions.find(a => a.kind === "create-index")!;
+        expect(index.sql).toContain("CREATE INDEX IF NOT EXISTS");
+        expect(index.sql).not.toContain("CONCURRENTLY");
     });
 
     it("the ensure plans the index after the column it indexes", () => {

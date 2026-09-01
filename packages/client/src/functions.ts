@@ -54,6 +54,26 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
             payload?: unknown,
             options?: FunctionInvokeOptions
         ): Promise<T> {
+            // A function name is ONE path segment — the loader takes functions
+            // from the top level of the directory only and refuses
+            // subdirectories — so `encodeURIComponent` below is right, and a
+            // name carrying a `/` is always a mistake at the call site.
+            //
+            // Refused rather than encoded, because encoding it is silent and
+            // wrong in the worst way: `invoke("storage-provision/<id>")` became
+            // `POST /api/functions/storage-provision%2F<id>`, which matches no
+            // route, so a route that exists answered a bare 404. That shipped,
+            // and `rebase cloud storage create` read as an unimplemented feature
+            // — including to the person who had implemented it. The sub-path
+            // belongs in `options.path`.
+            if (name.includes("/")) {
+                throw new Error(
+                    `Invalid function name "${name}": a function name is a single path segment. ` +
+                    "Pass anything after it as `options.path` — " +
+                    `invoke("${name.split("/")[0]}", payload, { path: "${name.split("/").slice(1).join("/")}" }).`
+                );
+            }
+
             const method = options?.method ?? "POST";
             // A `path` that starts the query or fragment is appended as-is. Only a
             // real sub-path gets a separator: inserting one before `?days=30` asks

@@ -88,6 +88,38 @@ Antes de implantar em produção, garanta:
 | **HTTPS** | Termine TLS no seu proxy reverso (nginx, Cloudflare, balanceador de carga) |
 | **Registro** | Defina `ALLOW_REGISTRATION=false` após criar sua conta de administrador |
 
+| **Leituras públicas ainda precisam de um chamador** | `access: "public"` amplia quais *linhas* um chamador vê, não quem pode chamar: uma requisição anônima para `/api/data/*` responde 401 enquanto `AUTH_REQUIRE` estiver ativo. Defina `AUTH_REQUIRE=false` para um site público que lê o próprio backend e deixe o RLS decidir sozinho. É uma variável de ambiente, então um `.env` local que a define **não** viaja com sua implantação. |
+
+## Módulos Nativos no Runtime Gerenciado
+
+O runtime gerenciado do Rebase Cloud executa seu bundle dentro de uma imagem
+compartilhada. Ele não tem compilador nem forma de carregar um **módulo nativo**
+— ou seja, qualquer coisa que traga um binário `.node` pré-compilado. O mais
+comum de longe é o `sharp`, que também é a dependência óbvia para qualquer coisa
+que sirva imagens.
+
+`rebase cloud deploy` recusa isso antes do upload, e não depois:
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Três saídas, na ordem em que costumam ser a certa:
+
+1. **Mova o trabalho para o build.** Redimensione e recodifique as imagens no
+   seu passo de build e implante os resultados. Nada nativo roda no caminho da
+   requisição.
+2. **Use um serviço.** Uma CDN de imagens ou uma API de transformação faz o
+   mesmo trabalho atrás de uma URL.
+3. **Rode seu próprio contêiner.** Uma implantação auto-hospedada (Docker,
+   Kubernetes, qualquer um dos
+   [guias por plataforma](/docs/deployment/self-hosting)) é a sua imagem, então
+   pode levar o que quiser.
+
+Funções que precisam apenas do Node, e não de um binário nativo, não são
+problema — a implantação as reporta separadamente (`1 of 3 function(s) depend on
+Node`) e as executa.
+
 ## Servindo o Frontend
 
 Em produção, o backend pode servir o frontend como uma SPA estática:

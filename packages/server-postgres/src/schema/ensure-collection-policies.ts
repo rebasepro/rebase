@@ -34,7 +34,7 @@
 import { type CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
-import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { describeDriverError, readExistingSchema, type Queryable } from "./ensure-collection-tables";
 import { REBASE_USER_ROLE } from "../security/rls-enforcement";
 
 export interface PolicyEnsureResult {
@@ -151,7 +151,12 @@ export async function ensureCollectionPolicies(
             await client.query(plan.enableRls);
             result.tablesSecured++;
         } catch (err) {
-            const error = err instanceof Error ? err.message : String(err);
+            // The database's own answer, not the ORM's wrapper — see
+            // `describeDriverError`. This is the most consequential message in
+            // the file: it is what the operator reads about a table that is now
+            // denying every request, and `Failed query: <the statement>` told
+            // them nothing they did not already have.
+            const error = describeDriverError(err);
             // Take the privilege back rather than serve an unprotected table.
             // This is the fail-closed step the old code assumed it already had:
             // per-table, so one collection cannot take the rest of the
@@ -189,7 +194,7 @@ grantWithdrawn });
         } catch (err) {
             result.failures.push({
                 table: plan.qualified,
-                error: err instanceof Error ? err.message : String(err)
+                error: describeDriverError(err)
             });
         }
     }

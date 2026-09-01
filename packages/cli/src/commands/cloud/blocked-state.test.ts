@@ -118,3 +118,44 @@ lastDeploy: { status: "deploying" } }
         }
     });
 });
+
+/**
+ * Which log holds the reason.
+ *
+ * `rebase cloud logs` is the BUILD log. A deploy that timed out waiting for
+ * readiness had a build that succeeded — the image was pushed and the pod was
+ * started — so that log is clean, and pointing at it describes a deploy that
+ * failed for no reason at all. The reason is in the container's own log, behind
+ * `--runtime`, which nothing named. On one real project four consecutive boot
+ * failures were diagnosed this way, at five minutes and one wrong log each.
+ */
+describe("which log a failed deploy sends you to", () => {
+    const failedWith = (logs: string | null) => resolveBlockedState({
+        database: { connectionStatus: "connected" },
+        lastDeploy: { status: "failed", logs }
+    });
+
+    it("sends a boot failure to the runtime log", () => {
+        const state = failedWith(
+            "rebase-backend did not become ready within 300s (1/1 updated, 0 available, " +
+            "1 old pod(s) still up). Rolled back to the previous version, which is serving again."
+        );
+        expect(state.blockedOn).toBe("last_deploy_failed");
+        expect(state.nextAction).toBe("rebase cloud logs --runtime");
+    });
+
+    it("sends a build failure to the build log", () => {
+        const state = failedWith("Step 6/12 : RUN pnpm build\nerror TS2345: ...\nThe command failed.");
+        expect(state.nextAction).toBe("rebase cloud logs");
+    });
+
+    it("sends a deploy with no log at all to the build log", () => {
+        // The safe default: the build log is the one that exists for every
+        // failure, including the ones that never reached a container.
+        expect(failedWith(null).nextAction).toBe("rebase cloud logs");
+        expect(resolveBlockedState({
+            database: { connectionStatus: "connected" },
+            lastDeploy: { status: "failed" }
+        }).nextAction).toBe("rebase cloud logs");
+    });
+});

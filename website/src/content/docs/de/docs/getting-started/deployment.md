@@ -90,6 +90,39 @@ Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 | **HTTPS** | Terminieren Sie TLS an Ihrem Reverse-Proxy (nginx, Cloudflare, Load Balancer) |
 | **Registrierung** | Setzen Sie `ALLOW_REGISTRATION=false`, nachdem Sie Ihr Admin-Konto erstellt haben |
 
+| **Öffentliche Lesezugriffe brauchen trotzdem einen Aufrufer** | `access: "public"` erweitert, welche *Zeilen* ein Aufrufer sieht, nicht wer aufrufen darf: Eine anonyme Anfrage an `/api/data/*` antwortet mit 401, solange `AUTH_REQUIRE` aktiv ist. Setzen Sie `AUTH_REQUIRE=false` für eine öffentliche Website, die ihr eigenes Backend liest, und überlassen Sie die Entscheidung allein RLS. Es ist eine Umgebungsvariable — eine lokale `.env`, die sie setzt, reist also **nicht** mit Ihrer Bereitstellung mit. |
+
+## Native Module in der verwalteten Laufzeitumgebung
+
+Die verwaltete Laufzeitumgebung von Rebase Cloud führt Ihr Bundle in einem
+gemeinsam genutzten Image aus. Dort gibt es keinen Compiler und keine
+Möglichkeit, ein **natives Modul** zu laden — also alles, was eine
+vorkompilierte `.node`-Binärdatei mitbringt. Das mit Abstand häufigste ist
+`sharp`, zugleich die naheliegende Abhängigkeit für alles, was Bilder
+ausliefert.
+
+`rebase cloud deploy` lehnt das vor dem Upload ab, nicht danach:
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Drei Wege hindurch, in der Reihenfolge, in der sie meist richtig sind:
+
+1. **Verlagern Sie die Arbeit in den Build.** Skalieren und kodieren Sie Bilder
+   in Ihrem Build-Schritt und stellen Sie die Ergebnisse bereit. Im
+   Anfrage-Pfad läuft dann nichts Natives.
+2. **Nutzen Sie einen Dienst.** Ein Bild-CDN oder eine Transform-API erledigt
+   dieselbe Arbeit hinter einer URL.
+3. **Betreiben Sie Ihren eigenen Container.** Eine selbst gehostete
+   Bereitstellung (Docker, Kubernetes, jede der
+   [Plattformanleitungen](/docs/deployment/self-hosting)) ist Ihr Image und darf
+   deshalb mitbringen, was sie will.
+
+Funktionen, die lediglich Node brauchen und keine native Binärdatei, sind
+unproblematisch — die Bereitstellung meldet diese getrennt (`1 of 3 function(s)
+depend on Node`) und führt sie aus.
+
 ## Das Frontend ausliefern
 
 In der Produktion kann das Backend das Frontend als statische SPA ausliefern:

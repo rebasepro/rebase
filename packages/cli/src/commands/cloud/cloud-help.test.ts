@@ -173,6 +173,41 @@ describe("rebase cloud <group> --help", () => {
         for (const handler of allHandlers()) expect(handler).not.toHaveBeenCalled();
     });
 
+    /**
+     * The third word. Depth two was fixed; depth three was not, so every leaf
+     * command's flags stayed undiscoverable — `storage attach`'s six were read
+     * out of `dist/index.es.js` by somebody deploying a real project, and the
+     * only way to learn that `storage create` takes none was the same one.
+     */
+    it.each([
+        ["storage", "attach", "--force-path-style"],
+        ["storage", "create", "platform-managed"],
+        ["env", "set", "--secret"],
+        ["env", "pull", "--output"],
+        ["db", "pitr", "--target"],
+        ["db", "backup", "--yes"],
+        ["webhooks", "create", "--events"],
+        ["deployments", "list", "--limit"],
+        ["domains", "add", "<domain>"]
+    ] as const)("prints %s %s's own page, not its group's index", async (group, action, expected) => {
+        await cloudCommand(group, argv(group, action, "--help"));
+
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        expect(printed).toContain(`rebase cloud ${group} ${action}`);
+        expect(printed).toContain(expected);
+        for (const handler of allHandlers()) expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("finds a leaf page through the group's alias", async () => {
+        // The dispatcher accepts `database` wherever it accepts `db`, so help
+        // has to as well — otherwise half the spellings of a command have no
+        // page and the reader cannot tell which half they typed.
+        await cloudCommand("database", argv("database", "create", "--help"));
+
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        expect(printed).toContain("--type");
+    });
+
     it("falls back to the index page for a group with no page of its own", async () => {
         await cloudCommand("logs", argv("logs", "--help"));
         // printCloudHelp is module-local, so its output is the observable.

@@ -446,9 +446,27 @@ code: "INTERNAL_ERROR" } }, 500);
             }
         }
 
+        // The API-level gate, and the one place a caller learns it exists.
+        //
+        // This fires for an anonymous request when `requireAuth` is on, whatever
+        // the collection's rules say — `access: "public"` widens which ROWS a
+        // caller sees, not who may call. Read as a bare "Unauthorized" it looks
+        // like broken RLS on a collection whose author wrote `public`, and gets
+        // debugged as one: the same declaration serves anonymously against a
+        // local server with `AUTH_REQUIRE=false` in its `.env` and 401s against a
+        // deployment without it, which reads as the two behaving differently for
+        // the same config. Naming the switch is what makes that one fact instead
+        // of two mysteries.
         if (enforceAuth && !c.get("user")) {
-            return c.json({ error: { message: "Unauthorized: Authentication required",
-code: "UNAUTHORIZED" } }, 401);
+            return c.json({
+                error: {
+                    message:
+                        "Unauthorized: Authentication required. This is the API-level gate, not a row " +
+                        "rule — a collection granting public reads still needs a caller. Set " +
+                        "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide.",
+                    code: "UNAUTHORIZED"
+                }
+            }, 401);
         }
 
         return next();

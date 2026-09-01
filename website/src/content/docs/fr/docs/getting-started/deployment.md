@@ -100,6 +100,38 @@ Avant de déployer en production, assurez-vous de :
 | **HTTPS** | Terminez TLS au niveau de votre reverse proxy (nginx, Cloudflare, équilibreur de charge) |
 | **Inscription** | Définissez `ALLOW_REGISTRATION=false` après avoir créé votre compte administrateur |
 
+| **Les lectures publiques ont quand même besoin d'un appelant** | `access: "public"` élargit les *lignes* qu'un appelant voit, pas qui a le droit d'appeler : une requête anonyme vers `/api/data/*` répond 401 tant que `AUTH_REQUIRE` est actif. Mettez `AUTH_REQUIRE=false` pour un site public qui lit son propre backend, et laissez RLS seul décider. C'est une variable d'environnement : un `.env` local qui la définit ne voyage **pas** avec votre déploiement. |
+
+## Modules natifs sur le runtime managé
+
+Le runtime managé de Rebase Cloud exécute votre bundle dans une image partagée.
+Il n'y a ni compilateur ni moyen de charger un **module natif** — c'est-à-dire
+tout ce qui embarque un binaire `.node` précompilé. Le plus courant de loin est
+`sharp`, qui se trouve être la dépendance évidente pour tout ce qui sert des
+images.
+
+`rebase cloud deploy` le refuse avant l'envoi, et non après :
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Trois issues, dans l'ordre où elles sont généralement les bonnes :
+
+1. **Déplacez le travail au moment du build.** Redimensionnez et réencodez vos
+   images dans votre étape de build, puis déployez les résultats. Plus rien de
+   natif ne s'exécute dans le chemin de la requête.
+2. **Utilisez un service.** Un CDN d'images ou une API de transformation fait le
+   même travail derrière une URL.
+3. **Faites tourner votre propre conteneur.** Un déploiement auto-hébergé
+   (Docker, Kubernetes, l'un des
+   [guides par plateforme](/docs/deployment/self-hosting)) est votre image :
+   elle peut donc embarquer ce qu'elle veut.
+
+Les fonctions qui ont seulement besoin de Node, et non d'un binaire natif, ne
+posent aucun problème — le déploiement les signale séparément (`1 of 3
+function(s) depend on Node`) et les exécute.
+
 ## Servir le frontend
 
 En production, le backend peut servir le frontend en tant que SPA statique :
