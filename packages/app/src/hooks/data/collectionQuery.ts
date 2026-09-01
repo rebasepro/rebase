@@ -47,9 +47,34 @@ export interface CollectionQueryInput<M extends Record<string, unknown>> {
 export function toFindParams<M extends Record<string, unknown>>(
     input: CollectionQueryInput<M>
 ): FindParams<M> {
-    const { searchString, ...rest } = input;
+    const { searchString, limit, ...rest } = input;
     return {
         ...rest,
+        ...resolveLimit(limit),
         ...(searchString ? { searchString, searchExplain: true } : {})
     } as FindParams<M>;
+}
+
+/**
+ * Keep a meaningless `limit` inside the browser.
+ *
+ * The API refuses a `limit` below 1 — rightly: a window nobody can be served is
+ * better refused than quietly widened. But a client that computes one has a bug
+ * *here*, and forwarding it turns that bug into a 400 the user reads as the
+ * server being broken. That is exactly how a restored, empty scroll entry
+ * presented: an `Invalid limit: 0` error where the table should have been.
+ *
+ * Only the meaningless end is guarded. An absent limit is a supported request —
+ * every ingress defaults it (`resolveClientListLimit`), so dropping one cannot
+ * produce an unbounded read — whereas a limit *above* the ceiling states an
+ * intent, and silently trimming it would hand back a page the caller cannot
+ * tell apart from the whole collection. That one still travels, and is still
+ * refused where the ceiling lives.
+ */
+function resolveLimit(limit: number | undefined): { limit?: number } {
+    if (limit === undefined) return {};
+    if (Number.isInteger(limit) && limit >= 1) return { limit };
+    console.warn(`Ignoring an unusable \`limit\` of ${limit} — a page size must be a whole number of at least 1. ` +
+        "Reading with the server's default page size instead.");
+    return {};
 }

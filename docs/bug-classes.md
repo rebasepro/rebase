@@ -2993,3 +2993,69 @@ convinced three reviewers the branch was right.
 (extended) and `saas/frontend/src/test/untranslated-literals.test.ts`. Both
 mutation-tested in both directions — restoring each swallowed catch fails, and
 so does re-gating storage on the count.
+
+---
+
+## 51. Zero is exactly the value the fallback was written to catch
+
+`useDataTableController` restores how many rows a collection had loaded, so
+coming back to a scrolled table does not snap to page one:
+
+```js
+const initialItemCount = collectionScroll?.data.length ?? pageSize;
+```
+
+`??` falls back on `null`/`undefined`. It does not fall back on `0` — and `0` is
+precisely the value that means "nothing was restored". A saved entry with an
+empty `data` array is ordinary: `updateCollectionScroll` records what was on
+screen, so any filter combination matching no rows persists `data: []` under its
+own `(path, filters)` key. Return to that view and the count restores as `0`,
+which becomes the read's `limit`, which the API refuses. The table rendered
+`Invalid limit: 0. Expected a whole number between 1 and 1000.` — a client bug
+wearing an API failure's clothes. Reported from the field against 0.17.3, in the
+published bundle as well as in source.
+
+The API is right to refuse; `resolveClientListLimit`'s rule — reject, never
+coerce, because a silently narrowed window is indistinguishable from the whole
+collection — is what makes the symptom loud instead of a table that quietly
+shows 50 of 4 000 rows. The defect is that the browser could produce the input
+at all.
+
+**The sweep question:** `??` (or `||`) with a *non-zero* default, over a
+`.length`, count, size or index. Then ask which of `0` and absent the default
+was written for. Both answers are common, so neither operator is the bug —
+`maxRetries ?? 5` is right because `0` retries is a real setting, and
+`data.length ?? pageSize` is wrong because no caller ever wants a page of no
+rows.
+
+| checked | result |
+|---|---|
+| `packages/app/.../useDataTableController.tsx` — `initialItemCount` | **BUG.** The reported one. Floored at `pageSize` |
+| same file — `pageSize` from `typeof collection.pagination === "number"` | **BUG, latent, same class one line up.** The line above it reads `pagination: 0` as *pagination disabled*; this one read it as *a page of zero rows*, and hands that on to the card, board and relation views as the number of rows each of them reads |
+| `packages/cms/.../useBoardDataController.tsx` — `columnItemCounts[column] ?? pageSize` (×4) | clean: counts are seeded and reset to `pageSize` and only ever incremented, so the key is absent or ≥ 1 — but only as long as `pageSize` itself cannot be `0`, which is the fix above |
+| `packages/ui/.../CollectionTableView.tsx` — `itemCount ?? pageSize ?? 50`; `CardView`/`ListView` — `(ic ?? ps) + ps` | clean by arithmetic: a restored `0` still had a page added to it. They would have loaded rows on scroll while the first read was being refused |
+| `packages/client/src/offline.ts` — `maxRetries ?? 5`, `maxCachedQueriesPerCollection ?? 50` | clean, and the counter-example that keeps the sweep honest: `0` is a real setting on both, and `??` is what preserves it |
+| `useSlot`, `ContentHomePage` — `order ?? 50`; `VirtualTable` — `headerHeight ?? 48`; `useDebounceCallback` — `delay ?? 200` | clean, all for the same reason: `0` means first / no header / no debounce, and is meant to survive |
+| `packages/cms/.../fetch_export_data.ts` — the export walk | clean, and the model: page size is a constant at or below the ceiling, and the walk advances by rows *received*, never by the page it asked for |
+| `packages/cms/.../UserSelector.tsx`, `useRelationSelector.tsx` | clean: page size is a defaulted prop no caller overrides, and the relation selector's limit only grows |
+
+**Gated by** `packages/app/test/hooks/useDataTableController.scroll-restoration.test.tsx`
+(nothing saved → a page; rows saved → that many; **empty entry saved → a page,
+not zero**; and `pagination: 0` → a real page size) and the `toFindParams` cases
+in `collection-query.test.ts`. Proved failing: reverting both source changes
+fails five of them.
+
+**And gated one level in**, because a floor at one call site only fixes one call
+site: `toFindParams` — the single place a collection read's parameters are
+assembled — now drops a `limit` that is not a whole number ≥ 1, with a warning
+naming it as the client bug it is, so the read falls back to the server's
+default page size instead of a 400. Deliberately one-sided: a limit *above* the
+ceiling still travels and is still refused there, because that one states an
+intent and trimming it would hand back a page the caller cannot tell apart from
+the whole collection.
+
+**Watch for:** the two read paths that build their `find`/`listen` params by
+hand — `useBoardDataController` and `useRelationSelector` — sit outside
+`toFindParams` and so outside that floor. They are safe by their own arithmetic
+today. `toFindParams` exists because four hand-built call sites disagreed about
+`searchExplain`; these two are the same shape, one guard later.

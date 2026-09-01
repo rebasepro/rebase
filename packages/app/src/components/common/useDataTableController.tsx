@@ -83,7 +83,14 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
     const fixedFilter = fixedFilterFromProps ?? fixedFilterFromCollection;
     const paginationEnabled = collection.pagination === undefined || Boolean(collection.pagination);
-    const pageSize = typeof collection.pagination === "number" ? collection.pagination : DEFAULT_PAGE_SIZE;
+    // `pagination: 0` says *disabled*, not "a page of no rows" — which is why
+    // it does not reach `paginationEnabled` above. It must not reach the page
+    // size either: this value is handed on to the card, board and relation
+    // views as the number of rows each of them reads, and a zero there is a
+    // `limit=0` the API refuses.
+    const pageSize = typeof collection.pagination === "number" && collection.pagination > 0
+        ? collection.pagination
+        : DEFAULT_PAGE_SIZE;
 
     const location = useLocation();
 
@@ -167,7 +174,27 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     useUpdateUrl(filterValues, sortBy, searchString, updateUrl);
 
     const collectionScroll = scrollRestoration?.getCollectionScroll(path, filterValues);
-    const initialItemCount = collectionScroll?.data.length ?? pageSize;
+    /**
+     * How many rows to ask for on mount: as many as were loaded last time this
+     * (path, filters) pair was on screen, so returning to a view that had been
+     * scrolled does not snap back to the first page.
+     *
+     * The floor is not cosmetic. This used to be `?? pageSize`, which falls back
+     * on `null`/`undefined` but not on `0` — and a saved entry whose `data` is
+     * empty is entirely ordinary: `updateCollectionScroll` records what was on
+     * screen, so any filter combination matching no rows persists `data: []`
+     * under its own key. Restoring that gave `itemCount === 0`, which became
+     * `limit=0` on the read, which the API rejects (400 `INVALID_LIMIT`) —
+     * the collection rendered an error instead of a table, and a client bug
+     * read as an API failure.
+     *
+     * The cache is left free to record an empty view honestly: that it *was*
+     * empty is a true fact, and refusing to store it would leave the previous,
+     * now-wrong offset and rows in place for a view whose rows have gone. What
+     * is wrong is reading "nothing was restored" as "ask for nothing".
+     */
+    const restoredItemCount = collectionScroll?.data.length ?? 0;
+    const initialItemCount = restoredItemCount > 0 ? restoredItemCount : pageSize;
 
     useEffect(() => {
         if (scrollRestoration) {
