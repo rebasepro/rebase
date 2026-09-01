@@ -76,17 +76,29 @@ interface Tile {
      *  video asked for a frame past its end holds its LAST one and the tile
      *  would sit frozen while everything around it kept moving. */
     length: number;
+    /** Where to start when the tile only gets the FILM's eight seconds rather
+     *  than the standalone's fourteen. One offset cannot serve both: several
+     *  of these clips hold deliberately still for five seconds so a filtered
+     *  result or an open record can be read, and a hold that is a third of the
+     *  long window is two thirds of the short one. Measured per clip; two
+     *  tiles were frozen for the whole tail of the film's bento before this
+     *  existed. */
+    atShort: number;
 }
 
 /** In slot order: three down the left, tall-then-short, short-then-tall. */
 export const TILES: Tile[] = [
-    { file: "customers", from: "left", delay: 14, at: 20, length: 396 },
-    { file: "exercises", from: "left", delay: 20, at: 80, length: 462 },
-    { file: "posts", from: "left", delay: 26, at: 80, length: 572 },
-    { file: "record", from: "up", delay: 0, at: 45, length: 427 },
-    { file: "tickets", from: "up", delay: 8, at: 30, length: 480 },
-    { file: "authors", from: "right", delay: 18, at: 50, length: 422 },
-    { file: "expand", from: "right", delay: 24, at: 30, length: 455 },
+    { file: "customers", from: "left", delay: 14, at: 20, length: 396, atShort: 183 },
+    { file: "exercises", from: "left", delay: 20, at: 80, length: 462, atShort: 20 },
+    { file: "posts", from: "left", delay: 26, at: 80, length: 572, atShort: 222 },
+    /* Starts ON THE FORM, not on the grid. This clip opens on the products
+       grid because that is where the click comes from, and the middle tile
+       was spending its first third showing cards — in the one box that
+       exists to show a record. The cards have their own box now. */
+    { file: "record", from: "up", delay: 0, at: 204, length: 594, atShort: 100 },
+    { file: "tickets", from: "up", delay: 8, at: 30, length: 480, atShort: 42 },
+    { file: "cards", from: "right", delay: 18, at: 40, length: 495, atShort: 153 },
+    { file: "expand", from: "right", delay: 24, at: 30, length: 455, atShort: 258 },
 ];
 
 const ENTRY = 32;
@@ -104,7 +116,8 @@ const Cell: React.FC<{
 
     const dx = tile.from === "left" ? -travel * away : tile.from === "right" ? travel * away : 0;
     const dy = tile.from === "up" ? lift * away : 0;
-    const startAt = Math.min(tile.at, Math.max(0, tile.length - duration * RATE - 6));
+    const want = duration <= 300 ? tile.atShort : tile.at;
+    const startAt = Math.min(want, Math.max(0, tile.length - duration * RATE - 6));
 
     return (
         <div

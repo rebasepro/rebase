@@ -421,7 +421,13 @@ Object.assign(CLIPS, {
             await scrollBy(700, 5.5, 350);
             await hold(0.4);
             await clickOn(() => page.getByRole("tab", { name: /orders/i }).first(), 2.6, 0.8);
-            await hold(0.6);
+            /* Back to the record and up through it. Without this the clip's
+               action ended at nine seconds and the standalone bento holds each
+               tile for fourteen — so this tile was frozen for its last four,
+               measured, while the six around it kept moving. */
+            await clickOn(() => page.getByRole("tab", { name: /^product$/i }).first(), 1.8, 0.7);
+            await scrollBy(-480, 3.2, 300);
+            await hold(0.4);
         },
     },
 
@@ -525,6 +531,30 @@ Object.assign(CLIPS, {
        cards, and what matters is the opening rather than what is inside.
        (There is no slide-out drawer to use; this panel opens records as full
        pages, and that is the expansion.) */
+    /* The product cards, on their own. They used to be the opening seconds of
+       b_record — the grid you click a product out of — which meant the bento's
+       middle tile spent its first third showing cards instead of the record
+       that tile is for. The cards are the best-looking thing the demo has, so
+       they get a box rather than a preamble.
+
+       Selection rather than a filter: exercises already filters, and clicking
+       card checkboxes keeps an action here that no other tile does while
+       leaving the photographs on screen the whole time. */
+    b_cards: {
+        viewport: WIDE,
+        run: async ({ page, hold, scrollBy, clickOn }) => {
+            await settleGrid(page, `${BASE}/c/products`, 10);
+            await hold(0.6);
+            const box = (n) => () => page.locator("[role=checkbox], input[type=checkbox]").nth(n);
+            await clickOn(box(1), 1.1, 0.8);
+            await clickOn(box(2), 2.4, 0.6);
+            await scrollBy(520, 5.0);
+            await clickOn(box(1), 1.6, 0.7);
+            await scrollBy(-320, 3.0);
+            await hold(0.5);
+        },
+    },
+
     b_expand: {
         viewport: TALL,
         run: async ({ page, hold, scrollBy, clickOn }) => {
