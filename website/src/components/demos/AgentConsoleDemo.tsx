@@ -101,7 +101,7 @@ const CAPABILITIES: Capability[] = [
         Icon: Server,
         title: "MCP server",
         desc: "Expose the whole project to Claude Code, Cursor or Windsurf over the Model Context Protocol. Agents read the schema, query data and run migrations as tools.",
-        pills: ["data tools", "schema tools", "admin tools"],
+        pills: ["data tools", "schema tools", "user & role tools"],
         screen: "rebase-mcp",
         body: (
             <>

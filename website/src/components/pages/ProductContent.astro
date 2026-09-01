@@ -29,13 +29,13 @@ const adminParts = [
     { name: "Entity forms", note: "Generated from properties, with validation and relations", meta: "properties" },
     { name: "Your React", note: "Custom fields, previews, views and entity actions", meta: "admin.Field" },
     { name: "Users & roles", note: "The same roles your policies read, managed by humans", meta: "RBAC" },
-    { name: "Studio", note: "SQL editor, schema builder, policy editor, branches, logs", meta: "/studio" },
+    { name: "Rebase Studio", note: "The developer workspace, registered inside the same panel as CMS: SQL, schema, policies, branches, logs", meta: "/studio" },
 ];
 
 // What you stop maintaining. Concrete, not aspirational.
 const replaced = [
     "CRUD controllers, serializers and request validation",
-    "A hand-rolled admin UI, and the sprint it costs every quarter",
+    "A hand-rolled back office, and the sprint it costs every quarter",
     "JWT plumbing, refresh rotation and password-reset email",
     "Permission checks scattered across route handlers",
     "File-upload endpoints and signed-URL helpers",
@@ -304,7 +304,7 @@ const replaced = [
                     <div class="px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
                         <div>
                             <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 02</p>
-                            <h3 class="text-2xl font-semibold text-white">The admin panel</h3>
+                            <h3 class="text-2xl font-semibold text-white">The panel</h3>
                         </div>
                         <span class="text-xs text-surface-500 shrink-0">opt in</span>
                     </div>

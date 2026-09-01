@@ -174,7 +174,7 @@ export const COMPARISON_FAQS: Record<string, Faq[]> = {
             a: "When you need to join data from many places quickly. Retool's catalogue of integrations — Stripe, Salesforce, S3, half a dozen databases, arbitrary REST — is enormous, and building an ops screen across four SaaS products is genuinely fast there. Rebase is Postgres-centred; if your data is not mostly in Postgres, much of the argument here does not apply."
         },
         {
-            q: "Can non-developers use the Rebase admin panel?",
+            q: "Can non-developers use Rebase CMS?",
             a: "That is who it is for. Roles and permissions, forms with validation, media, kanban and list views, inline editing and search are the default experience, and what each role can see is enforced by row-level security in the database rather than by hiding a button."
         },
         HOSTING

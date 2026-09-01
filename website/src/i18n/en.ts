@@ -23,7 +23,7 @@ export const en = {
   "copy.command.done": "Copied",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
-  "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
+  "demo.dev": "✔ API and realtime on :3001, panel on :5173.",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
   "see.badge": "The back office",
   "see.title": "Where the rest of your team works.",
@@ -65,21 +65,17 @@ export const en = {
   "modes.title": 'Take only the half you actually need.',
   "modes.subtitle":
     "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
-  "modes.baas.title":
-    "Backend",
+  "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, auth, storage, realtime and backups over your database. No UI, no React anywhere in the dependency tree.",
   "modes.baas.tag": "What your app talks to",
-  "modes.cms.title":
-    "Admin panel",
+  "modes.cms.title": "Rebase CMS",
   "modes.cms.desc":
     "Spreadsheet editing, media, relations, roles and workflows — with your own React components dropped in wherever the default field isn't enough.",
   "modes.cms.tag": "Where your team works",
-  "modes.full.title":
-    "Studio",
-  "modes.full.desc":
-    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer — registered as extra views inside the panel.",
-  "modes.full.tag": "Developer tools, inside the panel",
+  "modes.full.title": "Rebase Studio",
+  "modes.full.desc": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.",
+  "modes.full.tag": "Developer tools, in the same panel",
   "modes.link": "Why we built it this way",
   "stack.deps": "Your dependencies",
   "stack.capabilities": "What you get",
@@ -273,6 +269,7 @@ export const en = {
     "MIT-licensed, end to end — the schema editor, the generated APIs, the typed SDK, all of it. Your data stays in your Postgres: no vendor dependency, no per-seat pricing, no surprises.",
   "opensource.link1": "For developers",
   "opensource.link2": "How it compares",
+  "showcase.exploreCms": "Explore Rebase CMS",
   "showcase.sync.badge": "Your workflow",
   "showcase.sync.title": "Built for the way<br/>you actually work",
   "showcase.sync.subtitle":
@@ -293,8 +290,7 @@ export const en = {
   "power.badge": "Code as Truth",
   "power.appcode": "App Code",
   "power.generates": "→ generates all of the following",
-  "power.mobile.generates":
-    "→ generates Admin views · forms · DB schema · REST API · Typed SDK",
+  "power.mobile.generates": "→ generates DB schema · REST API · Typed SDK · entity forms · admin views",
   "power.label.admin": "Admin views",
   "power.label.form": "Entity Form",
   "power.label.db": "DB Schema",
@@ -303,7 +299,7 @@ export const en = {
 
   "nav.product": "Product",
   "nav.col.backend": "The backend",
-  "nav.col.admin": "The admin panel",
+  "nav.col.admin": "The panel",
   "nav.col.build": "Build",
   "nav.col.ship": "Ship",
   "nav.col.explore": "Explore",
@@ -314,7 +310,7 @@ export const en = {
   "nav.compare.desc": "Supabase, Directus, Strapi, Retool…",
   "nav.features": "Features",
   "nav.features.desc": "Everything Rebase can do, at a glance.",
-  "nav.studio": "Studio",
+  "nav.studio": "Rebase Studio",
   "nav.studio.desc": "SQL editor, schema builder, policies, branches.",
   "nav.backend": "Backend & APIs",
   "nav.backend.desc": "REST, typed SDK, realtime, auth, storage.",

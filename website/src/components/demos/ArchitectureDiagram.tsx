@@ -374,7 +374,7 @@ export function ArchitectureDiagram() {
                             <div className="rounded-lg border border-violet-500/10 bg-[#0f0f11] p-3.5">
                                 <div className="flex items-center gap-1.5 mb-2.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                                    <span className="text-xs font-semibold text-violet-400">Rebase Admin</span>
+                                    <span className="text-xs font-semibold text-violet-400">Rebase CMS</span>
                                     <span className="text-[9px] text-surface-600 font-mono ml-auto">CMS</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5">

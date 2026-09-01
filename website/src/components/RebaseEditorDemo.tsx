@@ -2,7 +2,7 @@ import { RichTextEditor } from "@rebasepro/cms/editor";
 
 const sampleContent = `# Getting Started with Rebase
 
-Rebase is a **code-first** framework for building admin panels. Unlike traditional CMS platforms, your schema lives in TypeScript files that you control.
+Rebase is a **code-first** backend for Postgres, and the panel renders from the same definition. Unlike traditional CMS platforms, your schema lives in TypeScript files that you control.
 
 > Ship your back-office in a sprint. Extend it forever.
 

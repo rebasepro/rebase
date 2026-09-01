@@ -57,7 +57,7 @@ export function DeveloperPlayground() {
         {
             id: "security",
             title: "Visual Security",
-            description: "Write row-level security (RLS) policies visually inside the admin console. Presets generate clean, performance-optimized SQL conditions.",
+            description: "Write row-level security (RLS) policies visually in Rebase Studio. Presets generate clean, indexable SQL conditions.",
             badge: "Postgres RLS",
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
