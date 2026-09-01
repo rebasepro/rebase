@@ -14,7 +14,6 @@ const solutions = [
     {
         slug: "gestion-de-procesos",
         category: t('kd.sol1.category'),
-        name: "Rebase Process Manager",
         sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/gestion-de-procesos",
         allSectors: true,
         description: t('kd.sol1.desc'),
@@ -38,7 +37,6 @@ const solutions = [
     {
         slug: "business-intelligence",
         category: t('kd.sol2.category'),
-        name: "Rebase Analytics Dashboard",
         sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/bi-analitica",
         allSectors: true,
         description: t('kd.sol2.desc'),
@@ -62,7 +60,6 @@ const solutions = [
     {
         slug: "gestion-de-clientes",
         category: t('kd.sol3.category'),
-        name: "Rebase CRM",
         sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/gestion-clientes",
         allSectors: true,
         description: t('kd.sol3.desc'),
@@ -86,7 +83,6 @@ const solutions = [
     {
         slug: "sitio-web",
         category: t('kd.sol4.category'),
-        name: "Rebase Web Presence",
         sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/sitio-web",
         allSectors: true,
         description: t('kd.sol4.desc'),
@@ -108,7 +104,6 @@ const solutions = [
     {
         slug: "comercio-electronico",
         category: t('kd.sol5.category'),
-        name: "Rebase E-Commerce",
         sourceUrl: "https://www.acelerapyme.gob.es/kit-digital/comercio-electronico",
         allSectors: true,
         description: t('kd.sol5.desc'),
@@ -233,6 +228,7 @@ const solutions = [
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <h2 class="text-3xl sm:text-4xl text-white">{t('kd.solutions.title')}</h2>
                     <p class="mt-6 text-lg leading-8 text-surface-400">{t('kd.solutions.desc')}</p>
+                    <p class="mt-4 text-base leading-7 text-surface-500">{t('kd.solutions.oneProduct')}</p>
                 </div>
 
                 <div class="space-y-12">
@@ -244,7 +240,7 @@ const solutions = [
                             </div>
 
                             <h3 class="text-2xl font-semibold text-white mb-2">{sol.category}</h3>
-                            <p class="text-primary-light font-medium text-lg mb-4">{t('kd.solutions.sol_prefix')} {sol.name}</p>
+                            <p class="text-primary-light font-medium text-lg mb-4">{t('kd.solutions.sol_prefix')} Rebase</p>
                             <p class="text-surface-300 leading-relaxed mb-6 max-w-4xl">{sol.description}</p>
 
                             <!-- Sector applicability -->

@@ -1,7 +1,6 @@
 ---
 import { NeatBackground } from "../NeatBackground";
 import CollectionPowerSection from "../CollectionPowerSection.astro";
-import RoadmapSection from "../RoadmapSection.astro";
 import ClientLogos from "../ClientLogos.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 import { ApiMiniDemo } from "../demos/ApiMiniDemo";
@@ -594,8 +593,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <CaseStudiesCarousel t={t} />
         </div>
 
-        <!-- ROADMAP -->
-        <RoadmapSection />
+        {/* The roadmap used to run here. It is not in SITE-STORY's beat table,
+            and it sat between the real customers (08) and the ownership close
+            (09) — a list of things that do not exist yet, in the last screen
+            before the ask, on a page whose rule is proof over assertion. It
+            still ships on /about, where "what are you building next" is the
+            page's own question. */}
 
         <!-- CHAPTER 09 — OWNERSHIP. Claim 5 (SITE-STORY §2), and the page's
              last argument before the ask.

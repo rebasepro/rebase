@@ -14,6 +14,7 @@ import { BodyPartsDemo } from '../../components/demos/BodyPartsDemo';
 
 
 import ClosingCta from "../ClosingCta.astro";
+import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 ---
 
 
@@ -32,6 +33,9 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
  <section class="relative isolate py-16">
             <div class="mx-auto max-w-6xl px-8 lg:px-12">
+                <h2 class="text-center text-lg font-semibold leading-8 text-surface-400">
+                    {t('social.title')}
+                </h2>
                 <div class="mx-auto mt-4 mb-8 animate-on-scroll fade-in">
                     <ClientLogos filter="agencies"/>
                 </div>
@@ -410,267 +414,23 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
 
 
- <section class="relative isolate py-10 sm:py-12">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 gap-8 sm:grid-cols-3 text-center animate-on-scroll scale-in">
-                    <div>
-                        <div class="text-4xl text-white" set:html={t('agencies.metrics.m1.value')}></div>
-                        <div class="mt-1 text-surface-400">{t('agencies.metrics.m1.label')}</div>
-                    </div>
-                    <div>
-                        <div class="text-4xl text-white" set:html={t('agencies.metrics.m2.value')}></div>
-                        <div class="mt-1 text-surface-400">{t('agencies.metrics.m2.label')}</div>
-                    </div>
-                    <div>
-                        <div class="text-4xl text-white" set:html={t('agencies.metrics.m3.value')}></div>
-                        <div class="mt-1 text-surface-400">{t('agencies.metrics.m3.label')}</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Agency Client Showcase Section -->
- <section class="relative isolate py-16 sm:py-24">
+        <!-- PRODUCT.md: no benchmarks, no user counts, no anonymous cases. This
+             band used to carry "5×", "↓80%", "100%" and four unnamed client
+             stories. The real projects are the proof, and they are named, live
+             and linkable. -->
+        <section class="relative isolate py-16 sm:py-24">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
-                <h2 class="text-3xl md:text-4xl mb-12 text-center text-white animate-on-scroll fade-in-up">
-                    {t('agencies.leverage.title')}</h2>
-                <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
-                    <div class="group relative overflow-hidden p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50 flex flex-col transition-all duration-300 hover:ring-primary/30 animate-on-scroll scale-in"
-                         data-spotlight-card>
-                        <!-- Mouse spotlight effect -->
-                        <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                             data-spotlight></div>
-
-                        <div class="relative z-10">
-                            <div class="flex items-center mb-4">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 mr-4 flex-shrink-0">
-                                    
-<svg
-  class="lucide lucide-shopping-cart"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="8" cy="21" r="1" />
-  <circle cx="19" cy="21" r="1" />
-  <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
-</svg>
-
-                                </div>
-                                <h3 class="text-xl font-semibold text-white">{t('agencies.leverage.c1.title')}</h3>
-                            </div>
-                            <div class="flex-grow mb-4">
-                                <p class="text-sm text-surface-400 mb-2" set:html={t('agencies.leverage.c1.challenge')}></p>
-                                <p class="text-sm text-white" set:html={t('agencies.leverage.c1.solution')}></p>
-                            </div>
-                            <div class="mt-auto pt-4 border-t border-surface-800 flex items-start">
-                                
-<svg
-  class="lucide lucide-circle-check-big"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
-  <path d="m9 11 3 3L22 4" />
-</svg>
-
-                                <span class="text-sm font-medium text-white" set:html={t('agencies.leverage.c1.result')}>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="group relative overflow-hidden p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50 flex flex-col transition-all duration-300 hover:ring-primary/30 animate-on-scroll scale-in delay-100"
-                         data-spotlight-card>
-                        <!-- Mouse spotlight effect -->
-                        <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                             data-spotlight></div>
-
-                        <div class="relative z-10">
-                            <div class="flex items-center mb-4">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 mr-4 flex-shrink-0">
-                                    
-<svg
-  class="lucide lucide-settings"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
-  <circle cx="12" cy="12" r="3" />
-</svg>
-
-                                </div>
-                                <h3 class="text-xl font-semibold text-white">{t('agencies.leverage.c2.title')}</h3>
-                            </div>
-                            <div class="flex-grow mb-4">
-                                <p class="text-sm text-surface-400 mb-2" set:html={t('agencies.leverage.c2.challenge')}></p>
-                                <p class="text-sm text-white" set:html={t('agencies.leverage.c2.solution')}></p>
-                            </div>
-                            <div class="mt-auto pt-4 border-t border-surface-800 flex items-start">
-                                
-<svg
-  class="lucide lucide-circle-check-big"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
-  <path d="m9 11 3 3L22 4" />
-</svg>
-
-                                <span class="text-sm font-medium text-white" set:html={t('agencies.leverage.c2.result')}>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="group relative overflow-hidden p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50 flex flex-col transition-all duration-300 hover:ring-primary/30 animate-on-scroll scale-in delay-200"
-                         data-spotlight-card>
-                        <!-- Mouse spotlight effect -->
-                        <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                             data-spotlight></div>
-
-                        <div class="relative z-10">
-                            <div class="flex items-center mb-4">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 mr-4 flex-shrink-0">
-                                    
-<svg
-  class="lucide lucide-layout-dashboard"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="7" height="9" x="3" y="3" rx="1" />
-  <rect width="7" height="5" x="14" y="3" rx="1" />
-  <rect width="7" height="9" x="14" y="12" rx="1" />
-  <rect width="7" height="5" x="3" y="16" rx="1" />
-</svg>
-
-                                </div>
-                                <h3 class="text-xl font-semibold text-white">{t('agencies.leverage.c3.title')}</h3>
-                            </div>
-                            <div class="flex-grow mb-4">
-                                <p class="text-sm text-surface-400 mb-2" set:html={t('agencies.leverage.c3.challenge')}></p>
-                                <p class="text-sm text-white" set:html={t('agencies.leverage.c3.solution')}></p>
-                            </div>
-                            <div class="mt-auto pt-4 border-t border-surface-800 flex items-start">
-                                
-<svg
-  class="lucide lucide-circle-check-big"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
-  <path d="m9 11 3 3L22 4" />
-</svg>
-
-                                <span class="text-sm font-medium text-white">
-                                    <b>Result:</b> Empowered marketing team, freeing up dev resources.
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="group relative overflow-hidden p-8 rounded-lg ring-1 ring-inset ring-surface-800 bg-surface-900/50 flex flex-col transition-all duration-300 hover:ring-primary/30 animate-on-scroll scale-in delay-300"
-                         data-spotlight-card>
-                        <!-- Mouse spotlight effect -->
-                        <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-                             data-spotlight></div>
-
-                        <div class="relative z-10">
-                            <div class="flex items-center mb-4">
-                                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20 mr-4 flex-shrink-0">
-                                    
-<svg
-  class="lucide lucide-briefcase"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-  <rect width="20" height="14" x="2" y="6" rx="2" />
-</svg>
-
-                                </div>
-                                <h3 class="text-xl font-semibold text-white">Service Business</h3>
-                            </div>
-                            <div class="flex-grow mb-4">
-                                <p class="text-sm text-surface-400 mb-2"><b>Challenge:</b> Needed a simple CRM to track
-                                    client projects, communication logs, and assigned tasks.</p>
-                                <p class="text-sm text-white"><b>Rebase Solution:</b> Built a custom CRM interface
-                                    using Rebase collections for clients, projects, and logs with relations.</p>
-                            </div>
-                            <div class="mt-auto pt-4 border-t border-surface-800 flex items-start">
-                                
-<svg
-  class="lucide lucide-circle-check-big"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M21.801 10A10 10 0 1 1 17 3.335" />
-  <path d="m9 11 3 3L22 4" />
-</svg>
-
-                                <span class="text-sm font-medium text-white">
-                                    <b>Result:</b> Improved project tracking and client communication.
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="mb-12 max-w-2xl">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
+                        Built on it
+                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white">Products shipped on Rebase</h2>
+                    <p class="mt-4 text-lg text-surface-400">
+                        Each of these runs on a Postgres database its owner controls. Built by the Rebase team.
+                    </p>
                 </div>
             </div>
+            <CaseStudiesCarousel t={t} />
         </section>
 
     <ClosingCta title="Start the next client project here." blurb="Scaffold against the client's own Postgres. They keep the database, you keep the code, nobody rents either." trackId="agencies" />

@@ -25,10 +25,6 @@ export const en = {
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ API and realtime on :3001, panel on :5173.",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
-  "see.badge": "The back office",
-  "see.title": "Where the rest of your team works.",
-  "see.subtitle":
-    "Tables, forms, relations, media, roles and workflows — every screen already laid out, and usable by the people on your team who will never open your repo.",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
@@ -40,9 +36,6 @@ export const en = {
   "engine.subtitle":
     "A typed SDK for your collections, REST over every table, and realtime on a WebSocket — plus auth, storage and backups, running against your database from minute one.",
   "engine.link": "Explore the backend",
-  "see.caption":
-    "A tour of the panel: filtering, inline editing, relations and uploads — running against the same API your app calls.",
-  "see.link": "Everything the admin panel adds",
   "agentera.badge": "Built for the agent era",
   "agentera.title": 'The backend an agent can\'t screw up',
   "agentera.p1":
@@ -84,30 +77,6 @@ export const en = {
   "stack.unchanged": "unchanged",
   "stack.api.note": "Identical in every configuration above. The layers change what a human can see — never what your app can call.",
   "stack.hint": "Click a layer to see what it adds.",
-  "paths.title": 'Two ways in. Same schema.',
-  "paths.subtitle": "Pick the half you need today. The other one is one dependency away.",
-  "paths.backend.title": "The backend",
-  "paths.backend.desc":
-    "Property types, auth providers, storage, realtime and backups — the full reference.",
-  "paths.backend.cta": "Explore the backend",
-  "paths.cms.title": "Rebase CMS",
-  "paths.cms.desc":
-    "Views, fields, custom React components, roles and workflows — the full reference.",
-  "paths.cms.cta": "Explore Rebase CMS",
-  "howitworks.badge": "Time reclaimed",
-  "howitworks.title":
-    'What you\'ll never build again.',
-  "howitworks.subtitle":
-    "Every hour you used to spend on plumbing is now spent on your product.",
-  "howitworks.step1.title": "Boilerplate admin UIs",
-  "howitworks.step1.desc":
-    "No more hand-wiring table views, form layouts, or filter logic. Connect your Postgres and get a complete, editable admin panel — instantly.",
-  "howitworks.step2.title": "Hand-rolled API layers",
-  "howitworks.step2.desc":
-    "Stop writing CRUD endpoints, serializers, and validation middleware. Rebase exposes type-safe REST and WebSocket APIs from your schema — zero glue code.",
-  "howitworks.step3.title": "Brittle auth & permissions",
-  "howitworks.step3.desc":
-    "Forget custom JWT plumbing and scattered access checks. Define row-level security and role-based permissions right in your TypeScript schema — auditable, version-controlled, bulletproof.",
   "showcase.badge": "Built for real products",
   "showcase.title.part1": "Teams ship faster with",
   "showcase.title.part2": "Rebase",
@@ -168,67 +137,6 @@ export const en = {
   "showcase.case6.title": "Edith",
   "showcase.case6.desc":
     "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three collections generated the entire back office — no admin screens were written.",
-  "features.title": "Everything your schema generates",
-  "features.subtitle":
-    "Production-grade features, all driven by your TypeScript schema. Every view updates in real time.",
-  "features.kanban.title": "Kanban boards",
-  "features.kanban.badge": "Drag & drop",
-  "features.kanban.desc":
-    "Drag cards between columns to update status fields instantly. Your Postgres records, visualized.",
-  "features.customization.title": "Extreme customization",
-  "features.customization.badge": "BYO Components",
-  "features.customization.desc":
-    "Bring your own React components to completely transform how fields look and behave in the admin.",
-  "features.history.title": "Data history & audit",
-  "features.history.badge": "Versioning",
-  "features.history.desc":
-    "Track who changed what. Compare versions side by side. Revert with one click.",
-  "features.import.title": "Import & export",
-  "features.import.badge": "Bulk ops",
-  "features.import.desc":
-    "CSV, JSON, or Excel — automatic field mapping in, one-click export out.",
-  "features.api.title": "Instant REST API",
-  "features.api.badge": "Auto-gen",
-  "features.api.desc":
-    "Filtering, sorting, pagination and relation expansion on every collection, over plain REST.",
-  "features.sdk.title": "TypeScript SDK",
-  "features.sdk.badge": "Type-safe",
-  "features.sdk.desc":
-    "Fully type-safe SDK with IDE auto-complete. Schema changes update your types automatically.",
-  "features.realtime.title": "Realtime engine",
-  "features.realtime.badge": "WebSocket",
-  "features.realtime.desc":
-    "Live data subscriptions, broadcast channels, and presence tracking — all over WebSocket. Build chat, dashboards, and collaborative UIs without any extra infrastructure.",
-  "faq.title": "Frequently asked questions",
-  "faq.subtitle": "Every answer links to the page that proves it.",
-  "faq.proof1": "Property types and Postgres mapping",
-  "faq.proof2": "Side-by-side comparisons",
-  "faq.proof3": "How the schema pipeline works",
-  "faq.proof4": "Read the MIT licence on GitHub",
-  "faq.proof5": "Architecture overview",
-  "faq.proof6": "Authentication docs",
-  "faq.proof7": "Extension mechanisms",
-  "faq.q1": "What database does Rebase support?",
-  "faq.a1":
-    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. Run it yourself and you bring your own database instance, which Rebase never sees or copies; on Rebase Cloud it is a dedicated Postgres you can dump and take with you.',
-  "faq.q2": "How is Rebase different from Retool or Supabase?",
-  "faq.a2":
-    "Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-retool\">Retool</a>, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-supabase\">Supabase</a>, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. You keep the database; Rebase is what runs in front of it.",
-  "faq.q3": "Can I use Rebase with an existing database?",
-  "faq.a3":
-    "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
-  "faq.q4": "Is Rebase open-source?",
-  "faq.a4":
-    "Yes. The entire framework is free and MIT-licensed — the schema editor, data import/export, user management, generated APIs, typed SDK, and every feature ships at no cost when you run it yourself. You pay only if you want us to host it, or if you need enterprise auth and support; see <a class=\"text-primary hover:underline\" href=\"/pricing\">pricing</a>.",
-  "faq.q5": "What's the tech stack?",
-  "faq.a5":
-    'The admin panel is a <strong class="text-white font-medium">React 19 SPA</strong> built with TypeScript and Tailwind CSS. The backend is a lightweight <strong class="text-white font-medium">Node.js</strong> service that connects directly to your PostgreSQL database. No SSR, no monolithic framework.',
-  "faq.q6": "Do you support SSO or enterprise auth?",
-  "faq.a6":
-    "SSO, yes — through OIDC, including Microsoft Entra ID, alongside Google, GitHub, Apple and other providers. MFA, scoped API keys and custom auth adapters ship in the open-source framework too. SAML is not built in; the custom auth adapter is the supported route to it today. Enterprise plans add dedicated support and SLAs — reach out to talk through your requirements.",
-  "faq.q7": "Can I embed Rebase inside my existing React app?",
-  "faq.a7":
-    "Yes. Rebase is distributed as npm packages. You can mount the entire admin panel inside your existing React application, or deploy it as a standalone SPA. It's designed to be embeddable.",
   "cta.title": "Point it at your database.",
   "cta.subtitle":
     'Three ways to run it.<br class="hidden sm:block"/>Pick the one that matches how you already deploy.',
@@ -308,8 +216,6 @@ export const en = {
   "nav.overview.desc": "Both layers, every subsystem",
   "nav.compare": "Compare",
   "nav.compare.desc": "Supabase, Directus, Strapi, Retool…",
-  "nav.features": "Features",
-  "nav.features.desc": "Everything Rebase can do, at a glance.",
   "nav.studio": "Rebase Studio",
   "nav.studio.desc": "SQL editor, schema builder, policies, branches.",
   "nav.backend": "Backend & APIs",
@@ -334,14 +240,6 @@ export const en = {
   "nav.docs.desc": "Guides, reference and recipes",
   "nav.security": "Security & RLS",
   "nav.security.desc": "Row-level security, enforced by Postgres.",
-  "nav.solutions": "Solutions",
-  "nav.startups": "For Startups",
-  "nav.startups.desc":
-    "Ship your product faster with schema-driven development.",
-  "nav.whyRebase": "Why Rebase",
-  "nav.whyRebase.desc": "See how Rebase compares to alternatives.",
-  "nav.agencies": "For Agencies",
-  "nav.agencies.desc": "Deliver bespoke client projects, faster.",
   "nav.docs": "Docs",
   "nav.tryDemo": "Try the demo",
   "roadmap.badge": "Roadmap",
@@ -372,7 +270,6 @@ export const en = {
   "roadmap.later.item2": "Text-to-Schema AI generation",
   "roadmap.later.item3": "Edge functions / Serverless logic",
   "roadmap.later.item4": "Advanced migration pipelines",
-  "roadmap.later.item5": "MongoDB support",
   "footer.product": "Product",
   "footer.developers": "Developers",
   "footer.solutions": "Solutions",
@@ -380,7 +277,6 @@ export const en = {
   "footer.allComparisons": "All comparisons",
   "footer.company": "Company",
   "footer.legal": "Legal",
-  "footer.features": "Features",
   "footer.studio": "Rebase Studio",
   "footer.backend": "Backend & APIs",
   "footer.cms": "Rebase CMS",
@@ -394,7 +290,6 @@ export const en = {
   "footer.startups": "For Startups",
   "footer.agencies": "For Agencies",
   "footer.europe": "Sovereignty in Europe",
-  "footer.whyRebase": "Why Rebase",
   "footer.vsSupabase": "vs Supabase",
   "footer.vsPayload": "vs Payload",
   "footer.vsDirectus": "vs Directus",
@@ -480,6 +375,7 @@ export const en = {
   "kd.solutions.title": "Our Digitization Solutions",
   "kd.solutions.desc":
     "Catalog of solutions eligible for subsidy under the Kit Digital Program, distributed by category and beneficiary segment.",
+  "kd.solutions.oneProduct": "There is one product. Rebase is delivered under five Kit Digital categories — the category decides which subsidy applies and what we configure, not what you install.",
   "kd.solutions.badge": "Kit Digital Category",
   "kd.solutions.sol_prefix": "Solution:",
   "kd.solutions.sector_all":
@@ -608,29 +504,6 @@ export const en = {
   "agencies.features.f5.desc": "Self-host on the client's own infrastructure, or run it on Rebase Cloud — in private beta today.",
   "agencies.features.f6.title": "Developer Friendly",
   "agencies.features.f6.desc": "React + TypeScript for a familiar and efficient DX.",
-  "agencies.metrics.m1.value": "5×",
-  "agencies.metrics.m1.label": "Faster project delivery",
-  "agencies.metrics.m2.value": "<span class=\"align-baseline\">↓</span>80%",
-  "agencies.metrics.m2.label": "Less boilerplate",
-  "agencies.metrics.m3.value": "100%",
-  "agencies.metrics.m3.label": "Client ownership",
-  "agencies.leverage.title": "How Agencies Leverage Rebase",
-  "agencies.leverage.c1.title": "E-commerce Store",
-  "agencies.leverage.c1.challenge": "<b>Challenge:</b> Needed a custom admin panel to manage products, orders, and customer data integrated with their existing Shopify backend.",
-  "agencies.leverage.c1.solution": "<b>Rebase Solution:</b> Used Rebase with custom actions and views to create a tailored interface, pulling data via APIs.",
-  "agencies.leverage.c1.result": "<b>Result:</b> Faster order processing and inventory management.",
-  "agencies.leverage.c2.title": "SaaS Platform",
-  "agencies.leverage.c2.challenge": "<b>Challenge:</b> Required an internal tool for the support team to manage user accounts, subscriptions, and feature flags.",
-  "agencies.leverage.c2.solution": "<b>Rebase Solution:</b> Deployed Rebase connected to their Postgres database, using role-based access for different support tiers.",
-  "agencies.leverage.c2.result": "<b>Result:</b> Reduced support resolution time by 30%.",
-  "agencies.leverage.c3.title": "Content Marketing Site",
-  "agencies.leverage.c3.challenge": "<b>Challenge:</b> Client needed an easy way for non-technical marketers to update blog posts, case studies, and landing pages.",
-  "agencies.leverage.c3.solution": "<b>Rebase Solution:</b> Set up Rebase with predefined content schemas and markdown editors, enabling easy content updates.",
-  "agencies.leverage.c3.result": "<b>Result:</b> Empowered marketing team, freeing up dev resources.",
-  "agencies.leverage.c4.title": "Service Business",
-  "agencies.leverage.c4.challenge": "<b>Challenge:</b> Needed a simple CRM to track client projects, communication logs, and assigned tasks.",
-  "agencies.leverage.c4.solution": "<b>Rebase Solution:</b> Built a custom CRM interface using Rebase collections for clients, projects, and logs with relations.",
-  "agencies.leverage.c4.result": "<b>Result:</b> Improved project tracking and client communication.",
   "agencies.cta.title": "Ready to build something amazing?",
   "agencies.cta.primary": "Try the demo",
   "agencies.cta.secondary": "Read the docs",
@@ -714,9 +587,9 @@ export const en = {
   "rebase-vs-hasura.meta.description": "An admin dashboard generated from your schema, a typed TypeScript SDK, and REST alongside — not a GraphQL surface with the back office left to you.",
   "rebase-vs-django.meta.title": "Rebase vs Django Admin — Modern React Stack Comparison",
   "rebase-vs-django.meta.description": "Compare Django's server-rendered admin with a Postgres backend that generates REST, a typed SDK and a React panel from one definition.",
-  "mosaic.badge": "Infinite Flexibility",
-  "mosaic.title": "A visual framework for any use case.",
-  "mosaic.subtitle": "From e-commerce and asset management to visual builders and live code edits. Rebase's schema-driven UI scales to meet any dashboard or editor requirement.",
+  "mosaic.badge": "One definition",
+  "mosaic.title": "One definition, every surface.",
+  "mosaic.subtitle": "A spreadsheet, a kanban board, a gallery, a block editor, a custom React view — every screen below reads the same collection through the same API, under the same policies. Nothing here is a second data model.",
   "pricing.meta.title": "Pricing — Rebase",
   "pricing.meta.description": "Rebase is free and open-source (MIT) — run everything yourself at no cost. You pay only if you want us to host it, or for enterprise SSO, dedicated support and SLAs.",
   "pricing.badge": "Pricing",
@@ -821,9 +694,6 @@ export const en = {
   "manifesto.signature": "The Rebase Team",
   "manifesto.signatureSubtitle": "Madrid · Building open-source developer tools since 2020",
 
-  "manifesto.cta.title": "Ready to build something?",
-  "manifesto.cta.getStarted": "Get Started",
-  "manifesto.cta.github": "View on GitHub",
 
   // Manifesto Banner
   "banner.title.control": "Own your data.<br/> Run it anywhere.",
@@ -840,23 +710,8 @@ export const en = {
   "ai.subtitle": "Vector search, scoped API keys, custom functions, realtime subscriptions with broadcast channels, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
 
   // Grouped Features Section
-  "features.group.baas.title": "Postgres BaaS",
-  "features.group.baas.subtitle": "Backend-as-a-Service",
-  "features.group.baas.desc": "Connect your database and get a fully-formed, secure backend. We handle the heavy lifting so you can focus on building your app.",
-  "features.group.cms.title": "Rebase CMS",
-  "features.group.cms.subtitle": "The back office, generated",
-  "features.group.cms.desc": "A premium, spreadsheet-like content management system generated directly from your database structure. No frontend boilerplate required.",
 
   // Alternatives Section
-  "alternatives.badge": "Alternatives",
-  "alternatives.title": "Replaces your product stack",
-  "alternatives.subtitle": "Instead of patching together half a dozen services and paying per-seat developer licenses, Rebase provides a unified, open-source stack that runs on your database.",
-  "alternatives.card.supabase.title": "Alternative to Supabase & Firebase",
-  "alternatives.card.supabase.desc": "Unlike closed-ecosystem BaaS platforms, Rebase is fully database-agnostic and connects directly to your existing database. You own your infrastructure, data, and schema definitions in clean TypeScript.",
-  "alternatives.card.retool.title": "Alternative to Retool & Internal Tools",
-  "alternatives.card.retool.desc": "No per-seat developer pricing or vendor lock-in. Rebase is an open-source React application. Extend it naturally with standard React components, version-control it with Git, and self-host for free.",
-  "alternatives.card.directus.title": "Alternative to Directus & Strapi",
-  "alternatives.card.directus.desc": "No opaque database alterations or proprietary configuration stores. Rebase works with schema-as-code: define your models in TypeScript and get real migration files.",
   "demo.page.title": "A real backend, running in your browser.",
   "demo.page.subtitle": "The API, the SDK and the panel on one database; change a row and watch all three.",
   "demo.meta.title": "Live demo — Rebase",
