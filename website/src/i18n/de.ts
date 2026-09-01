@@ -35,10 +35,9 @@ export const de = {
   "agentera.card.title": "Boilerplate verliert an Wert. Garantien gewinnen welchen.",
   "agentera.card.desc": "Agenten haben Code für Tag eins billig gemacht. Teuer geblieben sind die Probleme an Tag 30: RLS-Korrektheit, Backups, Migrationen, Realtime-Konsistenz. Rebase ist nicht das Boilerplate, das dein Agent ohnehin geschrieben hätte — es sind die operativen Garantien, die er nicht liefern kann.",
   "agentera.link": "KI- und Agent-Funktionen ansehen",
-  "modes.badge": "Eine Definition, die Hälfte deiner Wahl",
-  "modes.title": "Nimm nur die Hälfte, die du wirklich brauchst.",
-  "modes.subtitle":
-    "Das Panel liest deine Daten über dieselbe API und dieselben Policies wie deine App. Geh heute headless live und füge es an dem Tag hinzu, an dem ein Mensch an die Daten muss — oder nie. Welchen Teil du auch weglässt: Die API antwortet exakt gleich.",
+  "modes.badge": "Eine Definition, jeder Teil",
+  "modes.title": "Nimm nur die Teile, die du brauchst.",
+  "modes.subtitle": "Das Panel liest deine Daten über dieselbe API und dieselben Policies wie deine App. Liefere heute headless aus und füge es an dem Tag hinzu, an dem ein Mensch die Daten anfassen muss — oder nie. Was immer du weglässt, die API antwortet genau gleich.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, Auth, Storage, Realtime und Backups über deiner Datenbank. Keine UI, kein React irgendwo im Dependency-Baum.",
@@ -128,7 +127,7 @@ export const de = {
   "security.title": "In TypeScript geschrieben. Von Postgres erzwungen.",
   "security.desc":
     "Row-Level Security, direkt in derselben TypeScript-Datei wie die Collection definiert, kompiliert in echte Postgres-Policies. Granular pro Collection, pro Feld, pro Rolle — und von der Datenbank selbst durchgesetzt, nicht von Middleware, an deren Aufruf man erst denken muss.",
-  "security.link": "Rebase Studio entdecken",
+  "security.link": "Wie die Sicherheit funktioniert",
   "security.postLink": "Lesen: Die Sicherheit deines Backends sollte nicht davon abhängen, dass jemand daran denkt",
   "opensource.badge": "Open-Source",
   "opensource.title": "Dein Code. Deine Infra.<br/>Null Lock-in.",
@@ -136,7 +135,7 @@ export const de = {
   "opensource.link1": "Für Entwickler",
   "opensource.link2": "Im Vergleich",
   "showcase.exploreCms": "Rebase CMS ansehen",
-  "showcase.sync.badge": "Dein Workflow",
+  "showcase.sync.badge": "Das Panel",
   "showcase.sync.title": "Gebaut für die Art,<br/>wie du wirklich arbeitest",
   "showcase.sync.subtitle": "Kein neues Tool, das du erst lernen musst — Rebase arbeitet mit deiner bestehenden Datenbank und deinem bestehenden Workflow.",
   "showcase.sync.tab1.title": "Jede Ansicht. Null Code.",

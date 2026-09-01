@@ -54,10 +54,9 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.badge": "One definition, either half",
-  "modes.title": 'Take only the half you actually need.',
-  "modes.subtitle":
-    "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whichever half you leave out, the API answers exactly the same.",
+  "modes.badge": "One definition, every part",
+  "modes.title": "Take only the parts you need.",
+  "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, auth, storage, realtime and backups over your database. No UI, no React anywhere in the dependency tree.",
@@ -169,7 +168,7 @@ export const en = {
   "security.title": "Written in TypeScript. Enforced by Postgres.",
   "security.desc":
     "Row-level security written in the same TypeScript file as the collection, compiled into real Postgres policies. Granular per collection, per field, per role — and enforced by the database itself, not by middleware someone has to remember to call.",
-  "security.link": "Explore Rebase Studio",
+  "security.link": "How security works",
   "security.postLink": "Read: your backend's security should not depend on remembering to check",
   "opensource.badge": "Open source",
   "opensource.title": "Your code. Your infra.<br/>Zero lock-in.",
@@ -178,7 +177,7 @@ export const en = {
   "opensource.link1": "For developers",
   "opensource.link2": "How it compares",
   "showcase.exploreCms": "Explore Rebase CMS",
-  "showcase.sync.badge": "Your workflow",
+  "showcase.sync.badge": "The panel",
   "showcase.sync.title": "Built for the way<br/>you actually work",
   "showcase.sync.subtitle":
     "Not another tool to learn — Rebase works with your existing database and your existing workflow.",

@@ -152,7 +152,8 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
                 // admin-panel column), so the flat variant is parked at 0% rather
                 // than deleted — flip the weights back to split-test it again.
                 { id: "navigation-structure", variants: ["control", "flat-nav"], weights: [100, 0] },
-                { id: "manifesto-banner-text", variants: ["control", "mission", "founders"], weights: [34, 33, 33] }
+                // Parked at 0% — see src/scripts/ab-testing.ts for why.
+                { id: "manifesto-banner-text", variants: ["control", "mission", "founders"], weights: [100, 0, 0] }
             ];
 
             var updated = false;

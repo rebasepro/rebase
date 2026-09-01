@@ -70,7 +70,7 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
 2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
-3. **Take only the half you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+3. **Take only the parts you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
 4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
 5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
 
@@ -78,9 +78,9 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 Rebase is adopted in layers, and each one is additive:
 
-- **BaaS** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
-- **CMS** — the above, plus a schema-driven admin panel generated from the same collection definitions.
-- **Full** — the above, plus Studio: SQL editor, schema visualizer, RLS editor, logs and an API explorer.
+- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
+- **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
+- **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
 
 Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check $DATABASE_URL\` audits any Postgres, read-only, with nothing installed.
 

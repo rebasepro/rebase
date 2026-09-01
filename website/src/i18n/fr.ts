@@ -35,10 +35,9 @@ export const fr = {
   "agentera.card.title": "Le boilerplate se déprécie. Les garanties prennent de la valeur.",
   "agentera.card.desc": "Les agents ont rendu le code du premier jour bon marché. Ce qui reste cher, ce sont les problèmes du trentième jour : justesse des politiques RLS, sauvegardes, migrations, cohérence temps réel. Rebase n'est pas le boilerplate que votre agent aurait écrit de toute façon — ce sont les garanties opérationnelles qu'il ne peut pas offrir.",
   "agentera.link": "Découvrir les fonctions IA et agents",
-  "modes.badge": "Une définition, la moitié de votre choix",
-  "modes.title": "Ne prenez que la moitié dont vous avez vraiment besoin.",
-  "modes.subtitle":
-    "Le panneau lit vos données via la même API et les mêmes politiques que votre application. Déployez en headless aujourd'hui et ajoutez-le le jour où un humain doit toucher aux données — ou jamais. Quelle que soit la partie que vous laissez de côté, l'API répond exactement pareil.",
+  "modes.badge": "Une définition, chaque partie",
+  "modes.title": "Ne prenez que les parties dont vous avez besoin.",
+  "modes.subtitle": "Le panneau lit vos données via la même API et les mêmes politiques que votre application. Livrez en headless aujourd'hui et ajoutez-le le jour où un humain doit toucher aux données — ou jamais. Quoi que vous laissiez de côté, l'API répond exactement pareil.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, auth, stockage, temps réel et sauvegardes par-dessus votre base de données. Aucune UI, aucun React dans l'arbre de dépendances.",
@@ -128,7 +127,7 @@ export const fr = {
   "security.title": "Écrit en TypeScript. Appliqué par Postgres.",
   "security.desc":
     "Row-level security définie dans le même fichier TypeScript que la collection, compilée en véritables politiques Postgres. Granulaire par collection, par champ, par rôle — et appliquée directement par la base de données, pas par un middleware que l'on doit penser à appeler.",
-  "security.link": "Explorer Rebase Studio",
+  "security.link": "Comment la sécurité fonctionne",
   "security.postLink": "À lire : la sécurité de votre backend ne devrait pas dépendre d’une vérification qu’on oublie",
   "opensource.badge": "Open source",
   "opensource.title": "Votre code. Votre infra.<br/>Zéro lock-in.",
@@ -136,7 +135,7 @@ export const fr = {
   "opensource.link1": "Pour les développeurs",
   "opensource.link2": "Le comparatif",
   "showcase.exploreCms": "Découvrir Rebase CMS",
-  "showcase.sync.badge": "Votre flux de travail",
+  "showcase.sync.badge": "Le panneau",
   "showcase.sync.title": "Pensé pour votre façon<br/>de travailler",
   "showcase.sync.subtitle": "Pas un énième outil à apprendre — Rebase fonctionne avec votre base de données et votre workflow existants.",
   "showcase.sync.tab1.title": "Chaque vue. Zéro code.",

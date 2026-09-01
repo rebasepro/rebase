@@ -406,7 +406,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <span class="mx-2 text-surface-700">·</span>{t("modes.badge")}
                     </p>
                     <h2 class="mt-4 font-headers text-display-2 text-balance">
-                        Take only the half you actually need.
+                        {t("modes.title")}
                     </h2>
                     <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
                 </div>
@@ -588,8 +588,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
         </div>
 
         <!-- CHAPTER 08 — CUSTOMERS. The carousel renders its own eyebrow, title
-             and subtitle; wrapping it in a second header duplicated all three. -->
-        <div class="chapter border-t border-white/8 py-24 sm:py-32">
+             and subtitle; wrapping it in a second header duplicated all three.
+             It also renders its own `py-28 sm:py-36`, and this wrapper used to
+             add `py-24 sm:py-32` on top — 272px of ground above the heading and
+             272px below it, against ~128px everywhere else, which is what left
+             most of a screen empty between the customers and the close. The
+             wrapper keeps only the hairline. -->
+        <div class="chapter border-t border-white/8">
             <CaseStudiesCarousel t={t} />
         </div>
 
