@@ -634,11 +634,7 @@ export const en: RebaseTranslations = {
     error_setting_up_collections: "Error automatically setting up collections",
 
     // --- Home Suggestions ---
-    add_your: "Add your",
-    database_collections: "database collections",
-    no_unmapped_collections: "No unmapped collections in the database",
 
-    welcome_to_rebase: "Welcome to Rebase Cloud",
     admin_panel_ready_bring_data: "Your admin panel is ready. Let's bring in your data.",
     admin_panel_ready_get_started: "Your admin panel is ready. Here's how to get started.",
     auto_detect_collections: "Auto-detect collections",

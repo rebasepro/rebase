@@ -1,8 +1,25 @@
 {
   "name": "@rebasepro/studio",
-  "type": "module",
   "version": "0.17.3",
+  "description": "Rebase Studio \u2014 the SQL editor, schema visualiser, RLS policy editor and API explorer.",
+  "keywords": [
+    "rebase",
+    "studio",
+    "sql",
+    "rls",
+    "postgres"
+  ],
+  "homepage": "https://github.com/rebasepro/rebase#readme",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/studio"
+  },
   "license": "MIT",
+  "type": "module",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
@@ -44,7 +61,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "dev": "vite",
     "test": "jest --passWithNoTests",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
@@ -85,10 +102,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "gitHead": "9ecf37abf793bd2f2daaaed6f517ee5ee19b01ae",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/studio"
-  }
+  "gitHead": "9ecf37abf793bd2f2daaaed6f517ee5ee19b01ae"
 }

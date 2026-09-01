@@ -208,3 +208,6 @@ coverage/
 
 # Test and report output — playwright, e2e screenshots. One place, so root stays legible.
 /.artifacts/
+
+# Test-runner dumps: local paths, never useful in a diff.
+**/jest-output.txt

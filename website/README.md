@@ -83,4 +83,4 @@ Never hand-edit these; change the source or the generator in `scripts/`.
   run it again.
 - **`NeatBackground` does not render in headless screenshots.** It is decoration,
   never a section's only light — pair it with CSS radial gradients.
-- Open legal items are tracked in [`LEGAL-TODO.md`](LEGAL-TODO.md).
+- Open legal items are tracked privately.

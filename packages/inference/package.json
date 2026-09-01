@@ -1,6 +1,22 @@
 {
   "name": "@rebasepro/inference",
   "version": "0.17.3",
+  "description": "Infer a Rebase collection schema from existing data.",
+  "keywords": [
+    "rebase",
+    "schema",
+    "inference",
+    "codegen"
+  ],
+  "homepage": "https://github.com/rebasepro/rebase#readme",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/inference"
+  },
   "license": "MIT",
   "type": "module",
   "publishConfig": {
@@ -35,16 +51,11 @@
     "src"
   ],
   "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "dev": "vite",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test": "jest --passWithNoTests",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
-  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/inference"
-  }
+  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6"
 }

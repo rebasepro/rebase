@@ -167,7 +167,7 @@ grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
 **The home page's beat order, and why it is that order.** Revised 2026-08-10 after
-the competitor audit in `COMPETITOR-AUDIT-2026-08-10.md`.
+the competitor audit, which is kept privately.
 
 | Beat | Section | Carries |
 |------|---------|---------|

@@ -699,12 +699,8 @@ export interface RebaseTranslations {
     error_setting_up_collections: string;
 
     // --- Home ---
-    add_your: string;
-    database_collections: string;
-    no_unmapped_collections: string;
 
     // --- Welcome ---
-    welcome_to_rebase: string;
     admin_panel_ready_bring_data: string;
     admin_panel_ready_get_started: string;
     auto_detect_collections: string;

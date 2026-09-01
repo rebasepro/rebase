@@ -144,7 +144,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 26. **Storage authorization** — `storage/routes.ts`, `keys.ts`, path canonicalization,
     signed URLs, per-source authz. **done 2026-08-07**
 27. **Secrets & encryption** — `ENCRYPTION_KEY` handling, `crypto-utils.ts`, env-var
-    encryption in saas, key rotation story. **done 2026-08-09** — see [audits/27-secrets-and-encryption.md](27-secrets-and-encryption.md).
+    encryption in saas, key rotation story. **done 2026-08-09** — the write-up moved to the private control-plane repo.
 28. **Dependency & supply chain** — `pnpm-workspace.yaml` overrides (bounded?),
     `tooling/scripts/check-undeclared-deps.mjs`, published-dist runtime deps, npm trusted publishers. **partial**
 
@@ -272,7 +272,7 @@ were not re-checked at all. Absence from this list is not evidence of a fix.
 74. **Custom domains & TLS** — `verify-domain.ts`, wildcard certs, the cosmetic-badge class. **partial**
 75. **Console UI** — `saas/frontend/src`. Docker-era tabs, gating flags, empty states,
     error reporting truthfulness. **partial**
-76. **Disaster recovery** — `saas/DISASTER-RECOVERY.md` vs. reality: rehearse the runbook. **done 2026-08-08** — see [audits/76-disaster-recovery.md](76-disaster-recovery.md).
+76. **Disaster recovery** — `saas/DISASTER-RECOVERY.md` vs. reality: rehearse the runbook. **done 2026-08-08** — the write-up moved to the private control-plane repo.
 
 ## J. Cross-cutting engineering hygiene
 

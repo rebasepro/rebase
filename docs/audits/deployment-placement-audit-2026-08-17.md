@@ -15,7 +15,7 @@ The headline is not "here is what to build". It is:
 
 Five subsystems are complete, tested, and reachable from nothing. They are not stray dead
 code: together they are waves 4–7 of
-[tenancy-and-cost-plan-2026-07.md](../plans/tenancy-and-cost-plan-2026-07.md), each built in
+the tenancy and cost plan (moved to the private control-plane repo), each built in
 isolation and never wired to the others.
 
 ---
@@ -331,7 +331,7 @@ of whether the ordering is right.
 Read directly: `boot/role.ts`, `init/surfaces.ts`, `boot/boot.ts`, `serve-spa.ts`,
 `infra/docker/docker-compose.selfhost.yml`, `MODULAR-ARCHITECTURE.md`,
 `docs/runtime-roles-plan-2026-08.md`, `docs/apps-and-runtimes.md`,
-`docs/tenancy-and-cost-plan-2026-07.md`, and in `saas/backend/src`: `utils/tenant-topology.ts`,
+the tenancy and cost plan (private), and in `saas/backend/src`: `utils/tenant-topology.ts`,
 `k8s/{orchestrator,resolve,client,baseline,external-backend,reconciler,topology-diff,wildcard-tls}.ts`,
 `managed/{deployment,deploy-plan,apps-registry,rollout}.ts`, `static/{hosting,publish}.ts`,
 `cloudrun/service.ts`, `metering/enforcement.ts`. Reachability was established by grepping

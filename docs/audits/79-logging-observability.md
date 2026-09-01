@@ -337,7 +337,7 @@ quiet tenant the scrape traffic dominates the request-rate chart the console sho
 hand-written entrypoint calling `initializeRebaseBackend` — the documented ejection path — gets no
 metrics at all, even though `createMetricsMiddleware`/`createMetricsRoutes` are exported from
 `packages/server/src/index.ts:265-266`. `REBASE_METRICS` appears in `docs/apps-and-runtimes.md`
-and `docs/tenancy-and-cost-plan-2026-07.md` and in no user-facing docs page.
+and the private tenancy and cost plan, and in no user-facing docs page.
 
 **Fix:** either install it inside `configureMiddlewares` (behind the same env flag) or document the
 two exports as the ejection recipe.

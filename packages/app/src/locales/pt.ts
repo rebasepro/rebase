@@ -527,11 +527,7 @@ export const pt: RebaseTranslations = {
     error_setting_up_collections: "Erro ao configurar coleções automaticamente",
 
     // --- Home Suggestions ---
-    add_your: "Adicione as suas",
-    database_collections: "coleções da base de dados",
-    no_unmapped_collections: "Sem coleções não mapeadas na base de dados",
 
-    welcome_to_rebase: "Bem-vindo ao Rebase Cloud",
     admin_panel_ready_bring_data: "O seu painel de administração está pronto. Vamos importar os seus dados.",
     admin_panel_ready_get_started: "O seu painel de administração está pronto. Veja como começar.",
     auto_detect_collections: "Detetar coleções automaticamente",
