@@ -38,7 +38,16 @@ export const S04_Claim: React.FC = () => (
             a flex column beside the code frame — the largest type in the film
             after the bookends, crammed into half the width, and the only scene
             whose size matched no tier. The claim is the point of the scene, so
-            it gets the full measure and the evidence sits beneath it. */}
+            it gets the full measure and the evidence sits beneath it.
+
+            The lead used to open "generated from that same file". It ran second
+            in an earlier cut, straight after the scene that shows the collection
+            file, and the reference worked. This scene is now SECOND in the film
+            — the answer to the safety problem, before any Rebase code has been
+            on screen at all — so "that same file" pointed at something the
+            viewer had not seen yet, and would not see for another seven
+            seconds. It introduces the idea now and scene three reveals the
+            file. Reordering scenes is a copy edit as well as a timeline edit. */}
         <Stage>
             <Chapter n="01" label="Row-level security" delay={4} />
             <div style={{ marginTop: 24 }}>
@@ -48,8 +57,9 @@ export const S04_Claim: React.FC = () => (
             <div style={{ display: "flex", gap: 76, alignItems: "flex-start", marginTop: 52 }}>
                 <div style={{ width: 480, flexShrink: 0 }}>
                     <Lead delay={34} size={24} width={480}>
-                        Generated from that same file, and applied by migration. You
-                        cannot forget to call middleware that was never in your code.
+                        Written in TypeScript beside your schema, compiled into real
+                        Postgres policies, and applied by migration. You cannot forget
+                        to call middleware that was never in your code.
                     </Lead>
                 </div>
 
