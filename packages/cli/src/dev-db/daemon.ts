@@ -62,8 +62,22 @@ export interface ManagedDatabase {
 const MANAGED_USER = "postgres";
 const MANAGED_DATABASE = "postgres";
 
+/**
+ * The DSN for the managed development database.
+ *
+ * **`sslmode=disable` is not decoration.** PGlite's socket server speaks no TLS,
+ * and libpq-family clients try SSL first — so Atlas, which `rebase db push`
+ * shells out to, failed the whole push with
+ * `pq: SSL is not enabled on the server`. Its remedy box then told the reader to
+ * append `sslmode=disable` to `DATABASE_URL`, which on this path is not set at
+ * all: `rebase init` leaves it commented out precisely so the managed database
+ * is used. The advice was correct and unfollowable.
+ *
+ * Putting it in the URL fixes every consumer at once — Atlas, `pg`, and anything
+ * a driver shells out to later — rather than teaching each one about PGlite.
+ */
 export function managedUrl(port: number): string {
-    return `postgresql://${MANAGED_USER}@127.0.0.1:${port}/${MANAGED_DATABASE}`;
+    return `postgresql://${MANAGED_USER}@127.0.0.1:${port}/${MANAGED_DATABASE}?sslmode=disable`;
 }
 
 /**

@@ -36,7 +36,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
 import { ensureDevDatabase } from "../utils/dev-preflight";
-import { runDriverDbCommand } from "./db";
+import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
 
@@ -240,6 +240,62 @@ function readEnvVar(projectRoot: string, name: string): string | undefined {
 }
 
 /**
+ * Whether this project declares collections at all.
+ *
+ * A project with none has no schema to generate or push — the headless BaaS
+ * mode serves whatever the database already has.
+ */
+function projectHasCollections(projectRoot: string): boolean {
+    const collectionsDir = path.join(projectRoot, "config", "collections");
+    return fs.existsSync(collectionsDir)
+        && fs.readdirSync(collectionsDir).some(name => /\.(ts|js|mts|mjs)$/.test(name) && !name.startsWith("index."));
+}
+
+/**
+ * Make the generated Drizzle schema match the collections before anything reads it.
+ *
+ * ## The bug this exists for
+ *
+ * The scaffold ships `backend/src/schema.generated.ts` as a stub — `export const
+ * tables = {}` — and something has to replace it. On the Docker path
+ * `rebase db push` did, as step one of three. On the **managed PGlite path
+ * nothing did**, and that is the path a new project takes, because `rebase init`
+ * deliberately leaves `DATABASE_URL` commented out.
+ *
+ * The result was the worst shape a first run can have: the database was fine.
+ * Boot created all 30 tables through the additive ensure, `/health` answered
+ * 200, auth worked, the admin panel loaded — and every single
+ * `GET /api/data/*` returned a 500, `Table not found for collection 'posts'`,
+ * because the driver looks the table up in the generated file rather than in the
+ * database. A stranger following the README had no way to guess that
+ * `pnpm run schema:generate` was the missing step, and the README told them the
+ * schema was pushed for them.
+ *
+ * ## Why it runs unconditionally
+ *
+ * Generation reads collection files and writes one file. It needs no database,
+ * it is idempotent, and it takes about two seconds. Making it a precondition of
+ * starting the dev server — rather than a side effect of one database path —
+ * is what makes "the generated schema matches the collections" true by
+ * construction instead of true by remembering. The same staleness bites a
+ * project whose database was already running, where the push never ran either.
+ *
+ * Failure is not fatal: the server still starts, and it will report the real
+ * problem itself. A dev server that refuses to boot because codegen failed is
+ * worse than one that boots and says so.
+ */
+async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
+    if (!projectHasCollections(projectRoot)) return;
+    try {
+        await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
+        console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
+    }
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
@@ -248,11 +304,7 @@ function readEnvVar(projectRoot: string, name: string): string | undefined {
 async function runDatabasePreflight(options: { projectRoot: string; disabled: boolean }): Promise<void> {
     const { projectRoot, disabled } = options;
 
-    // A project with no collection files has no schema to push — the headless
-    // BaaS mode serves whatever the database already has.
-    const collectionsDir = path.join(projectRoot, "config", "collections");
-    const hasCollections = fs.existsSync(collectionsDir)
-        && fs.readdirSync(collectionsDir).some(name => /\.(ts|js|mts|mjs)$/.test(name) && !name.startsWith("index."));
+    const hasCollections = projectHasCollections(projectRoot);
 
     const outcome = await ensureDevDatabase({
         projectRoot,
@@ -314,6 +366,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // when it declines is in `ensureDevDatabase`; the frontend-only case is
     // decided here because there is no backend to need a database at all.
     if (!frontendOnly) {
+        // Before the database, because it needs no database and because the
+        // push below regenerates anyway on the one path that reaches it.
+        await ensureGeneratedSchema(projectRoot);
         await runDatabasePreflight({
             projectRoot,
             disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1"
