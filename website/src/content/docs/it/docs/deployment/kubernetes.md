@@ -8,7 +8,7 @@ description: Distribuisci Rebase su un cluster Kubernetes con il chart Helm uffi
 
 Il chart ufficiale è l'equivalente per Kubernetes della configurazione di self-hosting con Docker Compose. Stessa idea, stessa immagine, stesso bundle: **il runtime è l'immagine, il tuo progetto è il bundle e l'aggiornamento di Rebase consiste nel cambiare un tag.**
 
-Viene pubblicato come artefatto OCI insieme all'immagine di runtime, ed entrambi hanno la stessa versione: il chart che distribuisce il runtime `0.15.0` *è* il chart `0.15.0`, quindi c'è un solo numero da monitorare. Senza `--version` ottieni la versione più recente; fissala per una distribuzione reale, nello stesso modo in cui fisseresti `image.tag`:
+Viene pubblicato come artefatto OCI insieme all'immagine di runtime, ed entrambi hanno la stessa versione: il chart che distribuisce il runtime `0.17.3` *è* il chart `0.17.3`, quindi c'è un solo numero da monitorare. Senza `--version` ottieni la versione più recente; fissala per una distribuzione reale, nello stesso modo in cui fisseresti `image.tag`:
 
 ```bash
 helm install rebase oci://registry-1.docker.io/rebasepro/rebase \

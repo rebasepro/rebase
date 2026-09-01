@@ -74,6 +74,8 @@
     "write:derived-names": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/derived-names.mts --write",
     "record:project-snapshot": "pnpm --filter @rebasepro/server-postgres record:project-snapshot",
     "check:chart": "node tooling/scripts/check-chart.mjs",
+    "check:version-pins": "node tooling/scripts/docs-verify/check-version-pins.mjs",
+    "fix:version-pins": "node tooling/scripts/docs-verify/check-version-pins.mjs --write",
     "check:runtime-image": "node tooling/scripts/check-runtime-image.mjs",
     "check:runtime-deps": "node tooling/scripts/check-runtime-provided-deps.mjs",
     "check:runtime-image:boots": "node tooling/scripts/check-runtime-image-boots.mjs",

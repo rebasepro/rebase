@@ -266,6 +266,25 @@ node -e "
 "
 ok "Bumped the Helm chart to $NEW_VERSION"
 
+# Same failure, one surface over. Docs, the marketing site and the Terraform
+# module name the runtime tag as a literal — `FROM rebasepro/server:0.14.1` —
+# because prose has no variable to interpolate. Nothing used to move them, so
+# the self-hosting guide told readers to deploy 0.14.1 for three minors, and the
+# five machine-translated locales were a release behind that. `verify:docs`
+# fails on a stale pin now; this is what keeps the release from being the thing
+# that breaks it.
+node tooling/scripts/docs-verify/check-version-pins.mjs --write \
+  || err "Could not rewrite version pins."
+ok "Rewrote documented version pins to $NEW_VERSION"
+
+# The website's `llms.txt`, `llms-full.txt` and `sitemap.md` are committed copies
+# of the docs, and the docs just changed twice — the stamped changelog above and
+# the pins above that. `check:generated` diffs those copies against a fresh
+# render on every PR, so regenerating here is what keeps the release commit from
+# failing its own gate. Before the commit at the end, so it lands in it.
+pnpm -C website run generate-all >/dev/null || err "Could not regenerate the website mirrors."
+ok "Regenerated the website mirrors"
+
 # ── Build & Test ────────────────────────────────────────────
 step "Building all packages"
 pnpm run build

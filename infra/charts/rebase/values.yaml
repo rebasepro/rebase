@@ -119,7 +119,7 @@ api:
   #
   #   image:
   #     repository: ""   # inherited from the release-wide image when empty
-  #     tag: "0.15.0"    # pinning just the tag is the common case
+  #     tag: "0.17.3"    # pinning just the tag is the common case
   #   bundleUrl: ""      # bundle.mode=url only: a bundle of this unit's own
   image: {}
   bundleUrl: ""

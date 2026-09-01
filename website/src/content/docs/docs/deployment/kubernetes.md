@@ -11,7 +11,7 @@ setup. Same idea, same image, same bundle: **the runtime is the image, your
 project is the bundle, and upgrading Rebase is a tag change.**
 
 It is published as an OCI artifact beside the runtime image, and the two carry
-the same version — the chart that deploys runtime `0.15.0` *is* chart `0.15.0`,
+the same version — the chart that deploys runtime `0.17.3` *is* chart `0.17.3`,
 so there is one number to track. Without `--version` you get the newest; pin it
 for a real deployment, the same way you would pin `image.tag`:
 

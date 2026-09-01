@@ -34,10 +34,49 @@ barrels are handled):
 - member access on a receiver with a known SDK type (`channel.x`) exists on
   that type, counting **public** members only.
 
+Stage 1 also carries the checks that are textual rather than type-driven —
+deploy build contexts, **version pins** (below), marketing snippets, documented
+shell commands, MCP manifests, and type names claimed in prose.
+
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
 against workspace *source*. English only, because the other five locales are
 generated from it by `website/scripts/translate_docs.mjs`; stage 1 is the net
 for locale-only drift.
+
+## Version pins
+
+Every shipped artifact that names the runtime version reads it from a variable
+— the compose template says `rebasepro/server:${REBASE_VERSION}`, the chart
+falls back to `.Chart.appVersion`, `main.tf` interpolates `var.runtime_version`
+— and `check:runtime-image` holds the chart to `@rebasepro/server`. Prose and
+mock terminals have no variable to read, so the versions an author typed by hand
+are the only ones that rot, and they rot silently. The self-hosting guide sat on
+`rebasepro/server:0.14.1` for three minors, in three places, telling every
+reader to deploy a runtime three releases old — and the five machine-translated
+locales were a release behind *that*, still on `0.13.0`. Every gate was green.
+
+`check-version-pins.mjs` holds a literal version on a Rebase-owned anchor to
+`@rebasepro/server`'s: an image tag, an `@rebasepro/x@1.2.3` pin, a chart
+`--version`, a bundle manifest's `builtAgainst`, an `image.tag`, the `rls-check`
+banner. Those name a version *to use*, and no reading of them makes a past
+release correct.
+
+Bare versions are checked only where a reader would copy them — inside a fence,
+or on a non-comment line of a code file. Two things are deliberately left alone:
+
+- **Prose and comments**, because that is where the honest history lives.
+  "`rebase doctor --policies` catches this, from 0.10.0 on" is a frozen fact
+  about a past release, not a pin, and flagging it would mean an allowlist that
+  grows every release.
+- **Thresholds.** The chart validator's `semverCompare "<=0.16.0"` names where
+  URL bundle fetching started existing; bumping it with the release would turn a
+  working guard into a no-op. A line carrying a comparison or a directional word
+  ("after", "above", "before") is exempt.
+
+The bare rule matches `0.x.y` only, so the reader's *own* versions in the same
+examples (`tag: "1.4.0"`, `acme/api:1.4.0`) stay theirs. Anchored patterns keep
+working after 1.0; revisit the bare rule then. A line that must show an old
+release carries `version-pin: ignore`.
 
 ## What is globbed
 

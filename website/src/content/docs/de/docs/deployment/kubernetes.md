@@ -8,7 +8,7 @@ description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kuberne
 
 Das offizielle Chart ist das Kubernetes-Pendant zum Docker-Compose-Self-Hosting-Setup. Dieselbe Idee, dasselbe Image, dasselbe Bundle: **Die Runtime ist das Image, Ihr Projekt ist das Bundle und ein Upgrade von Rebase ist eine Änderung des Tags.**
 
-Es wird als OCI-Artefakt neben dem Runtime-Image veröffentlicht, und beide tragen dieselbe Version – das Chart, das die Runtime `0.15.0` bereitstellt, *ist* das Chart `0.15.0`, sodass es nur eine Versionsnummer zu verfolgen gilt. Ohne `--version` erhalten Sie die neueste Version; fixieren Sie sie für ein echtes Deployment, genau wie Sie `image.tag` fixieren würden:
+Es wird als OCI-Artefakt neben dem Runtime-Image veröffentlicht, und beide tragen dieselbe Version – das Chart, das die Runtime `0.17.3` bereitstellt, *ist* das Chart `0.17.3`, sodass es nur eine Versionsnummer zu verfolgen gilt. Ohne `--version` erhalten Sie die neueste Version; fixieren Sie sie für ein echtes Deployment, genau wie Sie `image.tag` fixieren würden:
 
 ```bash
 helm install rebase oci://registry-1.docker.io/rebasepro/rebase \

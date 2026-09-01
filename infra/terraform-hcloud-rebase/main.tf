@@ -13,9 +13,10 @@ locals {
   # the server is imported — so `terraform apply` succeeds, reports a healthy
   # plan, and leaves a container restart-looping behind Caddy serving 502s.
   #
-  # `latest` is not a pass. On Docker Hub it and `0.16.0` are the same digest
-  # today, so the default value of `runtime_version` is precisely the broken
-  # case; an unparseable tag is treated as unable, which is the safe direction.
+  # `latest` is not a pass, and it is the default value of `runtime_version`.
+  # Whatever it resolves to on Docker Hub on any given day is unknowable from
+  # here, and it moves between one apply and the next — so an unparseable tag is
+  # treated as unable, which is the safe direction.
   runtime_parts = try([for p in split(".", split("-", var.runtime_version)[0]) : tonumber(p)], [])
   # The whole comparison sits inside `try(..., false)`, and that is load-bearing
   # rather than defensive style. Terraform does NOT short-circuit `&&`: guarding
@@ -443,8 +444,9 @@ resource "hcloud_server" "this" {
         `No bundle found at /bundle.` — so this apply would succeed and leave a
         container restart-looping behind a proxy serving 502s.
 
-        `latest` is the same digest as `0.16.0` on Docker Hub today, so the
-        default is the broken case rather than a way around it.
+        `latest` is not a way around it, and it is the default: what a floating
+        tag resolves to cannot be checked from here, and it moves under a
+        deployment between one apply and the next.
 
         Pin `runtime_version` to a release above 0.16.0, or bake the bundle into
         an image and pass `image` instead.

@@ -8,7 +8,7 @@
 #   docker run -v ./dist-bundle:/bundle -e DATABASE_URL=... rebasepro/server
 #
 # Build from the repository root:
-#   docker build -f infra/docker/server.Dockerfile -t rebasepro/server:0.11.0 .
+#   docker build -f infra/docker/server.Dockerfile -t rebasepro/server:0.17.3 .
 
 # ── Stage 1: build the workspace packages ────────────────────────────────────
 FROM node:22-slim AS build
