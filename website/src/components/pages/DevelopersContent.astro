@@ -30,7 +30,7 @@ const loop = [
     {
         cmd: "rebase dev",
         title: "Run it, with no database to install",
-        desc: "Backend and panel together with hot reload. No DATABASE_URL? A managed Postgres starts with them — no install, no Docker, no compose file.",
+        desc: "Backend and panel together with hot reload. No DATABASE_URL? A managed Postgres starts with them — nothing to install, no Docker, no compose file to maintain.",
     },
 ];
 
@@ -121,9 +121,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </h1>
                     <p class="mb-8 text-lg leading-8 text-surface-300">
                         You write collections in TypeScript. Rebase keeps the database, the API, the types and —
-                        if you opted in — the admin panel in agreement with that one file. Clone the repo,
-                        run <code class="font-mono text-surface-200">rebase dev</code>, and it is already up: no
-                        Postgres to install, no Docker, no compose file to maintain.
+                        if you opted in — the panel in agreement with that one file.
+                        Run <code class="font-mono text-surface-200">pnpm dlx @rebasepro/cli init</code>,
+                        then <code class="font-mono text-surface-200">rebase dev</code>, and it is already up.
                     </p>
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                         <a href="/docs/getting-started/quickstart"
@@ -137,9 +137,9 @@ import ClosingCta from "../ClosingCta.astro";
                                 <path d="m12 5 7 7-7 7"/>
                             </svg>
                         </a>
-                        <a href="https://github.com/rebasepro/rebase" target="_blank" rel="noopener noreferrer"
+                        <a href="/docs"
                            class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                            Read the source
+                            Read the docs
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">

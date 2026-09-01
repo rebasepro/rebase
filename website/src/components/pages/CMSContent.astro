@@ -161,16 +161,6 @@ import ClosingCta from "../ClosingCta.astro";
                         ))}
                     </div>
                     <div class="mt-8 flex flex-col items-start gap-3">
-                        <a href={translatePath("/cms")}
-                           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            The editing experience
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <path d="M5 12h14"/>
-                                <path d="m12 5 7 7-7 7"/>
-                            </svg>
-                        </a>
                         <a href={translatePath("/studio")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                             Studio, for whoever writes the schema
@@ -232,198 +222,13 @@ import ClosingCta from "../ClosingCta.astro";
 
 
 
-    <!-- Editor Features Strip -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Every block you need.</h2>
-          <p class="mt-4 text-surface-400 text-lg">The editor supports a comprehensive set of content blocks — from simple text to complex embeds. All stored as structured data in your database.</p>
-        </div>
-        <div class="mx-auto max-w-md mb-10" inert aria-hidden="true">
-          <EditorMiniDemo client:visible />
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {/* A twelve-card grid listing block types stood here. SITE-STORY §5: a
+        live demo, not a card grid — and the editor above IS the demo, so the
+        grid was restating what the reader had just used. */}
 
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-violet-500/10 flex items-center justify-center mb-5 ring-1 ring-violet-500/20">
-              
-<svg
-  class="lucide lucide-type"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M12 4v16" />
-  <path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2" />
-  <path d="M9 20h6" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Rich Text & Headings</h3>
-            <p class="text-sm text-surface-400">Bold, italic, strikethrough, inline code, and 3 heading levels. Markdown shortcuts auto-convert as you type.</p>
-          </div>
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-5 ring-1 ring-cyan-500/20">
-              
-<svg
-  class="lucide lucide-code"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="m16 18 6-6-6-6" />
-  <path d="m8 6-6 6 6 6" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Code Blocks</h3>
-            <p class="text-sm text-surface-400">Fenced code blocks with syntax highlighting for 100+ languages. Perfect for technical documentation and developer content.</p>
-          </div>
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-5 ring-1 ring-amber-500/20">
-              
-<svg
-  class="lucide lucide-image"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-  <circle cx="9" cy="9" r="2" />
-  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Image Uploads</h3>
-            <p class="text-sm text-surface-400">Drag-and-drop or paste images directly into the editor. Files are stored via your configured storage provider.</p>
-          </div>
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-5 ring-1 ring-emerald-500/20">
-              
-<svg
-  class="lucide lucide-square-check-big"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344" />
-  <path d="m9 11 3 3L22 4" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Task Lists</h3>
-            <p class="text-sm text-surface-400">Interactive checkboxes for TODO lists and checklists. Track progress right inside your content.</p>
-          </div>
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-rose-500/10 flex items-center justify-center mb-5 ring-1 ring-rose-500/20">
-              
-<svg
-  class="lucide lucide-table"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M12 3v18" />
-  <rect width="18" height="18" x="3" y="3" rx="2" />
-  <path d="M3 9h18" />
-  <path d="M3 15h18" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Tables</h3>
-            <p class="text-sm text-surface-400">Inline editable tables with row and column controls. Add structured data directly inside rich text content.</p>
-          </div>
-
-          <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-violet-500/30 transition-all duration-300 flex flex-col">
-            <div class="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-5 ring-1 ring-blue-500/20">
-              
-<svg
-  class="lucide lucide-grip-vertical"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="9" cy="12" r="1" />
-  <circle cx="9" cy="5" r="1" />
-  <circle cx="9" cy="19" r="1" />
-  <circle cx="15" cy="12" r="1" />
-  <circle cx="15" cy="5" r="1" />
-  <circle cx="15" cy="19" r="1" />
-</svg>
-
-            </div>
-            <h3 class="text-base font-semibold text-white mb-2">Drag & Drop</h3>
-            <p class="text-sm text-surface-400">Reorder any block by dragging. Move paragraphs, images, and code blocks to restructure your content visually.</p>
-          </div>
-
-        </div>
-      </div>
-    </section>
-
-
-    <!-- Slash Commands Animated Demo -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-              Slash Commands
-            </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Type <code class="text-primary">/</code> to do anything.</h2>
-            <p class="text-lg text-surface-400 mb-6">A contextual command palette appears when you type <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">/</code> — just like Notion. Insert images, code blocks, tables, dividers, and more without lifting your fingers from the keyboard.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Fuzzy search across all available block types</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Register custom slash commands from your code</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Keyboard navigable — never leave your flow</li>
-            </ul>
-          </div>
-          <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
-            <RichTextEditorDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
+    {/* RichTextEditorDemo was mounted twice on this page. The framed one
+        above is the mount; this second copy came in with the folded-in
+        /editing content. */}
 
     <!-- Markdown with live preview -->
  <section class="py-16 sm:py-24">
@@ -455,10 +260,10 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
-              Kanban Board
+              Kanban
             </div>
             <h2 class="text-3xl sm:text-4xl text-white mb-4">Drag cards, update your database.</h2>
-            <p class="text-lg text-surface-400 mb-6">Every collection with an enum or status field automatically gets a Kanban view. Drag cards between columns to update records — no code, no config. Backed by real Postgres writes.</p>
+            <p class="text-lg text-surface-400 mb-6">A collection with a string property that has an <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">enum</code> gets the Kanban view without asking for it. The <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">enabledViews</code> line in the sample above narrows the switcher rather than turning the board on. Dragging a card writes to Postgres, under the same policies as every other write.</p>
             <ul class="space-y-3 text-surface-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Auto-generated from any enum or status property</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Drag-and-drop with optimistic database updates</li>
@@ -482,7 +287,7 @@ import ClosingCta from "../ClosingCta.astro";
               Spreadsheet View
             </div>
             <h2 class="text-3xl sm:text-4xl text-white mb-4">Edit like a spreadsheet. Save like a database.</h2>
-            <p class="text-lg text-surface-400 mb-6">Click any cell and start typing. Changes are persisted directly to Postgres. Sort, filter, bulk-select, and export — all from a familiar grid interface that non-technical users love.</p>
+            <p class="text-lg text-surface-400 mb-6">Click any cell and start typing; the change is written to Postgres through the same API your app uses. Sort, filter, bulk-select and export, in a grid that behaves the way a spreadsheet does.</p>
             <ul class="space-y-3 text-surface-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Click-to-edit cells with type-aware inputs</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Multi-row selection and bulk actions</li>
@@ -498,37 +303,16 @@ import ClosingCta from "../ClosingCta.astro";
     </section>
 
 
-    <!-- Extensibility: Custom Fields -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
-              Extensible
-            </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">20+ fields. Or build your own.</h2>
-            <p class="text-lg text-surface-400 mb-6">Text, numbers, dates, enums, arrays, maps, references, file uploads, rich text, JSON, and more — all pre-built. Need a color picker, a rating widget, or a map selector? Build it in React and plug it in.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> 20+ built-in field types with custom rendering</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Custom field widgets via standard React components</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Conditional field logic and validation rules</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Preview panels for real-time content previews</li>
-            </ul>
-          </div>
-          <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[450px]">
-            <CustomFieldsDemo client:only="react" />
-          </div>
-        </div>
-      </div>
-    </section>
-
+    {/* CustomFieldsDemo was mounted twice. The mount that survives is in
+        "It is a React app. Treat it like one." below, where the code sample
+        beside it says what the demo is showing. */}
 
     <!-- Full-Width Feature Strip: Data Formats -->
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
           <h2 class="text-3xl sm:text-4xl text-white">One editor. Every content type.</h2>
-          <p class="mt-4 text-surface-400 text-lg">From blog posts to product descriptions to internal docs — Rebase adapts to how your team works.</p>
+          <p class="mt-4 text-surface-400 text-lg">A blog entry, a product description and an internal doc are the same block editor writing to three different columns.</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
 
@@ -560,7 +344,7 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base font-semibold text-white">Content Teams</h3>
+                <h3 class="text-base font-semibold text-white">Content teams</h3>
               </div>
               <p class="text-sm text-surface-400 leading-relaxed">Write blog posts with the rich text editor. Drag blocks, insert media, and preview — no developer needed.</p>
             </div>

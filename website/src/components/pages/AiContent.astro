@@ -103,7 +103,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                 <span class="font-medium">{toolCount} MCP tools · scoped keys · enforced by Postgres</span>
             </div>
             <h1 class="mb-6 text-display-2 text-white">
-                The backend an agent<br class="hidden sm:inline"/> can't screw up.
+                A key permission<br class="hidden sm:inline"/> is not a policy.
             </h1>
             <p class="mb-4 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-48">
                 Give an agent real tools over your data — read, write, migrate, deploy — through an MCP server it
@@ -235,7 +235,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                         grants that role nothing at all unless one of your policies names it.
                     </p>
                     <p class="text-base leading-relaxed text-surface-400">
-                        Keys are SHA-256 hashed at rest, rate-limited per key, expiring, and revocable.
+                        The key itself is shown once. What the server keeps is a SHA-256 hash, so a dump of the
+                        keys table does not hand anyone a working key — and a key that leaks is revoked by
+                        deleting the row, not by rotating a shared secret. Each one carries its own rate limit
+                        and its own expiry.
                     </p>
                     <a href={translatePath("/security")}
                        class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">

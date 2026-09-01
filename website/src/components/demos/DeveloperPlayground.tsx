@@ -35,7 +35,7 @@ export function DeveloperPlayground() {
         {
             id: "sdk",
             title: "Type-Safe SDK",
-            description: "Interact with your database using an isomorphic client. Benefit from deep relational queries, zero N+1 issues, and perfect autocomplete.",
+            description: "One isomorphic client for data, auth, storage and realtime. Relations are fetched with `include`, and the types come from your collections rather than from a hand-written file.",
             badge: "Universal Client",
             icon: (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

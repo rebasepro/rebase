@@ -31,13 +31,16 @@ import ClosingCta from "../ClosingCta.astro";
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <h1 class="mb-6 text-display-2 text-white">
-          Ship your back-office in a sprint.<br/>Extend it forever.
+          The backend first.<br/>The back office when you need it.
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Get your startup's admin panel from database to production in <b>minutes</b>, not months. Stop wasting time on boilerplate CRUD and start building your core product.
+          Point Rebase at the Postgres you already run and you have REST, a typed SDK, auth, storage and
+          realtime the same afternoon — with the access rules enforced by the database rather than by
+          middleware nobody has time to review yet. Add the panel the day someone who is not an engineer
+          needs to touch the data. <b>Minutes, not months</b>, and no second data model either way.
         </p>
-        <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-          Get Started
+        <a href="/demo" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+          Try the demo
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
@@ -65,8 +68,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Your MVP Needs a Back-Office, Not a Backlog</h2>
-          <p class="mt-6 text-lg leading-8 text-surface-400">Building an internal admin panel is a distraction. Rebase connects directly to your PostgreSQL database and gives you a production-ready UI in minutes, letting your engineers focus on what matters.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">The layer you were going to build twice</h2>
+          <p class="mt-6 text-lg leading-8 text-surface-400">Every product needs the same plumbing before it needs anything interesting: CRUD endpoints, a client, sessions, uploads, permissions. Rebase reads your existing Postgres and generates it — API first, and the back office off the same definition when a human needs one.</p>
         </div>
 
         <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
@@ -82,23 +85,23 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Built for Startup Velocity</h2>
+          <h2 class="text-3xl sm:text-4xl text-white">What arrives on day one</h2>
         </div>
         <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={zapIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Instant Setup from Data</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Point Rebase at your existing PostgreSQL database and let it automatically infer your schemas. No tedious config, just immediate results.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">Your schema is the input</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">Point Rebase at an existing Postgres and it reads your tables, columns, foreign keys, enums and constraints. Nothing is copied and nothing is migrated.</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={cloudIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Self-Host in Minutes</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Clone our template or use the CLI to spin up your internal tools on your own infrastructure instantly. No vendor lock-in.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">It runs where you already deploy</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">A published container and a connection string: Docker, Fly, Railway, Hetzner or your own metal. Or Rebase Cloud, which is in private beta and runs the same image.</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={spreadsheetIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Empower Your Team</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">The intuitive spreadsheet UI and Notion-style editor mean non-technical users can manage data safely and efficiently from day one.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">The panel is a client, not a back door</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">Support and ops edit rows through the same API and the same row-level security your app runs under. Whatever they can see, your policies said so.</p>
           </div>
         </div>
       </div>
@@ -108,13 +111,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center">
-                <h2 class="text-3xl sm:text-4xl text-white mb-6">Start Fast, Scale with Full
-                    Control.</h2>
-                <p class="text-lg text-surface-400 mb-8">Start fast with an auto-generated UI, then customize it precisely to your needs. Add custom React components, white-label the UI, and take full ownership of your back-office.</p>
-                <a href="/docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
-                    Build with Rebase
-                </a>
+                <h2 class="text-3xl sm:text-4xl text-white mb-6">Generated first, yours afterwards</h2>
+                <p class="text-lg text-surface-400 mb-8">The generated views are the starting point, not the ceiling. Drop your own React in wherever the default field is not enough, rebrand the whole thing from configuration, and keep the code — it is MIT, and it is in your repository.</p>
             </div>
             <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 mt-12">
                 <SpreadsheetDemo client:load />
@@ -122,12 +120,12 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
     </section>
 
-    <!-- Startup-Friendly Features Section -->
+    <!-- What comes in the box -->
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
-                <h2 class="text-3xl sm:text-4xl text-white">Startup-Friendly Features</h2>
-                <p class="mt-6 text-lg leading-8 text-surface-400">Everything you need, nothing you don't.</p>
+                <h2 class="text-3xl sm:text-4xl text-white">What comes in the box</h2>
+                <p class="mt-6 text-lg leading-8 text-surface-400">All of it MIT, all of it on a database you own.</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -283,10 +281,10 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-start">
                 <div>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-6">More Than Just a CMS</h2>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-6">It is a backend, and a CMS is one thing you can render from it</h2>
                     <p class="text-xl text-surface-400 mb-8">
-                        Extend Rebase to build the custom internal tools your startup needs.
-                        Sensible defaults meet powerful customization.
+                        The same collection definition that serves your app also renders the screens your
+                        team works in — and your own React goes wherever the generated one stops.
                     </p>
                 </div>
                 <ul class="text-left text-lg space-y-4">
@@ -361,10 +359,10 @@ import ClosingCta from "../ClosingCta.astro";
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-center">
           <div class="lg:order-last self-start">
-            <h2 class="text-3xl sm:text-4xl text-white mb-6">Built for Pivots</h2>
-            <p class="text-lg text-surface-400 mb-8">Startups evolve. Your tools should too. Rebase makes adapting your data models easy. Change schemas, add content types, or restructure without rebuilding. The headless architecture decouples backend and frontend for maximum flexibility.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-6">Built for the pivot</h2>
+            <p class="text-lg text-surface-400 mb-8">Change a collection and the schema, the REST routes, the OpenAPI document, the typed SDK, the policies and the panel all move with it. There is no second data model to remember to update, which is the part that usually rots.</p>
             <a href="/product" class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
-              Explore Features
+              See both layers
             </a>
           </div>
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">

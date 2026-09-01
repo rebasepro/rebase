@@ -119,9 +119,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="max-w-3xl">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20 font-medium">
                             <svg class="lucide lucide-shield-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                            Database-Level Enforcement
+                            Enforced by the database
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white">Row-Level Security</h2>
+                        <h2 class="text-3xl sm:text-4xl text-white">Row-level security, written where the collection is</h2>
                         <p class="mt-4 text-base text-surface-400 max-w-2xl">
                             Define who can read, create, update, and delete each row — enforced directly by PostgreSQL.
                             Policies are written as code in your schema, version-controlled, and applied via migrations. No middleware, no ORM hacks.
@@ -192,6 +192,18 @@ import ClosingCta from "../ClosingCta.astro";
                                         for you to remember.</p>
                                 </li>
                                 <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">One database, no second copy</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">Rebase talks to your Postgres
+                                        directly and never ingests your rows into a store of its own. There is one place
+                                        the policies have to hold, and it is the place the data lives.</p>
+                                </li>
+                                <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">You can read the whole thing</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">The server is MIT-licensed end to
+                                        end. Audit the code, inspect the SQL it emits, and read the policies back out of
+                                        your own database with <code class="font-mono text-surface-300">rls-check</code>.</p>
+                                </li>
+                                <li class="px-7 py-5">
                                     <p class="text-sm font-semibold text-white mb-1">Drift is detectable</p>
                                     <p class="text-sm text-surface-400 leading-relaxed">The policy editor compares what is
                                         in your code with what is in the database and flags anything that has moved —
@@ -211,9 +223,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <div>
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20 font-medium">
                             <svg class="lucide lucide-users" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
-                            Roles & Permissions
+                            Roles and permissions
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white mb-4">Role-Based Access Control</h2>
+                        <h2 class="text-3xl sm:text-4xl text-white mb-4">Roles your policies can read</h2>
                         <p class="text-lg text-surface-300 mb-8">
                             Define roles in your schema — admin, editor, viewer, or any custom role you need. Each role gets granular permissions per collection.
                         </p>
@@ -253,51 +265,11 @@ import ClosingCta from "../ClosingCta.astro";
             <NeatBackground variant="a" client:visible/>
         </div>
 
-        <!-- Core Pillars Section -->
- <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="mx-auto max-w-3xl text-center mb-16">
-                    <h2 class="text-3xl sm:text-4xl text-white">Security Principles</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">
-                        Three pillars that define how Rebase handles your data.
-                    </p>
-                </div>
-                <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                    <!-- Pillar 1: Data Ownership -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
-                                <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">One Database, No Copies</h3>
-                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud it is a dedicated Postgres cluster we run for you and nobody else.</p>
-                    </div>
-                    <!-- Pillar 2: Enforced at Database Level -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
-                                <svg class="lucide lucide-shield-check text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">Database-Level Enforcement</h3>
-                        <p class="text-surface-400">Row-Level Security policies, role-based access control, and JWT authentication — defined in code, enforced by PostgreSQL.</p>
-                    </div>
-                    <!-- Pillar 3: Open Source -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10">
-                                <svg class="lucide lucide-eye text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">Fully Auditable</h3>
-                        <p class="text-surface-400">The Rebase server is open-source under the MIT license. Audit the code, inspect every query, verify every permission check. No black boxes.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
+        {/* The three "Security Principles" cards stood here. Two of them are
+            now rows in the fail-closed list above — which is where the page
+            actually argues — and the third restated it in Title Case. */}
 
-        <!-- Neat gradient divider -->
+    <!-- Neat gradient divider -->
         <div class="neat-divider relative pointer-events-none overflow-hidden" style="z-index: -1; --divider-h: 600px;">
             <NeatBackground variant="b" client:visible/>
         </div>
@@ -309,9 +281,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <div>
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
                             <svg class="lucide lucide-database" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
-                            Data Sovereignty · Self-hosted
+                            Data sovereignty · self-hosted
                         </div>
-                        <h2 class="text-3xl sm:text-4xl text-white mb-4">Your Data, Your Infrastructure</h2>
+                        <h2 class="text-3xl sm:text-4xl text-white mb-4">Your data, your infrastructure</h2>
                         <p class="text-lg text-surface-300 mb-8">
                             This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
                             control your data, the open-source Rebase server connects directly to <b>your own</b>{" "}
@@ -322,21 +294,21 @@ import ClosingCta from "../ClosingCta.astro";
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h4 class="font-semibold text-white">No Data Migration Required</h4>
+                                    <h4 class="font-semibold text-white">No data migration required</h4>
                                     <p class="text-surface-400">Rebase introspects and adapts to your existing schema.</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h4 class="font-semibold text-white">Zero Vendor Lock-in</h4>
+                                    <h4 class="font-semibold text-white">Zero vendor lock-in</h4>
                                     <p class="text-surface-400">Stop using Rebase anytime — your data stays exactly where it is.</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h4 class="font-semibold text-white">Direct Infrastructure Access</h4>
+                                    <h4 class="font-semibold text-white">Direct infrastructure access</h4>
                                     <p class="text-surface-400">Full control over your PostgreSQL database, backups, and infrastructure.</p>
                                 </div>
                             </div>
@@ -357,7 +329,7 @@ import ClosingCta from "../ClosingCta.astro";
                         <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                         Self-Hosted
                     </div>
-                    <h2 class="text-3xl sm:text-4xl text-white">Deploy on Your Terms</h2>
+                    <h2 class="text-3xl sm:text-4xl text-white">Deploy on your terms</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
                         Run Rebase wherever you want. No proprietary cloud required.
                     </p>
@@ -367,21 +339,21 @@ import ClosingCta from "../ClosingCta.astro";
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 mb-6">
                             <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">Your Database</h3>
+                        <h3 class="text-xl font-semibold text-white mb-3">Your database</h3>
                         <p class="text-surface-400 text-sm">Run PostgreSQL anywhere — AWS RDS, Supabase, Neon, a VPS, or your own hardware. Rebase connects to it; you own it.</p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 mb-6">
                             <svg class="lucide lucide-container text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="14" rx="2" /><rect width="20" height="8" x="2" y="2" rx="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">Your Server</h3>
+                        <h3 class="text-xl font-semibold text-white mb-3">Your server</h3>
                         <p class="text-surface-400 text-sm">Deploy the Rebase backend as a Node.js process or Docker container. Railway, Render, Fly.io, or bare metal — your call.</p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-git-branch text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">Your Rules</h3>
+                        <h3 class="text-xl font-semibold text-white mb-3">Your rules</h3>
                         <p class="text-surface-400 text-sm">Auth, RLS policies, and API permissions live in your codebase. Review them in PRs, version them in Git, enforce them in CI.</p>
                     </div>
                 </div>
