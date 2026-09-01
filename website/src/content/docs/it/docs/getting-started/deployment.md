@@ -90,6 +90,38 @@ Prima di distribuire in produzione, assicurati di:
 | **HTTPS** | Termina TLS sul tuo reverse proxy (nginx, Cloudflare, bilanciatore di carico) |
 | **Registrazione** | Imposta `ALLOW_REGISTRATION=false` dopo aver creato il tuo account amministratore |
 
+| **Le letture pubbliche richiedono comunque un chiamante** | `access: "public"` amplia quali *righe* vede un chiamante, non chi può chiamare: una richiesta anonima a `/api/data/*` risponde 401 finché `AUTH_REQUIRE` è attivo. Imposta `AUTH_REQUIRE=false` per un sito pubblico che legge il proprio backend e lascia decidere soltanto a RLS. È una variabile d'ambiente, quindi un `.env` locale che la imposta **non** viaggia con la tua distribuzione. |
+
+## Moduli Nativi sul Runtime Gestito
+
+Il runtime gestito di Rebase Cloud esegue il tuo bundle dentro un'immagine
+condivisa. Non ha un compilatore né alcun modo di caricare un **modulo nativo**
+— cioè qualsiasi cosa che porti con sé un binario `.node` precompilato. Il più
+comune di gran lunga è `sharp`, che è anche la dipendenza ovvia per qualunque
+cosa serva immagini.
+
+`rebase cloud deploy` lo rifiuta prima del caricamento, non dopo:
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Tre vie d'uscita, nell'ordine in cui di solito sono quella giusta:
+
+1. **Sposta il lavoro nel build.** Ridimensiona e ricodifica le immagini nel tuo
+   passo di build e distribuisci i risultati. Nel percorso della richiesta non
+   gira più nulla di nativo.
+2. **Usa un servizio.** Una CDN per immagini o una API di trasformazione fa lo
+   stesso lavoro dietro una URL.
+3. **Esegui il tuo container.** Una distribuzione self-hosted (Docker,
+   Kubernetes, una qualsiasi delle
+   [guide per piattaforma](/docs/deployment/self-hosting)) è la tua immagine, e
+   quindi può portarsi dietro quello che vuole.
+
+Le funzioni che hanno bisogno solo di Node e non di un binario nativo non danno
+problemi — la distribuzione le segnala a parte (`1 of 3 function(s) depend on
+Node`) e le esegue.
+
 ## Servire il Frontend
 
 In produzione, il backend può servire il frontend come SPA statica:

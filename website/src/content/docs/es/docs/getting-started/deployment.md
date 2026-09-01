@@ -92,6 +92,38 @@ Antes de desplegar en producción, asegúrate de:
 | **HTTPS** | Termina TLS en tu proxy inverso (nginx, Cloudflare, balanceador de carga) |
 | **Registro** | Establece `ALLOW_REGISTRATION=false` después de crear tu cuenta de administrador |
 
+| **Las lecturas públicas siguen necesitando un llamante** | `access: "public"` amplía qué *filas* ve un llamante, no quién puede llamar: una petición anónima a `/api/data/*` responde 401 mientras `AUTH_REQUIRE` esté activo. Pon `AUTH_REQUIRE=false` para un sitio público que lee su propio backend y deja que RLS decida por sí solo. Es una variable de entorno, así que un `.env` local que la defina **no** viaja con tu despliegue. |
+
+## Módulos Nativos en el Runtime Gestionado
+
+El runtime gestionado de Rebase Cloud ejecuta tu bundle dentro de una imagen
+compartida. No tiene compilador ni forma de cargar un **módulo nativo** —
+cualquier cosa que incluya un binario `.node` precompilado. El más común con
+diferencia es `sharp`, que además es la dependencia obvia para cualquier cosa
+que sirva imágenes.
+
+`rebase cloud deploy` lo rechaza antes de subir nada, no después:
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Tres salidas, en el orden en que suelen ser la correcta:
+
+1. **Mueve el trabajo al build.** Redimensiona y recodifica las imágenes en tu
+   paso de build y despliega los resultados. Nada nativo se ejecuta en la ruta
+   de la petición.
+2. **Usa un servicio.** Un CDN de imágenes o una API de transformación hace el
+   mismo trabajo detrás de una URL.
+3. **Ejecuta tu propio contenedor.** Un despliegue autogestionado (Docker,
+   Kubernetes, cualquiera de las
+   [guías por plataforma](/docs/deployment/self-hosting)) es tu imagen, así que
+   puede llevar lo que quiera.
+
+Las funciones que solo necesitan Node y no un binario nativo no dan problema —
+el despliegue las reporta por separado (`1 of 3 function(s) depend on Node`) y
+las ejecuta.
+
 ## Sirviendo el Frontend
 
 En producción, el backend puede servir el frontend como una SPA estática:

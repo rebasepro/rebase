@@ -123,11 +123,24 @@ export interface BlockedState {
 /** Deployment states that mean the platform is still doing something. */
 const IN_FLIGHT = new Set(["deploying", "building", "pending", "queued"]);
 
+/**
+ * Did this deploy get past its build and die booting?
+ *
+ * Matched on the control plane's own sentence, which is text this project emits
+ * (`awaitRolloutOrRollback`) rather than anything a customer's build can produce
+ * — so it is a signal about our state machine, not a guess about a log. Being
+ * wrong points a reader at the other log, which is recoverable; not answering at
+ * all pointed everyone at the empty one.
+ */
+function bootFailed(logs: string | null | undefined): boolean {
+    return typeof logs === "string" && /did not become ready within/i.test(logs);
+}
+
 export function resolveBlockedState(input: {
     projectStatus?: string | null;
     /** The project's database row, or undefined when none is attached. */
     database?: { connectionStatus?: string | null } | undefined;
-    lastDeploy?: { status?: string | null } | undefined;
+    lastDeploy?: { status?: string | null; logs?: string | null } | undefined;
 }): BlockedState {
     // First, because it is the state that never resolves itself. A project
     // with no database cannot deploy, and no amount of waiting attaches one.
@@ -152,10 +165,21 @@ nextAction: "rebase cloud deploy" };
     }
 
     // A failed deploy is not a wait either: the project stays exactly as it is
-    // until someone reads the log and deploys again.
+    // until someone reads the log and deploys again. WHICH log is the whole
+    // question, and `rebase cloud logs` is the build one.
+    //
+    // A readiness timeout means the build succeeded — the image was pushed and
+    // the pod was started — and the process then died on boot. So the build log
+    // this named is clean, and reads as a deploy that failed for no reason. The
+    // reason is in the container's log, behind a flag nothing mentioned. Four
+    // failures on one project were diagnosed that way, at five minutes each.
     if (input.lastDeploy.status && input.lastDeploy.status !== "success") {
-        return { blockedOn: "last_deploy_failed",
-nextAction: "rebase cloud logs" };
+        return {
+            blockedOn: "last_deploy_failed",
+            nextAction: bootFailed(input.lastDeploy.logs)
+                ? "rebase cloud logs --runtime"
+                : "rebase cloud logs"
+        };
     }
 
     // A database that has been attached but never reached — the deploy
@@ -248,7 +272,7 @@ path: projectId })
         const blocked = resolveBlockedState({
             projectStatus: project.status,
             database: db as { connectionStatus?: string | null } | undefined,
-            lastDeploy: deploy as { status?: string | null } | undefined
+            lastDeploy: deploy as { status?: string | null; logs?: string | null } | undefined
         });
 
         emit(
@@ -699,7 +723,14 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
 
         const res = await client.functions.invoke<{
             data: { bucketName: string; region: string; endpoint: string; accessKeyId: string };
-        }>(`storage-provision/${encodeURIComponent(projectId)}`, undefined, { method: "POST" });
+            // The project id is a SUB-PATH, not part of the function name.
+            // `invoke` runs `encodeURIComponent` over the name — correct, since
+            // a function name is one path segment — so folding the id into it
+            // sent `POST /api/functions/storage-provision%2F<id>`, which matches
+            // no route. The control plane answered a bare 404 and
+            // `rebase cloud storage create` read as an unimplemented feature for
+            // six weeks. `invoke` now refuses a name containing `/` outright.
+        }>("storage-provision", undefined, { method: "POST", path: projectId });
 
         const info = (res as unknown as { data?: typeof res.data }).data ?? res.data;
 

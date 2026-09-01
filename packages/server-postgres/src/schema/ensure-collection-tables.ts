@@ -63,6 +63,8 @@ import {
     type SkippedVectorIndex
 } from "./vector-index";
 import { buildCollectionIndexPlan, collectionIndexStatement } from "./collection-index";
+import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
+import { columnTypeDriftMessage, typesAgree, type ColumnTypeDrift } from "./column-type-drift";
 import {
     AUTH_USERS_COLUMNS,
     authUsersColumnDefinition,
@@ -127,6 +129,15 @@ export interface ExistingSchema {
     enumValues?: Map<string, string[]>;
     /** `schema.table.column` for every column the database marks NOT NULL. */
     notNullColumns?: Set<string>;
+    /**
+     * `schema.table.column` → the column's `udt_name` as the database reports
+     * it (`int4`, `jsonb`, `_numeric` for an array of numeric).
+     *
+     * The only evidence that a column's declared type and its real type have
+     * parted company. Absent is read as "unknown", which reports no drift —
+     * see `column-type-drift.ts` for why silence is the right unknown here.
+     */
+    columnTypes?: Map<string, string>;
     /**
      * Tables known to hold at least one row.
      *
@@ -234,6 +245,16 @@ export interface EnsurePlan {
      * to read.
      */
     withheldConstraints: WithheldConstraint[];
+    /**
+     * Columns whose type in the database is in a different family from the one
+     * the collection declares.
+     *
+     * Reported and never acted on — see `column-type-drift.ts`. This is the one
+     * divergence that presents as a *working* deploy: the statement was never
+     * planned, so nothing failed, and the first evidence is a write rejected
+     * hours later by whichever end validates first.
+     */
+    columnTypeDrift: ColumnTypeDrift[];
 }
 
 /** A constraint the configuration asks for that the planner is not applying. */
@@ -354,6 +375,7 @@ export function planCollectionSchemaEnsure(
 ): EnsurePlan {
     const constraintPolicy: ConstraintPolicy = options.constraints ?? "additive";
     const withheldConstraints: WithheldConstraint[] = [];
+    const columnTypeDrift: ColumnTypeDrift[] = [];
     // Boot receives every collection the bundle declares, including the ones
     // served by another engine entirely. Creating a Postgres table for a
     // Firestore collection is not a harmless extra: the app keeps reading
@@ -597,7 +619,8 @@ export function planCollectionSchemaEnsure(
             // and the agreement test can compare them directly instead of
             // checking that a column merely exists, which is how BIGSERIAL-vs-
             // INTEGER and every missing constraint went unnoticed.
-            let definition = getSqlColumnType(propName, p, collection, collections);
+            const declaredType = getSqlColumnType(propName, p, collection, collections);
+            let definition = declaredType;
             if (fresh && p.validation?.unique) definition += " UNIQUE";
             // Not gated on `fresh`: a default binds future writes only, so it is
             // safe on a live table, and a column added without it would take the
@@ -609,6 +632,22 @@ export function planCollectionSchemaEnsure(
             const required = p.validation?.required === true;
             const columnKey = `${key}.${column}`;
             const columnExists = existing.tables.get(key)?.has(column) === true;
+
+            // The column is there and holds a different kind of value than the
+            // collection says it does. Reported, never altered: an unattended
+            // `ALTER COLUMN … TYPE` over customer data is not a thing to do
+            // quietly, and the *quiet* is what this fixes. A deploy that changed
+            // a `columnType` used to report success while the column stayed as
+            // it was, and the divergence surfaced later as every write failing.
+            const actualType = existing.columnTypes?.get(columnKey);
+            if (columnExists && actualType && !typesAgree(declaredType, actualType)) {
+                columnTypeDrift.push({
+                    table: key,
+                    column,
+                    declared: declaredType,
+                    actual: actualType
+                });
+            }
 
             // A NOT NULL is safe exactly when it cannot fail against rows that
             // are already there, and there are three ways to know that:
@@ -825,12 +864,24 @@ export function planCollectionSchemaEnsure(
     //    the duration of the build, which on a live table is an outage. Each
     //    statement here is issued on its own, outside any transaction, which is
     //    the condition CONCURRENTLY requires.
+    //
+    //    ...and only on a live table. `concurrentIndexing` withholds it for a
+    //    table this same plan is creating: there are no rows to build from and
+    //    no writer to block, so the lock CONCURRENTLY avoids is a lock nobody
+    //    would have taken. Worth withholding rather than merely harmless,
+    //    because CONCURRENTLY is the one index form Postgres refuses inside a
+    //    transaction block — so on a first boot it buys nothing and adds the
+    //    single failure mode this whole statement family has.
+    const concurrentIndexing = (schema: string, table: string): boolean =>
+        !created.has(`${schema}.${table}`);
     for (const spec of searchSpecs) {
         for (const statement of searchIndexStatements(spec)) {
             actions.push({
                 kind: "create-index",
                 target: `${spec.schema}.${spec.table}`,
-                sql: statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+                sql: concurrentIndexing(spec.schema, spec.table)
+                    ? statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+                    : statement
             });
         }
     }
@@ -848,7 +899,9 @@ export function planCollectionSchemaEnsure(
             actions.push({
                 kind: "create-index",
                 target: `${spec.schema}.${spec.table}`,
-                sql: vectorIndexStatement(spec).replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+                sql: concurrentIndexing(spec.schema, spec.table)
+                    ? vectorIndexStatement(spec).replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+                    : vectorIndexStatement(spec)
             });
         }
         vectorIndexSkipped.push(...plan.skipped);
@@ -870,7 +923,10 @@ export function planCollectionSchemaEnsure(
         actions.push({
             kind: "create-index",
             target: `${spec.schema}.${spec.table}`,
-            sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true })
+            sql: collectionIndexStatement(spec, {
+                concurrently: concurrentIndexing(spec.schema, spec.table),
+                ifNotExists: true
+            })
         });
     }
 
@@ -881,7 +937,8 @@ export function planCollectionSchemaEnsure(
         searchDrift,
         searchAdopted,
         vectorIndexSkipped,
-        withheldConstraints
+        withheldConstraints,
+        columnTypeDrift
     };
 }
 
@@ -899,13 +956,20 @@ export async function readExistingSchema(
         .join(", ");
 
     const notNullColumns = new Set<string>();
+    // `udt_name` rather than `data_type`: `data_type` collapses every array to
+    // the literal string `ARRAY` and every extension type to `USER-DEFINED`,
+    // which cannot be compared with anything. `udt_name` names the actual type
+    // — `int4`, `jsonb`, `_numeric`, `vector` — which is what the drift check
+    // needs.
+    const columnTypes = new Map<string, string>();
     const { rows: columns } = await client.query<{
         table_schema: string;
         table_name: string;
         column_name: string;
         is_nullable: string;
+        udt_name: string | null;
     }>(
-        `SELECT table_schema, table_name, column_name, is_nullable
+        `SELECT table_schema, table_name, column_name, is_nullable, udt_name
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -914,6 +978,7 @@ export async function readExistingSchema(
         if (!tables.has(key)) tables.set(key, new Set());
         tables.get(key)!.add(row.column_name);
         if (row.is_nullable === "NO") notNullColumns.add(`${key}.${row.column_name}`);
+        if (row.udt_name) columnTypes.set(`${key}.${row.column_name}`, row.udt_name);
     }
 
     // Which tables hold rows. This is the only fact that decides whether a
@@ -1019,7 +1084,9 @@ export async function readExistingSchema(
         columnComments.set(`${row.schema}.${row.table}.${row.column}`, row.comment);
     }
 
-    return { tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables };
+    return {
+        tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes
+    };
 }
 
 /**
@@ -1171,6 +1238,17 @@ export async function ensureCollectionTables(
         log?.(message);
     }
 
+    // Said once per drifted column, every boot, and this is the one report here
+    // that describes a system which currently *looks* healthy. Everything else
+    // in this function explains a statement that did not run; this explains a
+    // statement that was never planned, on a deploy that reported success, and
+    // whose first symptom is a write rejected long afterwards.
+    for (const drift of plan.columnTypeDrift) {
+        const message = columnTypeDriftMessage(drift);
+        logger.warn(`[schema] ${message}`);
+        log?.(message);
+    }
+
     if (plan.actions.length === 0) {
         log?.("Schema is up to date; nothing to create.");
         return { ...plan, failures };
@@ -1184,7 +1262,7 @@ export async function ensureCollectionTables(
                 log?.(`${action.kind}: ${action.target} (already created by a peer)`);
             }
         } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
+            const message = describeDriverError(err);
             // A foreign key is the only action that can fail on the customer's
             // data rather than on the schema. The column it polices is already
             // there, so the collection serves either way — record it and carry
@@ -1195,7 +1273,23 @@ export async function ensureCollectionTables(
             // owning the table, which an adopted table may not grant). Losing
             // the stamp costs drift detection on the next boot; it must not cost
             // the deployment.
-            if (action.kind === "add-constraint" || action.kind === "comment-column") {
+            //
+            // An index that is not UNIQUE is an optimization, and losing an
+            // optimization must not cost the deployment. This was the difference
+            // between a slow collection and a tenant that would not boot: on a
+            // managed runtime the throw killed the process, the pod never went
+            // ready, and the deploy reported a 300-second readiness timeout — for
+            // an ANN index whose absence changes latency and nothing else.
+            //
+            // UNIQUE is excluded because it is not an optimization. It is the
+            // collection declaring that two rows cannot share a value, and
+            // serving without it is serving a promise the database is not
+            // keeping.
+            const survivable =
+                action.kind === "add-constraint" ||
+                action.kind === "comment-column" ||
+                (action.kind === "create-index" && !/CREATE\s+UNIQUE\s+INDEX/i.test(action.sql));
+            if (survivable) {
                 failures.push({ kind: action.kind, target: action.target, error: message });
                 continue;
             }
@@ -1205,6 +1299,62 @@ export async function ensureCollectionTables(
         }
     }
     return { ...plan, failures };
+}
+
+/**
+ * What actually went wrong, rather than what the ORM said about it.
+ *
+ * Drizzle wraps every driver error, and its `message` is literally
+ * ``Failed query: ${sql}\nparams: ${params}`` — the statement we already know,
+ * and not one word of Postgres's answer. Reporting `err.message` therefore
+ * produced a failure that named the statement twice and the *reason* zero
+ * times, so four unrelated boot failures — a missing extension, a wrong
+ * privilege, a bad index method, a constraint the rows violate — all read
+ * identically to whoever had to fix them.
+ *
+ * Two consequences, both observed in the field before this existed:
+ *
+ *  1. On a managed deployment the reason never reaches anybody. Boot dies, the
+ *     pod never goes ready, and the deploy reports a readiness timeout — so the
+ *     one line that says why is the one line that was thrown away here.
+ *  2. {@link vectorExtensionHint} matches on the error text. Against the
+ *     wrapper it matched nothing, so the hint written specifically to explain a
+ *     missing pgvector never fired on the path that raises it.
+ *
+ * `detail` and `hint` come along because they are the fields Postgres uses to
+ * say which object it meant and what to do about it — `CREATE EXTENSION` names
+ * the missing library there, and a rejected constraint names the row. This
+ * writes into the tenant's own boot log, about the tenant's own database.
+ */
+export function describeDriverError(err: unknown): string {
+    const pg = extractPgError(err);
+    if (pg) {
+        const parts = [pg.code ? `${pg.message} [${pg.code}]` : pg.message];
+        if (pg.detail) parts.push(`  detail: ${pg.detail}`);
+        if (pg.hint) parts.push(`  hint: ${pg.hint}`);
+        return parts.join("\n");
+    }
+    // No SQLSTATE anywhere in the chain: not a database answer at all — a
+    // socket that closed, a bug in this file. The deepest cause still beats the
+    // wrapper, and the wrapper still beats nothing.
+    const cause = extractCauseMessage(err);
+    if (cause) return cause;
+    return err instanceof Error ? err.message : String(err);
+}
+
+/** ` CONCURRENTLY ` as it appears in a rendered `CREATE [UNIQUE] INDEX`. */
+const CONCURRENTLY_RE = /\sCONCURRENTLY\s/i;
+
+/**
+ * `25001 active_sql_transaction` — "cannot run inside a transaction block".
+ *
+ * Only ever raised here by `CREATE INDEX CONCURRENTLY`, and only when the
+ * connection we were handed is inside a transaction. Deliberately narrow: it
+ * decides to retry a *different* statement, so it must not fire on anything it
+ * has not been reasoned about.
+ */
+function isTransactionBlockRefusal(err: unknown): boolean {
+    return extractPgError(err)?.code === "25001";
 }
 
 /** Attempts per action, including the first. Matches the server's bootstraps. */
@@ -1235,11 +1385,28 @@ async function applyAction(
     client: Queryable,
     action: EnsureAction
 ): Promise<boolean> {
+    let sqlText = action.sql;
     for (let attempt = 1; ; attempt++) {
         try {
-            await client.query(action.sql);
+            await client.query(sqlText);
             return true;
         } catch (err) {
+            // `CREATE INDEX CONCURRENTLY` is the one statement here Postgres
+            // refuses inside a transaction block (25001), and whether we are in
+            // one is not ours to know: the client is whatever handle the caller
+            // bootstrapped with, and an application that builds its own adapter
+            // can hand us a connection already inside a transaction. The plain
+            // form is always correct and never refused — it takes a write lock
+            // for the build, which is the cost of getting the index at all.
+            if (isTransactionBlockRefusal(err) && CONCURRENTLY_RE.test(sqlText)) {
+                sqlText = sqlText.replace(CONCURRENTLY_RE, " ");
+                logger.warn(
+                    `[schema] ${action.kind} ${action.target}: this connection is inside a transaction, ` +
+                    "so the index is being built with a write lock rather than concurrently. Writes to " +
+                    "this table block until it finishes."
+                );
+                continue;
+            }
             // Already there. Not "retry" — the end state this statement wanted
             // is the end state the database is in, so carry on to the next
             // action rather than spending three more attempts proving it.

@@ -31,6 +31,16 @@ import {
     type CloudClient
 } from "./context";
 
+/**
+ * Reserved names the control plane will release the value of.
+ *
+ * They carry no row, so the listing above cannot see them, and a CLI that
+ * required a row refused them before the server got a say. Kept as a list here
+ * only so the refusal is skipped — the server is what decides, and it holds the
+ * same allowlist for the reasons set out there.
+ */
+const PLATFORM_REVEALABLE_KEYS = ["REBASE_SERVICE_KEY"];
+
 interface EnvVarView {
     id: string;
     key: string;
@@ -338,8 +348,17 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
         reportError(e, "Failed to reveal environment variable");
     }
     const found = list!.vars.find((v) => v.key === key);
-    if (!found) fail(`No variable named ${key} in project ${projectRef}.`, undefined, "not_found");
-    if (found!.secret) {
+    // A platform-managed name has no row in the listing, because the platform
+    // computes it and injects it at deploy time rather than storing it. Refusing
+    // here on the strength of an absent row is how `env reveal
+    // REBASE_SERVICE_KEY` came to answer "No variable named REBASE_SERVICE_KEY"
+    // for a value that very much exists — and that the tenant API recommends by
+    // name as the way out of "API keys cannot manage API keys". The server
+    // decides which of these it will release; this only stops pre-empting it.
+    if (!found && !PLATFORM_REVEALABLE_KEYS.includes(key!)) {
+        fail(`No variable named ${key} in project ${projectRef}.`, undefined, "not_found");
+    }
+    if (found?.secret) {
         fail(
             `${key} is a secret (write-only) variable; its value cannot be revealed.`,
             "Replace it with `rebase cloud env set KEY=VALUE` if you need to change it.",

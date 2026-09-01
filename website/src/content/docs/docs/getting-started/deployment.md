@@ -99,6 +99,34 @@ Before deploying to production, ensure:
 | **Storage volumes** | Mount persistent volumes for file uploads. Or switch to S3 for production. |
 | **HTTPS** | Terminate TLS at your reverse proxy (nginx, Cloudflare, load balancer) |
 | **Registration** | Set `ALLOW_REGISTRATION=false` after creating your admin account |
+| **Public reads still need a caller** | `access: "public"` widens which *rows* a caller sees, not who may call: an anonymous request to `/api/data/*` answers 401 while `AUTH_REQUIRE` is on. Set `AUTH_REQUIRE=false` for a public site that reads its own backend, and let RLS alone decide. It is an environment variable, so a local `.env` that sets it does **not** travel with your deploy. |
+
+## Native Modules on the Managed Runtime
+
+Rebase Cloud's managed runtime runs your bundle inside a shared image. It has no
+compiler and no way to load a **native module** — anything shipping a prebuilt
+`.node` binary. The most common one by far is `sharp`, which is also the obvious
+dependency for anything serving images.
+
+`rebase cloud deploy` refuses this before the upload rather than after:
+
+```
+This bundle depends on native modules (sharp), which the managed runtime cannot run
+```
+
+Three ways through, in the order they are usually right:
+
+1. **Move the work to build time.** Resize and re-encode images in your build
+   step and deploy the results. Nothing native runs in the request path.
+2. **Use a service.** An image CDN or a transform API does the same work behind
+   a URL.
+3. **Run your own container.** A self-hosted deployment (Docker, Kubernetes, any
+   of the [platform guides](/docs/deployment/self-hosting)) is your image, so it
+   can carry whatever it likes.
+
+Functions that merely need Node rather than a native binary are fine — the
+deploy reports those separately (`1 of 3 function(s) depend on Node`) and runs
+them.
 
 ## Serving the Frontend
 

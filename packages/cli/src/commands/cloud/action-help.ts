@@ -214,6 +214,248 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         flags: [["--baseline", "Also check ingress-nginx, cert-manager and CloudNativePG"]],
         examples: ["rebase cloud clusters verify gke-europe-west1 --baseline"],
         notes: ["Exits non-zero when the verdict is `unusable`, so it works as a gate."]
+    },
+
+    /* ── The leaves that were undiscoverable ───────────────────────────
+     *
+     * Every entry below existed as a command with its own flag spec and no page
+     * of its own, so `--help` fell through to its group's index — a list of
+     * sibling actions and not one flag. `storage attach`'s six flags were read
+     * out of `dist/index.es.js` by somebody deploying a real project, and the
+     * only way to learn that `storage create` takes no flags at all was the
+     * same one. The completeness check in `action-help.test.ts` now requires a
+     * page for every command that names itself to `parseCloudArgs`.
+     */
+
+    "projects delete": {
+        command: "cloud projects delete",
+        usage: "cloud projects delete <slug|id> [--yes]",
+        summary:
+            "Delete a project: its deployments, its database and its subdomain. The subdomain is "
+            + "not reusable afterwards. Takes no options of its own — `--yes` is the global one.",
+        flags: [],
+        examples: ["rebase cloud projects delete shop --yes"],
+        notes: ["Irreversible. Without --yes it prompts, and off a terminal it refuses rather than assuming."]
+    },
+
+    "db backup": {
+        command: "cloud db backup",
+        usage: "cloud db backup <list|create|restore|status|download> [filename] [--yes]",
+        summary:
+            "Take, list, inspect, download and restore this project's database backups. "
+            + "`list` is the default when no action is given.",
+        flags: [["--yes", "Skip the confirmation on `restore`, which overwrites the live database"]],
+        examples: [
+            "rebase cloud db backup",
+            "rebase cloud db backup create",
+            "rebase cloud db backup status",
+            "rebase cloud db backup restore base-20260831 --yes",
+            "rebase cloud db backup download base-20260831"
+        ],
+        notes: [
+            "`restore` replaces the live database. Nothing about it is undoable from here.",
+            "A managed database on the shared pool is backed up with the pool, not per project."
+        ]
+    },
+
+    "db pitr": {
+        command: "cloud db pitr",
+        usage: "cloud db pitr <status|restore|cutover|discard> [--target <timestamp>] [--yes]",
+        summary:
+            "Point-in-time recovery. `status` reports the recoverable window; `restore` stages a "
+            + "recovered copy beside the live database; `cutover` repoints the app at that copy; "
+            + "`discard` throws it away. `status` is the default.",
+        flags: [
+            ["--target <timestamp>", "The instant to recover to, ISO-8601. Defaults to the latest recoverable point"],
+            ["--yes", "Skip the confirmation on `restore` and `cutover`"]
+        ],
+        examples: [
+            "rebase cloud db pitr",
+            "rebase cloud db pitr restore --target 2026-08-30T14:00:00Z",
+            "rebase cloud db pitr cutover --yes",
+            "rebase cloud db pitr discard"
+        ],
+        notes: [
+            "`restore` does not touch the live database — `cutover` is the step that does.",
+            "Recovery is only possible inside the window `status` reports. Check it first."
+        ]
+    },
+
+    "deployments list": {
+        command: "cloud deployments list",
+        usage: "cloud deployments [list] [--limit <n>] [--all]",
+        summary: "The project's deployment history, newest first, with the status and image of each.",
+        flags: [
+            ["--limit <n>", "How many to return. Bounded; a value over the maximum is refused, not clamped"],
+            ["--all", "Return the maximum instead of naming a limit"]
+        ],
+        examples: [
+            "rebase cloud deployments",
+            "rebase cloud deployments list --limit 5",
+            "rebase cloud deployments --all --json"
+        ]
+    },
+
+    "domains add": {
+        command: "cloud domains add",
+        usage: "cloud domains add <domain>",
+        summary:
+            "Register a custom domain on this project and print the DNS records to publish. "
+            + "Registering is not verifying — run `domains verify` once the records are live.",
+        flags: [],
+        examples: ["rebase cloud domains add app.example.com"],
+        notes: [
+            "At a zone apex use the A record this prints, not a CNAME: a CNAME is invalid at an apex.",
+            "Verification is a separate command because DNS propagation is not instant."
+        ]
+    },
+
+    "domains remove": {
+        command: "cloud domains remove",
+        usage: "cloud domains remove <domain>",
+        summary:
+            "Unregister a custom domain. The project keeps serving on its <slug>.rebase.website host. "
+            + "Aliases: `rm`, `delete`.",
+        flags: [],
+        examples: ["rebase cloud domains remove app.example.com"]
+    },
+
+    "env set": {
+        command: "cloud env set",
+        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force]",
+        summary:
+            "Set one environment variable on the project. Takes effect on the next deploy — "
+            + "a running instance does not pick it up.",
+        flags: [
+            ["--secret", "Store it encrypted and never return it in a listing"],
+            ["--force", "Overwrite a variable that is already set"]
+        ],
+        examples: [
+            "rebase cloud env set STRIPE_KEY=sk_live_… --secret",
+            "rebase cloud env set LOG_LEVEL debug",
+            "rebase cloud env set FEATURE_X= "
+        ],
+        notes: [
+            "A value starting with `-` must use the KEY=VALUE form; the KEY VALUE form refuses it.",
+            "Variables the platform sets for every project cannot be overridden — `env reveal` reads them."
+        ]
+    },
+
+    "env pull": {
+        command: "cloud env pull",
+        usage: "cloud env pull [--output <path>]",
+        summary:
+            "Write the project's variables to a local .env file. Secrets come through, so the file "
+            + "this produces is a credential.",
+        flags: [["--output, --out <path>", "Where to write. Default: .env"]],
+        examples: [
+            "rebase cloud env pull",
+            "rebase cloud env pull --output .env.production"
+        ],
+        notes: ["Add the file it writes to .gitignore before running it, not after."]
+    },
+
+    "storage create": {
+        command: "cloud storage create",
+        usage: "cloud storage create",
+        summary:
+            "Provision platform-managed storage: a bucket and its credentials, written onto the "
+            + "project and injected into the tenant at deploy time. Takes no options of its own — "
+            + "region and naming come from the platform.",
+        flags: [],
+        examples: ["rebase cloud storage create"],
+        notes: [
+            "Creates billable infrastructure, and requires org admin rather than membership.",
+            "The secret key is never displayed: it goes to the project record and to the tenant's environment.",
+            "Redeploy afterwards — a running instance has no credentials for a bucket created after it started."
+        ]
+    },
+
+    "storage attach": {
+        command: "cloud storage attach",
+        usage:
+            "cloud storage attach --bucket <name> --access-key-id <id> --secret-access-key <secret> "
+            + "[--endpoint <url>] [--region <region>] [--force-path-style]",
+        summary:
+            "Point the project at storage you already own — S3, R2, MinIO, any S3-compatible bucket. "
+            + "The alternative to `storage create`, for a bucket the platform does not manage.",
+        flags: [
+            ["--bucket <name>", "The bucket name. Required"],
+            ["--access-key-id <id>", "Required"],
+            ["--secret-access-key <secret>", "Required. Stored encrypted and never returned"],
+            ["--endpoint <url>", "For anything that is not AWS S3 — R2, MinIO, Backblaze"],
+            ["--region <region>", "Bucket region. Default: the provider's own default"],
+            ["--force-path-style", "Address as endpoint/bucket rather than bucket.endpoint. Needed by MinIO"]
+        ],
+        examples: [
+            "rebase cloud storage attach --bucket assets --access-key-id AKIA… --secret-access-key …",
+            "rebase cloud storage attach --bucket assets --access-key-id … --secret-access-key … \\\n"
+                + "    --endpoint https://<account>.r2.cloudflarestorage.com --region auto"
+        ],
+        notes: [
+            "All three of --bucket, --access-key-id and --secret-access-key, or none: a bucket with no "
+                + "credentials reads as configured and fails on the first upload.",
+            "Redeploy for the tenant to pick the credentials up."
+        ]
+    },
+
+    "webhooks create": {
+        command: "cloud webhooks create",
+        usage:
+            "cloud webhooks create --name <name> --table <table> --url <url> [--events <list>]",
+        summary: "Register an outbound webhook on a table's row changes.",
+        flags: [
+            ["--name <name>", "Required. What it is called in listings"],
+            ["--table <table>", "Required. The table whose changes fire it"],
+            ["--url <url>", "Required. Where the POST goes"],
+            ["--events <list>", "Comma-separated: insert, update, delete. Default: all three"]
+        ],
+        examples: [
+            "rebase cloud webhooks create --name notify --table orders --url https://example.com/hook",
+            "rebase cloud webhooks create --name audit --table users --url https://example.com/hook --events insert,delete"
+        ]
+    },
+
+    "webhooks delete": {
+        command: "cloud webhooks delete",
+        usage: "cloud webhooks delete <id>",
+        summary: "Remove one webhook by the id `webhooks list` prints.",
+        flags: [],
+        examples: ["rebase cloud webhooks delete 42"]
+    },
+
+    deployments: {
+        command: "cloud deployments",
+        usage: "cloud deployments [list] [options]",
+        summary: "The project's deployment history. `list` is the only action, and the default.",
+        flags: [],
+        examples: ["rebase cloud deployments", "rebase cloud deployments list --limit 5"]
+    },
+
+    webhooks: {
+        command: "cloud webhooks",
+        usage: "cloud webhooks <list|create|delete> [options]",
+        summary: "Outbound webhooks on a table's row changes.",
+        flags: [],
+        examples: [
+            "rebase cloud webhooks list",
+            "rebase cloud webhooks create --help",
+            "rebase cloud webhooks delete 42"
+        ]
+    },
+
+    billing: {
+        command: "cloud billing",
+        usage: "cloud billing [portal|usage]",
+        summary:
+            "The selected organization's billing. `usage` reports what is currently running and what "
+            + "it costs; `portal` opens the Stripe customer portal. Organization-scoped, not project-scoped.",
+        flags: [],
+        examples: [
+            "rebase cloud billing",
+            "rebase cloud billing usage --json",
+            "rebase cloud billing portal"
+        ]
     }
 };
 

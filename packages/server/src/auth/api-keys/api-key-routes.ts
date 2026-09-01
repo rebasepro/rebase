@@ -58,8 +58,16 @@ function validatePermissions(permissions: unknown): permissions is ApiKeyPermiss
  */
 const rejectApiKeyAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     if (c.get("apiKey")) {
+        // Names where the service key comes from, because "use the service key"
+        // sent readers looking for something they had no way to obtain: it is
+        // injected by the platform, so it is not in their config, and it is
+        // reserved, so `env set` refuses it. A recommendation that cannot be
+        // followed is worse than no recommendation — it reads as a broken
+        // account rather than a missing step.
         throw ApiError.forbidden(
-            "API keys cannot manage API keys. Authenticate as an admin user, or use the service key.",
+            "API keys cannot manage API keys. Authenticate as an admin user, or use the service key — " +
+            "REBASE_SERVICE_KEY in this server's environment, or `rebase cloud env reveal REBASE_SERVICE_KEY` " +
+            "on Rebase Cloud.",
             "API_KEY_SELF_MANAGEMENT_FORBIDDEN"
         );
     }
