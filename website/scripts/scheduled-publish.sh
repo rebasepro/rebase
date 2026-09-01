@@ -16,6 +16,12 @@
 # Dry run (build, no deploy):  DRY_RUN=1 website/scripts/scheduled-publish.sh
 # Logs:  ~/.rebase-publish/publish.log
 # Disable:  launchctl unload ~/Library/LaunchAgents/pro.rebase.website-publish.plist
+#
+# ON FAILURE it notifies three ways, because a job nobody watches that fails
+# quietly is the same as no job at all: a desktop notification, a marker file on
+# the Desktop, and the log. The marker exists because a notification can be
+# suppressed by macOS without saying so — `osascript` exits 0 either way — and a
+# channel whose failure is invisible is not a channel.
 
 set -euo pipefail
 
@@ -38,8 +44,49 @@ FIREBASE="/opt/homebrew/bin/firebase"
 mkdir -p "$PUBLISH_ROOT"
 exec >> "$LOG" 2>&1
 
+NOTIFIER="/opt/homebrew/bin/terminal-notifier"
+MARKER="$HOME/Desktop/REBASE-PUBLISH-FAILED.txt"
+NOTIFIED=0
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-fail() { log "FAILED: $*"; exit 1; }
+
+# Three channels, deliberately. terminal-notifier registers as its own app and
+# is the one most likely to actually appear; osascript is the fallback; the
+# Desktop marker is the one that cannot be silently dropped by notification
+# settings, and it is what you will actually see on a Tuesday.
+notify() {
+	local msg="$1"
+	if [ -x "$NOTIFIER" ]; then
+		"$NOTIFIER" -title "Rebase publish failed" -message "$msg" \
+			-sound Basso -open "file://$LOG" >/dev/null 2>&1 || true
+	fi
+	/usr/bin/osascript -e "display notification \"$msg\" with title \"Rebase publish failed\" sound name \"Basso\"" >/dev/null 2>&1 || true
+	{
+		echo "Rebase scheduled publish FAILED"
+		echo "$(date '+%Y-%m-%d %H:%M:%S')"
+		echo
+		echo "$msg"
+		echo
+		echo "Full log: $LOG"
+		echo "Re-run by hand: /Users/francesco/rebase/website/scripts/scheduled-publish.sh"
+		echo "This file is deleted automatically by the next successful run."
+	} > "$MARKER" 2>/dev/null || true
+	NOTIFIED=1
+}
+
+fail() { log "FAILED: $*"; notify "$*"; exit 1; }
+
+# Covers the failures that do not go through fail(): `set -e` aborts, a killed
+# build, a syntax error added later. Without this, exactly the unexpected
+# failures — the ones worth hearing about — would be the silent ones.
+on_exit() {
+	local code=$?
+	if [ "$code" -ne 0 ] && [ "$NOTIFIED" -eq 0 ]; then
+		log "FAILED: unexpected exit $code"
+		notify "Unexpected exit $code. See the log."
+	fi
+}
+trap on_exit EXIT
 
 log "──────── scheduled publish starting ────────"
 
@@ -81,10 +128,31 @@ cd "$WT/website"
 # What the build decided to publish. Recorded every run, because the failure
 # this job can have that looks most like success is building a site whose date
 # gate never opened.
-POSTS=$(ls dist/blog 2>/dev/null | command grep -v '^index.html$' | tr '\n' ' ')
+POSTS=$(ls dist/blog 2>/dev/null | grep -v '^index.html$' | tr '\n' ' ')
 log "posts live in this build: $POSTS"
 
+# The silent failure this job can have: the build succeeds, deploys, and reports
+# nothing wrong, while a post whose date has arrived was never rendered. Nothing
+# above would notice — a date gate that never opens looks exactly like a date
+# gate with nothing due. So compare what SHOULD be live against what is.
+TODAY=$(date '+%Y-%m-%d')
+MISSING=""
+for md in src/content/blog/*.md; do
+	[ -e "$md" ] || continue
+	head -n 12 "$md" | grep -q '^draft: true' && continue
+	pub=$(head -n 12 "$md" | sed -n 's/^pubDate: *//p' | head -1 | cut -c1-10)
+	[ -n "$pub" ] || continue
+	# String compare is safe on zero-padded YYYY-MM-DD.
+	[ "$pub" \> "$TODAY" ] && continue
+	slug=$(basename "$md" .md)
+	[ -d "dist/blog/$slug" ] || MISSING="$MISSING $slug"
+done
+if [ -n "$MISSING" ]; then
+	fail "post(s) due but not built:$MISSING — the date gate did not open. Nothing was deployed."
+fi
+
 if [ "${DRY_RUN:-0}" = "1" ]; then
+	rm -f "$MARKER" 2>/dev/null || true
 	log "DRY_RUN=1 — built but not deployed"
 	log "──────── done (dry run) ────────"
 	exit 0
@@ -94,4 +162,5 @@ log "deploying to firebase hosting (rebase-578f2)"
 "$FIREBASE" deploy --only hosting --project rebase-578f2 --non-interactive \
 	|| fail "firebase deploy failed — check that 'firebase login:list' still shows an account"
 
+rm -f "$MARKER" 2>/dev/null || true
 log "──────── deployed $COMMIT ────────"
