@@ -23,7 +23,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Security &amp; RLS</span>
                 </p>
                 <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                    <span class="text-sm font-medium">Open source · self-hosted · Rebase Cloud (not launched)</span>
+                    <span class="text-sm font-medium">Open source · self-hosted · Rebase Cloud (private beta)</span>
                 </div>
                 <h1 class="mb-6 text-display-2 text-white">
                     Secured by the database.<br/>Not by middleware.
@@ -31,7 +31,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                     Authorization in Rebase is Postgres row-level security, enforced by the database itself —
                     and it fails closed: a table without RLS is <b>refused</b>, never leaked. That holds today when
-                    you self-host the open-source stack, and it will hold on Rebase Cloud when it launches.
+                    you self-host the open-source stack, and it holds on Rebase Cloud, which runs the same server.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-start">
                     <a href="#rls"
@@ -273,7 +273,7 @@ import ClosingCta from "../ClosingCta.astro";
                             </div>
                         </div>
                         <h3 class="text-2xl font-semibold text-white mb-4">One Database, No Copies</h3>
-                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud, once it launches, it will be a dedicated Postgres cluster we run for you and nobody else.</p>
+                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud it is a dedicated Postgres cluster we run for you and nobody else.</p>
                     </div>
                     <!-- Pillar 2: Enforced at Database Level -->
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
@@ -317,9 +317,8 @@ import ClosingCta from "../ClosingCta.astro";
                         <p class="text-lg text-surface-300 mb-8">
                             This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
                             control your data, the open-source Rebase server connects directly to <b>your own</b>{" "}
-                            PostgreSQL database, on infrastructure you operate. It is the only model available
-                            today. If you are waiting on <b>Rebase Cloud</b> instead, skip to the Rebase Cloud
-                            section below.
+                            PostgreSQL database, on infrastructure you operate. If you would rather we ran it, skip to
+                            the <b>Rebase Cloud</b> section below.
                         </p>
                         <div class="space-y-6">
                             <div class="flex items-start gap-3">
@@ -403,9 +402,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <h2 class="text-3xl sm:text-4xl text-white">Two deployment models, two security stories</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
                         Read this first — almost every claim on this page depends on which one you run.
-                        Self-hosted, we never see your data. Rebase Cloud, where we would host it for you,
-                        <b class="text-white">has not launched yet</b> — everything below describes how it is being
-                        built, so you can evaluate it before you join the waitlist.
+                        Self-hosted, we never see your data. On Rebase Cloud we host it for you, which makes us
+                        a processor. Rebase Cloud is <b class="text-white">in private beta</b>: it runs real
+                        tenants today and opens in batches, and everything below describes what runs now.
                     </p>
                 </div>
                 <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -427,14 +426,13 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
                             <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
-                            Rebase Cloud · Not launched yet
+                            Rebase Cloud · Private beta
                         </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">We would run it for you</h3>
+                        <h3 class="text-2xl font-semibold text-white mb-4">We run it for you</h3>
                         <p class="text-surface-400 mb-4">
-                            Rebase Cloud is our managed hosting, still in development and not yet open to customers.
-                            When it launches we will host your database and your application on our infrastructure,
-                            which means <b class="text-white">Rebase would act as a data processor</b> on your behalf,
-                            with Google Cloud as a sub-processor. Nothing on this page pretends otherwise.
+                            Rebase Cloud is our managed hosting. We host your database and your application on our
+                            infrastructure, which means <b class="text-white">Rebase acts as a data processor</b> on
+                            your behalf, with Google Cloud as a sub-processor. Nothing on this page pretends otherwise.
                         </p>
                         <p class="text-surface-500 text-sm">
                             The Rebase&nbsp;Cloud section below describes exactly where that data lives and how it is isolated.
@@ -450,14 +448,14 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium mx-auto">
                         <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
-                        Rebase Cloud · Not launched yet
+                        Rebase Cloud · Private beta
                     </div>
                     <h2 class="text-3xl sm:text-4xl text-white">When we host it, here is what that means</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
-                        Rebase Cloud is not open to customers yet — we are running our own products on it while we
-                        build it. This is the architecture it is being built on: your database and your application
-                        on infrastructure we operate, with Rebase as a data processor for the data you put in it and
-                        you as the controller. Join the waitlist in the footer for early access.
+                        This is the architecture running today: your database and your application on infrastructure
+                        we operate, with Rebase as a data processor for the data you put in it and you as the
+                        controller. Rebase Cloud is in private beta — it runs real tenants today and opens in
+                        batches. <a href="/pricing" class="text-primary hover:underline">Request access</a>.
                     </p>
                 </div>
 
@@ -568,11 +566,11 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
-                            Rebase Cloud · Not launched yet
+                            Rebase Cloud · Private beta
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">You would be the controller, we your processor</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">You are the controller, we are your processor</h3>
                         <ul class="space-y-3 text-surface-400 text-sm">
-                            <li><b class="text-white">Rebase would process on your instructions.</b> You stay the controller for your end users' data.</li>
+                            <li><b class="text-white">Rebase processes on your instructions.</b> You stay the controller for your end users' data.</li>
                             <li><b class="text-white">Google Cloud is a sub-processor</b>, providing the compute, storage and network in europe-west1 (Belgium).</li>
                             <li><b class="text-white">Data stays in the EU by default</b>, because that is the only region Rebase Cloud provisions into.</li>
                         </ul>

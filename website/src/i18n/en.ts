@@ -129,8 +129,7 @@ export const en = {
   "showcase.case0.feat2.desc":
     "Sign-in, sessions and every read go through the Rebase client. The editor ships as a static frontend with no server of its own.",
   "showcase.case0.feat3.title": "Dogfooding Rebase Cloud",
-  "showcase.case0.feat3.desc":
-    "Rebase Cloud — our managed hosting — has not launched yet. We run our own products on it first. Join the waitlist below for early access.",
+  "showcase.case0.feat3.desc": "Rebase Cloud — our managed hosting — is in private beta, and this editor is one of the products we run on it. Our own work deploys there first.",
   "showcase.case.badge": "Marketplace & Job Portal",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
@@ -237,9 +236,9 @@ export const en = {
   "cta.title": "Point it at your database.",
   "cta.subtitle":
     'Three ways to run it.<br class="hidden sm:block"/>Pick the one that matches how you already deploy.',
-  // The close is a fork, not a fourth copy of the hero's install command. Cloud
-  // has not launched — its lane offers the waitlist and says so, rather than a
-  // deploy button that would go nowhere.
+  // The close is a fork, not a fourth copy of the hero's install command. The
+  // cloud lane offers access rather than a deploy button, because Rebase Cloud
+  // opens in batches — see `cloud.status`, the one key every surface quotes.
   "cta.lane.local.title": "Run it locally",
   "cta.lane.local.desc":
     "One command against the Postgres you already have. No account, no container to pull, nothing to sign up for.",
@@ -248,11 +247,11 @@ export const en = {
   "cta.lane.selfhost.desc":
     "Docker, Fly, Railway, Hetzner or bare metal. Your data stays in your infrastructure and never reaches us.",
   "cta.lane.selfhost.link": "Deployment guides",
+  "cloud.status": "Rebase Cloud is in private beta. It runs real tenants today and opens in batches. Request access.",
   "cta.lane.cloud.title": "Rebase Cloud",
-  "cta.lane.cloud.desc":
-    "Managed hosting. We run our own products on it first — early access goes out from the waitlist, oldest first.",
-  "cta.lane.cloud.badge": "Not launched yet",
-  "cta.lane.cloud.link": "Join the waitlist",
+  "cta.lane.cloud.desc": "Managed hosting on our infrastructure. It runs real tenants today and opens in batches.",
+  "cta.lane.cloud.badge": "Private beta",
+  "cta.lane.cloud.link": "Request access",
   "cta.button.demo": "Try the Demo",
   "cta.button.docs": "Read the Docs",
   "cta.button.github": "GitHub",
@@ -365,12 +364,12 @@ export const en = {
   "roadmap.now.item8": "Backend crons and functions",
   "roadmap.now.item9": "Native S3 compatible storage",
   "roadmap.now.item10": "Offline & local-first sync — local database, queued writes, live queries",
+  "roadmap.now.item11": "Rebase Cloud (private beta)",
   "roadmap.next.title": "Next",
   "roadmap.next.badge": "In Progress",
   "roadmap.next.item1": "AI SQL generation in editor",
-  "roadmap.next.item2": "Hosted Rebase Cloud infrastructure",
-  "roadmap.next.item3": "Multiplayer cursors in Studio",
-  "roadmap.next.item4": "One-click vector embeddings",
+  "roadmap.next.item2": "Multiplayer cursors in Studio",
+  "roadmap.next.item3": "One-click vector embeddings",
   "roadmap.later.title": "Later",
   "roadmap.later.badge": "Planning",
   "roadmap.later.item1": "Conversational analytics & charts bot",
@@ -418,11 +417,10 @@ export const en = {
   "footer.cookies": "Cookie Policy",
   "footer.reportVulnerability": "Report a Vulnerability",
   "footer.waitlistTitle": "Rebase Cloud",
-  "footer.waitlistBlurb": "Hosted Rebase is on its way. Join the waitlist for early access.",
   "footer.waitlistPlaceholder": "you@company.com",
-  "footer.waitlistCta": "Join",
+  "footer.waitlistCta": "Request access",
   "footer.waitlistSending": "Signing you up…",
-  "footer.waitlistSuccess": "You're on the list. We'll be in touch.",
+  "footer.waitlistSuccess": "You're on the list. We'll be in touch as the next batch opens.",
   "footer.waitlistInvalid": "Please enter a valid email address.",
   "footer.waitlistError": "Something went wrong. Please try again.",
   "footer.tagline": "The open-source Postgres backend · Built in Europe",
@@ -610,8 +608,8 @@ export const en = {
   "agencies.features.f3.desc": "Define precise roles and access control for different users.",
   "agencies.features.f4.title": "Fast Deployment",
   "agencies.features.f4.desc": "Integrates smoothly with any host or self-host in minutes.",
-  "agencies.features.f5.title": "Cloud or Self-Hosted",
-  "agencies.features.f5.desc": "Choose the best hosting option based on client needs.",
+  "agencies.features.f5.title": "Cloud or self-hosted",
+  "agencies.features.f5.desc": "Self-host on the client's own infrastructure, or run it on Rebase Cloud — in private beta today.",
   "agencies.features.f6.title": "Developer Friendly",
   "agencies.features.f6.desc": "React + TypeScript for a familiar and efficient DX.",
   "agencies.metrics.m1.value": "5×",
@@ -718,7 +716,7 @@ export const en = {
   "rebase-vs-retool.meta.title": "Rebase vs Retool — Open-Source Dashboard Comparison",
   "rebase-vs-retool.meta.description": "Ditch per-seat licensing. Build custom internal tooling using standard React components with Git-based version control.",
   "rebase-vs-firebase.meta.title": "Rebase vs Firebase — Relational Data & Ownership Comparison",
-  "rebase-vs-firebase.meta.description": "Move away from NoSQL document storage and vendor lock-in to self-hosted relational PostgreSQL.",
+  "rebase-vs-firebase.meta.description": "Move away from NoSQL document storage and vendor lock-in to relational PostgreSQL.",
   "rebase-vs-hasura.meta.title": "Rebase vs Hasura — API and Admin Panel Comparison",
   "rebase-vs-hasura.meta.description": "Compare instant API generation with built-in admin dashboards and TypeScript SDK pipelines.",
   "rebase-vs-django.meta.title": "Rebase vs Django Admin — Modern React Stack Comparison",

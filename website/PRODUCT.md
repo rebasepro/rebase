@@ -115,10 +115,11 @@ Inherits the root record. Site-specific:
    command — never a card grid standing in for evidence.
 4. **Defensible against an expert.** Any comparison must survive a reader who
    uses the competitor daily.
-5. **Sell only what exists.** Self-hosting is what ships. A pre-launch Cloud lane
-   and waitlist are allowed and do ship on `/`, provided they are explicitly
-   labelled as not launched and offer no command, price, or deploy action. Only
-   `/europe` bans the mention outright.
+5. **Sell only what exists.** Self-hosting is what ships without conditions.
+   Rebase Cloud is a **live private beta** — real tenants, priced per resource,
+   opened in batches — and every surface that mentions it quotes the one
+   `cloud.status` key so the status cannot drift page to page. There are no plan
+   tiers and no "Pro" plan. Access is requested, not bought from the page.
 
 ## Accessibility & Inclusion
 
