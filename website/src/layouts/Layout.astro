@@ -13,7 +13,7 @@ import TypeDevPanel from "../components/TypeDevPanel.astro";
 
 import ManifestoBanner from "../components/ManifestoBanner.astro";
 
-import { getLangFromUrl } from "../i18n/ui";
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
 
 export interface BreadcrumbItem {
     name: string;
@@ -32,15 +32,76 @@ export interface Props {
 
 
 
+// The defaults ARE the home page's meta pair. They used to be their own
+// sentence — "The Postgres Admin Panel Built for Developers" — which sold the
+// retired panel-first brand to every page that forgets to pass a title, and to
+// the Organization schema below. One source, `index.meta.*`.
+const defaultT = useTranslations(getLangFromUrl(Astro.url));
+
 const {
-    title = "Rebase - The Postgres Admin Panel Built for Developers",
-    description = "Build powerful back-office applications in minutes with Rebase. An open-source, React-based admin framework for PostgreSQL featuring an AI-powered UI, visual schema builder, and beautiful data management.",
+    title = defaultT("index.meta.title"),
+    description = defaultT("index.meta.description"),
     breadcrumbs,
     lang = getLangFromUrl(Astro.url),
     showBanner = false,
     ogImage = "https://rebase.pro/img/teaser.png",
     ogType = "website"
 } = Astro.props;
+
+// The English pair, for the JSON-LD graph: structured data describes the
+// organisation, not the localised page the crawler happens to be on.
+const schemaTitle = "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & CMS";
+const schemaDescription = "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, deploy anywhere.";
+
+const siteSchema = {
+    "@context": "https://schema.org",
+    "@graph": [
+        {
+            "@type": "WebSite",
+            name: "Rebase",
+            url: "https://rebase.pro",
+            description: schemaDescription,
+            publisher: { "@id": "https://rebase.pro/#organization" },
+        },
+        {
+            "@type": "Organization",
+            "@id": "https://rebase.pro/#organization",
+            name: "Rebase",
+            url: "https://rebase.pro",
+            logo: {
+                "@type": "ImageObject",
+                url: "https://rebase.pro/img/logo_small.png",
+                width: 512,
+                height: 512,
+            },
+            // Only profiles that are actually ours. `x.com/rebaseco` 404s and
+            // `@rebasepro` on X belongs to an unrelated account; the LinkedIn
+            // company page named here was a different company called Rebase.
+            sameAs: ["https://github.com/rebasepro/rebase"],
+        },
+        {
+            "@type": "SoftwareApplication",
+            name: "Rebase",
+            alternateName: schemaTitle,
+            applicationCategory: "DeveloperApplication",
+            operatingSystem: "Web",
+            description: schemaDescription,
+            url: "https://rebase.pro",
+            screenshot: "https://rebase.pro/img/teaser.png",
+            offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "USD",
+                availability: "https://schema.org/InStock",
+            },
+            applicationSubCategory: "Backend as a Service",
+            keywords:
+                "Postgres backend, Postgres REST API, row-level security, typed SDK, realtime, headless CMS, self-hosted",
+            license: "https://opensource.org/licenses/MIT",
+            publisher: { "@id": "https://rebase.pro/#organization" },
+        },
+    ],
+};
 
 const canonicalBase = "https://rebase.pro";
 const path = Astro.url.pathname;
@@ -159,7 +220,7 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     <link rel="canonical" href={canonical}>
     <meta name="description" content={description}>
     <meta name="keywords"
-          content="Postgres admin panel, React admin panel, internal tools builder, no-code backend, AI-powered admin, visual schema builder, data management, back-office application, database UI">
+          content="Postgres backend, open-source Firebase alternative, Postgres REST API, row-level security, typed SDK, Postgres realtime, headless CMS for Postgres, self-hosted backend">
     <meta name="robots" content="index, follow">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="sitemap" href="/sitemap-index.xml"/>
@@ -172,7 +233,6 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:site" content="@rebasepro">
     <meta name="twitter:title" content={title}>
     <meta name="twitter:description" content={description}>
     <meta name="twitter:image:type" content="image/png">
@@ -181,60 +241,7 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     <meta name="twitter:image" content="https://rebase.pro/img/twitter_teaser.png">
 
     <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
-        {
-            "@context": "https://schema.org",
-            "@graph": [
-                {
-                    "@type": "WebSite",
-                    "name": "Rebase",
-                    "url": "https://rebase.pro",
-                    "description": "Build powerful back-office applications in minutes with Rebase. A modern React admin framework for PostgreSQL.",
-                    "publisher": {
-                        "@id": "https://rebase.pro/#organization"
-                    }
-                },
-                {
-                    "@type": "Organization",
-                    "@id": "https://rebase.pro/#organization",
-                    "name": "Rebase",
-                    "url": "https://rebase.pro",
-                    "logo": {
-                        "@type": "ImageObject",
-                        "url": "https://rebase.pro/img/logo_small.png",
-                        "width": 512,
-                        "height": 512
-                    },
-                    "sameAs": [
-                        "https://x.com/rebaseco",
-                        "https://github.com/rebasepro/rebase",
-                        "https://www.linkedin.com/company/rebase"
-                    ]
-                },
-                {
-                    "@type": "SoftwareApplication",
-                    "name": "Rebase",
-                    "applicationCategory": "DeveloperApplication",
-                    "operatingSystem": "Web",
-                    "description": "Build powerful back-office applications in minutes with Rebase. An open-source, React-based admin framework for PostgreSQL featuring an AI-powered UI, visual schema builder, and beautiful data management.",
-                    "url": "https://rebase.pro",
-                    "screenshot": "https://rebase.pro/img/teaser.png",
-                    "offers": {
-                        "@type": "Offer",
-                        "price": "0",
-                        "priceCurrency": "USD",
-                        "availability": "https://schema.org/InStock"
-                    },
-                    "softwareVersion": "3.1",
-                    "applicationSubCategory": "Content Management System",
-                    "keywords": "PostgreSQL admin panel, React admin panel, internal tools builder, no-code backend, AI-powered admin",
-                    "publisher": {
-                        "@id": "https://rebase.pro/#organization"
-                    }
-                }
-            ]
-        }
-    </script>
+    <script type="application/ld+json" set:html={JSON.stringify(siteSchema)} />
 
     {breadcrumbSchema && (
         <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />

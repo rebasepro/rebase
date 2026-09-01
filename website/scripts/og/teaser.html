@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: "Instrument Sans Variable";
+    src: url("FONT_HEAD") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: "Inter Variable";
+    src: url("FONT_BODY") format("woff2");
+    font-weight: 100 900;
+    font-style: normal;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    /* SITE-STORY §6: ground is #08090A, not pure black. */
+    background: #08090A;
+    color: #FFFFFF;
+    font-family: "Inter Variable", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    overflow: hidden;
+  }
+  /* One soft lift, the RAISED value, bled from the top-left so the card is not
+     a flat rectangle. No gradient across the type. */
+  .lift {
+    position: absolute; inset: -30% -10% 40% -20%;
+    background: radial-gradient(60% 70% at 22% 18%, rgba(20, 22, 27, 1) 0%, rgba(8, 9, 10, 0) 72%);
+  }
+  .rule {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+    background: #0070F4;
+  }
+  .page {
+    position: relative;
+    height: 100%;
+    padding: 76px 84px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand img { width: 46px; height: 46px; display: block; }
+  .brand span {
+    font-family: "Instrument Sans Variable", system-ui, sans-serif;
+    font-size: 30px; font-weight: 600; letter-spacing: -0.02em;
+  }
+  h1 {
+    font-family: "Instrument Sans Variable", system-ui, sans-serif;
+    /* 600 for the display tier; 700 is banned. One colour — the white/blue
+       split line is retired. */
+    font-weight: 600;
+    font-size: 58px;
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    color: #FFFFFF;
+  }
+  p.sub {
+    margin-top: 30px;
+    font-size: 25px;
+    line-height: 1.44;
+    color: #B4B8BD;
+    max-width: 40ch;
+    font-weight: 400;
+  }
+  .foot {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 19px; color: #6E7378;
+  }
+  .foot .cmd {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 18px; color: #8A8F94;
+  }
+</style>
+</head>
+<body>
+  <div class="lift"></div>
+  <div class="page">
+    <div class="brand">
+      <img src="LOGO_SRC" alt="">
+      <span>Rebase</span>
+    </div>
+    <div>
+      <h1>The Postgres you already have.<br>The backend you always wanted.</h1>
+      <p class="sub">Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated.</p>
+    </div>
+    <div class="foot">
+      <span>rebase.pro</span>
+      <span class="cmd">pnpm dlx @rebasepro/cli init</span>
+    </div>
+  </div>
+  <div class="rule"></div>
+</body>
+</html>
