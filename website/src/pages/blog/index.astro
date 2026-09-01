@@ -1,11 +1,9 @@
 ---
-import { getCollection } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
+import { publishedPosts } from '../../utils/blog';
 
-const posts = (await getCollection('blog')).sort(
-	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
-);
+const posts = await publishedPosts();
 
 const breadcrumbs = [
 	{ name: "Home", url: "https://rebase.pro" },

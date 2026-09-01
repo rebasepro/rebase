@@ -14,6 +14,11 @@ const blog = defineCollection({
 			updatedDate: z.coerce.date().optional(),
 			heroImage: image().optional(),
 			authors: z.string().optional(),
+			// Parked, as opposed to scheduled. A future `pubDate` publishes itself
+			// once a build runs past that date; `draft` never publishes until a
+			// human removes it. Keeping them separate stops a post parked with a
+			// far-future date from surprising everyone when the date arrives.
+			draft: z.boolean().optional(),
 			slug: z.string().optional(),
 			image: z.string().optional(),
 		}),
