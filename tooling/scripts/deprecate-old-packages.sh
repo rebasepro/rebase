@@ -3,7 +3,7 @@
 # Deprecate every @rebasepro package on npm that this repo no longer publishes.
 #
 # The scope holds 43 packages; the repo publishes 21. The other 22 are still
-# installable and still serve code, and `@rebasepro/server-core@0.9.0` is a
+# installable and still serve code, and `@rebasepro/server-core@0.9.0` is a  # version-pin: ignore — a package that no longer exists, named as it shipped
 # perfectly working install of a package that is no longer built. Deprecating
 # puts a pointer to the replacement in front of anyone who installs one.
 #

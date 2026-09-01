@@ -11,7 +11,7 @@ con Docker Compose. Misma idea, misma imagen, mismo bundle: **el runtime es la
 imagen, tu proyecto es el bundle y actualizar Rebase es un cambio de tag.**
 
 Se publica como un artefacto OCI junto a la imagen del runtime, y ambos llevan
-la misma versión — el chart que despliega el runtime `0.15.0` *es* el chart `0.15.0`,
+la misma versión — el chart que despliega el runtime `0.17.3` *es* el chart `0.17.3`,
 por lo que solo hay un número que rastrear. Sin `--version` obtienes el más
 reciente; fíjalo para un despliegue real, de la misma forma en que fijarías `image.tag`:
 

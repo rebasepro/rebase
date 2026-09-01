@@ -229,7 +229,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.16.0"     # só esta unidade; as restantes ficam na tag do release
+    tag: "0.17.3"     # só esta unidade; as restantes ficam na tag do release
 ```
 
 Normalmente só vale a pena fixar a tag: o repositório é herdado, portanto é um

@@ -8,9 +8,9 @@
  *      Catches the class of bug where a confidently-written API is invented and
  *      then machine-translated into all six locales.
  *      Stage 1 also carries the checks that are not about fenced TypeScript at
- *      all: deploy build contexts, the marketing site's highlighted-HTML
- *      snippets, the shell commands in the agent skills and example READMEs,
- *      and the agent bundle's own MCP manifests.
+ *      all: deploy build contexts, version pins, the marketing site's
+ *      highlighted-HTML snippets, the shell commands in the agent skills and
+ *      example READMEs, and the agent bundle's own MCP manifests.
  *   2. `snippets` — English + agent skills only (the other locales are
  *      generated from English by website/scripts/translate_docs.mjs). Compiles
  *      each fenced ts/js block against workspace source.
@@ -41,6 +41,7 @@ import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.m
 import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
+import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -69,6 +70,7 @@ if (asJson) {
         out.docCommands = checkDocCommands(ROOT).findings;
         out.agentBundle = checkAgentBundle(ROOT).findings;
         out.proseTypes = checkProseTypes(ROOT).findings;
+        out.versionPins = checkVersionPins(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -125,6 +127,22 @@ if (only === "both" || only === "names") {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);
             console.log(`      ${DIM}→ ${b.hint}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Version pins (all locales + infra) ━━━${NC}`);
+    const { findings: bad, scanned, expected } = checkVersionPins(ROOT);
+    console.log(`${DIM}Scanned ${scanned} files against @rebasepro/server ${expected}.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every version a reader would copy names ${expected}.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} stale version pin(s) — expected ${expected}:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC} ${b.what} is ${RED}${b.found}${NC}`);
+            console.log(`      ${DIM}${b.text}${NC}`);
         }
     }
 }

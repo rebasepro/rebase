@@ -16306,7 +16306,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.13.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.17.3", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -16357,7 +16357,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.14.1   # was 0.14.0 — your bundle is untouched
+image: rebasepro/server:0.17.3   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -16898,7 +16898,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.14.1
+FROM rebasepro/server:0.17.3
 COPY dist-bundle /bundle
 ```
 
@@ -16935,7 +16935,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.14.1"
+  image = "rebasepro/server:0.17.3"
 
 [http_service]
   internal_port = 8080
@@ -17057,7 +17057,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.14.1
+image: rebasepro/server:0.17.3
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -17282,7 +17282,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.16.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.17.3"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -17344,7 +17344,7 @@ setup. Same idea, same image, same bundle: **the runtime is the image, your
 project is the bundle, and upgrading Rebase is a tag change.**
 
 It is published as an OCI artifact beside the runtime image, and the two carry
-the same version — the chart that deploys runtime `0.15.0` *is* chart `0.15.0`,
+the same version — the chart that deploys runtime `0.17.3` *is* chart `0.17.3`,
 so there is one number to track. Without `--version` you get the newest; pin it
 for a real deployment, the same way you would pin `image.tag`:
 
@@ -17737,7 +17737,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.16.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.17.3` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run

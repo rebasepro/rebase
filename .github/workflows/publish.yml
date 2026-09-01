@@ -479,6 +479,21 @@ jobs:
             fs.writeFileSync(f,t);
           "
 
+          # Same failure, one surface over. Docs, the marketing site and the
+          # Terraform module name the runtime tag as a literal —
+          # `FROM rebasepro/server:0.14.1` — because prose has no variable to
+          # interpolate, so nothing moved them and the self-hosting guide told
+          # readers to deploy 0.14.1 for three minors while every gate stayed
+          # green. `verify:docs` fails on a stale pin now, which makes the
+          # release the thing that would break it unless it rewrites them here.
+          node tooling/scripts/docs-verify/check-version-pins.mjs --write
+
+          # `llms.txt`, `llms-full.txt` and `sitemap.md` are committed copies of
+          # the docs, and the pins above just changed them. `check:generated`
+          # diffs those copies against a fresh render on every PR, so the
+          # release commit fails its own gate without this.
+          pnpm -C website run generate-all
+
       # ── Pre-publish validation ───────────────────────────────
 
       # Fail here rather than at the registry. `check:publishable-set` re-derives
