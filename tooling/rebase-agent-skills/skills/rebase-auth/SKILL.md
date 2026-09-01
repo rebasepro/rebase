@@ -734,6 +734,15 @@ All login/register/OAuth endpoints return:
 }
 ```
 
+> **WARNING — the SDK flattens this, raw HTTP does not.** The JSON above is the
+> *wire* shape, and it is what you get from `fetch("/api/auth/login")`: the token
+> is at `body.tokens.accessToken`. The [Client SDK](#client-sdk) unwraps `tokens`
+> before handing the session back, so `auth.signInWithEmail()` resolves to a
+> flattened `{ user, accessToken, refreshToken }` instead. Both shapes are real,
+> at two different layers. Reading the SDK's shape off a raw `fetch` yields
+> `undefined` and the misleading symptom "login succeeded but returned no
+> accessToken" — the login was fine; the token was one level down.
+
 > **TIP:** Use the `transformAuthResponse` hook to inject additional tokens (e.g., external system tokens) or metadata into this response. See [Auth Lifecycle Hooks](#auth-lifecycle-hooks).
 
 ### Error Response Format
@@ -787,7 +796,9 @@ const { auth } = createRebaseClient({ baseUrl: "http://localhost:3000" });
 await auth.signInWithEmail(email, password);
 await auth.signUp(email, password, displayName?);
 
-// OAuth (all return { user, accessToken, refreshToken })
+// Every method below resolves to a FLATTENED { user, accessToken, refreshToken }.
+// That is the SDK's shape, not the wire's — over raw HTTP the token is nested at
+// `tokens.accessToken`. See "Auth Response Format" above.
 await auth.signInWithGoogle({ idToken });
 await auth.signInWithGoogle({ accessToken });
 await auth.signInWithGoogle({ code, redirectUri });

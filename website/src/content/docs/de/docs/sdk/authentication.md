@@ -10,6 +10,19 @@ Das Modul `client.auth` übernimmt die Benutzerauthentifizierung, die Token-Verw
 
 Das SDK persistiert Sitzungen standardmäßig im `localStorage` und aktualisiert Tokens automatisch, bevor sie ablaufen.
 
+:::note[Jede Anmeldemethode liefert eine abgeflachte Sitzung]
+`signInWithEmail`, `signUp` und jede `signInWith*`-Methode geben
+**`{ user, accessToken, refreshToken }`** zurück — das SDK hat die Hülle bereits
+für dich ausgepackt.
+
+Die darunterliegende REST-API gibt das Token stattdessen verschachtelt zurück,
+als `{ user, tokens: { accessToken, … } }`. Dieser Unterschied ist nur relevant,
+wenn du `/api/auth/*` zusätzlich direkt mit `fetch` aufrufst: Dort ist
+`body.accessToken` `undefined` und das Token liegt unter
+`body.tokens.accessToken`. Siehe
+[das Format der REST-API](/docs/backend/authentication).
+:::
+
 ## E-Mail / Passwort
 
 ### Anmelden

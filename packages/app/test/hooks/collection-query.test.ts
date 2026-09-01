@@ -47,3 +47,46 @@ describe("toFindParams", () => {
         expect(listen.searchExplain).toBe(find.searchExplain);
     });
 });
+
+/**
+ * A `limit` below 1 is a bug in whatever computed it, and the API refuses one —
+ * so forwarding it turns a client bug into a 400 that reads as the server being
+ * broken. That is how a restored, empty scroll entry presented: an
+ * `Invalid limit: 0` error where a collection table should have been.
+ */
+describe("toFindParams — an unusable limit stays in the browser", () => {
+
+    let warn: jest.SpyInstance;
+    beforeEach(() => {
+        warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+    afterEach(() => warn.mockRestore());
+
+    it("drops a limit of zero, so the read falls back to the server's page size", () => {
+        expect(toFindParams({ limit: 0 }).limit).toBeUndefined();
+        expect(warn).toHaveBeenCalled();
+    });
+
+    it("drops a negative and a fractional limit too", () => {
+        expect(toFindParams({ limit: -5 }).limit).toBeUndefined();
+        expect(toFindParams({ limit: 1.5 }).limit).toBeUndefined();
+    });
+
+    it("leaves an absent limit absent, and says nothing about it", () => {
+        expect("limit" in toFindParams({ where: { a: ["==", 1] } })).toBe(false);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("forwards a usable limit untouched", () => {
+        expect(toFindParams({ limit: 1 }).limit).toBe(1);
+        expect(toFindParams({ limit: 250 }).limit).toBe(250);
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    // Above the ceiling is an intent, not a glitch: trimming it would hand back
+    // a page the caller cannot tell apart from the whole collection, so it
+    // travels and is refused where the ceiling lives.
+    it("still sends a limit above the API ceiling, to be refused there", () => {
+        expect(toFindParams({ limit: 5000 }).limit).toBe(5000);
+    });
+});

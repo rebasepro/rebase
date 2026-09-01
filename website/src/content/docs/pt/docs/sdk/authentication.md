@@ -10,6 +10,18 @@ O módulo `client.auth` cuida da autenticação de usuários, do gerenciamento d
 
 O SDK persiste as sessões no `localStorage` por padrão e atualiza os tokens automaticamente antes de expirarem.
 
+:::note[Todo método de login resolve para uma sessão achatada]
+`signInWithEmail`, `signUp` e todos os métodos `signInWith*` retornam
+**`{ user, accessToken, refreshToken }`** — o SDK já desembrulhou o envelope para
+você.
+
+A API REST subjacente retorna o token aninhado, como
+`{ user, tokens: { accessToken, … } }`. Essa diferença só importa se você também
+chamar `/api/auth/*` diretamente com `fetch`, onde `body.accessToken` é
+`undefined` e o token está em `body.tokens.accessToken`. Veja
+[o formato da API REST](/docs/backend/authentication).
+:::
+
 ## E-mail / Senha
 
 ### Entrar

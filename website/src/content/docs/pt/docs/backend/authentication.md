@@ -174,6 +174,60 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 
 Todos os endpoints da API de dados exigem um cabeçalho `Authorization: Bearer <token>` válido quando `requireAuth: true` (o padrão).
 
+### Formato da resposta
+
+Todo endpoint que emite uma sessão responde com o mesmo envelope: `register`,
+`login`, cada provedor OAuth, `magic-link/verify`, `otp/verify`, `anonymous`,
+`anonymous/link` e `mfa/challenge/verify`.
+
+```json
+{
+  "user": {
+    "uid": "8f1c2a6e-…",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "photoURL": null,
+    "providerId": "password",
+    "isAnonymous": false,
+    "emailVerified": true,
+    "roles": ["editor"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOi…",
+    "refreshToken": "9b2e…",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+Devolva o token de acesso como `Authorization: Bearer <accessToken>`.
+`accessTokenExpiresAt` está em milissegundos desde a época.
+
+`POST /api/auth/refresh` responde com o mesmo envelope, com duas ressalvas:
+`user` é omitido por completo quando a conta não pode ser relida, então trate-o
+como opcional ali, e `providerId` é sempre `password`, qualquer que tenha sido o
+método de criação original da sessão.
+
+:::caution[O SDK cliente achata este envelope — o HTTP direto não]
+O JSON acima é o formato que trafega na rede, e é o que
+`fetch("/api/auth/login")` retorna: o token fica em
+**`body.tokens.accessToken`**.
+
+O [SDK cliente](/docs/sdk/authentication) desembrulha `tokens` antes de devolver
+a sessão, de modo que `auth.signInWithEmail()` resolve para um
+**`{ user, accessToken, refreshToken }`** achatado.
+
+Ambas as formas são reais; pertencem a duas camadas diferentes. Ler a forma do
+SDK a partir de um `fetch` direto produz `undefined`, o que aparece como “o login
+funcionou mas não há token de acesso”: o login estava certo, o token estava um
+nível abaixo.
+:::
+
+Com `cookieAuth` habilitado, o refresh token viaja como um cookie `httpOnly` e
+`tokens.refreshToken` é uma string vazia no corpo. O token de acesso não é
+afetado.
+
 ### Convidar colegas de equipe por e-mail
 
 Os fluxos de convite precisam transformar um endereço de e-mail em um ID de usuário, mas a coleção `users`

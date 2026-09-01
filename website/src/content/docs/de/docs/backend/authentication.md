@@ -177,6 +177,60 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 
 Alle Daten-API-Endpunkte erfordern einen gültigen `Authorization: Bearer <token>`-Header, wenn `requireAuth: true` (der Standard).
 
+### Antwortformat
+
+Jeder Endpunkt, der eine Sitzung ausstellt, antwortet mit derselben Hülle:
+`register`, `login`, jeder OAuth-Anbieter, `magic-link/verify`, `otp/verify`,
+`anonymous`, `anonymous/link` und `mfa/challenge/verify`.
+
+```json
+{
+  "user": {
+    "uid": "8f1c2a6e-…",
+    "email": "jane@example.com",
+    "displayName": "Jane Doe",
+    "photoURL": null,
+    "providerId": "password",
+    "isAnonymous": false,
+    "emailVerified": true,
+    "roles": ["editor"],
+    "metadata": {}
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOi…",
+    "refreshToken": "9b2e…",
+    "accessTokenExpiresAt": 1700000000000
+  }
+}
+```
+
+Sende das Access-Token als `Authorization: Bearer <accessToken>` zurück.
+`accessTokenExpiresAt` ist in Millisekunden seit der Epoche angegeben.
+
+`POST /api/auth/refresh` antwortet mit derselben Hülle, mit zwei Einschränkungen:
+`user` entfällt vollständig, wenn das Konto nicht erneut gelesen werden kann —
+behandle es dort also als optional — und `providerId` ist immer `password`,
+gleich womit die Sitzung ursprünglich erstellt wurde.
+
+:::caution[Das Client-SDK flacht diese Hülle ab — rohes HTTP nicht]
+Das JSON oben ist das Format auf der Leitung und das, was
+`fetch("/api/auth/login")` zurückgibt: Das Token liegt unter
+**`body.tokens.accessToken`**.
+
+Das [Client-SDK](/docs/sdk/authentication) packt `tokens` aus, bevor es die
+Sitzung zurückgibt, sodass `auth.signInWithEmail()` stattdessen ein abgeflachtes
+**`{ user, accessToken, refreshToken }`** liefert.
+
+Beide Formen sind echt; sie gehören zu zwei verschiedenen Schichten. Die
+SDK-Form aus einem rohen `fetch` zu lesen ergibt `undefined`, was sich als
+„Anmeldung erfolgreich, aber kein Access-Token“ zeigt: Die Anmeldung war in
+Ordnung, das Token lag eine Ebene tiefer.
+:::
+
+Mit aktiviertem `cookieAuth` reist das Refresh-Token als `httpOnly`-Cookie und
+`tokens.refreshToken` ist im Body eine leere Zeichenkette. Das Access-Token ist
+davon nicht betroffen.
+
 ### Teamkollegen per E-Mail einladen
 
 Einladungs-Flows müssen eine E-Mail-Adresse in eine Benutzer-ID umwandeln, aber die `users`-
