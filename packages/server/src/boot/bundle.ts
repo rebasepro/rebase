@@ -15,8 +15,8 @@ import { logger } from "../utils/logger";
 
 /** Thrown when a bundle cannot be read, or claims a contract this runtime cannot honour. */
 export class BundleError extends Error {
-    constructor(message: string, readonly hint?: string) {
-        super(message);
+    constructor(message: string, readonly hint?: string, options?: ErrorOptions) {
+        super(message, options);
         this.name = "BundleError";
     }
 }

@@ -42,7 +42,7 @@ import { resolveDataSources, resolveStorageSources } from "./sources";
 import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
-import { fetchBundle, shouldFetchBundle, usableBundleFallback, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
+import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 
 /** A running runtime, and the handle to stop it. */
@@ -179,6 +179,23 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         || fetchedDir
         || process.env.REBASE_BUNDLE
         || path.resolve(process.cwd(), "dist-bundle");
+
+    // Collapse any second copy of a runtime package the bundle brought with it,
+    // before anything is loaded out of that bundle.
+    //
+    // Here rather than in the install, because the install is only one of the
+    // four ways a bundle gets here — an explicit `bundleDir`, a vendored tree, a
+    // restart onto an already-installed one and the post-fetch-failure fallback
+    // all reach this line having installed nothing. A duplicate does not fail as
+    // a resolution error, it fails as divergent module state: two copies of
+    // `@rebasepro/types` each register kind `database` into one process-wide
+    // registry, and the second registration throws if the two specs disagree by
+    // so much as an added `optionKeys` entry. Which surfaces at the driver
+    // import, naming the driver.
+    //
+    // A no-op outside a container image, where there is no second copy to
+    // collapse, and a no-op on a bundle the entrypoint already stitched.
+    dedupeRuntimePackages(bundleDir, imageModulesDir());
 
     // The bundle is located before the environment is validated, because
     // pointing at the wrong directory is the likeliest first-run mistake, and

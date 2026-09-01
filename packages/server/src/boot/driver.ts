@@ -170,6 +170,44 @@ function resolvePackageEntry(packageDir: string): string | undefined {
 }
 
 /**
+ * Whether an import failed because nothing was there, as opposed to failing
+ * inside the module it found.
+ *
+ * Checked on the error's `code` rather than by matching its text, because the
+ * text is Node's to change and the code is the contract. `ERR_PACKAGE_PATH_NOT_EXPORTED`
+ * counts: a package present but exporting nothing importable is a packaging
+ * problem the install advice does fit.
+ *
+ * The nested `cause` walk is what makes this honest in the case that matters. A
+ * driver whose OWN import of a missing dependency fails arrives here as a
+ * module-not-found — correctly, it IS one — but a driver that threw for its own
+ * reasons must not be mistaken for one just because something in its stack
+ * mentions a module. So only the error itself and the chain of causes are read,
+ * never the message.
+ *
+ * Duck-typed rather than gated on `instanceof Error`, which is not sound here.
+ * The whole reason this function exists is a module graph with two copies of a
+ * package in it, and `instanceof` is precisely what stops working across a realm
+ * or a duplicated copy of a constructor. It already fails in the tests, where
+ * Jest's `ModuleNotFoundError` carries `code: "MODULE_NOT_FOUND"` and is not an
+ * `instanceof Error` in the test's realm — and it would fail the same way for a
+ * driver imported into a vm context or thrown across a worker boundary. Reading
+ * the property is the check that survives; there is no `Error` behaviour needed
+ * beyond `code` and `cause`.
+ */
+function isModuleNotFound(error: unknown): boolean {
+    let cursor = error;
+    for (let depth = 0; depth < 10; depth++) {
+        if (typeof cursor !== "object" || cursor === null) return false;
+        const { code, cause } = cursor as { code?: unknown; cause?: unknown };
+        if (code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND") return true;
+        if (code === "ERR_PACKAGE_PATH_NOT_EXPORTED") return true;
+        cursor = cause;
+    }
+    return false;
+}
+
+/**
  * Import a driver package, resolving its factories under either naming scheme.
  *
  * The generic names are the contract going forward; the Postgres-specific ones
@@ -200,10 +238,32 @@ async function importDriver(packageName: string, resolveFrom: string[] = []): Pr
         mod = await import(specifier) as DriverModule;
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+
+        // "Not installed" and "installed, and threw on import" are opposite
+        // problems wearing the same sentence, and telling someone to install a
+        // package that is already there sends them past the actual fault. A
+        // driver that ran and threw is reported as what it is, with where it was
+        // found, because that path is usually the whole diagnosis: a driver
+        // resolved from the bundle imports the bundle's copy of a runtime
+        // package, and a second copy of `@rebasepro/types` throws out of
+        // `registerResourceKind` before the driver exports anything.
+        if (!isModuleNotFound(err)) {
+            throw new BundleError(
+                `The database driver "${packageName}" failed while loading: ${message}`,
+                "The driver is installed" + (resolvedDir ? ` at ${resolvedDir}` : "") +
+                ", so this is not a missing dependency — it threw while being imported. " +
+                "A duplicated runtime package is the usual cause: check that " +
+                "`@rebasepro/types` under the bundle is a symlink to the runtime's own copy, " +
+                "and that the driver's version matches the runtime's.",
+                { cause: err }
+            );
+        }
+
         throw new BundleError(
             `Could not load the database driver "${packageName}": ${message}`,
             `Install it alongside the runtime (e.g. \`npm install ${packageName}\`), ` +
-            "or point the data source at a different driver with REBASE_DRIVER."
+            "or point the data source at a different driver with REBASE_DRIVER.",
+            { cause: err }
         );
     }
 
