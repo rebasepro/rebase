@@ -2256,6 +2256,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // built either way, because the singleton's data plane and every custom
         // function read through them. Only the HTTP mount is conditional.
         if (surfaces.data) config.app.route(`${basePath}/data`, dataRouter);
+    } else if (surfaces.data) {
+        // No collections and no tables to derive them from — the state a fresh
+        // `--headless` project starts in, since it declares nothing and the
+        // database is empty.
+        //
+        // Without this the data surface is simply absent, so Hono's default
+        // answers: a bare `404 Not Found` in `text/plain`. That reads as a typo
+        // in the URL and sends the reader to check their path, when the truth is
+        // that the server is working and there is nothing to serve yet. Every
+        // other error this API returns is JSON, so a client parsing the body
+        // gets a surprise on top.
+        //
+        // 404, not 501: the collection genuinely does not exist, and unlike
+        // storage this resolves by creating a table rather than by configuring
+        // the deployment. Same reasoning as `storageStub` above, different verb.
+        const emptyDataStub = new Hono<HonoEnv>();
+        emptyDataStub.all("/*", (c) => c.json({
+            error: {
+                message: "This project serves no collections yet. It declares none in code, and " +
+                    "the database has no tables to derive them from. Create tables — a migration, " +
+                    "SQL, or a collection file plus `rebase db push` — and restart.",
+                code: "NO_COLLECTIONS"
+            }
+        }, 404));
+        config.app.route(`${basePath}/data`, emptyDataStub);
+        logger.info("No collections to serve — /data returns 404 NO_COLLECTIONS");
     }
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
-import { BundleError, loadBundle, readBundleManifest } from "../src/boot/bundle";
+import { BundleError, createSourceBundle, loadBundle, readBundleManifest } from "../src/boot/bundle";
 
 /**
  * Reading a bundle.
@@ -111,5 +111,52 @@ describe("loadBundle", () => {
 
     it("explains a missing bundle directory", () => {
         expect(() => loadBundle(path.join(scratch, "nope"))).toThrow(/not found/);
+    });
+});
+
+describe("createSourceBundle declares only what the project has", () => {
+    /**
+     * A `--headless` project has no `config/collections` and no generated
+     * schema, both by design. The manifest used to name them anyway, from the
+     * conventional layout, and the runtime believed it — so a correct project
+     * booted telling its author that a file "does not exist" and that no tables
+     * would be created. Two warnings, both about the manifest, neither about
+     * anything the author had done wrong.
+     */
+    it("omits a collections directory that is not there", () => {
+        fs.mkdirSync(path.join(scratch, "config"), { recursive: true });
+        fs.writeFileSync(path.join(scratch, "config", "index.ts"), "export default {};");
+
+        const bundle = createSourceBundle({ projectRoot: scratch });
+
+        expect(bundle.manifest.entry?.collections).toBeUndefined();
+        expect(bundle.collectionsDir).toBeUndefined();
+    });
+
+    it("omits a schema file that is not there", () => {
+        const bundle = createSourceBundle({
+            projectRoot: scratch,
+            schema: "backend/src/schema.generated.ts"
+        });
+        expect(bundle.manifest.entry?.schema).toBeUndefined();
+    });
+
+    it("still declares what IS there", () => {
+        const collections = path.join(scratch, "config", "collections");
+        fs.mkdirSync(collections, { recursive: true });
+        fs.writeFileSync(path.join(collections, "posts.ts"), "export default {};");
+        const schemaDir = path.join(scratch, "backend", "src");
+        fs.mkdirSync(schemaDir, { recursive: true });
+        fs.writeFileSync(path.join(schemaDir, "schema.generated.ts"), "export const tables = {};");
+
+        const bundle = createSourceBundle({
+            projectRoot: scratch,
+            schema: "backend/src/schema.generated.ts"
+        });
+
+        expect(bundle.manifest.entry?.config).toBe("config");
+        expect(bundle.manifest.entry?.collections).toBe(path.join("config", "collections"));
+        expect(bundle.manifest.entry?.schema).toBe("backend/src/schema.generated.ts");
+        expect(bundle.collectionsDir).toBe(collections);
     });
 });
