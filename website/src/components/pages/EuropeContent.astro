@@ -49,7 +49,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
 
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-20">
-        <NeatBackground client:idle/>
+        <NeatBackground client:idle transition:persist="neat-hero" />
 
         {/* `px-6 lg:px-8`, not `px-4 lg:px-12`. This page was the only one on the
             site using its own shell padding, which put its left edge at 205px

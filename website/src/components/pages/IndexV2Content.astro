@@ -49,13 +49,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
             below rides 60px too high. */}
         <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(20)+var(--header-h))] pb-24 sm:pb-28">
             <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle randomize={false} />
+                <NeatBackground client:idle transition:persist="neat-hero" />
             </div>
             <!-- A second pass of the same shape, over the type, multiplying at low
                  opacity: the ribbon darkens the letterforms where it crosses them
                  and leaves them alone everywhere else. -->
             <div class="neat-over absolute inset-0 pointer-events-none" aria-hidden="true">
-                <NeatBackground client:idle randomize={false} />
+                <NeatBackground client:idle transition:persist="neat-hero-over" />
             </div>
 
             {/* The headline is full width and the row beneath it is the split,

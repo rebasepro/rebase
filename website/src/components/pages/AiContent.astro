@@ -92,7 +92,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
     <!-- ═══════════════════════ HERO ═══════════════════════ -->
     <section class="relative isolate overflow-hidden hero-under-nav pb-16 sm:pb-20">
-        <NeatBackground client:idle/>
+        <NeatBackground client:idle transition:persist="neat-hero" />
 
         <div class="relative z-10 mx-auto max-w-6xl px-4 lg:px-12">
             <p class="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">
