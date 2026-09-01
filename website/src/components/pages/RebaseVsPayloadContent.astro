@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Payload CMS
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Both Rebase and Payload deliver world-class TypeScript and React developer experiences. But when it comes to supporting existing Postgres databases and enabling non-technical teammates to manage schemas without coding, Rebase shines.
+          Payload runs inside your Next.js app and ships with it — one codebase, one deploy. Rebase is a backend that stands on its own, in front of a Postgres you own, serving several clients at once. If your product is a Next.js site, that is Payload's advantage; if it is an API with a web app, a mobile app and an ops team on it, it is the thing to weigh.
         </p>
       </div>
     </section>
@@ -461,6 +461,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Payload</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When you are building a content-heavy site in Next.js and want the CMS to live in the same codebase and deploy. That is a genuinely good architecture and Rebase does not replicate it. Rebase fits better when the backend has to stand on its own — several clients, a team that is not all frontend developers, or authorization that has to hold at the database.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

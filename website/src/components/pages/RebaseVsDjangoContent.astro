@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Django
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Django Admin and Laravel Nova were revolutionary when server-rendered monoliths ruled the web. But in the era of Headless APIs, real-time sync, and decoupled React frontends, Rebase offers the modern architectural answer without losing the instant-scaffolding magic.
+          Django gives you an admin scaffolded from your models and a server-rendered page for every screen. Rebase gives you the same scaffolding as a React app, plus the REST API and the typed client the admin is a consumer of — so a mobile client or a separate frontend is not a second thing you build.
         </p>
       </div>
     </section>
@@ -93,7 +93,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Monolithic Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Django and Laravel tie your admin panel heavily to their server-rendered ecosystems. Creating a separated Headless API (like Django REST Framework) for a completely independent consumer web/mobile app requires a massive amount of boilerplate duplication.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Django's admin is tied to its server-rendered templates and to the ORM behind them. A separate consumer app needs an API of its own — Django REST Framework or Ninja — and that means serializers, viewsets, routers and permission classes describing the same models a second time. Rebase generates the API and the admin from one definition, so there is no second description to keep in step.</p>
                   </div>
                 </div>
 
@@ -220,7 +220,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Monolithic Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Most server-side admin panels suffer from sluggish user experiences marked by full white-screen page reloads on every save. Injecting modern React components or real-time views into them is an arduous bolt-on process.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">A server-rendered admin reloads the page on every save, and putting a React component or a live view inside one means bolting a build step onto a template. The Rebase panel is a React app to begin with, so a custom field is a component you export.</p>
                   </div>
                 </div>
 
@@ -249,7 +249,7 @@ import ClosingCta from "../ClosingCta.astro";
                       <h4 class="text-white font-semibold">How Rebase Solves This</h4>
                     </div>
                     <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase provides an ultra-modern React SPA (Single Page Application).
+                      The Rebase panel is a React single-page application.
                     </p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
@@ -267,7 +267,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Navigations are instant. Actions execute asynchronously. The UI feels premium.</span></li>
+ <span class="leading-relaxed">Navigation does not round-trip the server, and an action does not reload the page.</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -317,6 +317,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Django</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When your team writes Python, when you need its ecosystem — data science libraries, Celery, the ORM's maturity — or when the application is a server-rendered Django app and adding a separate backend would be a second thing to run. Django is a complete framework; Rebase is a backend plus an admin panel, and it does not try to be the former.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

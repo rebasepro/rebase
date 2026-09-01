@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Strapi
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Strapi paved the way for Headless CMSs, but modern platforms require clean databases and smooth developer deployments. Discover why developers are migrating to Rebase for cleaner schemas, seamless upgrades, and deeper backend control.
+          Strapi owns the schema: content types are created in Strapi, in Strapi's tables, and the database is an implementation detail. Rebase points at a Postgres you already have and works with the tables it finds. That is a difference in kind, and it decides which one is right for you before any feature does.
         </p>
       </div>
     </section>
@@ -95,7 +95,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Strapi Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Strapi generates highly abstracted database schemas. To achieve dynamic zones and complex relations, Strapi creates dozens of opaque joining tables (`components_xxxxx`). Querying a Strapi database using raw SQL or external BI tools is an absolute nightmare.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Strapi models dynamic zones and relations through generated join tables and metadata of its own (<code class="font-mono text-surface-300">components_*</code>). That is a reasonable design for a CMS that owns its schema — but it means a BI tool or a raw SQL query reads Strapi's shape rather than yours, and migrating content out goes through the API rather than the tables.</p>
                   </div>
                 </div>
 
@@ -319,7 +319,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Environments stay 100% synchronized through Github commits, not database copy-pasting.</span></li>
+ <span class="leading-relaxed">Environments stay in step through GitHub commits, not database copy-pasting.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -480,6 +480,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Strapi</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When the primary users are content editors and you want a polished editorial experience out of the box, or when you need one of the plugins in its marketplace. Strapi has spent years on that surface. Rebase is the better answer when the application is the point and the back office has to follow the schema rather than define it.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Directus
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Directus is a powerful API engine, but its database-driven architecture makes deployments frustrating and extensibility hard. See why modern engineering teams are choosing Rebase's code-driven, React-native approach.
+          Both read a database you already have rather than owning one, which makes them closer in intent than anything else on this list. They part on two things: where the data model lives — a Directus project configures it in its own tables, a Rebase project in TypeScript you commit — and where permissions are enforced.
         </p>
       </div>
     </section>
@@ -96,7 +96,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Directus Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Directus stores your entire schema and UI configuration in hidden database tables (`directus_collections`, `directus_fields`). Managing environments (Staging to Production) requires clunky schema-sync CLI tools or manual database dumps that frequently break down or overwrite data.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Directus keeps the data model and the interface configuration in its own tables (<code class="font-mono text-surface-300">directus_collections</code>, <code class="font-mono text-surface-300">directus_fields</code>). It ships <code class="font-mono text-surface-300">schema snapshot</code> and <code class="font-mono text-surface-300">schema apply</code> to move that between environments, so this is a workflow rather than a gap. The difference is what the reviewer sees: a Directus snapshot is a generated YAML file describing the model, and a Rebase collection is the TypeScript that produces it — the thing you edited is the thing in the diff.</p>
                   </div>
                 </div>
 
@@ -287,7 +287,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Create custom fields, entirely new pages, or bespoke dashboard widgets leveraging the massive React ecosystem.</span></li>
+ <span class="leading-relaxed">Custom fields, whole new pages and bespoke dashboard widgets are ordinary React components, so the ecosystem you already use applies.</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -429,7 +429,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rules are pushed to the database via RLS (where possible), so your data stays locked down regardless of where the query originated.</span></li>
+ <span class="leading-relaxed">Rules are compiled to Postgres row-level security, so they hold regardless of where the query originated — including a psql session that never touched the API.</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -479,6 +479,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Directus</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When you need a mature content-management experience today. Directus has years of work in its editorial interface, a larger marketplace, and a broader set of database engines behind it — Rebase is PostgreSQL only, deliberately, because the row-level-security story depends on it. If your team is primarily editors managing content, Directus is the more finished product for that job.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

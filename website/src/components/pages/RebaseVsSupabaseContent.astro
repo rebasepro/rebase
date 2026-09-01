@@ -28,7 +28,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Supabase
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Supabase is a fantastic platform, but its "Firebase alternative" marketing hides the operational overhead of managing raw PostgreSQL in production. See how Rebase solves the biggest pain points developers face when scaling.
+          Both put row-level security in Postgres. The difference is where the policy is written: in Supabase it lives in the database and you keep it in sync with your code by hand; in Rebase it is a field on the collection, compiled to a policy, and the same file generates the API, the typed SDK and the back office.
         </p>
       </div>
     </section>
@@ -94,7 +94,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">PostgreSQL Row Level Security (RLS) policies are notoriously difficult to write, test, and debug. Poorly written policies destroy performance via implicit JOINs, and Supabase requires writing raw SQL for RLS policies without a visual, code-free RBAC policy builder.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Both projects put authorization in Postgres row-level security, and Supabase Studio has a policy editor with a generator and templates behind it. The difference is where the policy lives afterwards: in Supabase it is a database object you keep in step with your code by hand, and in Rebase it is a field on the collection that compiles to a policy — so the policy, the API and the panel move together, and drift between code and database is something the editor reports.</p>
                   </div>
                 </div>
 
@@ -239,7 +239,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Supabase Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Self-hosting Supabase is an infrastructure nightmare. It is a massive constellation of microservices: PostgREST (Haskell), GoTrue (Go), Realtime (Elixir), and Edge Functions (Deno). Upgrading these services independently is nearly impossible for small teams.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Self-hosting Supabase is a supported path with a published Docker Compose file, and plenty of teams run it. What you are taking on is several services in several languages — PostgREST in Haskell, Auth in Go, Realtime in Elixir, Edge Functions on Deno — each with its own release cadence. Rebase is one Node process and a Postgres, which is a smaller thing to keep upgraded, not a categorically different one.</p>
                   </div>
                 </div>
 
@@ -479,6 +479,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Supabase</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When you want the largest ecosystem in this category, the most third-party tutorials, or edge functions running at the CDN. Supabase is the more mature product with a much bigger community, and if nobody outside your engineering team will ever open the back office, most of what Rebase adds is weight you will not use.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

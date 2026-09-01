@@ -24,12 +24,12 @@ const families = [
     {
         kind: "A headless CMS",
         blurb: "You want editors to manage content without touching the database.",
-        theirModel: "The CMS owns the schema. Your tables are its tables, in its shape, reachable through its API and its permission engine.",
+        theirModel: "Usually the CMS owns the schema: your tables are its tables, in its shape, behind its API and its permission engine. Directus is the exception — it reads a database you already have, which is why it is the closest of the three in intent.",
         ourModel: "Your Postgres schema stays yours — including the tables that existed before Rebase. Access control is RLS on those tables, readable by any Postgres client.",
         tools: [
-            { name: "Directus", href: "/rebase-vs-directus", logo: "/img/competitors/directus-logo-light.svg", cls: "h-5" },
             { name: "Strapi", href: "/rebase-vs-strapi", logo: "/img/competitors/strapi-full-logo-light.svg", cls: "h-5" },
             { name: "Payload", href: "/rebase-vs-payload", logo: "/img/competitors/payload-logo-light.svg", cls: "h-5" },
+            { name: "Directus", href: "/rebase-vs-directus", logo: "/img/competitors/directus-logo-light.svg", cls: "h-5" },
         ],
     },
     {
@@ -73,7 +73,7 @@ const axes = [
     {
         axis: "How many copies of your data exist",
         rebase: "One. The panel talks to the same public API as your app, under the same policies. No sync, no mirror, no cache to reconcile.",
-        others: "Often two: the source database and the tool's own store, kept in step by a connector you have to watch.",
+        others: "One, in every tool on this page — but several of them add tables of their own for the model and the interface config, so the schema you back up is no longer only yours.",
     },
     {
         axis: "What happens if you stop using it",

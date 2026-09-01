@@ -134,7 +134,11 @@ const DIRECTUS: Alternative = {
         "Wraps a SQL database in a REST and GraphQL API and a well-built admin app, and it will work with a schema "
         + "you already have. Permissions are enforced in the Directus layer rather than in the database, and the "
         + "app owns a set of its own tables.",
-    licence: "Source-available (BSL)",
+    // Left MIT for the BSL in 2023, and moved again with v12 to the Monospace
+    // Sustainable Core License: source-available, free under a revenue and
+    // headcount threshold, GPL-3.0 four years after each release. Verified
+    // against directus/directus, 2026-09-02.
+    licence: "Source-available (MSCL)",
     hosting: "Both",
     compare: "/rebase-vs-directus"
 };
@@ -147,7 +151,9 @@ const HASURA: Alternative = {
         "Generates a GraphQL API over Postgres and other sources with a permission system defined in metadata. "
         + "The strongest option here if GraphQL is a product decision rather than a preference. It gives you an API "
         + "and a console, not a back office for non-developers.",
-    licence: "Source-available",
+    // graphql-engine is Apache-2.0. Verified 2026-09-02. Hasura's newer DDN
+    // product is a separate offering under separate terms; this row is the engine.
+    licence: "Open source (Apache-2.0)",
     hosting: "Both",
     compare: "/rebase-vs-hasura"
 };
@@ -209,7 +215,9 @@ const STRAPI: Alternative = {
         "The best-known open-source headless CMS, with a polished editorial interface and years of plugins behind "
         + "it. It owns the schema — content types are defined through Strapi, in Strapi's tables — which is the "
         + "trade you are making.",
-    licence: "Source-available",
+    // Community Edition is MIT Expat; only the `ee/` directory carries a
+    // separate enterprise licence. Verified against strapi/strapi, 2026-09-02.
+    licence: "MIT (enterprise directory excepted)",
     hosting: "Both",
     compare: "/rebase-vs-strapi"
 };
@@ -221,9 +229,10 @@ const PAYLOAD: Alternative = {
     description:
         "Config-as-code, TypeScript throughout, and it deploys as part of the Next.js application rather than "
         + "beside it. Deep content modelling — nested blocks, localisation, versioning. The tighter the Next.js "
-        + "coupling suits you, the better this is.",
-    licence: "Open source",
-    hosting: "Self-host",
+        + "coupling suits you, the better this is. Part of Figma since June 2025; the repository is still MIT, and "
+        + "Payload Cloud stopped taking new sign-ups after the acquisition.",
+    licence: "Open source (MIT)",
+    hosting: "Self-host, or Payload Cloud for existing customers",
     compare: "/rebase-vs-payload"
 };
 
@@ -528,11 +537,12 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
         what:
             "Directus wraps an existing SQL database in a REST and GraphQL API and a well-built admin application, "
             + "without demanding that you start from its schema. That last property is rare and is why people choose "
-            + "it. The usual reasons to look elsewhere are its BSL licence, and permissions being enforced in the "
-            + "application rather than the database.",
+            + "it. The usual reasons to look elsewhere are its licence — source-available, and since v12 the "
+            + "Monospace Sustainable Core License rather than the BSL it used before — and permissions being "
+            + "enforced in the application rather than in the database.",
         reasons: [
             {
-                reason: "The BSL licence is a problem for us",
+                reason: "The licence is a problem for us",
                 answer: "Rebase, NocoDB or Payload",
                 why: "All three carry conventional open-source licences, which matters if your legal review has an opinion or you intend to offer the thing as a service."
             },
@@ -573,7 +583,7 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
             },
             {
                 q: "Is Directus open source?",
-                a: "It is source-available under the Business Source License, which is not the same thing and occasionally matters — most often when a legal review takes a view, or when you intend to offer it to your own customers as a service. Rebase, NocoDB, Payload and Budibase carry conventional open-source licences."
+                a: "Not by the OSI definition, and the terms have moved twice. It left MIT for the Business Source License in 2023, and with v12 it moved again to the Monospace Sustainable Core License: source-available, free below a revenue and headcount threshold, and converting to GPL-3.0 four years after each release. Whether that is a problem is a question for your legal review rather than for us. Rebase, NocoDB, Payload and Budibase carry conventional open-source licences."
             },
             {
                 q: "Which alternatives work with an existing database?",
@@ -645,7 +655,7 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
             },
             {
                 q: "Is Strapi still open source?",
-                a: "The current major is source-available rather than MIT, which is worth checking against your own requirements before you plan around it. Payload, Rebase and NocoDB carry conventional open-source licences."
+                a: "The Community Edition is MIT. What is not MIT is the `ee/` directory — the enterprise features — which carries its own licence, and the cloud offering has its own terms on top. So: yes for the product most people run, with a boundary inside the repository worth reading if you plan to build on the enterprise side. Payload, Rebase and NocoDB are MIT throughout."
             },
             {
                 q: "Can I use a headless CMS with an existing database?",
@@ -686,9 +696,9 @@ export const ALTERNATIVES_PAGES: AlternativesPage[] = [
                 why: "The Hasura console is for building and inspecting the graph. A generated back office with roles, forms and media is the piece teams usually end up building on top of Hasura by hand."
             },
             {
-                reason: "The licence changed and we need to re-evaluate",
+                reason: "We need to know exactly what we are licensing",
                 answer: "PostgREST or Supabase",
-                why: "PostgREST is a small, permissively licensed piece of infrastructure that does one job. Supabase builds on it and is open source."
+                why: "graphql-engine is Apache-2.0, but Hasura's newer DDN product is a separate offering under separate terms, and the two do get confused. PostgREST is a small, permissively licensed piece of infrastructure that does one job; Supabase builds on it and is Apache-2.0."
             },
             {
                 reason: "We want GraphQL with auth and storage already attached",

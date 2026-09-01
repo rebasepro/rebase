@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Retool
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Retool is excellent for throwing together quick internal dashboards, but as complexity grows, you slam into the invisible wall of "low-code". Discover why engineering teams migrate to Rebase to retain true code control, native React extensibility, and avoid crippling per-seat pricing.
+          Retool is priced per seat and assembled in a visual editor; Rebase is MIT-licensed and assembled in your repository. The other difference matters more as the tool grows: Retool queries your database with credentials the tool holds, and Rebase reads it as the signed-in user, under policies Postgres enforces.
         </p>
       </div>
     </section>
@@ -265,7 +265,7 @@ import ClosingCta from "../ClosingCta.astro";
                       <h4 class="text-white font-semibold">How Rebase Solves This</h4>
                     </div>
                     <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase gives you a blazing fast out-of-the-box admin panel, but when you need to extend it, you're just writing React.
+                      Rebase gives you a generated back office, and extending it is writing React — no plugin API, no escape hatch to learn.
                     </p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
@@ -348,7 +348,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Source Control & DevOps
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Proprietary XML vs True Schema-as-Code</h3>
+                  <h3 class="text-2xl font-semibold text-white">An exported app, or the app itself</h3>
                 </div>
               </div>
               
@@ -381,7 +381,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Retool Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Retool's "Source Control" is a premium enterprise feature that exports your application state as massive, unreadable JSON or XML blobs. Code reviews (PRs) on these files are virtually impossible for humans to interpret, leading to broken staging environments.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Retool apps live in Retool and are exported for version control — as a single JSON file, or as a Toolscript archive that splits it across files. Toolscript is far more reviewable than the JSON was, but it is still a serialisation of a visual editor's state: the artefact in your repository is a description of the app rather than the app. A Rebase project is TypeScript and React that runs.</p>
                   </div>
                 </div>
 
@@ -478,6 +478,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Retool</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When you need to join data from many places quickly. Retool's catalogue of integrations — Stripe, Salesforce, S3, half a dozen databases, arbitrary REST — is enormous, and building an ops screen across four SaaS products is genuinely fast there. Rebase is Postgres-centred; if your data is not mostly in Postgres, much of the argument here does not apply.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

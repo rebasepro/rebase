@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Hasura
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Hasura is phenomenal at generating GraphQL APIs over Postgres. But APIs alone don't solve back-office problems. See why teams prefer Rebase when they need instant Admin Panels and tight logic bundling alongside their generated REST endpoints.
+          Hasura generates a GraphQL API and a console for building it. Rebase generates REST, a typed TypeScript SDK and a back office your operations team can work in, from the same collection definition — and its permissions compile to Postgres policies rather than to metadata the engine applies.
         </p>
       </div>
     </section>
@@ -318,6 +318,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Hasura</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When GraphQL is the product decision, when you need to federate several data sources behind one graph, or when your clients are already generating code from a GraphQL schema. Those are Hasura's home ground.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">

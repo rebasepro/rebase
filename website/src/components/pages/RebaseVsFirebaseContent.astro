@@ -27,7 +27,7 @@ import ClosingCta from "../ClosingCta.astro";
           Rebase vs Firebase
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Firebase provides an incredible initial developer experience, but its NoSQL foundation inevitably creates deep technical debt for relational data apps. See why teams migrate to Rebase for Postgres-powered schemas, zero lock-in, and instant Admin Panels.
+          Firestore is a document store, and joins, constraints and reporting are the things it asks you to design around. Rebase starts from a relational schema you already own — and the console you get is a back office your team can work in, not a data browser for developers.
         </p>
       </div>
     </section>
@@ -96,7 +96,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Firebase Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Because Firebase is NoSQL, your data is not inherently relational. To perform operations roughly equivalent to a SQL JOIN, developers have to dangerously denormalize/duplicate their data across collections, relying on complex Cloud Functions to keep data synced when it updates.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Firestore is a document store, so a JOIN is something you design around: denormalise across collections and keep the copies in step with Cloud Functions. Firebase does now offer a relational option — Data Connect, which is Cloud SQL for PostgreSQL behind a GraphQL layer — but it is a separate product from the Firestore most Firebase apps are built on, and it is Google's Postgres rather than yours.</p>
                   </div>
                 </div>
 
@@ -384,7 +384,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                       <h4 class="text-white font-semibold">The Firebase Pain</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Firebase is entirely proprietary to Google Cloud. If you decide to move, migrating data out of Firestore to a different database architecture is a massive, costly engineering endeavor.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">Firestore is proprietary to Google Cloud, and its document model is not a relational one. Moving off it is not an export — it is a remodelling exercise, and the cost is proportional to how much of the shape you denormalised to make Firestore work.</p>
                   </div>
                 </div>
 
@@ -431,7 +431,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Host on AWS, DigitalOcean, Fly.io, Railway, or barefoot metal servers.</span></li>
+ <span class="leading-relaxed">Host on AWS, DigitalOcean, Fly.io, Railway, Hetzner, or your own hardware.</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -447,7 +447,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Under the hood, your data is merely a standard PostgreSQL database, giving you eternal interoperability with BI tools everywhere.</span></li>
+ <span class="leading-relaxed">Underneath it is an ordinary PostgreSQL database, so any BI tool, ETL job or psql session that speaks Postgres already works against it.</span></li>
                     </ul>
                   </div>
                 </div>
@@ -465,6 +465,20 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground variant="a" client:visible/>
     </div>
 
+
+    {/* The honest concession, promoted out of the collapsed FAQ at the foot of
+        the page. PRODUCT.md principle 4: a comparison has to survive a reader
+        who uses the competitor daily, and a page that never says "stay" does
+        not. Same text as the FAQ entry, so the two cannot drift. */}
+    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-3xl px-6 lg:px-8">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Firebase</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">
+          When you are building a mobile app that has to work offline. Firebase's client SDKs and their offline persistence are genuinely excellent and there is no equivalent here. It is also the better answer if you want Google's operational scale without thinking about a database at all — the flip side of owning your Postgres is that you own your Postgres.
+        </p>
+      </div>
+    </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
