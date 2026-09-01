@@ -54,7 +54,16 @@ vi.mock("../utils/project", async importOriginal => {
 // go through neither.
 vi.mock("execa", () => ({ execa: vi.fn(async () => ({ exitCode: 0 })) }));
 vi.mock("../dev-db/prepare", () => ({
-    prepareDatabaseEnv: vi.fn(async () => ({ env: {} })),
+    // A DSN the developer named, which is what these tests mean by "a real
+    // invocation". The `database` field is not optional in the real return type,
+    // and omitting it made this fake describe a shape that cannot occur —
+    // `rebase db push` reads `database.kind` to refuse Atlas on the managed
+    // database, and against this fake that read threw.
+    prepareDatabaseEnv: vi.fn(async () => ({
+        env: {},
+        database: { kind: "url" as const },
+        description: "the configured database"
+    })),
     managedNotices: () => []
 }));
 
