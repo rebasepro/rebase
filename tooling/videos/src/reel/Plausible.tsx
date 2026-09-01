@@ -34,12 +34,22 @@ const SHIPPED = [
     "deployed · api.acme.com",
 ];
 
+/* Findings on the agent's OWN database, and deliberately not the ones the
+   proof scene shows. Those are a customer's production database a hundred
+   seconds later; repeating public.invoices and public.documents here made the
+   film audit the same tables twice and read as one canned screenshot used
+   twice.
+
+   All three are DATABASE findings. An earlier draft had rls-check reporting a
+   service key committed in apps/web, which it cannot do and does not claim to:
+   the proof scene says it opens a read-only transaction and nothing leaves
+   your machine, and a filesystem finding here contradicted that on screen. */
 const FOUND: { text: string; tone: "crit" | "body" | "fix" }[] = [
-    { text: "[critical] rls-disabled    public.invoices", tone: "crit" },
-    { text: "granted to anon and authenticated", tone: "body" },
-    { text: "[critical] policy-always-true    public.documents", tone: "crit" },
-    { text: "USING (true) — every row, every role", tone: "body" },
-    { text: "[high] service-key-in-client    apps/web", tone: "crit" },
+    { text: "[critical] rls-disabled     public.customers", tone: "crit" },
+    { text: "readable by anyone holding the anon key", tone: "body" },
+    { text: "[critical] anon-can-insert  public.orders", tone: "crit" },
+    { text: "no policy restricts INSERT for anon", tone: "body" },
+    { text: "[high]     permissive-select  public.tickets", tone: "crit" },
 ];
 
 export const Plausible: React.FC = () => {

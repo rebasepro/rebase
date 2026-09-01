@@ -31,8 +31,8 @@ export const S02_OneCommand: React.FC = () => (
                         <DisplayLine size={DISPLAY.statement} delay={18}>Run.</DisplayLine>
                     </div>
                     <Lead delay={34} size={25} width={470} style={{ marginTop: 28 }}>
-                        It reads your schema — tables, relations,
-                        constraints — and starts serving it.
+                        Three commands, and every layer in this film is
+                        running against your own database.
                     </Lead>
                 </div>
 

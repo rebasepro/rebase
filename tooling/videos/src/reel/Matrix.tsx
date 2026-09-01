@@ -190,8 +190,8 @@ export const Matrix: React.FC = () => {
                     opacity: ramp(frame, 186, 26),
                 }}
             >
-                Written once in the collection file, compiled to Postgres policies,
-                and enforced where your code cannot forget to ask.
+                Each cell is a policy Postgres evaluates per row, for the role that
+                asked. Change the collection file and the whole grid changes with it.
             </div>
         </AbsoluteFill>
     );
