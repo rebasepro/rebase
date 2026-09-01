@@ -6,9 +6,9 @@
  * command at the project root. Every local path on the command line therefore
  * has to be resolved before the child is handed a different working directory.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import path from "path";
-import { absolutizeLocalPathArgs } from "./db.js";
+import { absolutizeLocalPathArgs, refuseAtlasOnManagedDatabase } from "./db.js";
 
 const ROOT = path.resolve("/projects/my-app");
 
@@ -92,5 +92,56 @@ describe("absolutizeLocalPathArgs", () => {
         const copy = [...args];
         absolutizeLocalPathArgs(args, ROOT);
         expect(args).toEqual(copy);
+    });
+});
+
+describe("refuseAtlasOnManagedDatabase", () => {
+    /**
+     * PGlite serves one database; Atlas needs a second empty one to diff
+     * against. `CREATE DATABASE` against PGlite reports success and creates
+     * nothing, so Atlas compares the project's database with itself and stops
+     * on "connected database is not clean" — verified on a fresh scaffold, so
+     * no reset fixes it.
+     *
+     * The guard has to fire BEFORE the driver runs, because the first error the
+     * reader used to hit told them to edit a DATABASE_URL that `rebase init`
+     * deliberately leaves unset.
+     */
+    const call = (args: string[], kind: string) => {
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+            throw new Error("exited");
+        }) as never);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        let threw = false;
+        try {
+            refuseAtlasOnManagedDatabase(args, kind);
+        } catch {
+            threw = true;
+        }
+        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+        exit.mockRestore();
+        err.mockRestore();
+        return { refused: threw, output };
+    };
+
+    it.each(["push", "generate", "migrate"])("refuses db %s on the managed database", (sub) => {
+        const { refused, output } = call(["node", "rebase", "db", sub], "managed");
+        expect(refused).toBe(true);
+        // It must name something that works, not merely decline.
+        expect(output).toContain("rebase dev");
+        expect(output).toContain("DATABASE_URL");
+    });
+
+    it("allows the same subcommands against a real Postgres", () => {
+        expect(call(["node", "rebase", "db", "push"], "url").refused).toBe(false);
+        expect(call(["node", "rebase", "db", "push"], "docker").refused).toBe(false);
+    });
+
+    it("leaves subcommands that do not use Atlas alone", () => {
+        // Backups and branches reach the database directly; nothing here is
+        // planned by a diff, so the managed database serves them fine.
+        for (const sub of ["backup", "restore", "backups", "branch", "pull"]) {
+            expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
+        }
     });
 });

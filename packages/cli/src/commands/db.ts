@@ -132,6 +132,129 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
  * The database is resolved *here* rather than in the wrapper, so the schema
  * push `rebase dev` performs during start-up reaches the managed database too.
  */
+/**
+ * The `db` subcommands that plan their work with Atlas.
+ *
+ * Atlas computes a diff by replaying the desired schema into a **second, empty
+ * database** and comparing. That is why these three are listed and `backup`,
+ * `restore` and `branch` are not.
+ */
+const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
+
+/**
+ * Stop an Atlas-backed subcommand before it fails inside Atlas on the managed
+ * development database.
+ *
+ * **PGlite serves exactly one database.** `CREATE DATABASE "postgres_dev_diff"`
+ * against it reports success and creates nothing, so Atlas connects its dev-url
+ * straight back to the database it is meant to be comparing against, finds the
+ * project's own tables there, and stops with
+ * `connected database is not clean: found schema "public"`. Verified on a
+ * completely fresh scaffold, so this is not a leftover-state problem that a
+ * reset would fix — the model does not fit the engine.
+ *
+ * Before this guard the failure was worse than unhelpful. The first thing the
+ * reader hit was `pq: SSL is not enabled on the server`, whose remedy box said
+ * to append `sslmode=disable` to `DATABASE_URL` — a variable `rebase init`
+ * deliberately leaves unset, which is the very reason the managed database was
+ * in use. Two errors deep, about a variable that does not exist, for a command
+ * the quickstart told them to run.
+ *
+ * There is nothing to fix by trying harder here: Atlas's other dev-url option
+ * is `docker://`, and needing Docker is precisely what the managed database
+ * exists to avoid. So this says what the managed database can and cannot do,
+ * and names the two things that work.
+ */
+export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): void {
+    if (kind !== "managed") return;
+    const [domain, subcommand] = rawArgs.slice(2);
+    if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
+
+    console.error("");
+    console.error(chalk.red(`  ✗ rebase db ${subcommand} does not work on the managed development database.`));
+    console.error("");
+    console.error(chalk.gray("  It plans changes with Atlas, which needs a second empty database to"));
+    console.error(chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."));
+    console.error("");
+    console.error(chalk.gray("  You almost certainly do not need this command:"));
+    console.error(chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`));
+    console.error("");
+    console.error(chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"));
+    console.error(chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."));
+    console.error("");
+    process.exit(1);
+}
+
+/**
+ * Resolve the active driver's CLI and the environment it should run in.
+ *
+ * Shared by the two runners below. Deliberately does NOT resolve a database:
+ * `schema generate` reads collection files and writes one file, and starting a
+ * database to run it would be a side effect nobody asked for.
+ */
+async function resolveDriverCli(): Promise<{
+    projectRoot: string;
+    backendDir: string;
+    pluginCli: string;
+    env: Record<string, string>;
+}> {
+    const projectRoot = requireProjectRoot();
+    const backendDir = requireBackendDir(projectRoot);
+
+    const activePlugin = getActiveBackendPlugin(backendDir);
+    if (!activePlugin) {
+        throw new Error(
+            "Could not detect an active database plugin. Make sure a package like "
+            + "@rebasepro/server-postgres is installed in backend/package.json."
+        );
+    }
+    const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
+    if (!pluginCli) {
+        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
+    }
+
+    const envFile = findEnvFile(projectRoot);
+    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    if (envFile) {
+        env.DOTENV_CONFIG_PATH = envFile;
+    }
+    return { projectRoot, backendDir, pluginCli, env };
+}
+
+/** Run the resolved driver CLI with the given child arguments. */
+async function execDriverCli(
+    resolved: { projectRoot: string; backendDir: string; pluginCli: string; env: Record<string, string> },
+    childArgs: string[],
+    options: { quiet?: boolean } = {}
+): Promise<void> {
+    const { projectRoot, backendDir, pluginCli, env } = resolved;
+    const stdio = options.quiet ? "pipe" : "inherit";
+    const isTs = pluginCli.endsWith(".ts");
+    if (isTs) {
+        const tsxBin = resolveTsx(projectRoot);
+        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
+        return;
+    }
+    await execa("node", [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
+}
+
+/**
+ * Run a `schema` subcommand through the active driver's CLI.
+ *
+ * Separate from {@link runDriverDbCommand} because it must NOT resolve a
+ * database. `rebase dev` calls this before the database exists, which is the
+ * whole point: the generated schema has to be right before anything reads it.
+ * Throws rather than exiting — the caller has more to do.
+ */
+export async function runDriverSchemaCommand(
+    rawArgs: string[],
+    options: { quiet?: boolean } = {}
+): Promise<void> {
+    const resolved = await resolveDriverCli();
+    await execDriverCli(resolved, rawArgs.slice(2), options);
+}
+
 export async function runDriverDbCommand(
     rawArgs: string[],
     options: { quiet?: boolean } = {}
@@ -177,6 +300,8 @@ export async function runDriverDbCommand(
     if (!options.quiet) {
         for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
     }
+
+    refuseAtlasOnManagedDatabase(rawArgs, prepared.database.kind);
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.

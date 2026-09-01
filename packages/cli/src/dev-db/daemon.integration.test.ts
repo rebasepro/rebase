@@ -103,7 +103,17 @@ describe("managedUrl", () => {
     it("addresses loopback only", () => {
         // The managed database must never be reachable from the network: it has
         // no password, because it is not meant to leave the machine.
-        expect(managedUrl(5555)).toBe("postgresql://postgres@127.0.0.1:5555/postgres");
+        expect(managedUrl(5555)).toBe(
+            "postgresql://postgres@127.0.0.1:5555/postgres?sslmode=disable"
+        );
+    });
+
+    it("disables SSL, because PGlite's socket server speaks none", () => {
+        // Without this, `rebase db push` dies inside Atlas with
+        // "pq: SSL is not enabled on the server" — and its remedy box tells the
+        // reader to append sslmode to DATABASE_URL, which on the managed path is
+        // deliberately not set. The advice was correct and unfollowable.
+        expect(managedUrl(5555)).toContain("sslmode=disable");
     });
 });
 
