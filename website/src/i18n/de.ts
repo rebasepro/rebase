@@ -4,7 +4,7 @@ export const de = {
   "hero.title.part2": "Das Backend, das du immer wolltest.",
   "hero.subtitle":
     "Verbinde es mit deiner bestehenden Datenbank. Nichts zu provisionieren, nichts kopiert, nichts migriert — dein Schema ist der einzige Input.",
-  "hero.cta.demo": "Live-Demo ansehen",
+  "hero.cta.demo": "Demo testen",
   "hero.cli.label": "Die Demo braucht keine Anmeldung. Deine eigene ist einen Befehl entfernt:",
   "hero.cta.github": "Auf GitHub ansehen",
 
@@ -540,7 +540,7 @@ export const de = {
   "agencies.leverage.c4.result": "<b>Ergebnis:</b> Besseres Projekt-Tracking und Kundenkommunikation.",
   "agencies.cta.title": "Bereit, etwas Großartiges zu bauen?",
   "agencies.cta.primary": "Demo testen",
-  "agencies.cta.secondary": "Docs ansehen",
+  "agencies.cta.secondary": "Docs lesen",
   "about.meta.title": "Über uns — Rebase",
   "about.meta.description": "Warum wir Rebase bauen: Autorisierung gehört in die Datenbank, nicht in Middleware, die man aufzurufen vergessen kann. Vom Team hinter FireCMS, MIT-lizenziert, in Europa.",
   "about.hero.title": "Wir hatten es satt, immer wieder dasselbe Admin-Panel zu bauen.",

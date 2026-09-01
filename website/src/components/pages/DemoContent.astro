@@ -15,6 +15,17 @@ import ClosingCta from "../ClosingCta.astro";
             <p class="mb-6 text-base leading-7 text-surface-300 lg:text-lg">
                 {t('demo.page.subtitle')}
             </p>
+            <!-- The one place demo.rebase.pro is linked: this page is the demo,
+                 so its escalation is the full hosted panel rather than itself. -->
+            <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+               class="accent-link" data-track id="demo-hosted-panel">
+                Open the full hosted panel
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14"/>
+                    <path d="m12 5 7 7-7 7"/>
+                </svg>
+            </a>
         </div>
     </section>
 
@@ -27,6 +38,6 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
     </section>
 
-    <ClosingCta title="Now run it on your own data." blurb="The demo is someone else's database. This is one command against yours." trackId="demo" />
+    <ClosingCta title="Now run it on your own data." blurb="The demo is someone else's database. This is one command against yours." trackId="demo" demoHref="https://demo.rebase.pro" />
 
 </div>

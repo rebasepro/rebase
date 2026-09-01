@@ -104,8 +104,7 @@ const faqColumns = [
                  two-line paragraph introducing the command, an npx alternative
                  inside the box. Six text moments where a hero carries three. -->
             <div class="mt-10 flex items-center justify-start gap-3 flex-wrap animate-on-scroll animate-immediate fade-in-up">
-                <a href="https://demo.rebase.pro"
-                   target="_blank" rel="noopener noreferrer"
+                <a href={translatePath("/demo")}
                    id="hero-try-demo"
                    class="inline-flex items-center justify-start gap-x-2 rounded-lg bg-primary border border-transparent px-7 py-0 min-h-(--control-xl) text-base font-medium text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                     {t("hero.cta.demo")}
@@ -1341,7 +1340,7 @@ const faqColumns = [
                     </div>
             </div>
             <div class="flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-10 animate-on-scroll fade-in-up delay-100">
-                <a href="https://demo.rebase.pro"
+                <a href={translatePath("/demo")}
                    data-track
                    id="cta-try-rebase"
                    target="_blank" rel="noopener noreferrer"

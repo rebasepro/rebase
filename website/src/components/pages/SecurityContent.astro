@@ -39,11 +39,9 @@ import ClosingCta from "../ClosingCta.astro";
                         See how it works
                         <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
                     </a>
-                    <a href="https://demo.rebase.pro"
-                       class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
-                       rel="noopener noreferrer"
-                       target="_blank">
-                        Try the Demo
+                    <a href="/demo"
+                       class="inline-flex items-center justify-start gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all">
+                        Try the demo
                     </a>
                 </div>
             </div>
@@ -611,32 +609,6 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
         </section>
 
-        <!-- Final CTA Section -->
-        <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-                <h2 class="text-3xl sm:text-4xl text-white mb-8">Audit yours in ten seconds</h2>
-                <p class="text-lg text-surface-300 mb-8 max-w-2xl mx-auto">
-                    <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code> — no signup,
-                    nothing installed, and it works whether or not you ever adopt Rebase.
-                </p>
-                <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a href="https://demo.rebase.pro"
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
-                       rel="noopener noreferrer"
-                       target="_blank">
-                        Try the Demo
-                    </a>
-                    <a href="/docs"
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow">
-                        Get Started
-                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                    </a>
-                </div>
-            </div>
-        </section>
-
-
-    
     <ClosingCta title="Read the policies it writes." blurb="Scaffold a project and inspect the Postgres row-level security generated from your collection definitions — before you trust it with anything." trackId="security" />
 
 </div>

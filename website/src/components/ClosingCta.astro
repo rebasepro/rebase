@@ -22,12 +22,23 @@ interface Props {
     blurb?: string;
     /** Distinguishes copy events per page in analytics. */
     trackId?: string;
+    /**
+     * Where "Try the demo" goes. One destination site-wide — `/demo`, which is
+     * localised and opens a live demo in place. `/demo` itself overrides this
+     * to the full hosted panel, because a close cannot link to its own page.
+     */
+    demoHref?: string;
 }
-
-const { title = "Point it at your database.", blurb = "Scaffold a project against a Postgres database you already run — no account, nothing to provision.", trackId = "page" } = Astro.props;
 
 const lang = getLangFromUrl(Astro.url);
 const translatePath = useTranslatedPath(lang);
+
+const {
+    title = "Point it at your database.",
+    blurb = "Scaffold a project against a Postgres database you already run — no account, nothing to provision.",
+    trackId = "page",
+    demoHref = translatePath("/demo"),
+} = Astro.props;
 const COMMAND = "pnpm dlx @rebasepro/cli init";
 ---
 
@@ -60,7 +71,7 @@ const COMMAND = "pnpm dlx @rebasepro/cli init";
         </div>
 
         <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-            <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+            <a href={demoHref}
                class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
                data-track id={`${trackId}-cta-demo`}>
                 Try the demo

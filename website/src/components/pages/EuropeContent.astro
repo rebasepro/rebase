@@ -43,6 +43,7 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
 <span class="text-surface-500">// that is the deployment. There is no application</span>
 <span class="text-surface-500">// image to build — the runtime is published, and</span>
 <span class="text-surface-500">// your project travels as a bundle.</span>`;
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -342,38 +343,8 @@ const composeSnippet = `<span class="text-surface-500">// docker-compose.yml —
         </div>
     </section>
 
-    <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="relative z-0 py-20 sm:py-28">
-        {/* The closing CTA runs the same 72rem shell as everything above it. It
-            was the last centred block on the page; centred, it re-broke the left
-            edge at the one moment the reader is being asked to act. */}
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 [&_p]:max-w-[38rem] [&_h2]:max-w-[42rem]">
-            <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                It takes one command to find out
-            </h2>
-            <p class="mb-8 text-lg leading-relaxed text-surface-400">
-                No account, no credit card, no region picker. It scaffolds a project, starts Postgres, and hands you
-                a running backend on your own machine — which is, conveniently, the most sovereign infrastructure
-                you own.
-            </p>
-            <div class="mb-8 inline-flex items-center gap-3 rounded-xl border border-surface-800 bg-[#0c0d10] px-5 py-3.5 font-mono text-sm">
-                <span class="select-none font-semibold text-primary">&gt;</span>
-                <span class="select-all text-white">pnpm dlx @rebasepro/cli init</span>
-            </div>
-            <div class="flex flex-col justify-center gap-4 sm:flex-row">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">
-                    Try the demo
-                </a>
-                <a href="/docs/deployment/self-hosting"
-                   class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
-                    Read the self-hosting guide
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
+
+
+    <ClosingCta title="Run it where you choose." blurb="MIT-licensed and self-hosted on your own infrastructure — or on Rebase Cloud, with the processor and the sub-processor named." trackId="europe" />
+
 </div>

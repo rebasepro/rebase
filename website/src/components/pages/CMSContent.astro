@@ -79,10 +79,10 @@ import ClosingCta from "../ClosingCta.astro";
                 human needs to touch the data, skip it when nobody does, and remove it without your API noticing.
             </p>
             <div class="flex flex-wrap items-center justify-start gap-x-6 gap-y-3">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+                <a href={translatePath("/demo")}
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
                    data-track id="admin-hero-demo">
-                    Open the live demo
+                    Try the demo
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -795,42 +795,6 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="text-sm text-surface-400">SQL editor, schema visualizer, RLS policy editor, branches
                         and API explorer. Studio is the developer workspace. It registers inside the same panel
                         as CMS.</p>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="py-24 sm:py-32">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">
-                Add a back office in one dependency
-            </h2>
-            <p class="text-lg text-surface-400 mb-10 max-w-2xl mx-auto">
-                On a fresh clone, <code class="font-mono text-surface-300">rebase dev</code> brings up the backend,
-                the back office and a database together — nothing to install first. Or open the live demo: it is a
-                real Rebase project, with a real database behind it.
-            </p>
-            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
-                   data-track id="admin-cta-demo">
-                    Try the live demo
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-                <a href="/docs/frontend"
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
-                   data-track id="admin-cta-docs">
-                    CMS docs
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
                 </a>
             </div>
         </div>

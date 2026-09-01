@@ -4,7 +4,7 @@ export const en = {
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
     "Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated — your schema is the only input.",
-  "hero.cta.demo": "See the live demo",
+  "hero.cta.demo": "Try the demo",
   "hero.cli.label": "No signup for the demo. Yours is one command away:",
   "hero.cta.github": "View on GitHub",
 
@@ -248,8 +248,8 @@ export const en = {
   "cta.lane.cloud.desc": "Managed hosting on our infrastructure. It runs real tenants today and opens in batches.",
   "cta.lane.cloud.badge": "Private beta",
   "cta.lane.cloud.link": "Request access",
-  "cta.button.demo": "Try the Demo",
-  "cta.button.docs": "Read the Docs",
+  "cta.button.demo": "Try the demo",
+  "cta.button.docs": "Read the docs",
   "cta.button.github": "GitHub",
   "security.badge": "Security-first",
   // Carries claim 1 — security lives in the database — which is the page's
@@ -343,7 +343,7 @@ export const en = {
   "nav.agencies": "For Agencies",
   "nav.agencies.desc": "Deliver bespoke client projects, faster.",
   "nav.docs": "Docs",
-  "nav.tryDemo": "Try the Demo",
+  "nav.tryDemo": "Try the demo",
   "roadmap.badge": "Roadmap",
   "roadmap.title": "What's next for Rebase",
   "roadmap.subtitle":
@@ -632,8 +632,8 @@ export const en = {
   "agencies.leverage.c4.solution": "<b>Rebase Solution:</b> Built a custom CRM interface using Rebase collections for clients, projects, and logs with relations.",
   "agencies.leverage.c4.result": "<b>Result:</b> Improved project tracking and client communication.",
   "agencies.cta.title": "Ready to build something amazing?",
-  "agencies.cta.primary": "Try the Demo",
-  "agencies.cta.secondary": "View Documentation",
+  "agencies.cta.primary": "Try the demo",
+  "agencies.cta.secondary": "Read the docs",
   "about.meta.title": "About — Rebase",
   "about.meta.description": "Why we build Rebase: authorization belongs in the database, not in middleware you can forget to call. Built by the team behind FireCMS, MIT-licensed, in Europe.",
   "about.hero.title": "We got tired of rebuilding the same admin panel.",
