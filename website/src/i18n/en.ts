@@ -131,19 +131,6 @@ export const en = {
   "showcase.case0.feat3.title": "Dogfooding Rebase Cloud",
   "showcase.case0.feat3.desc":
     "Rebase Cloud — our managed hosting — has not launched yet. We run our own products on it first. Join the waitlist below for early access.",
-  "showcase.case.badge": "Marketplace & Job Portal",
-  "showcase.case.title": "SustenTalent",
-  "showcase.case.desc":
-    "A two-sided marketplace connecting sustainability professionals with green companies. Rebase powers both sides of the market: role-based auth, typed matching APIs, and the moderation back office.",
-  "showcase.case.feat1.title": "Dual-Role Authentication",
-  "showcase.case.feat1.desc":
-    "One account can hold talent and company profiles simultaneously — Rebase roles drive routing and permissions, with no custom auth service.",
-  "showcase.case.feat2.title": "Typed Matching APIs",
-  "showcase.case.feat2.desc":
-    "Vacancy matching runs through the generated TypeScript SDK, keeping queries type-safe from Postgres all the way into the React frontend.",
-  "showcase.case.feat3.title": "A Back Office They Never Built",
-  "showcase.case.feat3.desc":
-    "Postings are moderated, companies verified, and the skills taxonomy curated in the generated admin panel — zero internal-tools code.",
   "showcase.case2.badge": "Digital Pain Therapy",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
