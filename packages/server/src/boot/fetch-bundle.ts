@@ -317,12 +317,11 @@ export async function installBundleDependencies(
     }
     logger.info("Bundle dependencies installed", { ms: Date.now() - started });
 
-    // The install is what creates the duplicate, so the dedupe belongs to it.
-    // In a container this used to happen in the entrypoint, which runs BEFORE
-    // the runtime and therefore before this install exists — so on the fetch
-    // path it would have run against an empty directory and every custom
-    // function would have 500ed.
-    dedupeRuntimePackages(bundleRoot, imageModulesDir());
+    // The dedupe that used to live here now runs in `bootFromBundle`, against
+    // whatever bundle directory boot settled on. Here it was reachable only when
+    // an install actually happened, and the early return above — a bundle that
+    // vendored `node_modules`, or a pod restarting onto a tree it already
+    // installed — skipped the dedupe along with the install.
 
     // Cosmetic — a pod that cannot clean its cache still boots.
     await exec("npm", ["cache", "clean", "--force"], { cwd: bundleRoot }).catch(() => undefined);
@@ -373,7 +372,7 @@ export async function installBundleDependencies(
  */
 export const RUNTIME_MODULES_ENV = "REBASE_RUNTIME_MODULES";
 
-function imageModulesDir(): string | undefined {
+export function imageModulesDir(): string | undefined {
     return process.env[RUNTIME_MODULES_ENV] || undefined;
 }
 
@@ -414,12 +413,33 @@ export const RUNTIME_PROVIDED_PACKAGES = [
  * duplicate, and refusing to boot over it would turn a degraded start into no
  * start at all.
  *
+ * Called from `bootFromBundle` on EVERY boot, against whatever directory boot
+ * settled on — not from the install. Hanging it off the install made it
+ * unreachable for three of the four ways a bundle arrives: one that vendored
+ * `node_modules` at build time, a pod restarting onto a tree it installed
+ * earlier, and the fallback that serves an on-disk bundle after a failed fetch
+ * all skip the install and took the dedupe with them. Prospector hit the first:
+ * two copies of `@rebasepro/types` in one process, whose `registerResourceKind`
+ * calls for kind `database` disagreed, so importing the driver threw at boot and
+ * the pod crash-looped reporting a driver that was installed all along.
+ *
+ * Safe to repeat: an entry that is already a symlink is left alone, so the
+ * container entrypoint having done this first costs one `lstat` per package.
+ *
  * @param imageModules the runtime image's own `node_modules`. Absent, there is
  *   nothing to dedupe against and this is a no-op — which is the case in every
  *   context except a container built from the runtime image.
  */
 export function dedupeRuntimePackages(bundleRoot: string, imageModules: string | undefined): string[] {
     if (!imageModules || !fs.existsSync(imageModules)) return [];
+
+    // Nothing to collapse into a bundle that is not there — and, since the links
+    // below are created with `recursive: true`, doing it anyway would MAKE the
+    // directory. That matters now that boot calls this before `loadBundle`: a
+    // mistyped path would get a `node_modules` conjured into it and then fail
+    // with a missing manifest instead of the far more useful "bundle directory
+    // not found".
+    if (!fs.existsSync(bundleRoot)) return [];
 
     const deduped: string[] = [];
     for (const pkg of RUNTIME_PROVIDED_PACKAGES) {

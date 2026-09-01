@@ -21,7 +21,8 @@ import {
     BUNDLE_URL_ENV,
     BUNDLE_TOKEN_ENV,
     unpackedBundleSource,
-    usableBundleFallback
+    usableBundleFallback,
+    RUNTIME_MODULES_ENV
 } from "./fetch-bundle";
 import { MANIFEST_FILENAME, loadBundle } from "./bundle";
 
@@ -561,6 +562,31 @@ describe("a failed install leaves nothing a later boot would trust", () => {
         await installBundleDependencies(scratch, async (c) => { calls.push(c); });
         expect(calls).toEqual([]);
         expect(fs.existsSync(path.join(scratch, "node_modules", "vendored"))).toBe(true);
+    });
+
+    /**
+     * Why the dedupe cannot live here.
+     *
+     * This early return is correct — reinstalling over a complete tree is slower
+     * and no safer — but it used to carry `dedupeRuntimePackages` out with it,
+     * and a vendored bundle is exactly the shape that then boots with two copies
+     * of a runtime package. The owner is `bootFromBundle` now
+     * (`boot-dedupe.test.ts`); this pins the reason, so that moving it back here
+     * fails rather than quietly recreating the bug.
+     */
+    it("does not dedupe on the path that installs nothing", async () => {
+        const image = path.join(scratch, "image-modules");
+        fs.mkdirSync(path.join(image, "@rebasepro", "server"), { recursive: true });
+        process.env[RUNTIME_MODULES_ENV] = image;
+
+        fs.writeFileSync(path.join(scratch, "package.json"), "{}");
+        const duplicate = path.join(scratch, "node_modules", "@rebasepro", "server");
+        fs.mkdirSync(duplicate, { recursive: true });
+
+        await installBundleDependencies(scratch, async () => undefined);
+
+        expect(fs.lstatSync(duplicate).isSymbolicLink()).toBe(false);
+        delete process.env[RUNTIME_MODULES_ENV];
     });
 });
 
