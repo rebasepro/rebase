@@ -864,11 +864,11 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
 /**
  * Build an input schema (for POST/PUT) — excludes auto-generated fields.
  *
- * `excludeFromApi` columns are left out too, though a write naming one is still
- * accepted: a create the document invites and whose result it then cannot show
- * is not a round trip anyone can verify, and naming the column here discloses
- * it just as loudly as the read schema does — this document is served
- * unauthenticated.
+ * `excludeFromApi` columns are left out too, and the server now agrees: a write
+ * naming one is refused (`write-validation.ts`), which is what the flag's name
+ * and the generated SDK's own documentation always said. This comment used to
+ * record that such a write was "still accepted" — the document was right and
+ * the server was the thing that had not caught up.
  */
 function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
