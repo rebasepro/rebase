@@ -41,20 +41,11 @@ import ClosingCta from "../ClosingCta.astro";
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-          <span class="text-sm font-medium">SQL · Schema · RLS · Logs</span>
+          <span class="text-sm font-medium">{t("studiopage.00")}</span>
         </div>
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-          <a href="/product" class="hover:text-primary transition-colors">The panel</a>
-          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Rebase Studio</span>
-        </p>
-        <h1 class="mb-6 text-display-2 text-white">
-          Run your database<br/>from the same panel.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          A SQL console, a visual schema builder, the row-level-security policy editor, database branches, cron and
-          logs. Studio is the developer workspace. It registers inside the same panel as CMS — and everything it
-          does visually, it writes back as TypeScript you commit.
-        </p>
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("studiopage.01")}></p>
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("studiopage.02")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("studiopage.03")}</p>
         <div class="flex items-center justify-start gap-x-4">
           <a href="/demo"
              class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
@@ -89,8 +80,8 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">
               Code-as-Config
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Collection Editor</h2>
-            <p class="text-lg text-surface-400 mb-6">Every visual change generates clean, version-controlled TypeScript via AST transformation. What you see in the UI is what gets committed to your repo.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("studiopage.27")}</h2>
+            <p class="text-lg text-surface-400 mb-6">{t("studiopage.04")}</p>
             <ul class="space-y-3 text-surface-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Visual edits write to real TypeScript files</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Full collection config: properties, callbacks, security rules</li>
@@ -105,7 +96,7 @@ import ClosingCta from "../ClosingCta.astro";
                   <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
                   <div class="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
                 </div>
-                <span class="text-[11px] text-surface-400 font-mono tracking-wider uppercase font-semibold ml-2">Collection Editor</span>
+                <span class="text-[11px] text-surface-400 font-mono tracking-wider uppercase font-semibold ml-2">{t("studiopage.28")}</span>
               </div>
               <span class="text-[11px] text-surface-500 font-mono">orders.ts</span>
             </div>
@@ -116,7 +107,7 @@ import ClosingCta from "../ClosingCta.astro";
               <pre class="py-3 px-4 text-[11px] font-mono leading-[1.55rem] text-surface-300 overflow-x-auto flex-1 bg-surface-950" set:html={collectionEditorHtml}></pre>
             </div>
             <div class="px-4 py-2 border-t border-surface-800/40 bg-surface-900/30">
-              <p class="text-[11px] text-surface-500">Every visual change writes back to this file via AST transformation.</p>
+              <p class="text-[11px] text-surface-500">{t("studiopage.05")}</p>
             </div>
           </div>
         </div>
@@ -131,8 +122,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-12">
-          <h2 class="text-3xl sm:text-4xl text-white">When the UI runs out, you are already in SQL.</h2>
-          <p class="mt-4 text-surface-400 text-lg">Multiple tabs, autocomplete against your real schema, <code class="text-primary">EXPLAIN</code>, and results you can edit in place — running against your own Postgres, under the same row-level security as everything else.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("studiopage.06")}</h2>
+          <p class="mt-4 text-surface-400 text-lg" set:html={t("studiopage.07")}></p>
         </div>
         <div class="rounded-2xl border border-surface-800 bg-surface-950 shadow-2xl overflow-hidden">
           <SQLEditorDemo client:visible />
@@ -149,28 +140,28 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">The rest of the toolbox</h2>
-          <p class="mt-4 text-surface-400 text-lg">Every Studio tool ships with a scaffolded project and runs against your own database. Nothing here is a hosted service.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("studiopage.08")}</h2>
+          <p class="mt-4 text-surface-400 text-lg">{t("studiopage.09")}</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <SchemaBuilderMiniDemo client:load />
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Visual Schema Builder</h3>
-            <p class="text-sm text-surface-400">Create and modify tables, columns, and relationships through a visual interface.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.10")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.11")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <RbacMiniDemo client:load />
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Row Level Security</h3>
-            <p class="text-sm text-surface-400">Define granular permissions per role, per table — enforced natively in PostgreSQL.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.12")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.13")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v6"/><path d="M12 15v6"/><path d="M3 12h6"/><path d="M15 12h6"/><path d="m5.6 5.6 4.3 4.3"/><path d="m14.1 14.1 4.3 4.3"/><path d="m5.6 18.4 4.3-4.3"/><path d="m14.1 9.9 4.3-4.3"/></svg>
-                <span class="text-[10px] font-semibold text-white">Schema Visualizer</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.29")}</span>
               </div>
               <div class="flex flex-col gap-1 flex-1 items-center justify-center">
                 <div class="flex items-center gap-3">
@@ -185,15 +176,15 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Schema Visualizer</h3>
-            <p class="text-sm text-surface-400">Interactive ERD showing tables, columns, and relationships in a visual diagram.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.30")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.14")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-                <span class="text-[10px] font-semibold text-white">Database Branches</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.31")}</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -213,8 +204,8 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Database Branches</h3>
-            <p class="text-sm text-surface-400">Create an isolated copy of the database, work against it, and delete it when you are done. Create, list, inspect, delete — there is no merge, and the page does not pretend there is.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.32")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.15")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
@@ -232,14 +223,14 @@ import ClosingCta from "../ClosingCta.astro";
               </div>
             </div>
             <h3 class="text-base font-semibold text-white mb-2 mt-auto">JS Console</h3>
-            <p class="text-sm text-surface-400">Run JavaScript with the Rebase SDK in a live sandbox. Test queries and automate tasks.</p>
+            <p class="text-sm text-surface-400">{t("studiopage.16")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span class="text-[10px] font-semibold text-white">Cron Jobs</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.33")}</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -259,15 +250,15 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Cron Jobs</h3>
-            <p class="text-sm text-surface-400">Monitor and manage scheduled background tasks. View logs, status, and run history.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.34")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.17")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                <span class="text-[10px] font-semibold text-white">API Explorer</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.35")}</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-1 text-[8px] font-mono">
@@ -280,28 +271,28 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
                 <div class="flex items-center gap-1 text-[8px] font-mono">
                   <span class="px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[7px]">PUT</span>
-                  <span class="text-surface-300">/api/users/:id</span>
+                  <span class="text-surface-300">{t("studiopage.18")}</span>
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">API Explorer</h3>
-            <p class="text-sm text-surface-400">Interactive API documentation with live request testing. Browse and try every endpoint.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.36")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.19")}</p>
           </div>
 
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
-                <span class="text-[10px] font-semibold text-white">Logs Explorer</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.37")}</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
-                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400">INFO</span><span class="text-surface-300">GET /api/data/orders</span><span class="ml-auto text-[7px] text-surface-500">12ms</span></div>
-                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-amber-400">WARN</span><span class="text-surface-300">seq scan on orders</span><span class="ml-auto text-[7px] text-surface-500">840ms</span></div>
-                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400">INFO</span><span class="text-surface-300">POST /api/auth/login</span><span class="ml-auto text-[7px] text-surface-500">31ms</span></div>
+                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400">INFO</span><span class="text-surface-300">{t("studiopage.20")}</span><span class="ml-auto text-[7px] text-surface-500">12ms</span></div>
+                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-amber-400">WARN</span><span class="text-surface-300">{t("studiopage.21")}</span><span class="ml-auto text-[7px] text-surface-500">840ms</span></div>
+                <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400">INFO</span><span class="text-surface-300">{t("studiopage.22")}</span><span class="ml-auto text-[7px] text-surface-500">31ms</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Logs Explorer</h3>
-            <p class="text-sm text-surface-400">System and query logs, streamed live. Filter by level, follow a slow query back to the statement that ran it.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.38")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.23")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
@@ -316,7 +307,7 @@ import ClosingCta from "../ClosingCta.astro";
               </div>
             </div>
             <h3 class="text-base font-semibold text-white mb-2 mt-auto">Storage</h3>
-            <p class="text-sm text-surface-400">Browse, upload and move files across every storage source your project declares — the same buckets your API writes to.</p>
+            <p class="text-sm text-surface-400">{t("studiopage.24")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
@@ -331,13 +322,13 @@ import ClosingCta from "../ClosingCta.astro";
               </div>
             </div>
             <h3 class="text-base font-semibold text-white mb-2 mt-auto">Backups</h3>
-            <p class="text-sm text-surface-400">Browse and download every snapshot the scheduler has taken, with the size and age of each.</p>
+            <p class="text-sm text-surface-400">{t("studiopage.25")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
-                <span class="text-[10px] font-semibold text-white">API Keys</span>
+                <span class="text-[10px] font-semibold text-white">{t("studiopage.39")}</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-violet-300">▪</span><span class="text-surface-300">ci-deploy</span><span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">write</span></div>
@@ -345,8 +336,8 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-surface-500">▪</span><span class="text-surface-300">legacy-import</span><span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400">revoked</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">API Keys</h3>
-            <p class="text-sm text-surface-400">Issue scoped service keys for agents and server-to-server calls, and revoke one without touching the others.</p>
+            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.40")}</h3>
+            <p class="text-sm text-surface-400">{t("studiopage.26")}</p>
           </div>
 
         </div>

@@ -191,25 +191,10 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5 lg:order-last">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        The typed client
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Autocomplete that comes from your schema
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        <code class="font-mono text-surface-300">rebase generate-sdk</code> turns your collections
-                        into a <code class="font-mono text-surface-300">Database</code> type. Pass it to the client and
-                        collection names, field names, filter operators and return shapes are all checked at compile
-                        time — including the fields you asked for in <code class="font-mono text-surface-300">include</code>.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        Rename a column in the collection and the call sites turn red before anything ships.
-                        The repository that consumes the API does not need to be the one that defines
-                        it: <code class="font-mono text-surface-300">--from &lt;url&gt;</code> generates the same client
-                        from a running backend, in a project with no schema of its own. Your web app, admin and
-                        mobile client each stay in their own repo, and CI catches a stale client before a user does.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.00")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.01")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.02")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
                     <a href={translatePath("/sdk")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                         The full SDK tour
@@ -223,7 +208,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="lg:col-span-7 space-y-5">
                     <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                            <span class="font-mono text-xs text-surface-400">src/orders.ts</span>
+                            <span class="font-mono text-xs text-surface-400">{t("backendpage.04")}</span>
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={sdkCode}></code></pre>
                     </div>
@@ -245,25 +230,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Realtime
                     </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Changes arrive, however they were made
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        <code class="font-mono text-surface-300">listen()</code> on any collection and every insert,
-                        update and delete lands on the client over WebSocket. Subscriptions respect the same
-                        row-level security as a read, so a subscriber is never pushed a row they could not have
-                        fetched.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed">
-                        Writes made outside the API count too — a row changed
-                        from <code class="font-mono text-surface-300">psql</code>, a cron job or Studio's SQL editor emits
-                        the same event, because change capture happens in the database. Broadcast channels and
-                        presence are per-instance by default; set
-                        <code class="font-mono text-surface-300">realtime.bus</code> to
-                        <code class="font-mono text-surface-300">&#123; type: "postgres" &#125;</code> and they fan out across
-                        replicas over <code class="font-mono text-surface-300">LISTEN/NOTIFY</code>, or hand it a
-                        transport of your own.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.05")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.06")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed" set:html={t("backendpage.07")}></p>
                 </div>
                 <div class="lg:col-span-7">
                     <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
@@ -282,22 +251,15 @@ import ClosingCta from "../ClosingCta.astro";
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Authorization
                 </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    The rules live in Postgres, not in this server
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Requests execute as a restricted database role. Your <code class="font-mono text-surface-300">securityRules</code>{" "}
-                    compile to real row-level security policies, so a query that should return nothing returns
-                    nothing — whether it arrives through the SDK, a REST call, the admin panel, an agent's API key
-                    or a psql session. A collection with no policy serves no rows: the default is closed, not open.
-                </p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.08")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("backendpage.09")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
-                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">what you write</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.10")}</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">{t("backendpage.11")}</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={rulesCode}></code></pre>
                 </div>
@@ -306,7 +268,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="pointer-events-none absolute inset-0" aria-hidden="true"
                          style="background: radial-gradient(500px 260px at 70% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
                     <div class="relative px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">psql — what the database enforces</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.12")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">generated</span>
                     </div>
                     <pre class="relative p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={policyCode}></code></pre>
@@ -324,10 +286,7 @@ import ClosingCta from "../ClosingCta.astro";
                     </svg>
                 </a>
                 <span class="text-surface-700">·</span>
-                <span class="text-sm text-surface-500">
-                    Already on Postgres? <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code>{" "}
-                    audits it without installing anything.
-                </span>
+                <span class="text-sm text-surface-500" set:html={t("backendpage.13")}></span>
             </div>
         </div>
     </section>
@@ -337,22 +296,10 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        One server
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Everything mounted, nothing assembled
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        This is the routing table of a default project — one process, one deployment, no service
-                        mesh to draw. Each of these exists because building it yourself is a week you would
-                        rather spend elsewhere.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        One process is the default, not the ceiling. The same build also boots as an API, a
-                        functions tier and a worker — one variable per process decides which routes mount, which
-                        timers fire and which one owns the schema.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.25")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.14")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("backendpage.15")}</p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("backendpage.16")}</p>
                     <div class="space-y-4">
                         {alsoShipped.map(item => (
                                 <div class="flex gap-3">
@@ -371,7 +318,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <span class="ml-2 font-mono text-xs text-surface-400">rebase dev — mounted routes</span>
+                            <span class="ml-2 font-mono text-xs text-surface-400">{t("backendpage.17")}</span>
                         </div>
                         <ul class="divide-y divide-surface-800/60">
                             {routes.map(route => (
@@ -394,19 +341,14 @@ import ClosingCta from "../ClosingCta.astro";
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Underneath
                 </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Boring technology, on purpose
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    A Hono app and a Drizzle schema. Two things your team can read, debug and extend without
-                    learning a framework — and without waiting for us to expose a hook.
-                </p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.18")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("backendpage.19")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">backend/src/index.ts</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.20")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Hono</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
@@ -419,7 +361,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">relations, resolved in one query</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.21")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">Drizzle</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
@@ -437,15 +379,9 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    The other half
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">Headless by default</h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    The admin panel is a client of this API, not a layer inside it. It reads through the same policies your app does. Toggle it on below: the project gains one dependency
-                    and a nested <code class="font-mono text-surface-300">admin</code> block, a back office appears —
-                    and the API response on the right does not move.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.22")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.23")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("backendpage.24")}></p>
             </div>
             <SplitLayerDemo client:visible/>
             <div class="mt-10 text-center">
