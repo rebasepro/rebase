@@ -3021,12 +3021,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         callbacks: import("@rebasepro/types").CollectionCallbacks
     ): void => {
         let attached = 0;
+        // Assignment, not a merge — attaching callbacks REPLACES whatever the
+        // collection declared. That is the right semantics (the caller is
+        // taking ownership) and a silent one: a `beforeSave` on the collection
+        // config simply stops running, and a guard that is gone looks exactly
+        // like a guard that passed. It has already cost a duplicate-membership
+        // check in the control plane. So the replacement is said out loud,
+        // naming what is being dropped.
+        const replaced = new Set<string>();
         for (const registry of callbackTargets()) {
-            const collection = registry.get(slug) as { callbacks?: unknown } | undefined;
+            const collection = registry.get(slug) as { callbacks?: Record<string, unknown> } | undefined;
             if (collection) {
+                for (const [name, value] of Object.entries(collection.callbacks ?? {})) {
+                    if (typeof value === "function" && typeof (callbacks as Record<string, unknown>)[name] !== "function") {
+                        replaced.add(name);
+                    }
+                }
                 collection.callbacks = callbacks;
                 attached++;
             }
+        }
+        if (replaced.size > 0) {
+            logger.warn(
+                `[callbacks] Attaching callbacks to "${slug}" replaced ${[...replaced].map(n => `'${n}'`).join(", ")} ` +
+                "declared on the collection itself, which will no longer run. Callbacks are assigned, not merged — " +
+                "fold the collection's own callbacks into the ones being attached."
+            );
         }
         if (attached === 0) {
             logger.warn(`[callbacks] Collection "${slug}" not found in any registry — callbacks not attached.`);
