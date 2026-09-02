@@ -446,16 +446,13 @@ import ClosingCta from "../ClosingCta.astro";
                         <div inert aria-hidden="true">
                             <ReactExtMiniDemo client:visible/>
                         </div>
-                        <p class="text-sm text-surface-400 -mt-2">
-                            Your component renders in the form and in the list, with the entity, the collection and
-                            the SDK handed to it as props.
-                        </p>
+                        <p class="text-sm text-surface-400 -mt-2">{t("cmspage.00")}</p>
                     </div>
                 </div>
 
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">field widgets, configured</span>
+                        <span class="font-mono text-xs text-surface-400">{t("cmspage.01")}</span>
                     </div>
                     {/* The demo renders 449px of content; at 420 it spilled out of the frame and
                          over the caption underneath. `overflow-hidden` keeps a future content
@@ -464,10 +461,7 @@ import ClosingCta from "../ClosingCta.astro";
                         <CustomFieldsDemo client:visible/>
                     </div>
                     <div class="px-5 pb-5">
-                        <p class="text-sm text-surface-400">
-                            Twenty-odd field types ship with the panel. Everything beyond them is a component you
-                            write, not a feature request you file.
-                        </p>
+                        <p class="text-sm text-surface-400">{t("cmspage.02")}</p>
                     </div>
                 </div>
             </div>
@@ -490,15 +484,9 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    The cost of adding it
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">A layer, not a lock-in</h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Rebase split the CMS out of the backend contract, and the line is visible in your own
-                    project: the backend half of a collection, and
-                    the <code class="font-mono text-surface-300">admin</code> half the server never reads.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cmspage.03")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.04")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("cmspage.05")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -507,42 +495,30 @@ import ClosingCta from "../ClosingCta.astro";
                         <span class="font-mono text-xs text-surface-400">opting in</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={optInCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400">
-                        Without that reference, an <code class="font-mono text-surface-300">admin</code> key on a
-                        collection is a type error. Presentation cannot drift into a headless project by accident.
-                    </p>
+                    <p class="px-5 pb-5 text-sm text-surface-400" set:html={t("cmspage.06")}></p>
                 </div>
 
                 <div class="frame overflow-hidden">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
+                        <span class="font-mono text-xs text-surface-400">{t("cmspage.07")}</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={adminBlockCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400">
-                        Everything the panel needs lives in one nested block. Your data model stays readable to
-                        anyone who never opens the UI.
-                    </p>
+                    <p class="px-5 pb-5 text-sm text-surface-400">{t("cmspage.08")}</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">Same APIs as your app</h3>
-                    <p class="text-sm text-surface-400">The panel reads and writes through the same REST, auth and
-                        realtime endpoints you build on, under the same row-level security. No privileged data
-                        path.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.09")}</h3>
+                    <p class="text-sm text-surface-400">{t("cmspage.10")}</p>
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">Same schema, one source</h3>
-                    <p class="text-sm text-surface-400">No second data model to maintain. Rename a column in your
-                        collection and both the API and the back office follow in the same commit.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.11")}</h3>
+                    <p class="text-sm text-surface-400">{t("cmspage.12")}</p>
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">Its own SPA, or its own repository</h3>
-                    <p class="text-sm text-surface-400">Mount it inside an existing React app, or give it a repo
-                        of its own — <code class="font-mono text-surface-300">generate-sdk --from &lt;url&gt;</code> types
-                        it against the running backend, so it ships on its own cadence. npm packages, not a
-                        framework you move into.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.13")}</h3>
+                    <p class="text-sm text-surface-400" set:html={t("cmspage.14")}></p>
                 </div>
             </div>
         </div>
@@ -552,33 +528,26 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    Where it fits
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">Three layers, adopted in that order</h2>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cmspage.15")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.16")}</h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/backend")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 01</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase Backend</h3>
-                    <p class="text-sm text-surface-400">REST, a typed SDK, auth, storage, realtime and RLS over your
-                        Postgres. Headless and React-free. Everything else is optional.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.21")}</h3>
+                    <p class="text-sm text-surface-400">{t("cmspage.17")}</p>
                 </a>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-primary/30">
-                    <p class="text-xs font-mono text-surface-500 mb-2">layer 02 · you are here</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase CMS</h3>
-                    <p class="text-sm text-surface-400">The generated back office for the humans on your team,
-                        driven by the <code class="font-mono text-surface-300">admin</code> block in your
-                        collections.</p>
+                    <p class="text-xs font-mono text-surface-500 mb-2">{t("cmspage.18")}</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.22")}</h3>
+                    <p class="text-sm text-surface-400" set:html={t("cmspage.19")}></p>
                 </div>
                 <a href={translatePath("/studio")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 03</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase Studio</h3>
-                    <p class="text-sm text-surface-400">SQL editor, schema visualizer, RLS policy editor, branches
-                        and API explorer. Studio is the developer workspace. It registers inside the same panel
-                        as CMS.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.23")}</h3>
+                    <p class="text-sm text-surface-400">{t("cmspage.20")}</p>
                 </a>
             </div>
         </div>
