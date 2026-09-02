@@ -77,6 +77,59 @@ export interface ServeSPAConfig {
  * `apiBasePath` is always in the exclusion list, so this reached single-app
  * setups too, not just the multi-app ones the list was added for.
  */
+
+/**
+ * A request path that must never reach the static file server.
+ *
+ * Two shapes, and both were answering 200.
+ *
+ * **Dot-segments.** A build directory is not only the build: it is a directory
+ * on a disk, and in a self-host it is very often the project checkout or
+ * something beside it. `serveStatic` will happily answer for `/.env` and
+ * `/.git/config` because they are files under the root it was given, and the
+ * one thing that distinguishes them from `/assets/app.js` is the leading dot
+ * that every convention uses to mean "not content". A build has no legitimate
+ * dot-file to serve — `.well-known` is the one exception people reach for, and
+ * it is mounted as its own route rather than fished out of the SPA build.
+ *
+ * **Encoded traversal.** `%2e%2e%2f` decodes to `../` after routing, so a
+ * check on the raw path misses it while the file server does not. The path is
+ * decoded first and then judged.
+ */
+function isForbiddenStaticPath(requestPath: string): boolean {
+    let decoded = requestPath;
+    try {
+        decoded = decodeURIComponent(requestPath);
+    } catch {
+        // A path that is not valid percent-encoding is not a path to a build
+        // artifact either.
+        return true;
+    }
+    return decoded.split(/[/\\]/).some(segment => segment.startsWith("."));
+}
+
+/**
+ * Is the file this path names actually inside the build directory?
+ *
+ * `serveStatic` joins and reads, and a symlink inside the build resolves
+ * wherever it points — so a `node_modules` symlink, or a `public/` that a
+ * build tool linked to somewhere else, becomes a way out of the directory
+ * being served. Containment is asked of the RESOLVED path, because that is the
+ * file that would be read.
+ *
+ * A path that does not resolve is not refused here: it does not exist, and
+ * `serveStatic` answering 404 for it is the right outcome and a cheaper one.
+ */
+async function resolvesInsideBuild(frontendPath: string, relativePath: string): Promise<boolean> {
+    try {
+        const root = await fsp.realpath(frontendPath);
+        const target = await fsp.realpath(path.join(frontendPath, relativePath));
+        return target === root || target.startsWith(root + path.sep);
+    } catch {
+        return true;
+    }
+}
+
 function isUnderPath(requestPath: string, prefix: string): boolean {
     // "/" would exclude everything below it, which is every request.
     const trimmed = prefix.replace(/\/+$/, "");
@@ -241,6 +294,25 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
         // and carries the header from the 200 that seeded it.
         if (c.res.status !== 200) return;
         c.header("Cache-Control", isContentHashed(c.req.path) ? IMMUTABLE_CACHE : REVALIDATE_CACHE);
+    });
+
+    // Before `serveStatic`, because it is what `serveStatic` will otherwise
+    // answer. See {@link isForbiddenStaticPath} and {@link resolvesInsideBuild}.
+    app.use(scope, async (c, next) => {
+        const requestPath = isRoot ? c.req.path : (c.req.path.slice(basePath.length) || "/");
+
+        if (isForbiddenStaticPath(requestPath)) {
+            return c.text("Not found", 404);
+        }
+        if (!await resolvesInsideBuild(frontendPath, "." + requestPath)) {
+            logger.warn(
+                `[static] Refused ${c.req.path}: it resolves outside the build directory ` +
+                `(${frontendPath}). A symlink in a build is a way out of it.`
+            );
+            return c.text("Not found", 404);
+        }
+
+        return next();
     });
 
     app.use(scope, responseCompression());

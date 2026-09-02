@@ -217,18 +217,41 @@ export function isRowLevelSecurityDenial(error: unknown): boolean {
  * @param context  - A human-readable context string (e.g. collection slug or path)
  * @returns An object with a `message` safe for the client and the PG `code`.
  */
-export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string): { message: string; code: string } {
-    const detail = pgError.detail as string | undefined;
-    const hint = pgError.hint as string | undefined;
+export function pgErrorToFriendlyMessage(
+    pgError: PostgresError,
+    context: string,
+    options: { verbose?: boolean } = {}
+): { message: string; code: string } {
+    // Postgres's own `DETAIL` and `HINT`, and the raw driver message, are what
+    // make these errors useful while you are building — and what makes them an
+    // oracle once the server is answering strangers.
+    //
+    // The sharp one is `23505`: its detail reads `Key (email)=(a@b.c) already
+    // exists.`, which answers "is this person registered?" for any address, on
+    // a table whose rows RLS is otherwise hiding completely. The rest leak
+    // physical column and constraint names, which are the map for the next
+    // question. So in production the shape of the failure is served — what
+    // rule was broken, and where — and the values are not.
+    //
+    // The full text is not lost: the caller logs the original error. This
+    // decides what crosses the wire, not what is recorded.
+    const verbose = options.verbose ?? process.env.NODE_ENV !== "production";
+
+    const detail = verbose ? (pgError.detail as string | undefined) : undefined;
+    const hint = verbose ? (pgError.hint as string | undefined) : undefined;
     const constraint = pgError.constraint as string | undefined;
     const column = pgError.column as string | undefined;
     const table = pgError.table as string | undefined;
-    const dataType = pgError.dataType as string | undefined;
-    const pgMessage = pgError.message || "Unknown database error";
+    const dataType = verbose ? (pgError.dataType as string | undefined) : undefined;
+    const rawMessage = pgError.message || "Unknown database error";
+    const pgMessage = verbose ? rawMessage : "";
     const code = pgError.code || "UNKNOWN";
 
     const suffix = hint ? ` Hint: ${hint}` : "";
     const tableRef = table ?? context;
+
+    /** `": <postgres said>"`, or nothing when the details are withheld. */
+    const said = pgMessage ? `: ${pgMessage}` : "";
 
     switch (pgError.code) {
         case "23503": // foreign_key_violation
@@ -257,27 +280,27 @@ export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string
             };
         case "22P02": // invalid_text_representation (e.g. invalid UUID, wrong enum value)
             return {
-                message: `Invalid data format in "${context}": ${pgMessage}${suffix}`,
+                message: `Invalid data format in "${context}"${said}.${suffix}`,
                 code
             };
         case "22001": // string_data_right_truncation (value too long)
             return {
-                message: `Value too long for column "${column ?? "unknown"}" in "${tableRef}": ${pgMessage}${suffix}`,
+                message: `Value too long for column "${column ?? "unknown"}" in "${tableRef}"${said}.${suffix}`,
                 code
             };
         case "22003": // numeric_value_out_of_range
             return {
-                message: `Numeric value out of range for column "${column ?? "unknown"}" in "${tableRef}": ${pgMessage}${suffix}`,
+                message: `Numeric value out of range for column "${column ?? "unknown"}" in "${tableRef}"${said}.${suffix}`,
                 code
             };
         case "42703": // undefined_column
             return {
-                message: `Unknown column in "${tableRef}": ${pgMessage}. Check if your schema is up to date (run migrations).${suffix}`,
+                message: `Unknown column in "${tableRef}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
                 code
             };
         case "42P01": // undefined_table
             return {
-                message: `Table not found for "${context}": ${pgMessage}. Check if your schema is up to date (run migrations).${suffix}`,
+                message: `Table not found for "${context}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
                 code
             };
         case "42501": // insufficient_privilege
@@ -285,7 +308,7 @@ export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string
             // named both causes because it could not tell them apart — which
             // meant it was half wrong whichever one had happened, and sent the
             // reader to check the other. Postgres says which in its own message.
-            return pgMessage.toLowerCase().includes("row-level security policy")
+            return rawMessage.toLowerCase().includes("row-level security policy")
                 ? {
                     // The caller. Their policies do not permit this row; the
                     // deployment is working exactly as configured.
@@ -305,7 +328,7 @@ export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string
             };
         default: {
             // Unhandled PG code — still surface the actual database message
-            const parts = [`Database error in "${context}" [${code}]: ${pgMessage}`];
+            const parts = [`Database error in "${context}" [${code}]${said}`];
             if (detail) parts.push(`Detail: ${detail}`);
             if (column) parts.push(`Column: ${column}`);
             if (dataType) parts.push(`Data type: ${dataType}`);

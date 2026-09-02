@@ -208,16 +208,25 @@ export async function generateAccessToken(
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
-    // `aal` is written AFTER the custom claims, not before. The hook is handed a
-    // `defaultClaims` object that already contains `aal`, and the obvious hook
-    // — spread the input, add a field — echoes it straight back; one that
-    // merged a user-controlled profile object could echo back `aal: "aal2"`.
-    // Spreading last made the assurance level of a session something its own
-    // holder could assert, which is the one claim that must be decided here.
+    // The identity claims are written AFTER the custom ones, not before.
+    //
+    // `aal` already was, for a reason that applies just as much to the other
+    // two: the hook is handed a `defaultClaims` object that already contains
+    // them, and the obvious hook — spread the input, add a field — echoes them
+    // straight back, while one that merges a user-controlled profile object
+    // echoes back whatever that object happened to hold. Spread last, a claim
+    // becomes something its own holder can assert.
+    //
+    // For `aal` that meant a session could claim it had passed a second factor.
+    // For `uid` and `roles` it is worse and was not covered: `uid` is who the
+    // whole request is, down to the RLS identity the database evaluates
+    // policies against, and `roles` is what the admin gate reads. A custom
+    // claims hook is a place to add facts about a session, not the place its
+    // subject is decided.
     const payload: Record<string, unknown> = {
+        ...customClaims,
         uid,
         roles,
-        ...customClaims,
         aal
     };
 
