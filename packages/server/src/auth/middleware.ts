@@ -158,7 +158,13 @@ export function createRequireAuth(options?: {
      */
     revocationRepo?: Pick<AuthRepository, "getTokensValidAfter">;
 }): MiddlewareHandler<HonoEnv> {
-    if (!options?.serviceKey) return requireAuth;
+    // Only when there is nothing at all to add. Keyed on the service key alone,
+    // this dropped `resolveRoles` and `revocationRepo` silently for any caller
+    // that passed them without one — which reads as "the fresh-role check is
+    // wired" at the call site and behaves as if it were not.
+    if (!options?.serviceKey && !options?.resolveRoles && !options?.revocationRepo) {
+        return requireAuth;
+    }
 
     const key = options.serviceKey;
     const resolveRoles = options.resolveRoles;
@@ -179,7 +185,7 @@ export function createRequireAuth(options?: {
         }
 
         // Check service key first (constant-time comparison)
-        if (safeCompare(token, key)) {
+        if (key !== undefined && safeCompare(token, key)) {
             c.set("user", { uid: "service",
 roles: ["admin"] } as AccessTokenPayload);
             return next();
@@ -197,7 +203,7 @@ roles: ["admin"] } as AccessTokenPayload);
             }, 401);
         }
 
-        if (resolveRoles) {
+        if (resolveRoles || revocationRepo) {
             try {
                 // Same watermark the data plane checks. An admin route is the
                 // last place a revoked token should still work.
@@ -206,8 +212,9 @@ roles: ["admin"] } as AccessTokenPayload);
                         error: { message: "Session has been revoked", code: "SESSION_REVOKED" }
                     }, 401);
                 }
-                c.set("user", { ...payload,
-roles: await resolveRoles(payload.uid) });
+                c.set("user", resolveRoles
+                    ? { ...payload, roles: await resolveRoles(payload.uid) }
+                    : payload);
                 return next();
             } catch (error) {
                 // Fail closed. The token's own claim is exactly what must not be

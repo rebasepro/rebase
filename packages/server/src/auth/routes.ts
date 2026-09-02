@@ -8,7 +8,7 @@ import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
-import { requireAuth } from "./middleware";
+import { createRequireAuth, requireAuth } from "./middleware";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
@@ -194,6 +194,20 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     const authRepo = config.authRepo;
+
+    /**
+     * `requireAuth`, plus the question of whether the session still exists.
+     *
+     * Plain `requireAuth` verifies the signature and the expiry and stops
+     * there, so an access token stays good for its full hour after the account
+     * behind it has signed out everywhere or reset its password — the
+     * revocation watermark those write is checked on the data plane and was not
+     * checked here. On the three self-service routes below that mattered
+     * disproportionately: `/link/<provider>` attaches an OAuth identity to the
+     * account, so a stolen token could be turned into a permanent way back in
+     * AFTER the victim had done the one thing that is supposed to end it.
+     */
+    const requireLiveSession = createRequireAuth({ revocationRepo: authRepo });
     const { emailService, emailConfig, allowRegistration = false } = config;
     const ops = resolveAuthHooks(config.authHooks);
 
@@ -726,7 +740,7 @@ displayName: user.displayName });
              * email plays no part in the decision, so its verification status
              * is irrelevant.
              */
-            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireAuth, async (c) => {
+            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireLiveSession, async (c) => {
                 const userCtx = c.get("user") as { uid: string } | undefined;
                 if (!userCtx) {
                     throw ApiError.unauthorized("Not authenticated");
@@ -881,7 +895,7 @@ message: "Password has been reset successfully" });
      * POST /auth/change-password
      * Change password for authenticated user
      */
-    router.post("/change-password", requireAuth, async (c) => {
+    router.post("/change-password", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -930,7 +944,7 @@ message: "Password has been changed successfully" });
      * here: the address is unverified by construction, so an attacker can hold a
      * session for a mailbox that is not theirs.
      */
-    router.post("/send-verification", strictAuthLimiter, requireAuth, verificationEmailLimiter, async (c) => {
+    router.post("/send-verification", strictAuthLimiter, requireLiveSession, verificationEmailLimiter, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");

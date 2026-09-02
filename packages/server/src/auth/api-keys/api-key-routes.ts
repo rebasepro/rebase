@@ -18,6 +18,18 @@ import type { CreateApiKeyRequest, UpdateApiKeyRequest, ApiKeyPermission } from 
 export interface ApiKeyRouteOptions {
     store: ApiKeyStore;
     serviceKey?: string;
+    /**
+     * Read the caller's roles from the database rather than from their token.
+     *
+     * Without it this router trusted the `roles` claim, and a key minted here
+     * never expires and may carry `admin: true` — so an administrator demoted
+     * an hour ago could still mint themselves permanent admin access, and the
+     * demotion would not take effect until a token nobody can see had run out.
+     * See `createRequireAuth`.
+     */
+    resolveRoles?: (uid: string) => Promise<string[]>;
+    /** Repository for the token-revocation watermark. See `createRequireAuth`. */
+    revocationRepo?: Pick<import("../interfaces").AuthRepository, "getTokensValidAfter">;
 }
 
 /**
@@ -78,13 +90,13 @@ const rejectApiKeyAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
  * Create admin routes for API key management.
  */
 export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
-    const { store, serviceKey } = options;
+    const { store, serviceKey, resolveRoles, revocationRepo } = options;
     const router = new Hono<HonoEnv>();
 
     router.onError(errorHandler);
 
     // Apply auth middleware (service-key-aware)
-    router.use("/*", createRequireAuth({ serviceKey }));
+    router.use("/*", createRequireAuth({ serviceKey, resolveRoles, revocationRepo }));
     // Before requireAdmin, so a non-admin key gets the reason it was refused
     // rather than a generic "needs admin" that implies a wider key would work.
     router.use("/*", rejectApiKeyAuth);

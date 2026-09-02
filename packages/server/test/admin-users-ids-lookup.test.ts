@@ -30,7 +30,11 @@ roles: [] } : null;
     });
     const repo = {
         getUserWithRoles,
-        getUserRoleIds: async () => ["admin"],
+        // Per uid, not a blanket "admin". These routes re-read roles from the
+        // repository precisely so the token's claim cannot decide, and a mock
+        // that answers "admin" for everyone makes the 403 test pass for a
+        // reason that has nothing to do with the gate.
+        getUserRoleIds: async (id: string) => (id.startsWith("admin") ? ["admin"] : ["editor"]),
         getUserById: async (id: string) => users.find(u => u.id === id) ?? null,
         listUsersPaginated: async () => ({ users,
 total: users.length,

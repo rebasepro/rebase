@@ -1492,6 +1492,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
     // so keys created with `admin: true` genuinely reach the admin surfaces
+    // ─── What an administrative gate must re-read, per request ───────────
+    //
+    // `requireAdmin` reads `roles` out of the access token, and the token was
+    // minted up to an hour ago. Everything that has happened since — a demotion,
+    // a sign-out-everywhere, a password reset — is invisible to it. The user
+    // management routers already close that by re-reading both from the
+    // database on every request; the gate in front of backups, cron, logs, the
+    // schema editors, the RLS audit, the dev mailbox and the API-key router did
+    // not, which is to say it did not on the surfaces worth the most: a revoked
+    // token still downloaded a full database dump, and a demoted admin could
+    // mint themselves a permanent `admin: true` API key.
+    //
+    // Same repository, same two questions, wired once here so a new admin
+    // surface inherits the answer instead of having to remember it.
+    const adminIdentityRepo = (
+        authConfigResult?.authRepository ?? authConfigResult?.userService
+    ) as import("./auth/interfaces").AuthRepository | undefined;
+    const adminGateIdentity = {
+        resolveRoles: typeof adminIdentityRepo?.getUserRoleIds === "function"
+            ? (uid: string) => adminIdentityRepo.getUserRoleIds(uid)
+            : undefined,
+        revocationRepo: typeof adminIdentityRepo?.getTokensValidAfter === "function"
+            ? adminIdentityRepo
+            : undefined
+    };
+
     // (users, roles, api-keys, cron, backups, logs, schema editor) — their
     // documented behavior. Non-admin keys still fail `requireAdmin` with 403.
     const apiKeyPreAuth = apiKeyStore
@@ -1505,7 +1531,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
-            serviceKey: internalServiceKey
+            serviceKey: internalServiceKey,
+            // A key minted here never expires and can carry `admin: true`, so
+            // this is the single most valuable thing a stale token can reach.
+            ...adminGateIdentity
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
         logger.debug("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
@@ -1727,7 +1756,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             return;
         }
         if (apiKeyPreAuth) router.use("/*", apiKeyPreAuth);
-        router.use("/*", createRequireAuth({ serviceKey: internalServiceKey }), requireAdmin);
+        router.use(
+            "/*",
+            createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
+            requireAdmin
+        );
     };
 
     // The schema editor rewrites collection files, so it needs a collectionsDir
