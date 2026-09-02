@@ -324,12 +324,36 @@ export interface EnsureOutcome extends EnsurePlan {
     failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
 }
 
+/**
+ * The schema a collection lives in — validated, because it is about to be
+ * interpolated into DDL.
+ *
+ * Validation used to run only on the names read back OUT of the catalogue,
+ * which is the direction that cannot hurt anyone: those came from Postgres. The
+ * names going IN — the schema and table a collection declares — were quoted and
+ * concatenated on trust, and quoting is not escaping. A table named
+ * `x" (id int); DROP TABLE users; --` closes the quote and the statement, and
+ * the whole thing runs on the owner connection, which is the one connection in
+ * the system that is exempt from every RLS policy.
+ *
+ * That is only a config file on a self-hosted project, where the person writing
+ * it could run the SQL directly anyway. It is not only a config file where a
+ * collection can be defined over the wire — the live-schema and source editors
+ * both do that — and there the caller is an admin on the app, not an operator
+ * of the database.
+ */
 function schemaOf(collection: CollectionConfig): string {
-    return isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
+    const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
+    return assertSafeIdentifier(schema, "schema name");
+}
+
+/** A collection's table name, validated for the same reason as {@link schemaOf}. */
+function tableOf(collection: CollectionConfig): string {
+    return assertSafeIdentifier(getTableName(collection), "table name");
 }
 
 function qualified(collection: CollectionConfig): string {
-    return `${schemaOf(collection)}.${getTableName(collection)}`;
+    return `${schemaOf(collection)}.${tableOf(collection)}`;
 }
 
 /**
@@ -341,7 +365,7 @@ function qualified(collection: CollectionConfig): string {
  * silent schema fork.
  */
 function requiredEnums(collection: CollectionConfig): { name: string; values: string[] }[] {
-    const table = getTableName(collection);
+    const table = tableOf(collection);
     const schema = schemaOf(collection);
     const out: { name: string; values: string[] }[] = [];
     for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
@@ -486,7 +510,7 @@ export function planCollectionSchemaEnsure(
         if (existing.tables.has(key) || created.has(key)) continue;
         created.add(key);
         const schema = schemaOf(collection);
-        const table = getTableName(collection);
+        const table = tableOf(collection);
         const idEntry = Object.entries(collection.properties ?? {}).find(([n, p]) =>
             isIdProperty(n, p as Property, collection)
         );
@@ -505,7 +529,7 @@ export function planCollectionSchemaEnsure(
         const idType = idProp
             ? getSqlColumnType(idEntry![0], idProp, collection, collections)
             : "TEXT";
-        let idDef = `"${idName}" ${idType} PRIMARY KEY`;
+        let idDef = `"${assertSafeIdentifier(idName, "column name")}" ${idType} PRIMARY KEY`;
         if (idProp?.type === "string" && (idProp as { isId?: unknown }).isId === "uuid") {
             idDef += " DEFAULT gen_random_uuid()";
         }
@@ -573,6 +597,11 @@ export function planCollectionSchemaEnsure(
     ): void => {
         const present = existing.tables.get(key);
         if (present?.has(column)) return;
+        // Same reason as {@link schemaOf}: a column name reaching here came
+        // from a property declaration, which on the editor paths came over the
+        // wire. `definition` is built by the generator from a closed set of
+        // type mappings and is not caller text.
+        assertSafeIdentifier(column, "column name");
         actions.push({
             kind: "add-column",
             target: `${key}.${column}`,
@@ -583,7 +612,7 @@ export function planCollectionSchemaEnsure(
     for (const collection of collections) {
         const key = qualified(collection);
         const schema = schemaOf(collection);
-        const table = getTableName(collection);
+        const table = tableOf(collection);
         // A table this run is creating has no rows yet, so the constraints
         // `db push` writes are free to apply. On a table that already exists
         // they are not: `SET NOT NULL` is checked against live rows and a UNIQUE

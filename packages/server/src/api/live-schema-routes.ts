@@ -154,6 +154,18 @@ export function commitAuthor(user: unknown): { name: string; email: string } | u
  */
 const SAFE_COLLECTION_ID = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * What may become a Postgres identifier.
+ *
+ * Narrower than {@link SAFE_COLLECTION_ID}: a hyphen is fine in a filename and
+ * has to be quoted in SQL, and the builders downstream interpolate rather than
+ * escape. Deliberately the same alphabet
+ * `server-postgres/src/schema/ensure-collection-tables.ts` enforces, so a name
+ * this accepts is one that module will also accept — the two disagreeing would
+ * mean a change that validates here and throws from inside a planner.
+ */
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
+
 const parseProposed = (body: unknown): ProposedChange => {
     const candidate = body as Partial<ProposedChange> | undefined;
     if (!candidate?.collectionId || typeof candidate.collectionId !== "string") {
@@ -169,6 +181,43 @@ const parseProposed = (body: unknown): ProposedChange => {
     if (!candidate.collection || typeof candidate.collection !== "object") {
         throw ApiError.badRequest("`collection` is required.", "INVALID_CHANGE");
     }
+
+    // The names inside the collection reach SQL as identifiers, and only the id
+    // above was checked. `table`, `schema` and every property's `columnName` are
+    // interpolated into CREATE TABLE and ALTER TABLE — quoted, which is not the
+    // same as escaped — and those statements run on the owner connection, the
+    // one connection exempt from every RLS policy. The DDL builders refuse an
+    // unsafe identifier now too, but a 500 from the middle of a planner is not
+    // an answer a caller can act on, and the boundary is where a bad request
+    // belongs.
+    const collection = candidate.collection as {
+        table?: unknown;
+        schema?: unknown;
+        properties?: Record<string, { columnName?: unknown } | undefined>;
+    };
+    const named: Array<[string, unknown]> = [
+        ["table", collection.table],
+        ["schema", collection.schema],
+        ...Object.entries(collection.properties ?? {}).map(
+            ([property, spec]) => [`properties.${property}.columnName`, spec?.columnName] as [string, unknown]
+        )
+    ];
+    for (const [field, value] of named) {
+        if (value === undefined || value === null) continue;
+        if (typeof value !== "string" || !SAFE_SQL_IDENTIFIER.test(value)) {
+            // `typeof value` rather than the value itself: a body can carry an
+            // object whose `toString` is not callable, and formatting it would
+            // turn a 400 into a 500 from inside the validator.
+            const shown = typeof value === "string" ? `"${value}"` : `a ${typeof value}`;
+            throw ApiError.badRequest(
+                `${shown} is not a usable value for \`${field}\`. It becomes a Postgres ` +
+                "identifier, so it may contain only letters, numbers, underscores and dollar signs, " +
+                "and may not start with a digit.",
+                "INVALID_CHANGE"
+            );
+        }
+    }
+
     return { collectionId: candidate.collectionId, collection: candidate.collection };
 };
 
