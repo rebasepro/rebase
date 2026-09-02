@@ -959,6 +959,40 @@ force: true });
             });
         });
 
+        /*
+         * The stock scaffold serves its own collections, with no extra step.
+         *
+         * This is asserted HERE, before the test creates a `books` collection
+         * and pushes it, because everything after that point regenerates the
+         * Drizzle schema as a side effect — which is exactly how 0.17.3 shipped
+         * with every `GET /api/data/*` returning
+         * `500 Table not found for collection 'posts'` on a fresh project while
+         * this suite stayed green.
+         *
+         * `posts` ships with the scaffold. Boot creates its table either way;
+         * what was missing was `backend/src/schema.generated.ts`, which the
+         * template ships as `export const tables = {}` and which only
+         * `rebase db push` used to replace — a command the managed PGlite path
+         * never runs, and the path every new project takes.
+         *
+         * A 500 here means the generated schema is stale again. A 200 means a
+         * stranger following the README reaches their data.
+         */
+        console.log("\n🔎 Step 7b: Reading a scaffold collection before anything is pushed...");
+        const stockRead = await fetch(`http://localhost:${backendPort}/api/data/posts`, {
+            headers: { "Authorization": `Bearer ${serviceKey}` }
+        });
+        if (stockRead.status !== 200) {
+            const body = await stockRead.text();
+            throw new Error(
+                `The default scaffold could not serve its own 'posts' collection: `
+                + `HTTP ${stockRead.status} — ${body.slice(0, 300)}\n`
+                + "This is the first-run regression: `rebase dev` must generate the Drizzle schema "
+                + "on the managed database path, or every data read 500s on a fresh project."
+            );
+        }
+        console.log("✅ Stock scaffold serves /api/data/posts with no manual step.");
+
         console.log("\n🌐 Step 8: Dev Server is ready. Starting browser automation...");
         const browser = await chromium.launch({ headless: true });
         const context = await browser.newContext({
