@@ -151,7 +151,7 @@ const staged: string[] = [];
  * Add a version when one ships; remove one only when no deployed project can
  * still be on it, which is a decision about the fleet and not about this file.
  */
-const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0"];
+const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.14.1", "0.15.0", "0.16.0", "0.17.3"];
 
 /** The fixture the skew pass exercises — current format, real collections, real writes. */
 const SKEW_FIXTURE = "format2-backend";

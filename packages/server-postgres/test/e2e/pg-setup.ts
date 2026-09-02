@@ -70,7 +70,16 @@ export async function startPgContainer(): Promise<PgContainer> {
         "-e", "POSTGRES_PASSWORD=rebase",
         "-p", "5432",          // random host port
         "-d",
-        "postgres:18-alpine"
+        // pgvector's image, not `postgres:18-alpine`. It is the official
+        // Postgres image on the same major with the `vector` extension already
+        // built in — which is what `infra/docker/docker-compose.selfhost.yml`
+        // tells deployments to run, for the same reason.
+        //
+        // The plain image was fine until the reference fixture gained a vector
+        // property. `record-project-snapshot.mts` then died on
+        // `type "vector" does not exist` — recording a release's snapshot, the
+        // one job that has to work on a release commit and only once.
+        "pgvector/pgvector:pg18"
     ]);
 
     // Discover the assigned host port

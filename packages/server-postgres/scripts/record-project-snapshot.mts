@@ -32,7 +32,7 @@
  * ## Self-provisioning, deliberately
  *
  * Unlike the auth recorder, this one starts its own Postgres and provisions it
- * from the reference project in `scripts/derived-names.mts`. That is what lets
+ * from the reference project in `tooling/scripts/derived-names.mts`. That is what lets
  * `release.sh` record a snapshot every time without anyone having to have a live
  * database of the right vintage lying around — and "once per release" is a
  * discipline that has already been skipped for three releases running, so the
@@ -95,11 +95,12 @@ if (fs.existsSync(outDir) && !args.includes("--force")) {
 
 // ── The reference project ────────────────────────────────────────────────────
 
-const { FIXTURE } = await import(`${ROOT}/scripts/derived-names.mts`) as { FIXTURE: Record<string, unknown>[] };
+const { FIXTURE } = await import(`${ROOT}/tooling/scripts/derived-names.mts`) as { FIXTURE: Record<string, unknown>[] };
 const { generatePostgresDdl } = await import(
     `${PACKAGE}/src/schema/generate-postgres-ddl-logic.ts`
 );
 const { ensureAppRole } = await import(`${PACKAGE}/src/security/rls-enforcement.ts`);
+const { vectorExtensionStatement } = await import(`${PACKAGE}/src/schema/vector-index.ts`);
 const { ensureAuthTablesExist } = await import(`${PACKAGE}/src/auth/ensure-tables.ts`);
 const { startPgContainer, stopPgContainer } = await import(
     `${PACKAGE}/test/e2e/pg-setup.ts`
@@ -157,6 +158,20 @@ try {
     // The role has to exist before any policy naming it can be created, and the
     // generated DDL is where the policies are.
     await ensureAppRole(run, schemasOf(FIXTURE));
+
+    // pgvector, before the DDL that declares a `VECTOR(n)` column.
+    //
+    // The framework withholds `CREATE EXTENSION vector` from generated DDL on
+    // purpose — installing an extension needs a superuser and a managed provider
+    // has to allow it, neither of which is visible from inside the connection.
+    // A real deployment opts in through `DatabaseOptions.extensions`; this
+    // recorder owns its own throwaway container, so it opts in here.
+    //
+    // Without it the reference fixture's vector property fails as
+    // `type "vector" does not exist`, and the recorder dies on the one job that
+    // has to work on a release commit and only happens once.
+    await client.query(vectorExtensionStatement());
+
     const ddl: string = await generatePostgresDdl(FIXTURE, { includePolicies: true });
     await client.query(ddl);
 
@@ -219,9 +234,36 @@ try {
     for (const fk of ownedKeys.rows) {
         // Junctions are populated below, as whole rows.
         if (seeded[`${fk.schema}.${fk.table}`] === undefined) continue;
+        // Spread across the referenced rows rather than pinning every row to the
+        // first one.
+        //
+        // `LIMIT 1` was fine until the fixture grew a unique index over a
+        // relation column and an enum — `(primary_category_id, status)`. Both
+        // seeded rows take the same enum label by construction (an enum column
+        // cannot carry a per-row suffix), so giving them the same parent made the
+        // pair identical and the insert failed on
+        // `products_primary_category_id_status_ux_…`.
+        //
+        // Cycling also makes the snapshot better evidence: a rename that
+        // silently became an ADD leaves an empty column either way, but distinct
+        // values prove the *mapping* survived and not merely that something did.
         await client.query(
-            `UPDATE "${fk.schema}"."${fk.table}" SET "${fk.column}" = ` +
-            `(SELECT "${fk.ref_column}" FROM "${fk.ref_schema}"."${fk.ref_table}" ORDER BY 1 LIMIT 1)`
+            `WITH targets AS (
+                 SELECT "${fk.ref_column}" AS v,
+                        row_number() OVER (ORDER BY "${fk.ref_column}") AS rn
+                 FROM "${fk.ref_schema}"."${fk.ref_table}"
+             ),
+             numbered AS (
+                 SELECT ctid AS cid, row_number() OVER (ORDER BY ctid) AS rn
+                 FROM "${fk.schema}"."${fk.table}"
+             )
+             UPDATE "${fk.schema}"."${fk.table}" t
+             SET "${fk.column}" = (
+                 SELECT v FROM targets
+                 WHERE rn = ((n.rn - 1) % (SELECT GREATEST(count(*), 1) FROM targets)) + 1
+             )
+             FROM numbered n
+             WHERE t.ctid = n.cid`
         );
     }
 
@@ -299,7 +341,7 @@ try {
     ];
     const { stdout: dump } = await execa("docker", [
         "run", "--rm", "--add-host", "host.docker.internal:host-gateway",
-        "postgres:18-alpine", "pg_dump", ...dumpArgs
+        "pgvector/pgvector:pg18", "pg_dump", ...dumpArgs
     ], { maxBuffer: 64 * 1024 * 1024 });
 
     const cleaned = dump

@@ -22,6 +22,7 @@
  * upgrade test then proves that a schema can be migrated to itself.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +164,35 @@ if (!/CREATE TABLE/i.test(dump)) {
 // quietly signs every user out. Synthetic on purpose: a real dump would carry
 // real emails and password hashes into the repository.
 const stamp = outName.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+
+/**
+ * The seeded user's id, in a form the recorded `rebase.users.id` will accept.
+ *
+ * This used to be `'user-<stamp>'` unconditionally, which is a perfectly good
+ * primary key while that column is `text` — and 0.16 recorded it as `text`. It
+ * is `uuid` now, and against a uuid column the snapshot fails to restore at all:
+ * `invalid input syntax for type uuid: "user-recorded-v0-17-3-auth2-sql"`, from
+ * the line that loads the file, before a single assertion runs.
+ *
+ * That is the worst possible failure for this script. It produces a file that
+ * looks recorded, is committed, and only turns out to be unusable the next time
+ * somebody runs the upgrade suite — by which point the release it was recording
+ * has shipped and the moment to record it has passed.
+ *
+ * So the id follows the column. Derived from the stamp rather than random, so
+ * re-recording the same release twice produces the same file and the diff is
+ * empty.
+ */
+const usersIdIsUuid = /CREATE TABLE rebase\.users \(\s*\n\s*id uuid\b/i.test(dump);
+const seedUid = usersIdIsUuid
+    ? (() => {
+        // A v4-shaped uuid built from the stamp's own digest, so it is stable
+        // per file name and obviously synthetic.
+        const hex = createHash("sha256").update(stamp).digest("hex");
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    })()
+    : `user-${stamp}`;
+
 const seed = `
 -- ── Seed ─────────────────────────────────────────────────────────────────────
 -- Synthetic, and required: see schema-snapshots/README.md. One user and two live
@@ -170,7 +200,7 @@ const seed = `
 -- to preserve.
 
 INSERT INTO rebase.users (id, email, display_name, roles, email_verified)
-VALUES ('user-${stamp}', 'recorded@${stamp}.test', 'Recorded User', ARRAY['admin'], TRUE);
+VALUES ('${seedUid}', 'recorded@${stamp}.test', 'Recorded User', ARRAY['admin'], TRUE);
 
 -- session_started_at is set explicitly, and to the same instant as created_at,
 -- because the column already exists in every era this script can record from —
@@ -182,9 +212,9 @@ VALUES ('user-${stamp}', 'recorded@${stamp}.test', 'Recorded User', ARRAY['admin
 -- session start survives the upgrade untouched.
 INSERT INTO rebase.refresh_tokens (uid, token_hash, expires_at, user_agent, ip_address, created_at, session_started_at)
 VALUES
-    ('user-${stamp}', '${stamp}-token-a', NOW() + INTERVAL '30 days',
+    ('${seedUid}', '${stamp}-token-a', NOW() + INTERVAL '30 days',
      'Mozilla/5.0 (recorded)', '203.0.113.20', NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
-    ('user-${stamp}', '${stamp}-token-b', NOW() + INTERVAL '30 days',
+    ('${seedUid}', '${stamp}-token-b', NOW() + INTERVAL '30 days',
      'Mozilla/5.0 (recorded)', '203.0.113.21', NOW() - INTERVAL '6 hours', NOW() - INTERVAL '6 hours');
 `;
 
