@@ -53,15 +53,18 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` generiert eine sofort einsatzbereite `.env` für Sie (Geheimnisse, Datenbank-Passwort, ein freier lokaler Port) — kein Bearbeiten nötig, um loszulegen. Starten Sie den mitgelieferten PostgreSQL-Container, erstellen Sie die Tabellen und starten Sie dann die Entwicklungs-Server:
+`init` erzeugt eine startklare `.env` für Sie – nichts muss bearbeitet werden. Dann:
 
 ```bash
-docker compose up -d db   # Datenbank starten
-pnpm run db:push          # Tabellen aus Ihren Sammlungen erstellen
-pnpm dev                  # Backend + Frontend starten
+pnpm install
+pnpm run dev
 ```
 
-Ihr Admin-Panel läuft unter `http://localhost:5173` und die API unter `http://localhost:3001`. Das erste Konto, das Sie registrieren, wird zum Administrator.
+Das ist der gesamte erste Start. Es gibt keine Datenbank zu installieren und keinen Schema-Schritt: ohne gesetzte `DATABASE_URL` startet `rebase dev` eine verwaltete PostgreSQL (PGlite) im Projektverzeichnis, erzeugt das Schema aus Ihren Collections und legt die Tabellen beim Start an.
+
+**Lesen Sie die URLs aus der Ausgabe.** `rebase dev` wählt pro Projekt einen freien Port statt fester Ports, sodass sie sich zwischen Projekten und Maschinen unterscheiden. Das erste Konto, das Sie registrieren, wird zum Administrator.
+
+Um stattdessen Ihre eigene PostgreSQL zu verwenden, kommentieren Sie `DATABASE_URL` in `.env` ein und führen Sie `pnpm run dev` erneut aus.
 
 → Folgen Sie dem vollständigen [Schnellstart-Leitfaden](/docs/getting-started/quickstart) für eine komplette Anleitung, einschließlich der Anbindung Ihrer eigenen Datenbank.
 

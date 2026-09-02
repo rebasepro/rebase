@@ -32,31 +32,75 @@ Ceci échafaude un projet avec trois packages :
 N'exécutez pas `cp .env.example .env`. `.env.example` est une référence des variables disponibles — le copier par-dessus votre `.env` supprime les secrets générés et fait pointer `DATABASE_URL` vers une base de données qui n'existe pas. Modifiez directement `.env` si vous voulez changer une valeur.
 :::
 
-Si vous préférez pointer vers votre propre PostgreSQL plutôt que vers le conteneur inclus, modifiez `DATABASE_URL` dans `.env` :
+## Démarrer les serveurs de développement
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+C'est tout le premier démarrage. Il n'y a pas de base de données à installer ni
+d'étape de schéma : sans `DATABASE_URL` définie, `rebase dev` lance une
+**PostgreSQL gérée (PGlite)** dans le répertoire du projet, génère le schéma
+Drizzle à partir de vos collections et crée les tables au démarrage — y compris
+les exemples `posts`, `authors` et `tags`.
+
+Les deux moitiés démarrent ensemble :
+
+- **Backend** — API REST, auth, stockage, WebSocket
+- **Frontend** — le panneau d'administration Rebase
+- **Rechargement à chaud** pour les deux
+
+Les deux ports sont **dérivés du chemin de ce projet** plutôt que fixes, de sorte
+que plusieurs projets Rebase peuvent tourner côte à côte. `rebase dev` affiche
+les deux URLs auxquelles il s'est lié — **utilisez celles-là**, pas
+`localhost:3001` / `localhost:5173`. (`PORT` et `VITE_API_URL` dans `.env`
+configurent `rebase start`, le serveur de production, et sont ignorés ici.)
+Fixez un port avec `rebase dev --port 3001`.
+
+### Options utiles
+
+| Option | Sur | Effet |
+|---|---|---|
+| `--yes` | `init` | Accepte toutes les valeurs par défaut. **Obligatoire quand aucun terminal ne peut répondre**, en CI par exemple |
+| `--headless` | `init` | Un backend sans fichiers de collection et sans UI |
+| `--template <nom>` | `init` | Part d'un autre modèle que celui par défaut |
+| `--install` / `--no-install` | `init` | Lance le gestionnaire de paquets pour vous, ou non |
+| `--docker` | `dev` | Utilise PostgreSQL dans un conteneur plutôt que la base gérée |
+| `--no-db` | `dev` | Ne touche à aucune base ; vous apportez la vôtre |
+
+## Variante : votre propre PostgreSQL
+
+La base gérée est un confort, pas une obligation. Pour pointer le projet vers une
+PostgreSQL à vous, décommentez `DATABASE_URL` dans `.env` :
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-## Démarrer la base de données
+Démarrez ensuite les serveurs comme ci-dessus. Une `DATABASE_URL` déjà définie
+n'est jamais touchée, et une qui pointe ailleurs que sur cette machine est
+laissée entièrement tranquille.
 
-L'échafaudage fournit un `docker-compose.yml` avec un service PostgreSQL. Démarrez-le :
-
-```bash
-docker compose up -d db
-```
-
-(Ignorez cette étape si vous avez fait pointer `DATABASE_URL` vers votre propre base de données.)
-
-## Créer les tables
-
-Poussez vos collections vers la base de données. Ceci crée les tables pour les collections d'exemple `posts`, `authors` et `tags` :
+Avec votre propre base vous disposez en plus des commandes de migration, que la
+base gérée ne peut pas offrir : elles planifient les changements avec Atlas, qui
+a besoin d'une seconde base vide pour comparer, et PGlite en sert exactement une :
 
 ```bash
 pnpm run db:push
 ```
 
-Sans cette étape, le panneau d'administration s'ouvre quand même, mais chaque collection est vide et ses appels API échouent tant que les tables n'existent pas.
+Le démarrage crée déjà les tables manquantes de façon additive ; `db push` sert
+donc aux deux choses qu'il laisse délibérément de côté : la RLS des tables de
+jointure des relations plusieurs-à-plusieurs, et tout changement qui n'est pas
+purement additif — une colonne renommée, un type restreint, un champ supprimé.
+
+Le scaffold fournit aussi un `docker-compose.yml` avec un service PostgreSQL, si
+vous préférez un conteneur à une Postgres installée :
+
+```bash
+docker compose up -d db
+```
 
 ## Introspection d'une Base de Données Existante (Optionnel)
 
@@ -67,23 +111,6 @@ pnpm rebase schema introspect
 ```
 
 Cela analysera les tables, enums et relations de votre base de données et créera les fichiers de collection correspondants dans `config/collections/`.
-
-## Démarrer les serveurs de développement
-
-```bash
-pnpm dev
-```
-
-Ceci démarre les deux ensemble :
-- **Backend** — API REST, authentification, stockage, WebSocket
-- **Frontend** — le panneau d'administration Rebase
-- **Hot reload** pour les deux — les changements prennent effet instantanément
-
-Les deux ports sont **dérivés du chemin du projet** plutôt que fixes, ce qui permet
-d'exécuter plusieurs projets Rebase en parallèle. `rebase dev` affiche les deux URLs
-qu'il a liées — utilisez celles-ci, pas `localhost:3001`/`localhost:5173`. (`PORT` et
-`VITE_API_URL` dans `.env` configurent `rebase start`, le serveur de production, et
-sont ignorés ici.) Fixez un port avec `rebase dev --port 3001`.
 
 ## Première connexion
 
