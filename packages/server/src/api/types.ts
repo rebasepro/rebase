@@ -24,6 +24,15 @@ export type HonoEnv = {
          * bucket — a limiter in name only. See `auth/otp-routes.ts`.
          */
         otpEmail?: string;
+        /**
+         * The address a mail-sending auth route named, lower-cased.
+         *
+         * The generalisation of `otpEmail`, for the same reason and used the
+         * same way: `recipientEmailLimiter` bounds how many messages one
+         * MAILBOX receives, and the address it keys on lives in a body the
+         * limiter runs before anyone has parsed. See `auth/rate-limiter.ts`.
+         */
+        recipientEmail?: string;
         driver?: DataDriver;
         /** Set when the request is authenticated via a Service API Key. */
         apiKey?: ApiKeyMasked;

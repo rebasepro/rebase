@@ -29,15 +29,31 @@ jest.mock("../src/utils/logger", () => {
     };
 });
 
-// Bypass rate limiters — they share state across tests and cause 429s
+// Bypass rate limiters — they share state across tests and cause 429s.
+//
+// A hand-listed mock of a whole module, which means a NEW export the routes
+// start using arrives here as `undefined` and Hono reports it as
+// "r.handler is not a function" — a 500 on a route that was about to answer
+// something else entirely. So: everything `routes.ts` imports from this module
+// has a stand-in, and the two that are not middleware keep their real
+// behaviour, because the routes call them rather than mount them.
 jest.mock("../src/auth/rate-limiter", () => {
     const passthrough = async (_c: unknown, next: () => Promise<void>) => next();
     return {
         createRateLimiter: () => passthrough,
         defaultAuthLimiter: passthrough,
         strictAuthLimiter: passthrough,
-        // Exercised for real in `send-verification-rate-limit.test.ts`.
-        verificationEmailLimiter: passthrough
+        // Exercised for real in `send-verification-route.test.ts`.
+        verificationEmailLimiter: passthrough,
+        // Exercised for real in `recipient-email-limits.test.ts`.
+        captureRecipientEmail: passthrough,
+        recipientEmailLimiter: passthrough,
+        // Zero, not the real 400ms: this file is about what the routes ANSWER,
+        // and paying the anti-enumeration floor on every case here would add
+        // seconds to a suite that is not testing it. The floor's own behaviour
+        // is asserted where the real limiters are.
+        RECIPIENT_ROUTE_FLOOR_MS: 0,
+        notBefore: async <T>(_startedAt: number, _floorMs: number, result: T) => result
     };
 });
 
@@ -1026,20 +1042,28 @@ withEmail: false }); // Hack to pass empty list of providers
          * a response that differed by so much as a field would have passed,
          * because the existing-user branch was never asked what it returns.
          *
-         * "Timing-safe" is dropped from the name rather than pretended at: this
-         * handler does real work (token, template, SMTP) only for a user that
-         * exists, so it is *not* constant-time, and a unit test asserting
-         * otherwise would be the most misleading kind of green.
+         * The note that used to sit here said the handler "is *not*
+         * constant-time" and that asserting otherwise would be misleading. That
+         * was an accurate description of a real hole: the same words came back
+         * either way, and the TIME did not, so the endpoint that refuses to say
+         * whether an account exists said it anyway. The mail now goes off the
+         * response path and both branches are held to a floor — see
+         * `RECIPIENT_ROUTE_FLOOR_MS` — so there is a claim here worth making,
+         * and the case below makes it.
+         *
+         * Every case in this block uses its OWN address. They share a process
+         * with a per-address send limiter, and reusing one would have later
+         * cases answering 429 to a test about something else.
          */
         it("answers an unknown address and a real one identically", async () => {
             const app = createApp({ withEmail: true });
 
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
-            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknown = await app.request("/auth/forgot-password", json({ email: "identical-unknown@test.com" }));
             const unknownBody = await unknown.json();
 
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
-            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+            const known = await app.request("/auth/forgot-password", json({ email: "identical-known@test.com" }));
             const knownBody = await known.json();
 
             // Status, and every byte of the body: anything that differs here is
@@ -1056,12 +1080,12 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp({ withEmail: true });
 
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
-            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknown = await app.request("/auth/forgot-password", json({ email: "smtp-unknown@test.com" }));
             const unknownBody = await unknown.json();
 
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
             mockEmailService.send.mockRejectedValueOnce(new Error("smtp down"));
-            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+            const known = await app.request("/auth/forgot-password", json({ email: "smtp-known@test.com" }));
 
             expect(known.status).toBe(unknown.status);
             expect(await known.json()).toEqual(unknownBody);
@@ -1071,7 +1095,7 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp({ withEmail: true });
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
 
-            await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+            await app.request("/auth/forgot-password", json({ email: "sends-reset@test.com" }));
             expect(mockAuthRepo.createPasswordResetToken).toHaveBeenCalledTimes(1);
             expect(mockEmailService.send).toHaveBeenCalledTimes(1);
         });
@@ -1080,14 +1104,14 @@ withEmail: false }); // Hack to pass empty list of providers
             const app = createApp({ withEmail: true });
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
 
-            await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            await app.request("/auth/forgot-password", json({ email: "no-such-account@test.com" }));
             expect(mockAuthRepo.createPasswordResetToken).not.toHaveBeenCalled();
             expect(mockEmailService.send).not.toHaveBeenCalled();
         });
 
         it("returns 503 when email service is not configured", async () => {
             const app = createApp({ withEmail: false });
-            const res = await app.request("/auth/forgot-password", json({ email: "test@test.com" }));
+            const res = await app.request("/auth/forgot-password", json({ email: "no-mail-configured@test.com" }));
             expect(res.status).toBe(503);
             const body = await res.json() as any;
             expect(body.error.code).toBe("EMAIL_NOT_CONFIGURED");

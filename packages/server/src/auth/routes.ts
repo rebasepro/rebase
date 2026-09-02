@@ -12,7 +12,15 @@ import { createRequireAuth, requireAuth } from "./middleware";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
-import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
+import {
+    RECIPIENT_ROUTE_FLOOR_MS,
+    captureRecipientEmail,
+    defaultAuthLimiter,
+    notBefore,
+    recipientEmailLimiter,
+    strictAuthLimiter,
+    verificationEmailLimiter
+} from "./rate-limiter";
 import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
@@ -790,7 +798,19 @@ displayName: user.displayName });
      * POST /auth/forgot-password
      * Request password reset email
      */
-    router.post("/forgot-password", strictAuthLimiter, ...(captcha.forgotPassword ? [captcha.forgotPassword] : []), async (c) => {
+    router.post(
+        "/forgot-password",
+        strictAuthLimiter,
+        // Per-address as well as per-IP. `strictAuthLimiter` bounds a machine;
+        // an IP is the attacker's to rotate and the mailbox being filled is
+        // not, so without this a distributed run puts an unbounded number of
+        // reset messages into one person's inbox, from this deployment's
+        // domain. See `recipientEmailLimiter`.
+        captureRecipientEmail,
+        recipientEmailLimiter,
+        ...(captcha.forgotPassword ? [captcha.forgotPassword] : []),
+        async (c) => {
+        const startedAt = Date.now();
         const { email } = parseBody(forgotPasswordSchema, await c.req.json());
 
         // Check if email service is configured
@@ -823,25 +843,30 @@ displayName: user.displayName })
                 : getPasswordResetTemplate(resetUrl, { email: user.email,
 displayName: user.displayName }, appName, logoUrl);
 
-            // Send email
-            try {
-                await emailService!.send({
-                    to: user.email,
-                    subject: emailContent.subject,
-                    html: emailContent.html,
-                    text: emailContent.text
-                });
-            } catch (emailError: unknown) {
+            // Deliberately NOT awaited.
+            //
+            // An SMTP round trip is the largest and most variable thing this
+            // handler does, and it only happens on the branch where the address
+            // exists — so awaiting it made the response TIME the answer to the
+            // question the response TEXT refuses to answer. A failure was
+            // already withheld from the caller for the same reason; the only
+            // change is that the log line arrives after the response.
+            void emailService!.send({
+                to: user.email,
+                subject: emailContent.subject,
+                html: emailContent.html,
+                text: emailContent.text
+            }).catch((emailError: unknown) => {
                 logger.error("Failed to send password reset email", { error: emailError instanceof Error ? emailError.message : emailError });
-                // Don't reveal email sending failure to client
-            }
+            });
         }
 
-        // Always return success
-        return c.json({
+        // Held to a floor, so a known address and an unknown one take the same
+        // time to answer. See `RECIPIENT_ROUTE_FLOOR_MS`.
+        return notBefore(startedAt, RECIPIENT_ROUTE_FLOOR_MS, c.json({
             success: true,
             message: "If an account with that email exists, a password reset link has been sent."
-        });
+        }));
     });
 
     /**

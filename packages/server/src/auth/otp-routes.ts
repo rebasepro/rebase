@@ -108,6 +108,60 @@ const otpVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
     message: "Too many verification attempts for this account, please try again later."
 });
 
+/** Codes a single address may be MAILED per window. */
+const OTP_SENDS_PER_WINDOW = 5;
+
+/**
+ * Per-address throttle on code *delivery*.
+ *
+ * The verification limiter below has always been keyed per address; the send
+ * route had only `strictAuthLimiter`, which is keyed per IP. An IP is the
+ * attacker's to rotate and the mailbox under attack is not, so a distributed
+ * run put an unbounded number of messages into one person's inbox — from this
+ * deployment's domain, which is the reputation that pays for it.
+ *
+ * Five per fifteen minutes is generous for "I didn't get it, send it again"
+ * and useless as a mail bomb, matching `verificationEmailLimiter`.
+ */
+const otpSendLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: OTP_SENDS_PER_WINDOW,
+    keyGenerator: (c) => {
+        const email = (c.get("otpEmail") as string | undefined) ?? "unidentified";
+        return `otp-send:${email}`;
+    },
+    message: "Too many sign-in codes requested for this account, please try again later."
+});
+
+/**
+ * How long the send route takes, whoever asked.
+ *
+ * The route answers the same words for a known and an unknown address, which is
+ * the point — but it did not take the same TIME. A known address meant a token
+ * insert, a template render and an SMTP round trip; an unknown one meant
+ * returning immediately. The difference is measurable from anywhere, so the
+ * endpoint that refuses to say whether an account exists said it anyway, one
+ * address at a time and at whatever rate the IP limiter allowed.
+ *
+ * Two things close it, and both are needed. The mail is sent off the response
+ * path (below), which removes the largest and most variable part. And the
+ * handler is held to a floor, which covers the rest — the token write, the
+ * template — without needing the two branches to be instruction-for-instruction
+ * equal, which is not a property anyone can maintain.
+ *
+ * 400ms is chosen to sit above the slow branch's normal cost rather than to
+ * be pleasant: it is a login step a person takes once, and the alternative is
+ * an enumeration oracle.
+ */
+const OTP_SEND_FLOOR_MS = 400;
+
+/** Hold a result until at least `floorMs` has passed since `startedAt`. */
+async function notBefore<T>(startedAt: number, floorMs: number, result: T): Promise<T> {
+    const remaining = floorMs - (Date.now() - startedAt);
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+    return result;
+}
+
 /**
  * Read the address out of the body and put it where the limiter can key on it.
  *
@@ -173,7 +227,17 @@ export function mountOtpRoutes(deps: {
      * alternative is an oracle that turns this endpoint into a way to ask "is
      * this person a customer?", one address at a time.
      */
-    router.post("/otp", strictAuthLimiter, ...(captchaMiddleware ? [captchaMiddleware] : []), async (c) => {
+    router.post(
+        "/otp",
+        strictAuthLimiter,
+        // Per-address, in front of the handler, for the reason `otpSendLimiter`
+        // gives: the IP limiter above bounds a machine, and the mailbox being
+        // filled belongs to somebody who cannot rotate anything.
+        captureOtpEmail,
+        otpSendLimiter,
+        ...(captchaMiddleware ? [captchaMiddleware] : []),
+        async (c) => {
+        const startedAt = Date.now();
         const { email } = parseBody(requestSchema, await c.req.json());
 
         if (!isEmailConfigured()) {
@@ -185,11 +249,19 @@ export function mountOtpRoutes(deps: {
 
         const user = await authRepo.getUserByEmail(email);
 
-        if (user) {
-            if (ops.beforeLogin) {
-                await ops.beforeLogin(email, "otp");
-            }
+        // Fired for every attempt, not only the ones that name a real account.
+        //
+        // This hook is where a deployment blocks or audits sign-in attempts,
+        // and half of them were invisible to it: an enumeration run consists
+        // ENTIRELY of addresses that do not exist, so the hook could not see
+        // the thing it would most want to. It also means the hook cannot be
+        // used to infer whether an address is registered, which it could when
+        // its being called was itself the answer.
+        if (ops.beforeLogin) {
+            await ops.beforeLogin(email, "otp");
+        }
 
+        if (user) {
             const code = generateOtpCode();
             await authRepo.createMagicLinkToken(
                 user.id,
@@ -208,28 +280,37 @@ export function mountOtpRoutes(deps: {
                     logoUrl
                 );
 
-            try {
-                await emailService!.send({
-                    to: user.email,
-                    subject: content.subject,
-                    html: content.html,
-                    text: content.text
-                });
-            } catch (emailError: unknown) {
-                // Not reported to the caller: the answer must not depend on
-                // whether the address exists, and a delivery failure is one of
-                // the ways it could.
+            // Deliberately NOT awaited.
+            //
+            // An SMTP round trip is the largest and most variable thing this
+            // handler does, and it only happens on the branch where the address
+            // exists — so awaiting it made the response time the answer to the
+            // question the response text refuses to answer. Off the response
+            // path, the remaining difference is a token insert, which the floor
+            // below covers.
+            //
+            // A failure was already not reported to the caller, for the same
+            // reason; the only change is that the log line now arrives after
+            // the response rather than before it.
+            void emailService!.send({
+                to: user.email,
+                subject: content.subject,
+                html: content.html,
+                text: content.text
+            }).catch((emailError: unknown) => {
                 logger.error("Failed to send one-time code email", {
                     error: emailError instanceof Error ? emailError.message : emailError
                 });
-            }
+            });
         }
 
-        return c.json({
+        // Held to a floor, so a known address and an unknown one take the same
+        // time to answer. See OTP_SEND_FLOOR_MS.
+        return notBefore(startedAt, OTP_SEND_FLOOR_MS, c.json({
             success: true,
             message: "If an account with that email exists, a sign-in code has been sent.",
             expiresInSeconds: OTP_TTL_MS / 1000
-        });
+        }));
     });
 
     /**
