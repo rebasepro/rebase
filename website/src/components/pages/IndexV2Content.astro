@@ -244,9 +244,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <!-- What is left over is a line of text, not a fourth panel. -->
                     <div class="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-6">
                         <p class="text-sm text-[#b4b8bd] max-w-2xl">
-                            Plus auth and roles, S3-compatible storage, scheduled jobs, serverless
-                            functions and backups — all against the database you already own, under
-                            the same policies.
+                            {t("engine.plus")}
                         </p>
                         <a href={translatePath("/backend")} class="accent-link ml-auto">
                             {t("engine.link")}
@@ -302,7 +300,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                     class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
                                 >
                                     <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
-                                        Blog
+                                        {t("label.blog")}
                                     </span>
                                     <span class="max-w-[34rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
                                         {t("security.postLink")}
@@ -352,18 +350,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                     <div class="max-w-xl">
                         <h2 class="font-headers text-2xl sm:text-3xl text-balance">
-                            Don't take that on faith.
+                            {t("rlscheck.title")}
                         </h2>
-                        <p class="mt-4 text-sm text-[#b4b8bd] leading-relaxed">
-                            <code class="font-mono text-surface-300">rls-check</code> reads your database's own
-                            catalogue and reports what is actually exposed — tables served with row-level security
-                            switched off, policies that evaluate to true for everyone, views that read straight past
-                            the RLS on their base tables. Fourteen checks. Any Postgres: Supabase, Neon, RDS, your
-                            own server. It is read-only, it needs no account, and it does not care whether you use
-                            Rebase.
-                        </p>
+                        <p class="mt-4 text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
                         <a href={translatePath("/rls-check")} class="accent-link mt-6">
-                            See all 14 checks
+                            {t("rlscheck.cta")}
                             <ArrowRight size={15} />
                         </a>
                     </div>
@@ -387,10 +378,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 </svg>
                             </button>
                         </div>
-                        <p class="mt-3 text-2xs leading-5 text-surface-500">
-                            SELECTs against the system catalogues and nothing else. No telemetry, no upload, and
-                            it never reads your data.
-                        </p>
+                        <p class="mt-3 text-2xs leading-5 text-surface-500">{t("rlscheck.note")}</p>
                     </div>
                 </div>
             </div>
@@ -493,48 +481,44 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                 <p class="eyebrow mb-4">
                     <span class="font-mono">06</span>
-                    <span class="mx-2 text-surface-700">·</span>Who touches it
+                    <span class="mx-2 text-surface-700">·</span>{t("personas.badge")}
                 </p>
                 <h2 class="font-headers text-display-2 max-w-xl text-balance">
-                    Three people touch this. None of them the same way.
+                    {t("personas.title")}
                 </h2>
                 <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
                     <div class="md:border-r border-white/8 py-9 md:pr-8">
-                        <h3 class="text-base font-semibold tracking-tight">The developer who owns the database</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.dev.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Writes one collection file and gets a schema, REST, an SDK and policies.
-                            Mostly stays in the editor — and when a question is faster to answer in
-                            SQL, opens Studio rather than a second tool.
+                            {t("personas.dev.desc")}
                         </p>
                         {/* This used to end "never opens the panel", which reads well and is
                             wrong: Studio is IN the panel, and it is built for exactly this
                             person. The page then had no route to Studio at all except a link
                             buried in the security section. */}
                         <a href={translatePath("/backend")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            The backend <ArrowRight size={14} />
+                            {t("personas.dev.link")} <ArrowRight size={14} />
                         </a>
                         <a href={translatePath("/studio")} class="accent-link mt-2 !text-surface-300 hover:!text-white">
-                            Studio <ArrowRight size={14} />
+                            {t("personas.dev.link2")} <ArrowRight size={14} />
                         </a>
                     </div>
                     <div class="md:border-r border-white/8 py-9 md:px-8 border-t md:border-t-0">
-                        <h3 class="text-base font-semibold tracking-tight">The operator who lives in the panel</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.operator.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Fixes a wrong address, refunds an order, moves a card. Did not choose Rebase
-                            and will not read its docs — the panel answers to them.
+                            {t("personas.operator.desc")}
                         </p>
                         <a href={translatePath("/cms")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            The admin panel <ArrowRight size={14} />
+                            {t("personas.operator.link")} <ArrowRight size={14} />
                         </a>
                     </div>
                     <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/8">
-                        <h3 class="text-base font-semibold tracking-tight">The agent holding a scoped key</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.agent.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Reads and writes through the same API under the same policies as the humans.
-                            A first-class caller, not an integration.
+                            {t("personas.agent.desc")}
                         </p>
                         <a href={translatePath("/ai")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            AI &amp; agents <ArrowRight size={14} />
+                            <Fragment set:html={t("personas.agent.link")} /> <ArrowRight size={14} />
                         </a>
                     </div>
                 </div>

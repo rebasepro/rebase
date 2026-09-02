@@ -10,12 +10,9 @@ export const en = {
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
-  "rlscheck.badge": "Free tool · no signup",
-  "rlscheck.title": "Don't take our word for it",
-  "rlscheck.subtitle":
-    "rls-check runs against any Postgres — Supabase, Neon, RDS or your own server — and reports what is actually exposed: tables served with row-level security switched off, policies that are true for everyone, views that read straight past the RLS on their base tables.",
-  "rlscheck.note":
-    "Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes nothing, and no data ever leaves your machine.",
+  "rlscheck.title": "Don't take that on faith.",
+  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> reads your database's own catalogue and reports what is actually exposed — tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. Fourteen checks. Any Postgres: Supabase, Neon, RDS, your own server. It is read-only, it needs no account, and it does not care whether you use Rebase.",
+  "rlscheck.note": "SELECTs against the system catalogues and nothing else. No telemetry, no upload, and it never reads your data.",
   "rlscheck.cta": "See all 14 checks",
   "demo.badge": "The first five minutes",
   "demo.title": "Init. Push. Run.",
@@ -158,6 +155,20 @@ export const en = {
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
   "cta.button.github": "GitHub",
+  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups — all against the database you already own, under the same policies.",
+  "personas.badge": "Who touches it",
+  "personas.title": "Three people touch this. None of them the same way.",
+  "personas.dev.title": "The developer who owns the database",
+  "personas.dev.desc": "Writes one collection file and gets a schema, REST, an SDK and policies. Mostly stays in the editor — and when a question is faster to answer in SQL, opens Studio rather than a second tool.",
+  "personas.dev.link": "The backend",
+  "personas.dev.link2": "Rebase Studio",
+  "personas.operator.title": "The operator who lives in the panel",
+  "personas.operator.desc": "Fixes a wrong address, refunds an order, moves a card. Did not choose Rebase and will not read its docs — the panel answers to them.",
+  "personas.operator.link": "Rebase CMS",
+  "personas.agent.title": "The agent holding a scoped key",
+  "personas.agent.desc": "Reads and writes through the same API under the same policies as the humans. A first-class caller, not an integration.",
+  "personas.agent.link": "AI &amp; agents",
+  "label.blog": "Blog",
   "security.badge": "Security-first",
   // Carries claim 1 — security lives in the database — which is the page's
   // highest-ranked claim and was previously left entirely to the body copy.
