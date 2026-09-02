@@ -858,11 +858,26 @@ export function warnOnDriverSkew(
  */
 export function warnOnUnusableBundleShape(bundle: LoadedBundle): void {
     if (bundle.manifest.kind !== "backend") return;
-    if (!bundle.manifest.entry?.config) return;
+
+    // Keyed on `entry.collections`, not `entry.config`.
+    //
+    // The header above says only the bundle can tell "this project declares no
+    // collections" from "this build lost them" — and keying on `entry.config`
+    // threw that information away, because a headless project has a config
+    // package (its `index.ts`, its resources) and deliberately no collections
+    // directory. Every `--headless` boot therefore warned that its build was
+    // broken, on a project that is correct.
+    //
+    // Both bundle builders now declare `entry.collections` only when the
+    // directory exists — `createSourceBundle` for `rebase dev`, `rebase build`
+    // for a packaged one — so an absent entry means "declares none" and a
+    // declared-but-unresolved entry means "the build lost them". Which is the
+    // distinction this warning was always trying to draw.
+    if (!bundle.manifest.entry?.collections) return;
     if (bundle.collectionsDir) return;
     logger.warn(
-        `This bundle declares a config package at "${bundle.manifest.entry.config}", but no collections ` +
-            "directory resolved inside it, so no collections were loaded and no tables will be created. " +
-            "Rebuild with `rebase build` and check the manifest's `entry.collections`."
+        `This bundle declares collections at "${bundle.manifest.entry.collections}", but that ` +
+            "directory did not resolve, so no collections were loaded and no tables will be created. " +
+            "Rebuild with `rebase build`."
     );
 }

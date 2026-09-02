@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
 import { BundleError, createSourceBundle, loadBundle, readBundleManifest } from "../src/boot/bundle";
+import { warnOnUnusableBundleShape } from "../src/boot/boot";
 
 /**
  * Reading a bundle.
@@ -158,5 +159,36 @@ describe("createSourceBundle declares only what the project has", () => {
         expect(bundle.manifest.entry?.collections).toBe(path.join("config", "collections"));
         expect(bundle.manifest.entry?.schema).toBe("backend/src/schema.generated.ts");
         expect(bundle.collectionsDir).toBe(collections);
+    });
+});
+
+describe("warnOnUnusableBundleShape", () => {
+    const bundle = (entry: Record<string, unknown>, collectionsDir?: string) => ({
+        dir: scratch,
+        manifest: { kind: "backend", entry },
+        collectionsDir,
+        functionsDir: undefined,
+        cronsDir: undefined,
+        staticApps: []
+    }) as never;
+
+    it("says nothing about a project that declares no collections", () => {
+        // A `--headless` project has a config package — its index, its resources
+        // — and deliberately no collections directory. Keying this warning on
+        // `entry.config` made every headless boot report its own build as
+        // broken.
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        warnOnUnusableBundleShape(bundle({ config: "config" }));
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it("still warns when a declared collections directory did not resolve", () => {
+        // The case it exists for: the build lost them. Distinguishable only
+        // because the manifest declares what the project HAS.
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        warnOnUnusableBundleShape(bundle({ config: "config", collections: "config/collections" }));
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
     });
 });
