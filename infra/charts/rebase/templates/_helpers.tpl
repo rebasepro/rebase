@@ -154,6 +154,28 @@ is what lets one Deployment carry a different build than its siblings.
 - name: CORS_ORIGINS
   value: {{ printf "https://%s" .Values.ingress.host | quote }}
 {{- end }}
+{{/* Self-registration is off unless the chart is told otherwise: the Ingress
+     and its certificate come up before anyone has opened the sign-up form, so
+     an open form is a race the operator can lose for their own deployment.
+     The first account is named below instead. */}}
+{{- if not .Values.config.allowSelfRegistration }}
+- name: DISABLE_SELF_REGISTRATION
+  value: "true"
+{{- end }}
+{{- if or .Values.config.adminEmail .Values.existingSecret }}
+- name: REBASE_ADMIN_EMAIL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "rebase.secretName" . }}
+      key: REBASE_ADMIN_EMAIL
+      optional: true
+- name: REBASE_ADMIN_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "rebase.secretName" . }}
+      key: REBASE_ADMIN_PASSWORD
+      optional: true
+{{- end }}
 - name: REBASE_RATE_LIMIT_STORE
   value: {{ include "rebase.rateLimitStore" . | quote }}
 {{- if .Values.sharedState.requireSchemaMatch }}

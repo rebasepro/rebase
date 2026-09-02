@@ -8,6 +8,8 @@
 #   fly secrets set JWT_SECRET=$(openssl rand -hex 32) \
 #                  REBASE_SERVICE_KEY=$(openssl rand -hex 32)
 #   fly secrets set CORS_ORIGINS=https://<app>.fly.dev FRONTEND_URL=https://<app>.fly.dev
+#   fly secrets set REBASE_ADMIN_EMAIL=you@example.com \
+#                  REBASE_ADMIN_PASSWORD=$(openssl rand -hex 12)
 #   fly deploy
 #
 # Secrets are set from the command line rather than declared here on purpose:
@@ -22,6 +24,17 @@ primary_region = "cdg"
 [env]
   NODE_ENV = "production"
   PORT = "8080"
+  # ─── The first account ─────────────────────────────────────────────────
+  #
+  # A fresh Rebase database has no users, and the registration policy admits
+  # the first registration and makes it an admin — otherwise an empty database
+  # is a dead end, because bootstrapping an admin needs a caller who is already
+  # signed in. Fly gives the app a public hostname the moment it deploys, which
+  # makes that a race the operator can lose.
+  #
+  # So sign-up is closed here and the first account is named with the secrets
+  # above. The runtime creates it once, while the user table is still empty.
+  DISABLE_SELF_REGISTRATION = "true"
   # Uploads: the container filesystem does not survive a restart, so a `local`
   # storage backend in production is silent data loss and the runtime refuses
   # it. Either configure S3-compatible storage as secrets, or — if the project

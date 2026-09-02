@@ -26,8 +26,8 @@ worth declaring there is infrastructure the platform would otherwise own for you
 
 ## What every one of them has to get right
 
-The same four things, in every platform's own dialect. Each is a real boot
-failure, not a preference.
+The same five things, in every platform's own dialect. Each is a real boot
+failure or an open door, not a preference.
 
 **`DATABASE_URL` needs `pgvector` if you declare a vector property.** A
 `{ type: "vector" }` column compiles to `VECTOR(n)`, and a stock Postgres
@@ -43,6 +43,18 @@ ships a literal value is a blueprint that puts that value in production.
 refuses to boot in production without an allowed origin — deliberately, because
 the alternative is a permissive default nobody revisits. Each file wires the
 platform's own URL variable in where one exists.
+
+**The first account must be named, not raced for.** A fresh Rebase database has
+no users, and the registration policy admits the first registration and promotes
+it to admin — otherwise an empty database is a dead end, because bootstrapping
+an admin needs a caller who is already signed in. Every platform here publishes
+the deployment's URL the moment it is live, so on these that rule is a window
+between "the app is reachable" and "the operator has signed up", and whoever
+arrives first owns it. So each file sets `DISABLE_SELF_REGISTRATION=true` and
+names `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` (min 12 characters); the
+runtime creates that account once, while the user table is still empty, and
+does nothing on every deploy after that. To run an open sign-up instead, clear
+all three — knowing what the first visitor gets.
 
 **Storage hard-fails in production if it is left local.** The container
 filesystem is destroyed on every restart, so a `local` storage backend in

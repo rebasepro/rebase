@@ -46,6 +46,25 @@ services:
           envVarKey: RENDER_EXTERNAL_URL
       - key: NODE_ENV
         value: production
+      # ─── The first account ──────────────────────────────────────────────
+      #
+      # A fresh Rebase database has no users, and the registration policy
+      # admits the first registration and makes it an admin — otherwise an
+      # empty database is a dead end, because bootstrapping an admin needs a
+      # caller who is already signed in. Render publishes this service's URL
+      # the moment it is live, which makes that a race the operator can lose.
+      #
+      # So sign-up is closed and the first account is named instead. Set both
+      # in the Render dashboard before the first deploy; the runtime creates
+      # the account once, while the user table is still empty, and does
+      # nothing on every deploy after that.
+      - key: DISABLE_SELF_REGISTRATION
+        value: "true"
+      - key: REBASE_ADMIN_EMAIL
+        sync: false
+      # At least 12 characters. Change it after the first sign-in.
+      - key: REBASE_ADMIN_PASSWORD
+        generateValue: true
       # Uploads. Leave storage unset and /storage answers 501; set S3 to enable
       # it. The one thing you must not do is leave it `local` in production —
       # the container filesystem is wiped on every deploy, so the runtime

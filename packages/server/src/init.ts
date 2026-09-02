@@ -118,6 +118,7 @@ import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
 import { enforceAuthSecretExclusion } from "./auth/exclude-auth-secrets";
+import { seedInitialAdmin } from "./auth/seed-admin";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
@@ -1644,6 +1645,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
         }
+
+        // ── The operator's own account, before anyone can race them to it ──
+        //
+        // A fresh deployment's user table is empty, and the registration policy
+        // admits the first registration and makes it an admin — because
+        // otherwise an empty database can never produce the authenticated
+        // caller that `POST /admin/bootstrap` needs. That is fine on a laptop
+        // and a race on anything with a hostname. Naming the first account in
+        // the environment is what lets an artifact ship with self-registration
+        // off and still be reachable by the person who deployed it.
+        //
+        // Awaited, so the account exists before the server accepts a request.
+        // See ./auth/seed-admin.
+        await seedInitialAdmin(authAdapter?.userManagement);
     }
 
     // ── JWKS ─────────────────────────────────────────────────────────────

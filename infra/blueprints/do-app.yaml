@@ -52,6 +52,29 @@ services:
       - key: NODE_ENV
         scope: RUN_TIME
         value: production
+      # ─── The first account ──────────────────────────────────────────────
+      #
+      # A fresh Rebase database has no users, and the registration policy
+      # admits the first registration and makes it an admin — otherwise an
+      # empty database is a dead end, because bootstrapping an admin needs a
+      # caller who is already signed in. App Platform routes ${APP_URL} as
+      # soon as the app is live, which makes that a race the operator can
+      # lose to whoever finds the sign-up form first.
+      #
+      # So sign-up is closed and the first account is named instead. Fill both
+      # in before the first deploy; the runtime creates the account once,
+      # while the user table is still empty.
+      - key: DISABLE_SELF_REGISTRATION
+        scope: RUN_TIME
+        value: "true"
+      - key: REBASE_ADMIN_EMAIL
+        scope: RUN_TIME
+        value: CHANGE_ME_your_email
+      # At least 12 characters. Change it after the first sign-in.
+      - key: REBASE_ADMIN_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: CHANGE_ME_openssl_rand_hex_16
       # Uploads. See infra/blueprints/README.md — `local` storage in production is
       # refused, because the container filesystem is wiped on every deploy.
       # - key: STORAGE_TYPE

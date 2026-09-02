@@ -83,7 +83,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). The **first** user can always register, whatever this says — an empty user table has to admit somebody. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. | — |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a deployment closes the bootstrap window without becoming unreachable: the operator names the first account instead of racing the internet for it. | — |
+| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
 | `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |

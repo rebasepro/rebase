@@ -67,6 +67,30 @@ config:
   databaseUrl: ""
   jwtSecret: ""
   serviceKey: ""
+  # ─── The first account ───────────────────────────────────────────────────
+  #
+  # A fresh Rebase database has no users, and the registration policy admits
+  # the first registration and makes it an admin — otherwise an empty database
+  # is a dead end, since bootstrapping an admin needs a caller who is already
+  # signed in. On a laptop that is convenient. On this chart it is a race the
+  # operator can lose: the Ingress and its certificate are up before anyone has
+  # opened the sign-up form, so the deployment is reachable, and whoever
+  # registers first is its administrator.
+  #
+  # So this chart ships with self-registration OFF and asks who the first
+  # account belongs to. The runtime creates it, once, while the user table is
+  # empty; nothing is left to be claimed.
+  #
+  # Set `adminEmail` and `adminPassword` (min 12 characters), or point
+  # `existingSecret` at a Secret carrying REBASE_ADMIN_EMAIL and
+  # REBASE_ADMIN_PASSWORD. Change the password after the first sign-in.
+  #
+  # To run an open sign-up instead, set `allowSelfRegistration: true` and leave
+  # the two above empty — but understand that the first person to reach the
+  # form becomes the admin.
+  adminEmail: ""
+  adminPassword: ""
+  allowSelfRegistration: false
   # Origins your frontend is served from. Required in production; "*" is
   # refused by the runtime because the API sends credentials.
   corsOrigins: ""
