@@ -72,10 +72,31 @@ if [ "$SKIP_BUILD" = false ]; then
   info "Image: ${IMAGE}"
   echo ""
 
+  # `git archive HEAD`, not `.`.
+  #
+  # Submitting the working tree means submitting whatever is in it, filtered
+  # only by `.gcloudignore` — and the presence of that file is exactly what
+  # stops gcloud consulting `.gitignore`, so every ignored file is uploaded
+  # unless someone remembered to name it twice. That is a rule nobody can hold
+  # in their head, and it did not hold: `saas/.env.prod` went to the build
+  # bucket on every demo deploy, carrying the production control-plane database
+  # password, along with the private control-plane source tree.
+  #
+  # An archive of HEAD cannot carry an untracked or ignored file at all, which
+  # makes the property structural instead of a list to maintain. It is also
+  # what the control-plane deploy already does, so the two agree.
+  #
+  # The cost is real and worth stating: an uncommitted change is not deployed.
+  # That is the correct default for a deploy — see "deploys use the working
+  # tree as context" for what the other way costs.
+  CONTEXT_TARBALL="$(mktemp -t rebase-demo-context)".tar.gz
+  trap 'rm -f "$CONTEXT_TARBALL"' EXIT
+  git archive --format=tar.gz -o "$CONTEXT_TARBALL" HEAD
+
   gcloud builds submit \
     --config=infra/cloudbuild.yaml \
     --project="$PROJECT" \
-    .
+    "$CONTEXT_TARBALL"
 
   ok "Image built and pushed to Artifact Registry."
   echo ""

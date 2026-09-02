@@ -4,7 +4,27 @@
 **/dist/
 **/build/
 **/.DS_Store
+# Secrets.
+#
+# `**/.env` alone was not enough, and the gap was not obvious: this file
+# EXISTING is what makes gcloud stop consulting .gitignore, so everything
+# gitignored is uploaded unless it is also named here. `**/.env.prod` is not
+# `**/.env`, and the control plane's copy of it carries the production
+# database password.
+#
+# The `!` line keeps the checked-in examples, which are the only .env.* files
+# that belong in a build context.
 **/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
+
+# The Cloud control plane. A separate, PRIVATE repository that happens to live
+# inside this tree, and nothing in it is needed to build the demo image — so
+# every demo deploy was tarring a private source tree into a bucket whose read
+# access is much wider than that repository's.
+/saas/
+
 **/test-output.txt
 **/eslint-errors*.json
 **/lerna-debug.log

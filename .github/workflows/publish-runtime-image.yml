@@ -34,10 +34,22 @@ on:
         description: "Also move the `latest` tag to this image"
         type: boolean
         default: true
+      allow_overwrite:
+        description: "Republish over an image tag that already exists (rare — see the guard below)"
+        type: boolean
+        default: false
 
 jobs:
   image:
     runs-on: ubuntu-latest
+    # A GitHub environment, so the protection rules on it — required
+    # reviewers, a wait timer — apply. This workflow takes a free-form ref and
+    # pushes `rebasepro/server:<version>`, and the control plane's release
+    # intake registers the resulting digest as an active canary within fifteen
+    # minutes. That makes it the shortest path in the system from "a
+    # collaborator token" to "code running in every tenant", and it should not
+    # be one person's button.
+    environment: runtime-image
     # Two successful runs to go on, both near 10 minutes — a thin sample for a
     # job whose cost is dominated by a linux/amd64,linux/arm64 build. The arm64
     # half runs under emulation, so a cold layer cache is legitimately several
@@ -88,6 +100,45 @@ jobs:
       - name: Name the fleet tag
         id: fleet
         run: echo "tag=${{ inputs.version }}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # A released image tag is a name people have already pulled, and pinned,
+      # and built compose files against. Overwriting one changes what those
+      # pull WITHOUT any version changing, which is the one thing a version
+      # number is for — and here it also reaches the fleet, because the control
+      # plane registers a new digest under a known tag as an active canary.
+      #
+      # So an existing tag is a refusal, not a warning. Repairing a release
+      # that never got an image is what this workflow is for; replacing one
+      # that did is a new version's job. `--allow-overwrite` exists because
+      # there is a real case — an image published from the wrong commit, caught
+      # immediately — and it exists as a deliberate second act rather than as
+      # the default.
+      - name: Refuse to overwrite an image that already exists
+        if: ${{ !inputs.allow_overwrite }}
+        run: |
+          TAG="rebasepro/server:${{ inputs.version }}"
+          # The manifest endpoint on Docker Hub, unauthenticated, exactly as a
+          # `docker pull` would ask. A network failure is not evidence of
+          # absence, so anything other than a clean 404 refuses too.
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://hub.docker.com/v2/repositories/rebasepro/server/tags/${{ inputs.version }}")
+          case "$STATUS" in
+            404)
+              echo "$TAG does not exist yet — this is a first publish."
+              ;;
+            200)
+              echo "::error::$TAG already exists. Overwriting a released tag changes what"
+              echo "::error::everyone who pinned it pulls, and the control plane registers the new"
+              echo "::error::digest as an active canary. Cut a new version, or re-run with"
+              echo "::error::allow_overwrite if you know this image was published from the wrong commit."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not determine whether $TAG exists (HTTP $STATUS)."
+              echo "::error::Refusing rather than guessing: a failed check is not an absent tag."
+              exit 1
+              ;;
+          esac
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
