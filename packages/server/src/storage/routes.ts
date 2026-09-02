@@ -191,6 +191,15 @@ export interface StorageRoutesConfig {
      *  When false and requireAuth is true, reads also require authentication. */
     publicRead?: boolean;
     /**
+     * The storage configuration's `maxFileSize`.
+     *
+     * Only the resumable route needs it: `POST /upload` is capped by the body
+     * limit the server mounts in front of it, and the controllers check on
+     * write. TUS has neither — a chunked upload is many small bodies, and the
+     * controller's check runs at finalize, after every byte is on disk.
+     */
+    maxFileSize?: number;
+    /**
      * When provided, storage routes delegate auth to this adapter instead
      * of the built-in JWT module. This mirrors how data routes use
      * `createAdapterAuthMiddleware()` and avoids the "JWT secret not
@@ -1063,7 +1072,10 @@ message: "No file to delete" });
                     at: new Date().toISOString()
                 });
             }
-            : undefined
+            : undefined,
+        // What this deployment accepts, so the resumable path refuses a file
+        // that is too large at creation rather than after receiving it.
+        config.maxFileSize
     );
     tusHandler.startCleanup();
 

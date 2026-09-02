@@ -2140,7 +2140,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // after these routes are mounted, but always before a request runs.
             authorizeData: () => storageAuthorizeData.current,
             renditionCache: config.storageRenditionCache,
-            triggers: config.storageTriggers
+            triggers: config.storageTriggers,
+            // The same number the body limit above is derived from. The
+            // resumable route has no body limit in front of it — a chunked
+            // upload is many small bodies — so it has to be told.
+            maxFileSize: storageMaxSize
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it
