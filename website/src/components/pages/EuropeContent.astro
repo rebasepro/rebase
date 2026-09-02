@@ -3,10 +3,10 @@ const { lang, t } = Astro.props;
 
 import { useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
-import JurisdictionDemo from '../demos/JurisdictionDemo';
+import JurisdictionDemo, { JURISDICTION_STRINGS } from '../demos/JurisdictionDemo';
 import DeployTargetDemo from '../demos/DeployTargetDemo';
-import EuHostingCostDemo from '../demos/EuHostingCostDemo';
-import EuropeMapDemo from '../demos/EuropeMapDemo';
+import EuHostingCostDemo, { EU_HOSTING_COST_STRINGS } from '../demos/EuHostingCostDemo';
+import EuropeMapDemo, { EUROPE_MAP_STRINGS } from '../demos/EuropeMapDemo';
 
 const translatePath = useTranslatedPath(lang);
 
@@ -100,7 +100,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <div class="mx-auto max-w-6xl">
-                <JurisdictionDemo client:visible/>
+                <JurisdictionDemo client:visible s={Object.fromEntries(JURISDICTION_STRINGS.map((k) => [k, t(k)]))} />
             </div>
         </div>
     </section>
@@ -164,7 +164,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <div class="mx-auto max-w-6xl">
-                <EuHostingCostDemo client:visible/>
+                <EuHostingCostDemo client:visible s={Object.fromEntries(EU_HOSTING_COST_STRINGS.map((k) => [k, t(k)]))} />
             </div>
         </div>
     </section>
@@ -213,7 +213,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <p class="text-base leading-relaxed text-surface-400">{t("europe.23")}</p>
             </div>
 
-            <EuropeMapDemo client:visible/>
+            <EuropeMapDemo client:visible s={Object.fromEntries(EUROPE_MAP_STRINGS.map((k) => [k, t(k)]))} />
         </div>
     </section>
 
