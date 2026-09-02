@@ -102,7 +102,7 @@ const { generatePostgresDdl } = await import(
 const { ensureAppRole } = await import(`${PACKAGE}/src/security/rls-enforcement.ts`);
 const { vectorExtensionStatement } = await import(`${PACKAGE}/src/schema/vector-index.ts`);
 const { ensureAuthTablesExist } = await import(`${PACKAGE}/src/auth/ensure-tables.ts`);
-const { startPgContainer, stopPgContainer } = await import(
+const { startPgContainer, stopPgContainer, PGVECTOR_IMAGE } = await import(
     `${PACKAGE}/test/e2e/pg-setup.ts`
 );
 const { drizzle } = await import("drizzle-orm/node-postgres");
@@ -139,7 +139,11 @@ function serializable(collections: Record<string, unknown>[]): Record<string, un
 const schemasOf = (collections: Record<string, unknown>[]): string[] =>
     Array.from(new Set(["public", "rebase", ...collections.map(c => (c.schema as string) ?? "public")]));
 
-const container = await startPgContainer();
+// pgvector's image, not the suites' Alpine default: the reference fixture
+// declares a vector property. Scoped to this script — pointing the shared
+// default at a Debian image changes the collation, and two suites assert on
+// text ordering. See PGVECTOR_IMAGE.
+const container = await startPgContainer({ image: PGVECTOR_IMAGE });
 let client: pg.Client | undefined;
 
 try {
