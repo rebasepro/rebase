@@ -1600,4 +1600,8 @@ export const fr = {
   "alt.page.hasura.f3.a": "Les permissions de Hasura vivent dans ses métadonnées et sont appliquées par le moteur au moment où il construit chaque requête — expressives et bien conçues, et en vigueur pour les requêtes qui passent par Hasura. La sécurité au niveau des lignes de Postgres est appliquée par la base pour tous les clients. Le compromis est l'expressivité contre la portée, et laquelle compte dépend du nombre de choses qui touchent votre base.",
   "alt.page.hasura.f4.q": "Puis-je faire tourner Hasura et autre chose sur la même base ?",
   "alt.page.hasura.f4.a": "Oui, et c'est la façon sensée d'évaluer. Hasura, Rebase et Directus pointent tous vers un Postgres existant plutôt que de le posséder, et chacun garde sa propre comptabilité dans son propre schéma. Faites-les tourner côte à côte sur une copie avant de vous engager.",
+
+  // ── cfaq-ui ─────────────────────────────────────────────────────
+  "cfaq.pill": "Questions",
+  "cfaq.heading": "Rebase et %s, en réponses",
 };

@@ -83,10 +83,10 @@ const faqSchema = {
     <div class="mx-auto max-w-3xl px-6 lg:px-8 relative z-10">
         <div class="text-center mb-12">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
-                Questions
+                {t("cfaq.pill")}
             </span>
             <h2 class="mt-4 text-display-2 text-white">
-                {heading ?? `Rebase and ${competitor}, answered`}
+                {heading ?? t("cfaq.heading").replace("%s", competitor)}
             </h2>
         </div>
 

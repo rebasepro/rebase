@@ -1599,4 +1599,8 @@ export const de = {
   "alt.page.hasura.f3.a": "Hasuras Berechtigungen leben in seinen Metadaten und werden von der Engine beim Bau jeder Query angewendet — ausdrucksstark und gut entworfen, und in Kraft für Anfragen, die durch Hasura gehen. Postgres-Row-Level-Security setzt die Datenbank für jeden Client durch. Der Handel ist Ausdrucksstärke gegen Reichweite, und was zählt, hängt davon ab, wie viele Dinge deine Datenbank anfassen.",
   "alt.page.hasura.f4.q": "Kann ich Hasura und etwas anderes auf derselben Datenbank betreiben?",
   "alt.page.hasura.f4.a": "Ja, und das ist der vernünftige Weg zu evaluieren. Hasura, Rebase und Directus richten sich alle auf ein bestehendes Postgres, statt es zu besitzen, und jedes führt seine eigene Buchhaltung in seinem eigenen Schema. Lass sie nebeneinander auf einer Kopie laufen, bevor du dich festlegst.",
+
+  // ── cfaq-ui ─────────────────────────────────────────────────────
+  "cfaq.pill": "Fragen",
+  "cfaq.heading": "Rebase und %s, beantwortet",
 };
