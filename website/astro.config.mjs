@@ -19,6 +19,16 @@ export default defineConfig({
         }),
         starlight({
             title: "Rebase Docs",
+            // Starlight emits og:title, og:type, og:url and og:description and
+            // no og:image at all, so every documentation page previewed as a
+            // bare text card. One image for the whole section: a page-specific
+            // one would mean generating 1,200 of them, and the section is the
+            // useful unit anyway.
+            head: [
+                { tag: "meta", attrs: { property: "og:image", content: "https://rebase.pro/img/og/docs.png" } },
+                { tag: "meta", attrs: { name: "twitter:image", content: "https://rebase.pro/img/og/docs.png" } },
+                { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } }
+            ],
             locales: { root: { label: "English", lang: "en" }, es: { label: "Español", lang: "es" }, de: { label: "Deutsch", lang: "de" }, fr: { label: "Français", lang: "fr" }, it: { label: "Italiano", lang: "it" }, pt: { label: "Português", lang: "pt" } },
             customCss: [
                 "./src/styles/global.css",
