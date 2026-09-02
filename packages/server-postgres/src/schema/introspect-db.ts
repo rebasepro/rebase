@@ -15,7 +15,7 @@ import {
     safeHostFromUrl
 } from "./introspect-db-logic";
 import { detectCollectionBuilder } from "./introspect-db-project";
-import { countRowsUpTo, readSchemaMetadata } from "./introspect-db-queries";
+import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
 import { out, outWarn, outError } from "../cli-output";
@@ -173,6 +173,29 @@ async function main() {
             const batch = tablesToProcess.slice(i, i + BATCH_SIZE);
 
             await Promise.all(batch.map(async ([tableName, meta]) => {
+                // ── The name has to be usable as a filename ────────────────
+                //
+                // `tableName` came out of `pg_class` in a database this tool
+                // did not create — adopting somebody else's database is the
+                // whole point of introspection — and it is about to be joined
+                // onto a path. Postgres will happily hold a table called
+                // `../../../etc/cron.d/x`, and `path.join` resolves it: the
+                // generator would write a TypeScript file wherever that
+                // pointed, as whoever ran the command.
+                //
+                // Skipped rather than sanitised. A file named something other
+                // than its table is a collection that does not round-trip, and
+                // silently renaming it would be a worse surprise than one line
+                // saying which table was left out.
+                if (!isUsableFileName(tableName)) {
+                    outWarn(chalk.yellow(
+                        `⚠ Skipping table ${JSON.stringify(tableName)}: its name cannot be used as a ` +
+                        "filename. Rename the table, or write this collection by hand."
+                    ));
+                    skippedFiles.push(tableName);
+                    return;
+                }
+
                 // ── File overwrite protection ──────────────────────────────
                 const filePath = path.join(outDir, `${tableName}.ts`);
                 if (fs.existsSync(filePath) && !force) {
@@ -183,7 +206,10 @@ async function main() {
                 let sampleData: Record<string, unknown>[] | undefined = undefined;
                 if (runDataInference) {
                     try {
-                        const { rows } = await client.query(`SELECT * FROM "${pgSchema}"."${tableName}" LIMIT 100`);
+                        // Quoted by `quoteRelation`, which doubles an embedded
+                        // quote. Wrapping a catalogue name in `"` is not
+                        // escaping it — see that function.
+                        const { rows } = await client.query(`SELECT * FROM ${quoteRelation(pgSchema, tableName)} LIMIT 100`);
                         sampleData = rows;
                     } catch (err) {
                         outError(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));

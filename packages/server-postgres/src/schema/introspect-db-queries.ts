@@ -27,6 +27,58 @@ export interface QueryableClient {
 }
 
 /**
+ * A Postgres identifier, quoted so that whatever is inside it stays inside it.
+ *
+ * Introspection reads table and schema names out of `pg_class` and puts them
+ * straight back into SQL, and wrapping a name in double quotes is not the same
+ * as escaping it: a table named `x" ; DROP TABLE users; --` closes the quote
+ * and then the statement. Postgres's own escape for a quote inside a quoted
+ * identifier is to double it, which is what this does.
+ *
+ * "The catalogue is trusted" is true of your own database, and is exactly the
+ * assumption this tool cannot make. Introspection exists to be pointed at
+ * databases somebody else built, and it runs with the privileges of whoever
+ * ran it — which is usually a superuser, because that is who has a connection
+ * string to a database they are adopting.
+ */
+export function quoteIdentifier(name: string): string {
+    return `"${name.replace(/"/g, "\"\"")}"`;
+}
+
+/** `"schema"."table"`, both halves quoted. */
+export function quoteRelation(schema: string, table: string): string {
+    return `${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
+}
+
+/**
+ * Can this table's name be the name of the file describing it?
+ *
+ * Introspection writes `<collectionsDir>/<tableName>.ts`, and the table name
+ * came from a database this tool did not create. Postgres will hold a table
+ * called `../../../etc/cron.d/x`, and `path.join` resolves it — so without this
+ * the generator writes a file wherever the name points, as whoever ran the
+ * command.
+ *
+ * Deliberately narrow, and deliberately not a blocklist of `..` and `/`: the
+ * question is "is this a plain file name?", and every answer that is not
+ * obviously yes is a table better written by hand. NUL and the Windows
+ * separator are in scope because a collections directory is checked out on
+ * whatever machine the developer has.
+ */
+export function isUsableFileName(name: string): boolean {
+    if (name.length === 0 || name.length > 200) return false;
+    if (name === "." || name === "..") return false;
+    // Path separators (both platforms'), the Windows drive separator, and any
+    // control character — a NUL truncates the path at the OS boundary, so a
+    // name that reads as harmless in a log can be something else on disk.
+    // eslint-disable-next-line no-control-regex
+    if (/[/\\:\u0000-\u001f]/.test(name)) return false;
+    // A leading dot makes a hidden file, and a trailing one is invalid on
+    // Windows; neither is a table anyone means to generate.
+    return !name.startsWith(".") && !name.endsWith(".");
+}
+
+/**
  * Base tables, excluding partitions.
  *
  * `relispartition` is the reason this reads `pg_class` rather than
@@ -272,7 +324,7 @@ export async function countRowsUpTo(
     limit: number
 ): Promise<number> {
     const { rows } = await client.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM (SELECT 1 FROM "${schema}"."${table}" LIMIT ${limit + 1}) probe`
+        `SELECT count(*)::text AS count FROM (SELECT 1 FROM ${quoteRelation(schema, table)} LIMIT ${limit + 1}) probe`
     );
     return Number(rows[0]?.count ?? 0);
 }
