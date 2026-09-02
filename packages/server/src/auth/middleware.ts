@@ -421,8 +421,16 @@ code: "INTERNAL_ERROR" } }, 500);
                     if (payload) {
                         c.set("user", payload);
                         try {
-                            const user = { uid: payload.uid,
-roles: payload.roles };
+                            // `isAnonymous` comes from the token, and reaches
+                            // the RLS identity as `rebase.is_anonymous()`.
+                            // Without it a guest — a real user row minted by
+                            // anonymous sign-in — is the same principal as an
+                            // account inside every policy.
+                            const user = {
+                                uid: payload.uid,
+                                roles: payload.roles,
+                                isAnonymous: payload.isAnonymous === true
+                            };
                             c.set("driver", await scopeDataDriver(driver, user));
                         } catch (error) {
                             // withAuth() failed for a valid token — reject (fail closed)

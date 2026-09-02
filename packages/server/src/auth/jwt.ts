@@ -51,6 +51,21 @@ export interface AccessTokenPayload {
     /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
     aal?: "aal1" | "aal2";
     /**
+     * Whether this session is a GUEST: anonymous sign-in rather than an account.
+     *
+     * An identity claim, written by the server and never taken from a custom
+     * claims hook — see {@link generateAccessToken}. It is here rather than
+     * looked up per request because everything downstream needs it and nothing
+     * downstream has a database: the RLS identity carries it into
+     * `rebase.is_anonymous()`, and the WebSocket path has only the token.
+     *
+     * Absent means "not a guest". A token minted before this claim existed is
+     * therefore read as an ordinary account, which is the behaviour that
+     * deployment already had — the alternative would reclassify every session
+     * in flight at the moment of a deploy.
+     */
+    isAnonymous?: boolean;
+    /**
      * When the token was issued, in seconds since the epoch — the standard JWT
      * `iat` claim, which the signer behind `jwt-crypto.ts` sets on every token
      * it mints — see the note there before replacing that implementation.
@@ -202,7 +217,13 @@ export async function generateAccessToken(
     uid: string,
     roles: string[],
     aal: "aal1" | "aal2" = "aal1",
-    customClaims?: Record<string, unknown>
+    customClaims?: Record<string, unknown>,
+    /**
+     * Whether this session is a guest — anonymous sign-in rather than an
+     * account. Written into the token so the RLS identity and the WebSocket
+     * path can tell the two apart without a database lookup.
+     */
+    isAnonymous = false
 ): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
@@ -227,7 +248,11 @@ export async function generateAccessToken(
         ...customClaims,
         uid,
         roles,
-        aal
+        aal,
+        // An identity claim, so it goes with the others — after the custom
+        // ones, where a hook cannot overwrite it. Omitted when false to keep
+        // the token as small as it was.
+        ...(isAnonymous ? { isAnonymous: true } : {})
     };
 
     // The `kid` is what lets a verifier pick the right public key out of the
@@ -317,7 +342,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
         const decoded = (namedKey
             ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
             : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
+        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
@@ -334,6 +359,13 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             uid: id,
             roles: decoded.roles || [],
             aal,
+            // Present only when true, mirroring the mint. Absent means "not a
+            // guest" on both sides, which is what a token issued before this
+            // claim existed carries — and reading that as an ordinary account
+            // is the behaviour that deployment already had. Keeping the key off
+            // the object also means the verified payload has exactly the shape
+            // it had, for everything that compares whole payloads.
+            ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
             iat: decoded.iat
         };
     } catch (error) {

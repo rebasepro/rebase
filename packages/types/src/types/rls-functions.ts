@@ -60,6 +60,18 @@ export const RLS_UID_SQL = `${REBASE_SCHEMA}.uid()`;
 /** The request's roles as a comma-separated string, for `string_to_array`. */
 export const RLS_ROLES_SQL = `${REBASE_SCHEMA}.roles()`;
 
+/**
+ * Whether the caller is a GUEST — signed in through anonymous sign-in rather
+ * than with an account.
+ *
+ * A different question from {@link ANONYMOUS_USER_ID}, and the two are easy to
+ * confuse: that sentinel means "no session at all", while this means "a session
+ * with nobody behind it". Anonymous sign-in mints a real user row with a real
+ * uid, so before this reached the database the two kinds of caller were one
+ * principal inside every policy.
+ */
+export const RLS_IS_ANONYMOUS_SQL = `${REBASE_SCHEMA}.is_anonymous()`;
+
 /** The request's JWT claims as `jsonb`, or `{}`. */
 export const RLS_JWT_SQL = `${REBASE_SCHEMA}.jwt()`;
 

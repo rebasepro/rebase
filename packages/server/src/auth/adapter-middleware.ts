@@ -86,12 +86,17 @@ code: "UNAUTHORIZED" } }, 401);
             c.set("user", {
                 uid: authenticatedUser.uid,
                 email: authenticatedUser.email,
-                roles: authenticatedUser.roles
+                roles: authenticatedUser.roles,
+                isAnonymous: authenticatedUser.isAnonymous === true
             });
             try {
                 c.set("driver", await scopeDataDriver(driver, {
                     uid: authenticatedUser.uid,
-                    roles: authenticatedUser.roles
+                    roles: authenticatedUser.roles,
+                    // A guest is a signed-in caller with no account behind
+                    // them. Absent from an adapter that has no such concept,
+                    // and absent reads as "not a guest".
+                    isAnonymous: authenticatedUser.isAnonymous === true
                 }));
             } catch (error) {
                 logger.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user", { error: error });

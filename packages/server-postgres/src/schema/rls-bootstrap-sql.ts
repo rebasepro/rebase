@@ -68,6 +68,29 @@ $$ LANGUAGE sql STABLE`,
 
     `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.roles() RETURNS text AS $$
     SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
+$$ LANGUAGE sql STABLE`,
+
+    // Is the caller a GUEST — signed in through anonymous sign-in rather than
+    // with an account?
+    //
+    // Anonymous sign-in mints a real user row and a real uid, so inside a policy
+    // a guest was indistinguishable from a registered account: same `uid()`
+    // shape, same default role. Every rule meaning "a signed-in person" was
+    // therefore also a rule about anybody who had called
+    // `POST /auth/anonymous`, which needs no email, no password and no consent
+    // to anything. On a deployment with anonymous sign-in enabled, that is the
+    // whole internet holding a session.
+    //
+    // The fact exists on the user row (`is_anonymous`) and simply never reached
+    // the database's own identity. Now it does, and a policy can say
+    // `NOT rebase.is_anonymous()`.
+    //
+    // Defaults to FALSE when the GUC is unset, which is the safe direction:
+    // an older backend against a newer database leaves it unset, and reading
+    // that as "not a guest" preserves exactly the behaviour that deployment
+    // already had rather than locking its users out.
+    `CREATE OR REPLACE FUNCTION ${REBASE_SCHEMA}.is_anonymous() RETURNS boolean AS $$
+    SELECT COALESCE(NULLIF(current_setting('app.is_anonymous', true), ''), 'false')::boolean;
 $$ LANGUAGE sql STABLE`
 ];
 

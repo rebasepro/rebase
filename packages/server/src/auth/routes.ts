@@ -363,10 +363,22 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const roles = await authRepo.getUserRoles(uid);
         const roleIds = roles.map(r => r.id);
 
+        // Is this session a GUEST — anonymous sign-in rather than an account?
+        //
+        // It goes into the token because everything that needs it downstream
+        // has no database: the RLS identity carries it into
+        // `rebase.is_anonymous()`, and the WebSocket path has only the token.
+        // Read once here rather than per request.
+        //
+        // The lookup below already happens whenever a custom-claims hook is
+        // configured; this is the same read, hoisted so it happens either way.
+        const sessionUser = await authRepo.getUserById(uid);
+        const isAnonymous = sessionUser?.isAnonymous === true;
+
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
         if (ops.customizeAccessToken) {
-            const user = await authRepo.getUserById(uid);
+            const user = sessionUser;
             if (user) {
                 const defaultClaims: Record<string, unknown> = { uid,
 roles: roleIds,
@@ -375,7 +387,7 @@ aal };
             }
         }
 
-        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims);
+        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous);
         const refreshToken = generateRefreshToken();
 
         // A sign-in opens a session; every token later rotated out of it
@@ -1174,7 +1186,13 @@ aal: sessionAal };
             customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
-        const newAccessToken = await generateAccessToken(storedToken.uid, roleIds, sessionAal, customClaims);
+        // The guest flag is carried across a rotation, from the user row
+        // rather than from the old token: a session that WAS anonymous and has
+        // since been upgraded to a real account should stop being a guest at
+        // its next refresh, not at its next sign-in.
+        const newAccessToken = await generateAccessToken(
+            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true
+        );
         const newRefreshToken = generateRefreshToken();
 
         // Rotate: mark the presented token superseded and mint its successor

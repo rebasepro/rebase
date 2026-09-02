@@ -195,6 +195,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
+                // From the token, where the server wrote it at sign-in and a
+                // custom-claims hook cannot reach it. Reaches the database as
+                // `rebase.is_anonymous()` — see the claim's own note.
+                isAnonymous: payload.isAnonymous === true,
                 rawToken: token
             };
         },
@@ -253,6 +257,10 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 displayName: payload.displayName ?? null,
                 roles,
                 isAdmin,
+                // From the token, where the server wrote it at sign-in and a
+                // custom-claims hook cannot reach it. Reaches the database as
+                // `rebase.is_anonymous()` — see the claim's own note.
+                isAnonymous: payload.isAnonymous === true,
                 rawToken: token
             };
         },

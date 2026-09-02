@@ -96,6 +96,21 @@ export interface AuthContext {
     uid: string;
     /** Raw roles as carried on the user (strings or `{ id }` objects). */
     roles: unknown[];
+    /**
+     * Whether this session came from anonymous sign-in rather than an account.
+     *
+     * Anonymous sign-in mints a real user row and a real uid, so a guest was
+     * indistinguishable from a registered account inside a policy: same
+     * `rebase.uid()`, same default role. Every rule meaning "a signed-in
+     * person" was therefore also a rule about anybody who had called
+     * `POST /auth/anonymous`, which asks for no email, no password and no
+     * agreement to anything.
+     *
+     * Optional, and absent reads as `false`: a caller that predates this — a
+     * realtime subscription, a custom validator — keeps the behaviour it had
+     * rather than having every one of its users reclassified as guests.
+     */
+    isAnonymous?: boolean;
 }
 
 const quoteIdent = (name: string): string => `"${name.replace(/"/g, "\"\"")}"`;
@@ -370,12 +385,26 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
     // to `current_setting('app.user_id')`, and those predicates would evaluate
     // to NULL — failing open or locking out — if we stopped setting it. Drop
     // the alias only once no live database carries a legacy policy.
+    // A guest is a signed-in caller with no account behind them, and until this
+    // the database could not tell the difference — see `rebase.is_anonymous()`.
+    // Written as a string because that is what `set_config` takes.
+    const isAnonymous = auth.isAnonymous === true ? "true" : "false";
+
     await tx.execute(drizzleSql`
         SELECT
             set_config('app.uid', ${uid}, true),
             set_config('app.user_id', ${uid}, true),
             set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
-            set_config('app.jwt', ${JSON.stringify({ sub: uid, roles: auth.roles })}, true)
+            set_config('app.is_anonymous', ${isAnonymous}, true),
+            set_config('app.jwt', ${JSON.stringify({
+        sub: uid,
+        roles: auth.roles,
+        // In the claims too, so a policy reading `rebase.jwt()` — which is
+        // how a rule reaches anything that is not uid or roles — sees the
+        // same fact as `rebase.is_anonymous()`. Two sources that could
+        // disagree would be worse than one.
+        is_anonymous: auth.isAnonymous === true
+    })}, true)
     `);
     if (userRole) {
         await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));

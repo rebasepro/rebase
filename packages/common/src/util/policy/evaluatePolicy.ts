@@ -26,6 +26,12 @@ export interface PolicyEvalContext {
     uid?: string | null;
     /** The current user's application roles. */
     roles?: string[];
+    /**
+     * Whether this session is a GUEST — anonymous sign-in rather than an
+     * account. Optional, and absent means "not a guest", so a caller that does
+     * not know keeps the behaviour it had.
+     */
+    isAnonymous?: boolean;
     /** The row being evaluated, or null when no specific row is available. */
     entity: Entity | null;
 }
@@ -66,6 +72,11 @@ export function evaluatePolicy(expr: PolicyExpression, ctx: PolicyEvalContext): 
             // is the client optimistically rendering a row the database will
             // refuse, or hiding one it would have allowed.
             return ctx.uid != null && !isAnonymousUid(ctx.uid);
+        case "registered":
+            // The same two halves the Postgres compilation has. A client that
+            // disagreed with the database here would optimistically render a
+            // row the database refuses, or hide one it would have allowed.
+            return ctx.uid != null && !isAnonymousUid(ctx.uid) && ctx.isAnonymous !== true;
         case "serverContext":
             // A client is never the server context. Postgres decides this by
             // `rebase.uid() IS NULL`, which a client request can never produce:

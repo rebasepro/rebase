@@ -45,7 +45,7 @@ export const SERVICE_IDENTITY: { uid: string; roles: string[] } = { uid: "servic
  * extend DataDriver with this method.
  */
 interface RLSScopedDriver extends DataDriver {
-    withAuth(user: { uid: string; roles?: string[] }): Promise<DataDriver>;
+    withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean }): Promise<DataDriver>;
 }
 
 /**
@@ -70,7 +70,13 @@ function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
  */
 export async function scopeDataDriver(
     driver: DataDriver,
-    user: { uid: string; roles?: string[] }
+    /**
+     * `isAnonymous` rides along so a policy can tell a GUEST — an anonymous
+     * sign-in — from an account. It is a real user row with a real uid, so
+     * without this the database sees the same principal either way. See
+     * `rebase.is_anonymous()`.
+     */
+    user: { uid: string; roles?: string[]; isAnonymous?: boolean }
 ): Promise<DataDriver> {
     if (isRLSScopedDriver(driver)) {
         // Fail closed — do NOT catch and swallow errors here.

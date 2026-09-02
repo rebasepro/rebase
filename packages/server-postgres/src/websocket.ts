@@ -30,6 +30,13 @@ interface WsUserIdentity {
     uid: string;
     roles: string[];
     isAdmin: boolean;
+    /**
+     * Whether this session is a guest — anonymous sign-in rather than an
+     * account. Read from the token, because a socket has no request to look
+     * anything up on and every refetch it triggers needs the same principal the
+     * initial HTTP fetch had.
+     */
+    isAnonymous?: boolean;
 }
 
 interface ClientSession {
@@ -278,7 +285,8 @@ code } }
                             verifiedUser = {
                                 uid: jwtPayload.uid,
                                 roles: jwtPayload.roles ?? [],
-                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin")
+                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin"),
+                                isAnonymous: jwtPayload.isAnonymous === true
                             };
                         }
                     }
@@ -777,10 +785,22 @@ colors: true }));
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user
-                            ? { uid: session.user.uid,
-roles: session.user.roles ?? [] }
-                            : { uid: ANONYMOUS_USER_ID,
-roles: ["anon"] };
+                            ? {
+                                uid: session.user.uid,
+                                roles: session.user.roles ?? [],
+                                // A guest is a signed-in caller with no account.
+                                // Carried so a refetch's policies see what the
+                                // initial fetch saw — see `rebase.is_anonymous()`.
+                                isAnonymous: session.user.isAnonymous === true
+                            }
+                            : {
+                                uid: ANONYMOUS_USER_ID,
+                                roles: ["anon"],
+                                // An UNAUTHENTICATED caller, which is a
+                                // different thing again: no session at all
+                                // rather than a session with no account.
+                                isAnonymous: false
+                            };
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {
                             type,
