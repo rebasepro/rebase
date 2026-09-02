@@ -23,12 +23,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Retool" logo="/img/competitors/Retool_Logo_0.svg" logoClass="h-4 sm:h-5"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Retool
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Retool is priced per seat and assembled in a visual editor; Rebase is MIT-licensed and assembled in your repository. The other difference matters more as the tool grows: Retool queries your database with credentials the tool holds, and Rebase reads it as the signed-in user, under policies Postgres enforces.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vsretool.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vsretool.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -61,7 +57,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Pricing Model
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Per-Seat Tax vs Open Source</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsretool.02")}</h3>
                 </div>
               </div>
               
@@ -92,9 +88,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Retool's pricing model aggressively charges per seat. As your company scales and more non-technical teammates, contractors, or customers need access to internal apps, your SaaS bill balloons out of control, punishing you for growing.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsretool.04")}</p>
                   </div>
                 </div>
 
@@ -120,11 +116,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase does not punish you for success.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsretool.06")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -141,7 +135,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase is completely open-source (MIT licensed) and free to self-host.</span></li>
+ <span class="leading-relaxed">{t("vsretool.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -157,7 +151,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Zero per-seat licensing fees. Add 10 users or 10,000 users.</span></li>
+ <span class="leading-relaxed">{t("vsretool.08")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -173,7 +167,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Stop rationing access to internal tools simply to save on OPEX.</span></li>
+ <span class="leading-relaxed">{t("vsretool.09")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -203,7 +197,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Extensibility & Logic
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Low-Code Walls vs Native React</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsretool.10")}</h3>
                 </div>
               </div>
               
@@ -234,9 +228,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">When your app logic gets complex, Retool forces developers to write hacky, disjointed blocks of JavaScript inside tiny UI text boxes. Debugging is incredibly difficult, and stepping outside their prescribed component library requires building custom iFrames.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsretool.12")}</p>
                   </div>
                 </div>
 
@@ -262,11 +256,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase gives you a generated back office, and extending it is writing React — no plugin API, no escape hatch to learn.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsretool.14")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -283,7 +275,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Use your favorite React IDE (VSCode, Cursor, WebStorm).</span></li>
+ <span class="leading-relaxed">{t("vsretool.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -299,7 +291,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Import ANY package from NPM (MUI, Tailwind, Recharts, etc) universally natively without iFrame hacks.</span></li>
+ <span class="leading-relaxed">{t("vsretool.16")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -315,7 +307,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Write beautifully clean, linted, and testable TypeScript.</span></li>
+ <span class="leading-relaxed">{t("vsretool.17")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -348,7 +340,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Source Control & DevOps
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">An exported app, or the app itself</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsretool.18")}</h3>
                 </div>
               </div>
               
@@ -379,9 +371,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Retool Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Retool apps live in Retool and are exported for version control — as a single JSON file, or as a Toolscript archive that splits it across files. Toolscript is far more reviewable than the JSON was, but it is still a serialisation of a visual editor's state: the artefact in your repository is a description of the app rather than the app. A Rebase project is TypeScript and React that runs.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsretool.20")}</p>
                   </div>
                 </div>
 
@@ -407,11 +399,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase was built on Git from day one.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsretool.22")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -428,7 +418,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Configuration and UI schemas are standard TypeScript files.</span></li>
+ <span class="leading-relaxed">{t("vsretool.23")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -444,7 +434,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">A PR review looks exactly like a standard frontend code review: `+ published: boolean`.</span></li>
+ <span class="leading-relaxed">{t("vsretool.24")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -460,7 +450,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Deploy predictably using standard CI/CD pipelines instead of proprietary deployment tools.</span></li>
+ <span class="leading-relaxed">{t("vsretool.25")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -485,25 +475,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Retool</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When you need to join data from many places quickly. Retool's catalogue of integrations — Stripe, Salesforce, S3, half a dozen databases, arbitrary REST — is enormous, and building an ops screen across four SaaS products is genuinely fast there. Rebase is Postgres-centred; if your data is not mostly in Postgres, much of the argument here does not apply.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vsretool.27")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vsretool.28")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons

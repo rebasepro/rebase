@@ -24,12 +24,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Supabase" logo="/img/competitors/supabase-logo-wordmark-dark.svg" logoClass="h-6 sm:h-7"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Supabase
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Both put row-level security in Postgres. The difference is where the policy is written: in Supabase it lives in the database and you keep it in sync with your code by hand; in Rebase it is a field on the collection, compiled to a policy, and the same file generates the API, the typed SDK and the back office.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vssupabase.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vssupabase.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -61,7 +57,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Security & RBAC
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">RLS without the Footgun</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vssupabase.02")}</h3>
                 </div>
               </div>
               
@@ -92,9 +88,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Both projects put authorization in Postgres row-level security, and Supabase Studio has a policy editor with a generator and templates behind it. The difference is where the policy lives afterwards: in Supabase it is a database object you keep in step with your code by hand, and in Rebase it is a field on the collection that compiles to a policy — so the policy, the API and the panel move together, and drift between code and database is something the editor reports.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vssupabase.04")}</p>
                   </div>
                 </div>
 
@@ -120,11 +116,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase embraces Native Postgres RLS but surrounds it with powerful tooling. Instead of writing opaque SQL, you define dynamic policies purely in TypeScript. Real-time inference generates user-friendly configuration UI.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vssupabase.06")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -141,7 +135,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Built-in visual RLS policy editor.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -157,7 +151,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Define dynamic context directly in TypeScript instead of complex JOINs.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.08")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -173,7 +167,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Granular access control applied logically.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.09")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -206,7 +200,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Infrastructure
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">True Self-Hosting Symmetry</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vssupabase.10")}</h3>
                 </div>
               </div>
               
@@ -237,9 +231,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Self-hosting Supabase is a supported path with a published Docker Compose file, and plenty of teams run it. What you are taking on is several services in several languages — PostgREST in Haskell, Auth in Go, Realtime in Elixir, Edge Functions on Deno — each with its own release cadence. Rebase is one Node process and a Postgres, which is a smaller thing to keep upgraded, not a categorically different one.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vssupabase.12")}</p>
                   </div>
                 </div>
 
@@ -265,11 +259,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase is unified. It is a single Node.js backend using standard Hono and Drizzle ORM.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vssupabase.14")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -286,7 +278,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">One service to deploy via Docker, Railway, Fly, or bare metal.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -302,7 +294,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Written completely in TypeScript — the language you already know.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.16")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -318,7 +310,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Tightly coupled and fully integrated without black-box binaries.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.17")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -349,7 +341,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Architecture
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Schema-as-Code Workflow</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vssupabase.18")}</h3>
                 </div>
               </div>
               
@@ -380,9 +372,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Supabase Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">With Supabase, the database *is* the state. Local development, staging, and production environments quickly fall out of sync. Managing version control for RPCs, Triggers, and RLS inside raw SQL files requires extreme discipline.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vssupabase.20")}</p>
                   </div>
                 </div>
 
@@ -408,11 +400,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase pioneers a Git-backed hybrid approach. Your schema definitions live purely as standalone TypeScript configuration files (`/collections/products.ts`).
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vssupabase.22")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -429,7 +419,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase Studio uses AST manipulation to inject fields into your code safely.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.23")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -445,7 +435,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Drizzle migrations are automatically synced and deployed.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.24")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -461,7 +451,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Code is the source of truth, guaranteeing environmental parity.</span></li>
+ <span class="leading-relaxed">{t("vssupabase.25")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -486,25 +476,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Supabase</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When you want the largest ecosystem in this category, the most third-party tutorials, or edge functions running at the CDN. Supabase is the more mature product with a much bigger community, and if nobody outside your engineering team will ever open the back office, most of what Rebase adds is weight you will not use.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vssupabase.27")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vssupabase.28")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons

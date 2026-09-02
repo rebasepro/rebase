@@ -23,12 +23,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Directus" logo="/img/competitors/directus-logo-light.svg" logoClass="h-7 sm:h-8"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Directus
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Both read a database you already have rather than owning one, which makes them closer in intent than anything else on this list. They part on two things: where the data model lives — a Directus project configures it in its own tables, a Rebase project in TypeScript you commit — and where permissions are enforced.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vsdirectus.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vsdirectus.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -63,7 +59,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Schema Management
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Code vs Database State</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsdirectus.02")}</h3>
                 </div>
               </div>
               
@@ -94,9 +90,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Directus keeps the data model and the interface configuration in its own tables (<code class="font-mono text-surface-300">directus_collections</code>, <code class="font-mono text-surface-300">directus_fields</code>). It ships <code class="font-mono text-surface-300">schema snapshot</code> and <code class="font-mono text-surface-300">schema apply</code> to move that between environments, so this is a workflow rather than a gap. The difference is what the reviewer sees: a Directus snapshot is a generated YAML file describing the model, and a Rebase collection is the TypeScript that produces it — the thing you edited is the thing in the diff.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed" set:html={t("vsdirectus.04")}></p>
                   </div>
                 </div>
 
@@ -122,11 +118,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase uses a <strong>Schema-as-Code</strong> approach. Every collection and field is defined in a standard TypeScript file.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4" set:html={t("vsdirectus.06")}></p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -143,7 +137,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Even when you use the visual Rebase Studio to add fields, the engine uses AST-manipulation to write the changes directly to your TypeScript schemas.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -159,7 +153,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Changes are committed to Git.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.08")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -175,7 +169,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Deployments are just a `git pull` away, guaranteeing perfectly synchronized environments every single time.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.09")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -207,7 +201,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Extensibility
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">React Framework vs Vue Engine</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsdirectus.10")}</h3>
                 </div>
               </div>
               
@@ -238,9 +232,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Directus is an API engine built heavily on Vue.js. To build custom dashboards, specialized inputs, or unique data views, your team is forced to adopt Vue workflows, and stepping outside Directus's specific extension patterns is notoriously difficult.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsdirectus.12")}</p>
                   </div>
                 </div>
 
@@ -266,11 +260,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase is built natively on React.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsdirectus.14")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -287,7 +279,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Custom fields, whole new pages and bespoke dashboard widgets are ordinary React components, so the ecosystem you already use applies.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -303,7 +295,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Use your favorite React components (MUI, Tailwind, Recharts) instantly without friction.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.16")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -319,7 +311,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">The backend is a standard Hono app. Want a custom route? Just add `app.get()`.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.17")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -349,7 +341,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Security & Permissions
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Native RLS vs Application Layer</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsdirectus.18")}</h3>
                 </div>
               </div>
               
@@ -380,9 +372,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Directus Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Directus enforces permissions exclusively via its own application layer. It does not utilize Postgres Row Level Security (RLS). If an external service queries your DB directly, all those Directus permissions vanish, leaving data exposed.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsdirectus.20")}</p>
                   </div>
                 </div>
 
@@ -408,11 +400,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase marries the power of native Postgres Row-Level Security with a visual management UI.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsdirectus.22")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -429,7 +419,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rules are compiled to Postgres row-level security, so they hold regardless of where the query originated — including a psql session that never touched the API.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.23")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -445,7 +435,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Visual editors make defining RLS policies intuitive and error-free.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.24")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -461,7 +451,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">You remain in total control of the security context.</span></li>
+ <span class="leading-relaxed">{t("vsdirectus.25")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -486,25 +476,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Directus</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When you need a mature content-management experience today. Directus has years of work in its editorial interface, a larger marketplace, and a broader set of database engines behind it — Rebase is PostgreSQL only, deliberately, because the row-level-security story depends on it. If your team is primarily editors managing content, Directus is the more finished product for that job.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vsdirectus.27")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vsdirectus.28")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons

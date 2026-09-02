@@ -23,12 +23,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Strapi" logo="/img/competitors/strapi-full-logo-light.svg" logoClass="h-5 sm:h-6"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Strapi
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Strapi owns the schema: content types are created in Strapi, in Strapi's tables, and the database is an implementation detail. Rebase points at a Postgres you already have and works with the tables it finds. That is a difference in kind, and it decides which one is right for you before any feature does.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vsstrapi.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vsstrapi.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -62,7 +58,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Schema Clarity
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Opaque vs Clean Schemas</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsstrapi.02")}</h3>
                 </div>
               </div>
               
@@ -93,9 +89,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Strapi models dynamic zones and relations through generated join tables and metadata of its own (<code class="font-mono text-surface-300">components_*</code>). That is a reasonable design for a CMS that owns its schema — but it means a BI tool or a raw SQL query reads Strapi's shape rather than yours, and migrating content out goes through the API rather than the tables.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed" set:html={t("vsstrapi.04")}></p>
                   </div>
                 </div>
 
@@ -121,11 +117,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase uses true Postgres-native definitions powered by Drizzle ORM.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsstrapi.06")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -142,7 +136,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Table structures remain readable, exactly how a developer would craft them by hand.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -158,7 +152,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Connects gracefully to <b>existing</b> databases! You don't have to start from scratch.</span></li>
+ <span class="leading-relaxed" set:html={t("vsstrapi.08")}></span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -174,7 +168,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Zero vendor lock-in because your data remains entirely queryable by any standard tool.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.09")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -207,7 +201,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Migrations
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Smooth Migration Syncing</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsstrapi.10")}</h3>
                 </div>
               </div>
               
@@ -238,9 +232,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Moving custom endpoints, data structures, and permissions from a local Strapi instance to production environments has historically been incredibly manual and dangerous, risking data loss during deployments.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsstrapi.12")}</p>
                   </div>
                 </div>
 
@@ -266,11 +260,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase operates entirely on a <strong>Schema-as-Code</strong> paradigm.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4" set:html={t("vsstrapi.14")}></p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -287,7 +279,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase Studio writes its edits back into your TypeScript through AST modifications you can read in the diff.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -303,7 +295,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Drizzle takes care of migrating your database via simple CLI commands.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.16")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -319,7 +311,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Environments stay in step through GitHub commits, not database copy-pasting.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.17")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -350,7 +342,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Developer Experience
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Slow Reloads & Bloat</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vsstrapi.18")}</h3>
                 </div>
               </div>
               
@@ -381,9 +373,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Strapi Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Strapi forces full server reboots during schema changes which can dramatically slow down development time. Adding custom logic or reacting to lifecycle events involves diving into deep layers of proprietary configuration files.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vsstrapi.20")}</p>
                   </div>
                 </div>
 
@@ -409,11 +401,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase is a unified, tightly-coupled TypeScript service.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vsstrapi.22")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -430,7 +420,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Sub-second hot-reloading for most schema and endpoint changes.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.23")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -446,7 +436,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Decoupled architecture using standard Hono and generic React components.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.24")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -462,7 +452,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Build standard API routes for your custom behavior rather than fighting a monolith.</span></li>
+ <span class="leading-relaxed">{t("vsstrapi.25")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -487,25 +477,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Strapi</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When the primary users are content editors and you want a polished editorial experience out of the box, or when you need one of the plugins in its marketplace. Strapi has spent years on that surface. Rebase is the better answer when the application is the point and the back office has to follow the schema rather than define it.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vsstrapi.27")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vsstrapi.28")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons

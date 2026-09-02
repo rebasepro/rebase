@@ -23,12 +23,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Payload CMS" logo="/img/competitors/payload-logo-light.svg" logoClass="h-5 sm:h-6"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Payload CMS
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Payload runs inside your Next.js app and ships with it — one codebase, one deploy. Rebase is a backend that stands on its own, in front of a Postgres you own, serving several clients at once. If your product is a Next.js site, that is Payload's advantage; if it is an API with a web app, a mobile app and an ops team on it, it is the thing to weigh.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vspayload.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vspayload.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -62,7 +58,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Existing Databases
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Database Generation vs Introspection</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vspayload.02")}</h3>
                 </div>
               </div>
               
@@ -93,9 +89,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Payload CMS is fundamentally a code-first system designed to start with clean slates. Pointing Payload to an extremely large, heavily-populated legacy database requires tedious manual recreation of your structure in its proprietary Config.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vspayload.04")}</p>
                   </div>
                 </div>
 
@@ -121,11 +117,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase thrives on existing data.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vspayload.06")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -142,7 +136,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Connect Rebase directly to your existing Postgres DB and let built-in introspection tools map it perfectly.</span></li>
+ <span class="leading-relaxed">{t("vspayload.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -158,7 +152,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase generates the API, the typed SDK and the panel from your existing schema without breaking the apps already on it.</span></li>
+ <span class="leading-relaxed">{t("vspayload.08")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -188,7 +182,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Non-Technical Collaboration
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Code-Only vs Visual AST Manipulation</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vspayload.09")}</h3>
                 </div>
               </div>
               
@@ -219,9 +213,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Because Payload forces a strict code-first setup, making simple schema enhancements (like adding a `published_date` field or swapping an input validation logic) requires a developer to open an IDE, write TypeScript, PR, and redeploy.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vspayload.11")}</p>
                   </div>
                 </div>
 
@@ -247,11 +241,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase empowers PMs, admins, and content managers to move quickly without waiting on engineering.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vspayload.13")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -268,7 +260,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase Studio allows visual schema edits directly from the panel.</span></li>
+ <span class="leading-relaxed">{t("vspayload.14")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -284,7 +276,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Using intelligent AST manipulation, Rebase safely writes the required TypeScript code changes directly back to your repository—preserving custom developer callbacks identically.</span></li>
+ <span class="leading-relaxed">{t("vspayload.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -300,7 +292,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Developers still get `Schema-as-Code`, but the whole team can contribute visually.</span></li>
+ <span class="leading-relaxed">{t("vspayload.16")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -331,7 +323,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Raw Tooling
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Abstracted Layers vs DB Transparency</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vspayload.17")}</h3>
                 </div>
               </div>
               
@@ -362,9 +354,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Payload CMS Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Payload entirely abstracts away the database layer (for broader MongoDB / SQL compatibility). If you are building a Postgres-heavy, complex internal tool, you lose out on the Postgres tooling directly inside your admin panel.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vspayload.19")}</p>
                   </div>
                 </div>
 
@@ -390,11 +382,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Rebase Approach</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase builds tools specifically for Postgres admins.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vspayload.21")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -411,7 +401,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Utilize a fully functional, integrated SQL Console to query raw tables directly.</span></li>
+ <span class="leading-relaxed">{t("vspayload.22")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -427,7 +417,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Execute Postgres EXPLAIN plans instantly to optimize expensive query costs while building internally.</span></li>
+ <span class="leading-relaxed">{t("vspayload.23")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -443,7 +433,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Configure powerful visual RLS rules for airtight security architecture.</span></li>
+ <span class="leading-relaxed">{t("vspayload.24")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -468,25 +458,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Payload</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When you are building a content-heavy site in Next.js and want the CMS to live in the same codebase and deploy. That is a genuinely good architecture and Rebase does not replicate it. Rebase fits better when the backend has to stand on its own — several clients, a team that is not all frontend developers, or authorization that has to hold at the database.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vspayload.26")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vspayload.27")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons

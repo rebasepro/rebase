@@ -23,12 +23,8 @@ import ClosingCta from "../ClosingCta.astro";
       
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
         <VsHeroLockup name="Hasura" logo="/img/competitors/hasura-logo-primary-darkbg.svg" logoClass="h-6 sm:h-7"/>
-        <h1 class="mb-6 text-display-2 text-white">
-          Rebase vs Hasura
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Hasura generates a GraphQL API and a console for building it. Rebase generates REST, a typed TypeScript SDK and a back office your operations team can work in, from the same collection definition — and its permissions compile to Postgres policies rather than to metadata the engine applies.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("vshasura.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("vshasura.01")}</p>
       </div>
     </section>
     <!-- Content Sections -->
@@ -60,7 +56,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     The Frontend Gap
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Missing Admin Interfaces</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vshasura.02")}</h3>
                 </div>
               </div>
               
@@ -91,9 +87,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Hasura Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">Hasura purely focuses on the API layer. While it creates GraphQL instantly, it gives nothing to your non-technical teammates. To manage the data going through those APIs, you still have to build an admin panel from scratch or cobble it together with Retool.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vshasura.04")}</p>
                   </div>
                 </div>
 
@@ -119,11 +115,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase generates both the API layer AND the application layer.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vshasura.06")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -140,7 +134,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase generates real REST APIs based on your Postgres Schema.</span></li>
+ <span class="leading-relaxed">{t("vshasura.07")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -156,7 +150,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Rebase also generates Rebase CMS — a React back office with editing, auditing and dashboards — from the same definition.</span></li>
+ <span class="leading-relaxed">{t("vshasura.08")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -188,7 +182,7 @@ import ClosingCta from "../ClosingCta.astro";
 
                     Business Logic Complexity
                   </div>
-                  <h3 class="text-2xl font-semibold text-white">Fragmented Logic Networks</h3>
+                  <h3 class="text-2xl font-semibold text-white">{t("vshasura.09")}</h3>
                 </div>
               </div>
               
@@ -219,9 +213,9 @@ import ClosingCta from "../ClosingCta.astro";
   <line x1="12" x2="12.01" y1="16" y2="16" />
 </svg>
 
-                      <h4 class="text-white font-semibold">The Hasura Pain</h4>
+                      <h4 class="text-white font-semibold">{t("vs.pain")}</h4>
                     </div>
-                    <p class="text-surface-400 text-sm leading-relaxed">When you need to run business logic in Hasura (e.g. charging a Stripe customer when a row is inserted), you have to set up "Actions" or "Event Triggers"—which requires you to stand up, deploy, and maintain an entirely separate server backend to receive webhooks.</p>
+                    <p class="text-surface-400 text-sm leading-relaxed">{t("vshasura.11")}</p>
                   </div>
                 </div>
 
@@ -247,11 +241,9 @@ import ClosingCta from "../ClosingCta.astro";
   <path d="m9 11 3 3L22 4" />
 </svg>
 
-                      <h4 class="text-white font-semibold">How Rebase Solves This</h4>
+                      <h4 class="text-white font-semibold">{t("vs.solve")}</h4>
                     </div>
-                    <p class="text-surface-300 leading-relaxed text-sm mb-4">
-                      Rebase is a unified Node.js backend environment.
-                    </p>
+                    <p class="text-surface-300 leading-relaxed text-sm mb-4">{t("vshasura.13")}</p>
                     <ul class="text-surface-400 space-y-3 text-sm">
                       <li class="flex items-start">
 <svg
@@ -268,7 +260,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Your custom business logic runs in the exact same Node process as your generated endpoints.</span></li>
+ <span class="leading-relaxed">{t("vshasura.14")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -284,7 +276,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">No network hop latency for internal triggers, no disjointed webhook configurations.</span></li>
+ <span class="leading-relaxed">{t("vshasura.15")}</span></li>
                   <li class="flex items-start">
 <svg
   class="lucide lucide-check"
@@ -300,7 +292,7 @@ import ClosingCta from "../ClosingCta.astro";
 >
   <path d="M20 6 9 17l-5-5" />
 </svg>
- <span class="leading-relaxed">Maintain everything elegantly in one TypeScript repository.</span></li>
+ <span class="leading-relaxed">{t("vshasura.16")}</span></li>
                     </ul>
                   </div>
                 </div>
@@ -325,25 +317,18 @@ import ClosingCta from "../ClosingCta.astro";
         not. Same text as the FAQ entry, so the two cannot drift. */}
     <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Do not switch</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-5">When to stay on Hasura</h2>
-        <p class="text-base sm:text-lg leading-8 text-surface-300">
-          When GraphQL is the product decision, when you need to federate several data sources behind one graph, or when your clients are already generating code from a GraphQL schema. Those are Hasura's home ground.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vshasura.18")}</h2>
+        <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vshasura.19")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
     <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Keep comparing</p>
-        <h2 class="text-2xl sm:text-3xl text-white mb-4">
-          Not the comparison you needed?
-        </h2>
-        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
-          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
-          differ, and the cases where you should pick something else.
-        </p>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}
            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
           All comparisons
