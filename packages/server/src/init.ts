@@ -941,6 +941,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        finalizeSecurityPosture: dbAdapter.finalizeSecurityPosture
+            ? (driverResult) => dbAdapter.finalizeSecurityPosture!(driverResult)
+            : undefined,
         readCollectionsSchemaVersion: dbAdapter.readCollectionsSchemaVersion
             ? (driverResult) => dbAdapter.readCollectionsSchemaVersion!(driverResult)
             : undefined,
@@ -1083,6 +1086,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let defaultDriverResult: InitializedDriver | undefined = undefined;
 
+    /** What each bootstrapper's `initializeDriver` returned, by bootstrapper. */
+    const driverResults = new Map<BackendBootstrapper, InitializedDriver>();
+
     // ─── Collection schema ───────────────────────────────────────────────
     //
     // Create any collection tables the database is missing, BEFORE any driver
@@ -1144,6 +1150,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
+        // Kept because a later step has to hand each bootstrapper back its own
+        // result: `finalizeSecurityPosture` reaches into the driver it
+        // initialized, and only the default driver's result was retained here.
+        driverResults.set(bootstrapper, driverResult);
 
         // In baas mode the driver reports what it found in the database.
         // `undefined` means it never looked — it has no introspection support,
@@ -1364,6 +1374,24 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         introspecting: introspectCollections,
         provision: config.provisionSchema ?? true
     });
+
+    // ── Is the database's authorization actually in force? ───────────────────
+    //
+    // The driver decided that at connect time, which on a fresh database is
+    // before there is anything to decide from: a role that owns no tables does
+    // not bypass RLS, so no isolation is configured — and then the steps above
+    // create every table on that same connection, making it their owner, and an
+    // owner is exempt from the policies on what it owns. The answer has to be
+    // taken again now that the schema exists, on every driver that has one.
+    //
+    // Deliberately after the policies, not merely after the tables: a table with
+    // RLS enabled and no policy is closed, so the window this closes is the one
+    // where both halves are in place and only the role switch is missing.
+    for (const bootstrapper of bootstrappers) {
+        const result = driverResults.get(bootstrapper);
+        if (!bootstrapper.finalizeSecurityPosture || !result) continue;
+        await bootstrapper.finalizeSecurityPosture(result);
+    }
 
     // ── Does this process match the schema it is about to serve? ─────────────
     //

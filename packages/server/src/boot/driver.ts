@@ -319,6 +319,9 @@ export function adapterToBootstrapper(
             ? (collections, driverResult, log) =>
                 adapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        finalizeSecurityPosture: adapter.finalizeSecurityPosture
+            ? (driverResult) => adapter.finalizeSecurityPosture!(driverResult)
+            : undefined,
         readCollectionsSchemaVersion: adapter.readCollectionsSchemaVersion
             ? (driverResult) => adapter.readCollectionsSchemaVersion!(driverResult)
             : undefined,

@@ -574,19 +574,58 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 // that is worth knowing before reading the drift report below.
                 await warnOnRoleSchemaCollision(runSql);
 
-                const posture = await detectConnectionPosture(runSql);
+                const collectionSchemas = registry.getCollections()
+                    .map((c) => (c as { schema?: string }).schema)
+                    .filter((s): s is string => typeof s === "string");
+                // `auth` is deliberately absent: the RLS helpers moved into
+                // `rebase`, and granting USAGE on a schema Rebase does not
+                // own would, on a Supabase database, hand the end-user role
+                // access to theirs.
+                const managedSchemas = ["public", "rebase", ...collectionSchemas];
+
+                const posture = await detectConnectionPosture(runSql, managedSchemas);
                 if (posture.privileged) {
-                    const collectionSchemas = registry.getCollections()
-                        .map((c) => (c as { schema?: string }).schema)
-                        .filter((s): s is string => typeof s === "string");
-                    // `auth` is deliberately absent: the RLS helpers moved into
-                    // `rebase`, and granting USAGE on a schema Rebase does not
-                    // own would, on a Supabase database, hand the end-user role
-                    // access to theirs.
-                    await ensureAppRole(runSql, ["public", "rebase", ...collectionSchemas]);
-                    driver.rlsUserRole = REBASE_USER_ROLE;
-                    realtimeService.rlsUserRole = REBASE_USER_ROLE;
-                    logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);
+                    // Two different failures hide behind one call here, and they
+                    // deserve different answers. A connection that bypasses RLS
+                    // *right now* and cannot be switched must not serve: that is
+                    // the original contract and it stays fatal. A connection that
+                    // merely *could become* the owner — it owns nothing yet, but
+                    // may create tables in a schema the server provisions — is
+                    // constrained by RLS today, so refusing to boot over it would
+                    // break deployments that have been correct all along
+                    // (Postgres before 15 grants CREATE on public to PUBLIC, so
+                    // that describes a great many ordinary app roles).
+                    //
+                    // For the second case the answer is: try, warn, and ask again
+                    // once provisioning has run. See finalizeSecurityPosture.
+                    const bypassesNow = posture.superuser || posture.bypassRLS || posture.ownsTables;
+                    let switched = true;
+                    try {
+                        await ensureAppRole(runSql, managedSchemas);
+                    } catch (err) {
+                        if (bypassesNow) throw err;
+                        switched = false;
+                        logger.warn(
+                            `⚠️ RLS enforcement: connection role "${posture.role}" owns no tables yet and is ` +
+                            `subject to RLS, but it may create tables in ${managedSchemas.join(", ")} — and a ` +
+                            "table's owner bypasses every non-FORCE policy on it. The restricted role could not " +
+                            `be provisioned: ${err instanceof Error ? err.message : String(err)}`
+                        );
+                    }
+
+                    if (switched) {
+                        driver.rlsUserRole = REBASE_USER_ROLE;
+                        realtimeService.rlsUserRole = REBASE_USER_ROLE;
+                        const why = posture.superuser
+                            ? "superuser"
+                            : posture.bypassRLS
+                                ? "BYPASSRLS"
+                                : posture.ownsTables
+                                    ? "table owner"
+                                    : "may create (and would then own) tables in the schemas it serves";
+                        logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${why})`);
+                    }
+
                     if (posture.superuser || posture.bypassRLS) {
                         const message =
                             `The database connection runs as ${posture.superuser ? "a superuser" : "a BYPASSRLS role"} ("${posture.role}"). ` +
@@ -1157,6 +1196,69 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             if (!db) return;
             const { stampCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
             await stampCollectionsSchemaVersion(db as never, SCHEMA_META_SCHEMA, version);
+        },
+
+        /**
+         * Ask the RLS question again, now that the schema exists.
+         *
+         * `initializeDriver` decides the posture before anything auth or
+         * introspection creates, and on a genuinely fresh database the catalogue
+         * has nothing to answer with: the role owns no tables, so it does not
+         * bypass, so no role switch is configured — and then this very process
+         * creates the tables and owns every one of them. Table owners bypass all
+         * non-FORCE policies, so from that point on the process serves every
+         * request unfiltered, for its whole lifetime, while the boot log records
+         * that RLS was fine. The next restart sees the tables and quietly fixes
+         * it, which is why the state is so easy to miss.
+         *
+         * This runs after provisioning and after auth has created its own tables,
+         * and asks once more. Three outcomes:
+         *
+         * - a switch is already configured — nothing to do;
+         * - the connection still owns nothing — the original answer held;
+         * - the connection now owns tables — the answer has changed under us, so
+         *   configure the switch, and if that is impossible, FAIL. A boot that
+         *   crashes with the reason in its logs is recoverable. A boot that
+         *   serves every row to everyone is not.
+         */
+        async finalizeSecurityPosture(driverResult: InitializedDriver): Promise<void> {
+            const internals = driverResult.internals as PostgresDriverInternals;
+            const { driver, realtimeService, registry, db } = internals;
+            if (!db || driver.rlsUserRole) return;
+
+            const runSql: RawSqlRunner = async (text) => {
+                const res = await db.execute(sql.raw(text));
+                return (res.rows ?? []) as Record<string, unknown>[];
+            };
+
+            const collectionSchemas = registry.getCollections()
+                .map((c) => (c as { schema?: string }).schema)
+                .filter((s): s is string => typeof s === "string");
+            const managedSchemas = ["public", "rebase", ...collectionSchemas];
+
+            const posture = await detectConnectionPosture(runSql, managedSchemas);
+            // Only ownership matters here. `canCreateTables` was already weighed
+            // at boot, and re-failing on it now would turn the tolerant branch
+            // above into a hard failure by the back door.
+            if (!posture.superuser && !posture.bypassRLS && !posture.ownsTables) return;
+
+            try {
+                await ensureAppRole(runSql, managedSchemas);
+            } catch (err) {
+                throw new Error(
+                    `The database connection role "${posture.role}" now owns tables in this database, so it ` +
+                    "bypasses every row-level security policy on them — but the restricted role it should " +
+                    "switch to could not be provisioned, so authenticated requests would be served with no " +
+                    `policy applied at all. Refusing to serve.\n\n${err instanceof Error ? err.message : String(err)}`
+                );
+            }
+
+            driver.rlsUserRole = REBASE_USER_ROLE;
+            realtimeService.rlsUserRole = REBASE_USER_ROLE;
+            logger.info(
+                `🔐 RLS enforcement active: the connection role "${posture.role}" became a table owner during ` +
+                `this boot, so authenticated requests now run as "${REBASE_USER_ROLE}".`
+            );
         },
 
         getAdmin(driverResult: InitializedDriver): DatabaseAdmin | undefined {

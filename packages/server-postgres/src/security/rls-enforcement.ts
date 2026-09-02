@@ -70,8 +70,24 @@ export interface ConnectionPosture {
     role: string;
     superuser: boolean;
     bypassRLS: boolean;
-    /** Owns at least one user table — owners bypass non-FORCE RLS. */
+    /**
+     * Owns at least one user table — owners bypass non-FORCE RLS.
+     *
+     * "Owns" in Postgres's sense, not by name: a role that INHERITs the owner is
+     * the owner for every ownership test the planner makes, including the one
+     * that decides whether a policy applies at all.
+     */
     ownsTables: boolean;
+    /**
+     * May create tables somewhere the server writes — and would then own them.
+     *
+     * The reason this is part of the posture rather than a separate question:
+     * the posture is decided ONCE, at boot, and on a fresh database the
+     * catalogue has nothing to report yet. The process that asks then goes on to
+     * create every table in the schema and owns all of them for the rest of its
+     * life. Asking only what is already there answers about the wrong instant.
+     */
+    canCreateTables: boolean;
     /** True when RLS would NOT constrain this connection. */
     privileged: boolean;
 }
@@ -138,16 +154,67 @@ export async function warnOnRoleSchemaCollision(run: RawSqlRunner): Promise<void
     }
 }
 
-export async function detectConnectionPosture(run: RawSqlRunner): Promise<ConnectionPosture> {
+/**
+ * Would RLS actually constrain this connection?
+ *
+ * Four ways the answer is no, and only two of them are obvious. Superuser and
+ * BYPASSRLS announce themselves in `pg_roles`. The other two are about
+ * ownership, and both used to read as "no bypass here":
+ *
+ * - **Ownership through membership.** The old query compared
+ *   `pg_tables.tableowner` to `current_user` as a string. Postgres does not: a
+ *   role that INHERITs the owner passes every ownership test the planner makes,
+ *   including the one that decides whether a policy applies. So a perfectly
+ *   ordinary "app role that is a member of the owner role" setup reported
+ *   unprivileged and bypassed every policy — permanently, since no restart
+ *   changes a string comparison's answer.
+ *
+ * - **Ownership that has not happened yet.** The posture is decided once, at
+ *   boot, and on a fresh database there is nothing in the catalogue to find. The
+ *   same process then creates every table and owns all of them. The first boot
+ *   of a new deployment therefore served every request unconstrained, the log
+ *   said RLS was fine, and the SECOND boot silently fixed it — which is the
+ *   worst possible shape for a security check, because the state that reproduces
+ *   it is gone by the time anyone looks. Asking "may this role create tables
+ *   where the server provisions?" answers about the process's whole life rather
+ *   than about one instant of it.
+ *
+ * `schemas` narrows the CREATE question to where the server actually writes.
+ * Omitted, it asks about every schema the role can see, which is the safe
+ * direction: over-reporting costs a role switch that was not strictly needed,
+ * under-reporting costs the entire authorization model.
+ */
+export async function detectConnectionPosture(
+    run: RawSqlRunner,
+    schemas?: string[]
+): Promise<ConnectionPosture> {
+    // Identifiers, and they reach SQL as literals in a catalogue comparison —
+    // but they arrive from collection configs, so they are quoted as string
+    // literals rather than interpolated as names, and a quote inside one is
+    // escaped rather than trusted.
+    const schemaFilter = schemas?.length
+        ? `AND n.nspname IN (${Array.from(new Set(schemas))
+            .map((s) => `'${s.replace(/'/g, "''")}'`)
+            .join(", ")})`
+        : "";
+
     const rows = await run(`
         SELECT current_user            AS role,
                r.rolsuper              AS superuser,
                r.rolbypassrls          AS bypassrls,
                EXISTS (
                    SELECT 1 FROM pg_tables t
-                   WHERE t.tableowner = current_user
+                   WHERE pg_has_role(current_user, t.tableowner, 'USAGE')
                      AND t.schemaname NOT IN ('pg_catalog', 'information_schema')
-               )                       AS owns_tables
+               )                       AS owns_tables,
+               EXISTS (
+                   SELECT 1 FROM pg_namespace n
+                   WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+                     AND n.nspname NOT LIKE 'pg\\_toast%'
+                     AND n.nspname NOT LIKE 'pg\\_temp%'
+                     ${schemaFilter}
+                     AND has_schema_privilege(current_user, n.oid, 'CREATE')
+               )                       AS can_create
         FROM pg_roles r
         WHERE r.rolname = current_user
     `);
@@ -155,12 +222,14 @@ export async function detectConnectionPosture(run: RawSqlRunner): Promise<Connec
     const superuser = row.superuser === true;
     const bypassRLS = row.bypassrls === true;
     const ownsTables = row.owns_tables === true;
+    const canCreateTables = row.can_create === true;
     return {
         role: String(row.role ?? "unknown"),
         superuser,
         bypassRLS,
         ownsTables,
-        privileged: superuser || bypassRLS || ownsTables
+        canCreateTables,
+        privileged: superuser || bypassRLS || ownsTables || canCreateTables
     };
 }
 
