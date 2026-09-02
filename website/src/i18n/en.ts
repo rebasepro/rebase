@@ -773,5 +773,65 @@ export const en = {
   "europe.legal2": "describes how the access rules themselves are enforced.",
   "europe.meta.title": "Sovereign backend for Europe — Rebase",
   "europe.meta.description": "Everyone can host in Europe. The question is who the second party is: run Rebase yourself and there is none, or let a Spanish company operate it, with the sub-processor disclosed.",
+
+  // ── ui ──────────────────────────────────────────────────────────
+  "ui.00": "<a href=\"/cms\" class=\"hover:text-primary transition-colors\">Rebase CMS</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">Component library</span>",
+  "ui.01": "The components<br/>the panel is built from.",
+  "ui.02": "<code class=\"font-mono text-surface-200\">@rebasepro/ui</code> is the React library the admin panel renders itself with — and the one your custom fields, previews and entity views should use, so an extension looks like it belongs rather than like a bolt-on.",
+  "ui.03": "Already a dependency of every Rebase panel. Add it directly when you are building extensions in a separate package.",
+  "ui.04": "Every component, with its real prop types and a working example — searchable, and generated from the library itself.",
+  "ui.05": "How the panel is composed",
+  "ui.06": "The same components assembled into the screens the admin panel actually ships — drawer, app bar, tabs, management views. Per-component props and examples live in the <a href=\"/docs/ui/components/\" class=\"text-primary hover:underline\">docs reference</a>.",
+  "ui.07": "Component reference",
+
+  // ── cli ─────────────────────────────────────────────────────────
+  "cli.00": "<a href=\"/developers\" class=\"hover:text-primary transition-colors\">For developers</a> <span class=\"mx-2 text-surface-600\">/</span><span class=\"text-surface-500\">CLI &amp; tooling</span>",
+  "cli.01": "One CLI for<br/>the whole lifecycle.",
+  "cli.02": "Scaffold a project, introspect a database you already have, move the schema, regenerate the types, run both halves in dev, and install the skills your coding agent needs.",
+  "cli.03": "The first five minutes",
+  "cli.04": "Three commands, then it is running",
+  "cli.05": "Scaffold against a database you already have, move the schema onto it, and start both halves. Nothing between those steps is hidden from you — every one of them prints what it did.",
+  "cli.06": "Install the agent skills",
+  "cli.07": "Writes the Rebase skill files into the agent directories in your project, so a coding agent knows the collection format and the API shape without being told each time.",
+  "cli.08": "Back it up, restore it back",
+  "cli.09": "<code class=\"font-mono text-surface-300\">pg_dump</code> and <code class=\"font-mono text-surface-300\">pg_restore</code> under a Rebase command, so a backup is a step in CI rather than a runbook. Restore is destructive and asks for <code class=\"font-mono text-surface-300\">--yes</code>.",
+
+  // ── rlscheckpage ────────────────────────────────────────────────
+  "rlscheckpage.00": "Free tool · no account",
+  "rlscheckpage.01": "Audit row-level security on any Postgres",
+  "rlscheckpage.02": "Fourteen checks for the failures that make a Postgres database leak in practice — not the ones that are easy to check for. Works on Supabase, Neon, RDS, Cloud SQL, or a container on your laptop. One command, nothing to install, nothing to sign up for.",
+  "rlscheckpage.03": "The fourteen checks",
+  "rlscheckpage.04": "Each finding the tool prints carries the id below, the reason it matters, and the SQL that fixes it. Severity is the worst level a check can report — several grade themselves down depending on what they find.",
+  "rlscheckpage.05": "What a run looks like",
+  "rlscheckpage.06": "Every finding names the relation, says who can reach it and what they would get, and prints the SQL that closes it. Exits non-zero above a severity you choose, so it belongs in CI.",
+  "rlscheckpage.07": "SELECTs against the system catalogues and nothing else. It never reads your data.",
+  "rlscheckpage.08": "Nothing leaves the machine",
+  "rlscheckpage.09": "No telemetry, no upload, no network beyond the connection string you pass it.",
+  "rlscheckpage.10": "No Rebase required",
+  "rlscheckpage.11": "It reads the database, not your codebase. It needs no Rebase and asks about none.",
+  "rlscheckpage.meta.title": "Free Postgres RLS audit — check your row-level security in one command",
+  "rlscheckpage.meta.description": "rls-check is a free, read-only Row-Level Security audit for any PostgreSQL database. Fourteen checks for the failures that make Postgres leak: RLS disabled on exposed tables, policies that are always true, views that read past their base table. Works on Supabase, Neon, RDS. No account, no install.",
+
+  // ── contact ─────────────────────────────────────────────────────
+  "contact.00": "Talk to the people building it.",
+  "contact.01": "Schedule a call with our team to discuss your project, get a demo, or just say hello. Or reach us at <a href=\"mailto:hello@rebase.pro\" class=\"font-semibold underline hover:text-white transition-colors\">hello@rebase.pro</a>",
+  "contact.02": "Join our community",
+  "contact.03": "Get technical support and connect with other Rebase developers",
+  "contact.04": "Chat with the team and other developers in real-time",
+  "contact.05": "Browse the code, report issues, and contribute",
+  "contact.06": "View on GitHub →",
+  "contact.07": "Questions about Rebase, custom integrations, or enterprise support? We're here to help.",
+  "contact.08": "Reporting a security issue?",
+  "contact.09": "Please report vulnerabilities privately to <a href=\"mailto:security@rebase.pro\" class=\"text-primary font-semibold hover:underline\">security@rebase.pro</a> rather than opening a public issue. See our <a href=\"https://github.com/rebasepro/rebase/blob/main/SECURITY.md\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-primary hover:underline\">security policy</a> and the <a href=\"/security\" class=\"text-primary hover:underline\">security page</a> for details.",
+  "contact.10": "Follow us on social media",
+  "contact.11": "Discord community",
+  "contact.12": "GitHub repository",
+  "contact.13": "Sales enquiries",
+
+  // ── altpage ─────────────────────────────────────────────────────
+  "altpage.00": "Published by <a href=\"/\" class=\"text-surface-300 underline underline-offset-2\">Rebase</a>, which is one of the tools on this page. Every other entry is described by what it is good at, several of the recommendations below are not us, and there are no prices anywhere — competitor pricing changes quarterly and a stale number is worse than none.",
+  "altpage.01": "Start from why you are leaving",
+  "altpage.02": "Almost nobody wants \"the best alternative\". They want the one that fixes the specific thing that broke. Find your row.",
+  "altpage.03": "Ordered roughly by how often each one turns out to be the answer, not by any score. Where a head-to-head exists, it is linked.",
 };
 

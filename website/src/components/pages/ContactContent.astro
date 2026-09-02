@@ -18,13 +18,8 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <h1 class="mb-6 text-display-2 text-white">
-          Talk to the people building it.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Schedule a call with our team to discuss your project, get a demo, or just say hello.
-          Or reach us at <a href="mailto:hello@rebase.pro" class="font-semibold underline hover:text-white transition-colors">hello@rebase.pro</a>
-        </p>
+        <h1 class="mb-6 text-display-2 text-white">{t("contact.00")}</h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("contact.01")}></p>
         <a href="https://calendar.app.google/UDSmMagx6AEwar8P8"
            target="_blank"
            rel="noopener noreferrer"
@@ -42,8 +37,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="relative z-0 py-16 sm:py-24 border-t border-surface-800">
       <div class="mx-auto max-w-4xl px-6 lg:px-8">
         <div class="text-center mb-12">
-          <h2 class="text-3xl md:text-4xl text-white mb-4">Join Our Community</h2>
-          <p class="text-lg text-surface-400">Get technical support and connect with other Rebase developers</p>
+          <h2 class="text-3xl md:text-4xl text-white mb-4">{t("contact.02")}</h2>
+          <p class="text-lg text-surface-400">{t("contact.03")}</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -60,8 +55,8 @@ import ClosingCta from "../ClosingCta.astro";
                   <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
                 </svg>
               </div>
-              <h3 class="text-2xl font-semibold text-white mb-3">Discord Community</h3>
-              <p class="text-surface-400 mb-6">Chat with the team and other developers in real-time</p>
+              <h3 class="text-2xl font-semibold text-white mb-3">{t("contact.11")}</h3>
+              <p class="text-surface-400 mb-6">{t("contact.04")}</p>
               <span class="text-primary font-semibold group-hover:underline">Join Discord →</span>
             </div>
           </a>
@@ -79,9 +74,9 @@ import ClosingCta from "../ClosingCta.astro";
                   <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" />
                 </svg>
               </div>
-              <h3 class="text-2xl font-semibold text-white mb-3">GitHub Repository</h3>
-              <p class="text-surface-400 mb-6">Browse the code, report issues, and contribute</p>
-              <span class="text-primary font-semibold group-hover:underline">View on GitHub →</span>
+              <h3 class="text-2xl font-semibold text-white mb-3">{t("contact.12")}</h3>
+              <p class="text-surface-400 mb-6">{t("contact.05")}</p>
+              <span class="text-primary font-semibold group-hover:underline">{t("contact.06")}</span>
             </div>
           </a>
         </div>
@@ -104,8 +99,8 @@ import ClosingCta from "../ClosingCta.astro";
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
               </svg>
             </div>
-            <h2 class="text-3xl md:text-4xl text-white mb-4">Sales Inquiries</h2>
-            <p class="text-lg text-surface-400 mb-8">Questions about Rebase, custom integrations, or enterprise support? We're here to help.</p>
+            <h2 class="text-3xl md:text-4xl text-white mb-4">{t("contact.13")}</h2>
+            <p class="text-lg text-surface-400 mb-8">{t("contact.07")}</p>
           </div>
 
           <div class="max-w-md mx-auto space-y-4">
@@ -132,14 +127,8 @@ import ClosingCta from "../ClosingCta.astro";
           </div>
 
           <div class="max-w-md mx-auto mt-8 pt-8 border-t border-surface-800 text-center">
-            <h3 class="text-lg font-semibold text-white mb-2">Reporting a security issue?</h3>
-            <p class="text-surface-400 text-sm">
-              Please report vulnerabilities privately to
-              <a href="mailto:security@rebase.pro" class="text-primary font-semibold hover:underline">security@rebase.pro</a>{" "}
-              rather than opening a public issue. See our
-              <a href="https://github.com/rebasepro/rebase/blob/main/SECURITY.md" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">security policy</a>{" "}
-              and the <a href="/security" class="text-primary hover:underline">security page</a> for details.
-            </p>
+            <h3 class="text-lg font-semibold text-white mb-2">{t("contact.08")}</h3>
+            <p class="text-surface-400 text-sm" set:html={t("contact.09")}></p>
           </div>
         </div>
       </div>
@@ -148,7 +137,7 @@ import ClosingCta from "../ClosingCta.astro";
     <!-- Social Links -->
  <section class="py-12 sm:py-16">
       <div class="mx-auto max-w-2xl text-center px-6">
-        <p class="text-surface-400 mb-6">Follow us on social media</p>
+        <p class="text-surface-400 mb-6">{t("contact.10")}</p>
         <div class="flex justify-center gap-6">
           <a href="https://github.com/rebasepro/rebase" target="_blank" rel="noopener noreferrer" class="text-surface-400 hover:text-primary transition-colors">
             <span class="sr-only">GitHub</span>

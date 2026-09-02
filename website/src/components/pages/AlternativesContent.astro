@@ -26,9 +26,11 @@ import ClosingCta from "../ClosingCta.astro";
 
 interface Props {
     page: AlternativesPage;
+    lang: string;
+    t: (key: string) => string;
 }
 
-const { page } = Astro.props as Props;
+const { page, t } = Astro.props as Props;
 const pageUrl = `https://rebase.pro/alternatives/${page.slug}`;
 
 /**
@@ -77,23 +79,15 @@ const listSchema = {
             </h1>
             <p class="text-lg leading-8 text-surface-300 lg:text-xl">{page.what}</p>
 
-            <p class="mt-8 text-sm text-surface-500 leading-relaxed border-l-2 border-surface-800 pl-4">
-                Published by <a href="/" class="text-surface-300 underline underline-offset-2">Rebase</a>, which is
-                one of the tools on this page. Every other entry is described by what it is good at, several of the
-                recommendations below are not us, and there are no prices anywhere — competitor pricing changes
-                quarterly and a stale number is worse than none.
-            </p>
+            <p class="mt-8 text-sm text-surface-500 leading-relaxed border-l-2 border-surface-800 pl-4" set:html={t("altpage.00")}></p>
         </div>
     </section>
 
     <!-- Pick by reason -->
     <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">Start from why you are leaving</h2>
-            <p class="text-surface-400 mb-10 leading-relaxed">
-                Almost nobody wants "the best alternative". They want the one that fixes the specific thing that
-                broke. Find your row.
-            </p>
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("altpage.01")}</h2>
+            <p class="text-surface-400 mb-10 leading-relaxed">{t("altpage.02")}</p>
 
             <div class="space-y-3">
                 {page.reasons.map((reason) => (
@@ -117,10 +111,7 @@ const listSchema = {
             <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">
                 {page.alternatives.length} alternatives to {page.name}
             </h2>
-            <p class="text-surface-400 mb-10 leading-relaxed">
-                Ordered roughly by how often each one turns out to be the answer, not by any score. Where a
-                head-to-head exists, it is linked.
-            </p>
+            <p class="text-surface-400 mb-10 leading-relaxed">{t("altpage.03")}</p>
 
             <ol class="space-y-4">
                 {page.alternatives.map((alt, index) => (

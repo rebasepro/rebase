@@ -30,17 +30,9 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-          <a href="/developers" class="hover:text-primary transition-colors">For developers</a>
-          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">CLI &amp; tooling</span>
-        </p>
-        <h1 class="mb-6 text-display-2 text-white">
-          One CLI for<br/>the whole lifecycle.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Scaffold a project, introspect a database you already have, move the schema, regenerate the types, run both
-          halves in dev, and install the skills your coding agent needs.
-        </p>
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("cli.00")}></p>
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("cli.01")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("cli.02")}</p>
       </div>
     </section>
 
@@ -52,14 +44,9 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative z-0 py-16 sm:py-24">
       <div class="mx-auto max-w-4xl px-6 lg:px-8">
         <div class="max-w-2xl mb-10">
-          <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-            The first five minutes
-          </p>
-          <h2 class="text-3xl sm:text-4xl text-white">Three commands, then it is running</h2>
-          <p class="mt-5 text-lg leading-8 text-surface-400">
-            Scaffold against a database you already have, move the schema onto it, and start both halves.
-            Nothing between those steps is hidden from you — every one of them prints what it did.
-          </p>
+          <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("cli.03")}</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("cli.04")}</h2>
+          <p class="mt-5 text-lg leading-8 text-surface-400">{t("cli.05")}</p>
         </div>
 
         <div class="frame overflow-hidden">
@@ -74,23 +61,15 @@ import ClosingCta from "../ClosingCta.astro";
 
         <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <h3 class="text-lg font-semibold text-white mb-2">Install the agent skills</h3>
-            <p class="text-sm text-surface-400 mb-3">
-              Writes the Rebase skill files into the agent directories in your project, so a coding agent
-              knows the collection format and the API shape without being told each time.
-            </p>
+            <h3 class="text-lg font-semibold text-white mb-2">{t("cli.06")}</h3>
+            <p class="text-sm text-surface-400 mb-3">{t("cli.07")}</p>
             <div class="rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-2.5 font-mono text-xs text-surface-300">
               rebase skills install --agent claude
             </div>
           </div>
           <div>
-            <h3 class="text-lg font-semibold text-white mb-2">Back it up, restore it back</h3>
-            <p class="text-sm text-surface-400 mb-3">
-              <code class="font-mono text-surface-300">pg_dump</code> and
-              <code class="font-mono text-surface-300">pg_restore</code> under a Rebase command, so a backup
-              is a step in CI rather than a runbook. Restore is destructive and asks for
-              <code class="font-mono text-surface-300">--yes</code>.
-            </p>
+            <h3 class="text-lg font-semibold text-white mb-2">{t("cli.08")}</h3>
+            <p class="text-sm text-surface-400 mb-3" set:html={t("cli.09")}></p>
             <div class="rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-2.5 font-mono text-xs text-surface-300">
               rebase db backup --out s3://backups/app.dump
             </div>
