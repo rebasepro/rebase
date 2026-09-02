@@ -36,6 +36,6 @@ const breadcrumbs = [
     { name: `${page.name} alternatives`, url: `https://rebase.pro/alternatives/${page.slug}` }
 ];
 ---
-<Layout title={page.title} description={page.description} breadcrumbs={breadcrumbs}>
+<Layout title={t(page.title)} description={t(page.description)} breadcrumbs={breadcrumbs}>
     <AlternativesContent page={page} lang={currentLang} t={t} />
 </Layout>

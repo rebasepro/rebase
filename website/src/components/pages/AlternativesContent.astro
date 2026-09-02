@@ -30,7 +30,27 @@ interface Props {
     t: (key: string) => string;
 }
 
-const { page, t } = Astro.props as Props;
+const { page: rawPage, t } = Astro.props as Props;
+
+// `alternatives.ts` carries i18n KEYS, not sentences — one list, four locales.
+// A value that is not a key (a product name in `answer`) passes straight
+// through, because `t()` returns the key itself when it does not resolve.
+const tr = (v: string) => (v.startsWith("alt.") ? t(v) : v);
+const page = {
+    ...rawPage,
+    title: tr(rawPage.title),
+    description: tr(rawPage.description),
+    what: tr(rawPage.what),
+    reasons: rawPage.reasons.map((r) => ({ reason: tr(r.reason), answer: tr(r.answer), why: tr(r.why) })),
+    alternatives: rawPage.alternatives.map((a) => ({
+        ...a,
+        bestFor: tr(a.bestFor),
+        description: tr(a.description),
+        licence: tr(a.licence),
+        hosting: tr(a.hosting),
+    })),
+    faqs: rawPage.faqs.map((f) => ({ q: tr(f.q), a: tr(f.a) })),
+};
 const pageUrl = `https://rebase.pro/alternatives/${page.slug}`;
 
 /**
@@ -75,7 +95,7 @@ const listSchema = {
                 Alternatives
             </span>
             <h1 class="mt-5 mb-6 text-display-2 text-white">
-                Alternatives to {page.name}
+                {t("altpage.heading").replace("%s", page.name)}
             </h1>
             <p class="text-lg leading-8 text-surface-300 lg:text-xl">{page.what}</p>
 
@@ -109,7 +129,7 @@ const listSchema = {
     <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">
-                {page.alternatives.length} alternatives to {page.name}
+                {t("altpage.count").replace("%n", String(page.alternatives.length)).replace("%s", page.name)}
             </h2>
             <p class="text-surface-400 mb-10 leading-relaxed">{t("altpage.03")}</p>
 
@@ -132,7 +152,7 @@ const listSchema = {
                                     <span class="text-2xs text-surface-500 uppercase tracking-wide">· {alt.hosting}</span>
                                 </div>
 
-                                <p class="text-sm text-primary-light/90 mb-3">Best for: {alt.bestFor}</p>
+                                <p class="text-sm text-primary-light/90 mb-3">{t("altpage.bestFor")} {alt.bestFor}</p>
                                 <p class="text-surface-400 leading-relaxed text-sm sm:text-base">{alt.description}</p>
 
                                 <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -141,7 +161,7 @@ const listSchema = {
                                         class="text-surface-300 hover:text-white underline underline-offset-2"
                                         rel={alt.isUs ? undefined : "nofollow noopener"}
                                         target={alt.isUs ? undefined : "_blank"}
-                                    >{alt.isUs ? "Read more" : `${alt.name} →`}</a>
+                                    >{alt.isUs ? t("altpage.readMore") : `${alt.name} →`}</a>
                                     {alt.compare && (
                                         <a href={alt.compare} class="text-primary-light hover:text-white underline underline-offset-2">
                                             Rebase vs {alt.name} →
