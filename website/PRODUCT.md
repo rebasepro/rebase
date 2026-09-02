@@ -17,6 +17,8 @@ The **evaluating developer**, arriving cold. They own a Postgres database or are
 about to, they are comparing against a named alternative (Supabase, Firebase,
 Payload, Directus, Strapi, Hasura, Retool, Django), and they will decide from the
 page whether to run `pnpm dlx @rebasepro/cli init`.
+What they are worried about, and why that settles the hero, is pinned in
+`SITE-STORY.md` §1, *Who we win first*.
 
 Secondary, and never at the primary developer's expense:
 

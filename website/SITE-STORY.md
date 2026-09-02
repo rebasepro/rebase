@@ -24,6 +24,26 @@ See `~/.claude/.../memory/backend-first-positioning.md` — the site used to sel
 the panel first, which undersells the product and mispositions it against
 Supabase-class competitors.
 
+### Who we win first
+
+Added 2026-09-02. The reader every page is written for is the developer who
+already owns a Postgres database and has just written, or is about to write, the
+backend in front of it — on Supabase, or by hand with an ORM and a permissions
+middleware. They are not shopping for a CMS. They suspect, usually correctly,
+that their access rules do not hold: a service role that bypasses RLS, a table
+served with no policy, a check that lives in one route and not the next.
+`rls-check` is written for that suspicion, and it is the first thing we hand
+them. It is useful whether or not they ever adopt Rebase, which is why they
+trust it.
+
+Everyone else arrives through that developer. The operator team, the agency,
+the agent holding a key and the European buyer are real audiences, and each has
+a deep page — but none of them is addressed on `/` at the developer's expense,
+and none of them is the reason the hero says what it says. Naming the
+beachhead is what settles the hero: it leads with claim 1 because that is the
+claim this reader is already looking for, and "the Postgres you already have"
+is the sentence that tells them they will not have to move to get it.
+
 ## 2. The four claims we are allowed to lead with
 
 Ranked. Anything below the line is a feature, not a claim.
@@ -220,7 +240,8 @@ after the brand audit.
 | Beat | Section | Carries |
 |------|---------|---------|
 | — | `s-hero` | Headline, one action, and the install terminal — whose output names the API and realtime before the panel |
-| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" |
+| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" — and, since 2026-09-02, naming FireCMS's 10,000+ projects, the heritage the star count cannot supply |
+| — | `s-recognition` | Recognition, before the argument: the same table declared five times — migration, type, validator, route, form — folding into one collection file. Unnumbered because it precedes the argument the numerals carry |
 | 01 | `s-collection-power` | Claim 2 — one definition, every surface; the chips run schema → REST → SDK → forms → views |
 | 02 | `s-backend-engine` | What that definition generates |
 | 03 | `s-security` | **Claim 1** — security lives in the database; links to `/security`, the page that carries it |
@@ -239,15 +260,15 @@ customers and the close. The manifesto banner (§6). The FAQ, the "what you will
 never build again" list and the feature bento from the pre-V2 page — their keys
 were deleted with `IndexContent.astro`, so they cannot come back by accident.
 
-**One beat the page is still missing.** Recorded 2026-08-29 while rebuilding the
-intro film against `docs/PRODUCT.md`: **recognition, before the argument
-starts.** Every beat above is an assertion — here is what it does, here is what
-it generates, here is why that is safe. Nothing asks the reader to recognise a
-problem they already have, so "there is no second data model" arrives as a
-feature rather than as relief. The film opens its argument by showing the same
-table declared five times (a schema, a type, a validator, a route file, a form
-field) and collapsing them into one. That beat belongs here too, above 01. (The
-other beat recorded missing that day, ownership at the close, is 09 now.)
+**Both beats recorded missing on 2026-08-29 are on the page now.** Ownership at
+the close is 09. Recognition, before the argument starts, is the unnumbered
+section above 01 (added 2026-09-02): the same table declared five times, with
+the drift a reader will recognise — the type says `inStock` where the column
+says `in_stock`, and the route's owner filter is a TODO — folding into the one
+collection file, security rules included. It shares its five file names with
+the film's `S03_OneDefinition`, so a viewer who has seen one recognises the
+other. Its resolution is beat 01, one scroll down, which is why its copy ends
+on "below" and carries no link.
 
 Three rules are encoded in that table and should not be quietly undone:
 

@@ -66,6 +66,8 @@ ${cleanHtml(tr("hero.title.part1"))} ${cleanHtml(tr("hero.title.part2"))}
 
 ${cleanHtml(tr("hero.subtitle"))}
 
+${cleanHtml(tr("recognition.title"))} ${cleanHtml(tr("recognition.subtitle"))}
+
 ## The claims, in the order the page makes them
 
 1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}

@@ -2,6 +2,7 @@
 import { NeatBackground } from "../NeatBackground";
 import CollectionPowerSection from "../CollectionPowerSection.astro";
 import ClientLogos from "../ClientLogos.astro";
+import RecognitionSection from "../RecognitionSection.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 import { ApiMiniDemo } from "../demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../demos/SdkMiniDemo";
@@ -166,6 +167,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
         <div class="border-t border-white/5 py-10 sm:py-14">
             <ClientLogos />
         </div>
+
+        <!-- RECOGNITION — before the argument starts. Unnumbered, like the
+             rls-check band: the numerals are the spine and this precedes it.
+             SITE-STORY §5 recorded it as the beat the page was missing. -->
+        <RecognitionSection lang={lang} t={t} />
 
         <!-- ============================================================
              NEAT DIVIDER → chapter 01. The strip is the real canvas; the
