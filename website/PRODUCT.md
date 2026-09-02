@@ -48,16 +48,19 @@ The docs exist to keep that developer building without leaving.
   English into three locales. Keys are namespaced per page (`securitypage.NN`,
   `vsdirectus.NN`), and strings repeated across pages get one shared key
   (`vs.*`, `close.*`, `cloud.status`) rather than a copy each.
-- **Two things stay English on purpose, and both have a reason.**
+- **Three things stay English on purpose, and each has a reason.**
   `src/data/rls-checks.ts` is lifted verbatim from `packages/rls-check` because
   a reader compares a finding on their terminal against that page, and the
   terminal is English. `/pitch` is an investor deck and declares `lang="en"`.
-  **Still outstanding:** `src/data/alternatives.ts` (the seven
-  `/alternatives/*` pages) and the interactive demo components, which need a
-  `strings` prop before a React island can be localised. Demos that mock the
-  product's own UI should stay English — the product ships English — but the
-  ones that argue (`JurisdictionDemo`, `EuHostingCostDemo`, `EuropeMapDemo`)
-  are page prose and should be translated when that refactor happens.
+  Demos that *mock the product's own UI* stay English, because the product
+  ships English and a translated screenshot of it would be a lie.
+- **A demo that argues is page prose, so it is translated.** The three on
+  `/europe` (`JurisdictionDemo`, `EuHostingCostDemo`, `EuropeMapDemo`) take an
+  `s` prop of resolved strings and keep an English map inline as the fallback,
+  so the island still renders standalone in `/dev/demos`. `src/data/alternatives.ts`
+  holds keys rather than sentences for the same reason. Proper nouns are not
+  keyed: city names, region ids (`eu-central-1 · Frankfurt`) and legal entities
+  stay as they are printed everywhere else.
 - Machine-readable surfaces are generated at build time: `llms.txt`, the sitemap,
   per-page `.md` variants, and the changelog copy. A page absent from the sidebar
   is absent from `llms.txt`.

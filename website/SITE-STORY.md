@@ -518,7 +518,8 @@ changes, and replace the date here.
 - None of the eight keeps a second copy of your data. "Often two databases" was
   false for all of them.
 
-**Still English** — on purpose or not yet; the reasons are in `PRODUCT.md`:
-`src/data/rls-checks.ts` (verbatim from the tool), `/pitch` (`lang="en"`),
-demos that mock product UI. Not yet: `src/data/alternatives.ts` and the three
-`/europe` demos that argue rather than mock.
+**Still English, on purpose** — the reasons are in `PRODUCT.md`:
+`src/data/rls-checks.ts` (verbatim from the tool), `/pitch` (`lang="en"`), and
+demos that mock product UI. A demo that *argues* is page prose and is
+translated: the three on `/europe` take an `s` prop of resolved strings, as
+does `src/data/alternatives.ts`, which holds keys rather than sentences.
