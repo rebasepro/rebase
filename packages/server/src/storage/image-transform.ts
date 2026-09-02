@@ -8,11 +8,22 @@
 
 import os from "node:os";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sharpFactory: ((input: Buffer | Uint8Array) => any) | undefined;
+/**
+ * The second argument is the decoder's own limits — see `MAX_INPUT_PIXELS` and
+ * `DECODABLE_FORMATS`. Typed here rather than left off, because omitting it is
+ * how the defaults (a 268-megapixel ceiling, and tolerance for truncated
+ * input) stayed in force without anyone choosing them.
+ */
+interface SharpOptions {
+    limitInputPixels?: number | boolean;
+    failOn?: "none" | "truncated" | "error" | "warning";
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getSharp(): Promise<(input: Buffer | Uint8Array) => any> {
+let sharpFactory: ((input: Buffer | Uint8Array, options?: SharpOptions) => any) | undefined;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getSharp(): Promise<(input: Buffer | Uint8Array, options?: SharpOptions) => any> {
     if (!sharpFactory) {
         try {
             const mod = await import("sharp");
@@ -130,6 +141,47 @@ export function parseTransformOptions(query: Record<string, string>): ImageTrans
     return hasTransform ? opts : null;
 }
 
+/**
+ * The largest decoded image this server will produce, in pixels.
+ *
+ * A cap on the DECODE, which is a different quantity from the file size the
+ * upload path bounds: a 300 KB PNG can describe a 40,000 × 40,000 canvas, and
+ * decoding it asks for several bytes per pixel. sharp's own default is about
+ * 268 megapixels, which is not a limit so much as an upper bound on the format.
+ *
+ * 50 megapixels is beyond any image a website serves — a 50MP source is a
+ * medium-format camera original — and bounds a decode at hundreds of megabytes
+ * rather than tens of gigabytes.
+ */
+export const MAX_INPUT_PIXELS = 50_000_000;
+
+/**
+ * The formats this server will actually decode, judged from the bytes.
+ *
+ * `isTransformableImage` decides whether to transform at all, and it reads the
+ * stored content type — which the uploader chose. This is the check that cannot
+ * be lied to, and it exists because the two exclusions up there matter: SVG is
+ * a document format rendered through librsvg, a much larger surface than a
+ * raster decoder and one with a history of resolving external references, and
+ * an animated GIF multiplies a decode by its frame count.
+ *
+ * Raster formats only, and only ones with a plain decoder.
+ */
+export const DECODABLE_FORMATS = new Set(["jpeg", "jpg", "png", "webp", "avif", "tiff", "heif"]);
+
+/**
+ * The file is not something this server is willing to decode.
+ *
+ * Distinct from {@link InvalidTransformOptionsError}, which is about the
+ * request: this one is about what was found in the object. Surfaced as a 415.
+ */
+export class UntransformableImageError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "UntransformableImageError";
+    }
+}
+
 /** MIME types that can be used as a Content-Type header. */
 const FORMAT_CONTENT_TYPES: Record<string, string> = {
     webp: "image/webp",
@@ -233,7 +285,48 @@ async function runTransform(
     options: ImageTransformOptions
 ): Promise<{ data: Buffer; contentType: string }> {
     const sharp = await getSharp();
-    let pipeline = sharp(buffer);
+    // A bound on what the DECODER will allocate, which is a different thing
+    // from a bound on the file.
+    //
+    // sharp's default `limitInputPixels` is 0x3FFF × 0x3FFF — about 268
+    // megapixels — and a decoded pixel costs several bytes, so a file well
+    // inside the upload limit can ask this process for gigabytes. That is the
+    // shape of the classic decompression bomb: a few hundred KB of PNG
+    // describing a 40,000 × 40,000 canvas. The size checks upstream cannot see
+    // it, because they are about the compressed bytes.
+    //
+    // 50 megapixels is far beyond any image a website serves — a 50MP source is
+    // a medium-format camera original — and small enough that a decode is
+    // hundreds of megabytes rather than tens of gigabytes.
+    //
+    // `failOn: "truncated"` in the same breath: sharp's default tolerates
+    // damaged input and keeps decoding, which for a file chosen by somebody
+    // else is a longer decode with a less predictable result.
+    let pipeline = sharp(buffer, {
+        limitInputPixels: MAX_INPUT_PIXELS,
+        failOn: "truncated"
+    });
+
+    // What the BYTES are, not what the upload said they were.
+    //
+    // Whether a transform runs at all is decided by `isTransformableImage`,
+    // which reads the stored content type — a value the uploader chose. So a
+    // file served as `image/png` reaches this decoder whatever it actually
+    // contains, and the two formats deliberately excluded up there are excluded
+    // for real reasons: SVG is a document format that sharp renders through
+    // librsvg, a far larger surface than a raster decoder and one with a
+    // history of resolving external references; an animated GIF multiplies the
+    // decode by its frame count.
+    //
+    // sharp has already parsed the header by the time `metadata()` answers, so
+    // this costs nothing extra and asks the only source that cannot be lied to.
+    const detected = (await pipeline.metadata()).format;
+    if (!detected || !DECODABLE_FORMATS.has(detected)) {
+        throw new UntransformableImageError(
+            `This file is ${detected ? `a ${detected}` : "not an"} image that can be transformed. ` +
+            `Transformable formats: ${[...DECODABLE_FORMATS].sort().join(", ")}.`
+        );
+    }
 
     if (options.width || options.height) {
         pipeline = pipeline.resize({

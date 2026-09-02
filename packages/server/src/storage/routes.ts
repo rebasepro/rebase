@@ -21,7 +21,7 @@ import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTo
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
+import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
 import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
@@ -111,6 +111,14 @@ async function transformOnce(
             // requests that joined it get the same answer.
             if (err instanceof TransformOverloadedError) {
                 throw ApiError.serviceUnavailable(err.message, "TRANSFORM_OVERLOADED");
+            }
+            // A file whose bytes are not a transformable image is a 415, not a
+            // 500. The declared content type said one thing and the decoder
+            // found another — which is the caller's file, not this server's
+            // problem, and the status has to say so or every SVG served as PNG
+            // reads as an outage.
+            if (err instanceof UntransformableImageError) {
+                throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", err.message);
             }
             throw err;
         }

@@ -26,7 +26,9 @@ import {
     TransformQueue,
     TransformOverloadedError,
     transformQueue,
-    transformImage
+    transformImage,
+    UntransformableImageError,
+    MAX_INPUT_PIXELS
 } from "../src/storage/image-transform";
 
 describe("parseTransformOptions", () => {
@@ -133,6 +135,60 @@ describe("transformImage", () => {
         expect(result.contentType).toBe("image/webp");
         expect((await sharp(result.data).metadata()).width).toBe(32);
     });
+
+    /**
+     * What the BYTES are, not what the upload said they were.
+     *
+     * Whether a transform runs at all is decided from the stored content type,
+     * which the uploader chose — so a file served as `image/png` reaches the
+     * decoder whatever it contains. SVG is excluded on purpose: sharp renders
+     * it through librsvg, a far larger surface than a raster decoder, and one
+     * with a history of resolving external references.
+     */
+    it("refuses an SVG, however the object was labelled", async () => {
+        const svg = Buffer.from(
+            `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">` +
+            `<rect width="32" height="32" fill="red"/></svg>`
+        );
+
+        await expect(transformImage(svg, { width: 16, format: "webp" }))
+            .rejects.toThrow(UntransformableImageError);
+    });
+
+    it("refuses a file that is not an image at all", async () => {
+        await expect(transformImage(Buffer.from("just some text, honestly"), { width: 16 }))
+            .rejects.toThrow();
+    });
+
+    it("still transforms the raster formats it is meant to", async () => {
+        const result = await transformImage(await png(16, 16), { width: 8, format: "webp" });
+        expect(result.contentType).toBe("image/webp");
+    });
+
+    /**
+     * A bound on the DECODE, which the upload size limit cannot express: a few
+     * hundred KB of PNG can describe a 40,000 × 40,000 canvas, and a decoded
+     * pixel costs several bytes. sharp's own default ceiling is about 268
+     * megapixels, which is a property of the format rather than a decision.
+     */
+    it("caps the decode well below sharp's own default", () => {
+        expect(MAX_INPUT_PIXELS).toBeLessThan(0x3fff * 0x3fff);
+        // And comfortably above any image a website serves.
+        expect(MAX_INPUT_PIXELS).toBeGreaterThan(8000 * 6000);
+    });
+
+    it("refuses an image with more pixels than the cap", async () => {
+        // Built at a size that is cheap to create and declared over the cap by
+        // lowering nothing — the assertion is that the limit is the decoder's,
+        // so this uses sharp's own error.
+        const sharp = (await import("sharp")).default;
+        const huge = await sharp({
+            create: { width: 8000, height: 8000, channels: 3, background: { r: 0, g: 0, b: 0 } }
+        }).png().toBuffer();
+
+        // 64 megapixels, over the 50 megapixel cap.
+        await expect(transformImage(huge, { width: 16 })).rejects.toThrow(/pixel limit/i);
+    }, 60_000);
 
     it("refuses when the shared queue is saturated, instead of piling on more decodes", async () => {
         // Fill the process-wide queue the route uses. Without the queue, this
