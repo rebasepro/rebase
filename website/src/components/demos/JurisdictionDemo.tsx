@@ -18,7 +18,9 @@ const EN: Record<string, string> = {
     "jd.row.keyholders": "Who can read the rows",
     "jd.row.keyholders.hint": "without asking you first",
     "jd.row.exit": "What leaving costs",
-    "jd.seatedIn": "seated in",
+    "jd.seat.us": "seated in the United States",
+    "jd.seat.usde": "seated in the United States (Delaware)",
+    "jd.seat.es": "seated in Spain (European Union)",
     "jd.constant": "Europe, if you ask for it",
     "jd.unchanged": "unchanged",
     "jd.verdict.none": "One party to the data",
@@ -34,7 +36,7 @@ const EN: Record<string, string> = {
     "jd.cloud.note": "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. Today the machines underneath are Google Cloud's in Belgium, which makes Google a sub-processor; moving Cloud onto a European host is work we have committed to, and until it is done this row says so.",
     "jd.self.label": "Rebase, self-hosted",
     "jd.self.region": "Wherever you rented the box",
-    "jd.self.seat": "Your jurisdiction",
+    "jd.self.seat": "seated in your own jurisdiction",
     "jd.self.exit": "There is no exit — you already have the database and the source",
     "jd.self.note": "The software is MIT-licensed and runs as a container against your Postgres. We never see the data, hold no credentials, and have nothing to be served with.",
     "jd.struct.none.lead": "Nobody can be served with a request for your data except you",
@@ -102,7 +104,7 @@ const VENDORS: Vendor[] = [
         label: "Firebase",
         region: "eur3 · Belgium + Netherlands",
         operator: "Google LLC",
-        operatorSeat: "United States",
+        operatorSeat: "jd.seat.us",
         posture: "us",
         keyholders: ["jd.you", "Google LLC"],
         exit: "jd.firebase.exit",
@@ -113,7 +115,7 @@ const VENDORS: Vendor[] = [
         label: "Supabase",
         region: "eu-central-1 · Frankfurt",
         operator: "Supabase, Inc.",
-        operatorSeat: "United States (Delaware)",
+        operatorSeat: "jd.seat.usde",
         posture: "us",
         keyholders: ["jd.you", "Supabase, Inc.", "AWS jd.subprocessor"],
         exit: "jd.supabase.exit",
@@ -124,7 +126,7 @@ const VENDORS: Vendor[] = [
         label: "Rebase Cloud",
         region: "europe-west1 · Belgium",
         operator: "FireCMS S.L.",
-        operatorSeat: "Spain (European Union)",
+        operatorSeat: "jd.seat.es",
         posture: "eu",
         keyholders: ["jd.you", "FireCMS S.L.", "Google Cloud jd.subprocessor"],
         exit: "jd.cloud.exit",
@@ -275,7 +277,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                                                 {T(vendor.operator)}
                                             </span>
                                             <span className="text-sm text-surface-500">
-                                                {T("jd.seatedIn")} {T(vendor.operatorSeat)}
+                                                {T(vendor.operatorSeat)}
                                             </span>
                                         </p>
                                     ) : constant ? (

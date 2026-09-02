@@ -4,7 +4,7 @@ const { lang, t } = Astro.props;
 import { useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import JurisdictionDemo, { JURISDICTION_STRINGS } from '../demos/JurisdictionDemo';
-import DeployTargetDemo from '../demos/DeployTargetDemo';
+import DeployTargetDemo, { DEPLOY_TARGET_STRINGS } from '../demos/DeployTargetDemo';
 import EuHostingCostDemo, { EU_HOSTING_COST_STRINGS } from '../demos/EuHostingCostDemo';
 import EuropeMapDemo, { EUROPE_MAP_STRINGS } from '../demos/EuropeMapDemo';
 
@@ -13,18 +13,18 @@ const translatePath = useTranslatedPath(lang);
 // Everything the runtime serves, self-hosted or not. This list is the "no lite
 // tier" claim, so it has to match what `initializeRebaseBackend` actually mounts.
 const surfaces = [
-    { name: "REST API", detail: "filters, sorting, pagination, relation includes" },
-    { name: "Typed SDK", detail: "generated from your collections" },
-    { name: "Row-level security", detail: "enforced by Postgres, fail-closed" },
-    { name: "Auth", detail: "sessions, OAuth, MFA, roles, password reset" },
-    { name: "Storage", detail: "local disk, or any S3-compatible bucket" },
-    { name: "Realtime", detail: "row subscriptions, broadcast, presence" },
-    { name: "Functions", detail: "your own routes, auto-mounted" },
-    { name: "Cron", detail: "scheduled jobs with run history" },
-    { name: "OpenAPI", detail: "spec and explorer, generated" },
-    { name: "Admin panel", detail: "the whole thing, if you want it" },
-    { name: "Studio", detail: "SQL, schema, RLS, branches" },
-    { name: "MCP server", detail: "agents, under the same policies" },
+    { name: "REST API", detail: t("europe.s.rest") },
+    { name: "Typed SDK", detail: t("europe.s.sdk") },
+    { name: t("europe.s.rls.name"), detail: t("europe.s.rls") },
+    { name: t("europe.s.auth.name"), detail: t("europe.s.auth") },
+    { name: t("europe.s.storage.name"), detail: t("europe.s.storage") },
+    { name: t("europe.s.realtime.name"), detail: t("europe.s.realtime") },
+    { name: t("europe.s.functions.name"), detail: t("europe.s.functions") },
+    { name: "Cron", detail: t("europe.s.cron") },
+    { name: "OpenAPI", detail: t("europe.s.openapi") },
+    { name: "Rebase CMS", detail: t("europe.s.cms") },
+    { name: "Rebase Studio", detail: t("europe.s.studio") },
+    { name: "MCP", detail: t("europe.s.mcp") },
 ];
 
 const composeSnippet = `<span class="text-surface-500">// docker-compose.yml — the whole deployment</span>
@@ -126,7 +126,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
 
                 <div class="lg:col-span-7">
-                    <DeployTargetDemo client:visible/>
+                    <DeployTargetDemo client:visible s={Object.fromEntries(DEPLOY_TARGET_STRINGS.map((k) => [k, t(k)]))} />
                 </div>
             </div>
 
@@ -164,7 +164,7 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
 
             <div class="mx-auto max-w-6xl">
-                <EuHostingCostDemo client:visible s={Object.fromEntries(EU_HOSTING_COST_STRINGS.map((k) => [k, t(k)]))} />
+                <EuHostingCostDemo client:visible lang={lang} s={Object.fromEntries(EU_HOSTING_COST_STRINGS.map((k) => [k, t(k)]))} />
             </div>
         </div>
     </section>

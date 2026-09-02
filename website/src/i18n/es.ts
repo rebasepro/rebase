@@ -1615,7 +1615,6 @@ export const es = {
   "jd.row.keyholders": "Quién puede leer las filas",
   "jd.row.keyholders.hint": "sin preguntarte antes",
   "jd.row.exit": "Lo que cuesta irse",
-  "jd.seatedIn": "con sede en",
   "jd.constant": "Europa, si lo pides",
   "jd.unchanged": "sin cambios",
   "jd.verdict.none": "Una sola parte con los datos",
@@ -1631,7 +1630,7 @@ export const es = {
   "jd.cloud.note": "Lo operamos nosotros, así que hay una segunda parte, y somos nosotros. FireCMS S.L. es una empresa española sin matriz estadounidense — esa es la fila que se mueve. Hoy las máquinas de debajo son de Google Cloud en Bélgica, lo que convierte a Google en subencargado; mover Cloud a un proveedor europeo es trabajo al que nos hemos comprometido, y hasta que esté hecho esta fila lo dice.",
   "jd.self.label": "Rebase, autoalojado",
   "jd.self.region": "Donde hayas alquilado la máquina",
-  "jd.self.seat": "Tu jurisdicción",
+  "jd.self.seat": "con sede en tu propia jurisdicción",
   "jd.self.exit": "No hay salida — ya tienes la base de datos y el código",
   "jd.self.note": "El software tiene licencia MIT y corre como contenedor contra tu Postgres. Nunca vemos los datos, no tenemos credenciales, y no hay nada con lo que se nos pueda requerir.",
   "jd.struct.none.lead": "A nadie se le puede requerir tus datos salvo a ti",
@@ -1721,4 +1720,45 @@ export const es = {
   "em.idle.lead": "%1 ciudades. %2 empresas. Ninguna somos nosotros.",
   "em.idle.body": "Sin enlaces de afiliado, sin códigos de referido, sin nivel de partner. Un contenedor y una cadena de conexión de Postgres corren en cualquier sitio, y dónde los pongas no es asunto nuestro en absoluto — que es justo el sentido de la página que estás leyendo.",
   "em.footnote": "Las ubicaciones son las que publica cada proveedor, y cambian — compruébalo antes de comprometerte. Suiza queda fuera de la UE bajo una decisión de adecuación, que es una posición legal distinta de la de un estado miembro.",
+
+  // ── europe.s ────────────────────────────────────────────────────
+  "europe.s.rest": "filtros, orden, paginación, inclusión de relaciones",
+  "europe.s.sdk": "generado desde tus colecciones",
+  "europe.s.rls.name": "Seguridad a nivel de fila",
+  "europe.s.rls": "aplicada por Postgres, cierra por defecto",
+  "europe.s.auth.name": "Autenticación",
+  "europe.s.auth": "sesiones, OAuth, MFA, roles, restablecer contraseña",
+  "europe.s.storage.name": "Almacenamiento",
+  "europe.s.storage": "disco local, o cualquier bucket compatible con S3",
+  "europe.s.realtime.name": "Tiempo real",
+  "europe.s.realtime": "suscripciones a filas, difusión, presencia",
+  "europe.s.functions.name": "Funciones",
+  "europe.s.functions": "tus propias rutas, montadas solas",
+  "europe.s.cron": "tareas programadas con historial de ejecuciones",
+  "europe.s.openapi": "especificación y explorador, generados",
+  "europe.s.cms": "contenido, usuarios, roles, importación y exportación",
+  "europe.s.studio": "SQL, esquema, RLS, ramas",
+  "europe.s.mcp": "agentes, bajo las mismas políticas",
+
+  // ── jd.seat ─────────────────────────────────────────────────────
+  "jd.seat.us": "con sede en Estados Unidos",
+  "jd.seat.usde": "con sede en Estados Unidos (Delaware)",
+  "jd.seat.es": "con sede en España (Unión Europea)",
+
+  // ── ehc.unit ────────────────────────────────────────────────────
+  "ehc.unit.gb": "GB",
+  "ehc.unit.tb": "TB",
+
+  // ── dt ──────────────────────────────────────────────────────────
+  "dt.vps.label": "Un VPS que alquilas",
+  "dt.vps.sub": "Hetzner, OVHcloud, Scaleway, IONOS — cualquier cosa con SSH y Docker",
+  "dt.compose.label": "Docker, primero en local",
+  "dt.compose.sub": "Los mismos cuatro comandos, antes de que nada salga de tu portátil",
+  "dt.image.label": "Una imagen fijada, desde CI",
+  "dt.image.sub": "Hornea el bundle dentro para que lo que probaste sea lo que corre",
+  "dt.metal.label": "Tu propio rack",
+  "dt.metal.sub": "Sin Docker, sin orquestador — un proceso Node bajo systemd",
+  "dt.footnote": "Comandos tomados literalmente de la guía de autoalojamiento. No hay imagen de aplicación que construir — el runtime está publicado, tu proyecto viaja como bundle.",
+  "dt.replay": "Repetir",
+  "dt.skip": "Saltar",
 };

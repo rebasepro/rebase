@@ -1614,7 +1614,6 @@ export const fr = {
   "jd.row.keyholders": "Qui peut lire les lignes",
   "jd.row.keyholders.hint": "sans vous demander d'abord",
   "jd.row.exit": "Ce que coûte le départ",
-  "jd.seatedIn": "établi en",
   "jd.constant": "L'Europe, si vous le demandez",
   "jd.unchanged": "inchangé",
   "jd.verdict.none": "Une seule partie aux données",
@@ -1630,7 +1629,7 @@ export const fr = {
   "jd.cloud.note": "C'est nous qui l'exploitons : il y a donc une seconde partie, et c'est nous. FireCMS S.L. est une société espagnole sans maison mère américaine — c'est la ligne qui bouge. Aujourd'hui les machines dessous sont celles de Google Cloud en Belgique, ce qui fait de Google un sous-traitant ultérieur ; déplacer Cloud vers un hébergeur européen est un travail auquel nous nous sommes engagés, et tant qu'il n'est pas fait cette ligne le dit.",
   "jd.self.label": "Rebase, auto-hébergé",
   "jd.self.region": "Là où vous avez loué la machine",
-  "jd.self.seat": "Votre juridiction",
+  "jd.self.seat": "établi dans votre propre juridiction",
   "jd.self.exit": "Il n'y a pas de sortie — vous avez déjà la base de données et le code",
   "jd.self.note": "Le logiciel est sous licence MIT et tourne comme conteneur devant votre Postgres. Nous ne voyons jamais les données, ne détenons aucun identifiant, et n'avons rien qui puisse nous être réclamé.",
   "jd.struct.none.lead": "Personne d'autre que vous ne peut recevoir une réquisition pour vos données",
@@ -1720,4 +1719,45 @@ export const fr = {
   "em.idle.lead": "%1 villes. %2 entreprises. Aucune n'est nous.",
   "em.idle.body": "Aucun lien d'affiliation, aucun code de parrainage, aucun statut de partenaire. Un conteneur et une chaîne de connexion Postgres tournent n'importe où, et l'endroit où vous les mettez ne nous regarde vraiment pas — c'est tout le propos de la page que vous lisez.",
   "em.footnote": "Les sites sont ceux publiés par chaque fournisseur, et ils changent — vérifiez avant de vous engager. La Suisse est hors UE sous décision d'adéquation, ce qui est une position juridique différente de celle d'un État membre.",
+
+  // ── europe.s ────────────────────────────────────────────────────
+  "europe.s.rest": "filtres, tri, pagination, inclusion de relations",
+  "europe.s.sdk": "généré depuis vos collections",
+  "europe.s.rls.name": "Sécurité au niveau des lignes",
+  "europe.s.rls": "appliquée par Postgres, fermée par défaut",
+  "europe.s.auth.name": "Authentification",
+  "europe.s.auth": "sessions, OAuth, MFA, rôles, réinitialisation du mot de passe",
+  "europe.s.storage.name": "Stockage",
+  "europe.s.storage": "disque local, ou n'importe quel bucket compatible S3",
+  "europe.s.realtime.name": "Temps réel",
+  "europe.s.realtime": "abonnements aux lignes, diffusion, présence",
+  "europe.s.functions.name": "Fonctions",
+  "europe.s.functions": "vos propres routes, montées automatiquement",
+  "europe.s.cron": "tâches planifiées avec historique d'exécution",
+  "europe.s.openapi": "spécification et explorateur, générés",
+  "europe.s.cms": "contenu, utilisateurs, rôles, import et export",
+  "europe.s.studio": "SQL, schéma, RLS, branches",
+  "europe.s.mcp": "agents, sous les mêmes politiques",
+
+  // ── jd.seat ─────────────────────────────────────────────────────
+  "jd.seat.us": "établi aux États-Unis",
+  "jd.seat.usde": "établi aux États-Unis (Delaware)",
+  "jd.seat.es": "établi en Espagne (Union européenne)",
+
+  // ── ehc.unit ────────────────────────────────────────────────────
+  "ehc.unit.gb": "Go",
+  "ehc.unit.tb": "To",
+
+  // ── dt ──────────────────────────────────────────────────────────
+  "dt.vps.label": "Un VPS que vous louez",
+  "dt.vps.sub": "Hetzner, OVHcloud, Scaleway, IONOS — n'importe quoi avec SSH et Docker",
+  "dt.compose.label": "Docker, en local d'abord",
+  "dt.compose.sub": "Les quatre mêmes commandes, avant que quoi que ce soit ne quitte votre portable",
+  "dt.image.label": "Une image épinglée, depuis la CI",
+  "dt.image.sub": "Intégrez le bundle pour que ce que vous avez testé soit ce qui tourne",
+  "dt.metal.label": "Votre propre baie",
+  "dt.metal.sub": "Sans Docker, sans orchestrateur — un processus Node sous systemd",
+  "dt.footnote": "Commandes reprises telles quelles du guide d'auto-hébergement. Il n'y a pas d'image applicative à construire — le runtime est publié, votre projet voyage sous forme de bundle.",
+  "dt.replay": "Rejouer",
+  "dt.skip": "Passer",
 };

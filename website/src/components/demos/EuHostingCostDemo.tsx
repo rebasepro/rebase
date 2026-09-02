@@ -24,7 +24,8 @@ import React, { useMemo, useState } from "react";
  */
 
 const PRICING = {
-    checked: "28 July 2026",
+    /** ISO so it can be rendered in the reader's language; one home for the date. */
+    checked: "2026-07-28",
     source: "https://supabase.com/pricing",
     base: 25,
     /** Pro bundles $10/month of compute credit, which covers one Micro. */
@@ -123,7 +124,10 @@ const requirementFor = (mau: number, dbGb: number) => ({
 });
 
 const fmtCount = (n: number) => (n >= 1_000_000 ? `${n / 1_000_000}M` : n >= 1_000 ? `${n / 1_000}k` : `${n}`);
-const fmtGb = (n: number) => (n >= 1_000 ? `${(n / 1_000).toLocaleString("en-US")} TB` : `${n} GB`);
+// "GB" is a word in some of the languages this page is read in — French bills
+// in Go, not GB — so the unit comes from the string table like everything else.
+const fmtGbIn = (n: number, gb: string, tb: string) =>
+    (n >= 1_000 ? `${(n / 1_000).toLocaleString("en-US")} ${tb}` : `${n} ${gb}`);
 // Cents everywhere on the invoice: mixing "$25.00" with "$1,300" in one column
 // reads like a typo, and rounding $202.50 up to $203 in a figure whose whole
 // argument is arithmetic is worse than ugly.
@@ -156,6 +160,8 @@ const EN: Record<string, string> = {
     "ehc.item.storage": "File storage",
     "ehc.item.egress": "Egress",
     "ehc.over": "%1 over %2 × $%3",
+    "ehc.unit.gb": "GB",
+    "ehc.unit.tb": "TB",
     "ehc.permonth": "per month",
     "ehc.managed.note": "Every figure is a price Supabase publishes, checked %1 — including the compute add-on, which is sized by the same rule as the box opposite rather than left on the included Micro instance. Still conservative: it counts no read replicas, no PITR and no support plan.",
     "ehc.box.title": "Self-hosted, on a box you rent",
@@ -184,10 +190,17 @@ const EN: Record<string, string> = {
 
 export const EU_HOSTING_COST_STRINGS = Object.keys(EN);
 
-export function EuHostingCostDemo({ s = {} }: { s?: Record<string, string> }) {
+export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, string>; lang?: string }) {
     /** Resolve a key and fill `%1`… placeholders left for the numbers. */
     const T = (k: string, ...v: (string | number)[]) =>
         v.reduce<string>((out, x, i) => out.split(`%${i + 1}`).join(String(x)), s[k] ?? EN[k] ?? k);
+    const fmtGb = (n: number) => fmtGbIn(n, T("ehc.unit.gb"), T("ehc.unit.tb"));
+    // "28 July 2026" in English, "28. Juli 2026" in German — from the one ISO date.
+    // en-GB, not en: a page arguing for European hosting does not date itself
+    // month-first.
+    const checked = new Date(`${PRICING.checked}T00:00:00Z`).toLocaleDateString(lang === "en" ? "en-GB" : lang, {
+        day: "numeric", month: "long", year: "numeric", timeZone: "UTC"
+    });
 
     const [mauIdx, setMauIdx] = useState(3);       // 100k — exactly the included tier
     const [dbIdx, setDbIdx] = useState(2);         // 8 GB
@@ -222,19 +235,19 @@ export function EuHostingCostDemo({ s = {} }: { s?: Record<string, string> }) {
             },
             {
                 label: T("ehc.item.db"),
-                detail: T("ehc.over", `${Math.max(0, dbGb - PRICING.included.dbGb)} GB`, `${PRICING.included.dbGb} GB`, PRICING.rate.dbGb),
+                detail: T("ehc.over", fmtGb(Math.max(0, dbGb - PRICING.included.dbGb)), fmtGb(PRICING.included.dbGb), PRICING.rate.dbGb),
                 amount: over(dbGb, PRICING.included.dbGb, PRICING.rate.dbGb),
                 always: false
             },
             {
                 label: T("ehc.item.storage"),
-                detail: T("ehc.over", fmtGb(Math.max(0, storageGb - PRICING.included.storageGb)), `${PRICING.included.storageGb} GB`, PRICING.rate.storageGb),
+                detail: T("ehc.over", fmtGb(Math.max(0, storageGb - PRICING.included.storageGb)), fmtGb(PRICING.included.storageGb), PRICING.rate.storageGb),
                 amount: over(storageGb, PRICING.included.storageGb, PRICING.rate.storageGb),
                 always: false
             },
             {
                 label: T("ehc.item.egress"),
-                detail: T("ehc.over", fmtGb(Math.max(0, egressGb - PRICING.included.egressGb)), `${PRICING.included.egressGb} GB`, PRICING.rate.egressGb),
+                detail: T("ehc.over", fmtGb(Math.max(0, egressGb - PRICING.included.egressGb)), fmtGb(PRICING.included.egressGb), PRICING.rate.egressGb),
                 amount: over(egressGb, PRICING.included.egressGb, PRICING.rate.egressGb),
                 always: false
             }
@@ -340,7 +353,7 @@ export function EuHostingCostDemo({ s = {} }: { s?: Record<string, string> }) {
                     </div>
 
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500"
-                       dangerouslySetInnerHTML={{ __html: T("ehc.managed.note", PRICING.checked) }}/>
+                       dangerouslySetInnerHTML={{ __html: T("ehc.managed.note", checked) }}/>
                 </div>
 
                 {/* ── Your box ──────────────────────────────────────── */}

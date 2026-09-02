@@ -1710,7 +1710,6 @@ export const en = {
   "jd.row.keyholders": "Who can read the rows",
   "jd.row.keyholders.hint": "without asking you first",
   "jd.row.exit": "What leaving costs",
-  "jd.seatedIn": "seated in",
   "jd.constant": "Europe, if you ask for it",
   "jd.unchanged": "unchanged",
   "jd.verdict.none": "One party to the data",
@@ -1726,7 +1725,7 @@ export const en = {
   "jd.cloud.note": "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. Today the machines underneath are Google Cloud's in Belgium, which makes Google a sub-processor; moving Cloud onto a European host is work we have committed to, and until it is done this row says so.",
   "jd.self.label": "Rebase, self-hosted",
   "jd.self.region": "Wherever you rented the box",
-  "jd.self.seat": "Your jurisdiction",
+  "jd.self.seat": "seated in your own jurisdiction",
   "jd.self.exit": "There is no exit — you already have the database and the source",
   "jd.self.note": "The software is MIT-licensed and runs as a container against your Postgres. We never see the data, hold no credentials, and have nothing to be served with.",
   "jd.struct.none.lead": "Nobody can be served with a request for your data except you",
@@ -1816,5 +1815,46 @@ export const en = {
   "em.idle.lead": "%1 cities. %2 companies. None of them us.",
   "em.idle.body": "No affiliate links, no referral codes, no partner tier. A container and a Postgres connection string run anywhere, and where you put them is genuinely none of our business — which is the entire point of the page you are reading.",
   "em.footnote": "Locations as published by each provider, and they change — check before you commit. Switzerland sits outside the EU under an adequacy decision, which is a different legal position from a member state.",
+
+  // ── europe.s ────────────────────────────────────────────────────
+  "europe.s.rest": "filters, sorting, pagination, relation includes",
+  "europe.s.sdk": "generated from your collections",
+  "europe.s.rls.name": "Row-level security",
+  "europe.s.rls": "enforced by Postgres, fail-closed",
+  "europe.s.auth.name": "Auth",
+  "europe.s.auth": "sessions, OAuth, MFA, roles, password reset",
+  "europe.s.storage.name": "Storage",
+  "europe.s.storage": "local disk, or any S3-compatible bucket",
+  "europe.s.realtime.name": "Realtime",
+  "europe.s.realtime": "row subscriptions, broadcast, presence",
+  "europe.s.functions.name": "Functions",
+  "europe.s.functions": "your own routes, auto-mounted",
+  "europe.s.cron": "scheduled jobs with run history",
+  "europe.s.openapi": "spec and explorer, generated",
+  "europe.s.cms": "content, users, roles, import and export",
+  "europe.s.studio": "SQL, schema, RLS, branches",
+  "europe.s.mcp": "agents, under the same policies",
+
+  // ── jd.seat ─────────────────────────────────────────────────────
+  "jd.seat.us": "seated in the United States",
+  "jd.seat.usde": "seated in the United States (Delaware)",
+  "jd.seat.es": "seated in Spain (European Union)",
+
+  // ── ehc.unit ────────────────────────────────────────────────────
+  "ehc.unit.gb": "GB",
+  "ehc.unit.tb": "TB",
+
+  // ── dt ──────────────────────────────────────────────────────────
+  "dt.vps.label": "A VPS you rent",
+  "dt.vps.sub": "Hetzner, OVHcloud, Scaleway, IONOS — anything with SSH and Docker",
+  "dt.compose.label": "Docker, locally first",
+  "dt.compose.sub": "The same four commands, before any of it leaves your laptop",
+  "dt.image.label": "A pinned image, from CI",
+  "dt.image.sub": "Bake the bundle in so the thing you tested is the thing that runs",
+  "dt.metal.label": "Your own rack",
+  "dt.metal.sub": "No Docker, no orchestrator — a Node process under systemd",
+  "dt.footnote": "Commands taken verbatim from the self-hosting guide. There is no application image to build — the runtime is published, your project travels as a bundle.",
+  "dt.replay": "Replay",
+  "dt.skip": "Skip",
 };
 
