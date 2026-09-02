@@ -25,6 +25,8 @@
  * marketing and cited by nobody; the `/compare` page already takes this line,
  * and this block follows it.
  */
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+
 interface Faq {
     q: string;
     a: string;
@@ -44,7 +46,12 @@ interface Props {
     heading?: string;
 }
 
-const { competitor, faqs, pageUrl, heading } = Astro.props as Props;
+const { competitor, faqs: faqKeys, pageUrl, heading } = Astro.props as Props;
+
+// `faqs` carries i18n KEYS, not sentences — see src/data/comparison-faqs.ts.
+// Resolving them here keeps the data file one list rather than four.
+const t = useTranslations(getLangFromUrl(Astro.url));
+const faqs = faqKeys.map((f) => ({ q: t(f.q), a: t(f.a) }));
 
 /**
  * FAQPage structured data.
