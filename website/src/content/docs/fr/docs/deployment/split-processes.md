@@ -232,7 +232,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.16.0"     # cette unité seulement ; le reste garde le tag du release
+    tag: "0.17.3"     # cette unité seulement ; le reste garde le tag du release
 ```
 
 En général seul le tag vaut la peine d'être épinglé : le dépôt est hérité, donc

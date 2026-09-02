@@ -1,0 +1,207 @@
+---
+/**
+ * The recognition beat — before the argument starts.
+ *
+ * SITE-STORY §5 recorded this as the beat the home page was missing: every
+ * numbered chapter is an assertion, and nothing asked the reader to recognise a
+ * problem they already have, so "one definition, everything generated" arrived
+ * at 01 as a feature rather than as relief. This sits between the logo wall and
+ * 01, unnumbered for the same reason the rls-check band is — the numerals are
+ * the argument, and this comes before it.
+ *
+ * The figure is the argument: the same `products` table as a migration, a type,
+ * a validator, a route and a form. The drift is deliberate and small (the type
+ * says `inStock` where the column says `in_stock`; the route's owner filter is
+ * a TODO). Press "One file" — or scroll it into view — and the five fold into
+ * the one collection definition, security rules included.
+ *
+ * Base ground, not raised: the reader is being shown their own code, not a
+ * machine being opened. Code stays English; only the prose is translated.
+ *
+ * The snippets live here as strings and render through `set:html`, because an
+ * Astro template reads every `{` in a `<pre>` as an expression.
+ */
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+
+const { lang: langProp, t: tProp } = Astro.props;
+const lang = langProp ?? getLangFromUrl(Astro.url);
+const t = tProp ?? useTranslations(lang);
+
+const k = (s: string) => `<span class="k">${s}</span>`;
+const s = (v: string) => `<span class="s">${v}</span>`;
+
+const FILES: { name: string; code: string }[] = [
+    {
+        name: "migrations/0007_products.sql",
+        code: `${k("CREATE TABLE")} products (
+  id        uuid ${k("PRIMARY KEY")},
+  name      text ${k("NOT NULL")},
+  price     numeric ${k("NOT NULL")},
+  in_stock  boolean ${k("DEFAULT")} true
+);`,
+    },
+    {
+        name: "types/product.ts",
+        code: `${k("export interface")} Product {
+  id: string;
+  name: string;
+  price: number;
+  inStock: boolean;   <span class="c">// column is in_stock</span>
+}`,
+    },
+    {
+        name: "validators/product.ts",
+        code: `${k("export const")} productSchema = z.object({
+  name: z.string().min(1),
+  price: z.number().positive(),
+  in_stock: z.boolean().optional(),
+});`,
+    },
+    {
+        name: "routes/products.ts",
+        code: `app.get(${s('"/products"')}, ${k("async")} (req, res) =&gt; {
+  ${k("if")} (!req.user) ${k("return")} res.status(401).end();
+  <span class="w">// TODO: filter by owner</span>
+  res.json(${k("await")} db.select().from(products));
+});`,
+    },
+    {
+        name: "components/ProductForm.tsx",
+        code: `&lt;input name=${s('"price"')} type=${s('"number"')} step=${s('"0.01"')} required /&gt;
+&lt;input name=${s('"inStock"')} type=${s('"checkbox"')} /&gt;`,
+    },
+];
+
+const ONE = `${k("export const")} products = collection({
+  slug: ${s('"products"')},
+  properties: {
+    name:     { name: ${s('"Name"')},     type: ${s('"string"')},  validation: { required: ${k("true")} } },
+    price:    { name: ${s('"Price"')},    type: ${s('"number"')},  validation: { min: 0 } },
+    in_stock: { name: ${s('"In stock"')}, type: ${s('"boolean"')}, defaultValue: ${k("true")} },
+  },
+  securityRules: [
+    { operation: ${s('"select"')}, using: ${s('"in_stock = true OR owner_id = rebase.uid()"')} },
+    { operation: ${s('"update"')}, using: ${s('"owner_id = rebase.uid()"')} },
+  ],
+});`;
+---
+
+<section class="chapter relative border-t border-white/8 py-24 sm:py-32" data-recognition>
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            <div class="lg:col-span-5">
+                <p class="eyebrow">{t("recognition.badge")}</p>
+                <h2 class="mt-4 font-headers text-display-2 text-balance">{t("recognition.title")}</h2>
+                <p class="mt-5 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("recognition.subtitle")}</p>
+                <div class="mt-8 inline-flex overflow-hidden rounded-lg border border-white/10" role="group" aria-label={`${t("recognition.five")} / ${t("recognition.one")}`}>
+                    <button type="button" data-fold="five" aria-pressed="true"
+                            class="px-4 py-2 text-sm text-[#b4b8bd] transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        {t("recognition.five")}
+                    </button>
+                    <button type="button" data-fold="one" aria-pressed="false"
+                            class="px-4 py-2 text-sm text-[#b4b8bd] transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        {t("recognition.one")}
+                    </button>
+                </div>
+            </div>
+
+            {/* Reserved height on desktop (§6: an animating demo must not resize
+                the page). On small screens the fold happens on a press, where a
+                resize is the reader's own doing. */}
+            <div class="lg:col-span-7 lg:bleed-right">
+                <div class="fold relative lg:h-[720px] lg:overflow-hidden" data-fold-figure>
+                    {FILES.map((file, i) => (
+                        <div class="fold-file frame" style={`--i:${i}`}>
+                            <div class="frame-head">{file.name}</div>
+                            <pre set:html={file.code} />
+                        </div>
+                    ))}
+                    <div class="fold-one frame" aria-hidden="true">
+                        <div class="frame-head">collections/products.ts <span class="ml-auto truncate">{t("recognition.oneNote")}</span></div>
+                        <pre set:html={ONE} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .fold { display: grid; gap: 0.5rem; }
+    .fold .frame-head { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+    .fold pre {
+        margin: 0;
+        padding: 0.6rem 0.9rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        line-height: 1.45;
+        color: #c9ced6;
+        overflow-x: auto;
+        white-space: pre;
+    }
+    .fold :global(.k) { color: #7fb3ff; }
+    .fold :global(.s) { color: #a6e3a1; }
+    .fold :global(.c) { color: #6b7280; font-style: italic; }
+    .fold :global(.w) { color: #fb5066; }
+
+    .fold-file { transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1), opacity 500ms ease; }
+    .fold.is-one .fold-file {
+        position: absolute; top: 0; left: 0; right: 0;
+        opacity: 0;
+        transform: translateY(calc(var(--i) * 14px)) scale(0.98);
+        pointer-events: none;
+    }
+    .fold-one {
+        position: absolute; inset: 0 0 auto 0;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: opacity 500ms ease 350ms, transform 500ms ease 350ms;
+        pointer-events: none;
+    }
+    .fold.is-one .fold-one { position: relative; opacity: 1; transform: none; pointer-events: auto; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .fold-file, .fold-one { transition: none; }
+    }
+</style>
+
+<script>
+    function initRecognition() {
+        document.querySelectorAll<HTMLElement>("[data-recognition]").forEach((section) => {
+            if (section.dataset.bound === "1") return;
+            section.dataset.bound = "1";
+
+            const figure = section.querySelector<HTMLElement>("[data-fold-figure]");
+            const buttons = Array.from(section.querySelectorAll<HTMLButtonElement>("[data-fold]"));
+            if (!figure || buttons.length !== 2) return;
+
+            const set = (one: boolean) => {
+                figure.classList.toggle("is-one", one);
+                for (const b of buttons) b.setAttribute("aria-pressed", String((b.dataset.fold === "one") === one));
+                figure.querySelector(".fold-one")?.setAttribute("aria-hidden", String(!one));
+            };
+            for (const b of buttons) b.addEventListener("click", () => set(b.dataset.fold === "one"));
+
+            // Fold once, unprompted, the first time the figure is mostly in view —
+            // only on a viewport wide enough for the reserved height, and never for
+            // a reader who asked for reduced motion.
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const wide = window.matchMedia("(min-width: 1024px)").matches;
+            if (reduce || !wide || !("IntersectionObserver" in window)) return;
+            let played = false;
+            const io = new IntersectionObserver((entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting && !played) {
+                        played = true;
+                        window.setTimeout(() => set(true), 1800);
+                        io.disconnect();
+                    }
+                }
+            }, { threshold: 0.6 });
+            io.observe(figure);
+        });
+    }
+
+    initRecognition();
+    document.addEventListener("astro:page-load", initRecognition);
+</script>

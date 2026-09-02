@@ -96,23 +96,15 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
         <div class="relative z-10 mx-auto max-w-6xl px-4 lg:px-12">
             <p class="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">
-                <a href={translatePath("/backend")} class="transition-colors hover:text-primary">The backend</a>
-                <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">AI &amp; agents</span>
+                <a href={translatePath("/backend")} class="transition-colors hover:text-primary">{t("aipage.27")}</a>
+                <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">{t("aipage.00")}</span>
             </p>
             <div class="mx-auto mb-6 inline-flex items-center rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
                 <span class="font-medium">{toolCount} MCP tools · scoped keys · enforced by Postgres</span>
             </div>
-            <h1 class="mb-6 text-display-2 text-white">
-                The backend an agent<br class="hidden sm:inline"/> can't screw up.
-            </h1>
-            <p class="mb-4 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-48">
-                Give an agent real tools over your data — read, write, migrate, deploy — through an MCP server it
-                connects to in one config block.
-            </p>
-            <p class="text-base leading-7 text-surface-400">
-                Then take the safety on trust out of it. What the agent may touch is a scoped key, and what the
-                database will return is row-level security. Two gates, neither of them a prompt.
-            </p>
+            <h1 class="mb-6 text-display-2 text-white" set:html={t("aipage.01")}></h1>
+            <p class="mb-4 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-48">{t("aipage.02")}</p>
+            <p class="text-base leading-7 text-surface-400">{t("aipage.03")}</p>
         </div>
     </section>
 
@@ -121,29 +113,17 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Model Context Protocol</p>
-                    <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                        Your project, as tools an assistant can call
-                    </h2>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        <code class="font-mono text-surface-300">@rebasepro/mcp</code> speaks the Model Context Protocol,
-                        so anything that speaks MCP can drive your backend: query and edit data, push schema changes,
-                        open a database branch, trigger a cron job, tail the dev server.
-                    </p>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        Your collection definitions and the generated Drizzle schema are exposed as MCP
-                        <i>resources</i> too, so the assistant reads your actual data model rather than guessing at it
-                        from the code it happens to have open.
-                    </p>
-                    <p class="text-base leading-relaxed text-surface-400">
-                        There is nothing to build and no adapter to write. It is one block in a config file.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.04")}</p>
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.05")}</h2>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.06")}></p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.07")}></p>
+                    <p class="text-base leading-relaxed text-surface-400">{t("aipage.08")}</p>
                 </div>
 
                 <div class="lg:col-span-7">
                     <div class="frame overflow-hidden">
                         <div class="flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
-                            <span class="ml-2 font-mono text-2xs text-surface-400">.cursor/mcp.json</span>
+                            <span class="ml-2 font-mono text-2xs text-surface-400">{t("aipage.09")}</span>
                         </div>
                         <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-surface-300 sm:text-xs"><code set:html={mcpConfigCode}></code></pre>
                     </div>
@@ -156,14 +136,11 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto mb-12 max-w-3xl text-center">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">The tool surface</p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.10")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     {toolCount} tools, and these are their real names
                 </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    Not a category diagram — the actual list the server registers. An agent that can call these can
-                    build and operate an application without a human in the request path.
-                </p>
+                <p class="text-base leading-relaxed text-surface-400">{t("aipage.11")}</p>
             </div>
 
             <div class="frame p-6 sm:p-8">
@@ -202,18 +179,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto mb-12 max-w-3xl text-center">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Least-privilege agents</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    Authorization the agent cannot forget
-                </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    Everyone in this category will tell you their agent integration is safe. The question worth asking
-                    is what enforces it — because if the answer is the tool layer, then a bug in the tool layer is a
-                    breach. Here the tool layer is the first of two gates, and the second one is the database.
-                </p>
-                <p class="mt-4 text-base leading-relaxed text-surface-400">
-                    Revoke a permission below and watch the same four calls come back refused.
-                </p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.12")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.13")}</h2>
+                <p class="text-base leading-relaxed text-surface-400">{t("aipage.14")}</p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">{t("aipage.15")}</p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -222,21 +191,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
             <div class="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <h3 class="mb-4 text-2xl font-semibold text-white">A key, not a god-mode credential</h3>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        Permissions are declared per collection and per operation, and there are three operations
-                        rather than the usual two — <code class="font-mono text-surface-300">delete</code> is separable
-                        from <code class="font-mono text-surface-300">write</code>, which is the one you actually want
-                        to withhold from an agent.
-                    </p>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        <code class="font-mono text-surface-300">admin</code> is a separate flag. Without it the key
-                        carries only the <code class="font-mono text-surface-300">service</code> role, and Postgres
-                        grants that role nothing at all unless one of your policies names it.
-                    </p>
-                    <p class="text-base leading-relaxed text-surface-400">
-                        Keys are SHA-256 hashed at rest, rate-limited per key, expiring, and revocable.
-                    </p>
+                    <h3 class="mb-4 text-2xl font-semibold text-white">{t("aipage.16")}</h3>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.17")}></p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.18")}></p>
+                    <p class="text-base leading-relaxed text-surface-400">{t("aipage.19")}</p>
                     <a href={translatePath("/security")}
                        class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
                         How the policies are generated
@@ -249,7 +207,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                 <div class="lg:col-span-7">
                     <div class="frame overflow-hidden">
                         <div class="border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
-                            <span class="font-mono text-xs text-surface-400">POST /api/admin/api-keys</span>
+                            <span class="font-mono text-xs text-surface-400">{t("aipage.20")}</span>
                         </div>
                         <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-surface-300 sm:text-xs"><code set:html={keyCode}></code></pre>
                     </div>
@@ -266,14 +224,9 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto mb-16 max-w-3xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Agent infrastructure</p>
-                <h2 class="mt-4 text-display-2 text-white">
-                    Everything an agent needs to operate
-                </h2>
-                <p class="mt-4 text-base leading-relaxed text-surface-400 sm:text-lg">
-                    Vector search, scoped keys, streaming functions, realtime and scheduled tasks — the operational
-                    surface agents build on, in one window instead of a wall of cards.
-                </p>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.28")}</p>
+                <h2 class="mt-4 text-display-2 text-white">{t("aipage.21")}</h2>
+                <p class="mt-4 text-base leading-relaxed text-surface-400 sm:text-lg">{t("aipage.22")}</p>
             </div>
 
             <!-- Not `inert`, unlike the decorative mockups elsewhere on the site:
@@ -290,10 +243,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
         <!-- max-w-6xl so the eight chips clear one row on desktop; the sentence
              keeps its own narrower measure so it does not stretch with them. -->
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <p class="mx-auto mb-8 max-w-3xl text-center text-sm text-surface-400">
-                MCP is a standard, so the list of things that can drive your backend is not ours to control —
-                it is whatever speaks it.
-            </p>
+            <p class="mx-auto mb-8 max-w-3xl text-center text-sm text-surface-400">{t("aipage.23")}</p>
             <div class="flex flex-wrap items-center justify-center gap-2.5">
                 {mcpClients.map((client) => (
                     <span class="group inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm text-surface-300 ring-1 ring-inset ring-surface-800 transition-colors duration-200 hover:text-white hover:ring-surface-700">
@@ -312,22 +262,15 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     <!-- ═══════════════════════ CTA ═══════════════════════ -->
     <section class="relative z-0 py-20 sm:py-28">
         <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
-            <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                Point an agent at it
-            </h2>
-            <p class="mb-8 text-lg leading-relaxed text-surface-400">
-                Scaffold a project, add the config block, and hand your assistant a key that can read one collection.
-                It is a faster way to find out whether any of this is true than reading the rest of this page.
-            </p>
+            <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.24")}</h2>
+            <p class="mb-8 text-lg leading-relaxed text-surface-400">{t("aipage.25")}</p>
             <div class="mb-8 inline-flex items-center gap-3 rounded-xl border border-surface-800 bg-[#0c0d10] px-5 py-3.5 font-mono text-sm">
                 <span class="select-none font-semibold text-primary">&gt;</span>
-                <span class="select-all text-white">pnpm dlx @rebasepro/cli init</span>
+                <span class="select-all text-white">{t("aipage.26")}</span>
             </div>
             <div class="flex flex-col justify-center gap-4 sm:flex-row">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">
-                    Try the demo
-                </a>
+                <a href={translatePath("/demo")}
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">{t("aipage.29")}</a>
                 <a href="/docs/ai"
                    class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
                     Read the AI docs

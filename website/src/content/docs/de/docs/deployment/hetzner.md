@@ -59,7 +59,7 @@ rsync -a dist-bundle/ root@<ihre-server-ip>:/opt/rebase/dist-bundle/
 
 Für eine echte Bereitstellung sind die beiden Varianten vorzuziehen, die kein manuelles Kopieren erfordern:
 
-- **In ein Image backen** — `FROM rebasepro/server:0.16.0`, dann `COPY dist-bundle /bundle`; die Bereitstellung ist dann ein Tag-Wechsel.
+- **In ein Image backen** — `FROM rebasepro/server:0.17.3`, dann `COPY dist-bundle /bundle`; die Bereitstellung ist dann ein Tag-Wechsel.
 - **Über HTTP ausliefern** — `REBASE_BUNDLE_URL` setzen; die Runtime lädt und entpackt das Bundle bei jedem Start. Genau das tut das Terraform-Modul oben, und es ist derselbe Mechanismus, den das Helm-Chart nutzt.
 
 ## 4. Konfigurieren und starten

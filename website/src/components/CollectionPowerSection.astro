@@ -383,11 +383,11 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                 <p class="text-xs text-surface-500 font-mono">{t('power.generates')}</p>
                 <div class="flex flex-wrap justify-center gap-2">
                     {[
-                        { icon: TableProperties,     label: t('power.label.admin') },
-                        { icon: LayoutDashboard,     label: t('power.label.form') },
                         { icon: Database,            label: t('power.label.db') },
-                        { icon: Code,                label: t('power.label.sdk') },
                         { icon: Globe,               label: t('power.label.rest') },
+                        { icon: Code,                label: t('power.label.sdk') },
+                        { icon: LayoutDashboard,     label: t('power.label.form') },
+                        { icon: TableProperties,     label: t('power.label.admin') },
 
                     ].map(item => {
                         const IconComp = item.icon;

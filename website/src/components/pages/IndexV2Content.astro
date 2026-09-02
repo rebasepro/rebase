@@ -1,8 +1,8 @@
 ---
 import { NeatBackground } from "../NeatBackground";
 import CollectionPowerSection from "../CollectionPowerSection.astro";
-import RoadmapSection from "../RoadmapSection.astro";
 import ClientLogos from "../ClientLogos.astro";
+import RecognitionSection from "../RecognitionSection.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 import { ApiMiniDemo } from "../demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../demos/SdkMiniDemo";
@@ -151,9 +151,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <p class="text-emerald-400">{t("demo.init")}</p>
                                 <p class="text-emerald-400">{t("demo.pull")}</p>
                                 <p class="text-emerald-400">{t("demo.dev")}</p>
-                                <p class="mt-3 text-surface-500">
-                                    API on <span class="text-surface-200">:3001</span> <span class="text-surface-700">·</span> panel on <span class="text-surface-200">:5173</span>
-                                </p>
+                                <p class="mt-3 text-surface-500" set:html={t("demo.ports")}></p>
                                 <p class="mt-1"><span class="select-none text-surface-500">$</span> <span class="terminal-caret inline-block h-4 w-[7px] translate-y-[2px] bg-primary"></span></p>
                             </div>
                         </div>
@@ -169,6 +167,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
         <div class="border-t border-white/5 py-10 sm:py-14">
             <ClientLogos />
         </div>
+
+        <!-- RECOGNITION — before the argument starts. Unnumbered, like the
+             rls-check band: the numerals are the spine and this precedes it.
+             SITE-STORY §5 recorded it as the beat the page was missing. -->
+        <RecognitionSection lang={lang} t={t} />
 
         <!-- ============================================================
              NEAT DIVIDER → chapter 01. The strip is the real canvas; the
@@ -245,9 +248,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <!-- What is left over is a line of text, not a fourth panel. -->
                     <div class="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-6">
                         <p class="text-sm text-[#b4b8bd] max-w-2xl">
-                            Plus auth and roles, S3-compatible storage, scheduled jobs, serverless
-                            functions and backups — all against the database you already own, under
-                            the same policies.
+                            {t("engine.plus")}
                         </p>
                         <a href={translatePath("/backend")} class="accent-link ml-auto">
                             {t("engine.link")}
@@ -303,7 +304,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                     class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
                                 >
                                     <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
-                                        Blog
+                                        {t("label.blog")}
                                     </span>
                                     <span class="max-w-[34rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
                                         {t("security.postLink")}
@@ -353,18 +354,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
                     <div class="max-w-xl">
                         <h2 class="font-headers text-2xl sm:text-3xl text-balance">
-                            Don't take that on faith.
+                            {t("rlscheck.title")}
                         </h2>
-                        <p class="mt-4 text-sm text-[#b4b8bd] leading-relaxed">
-                            <code class="font-mono text-surface-300">rls-check</code> reads your database's own
-                            catalogue and reports what is actually exposed — tables served with row-level security
-                            switched off, policies that evaluate to true for everyone, views that read straight past
-                            the RLS on their base tables. Fourteen checks. Any Postgres: Supabase, Neon, RDS, your
-                            own server. It is read-only, it needs no account, and it does not care whether you use
-                            Rebase.
-                        </p>
+                        <p class="mt-4 text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
                         <a href={translatePath("/rls-check")} class="accent-link mt-6">
-                            See all 14 checks
+                            {t("rlscheck.cta")}
                             <ArrowRight size={15} />
                         </a>
                     </div>
@@ -388,10 +382,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 </svg>
                             </button>
                         </div>
-                        <p class="mt-3 text-2xs leading-5 text-surface-500">
-                            SELECTs against the system catalogues and nothing else. No telemetry, no upload, and
-                            it never reads your data.
-                        </p>
+                        <p class="mt-3 text-2xs leading-5 text-surface-500">{t("rlscheck.note")}</p>
                     </div>
                 </div>
             </div>
@@ -407,7 +398,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <span class="mx-2 text-surface-700">·</span>{t("modes.badge")}
                     </p>
                     <h2 class="mt-4 font-headers text-display-2 text-balance">
-                        Take only the half you actually need.
+                        {t("modes.title")}
                     </h2>
                     <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
                 </div>
@@ -478,7 +469,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <AdminDemoCarousel client:visible height={620} />
                     </div>
                     <a href={translatePath("/cms")} class="accent-link mt-8">
-                        Explore the admin panel
+                        {t("showcase.exploreCms")}
                         <ArrowRight size={15} />
                     </a>
                 </div>
@@ -494,48 +485,44 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                 <p class="eyebrow mb-4">
                     <span class="font-mono">06</span>
-                    <span class="mx-2 text-surface-700">·</span>Who touches it
+                    <span class="mx-2 text-surface-700">·</span>{t("personas.badge")}
                 </p>
                 <h2 class="font-headers text-display-2 max-w-xl text-balance">
-                    Three people touch this. None of them the same way.
+                    {t("personas.title")}
                 </h2>
                 <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
                     <div class="md:border-r border-white/8 py-9 md:pr-8">
-                        <h3 class="text-base font-semibold tracking-tight">The developer who owns the database</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.dev.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Writes one collection file and gets a schema, REST, an SDK and policies.
-                            Mostly stays in the editor — and when a question is faster to answer in
-                            SQL, opens Studio rather than a second tool.
+                            {t("personas.dev.desc")}
                         </p>
                         {/* This used to end "never opens the panel", which reads well and is
                             wrong: Studio is IN the panel, and it is built for exactly this
                             person. The page then had no route to Studio at all except a link
                             buried in the security section. */}
                         <a href={translatePath("/backend")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            The backend <ArrowRight size={14} />
+                            {t("personas.dev.link")} <ArrowRight size={14} />
                         </a>
                         <a href={translatePath("/studio")} class="accent-link mt-2 !text-surface-300 hover:!text-white">
-                            Studio <ArrowRight size={14} />
+                            {t("personas.dev.link2")} <ArrowRight size={14} />
                         </a>
                     </div>
                     <div class="md:border-r border-white/8 py-9 md:px-8 border-t md:border-t-0">
-                        <h3 class="text-base font-semibold tracking-tight">The operator who lives in the panel</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.operator.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Fixes a wrong address, refunds an order, moves a card. Did not choose Rebase
-                            and will not read its docs — the panel answers to them.
+                            {t("personas.operator.desc")}
                         </p>
                         <a href={translatePath("/cms")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            The admin panel <ArrowRight size={14} />
+                            {t("personas.operator.link")} <ArrowRight size={14} />
                         </a>
                     </div>
                     <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/8">
-                        <h3 class="text-base font-semibold tracking-tight">The agent holding a scoped key</h3>
+                        <h3 class="text-base font-semibold tracking-tight">{t("personas.agent.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            Reads and writes through the same API under the same policies as the humans.
-                            A first-class caller, not an integration.
+                            {t("personas.agent.desc")}
                         </p>
                         <a href={translatePath("/ai")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            AI &amp; agents <ArrowRight size={14} />
+                            <Fragment set:html={t("personas.agent.link")} /> <ArrowRight size={14} />
                         </a>
                     </div>
                 </div>
@@ -568,7 +555,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <span class="mx-2 opacity-40">·</span>{t("agentera.badge")}
                             </p>
                             <h2 class="mt-4 font-headers text-display-2 text-balance">
-                                The backend an agent can't screw up.
+                                {t("agentera.title")}.
                             </h2>
                             <p class="mt-5 leading-relaxed" set:html={t("agentera.p1")}></p>
                             <a href={translatePath("/ai")} class="accent-link mt-8">
@@ -589,13 +576,22 @@ const SELFHOST_COMMAND = "docker compose up -d";
         </div>
 
         <!-- CHAPTER 08 — CUSTOMERS. The carousel renders its own eyebrow, title
-             and subtitle; wrapping it in a second header duplicated all three. -->
-        <div class="chapter border-t border-white/8 py-24 sm:py-32">
+             and subtitle; wrapping it in a second header duplicated all three.
+             It also renders its own `py-28 sm:py-36`, and this wrapper used to
+             add `py-24 sm:py-32` on top — 272px of ground above the heading and
+             272px below it, against ~128px everywhere else, which is what left
+             most of a screen empty between the customers and the close. The
+             wrapper keeps only the hairline. -->
+        <div class="chapter border-t border-white/8">
             <CaseStudiesCarousel t={t} />
         </div>
 
-        <!-- ROADMAP -->
-        <RoadmapSection />
+        {/* The roadmap used to run here. It is not in SITE-STORY's beat table,
+            and it sat between the real customers (08) and the ownership close
+            (09) — a list of things that do not exist yet, in the last screen
+            before the ask, on a page whose rule is proof over assertion. It
+            still ships on /about, where "what are you building next" is the
+            page's own question. */}
 
         <!-- CHAPTER 09 — OWNERSHIP. Claim 5 (SITE-STORY §2), and the page's
              last argument before the ask.
@@ -722,14 +718,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/10">
                         <h3 class="text-base font-semibold tracking-tight flex items-center gap-3">
                             {t("cta.lane.cloud.title")}
-                            <span class="rounded-md bg-amber-400/15 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-amber-300">
+                            <span class="rounded-md bg-white/10 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-surface-300">
                                 {t("cta.lane.cloud.badge")}
                             </span>
                         </h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.cloud.desc")}</p>
-                        <div class="mt-5 rounded-lg border border-dashed border-white/10 px-3 py-2.5 font-mono text-xs text-surface-600">
-                            no command yet
-                        </div>
                         <a href={translatePath("/pricing")} class="accent-link mt-5">
                             {t("cta.lane.cloud.link")} <ArrowRight size={14} />
                         </a>

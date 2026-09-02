@@ -156,7 +156,7 @@ Il runtime è un normale container in ascolto su `$PORT`, quindi qualsiasi siste
 
 ```toml
 [build]
-  image = "rebasepro/server:0.13.0"
+  image = "rebasepro/server:0.17.3"
 
 [http_service]
   internal_port = 8080
@@ -210,7 +210,7 @@ possono essere avviati come più processi che cooperano. Vedi
 ## Aggiornamento
 
 ```yaml
-image: rebasepro/server:0.13.0
+image: rebasepro/server:0.17.3
 ```
 
 Riavvia. Il tuo bundle rimane invariato. All'interno della stessa major version del contratto di runtime, un bundle validato continuerà a funzionare — consulta [Compatibilità](/docs/architecture/runtime-and-bundles/#compatibility).

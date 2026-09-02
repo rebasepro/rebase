@@ -155,7 +155,7 @@ O runtime é um contêiner comum escutando na porta `$PORT`, portanto, qualquer 
 
 ```toml
 [build]
-  image = "rebasepro/server:0.13.0"
+  image = "rebasepro/server:0.17.3"
 
 [http_service]
   internal_port = 8080
@@ -209,7 +209,7 @@ processos que cooperam. Ver
 ## Atualizando
 
 ```yaml
-image: rebasepro/server:0.13.0
+image: rebasepro/server:0.17.3
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma versão major do contrato de runtime, um bundle validado continua funcionando — veja [Compatibilidade](/docs/architecture/runtime-and-bundles/#compatibility).

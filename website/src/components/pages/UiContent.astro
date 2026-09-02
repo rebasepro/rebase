@@ -21,18 +21,9 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-          <a href="/cms" class="hover:text-primary transition-colors">Rebase CMS</a>
-          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Component library</span>
-        </p>
-        <h1 class="mb-6 text-display-2 text-white">
-          The components<br/>the panel is built from.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          <code class="font-mono text-surface-200">@rebasepro/ui</code> is the React library the admin panel renders
-          itself with — and the one your custom fields, previews and entity views should use, so an extension looks
-          like it belongs rather than like a bolt-on.
-        </p>
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("ui.00")}></p>
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("ui.01")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("ui.02")}></p>
         <div class="mx-auto max-w-md" inert aria-hidden="true">
           <ReactExtMiniDemo client:visible />
         </div>
@@ -51,18 +42,12 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="grid gap-8 md:grid-cols-2 md:items-center">
           <div>
             <h2 class="text-2xl text-white mb-3">Install it</h2>
-            <p class="text-surface-400 mb-5">
-              Already a dependency of every Rebase admin panel. Add it directly when you are
-              building extensions in a separate package.
-            </p>
+            <p class="text-surface-400 mb-5">{t("ui.03")}</p>
             <pre class="rounded-lg border border-surface-800 bg-surface-950 px-4 py-3 font-mono text-sm text-surface-200 overflow-x-auto"><code>npm install @rebasepro/ui</code></pre>
           </div>
           <div>
-            <h2 class="text-2xl text-white mb-3">Component reference</h2>
-            <p class="text-surface-400 mb-5">
-              Every component, with its real prop types and a working example — searchable,
-              and generated from the library itself.
-            </p>
+            <h2 class="text-2xl text-white mb-3">{t("ui.07")}</h2>
+            <p class="text-surface-400 mb-5">{t("ui.04")}</p>
             <a href="/docs/ui/components/"
                class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary border border-transparent px-6 py-0 min-h-(--control-large) text-base font-medium text-white hover:bg-primary-dark transition-colors">
               Browse the components
@@ -79,12 +64,8 @@ import ClosingCta from "../ClosingCta.astro";
     <!-- UI Reference View Section -->
  <section class="py-16 sm:py-24 border-t border-surface-800">
       <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-8">
-        <h2 class="text-2xl text-white mb-2">
-          How the panel is composed
-        </h2>
-        <p class="text-surface-400 text-sm">
-          The same components assembled into the screens the admin panel actually ships — drawer, app bar, tabs, management views. Per-component props and examples live in the <a href="/docs/ui/components/" class="text-primary hover:underline">docs reference</a>.
-        </p>
+        <h2 class="text-2xl text-white mb-2">{t("ui.05")}</h2>
+        <p class="text-surface-400 text-sm" set:html={t("ui.06")}></p>
       </div>
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="dark rounded-lg border border-surface-800 bg-surface-900" data-theme="dark">
@@ -94,7 +75,7 @@ import ClosingCta from "../ClosingCta.astro";
     </section>
 
   
-    <ClosingCta title="Build your own fields on it." blurb="Scaffold a project and drop your React components into the panel wherever the default field isn't enough." trackId="ui" />
+    <ClosingCta title={t("close.ui.title")} blurb={t("close.ui.blurb")} trackId="ui" />
 
 </div>
 

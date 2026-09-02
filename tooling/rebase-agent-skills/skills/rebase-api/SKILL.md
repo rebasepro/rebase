@@ -600,7 +600,7 @@ Gated — admin, a service key, or an admin API key.
 ```json
 {
   "schemaVersion": "a1b2c3…",
-  "runtime": { "version": "0.16.0", "contract": 1 },
+  "runtime": { "version": "0.17.3", "contract": 1 },
   "collections": [ "…serialized collections, client-safe fields only…" ],
   "collectionSlugs": ["orders", "products", "users"],
   "generatedAt": "2026-08-21T10:30:00.000Z"

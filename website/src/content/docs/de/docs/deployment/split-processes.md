@@ -232,7 +232,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.16.0"     # nur diese Einheit; der Rest bleibt auf dem Release-Tag
+    tag: "0.17.3"     # nur diese Einheit; der Rest bleibt auf dem Release-Tag
 ```
 
 Meist lohnt nur das Tag: das Repository wird geerbt, es bleibt also ein Projekt

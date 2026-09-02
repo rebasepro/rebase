@@ -3,7 +3,9 @@
 This is the source of truth for **what each page is for**. If a section can't be
 justified from this document, it does not belong on the site.
 
-Written 2026-07-27, during the full marketing-site rework.
+Written 2026-07-27, during the full marketing-site rework. Revised 2026-09-02
+after the brand and storytelling audit (PR #39): §2 naming, §4 IA, §5 contracts
+and beat table, §6 additions, and §7, which is new.
 
 ---
 
@@ -21,6 +23,26 @@ onto it.
 See `~/.claude/.../memory/backend-first-positioning.md` — the site used to sell
 the panel first, which undersells the product and mispositions it against
 Supabase-class competitors.
+
+### Who we win first
+
+Added 2026-09-02. The reader every page is written for is the developer who
+already owns a Postgres database and has just written, or is about to write, the
+backend in front of it — on Supabase, or by hand with an ORM and a permissions
+middleware. They are not shopping for a CMS. They suspect, usually correctly,
+that their access rules do not hold: a service role that bypasses RLS, a table
+served with no policy, a check that lives in one route and not the next.
+`rls-check` is written for that suspicion, and it is the first thing we hand
+them. It is useful whether or not they ever adopt Rebase, which is why they
+trust it.
+
+Everyone else arrives through that developer. The operator team, the agency,
+the agent holding a key and the European buyer are real audiences, and each has
+a deep page — but none of them is addressed on `/` at the developer's expense,
+and none of them is the reason the hero says what it says. Naming the
+beachhead is what settles the hero: it leads with claim 1 because that is the
+claim this reader is already looking for, and "the Postgres you already have"
+is the sentence that tells them they will not have to move to get it.
 
 ## 2. The four claims we are allowed to lead with
 
@@ -83,21 +105,39 @@ who has. **It belongs at the close, not the open.** The copy for it already
 existed (`opensource.*`, translated in all four locales) and was dropped in the
 V2 rework; see §5.
 
-### The three adoption modes are the page's spine, not a feature list
+### The three products are the page's spine, not a feature list
 
-`docs/PRODUCT.md` calls BaaS / CMS / Full *"the shape of the offer"*, and it is
-the most useful structure the product has for explaining itself:
+Decided 2026-08-27 and applied to the site 2026-09-02: Rebase is three peers
+under one umbrella, not a parent with two children.
 
-| Mode | What it is | Who it is for |
-|------|------------|---------------|
-| **BaaS** | REST, typed SDK, realtime, auth, storage, functions, cron, backups. The panel's packages are never installed. | The developer who owns the database |
-| **CMS** | The above plus a schema-driven panel — spreadsheet, every field type, import/export, custom React views. | The operator team |
-| **Full** | The above plus Studio — SQL editor, schema visualizer, RLS editor, logs, API explorer. | The developer, again, day to day |
+| Product | What it is | Who it is for |
+|---------|------------|---------------|
+| **Rebase Backend** | REST, typed SDK, realtime, auth, storage, functions, cron, backups. The panel's packages are never installed. | The developer who owns the database |
+| **Rebase CMS** | The above plus a schema-driven panel — spreadsheet, every field type, import/export, custom React views. | The operator team |
+| **Rebase Studio** | SQL editor, schema visualizer, RLS editor, logs, API explorer. *Studio is the developer workspace. It registers inside the same panel as CMS.* | The developer, again, day to day |
 
 Told in that order it is ADDITIVE, which carries claim 3 structurally instead of
 asserting it: the panel is obviously optional because the reader was shown what
 came before it. It also stops the product reading as "a way to generate REST
-routes", which is what happens when only the middle mode is described.
+routes", which is what happens when only the middle product is described.
+
+**The naming sheet.** Three product names, one descriptive phrase, nothing else.
+
+- **Rebase Backend**, **Rebase CMS**, **Rebase Studio** — with the prefix, in
+  every heading, nav item and meta title. Never "Studio" alone beside "Rebase
+  CMS" in the same menu.
+- **the panel** — lowercase, the only phrase for CMS and Studio rendered
+  together. The nav column is "The panel".
+- Studio's place is one sentence, used verbatim wherever it is described:
+  *Studio is the developer workspace. It registers inside the same panel as
+  CMS.* Before 2026-09-02 four pages described it four ways — a child of CMS,
+  "the database half of the panel", "layer 03", and inside "the admin panel".
+- Banned in copy: "Rebase Admin", "Admin UI", "admin console", "admin tool",
+  "admin scaffolding", "the Rebase Studio". The one legitimate "admin UI" in
+  the tree is `src/data/alternatives.ts` describing PocketBase's and Directus's
+  own products; a competitor's product keeps its own name.
+- The `admin:` collection key, `roles: ["admin"]` and `/api/admin/*` are code,
+  not copy. They are not renamed.
 
 ## 3. The three-act shape, reused everywhere
 
@@ -112,27 +152,33 @@ Every major page is a variation on the same three acts:
 ## 4. Information architecture
 
 ```
-/                    Home — the story in seven beats, for someone who arrived cold
-/product             The platform map — both layers, every subsystem, one screen each
-├── /backend         The BaaS, in depth. Live proof per API surface.
+/                    Home — the story in nine beats, for someone who arrived cold
+/product             The platform map — every product, every subsystem, one screen each
+├── /backend         Rebase Backend, in depth. Live proof per API surface.
 │   ├── /security    RLS-first security, rls-check, hosting & GDPR
 │   └── /ai          Agents: MCP, scoped keys, skills
-└── /admin           The optional panel, in depth
-    ├── /studio      Studio — the database workspace (SQL, schema, RLS, branches, cron)
-    └── /editing     Editing — content & fields (block editor, kanban, spreadsheet)
+├── /cms             Rebase CMS — the optional panel; content & fields live here too
+└── /studio          Rebase Studio — the developer workspace (SQL, schema, RLS, logs)
 /developers          Build with Rebase — SDK, CLI, extending, deploying
 ├── /sdk             SDK tour
 └── /cli             CLI tour
 /compare             Comparison hub  (was /why-rebase)
-└── /rebase-vs-*     8 head-to-head pages
+├── /rebase-vs-*     8 head-to-head pages
+└── /alternatives/*  7 programmatic pages from src/data/alternatives.ts
+/rls-check           The free audit — the proof for claim 1, on its own page
 /pricing  /demo  /about  /manifesto  /contact  /pitch
 /startups /agencies /kit-digital /europe    campaign pages
 ```
 
 Plus `/ui` — the `@rebasepro/ui` component gallery. It is not in the nav; it is
-reached from `/admin` and `/developers`, and it now says what it is for (the
-library your custom fields should be built with) instead of "Build Beautifully,
-Build Fast".
+reached from `/cms` and `/developers`, and it says what it is for (the library
+your custom fields should be built with) instead of "Build Beautifully, Build
+Fast".
+
+**The nav teaches the product.** The Product menu is three labelled columns —
+*The backend* (Backend & APIs · Security & RLS · AI & agents), *The panel*
+(Rebase CMS · Rebase Studio · Component library) and *Explore* (Platform
+overview · Compare). The footer mirrors it.
 
 **Removed** (duplicated a page above, 301 redirect in `firebase.json`):
 
@@ -140,61 +186,89 @@ Build Fast".
 |------|---|-----|
 | `/features` | `/product` | Was a near-verbatim copy of `/product`: same hero claim, same "Edit like a spreadsheet" section, same import/branding images. |
 | `/why-rebase` | `/compare` | Its only distinct content was "how we compare"; the rest restated the home page. |
+| `/admin` | `/cms` | Renamed with the product (2026-08-27). |
+| `/editing` | `/cms` | Folded into the CMS page: content and fields are what the CMS is, not a sibling of it. |
 
-**The nav A/B test is parked.** `navigation-structure` was splitting 50/50
-between the mega-nav and a flat four-link nav — which meant half of all visitors
-never saw the backend/admin-panel split the whole site is organised around. The
-variant is kept in the code at weight 0 (`src/layouts/Layout.astro`,
-`src/scripts/ab-testing.ts`); flip the weights to run it again.
+**Two A/B tests are parked at weight 0** in `src/scripts/ab-testing.ts`
+(`navigation-structure` also in `src/layouts/Layout.astro`). `navigation-structure`
+was splitting 50/50 between the mega-nav and a flat four-link nav — which meant
+half of all visitors never saw the backend/panel split the whole site is
+organised around. `manifesto-banner-text` varied a banner that no longer renders
+(§6, *Nothing sits above the header*). Flip the weights to run either again.
 
 ## 5. Page contracts
 
 Each page must answer its question, carry at least one **live demo** (not a card
-grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli init`.
+grid), and end with the same close: `ClosingCta.astro`, and nothing else. It
+renders *Try the demo* → `/demo` (localised and in the IA; the one link to
+`demo.rebase.pro` is on `/demo` itself, via `demoHref`), the command
+`pnpm dlx @rebasepro/cli init`, and *Read the docs*. Labels are sentence case.
+Before 2026-09-02 ten pages stacked a hand-rolled close above the shared one,
+every vs page stacked four asks, and the demo button had eight labels and two
+destinations. `/kit-digital` is the exception: its ask is a call, so it keeps
+its own close and drops `ClosingCta`.
 
 | Page | The one question it answers | Demos it owns |
 |------|------------------------------|---------------|
-| `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, SplitLayer, AdminCarousel, AgentConsole, Mosaic |
-| `/product` | What do I actually get, in both layers? | AdoptionStack, per-subsystem strip, AdminDemoCarousel |
+| `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, RLSEditor, AdminCarousel, AgentConsole |
+| `/product` | What do I actually get, in every product? | AdoptionStack, per-subsystem strip, AdminDemoCarousel |
 | `/backend` | Is the backend good enough on its own? | HeroConnection, ApiMini, SdkMini, RealtimeMini, RLSEditor, SplitLayer |
-| `/admin` | What does my team get, and what does it cost me? | AdminDemoCarousel, ScrollSync, CustomFields, ReactExt |
+| `/cms` | Will non-developers actually live in this? | AdminDemoCarousel, ScrollSync, the editor, Kanban, Spreadsheet, CustomFields, ReactExt — each mounted once |
 | `/studio` | Can I run my database from here? | SQLEditor, SchemaBuilder, RLSEditor, OrdersList, JSEditor |
-| `/editing` | Will non-developers actually live in this? | Editor demos, Kanban, Spreadsheet, CustomFields |
 | `/security` | Can I trust it with production data? | RLSEditor, RbacMini, rls-check |
 | `/ai` | Can an agent drive this safely? | McpSession, AgentConsole |
-| `/developers` | How do I build with it day to day? | TerminalInit, SdkMini, Architecture, DeveloperPlayground |
-| `/compare` | Why this and not X? | comparison matrix |
+| `/developers` | How do I build with it day to day? | TerminalInit, Architecture, DeveloperPlayground |
+| `/sdk` | What does calling it from my code look like? | SdkMini; every snippet is checked against `packages/client` |
+| `/cli` | What does each step look like in a terminal? | One real run — init → db push → dev — plus `skills install` and `db backup` |
+| `/ui` | What do I build my custom fields with? | UIReferenceView |
+| `/rls-check` | Is my database exposed right now? | The tool's real output; the 14 checks from `src/data/rls-checks.ts` |
+| `/demo` | Can I see it before I run it? | The hosted panel, in place |
+| `/compare` | Why this and not X? | comparison matrix, RLSEditor, "four times you should not pick Rebase" |
+| `/rebase-vs-*` | Why this and not X, for someone who uses X today? | The shared FAQ layer, and a visible "When to stay on X" section on every page |
+| `/alternatives/*` | Which of these should I actually use? | `src/data/alternatives.ts` — "Stay." rows, the disclosure line, no prices |
+| `/pricing` | What is free, what costs money, and who operates what? | — |
+| `/about` | Who builds this, and why? | The manifesto's why, the FireCMS heritage paragraph, the roadmap |
+| `/manifesto` | What do you believe? | Five beliefs, each one disagreeable |
+| `/startups`, `/agencies` | Why this for my kind of team? | The `/europe` spine — backend → the panel as opt-in → ownership. SpreadsheetDemo, BodyPartsDemo |
+| `/kit-digital` | Can my Spanish SME get this subsidised? | Sourced amounts; one product under five categories |
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
 **The home page's beat order, and why it is that order.** Revised 2026-08-10 after
-the competitor audit, which is kept privately.
+the competitor audit, which is kept privately, and again 2026-09-02
+after the brand audit.
 
 | Beat | Section | Carries |
 |------|---------|---------|
-| — | `s-hero` | Headline, one action, and the install terminal |
-| — | `s-social-proof` | Logo wall |
-| 01 | `s-collection-power` | Claim 2 — one definition, every surface |
+| — | `s-hero` | Headline, one action, and the install terminal — whose output names the API and realtime before the panel |
+| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" — and, since 2026-09-02, naming FireCMS's 10,000+ projects, the heritage the star count cannot supply |
+| — | `s-recognition` | Recognition, before the argument: the same table declared five times — migration, type, validator, route, form — folding into one collection file. Unnumbered because it precedes the argument the numerals carry |
+| 01 | `s-collection-power` | Claim 2 — one definition, every surface; the chips run schema → REST → SDK → forms → views |
 | 02 | `s-backend-engine` | What that definition generates |
-| 03 | `s-security` | **Claim 1** — security lives in the database |
-| 04 | `s-modes` | Claim 3 — the panel is a client, not a back door |
-| 05 | `s-demo-carousel` | The panel itself |
-| 06 | `s-personas` | Developer / support / agent, one scenario each |
+| 03 | `s-security` | **Claim 1** — security lives in the database; links to `/security`, the page that carries it |
+| — | rls-check band | The proof for 03: "Don't take that on faith." Unnumbered on purpose — the numerals are the spine, and a proof point is not a chapter |
+| 04 | `s-modes` | Claim 3 — Rebase Backend / Rebase CMS / Rebase Studio; "take only the parts you need" |
+| 05 | `s-demo-carousel` | The panel itself; eyebrow "The panel" |
+| 06 | `s-personas` | Developer / operator / agent, one scenario each |
 | 07 | `s-agent-era` | Claim 4 — agent-native |
-| 08 | `s-case-study` | Real products |
+| 08 | `s-case-study` | Real products, seven of them |
+| 09 | `s-opensource` | Claim 5 — it is yours. Immediately before the ask |
+| — | `ground-close` | Three lanes: run it locally, self-host it, Rebase Cloud (private beta, request access) |
 
-**Two beats the page is missing.** Recorded 2026-08-29 while rebuilding the
-intro film against `docs/PRODUCT.md`; neither is on the page today.
+**Not on the page, by decision.** The roadmap — moved to `/about` on 2026-09-02:
+it is not a beat, and a list of things that do not exist yet sat between the real
+customers and the close. The manifesto banner (§6). The FAQ, the "what you will
+never build again" list and the feature bento from the pre-V2 page — their keys
+were deleted with `IndexContent.astro`, so they cannot come back by accident.
 
-- **Recognition, before the argument starts.** Every beat above is an assertion
-  — here is what it does, here is what it generates, here is why that is safe.
-  Nothing asks the reader to recognise a problem they already have, so "there is
-  no second data model" arrives as a feature rather than as relief. The film
-  opens its argument by showing the same table declared five times (a schema, a
-  type, a validator, a route file, a form field) and collapsing them into one.
-  That beat belongs here too, above 01.
-- **Ownership, at the close.** Claim 5. The copy is written and translated;
-  the section was simply not carried over from `IndexContent.astro` into
-  `IndexV2Content.astro`.
+**Both beats recorded missing on 2026-08-29 are on the page now.** Ownership at
+the close is 09. Recognition, before the argument starts, is the unnumbered
+section above 01 (added 2026-09-02): the same table declared five times, with
+the drift a reader will recognise — the type says `inStock` where the column
+says `in_stock`, and the route's owner filter is a TODO — folding into the one
+collection file, security rules included. It shares its five file names with
+the film's `S03_OneDefinition`, so a viewer who has seen one recognises the
+other. Its resolution is beat 01, one scroll down, which is why its copy ends
+on "below" and carries no link.
 
 Three rules are encoded in that table and should not be quietly undone:
 
@@ -218,7 +292,7 @@ Three rules are encoded in that table and should not be quietly undone:
 **Beat 06 is the only place a person appears.** The page was mechanism from top to
 bottom, which left the reader to translate every claim into their own week
 unaided. Each column is one concrete scenario closing on a different deep page —
-`/backend`, `/admin`, `/ai`. It is three columns of prose divided by hairlines
+`/backend`, `/cms`, `/ai`. It is three columns of prose divided by hairlines
 rather than three cards, because beat 05 above it is a carousel and §6 bans a card
 grid straight after another one.
 
@@ -268,9 +342,10 @@ The counterweight to "you are the only processor" is still *"being the only
 processor is also a job"* (backups, keys, uptime). Rebase Cloud is now the named
 answer to that job rather than a tier the page pretends not to have.
 
-If `/europe` ever goes back to a no-operator argument, the footer waitlist
-suppression in `Footer.astro` has to come back with it — that is the line the
-frontmatter note there is holding for you.
+The footer form is a request-access form now, not a waitlist: it renders
+`cloud.status` and its button says *Request access*. If `/europe` ever goes
+back to a no-operator argument, the footer suppression in `Footer.astro` has to
+come back with it.
 
 **No emoji, anywhere.** `/ai` shipped with a card grid headed 📝 👤 🗄️ 🌿 ⚙️ 🖥️ 📁.
 Icons are fine — lucide paths, inherited colour, sized to the text. Emoji render
@@ -399,9 +474,73 @@ there once. Do not re-implement any of them inline on a page.
     tuned for `#000`/`#0a0a0a` and falls to 4.16:1 on `#14161B`. The eyebrow
     lifts to `#8a8a8a` there. A muted value is only muted relative to something.
 - **A free tool is not a hero.** `rls-check` lives next to the claim it tests.
-- **Nothing sits above the header.**
+- **Nothing sits above the header.** The manifesto banner was the violation:
+  it sat above the header on the home page, in raw `#0070F4` (white on it is
+  3.74:1), and it made a values line the first sentence a cold visitor read.
+  Off the home page since 2026-09-02; the manifesto link lives in the footer
+  and `manifesto-banner-text` is parked (§4). `showBanner` still exists on
+  `Layout.astro`; no page passes it.
 - **No emoji, anywhere.**
+- **No English sentence in a page component.** Every marketing page goes through
+  `t()`; a hardcoded sentence ships English into three locales. The rule, the
+  key naming and the deliberate exceptions are in `PRODUCT.md` (Operating
+  Context).
+- **The social card is generated, not drawn.** `scripts/og/` renders
+  `public/img/teaser.png` and `twitter_teaser.png` from `teaser.html`: the hero
+  headline, on the ground, weight 600, one colour. When the hero changes, run it
+  again. Before 2026-09-02 the card said "Ship Faster with Postgres Superpowers",
+  a line the site had never said, in bold with the retired split line.
+- **Meta titles are `<Page> — Rebase`**, em dash. `Layout.astro`'s default
+  title, description and the Organization JSON-LD read `index.meta.*`; a page
+  that sets no meta gets the home page's, never a stale string of its own.
+- **Only the GitHub org is a real social handle.** `@rebasepro` on X is an
+  unrelated account, `x.com/rebaseco` does not exist, and the LinkedIn page that
+  was in `sameAs` is Rebase Australia. Do not add a handle you have not opened.
 
 **Trap, recorded because it cost most of a day:** Astro's dev server serves stale
 component style modules after edits. A rule that appears not to apply is usually
 cache, not cascade - restart `astro dev` before debugging specificity.
+
+## 7. Facts with one home
+
+Revised 2026-09-02, after the brand audit (PR #39). Each of these had drifted
+into two or more versions across the site, because no gate reads prose. Each
+now has one home: change it there, then grep.
+
+| Fact | Home | Anything else is drift |
+|------|------|------------------------|
+| Rebase Cloud's status | `cloud.status` in the four locale files | "not launched", "on its way", "coming", "in progress", "waitlist" |
+| The product names | the §2 naming sheet | "admin panel" as a product, "Admin UI", "the Rebase Studio" |
+| Where Studio lives | the one sentence in §2 | "half of the panel", "layer 03", a child of CMS |
+| Why we build it | `/manifesto`, belief 1; `/about` quotes it | the CRUD-fatigue story, "a global platform", the EU-lock-in origin in the pitch |
+| The close | `ClosingCta.astro` | any hand-rolled CTA above it |
+| The demo destination | `/demo` | `demo.rebase.pro` anywhere but `/demo` itself |
+| The logo wall caption | `social.title` — "Rebase and FireCMS" | "trusted by developers at…" |
+| What Rebase runs on | Postgres — the hero badge, the footer tagline, claim 1 | MongoDB on a roadmap, "database-agnostic", "multi-database engine" |
+| Proof | real products (`CaseStudiesCarousel`), real terminal output | invented multipliers, anonymous cases, testimonials |
+| Competitor facts | the competitor's own docs, verified with a date, below | any adjective |
+
+**Competitor facts as verified 2026-09-02.** Re-verify before a comparison page
+changes, and replace the date here.
+
+- Firebase: Firestore is the document store; Data Connect is Cloud SQL for
+  PostgreSQL. "Firebase is NoSQL" is wrong as written.
+- Retool: exports JSON or a Toolscript archive; never XML.
+- Supabase: Apache-2.0. Studio has a policy editor with a generator and
+  templates. Self-hosting is a supported path with a published Compose file.
+- Directus: `schema snapshot` / `schema apply` are built in; it introspects an
+  existing database, so the hub must not file it under "the CMS owns the
+  schema". Licence: MIT → BSL (2023) → the Monospace Sustainable Core License
+  with v12 (2026-04; GPL-3.0 after four years; free under $5M revenue / 50 staff).
+- Strapi: Community Edition is MIT Expat; only `ee/` is separately licensed.
+- Hasura: `graphql-engine` is Apache-2.0 (DDN is a different product).
+- Payload: MIT; part of Figma since 2025-06-17; Payload Cloud exists and is
+  closed to new sign-ups.
+- None of the eight keeps a second copy of your data. "Often two databases" was
+  false for all of them.
+
+**Still English, on purpose** — the reasons are in `PRODUCT.md`:
+`src/data/rls-checks.ts` (verbatim from the tool), `/pitch` (`lang="en"`), and
+demos that mock product UI. A demo that *argues* is page prose and is
+translated: the three on `/europe` take an `s` prop of resolved strings, as
+does `src/data/alternatives.ts`, which holds keys rather than sentences.

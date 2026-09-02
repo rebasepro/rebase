@@ -159,7 +159,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass all
 
 ```toml
 [build]
-  image = "rebasepro/server:0.13.0"
+  image = "rebasepro/server:0.17.3"
 
 [http_service]
   internal_port = 8080
@@ -213,7 +213,7 @@ mehrere zusammenarbeitende Prozesse starten. Siehe
 ## Aktualisieren
 
 ```yaml
-image: rebasepro/server:0.13.0
+image: rebasepro/server:0.17.3
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Hauptversion (Major) des Runtime-Vertrags funktioniert ein validiertes Bundle weiterhin — siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).

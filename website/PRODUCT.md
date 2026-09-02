@@ -17,6 +17,8 @@ The **evaluating developer**, arriving cold. They own a Postgres database or are
 about to, they are comparing against a named alternative (Supabase, Firebase,
 Payload, Directus, Strapi, Hasura, Retool, Django), and they will decide from the
 page whether to run `pnpm dlx @rebasepro/cli init`.
+What they are worried about, and why that settles the hero, is pinned in
+`SITE-STORY.md` §1, *Who we win first*.
 
 Secondary, and never at the primary developer's expense:
 
@@ -41,6 +43,26 @@ The docs exist to keep that developer building without leaving.
 - **Localisation is asymmetric and deliberate:** marketing runs 4 locales
   (`en`, `es`, `de`, `fr`, routed through `src/pages/[...lang]/`), docs run 6
   (`en`, `de`, `es`, `fr`, `it`, `pt`).
+- **Every marketing page component goes through `t()`.** Decided 2026-09-02,
+  after an audit found that 24 of 32 page components had zero translation calls
+  — so `/es`, `/de` and `/fr` served a translated header, footer and hero over
+  an English body. A page component that hardcodes a sentence is a bug: it ships
+  English into three locales. Keys are namespaced per page (`securitypage.NN`,
+  `vsdirectus.NN`), and strings repeated across pages get one shared key
+  (`vs.*`, `close.*`, `cloud.status`) rather than a copy each.
+- **Three things stay English on purpose, and each has a reason.**
+  `src/data/rls-checks.ts` is lifted verbatim from `packages/rls-check` because
+  a reader compares a finding on their terminal against that page, and the
+  terminal is English. `/pitch` is an investor deck and declares `lang="en"`.
+  Demos that *mock the product's own UI* stay English, because the product
+  ships English and a translated screenshot of it would be a lie.
+- **A demo that argues is page prose, so it is translated.** The three on
+  `/europe` (`JurisdictionDemo`, `EuHostingCostDemo`, `EuropeMapDemo`) take an
+  `s` prop of resolved strings and keep an English map inline as the fallback,
+  so the island still renders standalone in `/dev/demos`. `src/data/alternatives.ts`
+  holds keys rather than sentences for the same reason. Proper nouns are not
+  keyed: city names, region ids (`eu-central-1 · Frankfurt`) and legal entities
+  stay as they are printed everywhere else.
 - Machine-readable surfaces are generated at build time: `llms.txt`, the sitemap,
   per-page `.md` variants, and the changelog copy. A page absent from the sidebar
   is absent from `llms.txt`.
@@ -86,7 +108,8 @@ The docs exist to keep that developer building without leaving.
 
 Inherits the root record. Site-specific:
 
-- Design language is fixed in `SITE-STORY.md` §6 and marked *do not renegotiate*.
+- Design language is fixed in `SITE-STORY.md` §6; it is renegotiated with the
+  owner, in that file, never on a page.
 - The numbered eyebrow idiom (`01 · BADGE`) is home-page-only; deep pages use a
   plain uppercase eyebrow.
 - Nothing sits above the header.
@@ -98,11 +121,13 @@ Inherits the root record. Site-specific:
 - Live demo at `demo.rebase.pro`; real product screenshots in `public/img/`.
 - Blog under `src/content/blog`; docs under `src/content/docs`.
 - Comparison pages are built against real competitor behaviour and must stay
-  that way.
-- A client logo wall (`ClientLogos.astro`) and a three-project case-study
-  carousel (`CaseStudiesCarousel.astro`) already ship on the home page, with real
-  assets and live URLs. The logo wall is labelled *"Rebase and FireCMS"* — keep
-  that qualifier; do not restate it as Rebase-only proof.
+  that way. The facts they rest on are listed with a verification date in
+  `SITE-STORY.md` §7; re-verify and redate before changing a comparison.
+- A client logo wall (`ClientLogos.astro`) and a seven-project case-study
+  carousel (`CaseStudiesCarousel.astro`) ship on the home page and stand in for
+  proof on the campaign pages, with real assets and live URLs. Every logo wall
+  is captioned with `social.title` — *"Rebase and FireCMS"* — keep that
+  qualifier; do not restate it as Rebase-only proof.
 - **Absences:** no written testimonials or pull-quotes, no benchmarks, no user
   counts, no hosted-tier pricing. Do not invent them to fill a section.
 
@@ -115,10 +140,11 @@ Inherits the root record. Site-specific:
    command — never a card grid standing in for evidence.
 4. **Defensible against an expert.** Any comparison must survive a reader who
    uses the competitor daily.
-5. **Sell only what exists.** Self-hosting is what ships. A pre-launch Cloud lane
-   and waitlist are allowed and do ship on `/`, provided they are explicitly
-   labelled as not launched and offer no command, price, or deploy action. Only
-   `/europe` bans the mention outright.
+5. **Sell only what exists.** Self-hosting is what ships without conditions.
+   Rebase Cloud is a **live private beta** — real tenants, priced per resource,
+   opened in batches — and every surface that mentions it quotes the one
+   `cloud.status` key so the status cannot drift page to page. There are no plan
+   tiers and no "Pro" plan. Access is requested, not bought from the page.
 
 ## Accessibility & Inclusion
 

@@ -6,6 +6,7 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 import { NeatBackground } from '../../components/NeatBackground';
+import { SdkMiniDemo } from '../demos/SdkMiniDemo';
 
 
 
@@ -27,7 +28,7 @@ rebase.<span class="text-amber-400">realtime</span>  <span class="text-surface-5
 const crudCode = `<span class="text-surface-500">// Find all published posts</span>
 <span class="text-blue-400">const</span> { data } = <span class="text-blue-400">await</span> rebase.data.posts.<span class="text-amber-400">find</span>({
   limit: <span class="text-amber-400">20</span>,
-  orderBy: <span class="text-emerald-400">"createdAt:desc"</span>
+  orderBy: [<span class="text-emerald-400">"createdAt"</span>, <span class="text-emerald-400">"desc"</span>]
 });
 
 <span class="text-surface-500">// Get single post</span>
@@ -111,15 +112,16 @@ const adminCode = `<span class="text-surface-500">// User management</span>
 <span class="text-blue-400">const</span> { roles } = <span class="text-blue-400">await</span> rebase.admin.<span class="text-amber-400">listRoles</span>();
 
 <span class="text-surface-500">// File storage</span>
-<span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">uploadFile</span>({
+<span class="text-blue-400">const</span> { key, bucket, storageUrl } = <span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">putObject</span>({
   file: myFile,
-  path: <span class="text-emerald-400">"uploads/avatar.jpg"</span>
+  key: <span class="text-emerald-400">"uploads/avatar.jpg"</span>
 });
 
+<span class="text-surface-500">// short-lived signed URL, or a permanent one for public objects</span>
 <span class="text-blue-400">const</span> { url } = <span class="text-blue-400">await</span> rebase.storage
-  .<span class="text-amber-400">getDownloadURL</span>(<span class="text-emerald-400">"uploads/avatar.jpg"</span>);
+  .<span class="text-amber-400">getSignedUrl</span>(<span class="text-emerald-400">"uploads/avatar.jpg"</span>);
 
-<span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">deleteFile</span>(<span class="text-emerald-400">"old.pdf"</span>);`;
+<span class="text-blue-400">await</span> rebase.storage.<span class="text-amber-400">deleteObject</span>(<span class="text-emerald-400">"old.pdf"</span>);`;
 
 const sdkGenCode = `<span class="text-surface-500">$ rebase generate-sdk</span>
 <span class="text-emerald-400">✓</span> Generated database.types.ts
@@ -148,17 +150,9 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-          <a href="/backend" class="hover:text-primary transition-colors">The backend</a>
-          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Client SDK</span>
-        </p>
-        <h1 class="mb-6 text-display-2 text-white">
-          One client.<br/>Typed from your schema.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Data, auth, storage, realtime and your own functions — from any JavaScript or TypeScript environment, with
-          collection names and field types checked at compile time.
-        </p>
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("sdkpage.00")}></p>
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("sdkpage.01")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("sdkpage.02")}</p>
       </div>
     </section>
 
@@ -167,11 +161,9 @@ import ClosingCta from "../ClosingCta.astro";
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-              Fully Typed
-            </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">One Client, Everything You Need</h2>
-            <p class="text-lg text-surface-400 mb-6"><code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">createRebaseClient</code> gives you typed access to data, auth, admin, and storage via a single instance. Generate types with <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">rebase generate-sdk</code> for full IntelliSense.</p>
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">{t("sdkpage.13")}</div>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.03")}</h2>
+            <p class="text-lg text-surface-400 mb-6" set:html={t("sdkpage.04")}></p>
           </div>
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
             <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={initCode}/></pre>
@@ -188,17 +180,31 @@ import ClosingCta from "../ClosingCta.astro";
     <!-- Data Access -->
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="mx-auto max-w-3xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Proxy-Based Data Access</h2>
-          <p class="mt-4 text-lg text-surface-400">Access any collection as a typed property. No string lookups, no manual typing — just <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">rebase.data.posts</code>.</p>
+        <div class="mx-auto max-w-3xl text-center mb-12">
+          <h2 class="text-3xl sm:text-4xl text-white">{t("sdkpage.05")}</h2>
+          <p class="mt-4 text-lg text-surface-400" set:html={t("sdkpage.06")}></p>
+        </div>
+
+        {/* SITE-STORY §5: every page carries a live demo, and this is the page
+            that makes the SDK claim, so the demo lives here rather than on
+            /backend — which keeps the code sample and links across. */}
+        <div class="mx-auto mb-12 max-w-3xl">
+          <div class="frame overflow-hidden">
+            <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+              <span class="font-mono text-xs text-surface-400">app.ts</span>
+            </div>
+            <div class="h-[280px] w-full flex items-center justify-center overflow-hidden">
+              <SdkMiniDemo client:visible/>
+            </div>
+          </div>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">CRUD Operations</div>
+            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">CRUD</div>
             <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={crudCode}/></pre>
           </div>
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">Fluent Query Builder</div>
+            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">{t("sdkpage.14")}</div>
             <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={queryCode}/></pre>
           </div>
         </div>
@@ -213,18 +219,16 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20">
               rebase.auth
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Built-in Auth Client</h2>
-            <p class="text-lg text-surface-400 mb-6">Full auth lifecycle — sign in, sign up, Google OAuth, token refresh, password reset, email verification, and session management. Works in browser and Node.js.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.07")}</h2>
+            <p class="text-lg text-surface-400 mb-6">{t("sdkpage.08")}</p>
             <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
               <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={authCode}/></pre>
             </div>
           </div>
           <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-purple-500/10 text-purple-400 ring-1 ring-inset ring-purple-500/20">
-              rebase.admin + rebase.storage
-            </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Admin & Storage</h2>
-            <p class="text-lg text-surface-400 mb-6">Manage users, roles, and files programmatically — no admin UI required.</p>
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-purple-500/10 text-purple-400 ring-1 ring-inset ring-purple-500/20">{t("sdkpage.15")}</div>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.09")}</h2>
+            <p class="text-lg text-surface-400 mb-6">{t("sdkpage.10")}</p>
             <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
               <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={adminCode}/></pre>
             </div>
@@ -241,8 +245,8 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
               rebase generate-sdk
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Generated Types</h2>
-            <p class="text-lg text-surface-400 mb-6">Run <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">rebase generate-sdk</code> to produce a <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">database.types.ts</code> file from your collection definitions. Pass it as a generic to <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">createRebaseClient&lt;Database&gt;</code> for full end-to-end type safety.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("sdkpage.11")}</h2>
+            <p class="text-lg text-surface-400 mb-6" set:html={t("sdkpage.12")}></p>
             <ul class="space-y-3 text-surface-300">
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Auto-generated from your collection definitions</li>
               <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Full IntelliSense for <code class="text-sm bg-surface-800 px-1 rounded">rebase.data.&lt;collection&gt;</code></li>
@@ -257,62 +261,7 @@ import ClosingCta from "../ClosingCta.astro";
       </div>
     </section>
 
-    <!-- CTA -->
- <section class="py-24 sm:py-32">
-      <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-        <h2 class="text-3xl sm:text-4xl text-white mb-4">Start building with the SDK</h2>
-        <p class="text-lg text-surface-400 mb-8">Install, connect, query — in under 30 seconds.</p>
-        <div class="inline-block rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6 mb-8 text-left">
-          <pre class="text-sm font-mono"><code class="text-surface-300"><span class="text-surface-500">$</span> pnpm add @rebasepro/client
-<span class="text-surface-500">$</span> rebase generate-sdk</code></pre>
-        </div>
-        <div class="flex items-center justify-center gap-x-6">
-          <a href="/backend"
-             class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-            Backend & APIs
-            
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
-          <a href="/cli" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-            CLI & Tooling
-            
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
-        </div>
-      </div>
-    </section>
-  
-    <ClosingCta title="Typed from your own schema." blurb="Scaffold a project and the client is generated from the collections you define. No hand-written types to drift." trackId="sdk" />
+    <ClosingCta title={t("close.sdk.title")} blurb={t("close.sdk.blurb")} trackId="sdk" />
 
 </div>
 

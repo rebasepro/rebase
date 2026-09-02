@@ -107,7 +107,7 @@ await client.data.orders.update("${activeOrder.id}", {
                 TypeScript SDK Mutation Synced with Postgres!
             </div>
 
-            {/* LEFT SIDE: Interactive Admin Console (8 cols on lg) */}
+            {/* LEFT SIDE: the interactive panel (8 cols on lg) */}
             <div className="lg:col-span-7 flex flex-col h-full border-b lg:border-b-0 lg:border-r border-surface-800">
                 {/* Admin Header */}
                 <div className="px-5 py-3 border-b border-surface-800/80 bg-surface-900/40 flex items-center justify-between">

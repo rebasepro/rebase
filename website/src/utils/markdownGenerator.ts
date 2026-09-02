@@ -43,7 +43,7 @@ export function generateMarkdownForPage(page: string, lang: string): string {
      * the benefit. The rendered result read:
      *
      *     ## Key Benefits
-     *     - **Boilerplate admin UIs**: ...
+     *     - **Boilerplate back offices**: ...
      *     - **Hand-rolled API layers**: ...
      *     - **Brittle auth & permissions**: ...
      *
@@ -66,11 +66,13 @@ ${cleanHtml(tr("hero.title.part1"))} ${cleanHtml(tr("hero.title.part2"))}
 
 ${cleanHtml(tr("hero.subtitle"))}
 
+${cleanHtml(tr("recognition.title"))} ${cleanHtml(tr("recognition.subtitle"))}
+
 ## The claims, in the order the page makes them
 
 1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
 2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
-3. **Take only the half you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+3. **Take only the parts you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
 4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
 5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
 
@@ -78,39 +80,42 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 Rebase is adopted in layers, and each one is additive:
 
-- **BaaS** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
-- **CMS** — the above, plus a schema-driven admin panel generated from the same collection definitions.
-- **Full** — the above, plus Studio: SQL editor, schema visualizer, RLS editor, logs and an API explorer.
+- **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres. No React in the dependency tree.
+- **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
+- **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
 
 Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check\` audits any Postgres, read-only, with nothing installed.
 
-## In the admin panel
+## The panel, when you want one
 
-Below the headline claims, and never a substitute for them:
+- **${inline(tr("modes.cms.title"))}** — ${cleanHtml(tr("modes.cms.desc"))}
+- **${inline(tr("modes.full.title"))}** — ${cleanHtml(tr("modes.full.desc"))}
 
-- **${cleanHtml(tr("features.api.title"))}** (Badge: ${cleanHtml(tr("features.api.badge"))}): ${cleanHtml(tr("features.api.desc"))}
-- **${cleanHtml(tr("features.sdk.title"))}** (Badge: ${cleanHtml(tr("features.sdk.badge"))}): ${cleanHtml(tr("features.sdk.desc"))}
-- **${cleanHtml(tr("features.realtime.title"))}** (Badge: ${cleanHtml(tr("features.realtime.badge"))}): ${cleanHtml(tr("features.realtime.desc"))}
-- **${cleanHtml(tr("features.customization.title"))}** (Badge: ${cleanHtml(tr("features.customization.badge"))}): ${cleanHtml(tr("features.customization.desc"))}
-- **${cleanHtml(tr("features.history.title"))}** (Badge: ${cleanHtml(tr("features.history.badge"))}): ${cleanHtml(tr("features.history.desc"))}
-- **${cleanHtml(tr("features.import.title"))}** (Badge: ${cleanHtml(tr("features.import.badge"))}): ${cleanHtml(tr("features.import.desc"))}
-- **${cleanHtml(tr("features.kanban.title"))}** (Badge: ${cleanHtml(tr("features.kanban.badge"))}): ${cleanHtml(tr("features.kanban.desc"))}
+Neither changes the API. ${cleanHtml(tr("modes.subtitle"))}
 
-## Frequently Asked Questions
-- **${cleanHtml(tr("faq.q1"))}**
-  ${cleanHtml(tr("faq.a1"))}
-- **${cleanHtml(tr("faq.q2"))}**
-  ${cleanHtml(tr("faq.a2"))}
-- **${cleanHtml(tr("faq.q3"))}**
-  ${cleanHtml(tr("faq.a3"))}
-- **${cleanHtml(tr("faq.q4"))}**
-  ${cleanHtml(tr("faq.a4"))}
-- **${cleanHtml(tr("faq.q5"))}**
-  ${cleanHtml(tr("faq.a5"))}
-- **${cleanHtml(tr("faq.q6"))}**
-  ${cleanHtml(tr("faq.a6"))}
-- **${cleanHtml(tr("faq.q7"))}**
-  ${cleanHtml(tr("faq.a7"))}
+## What it can do for an agent
+
+${inline(tr("agentera.badge"))}. ${cleanHtml(tr("agentera.p1"))}
+
+## Real products built on it
+
+Built by the Rebase team, each on a Postgres database its owner controls.
+
+- **${cleanHtml(tr("showcase.case0.title"))}** (${cleanHtml(tr("showcase.case0.badge"))}) — ${cleanHtml(tr("showcase.case0.desc"))}
+- **${cleanHtml(tr("showcase.case2.title"))}** (${cleanHtml(tr("showcase.case2.badge"))}) — ${cleanHtml(tr("showcase.case2.desc"))}
+- **${cleanHtml(tr("showcase.case.title"))}** (${cleanHtml(tr("showcase.case.badge"))}) — ${cleanHtml(tr("showcase.case.desc"))}
+
+## Rebase Cloud
+
+${cleanHtml(tr("cloud.status"))}
+
+## Where to run it
+
+- **${inline(tr("cta.lane.local.title"))}** — ${cleanHtml(tr("cta.lane.local.desc"))}
+- **${inline(tr("cta.lane.selfhost.title"))}** — ${cleanHtml(tr("cta.lane.selfhost.desc"))}
+- **${inline(tr("cta.lane.cloud.title"))}** — ${cleanHtml(tr("cta.lane.cloud.desc"))}
+
+\`pnpm dlx @rebasepro/cli init\`
 `;
   }
 
@@ -124,7 +129,6 @@ Rebase eliminates the custom boilerplate work between database, API, and UI by g
   - **${cleanHtml(tr("showcase.sync.tab1.title"))}**: ${cleanHtml(tr("showcase.sync.tab1.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab2.title"))}**: ${cleanHtml(tr("showcase.sync.tab2.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab3.title"))}**: ${cleanHtml(tr("showcase.sync.tab3.desc"))}
-  - **${cleanHtml(tr("showcase.sync.tab4.title"))}**: ${cleanHtml(tr("showcase.sync.tab4.desc"))}
 `;
   }
 
@@ -193,7 +197,7 @@ Define your collections in TypeScript and get a complete API server.
   }
 
   if (page === "admin") {
-    return `# Rebase — Admin panel
+    return `# Rebase CMS
 
 A generated back office that sits on top of a Rebase backend — optional, and a client of the same API.
 
@@ -219,7 +223,7 @@ A generated back office that sits on top of a Rebase backend — optional, and a
 Let AI agents read, write, and act on your Postgres data autonomously.
 
 ## Capabilities
-- **Model Context Protocol (MCP) Server**: Exposes your Postgres database and admin tools directly to AI assistants like Cursor and Claude.
+- **Model Context Protocol (MCP) Server**: Exposes your Postgres data plus schema, user, storage, cron and function tools — 40 of them — to AI assistants like Cursor and Claude.
 - **Scoped API Keys**: Per-collection, per-operation permissions for agents, enforced by Postgres row-level security on every query.
 `;
   }

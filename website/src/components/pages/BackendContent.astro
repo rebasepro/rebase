@@ -6,7 +6,6 @@ import { NeatBackground } from '../../components/NeatBackground';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 import { SplitLayerDemo } from '../demos/SplitLayerDemo';
 import { ApiMiniDemo } from '../demos/ApiMiniDemo';
-import { SdkMiniDemo } from '../demos/SdkMiniDemo';
 import { RealtimeMiniDemo } from '../demos/RealtimeMiniDemo';
 
 const translatePath = useTranslatedPath(lang);
@@ -118,6 +117,7 @@ const alsoShipped = [
     { title: "Backups", desc: "Role-complete dumps and restores, driven from the CLI or the admin API." },
     { title: "Multiple sources", desc: "Route different collections to different databases from one server." },
 ];
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -191,25 +191,10 @@ const alsoShipped = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5 lg:order-last">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        The typed client
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Autocomplete that comes from your schema
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        <code class="font-mono text-surface-300">rebase generate-sdk</code> turns your collections
-                        into a <code class="font-mono text-surface-300">Database</code> type. Pass it to the client and
-                        collection names, field names, filter operators and return shapes are all checked at compile
-                        time — including the fields you asked for in <code class="font-mono text-surface-300">include</code>.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        Rename a column in the collection and the call sites turn red before anything ships.
-                        The repository that consumes the API does not need to be the one that defines
-                        it: <code class="font-mono text-surface-300">--from &lt;url&gt;</code> generates the same client
-                        from a running backend, in a project with no schema of its own. Your web app, admin and
-                        mobile client each stay in their own repo, and CI catches a stale client before a user does.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.00")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.01")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.02")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
                     <a href={translatePath("/sdk")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                         The full SDK tour
@@ -221,17 +206,9 @@ const alsoShipped = [
                     </a>
                 </div>
                 <div class="lg:col-span-7 space-y-5">
-                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
-                            <div class="ml-2 text-3xs font-mono text-surface-400">app.ts</div>
-                        </div>
-                        <div class="h-[260px] w-full flex items-center justify-center overflow-hidden" inert aria-hidden="true">
-                            <SdkMiniDemo client:visible/>
-                        </div>
-                    </div>
                     <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                            <span class="font-mono text-xs text-surface-400">src/orders.ts</span>
+                            <span class="font-mono text-xs text-surface-400">{t("backendpage.04")}</span>
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={sdkCode}></code></pre>
                     </div>
@@ -253,21 +230,9 @@ const alsoShipped = [
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Realtime
                     </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Changes arrive, however they were made
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        <code class="font-mono text-surface-300">listen()</code> on any collection and every insert,
-                        update and delete lands on the client over WebSocket. Subscriptions respect the same
-                        row-level security as a read, so a subscriber is never pushed a row they could not have
-                        fetched.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed">
-                        Writes made outside the API count too — a row changed
-                        from <code class="font-mono text-surface-300">psql</code>, a cron job or Studio's SQL editor emits
-                        the same event, because change capture happens in the database. Across replicas, fan-out
-                        rides Postgres <code class="font-mono text-surface-300">LISTEN/NOTIFY</code>.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.05")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("backendpage.06")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed" set:html={t("backendpage.07")}></p>
                 </div>
                 <div class="lg:col-span-7">
                     <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
@@ -286,22 +251,15 @@ const alsoShipped = [
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Authorization
                 </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    The rules live in Postgres, not in this server
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Requests execute as a restricted database role. Your <code class="font-mono text-surface-300">securityRules</code>{" "}
-                    compile to real row-level security policies, so a query that should return nothing returns
-                    nothing — whether it arrives through the SDK, a REST call, the admin panel, an agent's API key
-                    or a psql session. A collection with no policy serves no rows: the default is closed, not open.
-                </p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.08")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("backendpage.09")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
-                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">what you write</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.10")}</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">{t("backendpage.11")}</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={rulesCode}></code></pre>
                 </div>
@@ -310,7 +268,7 @@ const alsoShipped = [
                     <div class="pointer-events-none absolute inset-0" aria-hidden="true"
                          style="background: radial-gradient(500px 260px at 70% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
                     <div class="relative px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">psql — what the database enforces</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.12")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">generated</span>
                     </div>
                     <pre class="relative p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={policyCode}></code></pre>
@@ -328,10 +286,7 @@ const alsoShipped = [
                     </svg>
                 </a>
                 <span class="text-surface-700">·</span>
-                <span class="text-sm text-surface-500">
-                    Already on Postgres? <code class="font-mono text-surface-400">npx @rebasepro/rls-check</code>{" "}
-                    audits it without installing anything.
-                </span>
+                <span class="text-sm text-surface-500" set:html={t("backendpage.13")}></span>
             </div>
         </div>
     </section>
@@ -341,22 +296,10 @@ const alsoShipped = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        One server
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Everything mounted, nothing assembled
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        This is the routing table of a default project — one process, one deployment, no service
-                        mesh to draw. Each of these exists because building it yourself is a week you would
-                        rather spend elsewhere.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        One process is the default, not the ceiling. The same build also boots as an API, a
-                        functions tier and a worker — one variable per process decides which routes mount, which
-                        timers fire and which one owns the schema.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.25")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("backendpage.14")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("backendpage.15")}</p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("backendpage.16")}</p>
                     <div class="space-y-4">
                         {alsoShipped.map(item => (
                                 <div class="flex gap-3">
@@ -375,7 +318,7 @@ const alsoShipped = [
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <span class="ml-2 font-mono text-xs text-surface-400">rebase dev — mounted routes</span>
+                            <span class="ml-2 font-mono text-xs text-surface-400">{t("backendpage.17")}</span>
                         </div>
                         <ul class="divide-y divide-surface-800/60">
                             {routes.map(route => (
@@ -398,19 +341,14 @@ const alsoShipped = [
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Underneath
                 </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Boring technology, on purpose
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    A Hono app and a Drizzle schema. Two things your team can read, debug and extend without
-                    learning a framework — and without waiting for us to expose a hook.
-                </p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.18")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("backendpage.19")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">backend/src/index.ts</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.20")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Hono</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
@@ -423,7 +361,7 @@ const alsoShipped = [
 
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">relations, resolved in one query</span>
+                        <span class="font-mono text-xs text-surface-400">{t("backendpage.21")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">Drizzle</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
@@ -441,15 +379,9 @@ const alsoShipped = [
     <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    The other half
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">Headless by default</h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    The admin panel is a client of this API, not a layer inside it. It reads through the same policies your app does. Toggle it on below: the project gains one dependency
-                    and a nested <code class="font-mono text-surface-300">admin</code> block, a back office appears —
-                    and the API response on the right does not move.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("backendpage.22")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("backendpage.23")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("backendpage.24")}></p>
             </div>
             <SplitLayerDemo client:visible/>
             <div class="mt-10 text-center">
@@ -466,63 +398,8 @@ const alsoShipped = [
         </div>
     </section>
 
-    <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="py-24 sm:py-32">
-        <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">
-                A backend in about a minute
-            </h2>
-            <p class="text-lg text-surface-400 mb-10">
-                Scaffold a project and read the OpenAPI spec it generates. A database comes up with it, so there
-                is nothing to install first — and naming your own <code class="font-mono text-surface-300">DATABASE_URL</code> overrides
-                it at any point.
-            </p>
 
-            <div class="group relative max-w-md mx-auto mb-10">
-                <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                     aria-hidden="true"></div>
-                <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                    <div class="px-5 py-4 flex items-center justify-between">
-                        <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                            <span class="text-primary mr-3">~</span>
-                            <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                        </div>
-                        <button data-track-copy="backend-cta" data-command="pnpm dlx @rebasepro/cli init"
-                                class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                aria-label="Copy command" title="Copy to clipboard">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
 
-            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-                <a href={translatePath("/developers")}
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
-                   data-track id="backend-cta-developers">
-                    How you build with it
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-                <a href="/docs/backend"
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
-                   data-track id="backend-cta-docs">
-                    Backend docs
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
+    <ClosingCta title={t("close.backend.title")} blurb={t("close.backend.blurb")} trackId="backend" />
+
 </div>

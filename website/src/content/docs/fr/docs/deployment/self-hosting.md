@@ -159,7 +159,7 @@ Le runtime est un conteneur ordinaire à l'écoute sur `$PORT`, de sorte que tou
 
 ```toml
 [build]
-  image = "rebasepro/server:0.13.0"
+  image = "rebasepro/server:0.17.3"
 
 [http_service]
   internal_port = 8080
@@ -213,7 +213,7 @@ coopérants. Voir [Processus séparés](/docs/deployment/split-processes/).
 ## Mise à niveau
 
 ```yaml
-image: rebasepro/server:0.13.0
+image: rebasepro/server:0.17.3
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une même version majeure du contrat de runtime, un bundle validé continue de fonctionner — voir [Compatibilité](/docs/architecture/runtime-and-bundles/#compatibility).

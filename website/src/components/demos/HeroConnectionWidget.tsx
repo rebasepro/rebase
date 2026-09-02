@@ -201,7 +201,7 @@ export default function HeroConnectionWidget() {
                             <div className="flex items-center gap-1.5 flex-wrap pt-2 justify-center">
                                 <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
                                     <TableProperties size={12} className="text-primary-light" />
-                                    Admin UI
+                                    The panel
                                 </span>
                                 <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
                                     <Code size={12} className="text-primary-light" />

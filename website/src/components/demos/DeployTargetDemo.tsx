@@ -26,8 +26,8 @@ interface Target {
 const TARGETS: Target[] = [
     {
         id: "vps",
-        label: "A VPS you rent",
-        subtitle: "Hetzner, OVHcloud, Scaleway, IONOS — anything with SSH and Docker",
+        label: "dt.vps.label",
+        subtitle: "dt.vps.sub",
         lines: [
             { kind: "cmd", text: "rebase build" },
             { kind: "out", text: "collections   12 compiled" },
@@ -44,8 +44,8 @@ const TARGETS: Target[] = [
     },
     {
         id: "compose",
-        label: "Docker, locally first",
-        subtitle: "The same four commands, before any of it leaves your laptop",
+        label: "dt.compose.label",
+        subtitle: "dt.compose.sub",
         lines: [
             { kind: "cmd", text: "rebase build" },
             { kind: "cmd", text: "docker compose up -d db" },
@@ -60,13 +60,13 @@ const TARGETS: Target[] = [
     },
     {
         id: "image",
-        label: "A pinned image, from CI",
-        subtitle: "Bake the bundle in so the thing you tested is the thing that runs",
+        label: "dt.image.label",
+        subtitle: "dt.image.sub",
         lines: [
             { kind: "cmd", text: "rebase build" },
             { kind: "cmd", text: "npm install --omit=dev --prefix dist-bundle" },
             { kind: "note", text: "# Dockerfile" },
-            { kind: "note", text: "#   FROM rebasepro/server:0.13.0" },
+            { kind: "note", text: "#   FROM rebasepro/server:0.17.3" },
             { kind: "note", text: "#   COPY dist-bundle /bundle" },
             { kind: "cmd", text: "docker build -t registry.example.eu/acme/api:1.4.0 ." },
             { kind: "cmd", text: "docker push registry.example.eu/acme/api:1.4.0" },
@@ -76,8 +76,8 @@ const TARGETS: Target[] = [
     },
     {
         id: "metal",
-        label: "Your own rack",
-        subtitle: "No Docker, no orchestrator — a Node process under systemd",
+        label: "dt.metal.label",
+        subtitle: "dt.metal.sub",
         lines: [
             { kind: "cmd", text: "npm install -g @rebasepro/server @rebasepro/server-postgres" },
             { kind: "cmd", text: "rsync -a dist-bundle/ deploy@rack.internal:/srv/myapp/dist-bundle/" },
@@ -94,7 +94,30 @@ const CHAR_MS = 14;
 const AFTER_CMD_MS = 300;
 const AFTER_OUT_MS = 150;
 
-export function DeployTargetDemo() {
+/**
+ * Labels and captions are keys; the terminal reel is not. A command is a
+ * command in every language, and translating one would make it wrong.
+ */
+const EN: Record<string, string> = {
+    "dt.vps.label": "A VPS you rent",
+    "dt.vps.sub": "Hetzner, OVHcloud, Scaleway, IONOS — anything with SSH and Docker",
+    "dt.compose.label": "Docker, locally first",
+    "dt.compose.sub": "The same four commands, before any of it leaves your laptop",
+    "dt.image.label": "A pinned image, from CI",
+    "dt.image.sub": "Bake the bundle in so the thing you tested is the thing that runs",
+    "dt.metal.label": "Your own rack",
+    "dt.metal.sub": "No Docker, no orchestrator — a Node process under systemd",
+    "dt.footnote": "Commands taken verbatim from the self-hosting guide. There is no application image to build — the runtime is published, your project travels as a bundle.",
+    "dt.replay": "Replay",
+    "dt.skip": "Skip"
+};
+
+export const DEPLOY_TARGET_STRINGS = Object.keys(EN);
+
+export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
+    /** Resolve a key; anything that is not one passes through. */
+    const T = (k: string) => s[k] ?? EN[k] ?? k;
+
     const [targetId, setTargetId] = useState(TARGETS[0].id);
     const [step, setStep] = useState(0);
     const [chars, setChars] = useState(0);
@@ -159,12 +182,12 @@ export function DeployTargetDemo() {
                                 ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/30"
                                 : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
                         }`}>
-                        {t.label}
+                        {T(t.label)}
                     </button>
                 ))}
             </div>
 
-            <p className="px-5 pt-4 text-sm text-surface-400 sm:px-6">{target.subtitle}</p>
+            <p className="px-5 pt-4 text-sm text-surface-400 sm:px-6">{T(target.subtitle)}</p>
 
             {/* Terminal */}
             <div
@@ -188,14 +211,13 @@ export function DeployTargetDemo() {
             {/* Footer */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-800/60 bg-surface-950/40 px-5 py-3 sm:px-6">
                 <p className="text-[11px] leading-relaxed text-surface-500">
-                    Commands taken verbatim from the self-hosting guide. There is no application image to build — the
-                    runtime is published, your project travels as a bundle.
+                    {T("dt.footnote")}
                 </p>
                 <button
                     type="button"
                     onClick={done ? replay : skipToEnd}
                     className="flex-none rounded-lg px-3 py-1.5 text-xs font-medium text-surface-400 ring-1 ring-inset ring-surface-800 transition-colors hover:text-white hover:ring-surface-700">
-                    {done ? "Replay" : "Skip"}
+                    {done ? T("dt.replay") : T("dt.skip")}
                 </button>
             </div>
         </div>
