@@ -208,3 +208,15 @@ coverage/
 
 # Test and report output — playwright, e2e screenshots. One place, so root stays legible.
 /.artifacts/
+
+# Test-runner and linter dumps.
+#
+# `packages/client/jest-output.txt` was tracked: ten thousand lines of a run on
+# somebody's laptop, carrying absolute paths from that machine into a public
+# repository, and stale from the moment it was committed. A checked-in run log
+# is never evidence of anything — the run that matters is the one CI just did.
+**/jest-output.txt
+**/vitest-output.txt
+**/test-output.txt
+**/eslint-errors*.json
+**/eslint_report.json
