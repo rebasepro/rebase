@@ -29,11 +29,55 @@ the rows survive — not merely that the boot did.
 What beta does mean: features are still missing, some subsystems are newer than
 others, and the shape of a rough edge is that something is absent or awkward,
 not that it silently corrupts something. Which subsystems are which is published
-and dated rather than left to be discovered.
+and dated rather than left to be discovered — the table below is that
+publication.
+
+## Readiness by subsystem
+
+**Dated 2 September 2026, against 0.17.3.** Re-read it at each minor; a rating
+that has not moved in three releases is either settled or forgotten, and this
+note is here so the difference gets checked.
+
+The three ratings mean:
+
+- **Stable** — the shape is settled and covered by a gate in CI. It can still
+  gain features; it will not be redesigned under you inside 0.x, and a change to
+  it that would break you is announced in the changelog.
+- **Beta** — it works and is used in production, and something about it is known
+  to be rough: a limit you can reach, an edge that is awkward, a design decision
+  not yet made. The rough part is named in the notes, because "beta" on its own
+  tells you nothing you can plan around.
+- **Experimental** — shipped so it can be used and reported on. Expect to hit
+  the parts nobody has.
+
+| Subsystem | Rating | What the rating rests on |
+|---|---|---|
+| REST API + generated SDK | Stable | The wire contract is versioned and gated; `client-sdk-e2e` drives register → sign-in → RLS-scoped reads → refresh → storage → realtime end to end |
+| Auth — email/password, OAuth, OIDC, magic link, one-time code | Stable | Twelve OAuth providers ship. The auth schema is a versioned contract, stamped and checked at boot |
+| Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
+| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fourteen checks, and the RLS e2e suite runs on every push |
+| Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
+| Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
+| Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
+| Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
+| Entity history | Stable | Snapshot-based, gated by its own suite |
+| Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
+| MCP server + agent skills | Beta | Thirty-odd tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. stdio transport only — there is no remote/HTTP transport yet |
+| Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
+| CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
+| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) do not work there and say so |
+| Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
+| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations |
+| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over |
+| Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
+
+Two entries above are the honest cost of publishing this table at all: the
+realtime refetch and the data table's accessibility are open defects, not
+roadmap items, and both are listed rather than left for a reader to discover.
 
 ## The 0.x promise
 
-Rebase is `0.x` — 0.16 at the time of writing. This section is written to hold
+Rebase is `0.x` — 0.17 at the time of writing. This section is written to hold
 for every 0.x release rather than for one of them, so it does not go stale on
 each cut. **Breaking changes to the authored TypeScript API are still allowed in
 a minor**, and the changelog is where they are announced. What is
@@ -220,7 +264,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
-| `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `contracts/server.api.txt`. This is the package `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
+| `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
 | `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |

@@ -12,8 +12,9 @@
  *
  * The three axes with a committed artifact can answer for themselves, so they do:
  *
- *   * `api-surface/server.api.txt`   — a REMOVED export, or an export that lost a
- *                                      member. Additions are not breaking.
+ *   * `contracts/server.api.txt`     — a REMOVED export, or an export that lost a
+ *                                      member, in any of its six sections.
+ *                                      Additions are not breaking.
  *   * `contracts/derived-names.txt`  — a name that DISAPPEARED, or one whose
  *                                      producers changed. Additions are not
  *                                      breaking. Frozen means frozen, not
