@@ -58,30 +58,18 @@ import ClosingCta from "../ClosingCta.astro";
             precisely so those edges agree. */}
         <div class="relative z-10 mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="font-medium">MIT-licensed · Runs on your Postgres · Operated in Europe, or by you</span>
+                <span class="font-medium">{t("europe.badge")}</span>
             </div>
 
-            <h1 class="mb-6 text-display-2 text-white">
-                Sovereignty is not<br/>a region setting.
-            </h1>
+            <h1 class="mb-6 text-display-2 text-white" set:html={t("europe.00")}></h1>
 
             {/* Measures, not padding. This carried `sm:px-16 … xl:px-40`, so on a
                 wide screen 160px of left padding pushed the lead a third of the
                 way across the page while the headline above it stayed on the
                 shell edge — three different left edges in one block. §6's lead
                 measure does the same job without moving the edge. */}
-            <p class="mb-6 max-w-[38rem] text-lg leading-8 text-surface-300 lg:text-xl">
-                Every backend platform will happily put your database in Frankfurt. That is the easy half.
-                The half nobody sells you is the second party — the company that operates the service, holds
-                the credentials, and can be asked for your rows without asking you first.
-            </p>
-            <p class="mb-10 max-w-[38rem] text-base leading-7 text-surface-400">
-                Rebase gives you what Firebase and Supabase give you — REST, a typed SDK, realtime, auth,
-                storage, functions, cron and an admin panel — as an open-source container. Run it yourself
-                and there is no second party at all. Let us run it and the second party is a Spanish
-                company, under European law, that you can leave with <code class="font-mono text-surface-300">pg_dump</code>.
-                What we will not sell you is a second party in Delaware with a Frankfurt region.
-            </p>
+            <p class="mb-6 max-w-[38rem] text-lg leading-8 text-surface-300 lg:text-xl">{t("europe.01")}</p>
+            <p class="mb-10 max-w-[38rem] text-base leading-7 text-surface-400" set:html={t("europe.02")}></p>
 
             {/* Left-aligned with everything above it. Centred, it was the only
                 element in the hero not on the shell edge. */}
@@ -105,20 +93,10 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Who holds the keys</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    Everyone can host in Europe. That was never the hard part.
-                </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    You will read a lot of marketing that implies your data is being flown to Virginia. It usually
-                    is not. Supabase will provision in Frankfurt; Firestore has a European multi-region. If the
-                    question is <i>where is the disk</i>, all three answers below are the same, and we are not going
-                    to pretend otherwise to sell you something.
-                </p>
-                <p class="mt-4 text-base leading-relaxed text-surface-400">
-                    The question worth asking is the other one. <b class="text-white">Who is the second party?</b>{" "}
-                    Switch vendors below and watch which row moves.
-                </p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.03")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.04")}</h2>
+                <p class="text-base leading-relaxed text-surface-400" set:html={t("europe.05")}></p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400" set:html={t("europe.06")}></p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -132,27 +110,14 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">What you actually deploy</p>
-                    <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                        A published container and a database you already know how to run
-                    </h2>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        Self-hosting has a reputation, and it is mostly deserved: most "open source alternatives" hand
-                        you a compose file with nine services in it and wish you luck. Rebase is two processes.
-                        Postgres, and the runtime image with your project mounted into it.
-                    </p>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        There is no application image to build. <code class="font-mono text-surface-300">rebase build</code>{" "}
-                        produces a bundle; the runtime is already on Docker Hub. Upgrading Rebase is a tag change, not a
-                        rebuild — your bundle is untouched.
-                    </p>
-                    <p class="mb-6 text-base leading-relaxed text-surface-400">
-                        Creating tables is a separate, deliberate command. A container restart must never be able to
-                        change your schema as a side effect of a deploy.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.07")}</p>
+                    <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.08")}</h2>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">{t("europe.09")}</p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.10")}></p>
+                    <p class="mb-6 text-base leading-relaxed text-surface-400">{t("europe.11")}</p>
                     <a href="/docs/deployment/self-hosting"
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
-                        The self-hosting guide
+                        {t("europe.link.selfhost")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
@@ -175,20 +140,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                 </div>
                 <div class="lg:col-span-5">
-                    <h3 class="mb-4 text-2xl font-semibold text-white">Small enough to read in one sitting</h3>
-                    <p class="mb-4 text-base leading-relaxed text-surface-400">
-                        That is the entire production deployment, minus the secrets. Two services, one volume,
-                        three environment variables. The runtime refuses to start in production
-                        without <code class="font-mono text-surface-300">DATABASE_URL</code>, <code class="font-mono text-surface-300">JWT_SECRET</code> and <code class="font-mono text-surface-300">CORS_ORIGINS</code> rather
-                        than guessing them.
-                    </p>
-                    <p class="text-base leading-relaxed text-surface-400">
-                        Mount the bundle read-only and a compromised hook cannot rewrite the code that runs after
-                        the next restart. Point your orchestrator's liveness probe
-                        at <code class="font-mono text-surface-300">/livez</code> and readiness
-                        at <code class="font-mono text-surface-300">/health</code>; the first never touches the database,
-                        so a brief hiccup does not restart a perfectly healthy process.
-                    </p>
+                    <h3 class="mb-4 text-2xl font-semibold text-white">{t("europe.12")}</h3>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("europe.13")}></p>
+                    <p class="text-base leading-relaxed text-surface-400" set:html={t("europe.14")}></p>
                 </div>
             </div>
         </div>
@@ -203,20 +157,10 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">The bill</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    Their price is a function of your success. Yours is a number you chose.
-                </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    This is the part of self-hosting that people are too polite to lead with, so we will. Most
-                    managed backends price monthly active users, gigabytes stored and gigabytes served, which means
-                    the bill grows in exactly the moment you least want a new bill. A VPS charges the same amount in
-                    the month you launch and the month you get on the front page. Rebase Cloud is priced per resource
-                    for the same reason — you state what runs, and the invoice follows that rather than your traffic.
-                </p>
-                <p class="mt-4 text-base leading-relaxed text-surface-400">
-                    Below is the honest version of that comparison, including the parts that do not favour us.
-                </p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.eyebrow.bill")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.15")}</h2>
+                <p class="text-base leading-relaxed text-surface-400">{t("europe.16")}</p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">{t("europe.17")}</p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -229,15 +173,9 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">No lite tier</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    The self-hosted build is the build
-                </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    There is no open-core split here, no feature held back for a paid tier, and no telephone-home.
-                    The container you run on your own hardware serves every surface Rebase has. This is the list, and
-                    it is the same list on every page of this site.
-                </p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.18")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.19")}</h2>
+                <p class="text-base leading-relaxed text-surface-400">{t("europe.20")}</p>
             </div>
 
             <div class="frame p-6 sm:p-8">
@@ -259,9 +197,8 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
 
                 <p class="mt-8 border-t border-surface-800/60 pt-6 text-sm leading-relaxed text-surface-400">
-                    The admin panel is a separate React app that talks to the same public API under the same policies.
-                    Add it, skip it, or delete it — the API response does not move.
-                    <a href={translatePath("/cms")} class="ml-1 text-primary hover:underline">See the panel</a>.
+                    {t("europe.panelNote")}
+                    <a href={translatePath("/cms")} class="ml-1 text-primary hover:underline">{t("europe.link.panel")}</a>.
                 </p>
             </div>
         </div>
@@ -271,15 +208,9 @@ import ClosingCta from "../ClosingCta.astro";
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Where to put it</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    European hosts we have no relationship with whatsoever
-                </h2>
-                <p class="text-base leading-relaxed text-surface-400">
-                    Seventeen cities, seven companies, and a €-denominated invoice from each of them. Pick one below
-                    and watch which pins are theirs — we resell none of it, take nothing from any of them, and the
-                    runtime does not know or care which one you picked.
-                </p>
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("europe.21")}</p>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.22")}</h2>
+                <p class="text-base leading-relaxed text-surface-400">{t("europe.23")}</p>
             </div>
 
             <EuropeMapDemo client:visible/>
@@ -291,54 +222,41 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
             <div class="mb-12 max-w-[42rem]">
                 <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">Paperwork</p>
-                <h2 class="mb-5 text-3xl sm:text-4xl text-white">
-                    Where this leaves you on GDPR
-                </h2>
+                <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("europe.24")}</h2>
             </div>
 
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
                     <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-                        Self-hosted
+                        {t("europe.badge.selfhosted")}
                     </div>
-                    <h3 class="mb-4 text-xl font-semibold text-white">You are the controller, and the only processor</h3>
+                    <h3 class="mb-4 text-xl font-semibold text-white">{t("europe.25")}</h3>
                     <ul class="space-y-3 text-sm text-surface-400">
-                        <li><b class="text-white">No third-party processor in the path.</b> The software runs on your infrastructure; we receive nothing, so there is no sub-processor list to chase and no transfer to assess.</li>
-                        <li><b class="text-white">Access and deletion requests are SQL.</b> Answer them from your own database, on your own timetable, without filing a support ticket with a vendor.</li>
-                        <li><b class="text-white">Residency is a decision, not a plan tier.</b> Put Postgres wherever your obligations require it, including a machine in your own building.</li>
+                        <li set:html={t("europe.26")}></li>
+                        <li set:html={t("europe.27")}></li>
+                        <li set:html={t("europe.28")}></li>
                     </ul>
                 </div>
 
                 <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
                     <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 ring-1 ring-inset ring-amber-500/20">
-                        The other side of it
+                        {t("europe.badge.otherside")}
                     </div>
-                    <h3 class="mb-4 text-xl font-semibold text-white">Being the only processor is also a job</h3>
-                    <p class="mb-4 text-sm leading-relaxed text-surface-400">
-                        Nobody else can be compelled to hand over your data — and nobody else is going to patch your
-                        kernel, notice that your backup has been silently failing for three weeks, or answer the pager
-                        at two in the morning. Both halves of that sentence come from the same fact.
-                    </p>
+                    <h3 class="mb-4 text-xl font-semibold text-white">{t("europe.29")}</h3>
+                    <p class="mb-4 text-sm leading-relaxed text-surface-400">{t("europe.30")}</p>
                     <ul class="space-y-3 text-sm text-surface-400">
-                        <li><b class="text-white">Backups are yours to prove.</b> <code class="font-mono text-surface-300">rebase db backup</code> takes role-complete dumps and restores them, but a backup nobody has restored is a hypothesis.</li>
-                        <li><b class="text-white">Keys are yours to lose.</b> There is no support ticket that recovers a <code class="font-mono text-surface-300">JWT_SECRET</code> you deleted.</li>
-                        <li><b class="text-white">Uptime is yours to own.</b> One VPS is one machine. If the business needs two, the architecture allows it and your invoice notices.</li>
+                        <li set:html={t("europe.31")}></li>
+                        <li set:html={t("europe.32")}></li>
+                        <li set:html={t("europe.33")}></li>
                     </ul>
-                    <p class="mt-5 text-sm leading-relaxed text-surface-500">
-                        If nobody on the team wants that job, that is a real answer, and a managed platform is
-                        buying you something real. Ours is <a href="/pricing" class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">Rebase Cloud</a>,
-                        operated by FireCMS S.L. in Spain — which makes us your processor, with everything that
-                        implies, rather than nobody at all. We would rather you decide that on the way in than
-                        find out later.
-                    </p>
+                    <p class="mt-5 text-sm leading-relaxed text-surface-500" set:html={t("europe.34")}></p>
                 </div>
             </div>
 
             <p class="mt-8 max-w-[38rem] text-xs leading-relaxed text-surface-500">
-                None of this is legal advice. It is an architecture description, which is the part we can actually be
-                held to — and the
-                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">security page</a>{" "}
-                describes how the access rules themselves are enforced.
+                {t("europe.legal")}
+                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">{t("europe.link.security")}</a>{" "}
+                {t("europe.legal2")}
             </p>
         </div>
     </section>
