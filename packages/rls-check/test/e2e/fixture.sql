@@ -177,6 +177,53 @@ CREATE POLICY vuln_anon_tautology_select ON public.vuln_anon_tautology
     FOR SELECT TO public USING (auth.uid() IS NOT NULL);
 GRANT SELECT ON public.vuln_anon_tautology TO anon, authenticated;
 
+-- policy-anonymous-tautology: the guard that names the wrong literal.
+--
+-- These two were live on the same production database on 2026-09-02 and differ
+-- only in which literals they exclude. The first was readable by anyone for
+-- three and a half weeks; the second, the same shape spelled completely,
+-- returned nothing throughout. `rls-check` was run against that database and
+-- reported clean, because the check bailed on the literal string `'anonymous'`
+-- and a policy naming `'anon'` fell past the bail into no match at all.
+--
+-- They are here rather than only in the unit tests because the expression has
+-- to survive Postgres's own rewriting — the parens it adds and the `::text`
+-- casts it inserts are exactly what the parse has to see through, and a
+-- hand-written string cannot prove that.
+--
+-- `current_setting(...)` rather than `auth.uid()` because this fixture's
+-- `auth.uid()` returns uuid, and no sentinel string is a valid uuid.
+CREATE TABLE public.vuln_anon_decoy_guard (
+    id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id uuid,
+    body     text
+);
+ALTER TABLE public.vuln_anon_decoy_guard ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vuln_anon_decoy_guard FORCE ROW LEVEL SECURITY;
+CREATE POLICY vuln_anon_decoy_guard_all ON public.vuln_anon_decoy_guard
+    FOR ALL TO public USING (
+        current_setting('request.jwt.claim.sub', true) IS NOT NULL
+        AND current_setting('request.jwt.claim.sub', true) <> 'anon'
+    );
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.vuln_anon_decoy_guard TO anon, authenticated;
+
+-- The same policy written so that it excludes every id a signed-out caller can
+-- arrive with. This one must stay quiet, and it is the whole reason the check
+-- cannot simply flag any `<>` against a literal.
+CREATE TABLE public.secure_anon_real_guard (
+    id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id uuid,
+    body     text
+);
+ALTER TABLE public.secure_anon_real_guard ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.secure_anon_real_guard FORCE ROW LEVEL SECURITY;
+CREATE POLICY secure_anon_real_guard_all ON public.secure_anon_real_guard
+    FOR ALL TO public USING (
+        current_setting('request.jwt.claim.sub', true) IS NOT NULL
+        AND current_setting('request.jwt.claim.sub', true) <> ALL (ARRAY['anon', 'anonymous'])
+    );
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.secure_anon_real_guard TO anon, authenticated;
+
 -- The base table for the view checks below. Correct in itself.
 CREATE TABLE public.protected_ledger (
     id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),

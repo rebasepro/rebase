@@ -1,4 +1,5 @@
-import type { Check, DbSnapshot, Finding, Severity } from "../types";
+import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
+import { SEVERITIES } from "../types";
 
 import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel } from "./util";
 
@@ -22,8 +23,9 @@ const ID = "policy-anonymous-tautology";
  *   - Anything else: it comes down to whether the stack coerces, which the
  *     database cannot tell us. `medium`, and say so out loud.
  *
- * A `<> 'anonymous'` guard alongside the null test is the corrected form and
- * clears the policy entirely.
+ * A guard that excludes the sentinel is the corrected form and clears the policy.
+ * A guard that excludes *something else* is the interesting case — see
+ * {@link matchTautology}.
  */
 export const policyAnonymousTautology: Check = {
     id: ID,
@@ -35,7 +37,7 @@ export const policyAnonymousTautology: Check = {
     run(snapshot: DbSnapshot): Finding[] {
         const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
-        const { severity, meaning, impactSuffix } = platformReading(snapshot.platform);
+        const { severity: baseSeverity, meaning, impactSuffix } = platformReading(snapshot.platform);
 
         for (const policy of snapshot.policies) {
             if (!snapshot.schemas.includes(policy.schema)) continue;
@@ -51,7 +53,12 @@ export const policyAnonymousTautology: Check = {
             if (checkMatch) clauses.push("WITH CHECK");
             if (clauses.length === 0) continue;
 
-            const shape = usingMatch ?? checkMatch ?? "the caller id";
+            const shape = usingMatch?.shape ?? checkMatch?.shape ?? "the caller id";
+            const decoys = [
+                ...new Set([...(usingMatch?.decoyGuards ?? []), ...(checkMatch?.decoyGuards ?? [])])
+            ];
+            const severity = forCommand(baseSeverity, policy.command);
+            const written = decoys.map((d) => `\`${shape} <> '${d}'\``);
 
             findings.push(
                 finding({
@@ -59,24 +66,43 @@ export const policyAnonymousTautology: Check = {
                     severity,
                     confidence: "heuristic",
                     title:
-                        `Policy "${policy.name}" on ${policy.schema}.${policy.table} only checks ` +
-                        `that ${shape} is not null`,
+                        decoys.length > 0
+                            ? `Policy "${policy.name}" on ${policy.schema}.${policy.table} excludes ` +
+                              `${listAnd(decoys.map((d) => `'${d}'`))}, which is not the anonymous sentinel`
+                            : `Policy "${policy.name}" on ${policy.schema}.${policy.table} only checks ` +
+                              `that ${shape} is not null`,
                     target: { schema: policy.schema, table: policy.table, policy: policy.name },
                     detail:
-                        `The ${listAnd(clauses)} expression of this ${policy.command} policy tests only ` +
-                        `that ${shape} is non-null. It does not compare anything to a column, so every ` +
-                        `row of the table satisfies it equally — the policy distinguishes signed-in from ` +
-                        `signed-out callers and nothing else. ${meaning}`,
+                        (decoys.length > 0
+                            ? `The ${listAnd(clauses)} expression of this ${policy.command} policy reads as ` +
+                              `"signed in": it tests that ${shape} is non-null and excludes ` +
+                              `${listAnd(written)}. But the id a signed-out caller actually arrives with is ` +
+                              `${listAnd(CLEARING_SENTINELS.map(describeSentinel))}, and neither is ` +
+                              `${listAnd(decoys.map((d) => `'${d}'`))} — so the guard excludes nobody and the ` +
+                              `null test stands on its own. `
+                            : `The ${listAnd(clauses)} expression of this ${policy.command} policy tests only ` +
+                              `that ${shape} is non-null. `) +
+                        `It does not compare anything to a column, so every row of the table satisfies it ` +
+                        `equally — the policy distinguishes signed-in from signed-out callers and nothing ` +
+                        `else. ${meaning}` +
+                        (policy.command === "ALL" || policy.command === "UPDATE" || policy.command === "DELETE"
+                            ? ` This policy governs ${policy.command === "ALL" ? "every command, writes included" : policy.command}, ` +
+                              `so the same expression decides who may change rows, not only who may read them.`
+                            : ""),
                     impact:
                         `Any caller for whom ${shape} is non-null can reach every row this policy covers, ` +
-                        `including rows belonging to other users or tenants. ${impactSuffix}`,
+                        `including rows belonging to other users or tenants. ${impactSuffix}` +
+                        (decoys.length > 0
+                            ? ` A policy in this shape reads as safe on review, which is why it survives: the ` +
+                              `guard is present, spelled plausibly, and matches nothing.`
+                            : ""),
                     fix:
                         `-- Scope the policy to the row's owner rather than to the existence of an id:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    USING (user_id = ${uidCall});\n` +
-                        `-- If the intent really is "any signed-in user", make that explicit and make it\n` +
-                        `-- reject the anonymous sentinel your stack may use:\n` +
-                        `--     USING (${uidCall} IS NOT NULL AND ${uidCall} <> 'anonymous');`
+                        `-- If the intent really is "any signed-in user", exclude every id your stack has\n` +
+                        `-- ever used for "nobody" — one literal is not enough:\n` +
+                        `--     USING (${uidCall} IS NOT NULL AND ${uidCall} <> ALL (ARRAY['anonymous', 'anon']));`
                 })
             );
         }
@@ -84,6 +110,23 @@ export const policyAnonymousTautology: Check = {
         return findings;
     }
 };
+
+/**
+ * Writes are worse than reads.
+ *
+ * The platform decides whether this expression is a bypass at all; the command
+ * decides what it costs when it is. A `FOR ALL` policy in this shape governed
+ * `UPDATE` and `DELETE` on a live users table — an anonymous PATCH setting
+ * `roles: ["admin"]` was reachable through it — while the same predicate under
+ * `FOR SELECT` would only have leaked. One step, not two: the platform reading
+ * is still the dominant term.
+ */
+function forCommand(base: Severity, command: DbPolicy["command"]): Severity {
+    if (command !== "ALL" && command !== "UPDATE" && command !== "DELETE") return base;
+    return SEVERITIES[Math.min(SEVERITIES.indexOf(base) + 1, SEVERITIES.length - 1)];
+}
+
+const describeSentinel = (s: string) => (s === "" ? "the empty string" : `'${s}'`);
 
 function platformReading(platform: DbSnapshot["platform"]): {
     severity: Severity;
@@ -147,37 +190,208 @@ const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] =
 ];
 
 /**
- * Recognise `<caller-id expression> IS NOT NULL` and name what was tested — but
- * only when that is the *entire* expression.
+ * The ids that a signed-out caller can actually arrive with, so excluding one of
+ * them is a real guard.
  *
- * The "entire" part is what keeps this check honest. `auth.uid() IS NOT NULL AND
- * user_id = auth.uid()` contains the shape and is a perfectly scoped policy; a
- * substring match would flag it, and flagging correct Supabase policies is the
- * fastest way to get this tool deleted. So the caller-id call is substituted for
- * a placeholder, casts, parens, `SELECT` wrappers and whitespace are stripped,
- * and what remains has to be exactly `<placeholder> is not null`.
+ * `'anonymous'` is Rebase's `ANONYMOUS_USER_ID`; the empty string is what a
+ * PostgREST-shaped stack leaves an unset claim as. Deliberately **not** the whole
+ * of Rebase's `ANONYMOUS_USER_IDS`: that list also carries `'anon'`, the id the
+ * request path reported before the sentinel was unified, and a policy excluding
+ * only `'anon'` does not exclude anyone on any server shipping today. Treating
+ * `'anon'` as clearing is exactly the mistake this check now exists to catch.
  */
-function matchTautology(clause: string | null | undefined): string | null {
-    if (!clause) return null;
-    const flat = clause.toLowerCase().replace(/\s+/g, " ");
+const CLEARING_SENTINELS = ["anonymous", ""];
 
-    // The corrected form guards against the anonymous sentinel; not this finding.
-    if (/(<>|!=)\s*'anonymous'/.test(flat) || /(<>|!=)\s*''/.test(flat)) return null;
+interface TautologyMatch {
+    /** How to name the caller-id expression in prose, e.g. `auth.uid()`. */
+    shape: string;
+    /** Literals the policy excludes that exclude nobody. Empty for a bare null test. */
+    decoyGuards: string[];
+}
+
+/**
+ * Recognise "the policy tests that a caller id exists, and nothing that narrows
+ * which rows" — and report which no-op guards it wears while doing so.
+ *
+ * Two rules keep this honest.
+ *
+ * **Every conjunct has to be accounted for.** `auth.uid() IS NOT NULL AND user_id
+ * = auth.uid()` contains the shape and is a perfectly scoped policy; a substring
+ * match would flag it, and flagging correct Supabase policies is the fastest way
+ * to get this tool deleted. So the expression is split on `AND`, each conjunct is
+ * classified, and a single conjunct this function does not recognise means it
+ * stays quiet. An `OR` anywhere means the same — the shape no longer describes
+ * what the policy admits.
+ *
+ * **A guard only clears if it excludes an id somebody can actually arrive with.**
+ * The version before this one bailed on the literal string `<> 'anonymous'`, which
+ * meant `<> 'anon'` fell past the bail and then failed to match the bare-null-test
+ * shape, so the function returned null and the check said nothing at all. That is
+ * not a near miss: it is the precise predicate that left a production `users`
+ * table — password hashes included — readable by the entire internet for three and
+ * a half weeks, and this tool was run against that database and reported clean.
+ * A guard naming the wrong literal is now the *loudest* case, not the silent one,
+ * because it is the one that survives code review.
+ */
+function matchTautology(clause: string | null | undefined): TautologyMatch | null {
+    if (!clause) return null;
+
+    const flat = clause
+        .toLowerCase()
+        // Casts first: `'anonymous'::text`, `array[...]::text[]`.
+        .replace(/::\s*[a-z0-9_]+(?:\s*\[\s*\])*/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
     for (const { re, label } of CALLER_ID_CALLS) {
         const first = new RegExp(re.source).exec(flat);
         if (!first) continue;
 
-        const normalized = flat
-            .replace(new RegExp(re.source, "g"), "callerid")
-            .replace(/::[a-z0-9_[\]]+/g, "")
-            .replace(/\bselect\b/g, "")
-            // Postgres renders a wrapped call as `( SELECT rebase.uid() AS uid)`.
-            .replace(/\bas [a-z0-9_]+/g, "")
-            .replace(/[()\s]/g, "");
+        const substituted = flat.replace(new RegExp(re.source, "g"), " callerid ");
+        // `OR` changes what the policy admits; this shape no longer describes it.
+        if (/\bor\b/.test(substituted)) return null;
 
-        if (normalized === "calleridisnotnull") return label(first);
+        let sawNullTest = false;
+        const decoys: string[] = [];
+        let cleared = false;
+
+        for (const raw of splitTopLevelAnd(substituted)) {
+            const conjunct = canon(raw);
+            if (conjunct === "") continue;
+
+            if (conjunct === "callerid is not null") {
+                sawNullTest = true;
+                continue;
+            }
+
+            const excluded = excludedLiterals(conjunct);
+            if (!excluded) return null; // something we do not understand: stay quiet
+            if (excluded.some((lit) => CLEARING_SENTINELS.includes(lit))) cleared = true;
+            decoys.push(...excluded);
+        }
+
+        if (!sawNullTest) continue;
+        if (cleared) return null;
+
+        return { shape: label(first), decoyGuards: [...new Set(decoys)] };
     }
 
     return null;
+}
+
+/**
+ * Split on `AND`, counting parens.
+ *
+ * A plain `.split(/\band\b/)` is what the first attempt used and it does not
+ * survive contact with Postgres, which reads an expression back fully
+ * parenthesised: `((uid() IS NOT NULL) AND (uid() <> 'anon'))` splits into two
+ * fragments with unbalanced parens, neither of which matches anything, so the
+ * check goes quiet on precisely the input it exists for. Depth is tracked, quoted
+ * literals are skipped so an `and` inside a string is not a separator, and each
+ * part is re-split so nested conjunctions flatten.
+ */
+function splitTopLevelAnd(expr: string): string[] {
+    const s = peel(expr);
+    const parts: string[] = [];
+    let depth = 0;
+    let inQuote = false;
+    let start = 0;
+
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (ch === "'") {
+            inQuote = !inQuote;
+            continue;
+        }
+        if (inQuote) continue;
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+        else if (depth === 0 && s.startsWith("and", i) && isWord(s, i, 3)) {
+            parts.push(s.slice(start, i));
+            i += 2;
+            start = i + 1;
+        }
+    }
+    parts.push(s.slice(start));
+
+    return parts.length === 1 ? parts : parts.flatMap(splitTopLevelAnd);
+}
+
+/** `and` as a whole word, not the tail of `brand` or the head of `android`. */
+function isWord(s: string, at: number, length: number): boolean {
+    const before = at === 0 ? "" : s[at - 1];
+    const after = s[at + length] ?? "";
+    return !/[a-z0-9_]/.test(before) && !/[a-z0-9_]/.test(after);
+}
+
+/** Remove balanced wrapping parens: `((x))` -> `x`, but `(a) and (b)` is left alone. */
+function peel(fragment: string): string {
+    let s = fragment.trim();
+    while (s.startsWith("(") && s.endsWith(")") && balanced(s.slice(1, -1))) {
+        s = s.slice(1, -1).trim();
+    }
+    return s;
+}
+
+/** Strip the noise Postgres adds when it rewrites an expression. */
+function canon(fragment: string): string {
+    let s = peel(
+        fragment
+            .replace(/\bselect\b/g, " ")
+            // `( SELECT rebase.uid() AS uid)` is how a wrapped call reads back.
+            .replace(/\bas [a-z0-9_]+/g, " ")
+            .replace(/\s+/g, " ")
+    );
+
+    let previous: string;
+    do {
+        previous = s;
+        s = peel(s.replace(/\(\s*(callerid)\s*\)/g, "$1").trim());
+    } while (s !== previous);
+
+    return s.replace(/\s+/g, " ").trim();
+}
+
+function balanced(s: string): boolean {
+    let depth = 0;
+    for (const ch of s) {
+        if (ch === "(") depth++;
+        else if (ch === ")" && --depth < 0) return false;
+    }
+    return depth === 0;
+}
+
+/**
+ * The literals a conjunct excludes the caller id from, or `null` if the conjunct
+ * is not an exclusion at all.
+ *
+ * `null` is the conservative answer and the common one: `user_id = callerid`
+ * lands here and silences the whole check, which is correct, because that
+ * conjunct scopes rows.
+ */
+function excludedLiterals(conjunct: string): string[] | null {
+    let m = /^callerid (?:<>|!=) '([^']*)'$/.exec(conjunct);
+    if (m) return [m[1]];
+
+    m = /^'([^']*)' (?:<>|!=) callerid$/.exec(conjunct);
+    if (m) return [m[1]];
+
+    m = /^callerid (?:<>|!=) all \( ?array \[(.*)\] ?\)$/.exec(conjunct);
+    if (m) return literalList(m[1]);
+
+    m = /^callerid not in \((.*)\)$/.exec(conjunct);
+    if (m) return literalList(m[1]);
+
+    return null;
+}
+
+/** `'a', 'b'` -> `["a", "b"]`; `null` if any element is not a plain literal. */
+function literalList(inner: string): string[] | null {
+    const out: string[] = [];
+    for (const part of inner.split(",")) {
+        const m = /^ ?'([^']*)' ?$/.exec(part);
+        if (!m) return null;
+        out.push(m[1]);
+    }
+    return out.length > 0 ? out : null;
 }

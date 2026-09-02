@@ -60,7 +60,7 @@
     "check:templates": "node tooling/scripts/check-templates.mjs",
     "check:eject": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-eject.mts",
     "check:examples": "pnpm --filter \"./examples/*\" -r run typecheck",
-    "check:generated": "pnpm -C website run generate-all && git -c core.fsmonitor=false diff --exit-code -- website/public/llms.txt website/public/llms-full.txt website/public/sitemap.md website/src/content/docs/docs/CHANGELOG.md website/src/content/docs/docs/compatibility.md",
+    "check:generated": "pnpm -C website run generate-all && git -c core.fsmonitor=false diff --exit-code -- website/public/llms.txt website/public/llms-full.txt website/public/sitemap.md website/src/content/docs/docs/CHANGELOG.md website/src/content/docs/de/docs/CHANGELOG.md website/src/content/docs/es/docs/CHANGELOG.md website/src/content/docs/fr/docs/CHANGELOG.md website/src/content/docs/it/docs/CHANGELOG.md website/src/content/docs/pt/docs/CHANGELOG.md website/src/content/docs/docs/compatibility.md",
     "check:names": "node tooling/scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node tooling/scripts/check-undeclared-deps.mjs",
     "check:publishable-set": "node tooling/scripts/check-publishable-set.mjs",

@@ -91,6 +91,169 @@ describe("policy-anonymous-tautology", () => {
         expect(policyAnonymousTautology.run(withPolicy("(deleted_at IS NOT NULL)"))).toEqual([]);
     });
 
+    describe("a guard naming the wrong literal", () => {
+        /**
+         * The two policies that were live on the same production database on
+         * 2026-09-02, differing only in the literals they exclude. `rebase.users`
+         * was readable by anyone for three and a half weeks; `public.talents`,
+         * carrying the same policy shape spelled correctly, returned 0 rows
+         * throughout. This tool was run against that database and reported clean,
+         * so the pair is kept verbatim.
+         */
+        const usersPolicy = snapshot({
+            platform: "rebase",
+            schemas: ["public", "rebase"],
+            relations: [table("rebase", "users")],
+            policies: [
+                policy("rebase", "users", "authenticated_access", {
+                    command: "ALL",
+                    roles: ["public"],
+                    using: "((auth.uid() IS NOT NULL) AND (auth.uid() <> 'anon'::text))"
+                })
+            ]
+        });
+
+        const talentsPolicy = snapshot({
+            platform: "rebase",
+            relations: [table("public", "talents")],
+            policies: [
+                policy("public", "talents", "require_real_user", {
+                    command: "ALL",
+                    roles: ["public"],
+                    using:
+                        "((auth.uid() IS NOT NULL) AND (auth.uid() <> ALL (ARRAY['anon'::text, " +
+                        "'anonymous'::text])))"
+                })
+            ]
+        });
+
+        it("fires on `<> 'anon'`, because the sentinel is 'anonymous'", () => {
+            const findings = policyAnonymousTautology.run(usersPolicy);
+
+            expect(findings).toHaveLength(1);
+            expect(findings[0].title).toContain("'anon'");
+            expect(findings[0].title).toContain("not the anonymous sentinel");
+            expect(findings[0].detail).toContain("the guard excludes nobody");
+        });
+
+        it("stays silent on `<> ALL (ARRAY['anon', 'anonymous'])`, which does exclude them", () => {
+            expect(policyAnonymousTautology.run(talentsPolicy)).toEqual([]);
+        });
+
+        it("does not depend on how heavily Postgres parenthesised it", () => {
+            // The two spellings as they were read off `pg_policies.qual`, without
+            // the redundant parens the rewriter usually adds.
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("auth.uid() IS NOT NULL AND auth.uid() <> 'anon'", "rebase")
+                )
+            ).toHaveLength(1);
+
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy(
+                        "auth.uid() IS NOT NULL AND auth.uid() <> ALL (ARRAY['anon', 'anonymous'])",
+                        "rebase"
+                    )
+                )
+            ).toEqual([]);
+        });
+
+        it("reads the `rebase.uid()` spelling the same way", () => {
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("(rebase.uid() IS NOT NULL) AND (rebase.uid() <> 'anon'::text)", "rebase")
+                )
+            ).toHaveLength(1);
+        });
+
+        it("reads NOT IN the same way as <> ALL", () => {
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("((auth.uid() IS NOT NULL) AND (auth.uid() NOT IN ('anon', 'anonymous')))")
+                )
+            ).toEqual([]);
+
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("((auth.uid() IS NOT NULL) AND (auth.uid() NOT IN ('anon', 'guest')))")
+                )
+            ).toHaveLength(1);
+        });
+
+        it("accepts the empty string as a sentinel, for stacks that leave a claim unset", () => {
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("((auth.uid() IS NOT NULL) AND (auth.uid() <> ''::text))")
+                )
+            ).toEqual([]);
+        });
+
+        it("still says nothing when a conjunct actually scopes the row", () => {
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("((auth.uid() IS NOT NULL) AND (auth.uid() <> 'anon') AND (user_id = auth.uid()))")
+                )
+            ).toEqual([]);
+        });
+
+        it("says nothing when an OR could admit rows on another branch", () => {
+            expect(
+                policyAnonymousTautology.run(
+                    withPolicy("((auth.uid() IS NOT NULL) AND ((auth.uid() <> 'anon') OR (is_public = true)))")
+                )
+            ).toEqual([]);
+        });
+    });
+
+    describe("a policy governing writes is worse than one governing reads", () => {
+        const withCommand = (command: "SELECT" | "ALL" | "UPDATE" | "DELETE" | "INSERT") =>
+            snapshot({
+                platform: "supabase",
+                relations: [table("public", "orders")],
+                policies: [
+                    policy("public", "orders", "orders_rw", {
+                        command,
+                        using: "(auth.uid() IS NOT NULL)",
+                        roles: ["authenticated"]
+                    })
+                ]
+            });
+
+        it("keeps the platform reading for SELECT and INSERT", () => {
+            expect(policyAnonymousTautology.run(withCommand("SELECT"))[0].severity).toBe("low");
+            expect(policyAnonymousTautology.run(withCommand("INSERT"))[0].severity).toBe("low");
+        });
+
+        it("raises it one step for ALL, UPDATE and DELETE", () => {
+            for (const command of ["ALL", "UPDATE", "DELETE"] as const) {
+                const [f] = policyAnonymousTautology.run(withCommand(command));
+                expect(f.severity, command).toBe("medium");
+            }
+        });
+
+        it("says out loud that the expression decides who may write", () => {
+            expect(policyAnonymousTautology.run(withCommand("ALL"))[0].detail).toContain(
+                "every command, writes included"
+            );
+        });
+
+        it("does not climb past critical", () => {
+            const rebase = snapshot({
+                platform: "rebase",
+                relations: [table("public", "orders")],
+                policies: [
+                    policy("public", "orders", "p", {
+                        command: "ALL",
+                        using: "(auth.uid() IS NOT NULL)",
+                        roles: ["authenticated"]
+                    })
+                ]
+            });
+            expect(policyAnonymousTautology.run(rebase)[0].severity).toBe("critical");
+        });
+    });
+
     it("ignores restrictive policies and unreachable roles", () => {
         const restrictive = snapshot({
             relations: [table("public", "orders")],

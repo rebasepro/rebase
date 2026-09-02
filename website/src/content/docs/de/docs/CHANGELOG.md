@@ -11,6 +11,133 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rls-check` reported clean on a table the whole internet could read.** The
+  `policy-anonymous-tautology` check bailed out whenever it saw the literal
+  `<> 'anonymous'`, so a policy guarding against `'anon'` instead fell past the
+  bail — and then no longer matched the bare null-test shape either, so the check
+  returned nothing at all. `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anon'`
+  reads as "signed in", is true for every anonymous caller, and was scanned and
+  passed. The guard is now parsed rather than string-matched: the expression is
+  split on `AND` counting parens, `<> ALL (ARRAY[…])` and `NOT IN (…)` are read
+  as the exclusions they are, and a policy only clears when it excludes an id a
+  signed-out caller can actually arrive with. Excluding some other literal is now
+  the loudest finding of the three, because it is the one that survives review.
+  Severity also rises a step for `ALL`, `UPDATE` and `DELETE` policies, where the
+  same predicate decides who may write.
+
+- **A bundle that vendors its own `node_modules` booted two copies of the
+  framework.** New pods crash-looped with `Could not load the database driver
+  "@rebasepro/server-postgres": Resource kind "database" is already registered
+  with a different definition` — while the driver was installed the whole time.
+  The process held the image's `@rebasepro/types` and the bundle's vendored
+  copy; `registerResourceKind` keys off `globalThis` deliberately, so both
+  registered into one registry, and the two specs for kind `database` had
+  diverged by a single `optionKeys` entry. It threw during the driver's import,
+  so the driver got the blame. The dedupe that exists to prevent this was
+  unreachable on three of the four paths into a running pod. (#38)
+
+- **`zod` was missing from the runtime-provided list, so a managed app ran no
+  crons and reported success.** A bundle shipped its own zod beside the image's;
+  `loadEnv({ extend })` then parsed a schema built by a different module
+  instance, and every field carrying a `.default()` was rejected. Nothing in
+  that failure mentions zod. Added to all three lists, and the agreement test
+  that should have caught it no longer filters to `@rebasepro/*` — which is why
+  a non-scoped entry could diverge for four releases unseen.
+
+- **Every failure on a first cloud deploy said what it was, or said nothing.**
+  The boot ensure built its message from `err.message`, which for drizzle is
+  `Failed query: <sql>` and not one word of Postgres's answer — the SQLSTATE,
+  message, detail and hint all sat in `.cause` and were discarded. Four
+  unrelated boot failures read identically. Fixed here and in the RLS-policy
+  sibling, where the swallowed reason explains a table that is now denying every
+  request. Also: `storage create` 404'd because `invoke()` percent-encoded a
+  function name the CLI had folded a project id into, so
+  `storage-provision%2F<id>` matched a route that had been live for six weeks.
+
+- **A restored, empty scroll entry asked the API for `limit=0`.**
+  `initialItemCount` fell back with `??`, which catches `null` and `undefined`
+  but not `0` — and `0` is exactly the value that means nothing was restored.
+  Any filter combination matching no rows saved `data: []`, so returning to that
+  view rendered `Invalid limit: 0` instead of a table, and a client bug wore an
+  API failure's clothes. (#37)
+
+- **The default scaffold's first data read returned 500.** `rebase init` writes
+  no `DATABASE_URL`, so `rebase dev` takes the managed PGlite path — and nothing
+  on that path replaced the template's stub `schema.generated.ts`
+  (`export const tables = {}`). The database was fine: boot created every table,
+  `/health` answered 200 and auth worked, while every `GET /api/data/*` returned
+  `Table not found`. `rebase dev` now generates the Drizzle schema before
+  starting anything, whichever database is behind it.
+
+- **`rebase db push` against the managed database failed twice over.** First
+  `pq: SSL is not enabled on the server`, because PGlite's socket server speaks
+  no TLS — its remedy box then told the reader to append `sslmode=disable` to
+  `DATABASE_URL`, the variable that is unset precisely because the managed
+  database is in use. Past that, Atlas needs a second empty database to diff
+  against and PGlite serves exactly one. The managed DSN now disables SSL, and
+  `push`, `generate` and `migrate` stop up front on that database with the two
+  things that do work.
+
+- **A `--headless` project read as misconfigured on a clean boot.** The source
+  bundle's manifest declared `entry.collections` and `entry.schema` from the
+  conventional layout whether or not those paths existed, so a correct project
+  warned that a file "does not exist" and that no tables would be created. The
+  manifest now states what the project has.
+
+- **`/api/data/*` answered a plain-text 404 when a project served no
+  collections.** The surface was not mounted at all, so Hono's default replied —
+  which reads as a wrong URL when the truth is that there is nothing to serve
+  yet. It now returns a JSON `NO_COLLECTIONS` 404 saying tables must exist
+  first.
+
+- **The welcome email was in Spanish, and linked the wrong port.** Subject and
+  body, on an English project, while every other template is English. And
+  `rebase dev` left the frontend port to Vite while the backend was started with
+  the scaffold's fixed `FRONTEND_URL=http://localhost:5173`, so the link named a
+  port the app was not on. The frontend port is now derived per project, like
+  the backend's, and handed to the server that builds the link.
+
+- **Twenty lines of ERESOLVE before the CLI printed anything.**
+  `@electric-sql/pglite-socket` pins its peers to exact versions per release, so
+  `^0.2.9` floated to 0.2.11, which demands `pglite-pgvector` 0.0.9 while the
+  CLI asked for 0.0.7. The family is pinned exactly.
+
+### Changed
+
+- **The ERD has one layout, and it reads top to bottom.** The LR/TB toggle
+  offered a choice the canvas cannot honour: the visualizer's pane is tall and
+  narrow, so the left-to-right default pushed the graph off both sides on open.
+  The machinery went with the buttons rather than being left behind.
+
+### Documentation
+
+- **`docs/compatibility.md` publishes the readiness table it promised** — one
+  row per subsystem, dated, rated stable / beta / experimental, each with what
+  the rating rests on. Realtime is beta because subscriptions are matched by
+  collection path, the data table's missing grid semantics are listed as the
+  defect they are, and `@rebasepro/server-mongo` is marked experimental with no
+  row-level security.
+
+- **One first run.** The README, the docs index and the quickstart page
+  described three different sequences, none of which matched what happens.
+  Converged, in six locales, with the derived ports and the `init` flags
+  documented and "use your own Postgres" as a named variant.
+
+- **The self-hosting page stops publishing a compose file that cannot work.**
+  Its inline YAML mounted `/var/lib/postgresql/data` (which the pg18 image
+  refuses) and set `POSTGRES_USER: rebase_app` against a `postgres://rebase:`
+  connection string. It now points at the compose file in the repository, the
+  one the acceptance gate boots on every push.
+
+- **Rebase Cloud has a documentation page**, and `rebase cloud`'s
+  twenty-eight command groups are in the CLI reference. So are `resources`,
+  `apps init`/`config`, six `db` subcommands, and every `init` flag.
+
+- **`@rebasepro/server-mongo` and `@rebasepro/firebase` have pages**, each
+  leading with what it does not do.
+
 ## [0.17.3] - 2026-08-31
 
 ### Fixed

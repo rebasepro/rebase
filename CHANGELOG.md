@@ -4,6 +4,20 @@
 
 ### Fixed
 
+- **`rls-check` reported clean on a table the whole internet could read.** The
+  `policy-anonymous-tautology` check bailed out whenever it saw the literal
+  `<> 'anonymous'`, so a policy guarding against `'anon'` instead fell past the
+  bail — and then no longer matched the bare null-test shape either, so the check
+  returned nothing at all. `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anon'`
+  reads as "signed in", is true for every anonymous caller, and was scanned and
+  passed. The guard is now parsed rather than string-matched: the expression is
+  split on `AND` counting parens, `<> ALL (ARRAY[…])` and `NOT IN (…)` are read
+  as the exclusions they are, and a policy only clears when it excludes an id a
+  signed-out caller can actually arrive with. Excluding some other literal is now
+  the loudest finding of the three, because it is the one that survives review.
+  Severity also rises a step for `ALL`, `UPDATE` and `DELETE` policies, where the
+  same predicate decides who may write.
+
 - **A bundle that vendors its own `node_modules` booted two copies of the
   framework.** New pods crash-looped with `Could not load the database driver
   "@rebasepro/server-postgres": Resource kind "database" is already registered
