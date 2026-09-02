@@ -80,11 +80,47 @@ if [ "$BRANCH" != "main" ]; then
   exit 1
 fi
 
-# Working tree must be clean (disabled temporarily)
-echo "Skipping dirty working tree check"
+# The working tree must be clean.
+#
+# Not a tidiness rule. This script commits with `git add -A` further down —
+# everything in the tree, which is the only way to catch the files it edits
+# across every package without maintaining a second list of them. So anything
+# ELSE sitting in the tree when it runs is published as part of the release: a
+# half-finished change, a debug edit, a parallel agent session's work in
+# progress. Nobody reviews a release commit, because a release commit is
+# supposed to be mechanical.
+#
+# It said "Skipping dirty working tree check" — printed, so at least it was
+# honest — and has said so since it was disabled "temporarily". A check that
+# announces its own absence is still an absent check.
+#
+# `--porcelain` covers staged, unstaged and untracked alike.
+DIRTY="$(git status --porcelain)"
+if [ -n "$DIRTY" ]; then
+  err "The working tree is not clean. A release commits everything in it."
+  echo "$DIRTY" | sed 's/^/    /'
+  echo ""
+  echo "  Commit or stash the above, then run this again."
+  exit 1
+fi
 
-# Pull latest (disabled temporarily)
-echo "Skipping git pull"
+# Up to date with origin.
+#
+# Releasing from a stale main tags a version that does not contain what main
+# contains, and the push at the end then either fails or races.
+step "Fetching origin"
+git fetch origin main --tags --quiet
+LOCAL_HEAD="$(git rev-parse HEAD)"
+REMOTE_HEAD="$(git rev-parse origin/main)"
+if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+  err "main is not level with origin/main."
+  echo "    local:  $LOCAL_HEAD"
+  echo "    origin: $REMOTE_HEAD"
+  echo ""
+  echo "  Pull (or push) first — a release built from a stale tree tags a version"
+  echo "  that does not contain what main contains."
+  exit 1
+fi
 
 # Check for required tools
 for cmd in gh node pnpm; do
@@ -322,8 +358,12 @@ fi
 # ── Commit & Tag ────────────────────────────────────────────
 step "Committing and tagging"
 
+# `git add -A` is safe here because the tree was asserted clean at the top:
+# everything present now was put here by this script.
 git add -A
-git commit -m "chore: release v${NEW_VERSION}" --no-verify
+# No `--no-verify`. A release commit is the last one that should skip whatever
+# gates the repo runs before a commit — it is the one nobody reviews.
+git commit -m "chore: release v${NEW_VERSION}"
 git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 ok "Created commit and tag v${NEW_VERSION}"
 
