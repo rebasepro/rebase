@@ -1,5 +1,6 @@
 import { Plugin, PluginKey, Transaction, EditorState } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
+import { parseSanitizedHtml } from "../sanitize-html";
 
 // Define and export the plugin key
 export const loadingDecorationKey = new PluginKey<LoadingDecorationState>("loadingDecoration");
@@ -73,9 +74,19 @@ export const textLoadingDecorationPlugin = () => {
                         const container = document.createElement("span");
                         container.className = "loading-decoration";
 
-                        // Sanitize and append HTML
+                        // The comment here said "Sanitize and append HTML" and
+                        // the line below it did neither: `innerHTML` on an
+                        // element of the LIVE document runs what it is given.
+                        // `<img src=x onerror=…>` fires during the assignment.
+                        //
+                        // What arrives is an AI completion, and its context is
+                        // the surrounding document — a customer's content, often
+                        // typed by somebody else. So this is where a record
+                        // holding a payload gets it read back and executed, in
+                        // the console's own origin.
                         if (loadingHtml) {
-                            container.innerHTML = loadingHtml;
+                            const safe = parseSanitizedHtml(loadingHtml);
+                            while (safe.firstChild) container.appendChild(safe.firstChild);
                         } else {
                             const span = document.createElement("span");
                             span.innerText = "loading...";
