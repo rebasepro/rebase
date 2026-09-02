@@ -75,6 +75,10 @@ Two entries above are the honest cost of publishing this table at all: the
 realtime refetch and the data table's accessibility are open defects, not
 roadmap items, and both are listed rather than left for a reader to discover.
 
+This table is what exists. What does not yet is on the
+[roadmap](https://rebase.pro/roadmap), one entry per GitHub issue, with the
+subset required for 1.0 marked.
+
 ## The 0.x promise
 
 Rebase is `0.x` — 0.17 at the time of writing. This section is written to hold
