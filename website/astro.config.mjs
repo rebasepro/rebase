@@ -188,6 +188,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
+                        { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "Kubernetes", slug: "docs/deployment/kubernetes" },
