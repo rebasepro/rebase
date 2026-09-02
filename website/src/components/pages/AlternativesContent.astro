@@ -26,9 +26,31 @@ import ClosingCta from "../ClosingCta.astro";
 
 interface Props {
     page: AlternativesPage;
+    lang: string;
+    t: (key: string) => string;
 }
 
-const { page } = Astro.props as Props;
+const { page: rawPage, t } = Astro.props as Props;
+
+// `alternatives.ts` carries i18n KEYS, not sentences — one list, four locales.
+// A value that is not a key (a product name in `answer`) passes straight
+// through, because `t()` returns the key itself when it does not resolve.
+const tr = (v: string) => (v.startsWith("alt.") ? t(v) : v);
+const page = {
+    ...rawPage,
+    title: tr(rawPage.title),
+    description: tr(rawPage.description),
+    what: tr(rawPage.what),
+    reasons: rawPage.reasons.map((r) => ({ reason: tr(r.reason), answer: tr(r.answer), why: tr(r.why) })),
+    alternatives: rawPage.alternatives.map((a) => ({
+        ...a,
+        bestFor: tr(a.bestFor),
+        description: tr(a.description),
+        licence: tr(a.licence),
+        hosting: tr(a.hosting),
+    })),
+    // faqs stay as KEYS: ComparisonFaq resolves them itself.
+};
 const pageUrl = `https://rebase.pro/alternatives/${page.slug}`;
 
 /**
@@ -73,27 +95,19 @@ const listSchema = {
                 Alternatives
             </span>
             <h1 class="mt-5 mb-6 text-display-2 text-white">
-                Alternatives to {page.name}
+                {t("altpage.heading").replace("%s", page.name)}
             </h1>
             <p class="text-lg leading-8 text-surface-300 lg:text-xl">{page.what}</p>
 
-            <p class="mt-8 text-sm text-surface-500 leading-relaxed border-l-2 border-surface-800 pl-4">
-                Published by <a href="/" class="text-surface-300 underline underline-offset-2">Rebase</a>, which is
-                one of the tools on this page. Every other entry is described by what it is good at, several of the
-                recommendations below are not us, and there are no prices anywhere — competitor pricing changes
-                quarterly and a stale number is worse than none.
-            </p>
+            <p class="mt-8 text-sm text-surface-500 leading-relaxed border-l-2 border-surface-800 pl-4" set:html={t("altpage.00")}></p>
         </div>
     </section>
 
     <!-- Pick by reason -->
     <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">Start from why you are leaving</h2>
-            <p class="text-surface-400 mb-10 leading-relaxed">
-                Almost nobody wants "the best alternative". They want the one that fixes the specific thing that
-                broke. Find your row.
-            </p>
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("altpage.01")}</h2>
+            <p class="text-surface-400 mb-10 leading-relaxed">{t("altpage.02")}</p>
 
             <div class="space-y-3">
                 {page.reasons.map((reason) => (
@@ -115,12 +129,9 @@ const listSchema = {
     <section class="relative z-0 py-16 sm:py-20 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">
-                {page.alternatives.length} alternatives to {page.name}
+                {t("altpage.count").replace("%n", String(page.alternatives.length)).replace("%s", page.name)}
             </h2>
-            <p class="text-surface-400 mb-10 leading-relaxed">
-                Ordered roughly by how often each one turns out to be the answer, not by any score. Where a
-                head-to-head exists, it is linked.
-            </p>
+            <p class="text-surface-400 mb-10 leading-relaxed">{t("altpage.03")}</p>
 
             <ol class="space-y-4">
                 {page.alternatives.map((alt, index) => (
@@ -141,7 +152,7 @@ const listSchema = {
                                     <span class="text-2xs text-surface-500 uppercase tracking-wide">· {alt.hosting}</span>
                                 </div>
 
-                                <p class="text-sm text-primary-light/90 mb-3">Best for: {alt.bestFor}</p>
+                                <p class="text-sm text-primary-light/90 mb-3">{t("altpage.bestFor")} {alt.bestFor}</p>
                                 <p class="text-surface-400 leading-relaxed text-sm sm:text-base">{alt.description}</p>
 
                                 <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -150,7 +161,7 @@ const listSchema = {
                                         class="text-surface-300 hover:text-white underline underline-offset-2"
                                         rel={alt.isUs ? undefined : "nofollow noopener"}
                                         target={alt.isUs ? undefined : "_blank"}
-                                    >{alt.isUs ? "Read more" : `${alt.name} →`}</a>
+                                    >{alt.isUs ? t("altpage.readMore") : `${alt.name} →`}</a>
                                     {alt.compare && (
                                         <a href={alt.compare} class="text-primary-light hover:text-white underline underline-offset-2">
                                             Rebase vs {alt.name} →
@@ -168,8 +179,8 @@ const listSchema = {
     <ComparisonFaq competitor={page.name} faqs={page.faqs} pageUrl={pageUrl} />
 
     <ClosingCta
-        title="Don't take our word for it."
-        blurb={`The comparison that matters is the one you run. Point Rebase at a Postgres database you already have and see how it holds up next to ${page.name}.`}
+        title={t("close.vs.title")}
+        blurb={t("close.vs.blurb").replace("%s", page.name)}
         trackId={`alternatives-${page.slug}`}
     />
 </div>

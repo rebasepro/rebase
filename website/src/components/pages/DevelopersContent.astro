@@ -30,7 +30,7 @@ const loop = [
     {
         cmd: "rebase dev",
         title: "Run it, with no database to install",
-        desc: "Backend and panel together with hot reload. No DATABASE_URL? A managed Postgres starts with them — no install, no Docker, no compose file.",
+        desc: "Backend and panel together with hot reload. No DATABASE_URL? A managed Postgres starts with them — nothing to install, no Docker, no compose file to maintain.",
     },
 ];
 
@@ -101,6 +101,7 @@ const deployTargets = [
     { name: "AWS · GCP · Azure · Scaleway", note: "A deployment guide per provider in the docs." },
     { name: "Your existing Hono app", note: "Mount the backend as a sub-app instead of deploying it separately." },
 ];
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -113,17 +114,10 @@ const deployTargets = [
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-6">
                     <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                        <span class="text-sm font-medium">TypeScript · Postgres · your editor</span>
+                        <span class="text-sm font-medium">{t("devpage.00")}</span>
                     </div>
-                    <h1 class="mb-6 text-display-2 text-white">
-                        Schema as code.<br/>Everything else follows.
-                    </h1>
-                    <p class="mb-8 text-lg leading-8 text-surface-300">
-                        You write collections in TypeScript. Rebase keeps the database, the API, the types and —
-                        if you opted in — the admin panel in agreement with that one file. Clone the repo,
-                        run <code class="font-mono text-surface-200">rebase dev</code>, and it is already up: no
-                        Postgres to install, no Docker, no compose file to maintain.
-                    </p>
+                    <h1 class="mb-6 text-display-2 text-white" set:html={t("devpage.01")}></h1>
+                    <p class="mb-8 text-lg leading-8 text-surface-300" set:html={t("devpage.02")}></p>
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                         <a href="/docs/getting-started/quickstart"
                            class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
@@ -136,9 +130,9 @@ const deployTargets = [
                                 <path d="m12 5 7 7-7 7"/>
                             </svg>
                         </a>
-                        <a href="https://github.com/rebasepro/rebase" target="_blank" rel="noopener noreferrer"
+                        <a href="/docs"
                            class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                            Read the source
+                            Read the docs
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -159,12 +153,8 @@ const deployTargets = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    The loop
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Four commands, and then you are just writing TypeScript
-                </h2>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("devpage.29")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("devpage.03")}</h2>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-800/60">
@@ -201,24 +191,10 @@ const deployTargets = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        The project
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Three folders, and one of them is optional
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        <code class="font-mono text-surface-300">config/collections/</code> is the only place your
-                        data model is described. The backend reads it to serve APIs and generate the Drizzle
-                        schema; the panel reads the same files to render itself.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed">
-                        Delete <code class="font-mono text-surface-300">frontend/</code> and you have a headless
-                        backend. Nothing under <code class="font-mono text-surface-300">backend/</code> imports
-                        React, and the type system enforces it —
-                        an <code class="font-mono text-surface-300">admin</code> key in a project that never opted in
-                        is a compile error.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("devpage.30")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("devpage.04")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("devpage.05")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed" set:html={t("devpage.06")}></p>
                 </div>
                 <div class="lg:col-span-7">
                     <div class="frame overflow-hidden">
@@ -226,7 +202,7 @@ const deployTargets = [
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <span class="ml-2 font-mono text-xs text-surface-400">after rebase init</span>
+                            <span class="ml-2 font-mono text-xs text-surface-400">{t("devpage.07")}</span>
                         </div>
                         <pre class="p-6 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-400"><code set:html={projectTree}></code></pre>
                     </div>
@@ -244,41 +220,28 @@ const deployTargets = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    Your code
-                </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Generated does not mean closed
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Every generated surface has a seam you can open: callbacks around writes, your own routes on
-                    the server, your own React in the panel, and raw SQL when the abstraction is in the way.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("devpage.31")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("devpage.08")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("devpage.09")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
+                        <span class="font-mono text-xs text-surface-400">{t("devpage.10")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">callbacks</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={callbackCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400">
-                        Business logic runs on the server, on every write path — including writes made from the
-                        admin panel.
-                    </p>
+                    <p class="px-5 pb-5 text-sm text-surface-400">{t("devpage.11")}</p>
                 </div>
 
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                        <span class="font-mono text-xs text-surface-400">backend/functions/checkout.ts</span>
+                        <span class="font-mono text-xs text-surface-400">{t("devpage.12")}</span>
                         <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">custom routes</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={functionCode}></code></pre>
-                    <p class="px-5 pb-5 text-sm text-surface-400">
-                        Drop a file in <code class="font-mono text-surface-300">functions/</code> and it is mounted,
-                        authenticated and RLS-scoped with no registration step.
-                    </p>
+                    <p class="px-5 pb-5 text-sm text-surface-400" set:html={t("devpage.13")}></p>
                 </div>
             </div>
 
@@ -326,33 +289,18 @@ const deployTargets = [
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Resources
                     </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Declare what you need. In code, once.
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        Databases, buckets and topics are constructors, not YAML. Each one names its own engine —
-                        Postgres, MongoDB, Firestore, SQLite; local disk, S3, GCS, Azure — and an engine we have
-                        never heard of is spelled <code class="font-mono text-surface-300">custom:</code> and accepted,
-                        so it fails at the call site instead of looking like a typo.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed">
-                        <code class="font-mono text-surface-300">rebase resources</code> generates the graph a host
-                        reads before it builds anything, and <code class="font-mono text-surface-300">--check</code> fails
-                        CI when the committed graph and your code disagree. There is no second place to declare a
-                        bucket, which is the point: two homes for one fact means one of them is silently losing.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("devpage.14")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("devpage.15")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed" set:html={t("devpage.16")}></p>
                 </div>
                 <div class="lg:col-span-7">
                     <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
-                            <span class="font-mono text-xs text-surface-400">config/resources.ts</span>
+                            <span class="font-mono text-xs text-surface-400">{t("devpage.17")}</span>
                             <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">declared once</span>
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={resourcesCode}></code></pre>
-                        <p class="px-5 pb-5 text-sm text-surface-400">
-                            Publishing inside a transaction that rolls back was never published. Each subscriber
-                            retries on its own schedule, and one that gives up is a row you can look at.
-                        </p>
+                        <p class="px-5 pb-5 text-sm text-surface-400">{t("devpage.18")}</p>
                     </div>
                 </div>
             </div>
@@ -366,13 +314,8 @@ const deployTargets = [
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                     Architecture
                 </p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Where every piece actually runs
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Your browser, your server, your database. Nothing routes through us — there is no us in the
-                    request path.
-                </p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("devpage.19")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("devpage.20")}</p>
             </div>
             <ArchitectureDiagram client:visible/>
         </div>
@@ -386,24 +329,10 @@ const deployTargets = [
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
                         Ship it
                     </p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        It deploys like the Node app it is
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        The backend builds to a bundle and runs behind whatever you already use. The admin panel
-                        is a static SPA — serve it from the same process or from a CDN.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        One process is the default and stays the default. When you outgrow it, the same bundle
-                        boots as an API, a functions tier and a worker — <code class="font-mono text-surface-300">REBASE_ROLE</code> per
-                        process, and which routes mount, which timers fire and who owns the schema all follow from
-                        it. Exactly one process migrates; the rest check themselves against the database and say so
-                        if they disagree.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        Rebase Cloud, our managed hosting, has not launched yet. Until it does, every deployment
-                        is yours: your database, your machine, your logs.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("devpage.21")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("devpage.22")}</p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4" set:html={t("devpage.23")}></p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("devpage.24")}</p>
                     <a href="/docs/deployment/self-hosting"
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
                         Self-hosting guide
@@ -434,25 +363,15 @@ const deployTargets = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
             <div class="rounded-2xl border border-surface-700/80 bg-surface-900/40 p-8 sm:p-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    Your agents, too
-                </p>
-                <h2 class="text-2xl sm:text-3xl text-white mb-5">
-                    Teach your coding agent the framework
-                </h2>
-                <p class="text-base text-surface-400 leading-relaxed mb-6">
-                    <code class="font-mono text-surface-300">rebase skills install</code> writes packaged
-                    instructions into Claude Code, Cursor, Windsurf or Gemini, so an agent working in your repo
-                    already knows how collections, policies and the panel fit together. The MCP server gives it
-                    tools — schema introspection, migrations, queries, storage, cron — under a scoped key that
-                    row-level security still applies to.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("devpage.25")}</p>
+                <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("devpage.26")}</h2>
+                <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("devpage.27")}></p>
                 <div class="group relative max-w-md mb-6">
                     <div class="relative rounded-xl bg-surface-950/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                         <div class="px-5 py-4 flex items-center justify-between">
                             <div class="font-mono text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
                                 <span class="text-primary mr-3">~</span>
-                                <span class="text-white">rebase skills install</span>
+                                <span class="text-white">{t("devpage.28")}</span>
                             </div>
                             <button data-track-copy="dev-skills" data-command="rebase skills install"
                                     class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
@@ -480,61 +399,8 @@ const deployTargets = [
         </div>
     </section>
 
-    <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="py-24 sm:py-32">
-        <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Ready to build?</h2>
-            <p class="text-lg text-surface-400 mb-10">
-                One command scaffolds the whole thing, and it runs on a managed database straight away. Name
-                a <code class="font-mono text-surface-300">DATABASE_URL</code> — your own Postgres, a colleague's
-                staging box, a Neon branch — and Rebase steps aside and uses exactly that.
-            </p>
 
-            <div class="group relative max-w-md mx-auto mb-10">
-                <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                     aria-hidden="true"></div>
-                <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                    <div class="px-5 py-4 flex items-center justify-between">
-                        <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                            <span class="text-primary mr-3">~</span>
-                            <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                        </div>
-                        <button data-track-copy="dev-cta" data-command="pnpm dlx @rebasepro/cli init"
-                                class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                aria-label="Copy command" title="Copy to clipboard">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
 
-            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-                <a href="/docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
-                   data-track id="dev-cta-docs">
-                    Read the docs
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-                <a href={translatePath("/backend")}
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
-                   data-track id="dev-cta-backend">
-                    What the backend gives you
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
+    <ClosingCta title={t("close.developers.title")} blurb={t("close.developers.blurb")} trackId="developers" />
+
 </div>

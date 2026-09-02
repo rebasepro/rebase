@@ -1,6 +1,61 @@
 import React, { useState } from "react";
 
 /**
+ * Every sentence this figure says, keyed. The page passes a resolved
+ * dictionary in as `s`; without one the English below renders, so the demo
+ * still works standalone (in /dev/demos, or in a story).
+ *
+ * The vendor NAMES, regions and company names are deliberately absent: they
+ * are proper nouns and legal entities, and translating "FireCMS S.L." or
+ * "eu-central-1 · Frankfurt" would make the figure wrong.
+ */
+const EN: Record<string, string> = {
+    "jd.strip": "Same app, four backends",
+    "jd.row.region": "Where the bytes sit",
+    "jd.row.region.hint": "all four can answer Europe",
+    "jd.row.operator": "Who operates it",
+    "jd.row.operator.hint": "this is the row that moves",
+    "jd.row.keyholders": "Who can read the rows",
+    "jd.row.keyholders.hint": "without asking you first",
+    "jd.row.exit": "What leaving costs",
+    "jd.seat.us": "seated in the United States",
+    "jd.seat.usde": "seated in the United States (Delaware)",
+    "jd.seat.es": "seated in Spain (European Union)",
+    "jd.constant": "Europe, if you ask for it",
+    "jd.unchanged": "unchanged",
+    "jd.verdict.none": "One party to the data",
+    "jd.verdict.eu": "Two parties, one jurisdiction",
+    "jd.verdict.us": "Two parties, two jurisdictions",
+    "jd.you": "You",
+    "jd.subprocessor": "(sub-processor)",
+    "jd.firebase.exit": "Rewrite every query — Firestore is not SQL and does not dump to it",
+    "jd.firebase.note": "Firestore will keep your documents in eur3. Google still runs the service, holds the credentials, and is a US company.",
+    "jd.supabase.exit": "pg_dump works — the schema is portable, the platform around it is not",
+    "jd.supabase.note": "It is Postgres in Frankfurt, which is genuinely good. The company operating it is incorporated in Delaware, and that is a separate fact from where the disk is.",
+    "jd.cloud.exit": "pg_dump, and the same image runs on your own box the same day",
+    "jd.cloud.note": "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. Today the machines underneath are Google Cloud's in Belgium, which makes Google a sub-processor; moving Cloud onto a European host is work we have committed to, and until it is done this row says so.",
+    "jd.self.label": "Rebase, self-hosted",
+    "jd.self.region": "Wherever you rented the box",
+    "jd.self.seat": "seated in your own jurisdiction",
+    "jd.self.exit": "There is no exit — you already have the database and the source",
+    "jd.self.note": "The software is MIT-licensed and runs as a container against your Postgres. We never see the data, hold no credentials, and have nothing to be served with.",
+    "jd.struct.none.lead": "Nobody can be served with a request for your data except you",
+    "jd.struct.none.rest": ", because nobody else has it. That is not a policy we promise to keep — it is an absence of anything to promise about.",
+    "jd.struct.eu.a": "There is a second party, and a second party can be asked. The question this page keeps returning to is",
+    "jd.struct.eu.b": "which court gets to ask",
+    "jd.struct.eu.c": ". A Spanish company answers to Spanish and EU law, and has no US parent that could be ordered separately — so the request arrives through a process you can see. Fewer parties is still stronger, and that option is one command away.",
+    "jd.struct.us.a": "A US-seated provider can be ordered to produce data in its",
+    "jd.struct.us.b": "possession, custody or control",
+    "jd.struct.us.c": ", including data held on European disks. Whether that ever happens to you is a legal question. Whether there is a second party who",
+    "jd.struct.us.could": "could",
+    "jd.struct.us.d": "be asked is a structural one.",
+    "jd.footnote": "Regions above are the European options each vendor publishes, not defaults — all four keep data in Europe if you ask. Nothing here is legal advice; if you have a specific obligation, take it to counsel with the architecture in hand."
+};
+
+/** The keys the page must resolve and pass in. */
+export const JURISDICTION_STRINGS = Object.keys(EN);
+
+/**
  * The sovereignty argument, made honestly.
  *
  * The tempting figure here is a map with packets flying to Virginia. It would
@@ -49,52 +104,52 @@ const VENDORS: Vendor[] = [
         label: "Firebase",
         region: "eur3 · Belgium + Netherlands",
         operator: "Google LLC",
-        operatorSeat: "United States",
+        operatorSeat: "jd.seat.us",
         posture: "us",
-        keyholders: ["You", "Google LLC"],
-        exit: "Rewrite every query — Firestore is not SQL and does not dump to it",
-        note: "Firestore will keep your documents in eur3. Google still runs the service, holds the credentials, and is a US company."
+        keyholders: ["jd.you", "Google LLC"],
+        exit: "jd.firebase.exit",
+        note: "jd.firebase.note"
     },
     {
         id: "supabase",
         label: "Supabase",
         region: "eu-central-1 · Frankfurt",
         operator: "Supabase, Inc.",
-        operatorSeat: "United States (Delaware)",
+        operatorSeat: "jd.seat.usde",
         posture: "us",
-        keyholders: ["You", "Supabase, Inc.", "AWS (sub-processor)"],
-        exit: "pg_dump works — the schema is portable, the platform around it is not",
-        note: "It is Postgres in Frankfurt, which is genuinely good. The company operating it is incorporated in Delaware, and that is a separate fact from where the disk is."
+        keyholders: ["jd.you", "Supabase, Inc.", "AWS jd.subprocessor"],
+        exit: "jd.supabase.exit",
+        note: "jd.supabase.note"
     },
     {
         id: "rebase-cloud",
         label: "Rebase Cloud",
         region: "europe-west1 · Belgium",
         operator: "FireCMS S.L.",
-        operatorSeat: "Spain (European Union)",
+        operatorSeat: "jd.seat.es",
         posture: "eu",
-        keyholders: ["You", "FireCMS S.L.", "Google Cloud (sub-processor)"],
-        exit: "pg_dump, and the same image runs on your own box the same day",
-        note: "We run it, so there is a second party, and it is us. FireCMS S.L. is a Spanish company with no US parent — that is the row that moves. Today the machines underneath are Google Cloud's in Belgium, which makes Google a sub-processor; moving Cloud onto a European host is work we have committed to, and until it is done this row says so."
+        keyholders: ["jd.you", "FireCMS S.L.", "Google Cloud jd.subprocessor"],
+        exit: "jd.cloud.exit",
+        note: "jd.cloud.note"
     },
     {
         id: "rebase",
-        label: "Rebase, self-hosted",
-        region: "Wherever you rented the box",
-        operator: "You",
-        operatorSeat: "Your jurisdiction",
+        label: "jd.self.label",
+        region: "jd.self.region",
+        operator: "jd.you",
+        operatorSeat: "jd.self.seat",
         posture: "none",
-        keyholders: ["You"],
-        exit: "There is no exit — you already have the database and the source",
-        note: "The software is MIT-licensed and runs as a container against your Postgres. We never see the data, hold no credentials, and have nothing to be served with."
+        keyholders: ["jd.you"],
+        exit: "jd.self.exit",
+        note: "jd.self.note"
     }
 ];
 
 const ROWS = [
-    { key: "region", label: "Where the bytes sit", hint: "all four can answer Europe" },
-    { key: "operator", label: "Who operates it", hint: "this is the row that moves" },
-    { key: "keyholders", label: "Who can read the rows", hint: "without asking you first" },
-    { key: "exit", label: "What leaving costs", hint: "" }
+    { key: "region", label: "jd.row.region", hint: "jd.row.region.hint" },
+    { key: "operator", label: "jd.row.operator", hint: "jd.row.operator.hint" },
+    { key: "keyholders", label: "jd.row.keyholders", hint: "jd.row.keyholders.hint" },
+    { key: "exit", label: "jd.row.exit", hint: "" }
 ] as const;
 
 /**
@@ -110,7 +165,7 @@ const TONES = {
         badge: "bg-primary/10 text-primary ring-primary/25",
         operator: "text-white",
         chip: "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25",
-        verdict: "One party to the data"
+        verdict: "jd.verdict.none"
     },
     eu: {
         button: "bg-emerald-500/10 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
@@ -119,7 +174,7 @@ const TONES = {
         badge: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/25",
         operator: "text-emerald-200",
         chip: "bg-emerald-500/[0.07] text-emerald-200/90 ring-1 ring-inset ring-emerald-500/25",
-        verdict: "Two parties, one jurisdiction"
+        verdict: "jd.verdict.eu"
     },
     us: {
         button: "bg-amber-500/10 text-amber-300 ring-1 ring-inset ring-amber-500/30",
@@ -128,11 +183,16 @@ const TONES = {
         badge: "bg-amber-500/10 text-amber-300 ring-amber-500/25",
         operator: "text-amber-200",
         chip: "bg-amber-500/[0.07] text-amber-200/90 ring-1 ring-inset ring-amber-500/25",
-        verdict: "Two parties, two jurisdictions"
+        verdict: "jd.verdict.us"
     }
 } as const;
 
-export function JurisdictionDemo() {
+export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
+    /** Resolve a key; a value that is not a key (a company name) passes through. */
+    const T = (k: string) => s[k] ?? EN[k] ?? k;
+    /** A keyholder chip is a name that may carry a keyed suffix. */
+    const TK = (k: string) => k.split(" ").map((w) => (w in EN ? T(w) : w)).join(" ");
+
     const [active, setActive] = useState<VendorId>("firebase");
     const vendor = VENDORS.find((v) => v.id === active)!;
     const tone = TONES[vendor.posture];
@@ -143,7 +203,7 @@ export function JurisdictionDemo() {
             {/* Vendor switch */}
             <div className="flex flex-wrap items-center gap-2 border-b border-surface-800/60 bg-surface-950/50 px-4 py-3 sm:px-6">
                 <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
-                    Same app, four backends
+                    {T("jd.strip")}
                 </span>
                 {VENDORS.map((v) => (
                     <button
@@ -156,7 +216,7 @@ export function JurisdictionDemo() {
                                 ? TONES[v.posture].button
                                 : "text-surface-400 ring-1 ring-inset ring-surface-800 hover:text-surface-200 hover:ring-surface-700"
                         }`}>
-                        {v.label}
+                        {T(v.label)}
                     </button>
                 ))}
             </div>
@@ -174,13 +234,13 @@ export function JurisdictionDemo() {
                             <div key={row.key} className="px-5 py-5 sm:px-7">
                                 <div className="flex items-baseline justify-between gap-3">
                                     <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
-                                        {row.label}
+                                        {T(row.label)}
                                     </span>
                                     {row.hint && (
                                         <span className={`text-[11px] transition-colors duration-300 ${
                                             constant ? "text-surface-600" : "text-surface-500"
                                         }`}>
-                                            {row.hint}
+                                            {T(row.hint)}
                                         </span>
                                     )}
                                 </div>
@@ -189,7 +249,7 @@ export function JurisdictionDemo() {
                                     {row.key === "keyholders" ? (
                                         <div className="flex flex-wrap gap-2">
                                             {(value as string[]).map((who) => {
-                                                const isYou = who === "You";
+                                                const isYou = who === "jd.you";
                                                 return (
                                                     <span
                                                         key={who}
@@ -206,7 +266,7 @@ export function JurisdictionDemo() {
                                                                 <path d="M8 12h8"/>
                                                             </svg>
                                                         )}
-                                                        {who}
+                                                        {TK(who)}
                                                     </span>
                                                 );
                                             })}
@@ -214,24 +274,24 @@ export function JurisdictionDemo() {
                                     ) : row.key === "operator" ? (
                                         <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                                             <span className={`text-lg font-semibold transition-colors duration-300 ${tone.operator}`}>
-                                                {vendor.operator}
+                                                {T(vendor.operator)}
                                             </span>
                                             <span className="text-sm text-surface-500">
-                                                seated in {vendor.operatorSeat}
+                                                {T(vendor.operatorSeat)}
                                             </span>
                                         </p>
                                     ) : constant ? (
                                         <>
                                             <p className="text-base leading-relaxed text-surface-300">
-                                                Europe, if you ask for it
+                                                {T("jd.constant")}
                                                 <span className="ml-2 inline-flex items-center rounded-md bg-white/[0.04] px-1.5 py-0.5 align-middle text-[11px] text-surface-500 ring-1 ring-inset ring-white/5">
-                                                    unchanged
+                                                    {T("jd.unchanged")}
                                                 </span>
                                             </p>
-                                            <p className="mt-1 font-mono text-xs text-surface-500">{value as string}</p>
+                                            <p className="mt-1 font-mono text-xs text-surface-500">{T(value as string)}</p>
                                         </>
                                     ) : (
-                                        <p className="text-base leading-relaxed text-surface-400">{value as string}</p>
+                                        <p className="text-base leading-relaxed text-surface-400">{T(value as string)}</p>
                                     )}
                                 </div>
                             </div>
@@ -262,11 +322,11 @@ export function JurisdictionDemo() {
                                     <path d="M12 9v4"/><path d="M12 17h.01"/>
                                 </svg>
                             )}
-                            {tone.verdict}
+                            {T(tone.verdict)}
                         </span>
 
                         <p className="mt-4 text-[15px] leading-relaxed text-surface-300">
-                            {vendor.note}
+                            {T(vendor.note)}
                         </p>
                     </div>
 
@@ -275,24 +335,21 @@ export function JurisdictionDemo() {
                         <p className="text-[13px] leading-relaxed text-surface-400">
                             {vendor.posture === "none" ? (
                                 <>
-                                    <b className="text-surface-200">Nobody can be served with a request for your
-                                    data except you</b>, because nobody else has it. That is not a policy we promise
-                                    to keep — it is an absence of anything to promise about.
+                                    <b className="text-surface-200">{T("jd.struct.none.lead")}</b>
+                                    {T("jd.struct.none.rest")}
                                 </>
                             ) : vendor.posture === "eu" ? (
                                 <>
-                                    There is a second party, and a second party can be asked. The question this page
-                                    keeps returning to is <b className="text-surface-200">which court gets to ask</b>.
-                                    A Spanish company answers to Spanish and EU law, and has no US parent that could
-                                    be ordered separately — so the request arrives through a process you can see.
-                                    Fewer parties is still stronger, and that option is one command away.
+                                    {T("jd.struct.eu.a")}{" "}
+                                    <b className="text-surface-200">{T("jd.struct.eu.b")}</b>
+                                    {T("jd.struct.eu.c")}
                                 </>
                             ) : (
                                 <>
-                                    A US-seated provider can be ordered to produce data in its
-                                    <b className="text-surface-200"> possession, custody or control</b>, including
-                                    data held on European disks. Whether that ever happens to you is a legal question.
-                                    Whether there is a second party who <i>could</i> be asked is a structural one.
+                                    {T("jd.struct.us.a")}{" "}
+                                    <b className="text-surface-200">{T("jd.struct.us.b")}</b>
+                                    {T("jd.struct.us.c")} <i>{T("jd.struct.us.could")}</i>{" "}
+                                    {T("jd.struct.us.d")}
                                 </>
                             )}
                         </p>
@@ -301,9 +358,7 @@ export function JurisdictionDemo() {
             </div>
 
             <p className="border-t border-surface-800/60 bg-surface-950/40 px-5 py-3 text-[11px] leading-relaxed text-surface-500 sm:px-7">
-                Regions above are the European options each vendor publishes, not defaults — all four keep data in
-                Europe if you ask. Nothing here is legal advice; if you have a specific obligation, take it to counsel
-                with the architecture in hand.
+                {T("jd.footnote")}
             </p>
         </div>
     );

@@ -30,14 +30,10 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <h1 class="mb-6 text-display-2 text-white">
-          Ship your back-office in a sprint.<br/>Extend it forever.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Get your startup's admin panel from database to production in <b>minutes</b>, not months. Stop wasting time on boilerplate CRUD and start building your core product.
-        </p>
-        <a href="/docs" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-          Get Started
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("startupspage.00")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("startupspage.01")}></p>
+        <a href="/demo" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+          Try the demo
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
@@ -47,7 +43,7 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="relative isolate py-16">
         <div class="mx-auto max-w-6xl px-8 lg:px-12">
             <h2 class="text-center text-lg font-semibold leading-8 text-surface-400">
-                Trusted by developers at forward-thinking companies
+                {t('social.title')}
             </h2>
             <div class="mx-auto mt-4 mb-8">
                 <ClientLogos filter="startups"/>
@@ -65,13 +61,13 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Your MVP Needs a Back-Office, Not a Backlog</h2>
-          <p class="mt-6 text-lg leading-8 text-surface-400">Building an internal admin panel is a distraction. Rebase connects directly to your PostgreSQL database and gives you a production-ready UI in minutes, letting your engineers focus on what matters.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.02")}</h2>
+          <p class="mt-6 text-lg leading-8 text-surface-400">{t("startupspage.03")}</p>
         </div>
 
         <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
           <img src="/img/users_table.png" width="2430" height="992"
-               alt="Screenshot of Rebase Admin Panel managing User Data"
+               alt="Rebase CMS: the generated back office, editing rows in a users table"
                class="w-full h-auto"/>
         </div>
 
@@ -82,62 +78,24 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Built for Startup Velocity</h2>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.04")}</h2>
         </div>
         <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={zapIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Instant Setup from Data</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Point Rebase at your existing PostgreSQL database and let it automatically infer your schemas. No tedious config, just immediate results.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.05")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.06")}</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={cloudIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Self-Host in Minutes</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Clone our template or use the CLI to spin up your internal tools on your own infrastructure instantly. No vendor lock-in.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.07")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.08")}</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={spreadsheetIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Empower Your Team</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">The intuitive spreadsheet UI and Notion-style editor mean non-technical users can manage data safely and efficiently from day one.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.09")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.10")}</p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Testimonials Section -->
- <section id="testimonials" class="relative isolate py-24 sm:py-32 scroll-mt-20">
-      <div class="mx-auto max-w-6xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">Trusted by Founders & CTOs</h2>
-        </div>
-        <div class="mx-auto grid max-w-2xl grid-cols-1 gap-8 lg:max-w-none lg:grid-cols-2">
-          <!-- Example Quote 3: EasyHome -->
-          <figure class="text-center">
-            <blockquote class="text-xl leading-8 text-surface-300">
-              <p>“So far, this has been the missing piece of the puzzle for running our back-end. I love how we can just throw some React in there and it all feels so seamless.”</p>
-            </blockquote>
-            <figcaption class="mt-8 flex items-center justify-center gap-x-4">
-              <img class="h-10 w-10 rounded-full bg-surface-800 object-cover" src="/img/avatars/john.avif" width="400" height="400" alt="John Coppa"/>
-              <div class="text-sm leading-6">
-                <div class="font-semibold text-white">John Coppa</div>
-                <div class="text-surface-400">CTO at EasyHome</div>
-              </div>
-            </figcaption>
-          </figure>
-
-          <!-- Example Quote 4: OikosBrain -->
-          <figure class="text-center">
-            <blockquote class="text-xl leading-8 text-surface-300">
-              <p>“We are early adopters of Rebase (and very proud of it) and it gives us a lot of flexibility and ease of integration of anything we develop.”</p>
-            </blockquote>
-            <figcaption class="mt-8 flex items-center justify-center gap-x-4">
-              <img class="h-10 w-10 rounded-full bg-surface-800 object-cover" src="/img/avatars/manuel.avif" width="240" height="240" alt="Manuel Pinilla"/>
-              <div class="text-sm leading-6">
-                <div class="font-semibold text-white">Manuel Pinilla</div>
-                <div class="text-surface-400">Founder, OikosBrain</div>
-              </div>
-            </figcaption>
-          </figure>
         </div>
       </div>
     </section>
@@ -146,13 +104,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center">
-                <h2 class="text-3xl sm:text-4xl text-white mb-6">Start Fast, Scale with Full
-                    Control.</h2>
-                <p class="text-lg text-surface-400 mb-8">Start fast with an auto-generated UI, then customize it precisely to your needs. Add custom React components, white-label the UI, and take full ownership of your back-office.</p>
-                <a href="/docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
-                    Build with Rebase
-                </a>
+                <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.11")}</h2>
+                <p class="text-lg text-surface-400 mb-8">{t("startupspage.12")}</p>
             </div>
             <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 mt-12">
                 <SpreadsheetDemo client:load />
@@ -160,12 +113,12 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
     </section>
 
-    <!-- Startup-Friendly Features Section -->
+    <!-- What comes in the box -->
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
-                <h2 class="text-3xl sm:text-4xl text-white">Startup-Friendly Features</h2>
-                <p class="mt-6 text-lg leading-8 text-surface-400">Everything you need, nothing you don't.</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.13")}</h2>
+                <p class="mt-6 text-lg leading-8 text-surface-400">{t("startupspage.14")}</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -188,8 +141,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">PostgreSQL Native</h3>
-                        <p class="text-sm text-surface-400">Leverages PostgreSQL's reliability, scalability, and advanced querying directly.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.36")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.15")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -212,8 +165,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Zero Server Management</h3>
-                        <p class="text-sm text-surface-400">Focus on features, not infrastructure. Self-host with ease.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.16")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.17")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -235,8 +188,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Schema Editor & Inference</h3>
-                        <p class="text-sm text-surface-400">Visual building & auto-detection adapt to your data fast.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.18")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.19")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -259,8 +212,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Powerful Editing Tools</h3>
-                        <p class="text-sm text-surface-400">Spreadsheet & form views, file storage, references, and more.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.20")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.21")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -282,8 +235,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Role-Based Access Control</h3>
-                        <p class="text-sm text-surface-400">Configure views and permissions per user role easily.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.22")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.23")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -304,8 +257,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Flexible Customization</h3>
-                        <p class="text-sm text-surface-400">Add custom fields, logic, hooks, and full React views.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.37")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.24")}</p>
                     </div>
                 </div>
             </div>
@@ -321,11 +274,8 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-start">
                 <div>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-6">More Than Just a CMS</h2>
-                    <p class="text-xl text-surface-400 mb-8">
-                        Extend Rebase to build the custom internal tools your startup needs.
-                        Sensible defaults meet powerful customization.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.25")}</h2>
+                    <p class="text-xl text-surface-400 mb-8">{t("startupspage.26")}</p>
                 </div>
                 <ul class="text-left text-lg space-y-4">
                     <li class="flex items-start">
@@ -334,7 +284,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/>
                         </svg>
-                        <span><b>Internal Tools:</b> Tailored dashboards for support, ops, sales, or data admin on your backend.</span>
+                        <span set:html={t("startupspage.27")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -343,7 +293,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        <span><b>Headless Content:</b> Manage content for web/mobile apps, marketing sites, blogs, docs.</span>
+                        <span set:html={t("startupspage.28")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -352,7 +302,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>
-                        <span><b>User Management:</b> View, edit, and manage user profiles and permissions.</span>
+                        <span set:html={t("startupspage.29")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -361,7 +311,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
-                        <span><b>Product/E-commerce Data:</b> Manage catalogs, variants, pricing, inventory easily.</span>
+                        <span set:html={t("startupspage.30")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -371,7 +321,7 @@ import ClosingCta from "../ClosingCta.astro";
                                   d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.096 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        <span><b>App Configuration:</b> Control settings, feature flags, or A/B tests via a UI.</span>
+                        <span set:html={t("startupspage.31")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -379,7 +329,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span><b>Background Jobs:</b> Cron jobs for scheduled data processing, report generation, and external API syncs.</span>
+                        <span set:html={t("startupspage.32")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -387,7 +337,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                         </svg>
-                        <span><b>Third-Party Integrations:</b> Webhooks and custom functions for Stripe, Slack, or any external service.</span>
+                        <span set:html={t("startupspage.33")}></span>
                     </li>
                 </ul>
             </div>
@@ -399,11 +349,9 @@ import ClosingCta from "../ClosingCta.astro";
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-center">
           <div class="lg:order-last self-start">
-            <h2 class="text-3xl sm:text-4xl text-white mb-6">Built for Pivots</h2>
-            <p class="text-lg text-surface-400 mb-8">Startups evolve. Your tools should too. Rebase makes adapting your data models easy. Change schemas, add content types, or restructure without rebuilding. The headless architecture decouples backend and frontend for maximum flexibility.</p>
-            <a href="/product" class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
-              Explore Features
-            </a>
+            <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.34")}</h2>
+            <p class="text-lg text-surface-400 mb-8">{t("startupspage.35")}</p>
+            <a href="/product" class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">{t("startupspage.38")}</a>
           </div>
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
             <img src="/img/widgets.png" width="1400" height="1408" alt="Rebase Widgets" class="w-full h-auto"/>
@@ -412,59 +360,7 @@ import ClosingCta from "../ClosingCta.astro";
       </div>
     </section>
 
-    <!-- Final CTA Section -->
- <section class="py-24 sm:py-32">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl text-white mb-8">Ready to accelerate your startup?</h2>
-            <div class="flex items-center justify-center gap-x-6">
-                <a href="/docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-                    Get Started
-                    
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-                </a>
-                <a href="/contact"
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                    Contact Sales
-                    
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-                </a>
-            </div>
-        </div>
-    </section>
-
-  
-    <ClosingCta title="Ship the back office this sprint." blurb="Scaffold against the Postgres you already run and hand the panel to your team — without building a single admin screen." trackId="startups" />
+    <ClosingCta title={t("close.startups.title")} blurb={t("close.startups.blurb")} trackId="startups" />
 
 </div>
 

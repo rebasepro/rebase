@@ -61,60 +61,60 @@ const HOSTS: Host[] = [
     {
         id: "hetzner",
         name: "Hetzner",
-        seat: "Germany",
+        seat: "em.country.germany",
         cities: [FALKENSTEIN, NUREMBERG, HELSINKI],
         url: "https://www.hetzner.com/cloud/",
-        note: "A German GmbH running its own data centres. The reason half of European side-projects are cheap."
+        note: "em.host.hetzner.note"
     },
     {
         id: "ovh",
         name: "OVHcloud",
-        seat: "France",
+        seat: "em.country.france",
         cities: [GRAVELINES, ROUBAIX, STRASBOURG, FRANKFURT, WARSAW],
         url: "https://www.ovhcloud.com/en/public-cloud/",
-        note: "The largest European host by some distance, and it builds its own servers."
+        note: "em.host.ovh.note"
     },
     {
         id: "scaleway",
         name: "Scaleway",
-        seat: "France",
+        seat: "em.country.france",
         cities: [PARIS, AMSTERDAM, WARSAW],
         url: "https://www.scaleway.com/en/pricing/",
-        note: "French, developer-shaped, with a managed Postgres if you would rather not run your own."
+        note: "em.host.scaleway.note"
     },
     {
         id: "ionos",
         name: "IONOS",
-        seat: "Germany",
+        seat: "em.country.germany",
         cities: [FRANKFURT, BERLIN, MADRID, LONDON],
         url: "https://cloud.ionos.com/",
-        note: "The boring enterprise option, which is a compliment when the topic is where your data sleeps."
+        note: "em.host.ionos.note"
     },
     {
         id: "upcloud",
         name: "UpCloud",
-        seat: "Finland",
+        seat: "em.country.finland",
         cities: [HELSINKI, FRANKFURT, MADRID, WARSAW],
         url: "https://upcloud.com/pricing",
-        note: "Finnish, and unusually loud about disk performance — which is the thing Postgres cares about."
+        note: "em.host.upcloud.note"
     },
     {
         id: "exoscale",
         name: "Exoscale",
-        seat: "Switzerland",
+        seat: "em.country.switzerland",
         nonEu: true,
         cities: [ZURICH, GENEVA, VIENNA, FRANKFURT, SOFIA],
         url: "https://www.exoscale.com/pricing/",
-        note: "Swiss-seated with EU regions, so read the jurisdiction note below before picking a Swiss one."
+        note: "em.host.exoscale.note"
     },
     {
         id: "infomaniak",
         name: "Infomaniak",
-        seat: "Switzerland",
+        seat: "em.country.switzerland",
         nonEu: true,
         cities: [GENEVA],
         url: "https://www.infomaniak.com/en/hosting/public-cloud",
-        note: "Swiss, employee-owned, and noisier about renewable power than anyone else on this list."
+        note: "em.host.infomaniak.note"
     }
 ];
 
@@ -136,19 +136,67 @@ const project = (lat: number, lon: number) => {
 // Country labels sit at a representative point, not a centroid — they only have
 // to tell the reader which cluster is which.
 const LABELS: { text: string; lat: number; lon: number }[] = [
-    { text: "FINLAND", lat: 62.4, lon: 25.5 },
-    { text: "POLAND", lat: 53.6, lon: 20.0 },
-    { text: "GERMANY", lat: 53.4, lon: 9.6 },
-    { text: "NETHERLANDS", lat: 53.4, lon: 4.4 },
-    { text: "FRANCE", lat: 46.9, lon: 2.0 },
-    { text: "SWITZERLAND", lat: 45.2, lon: 7.6 },
-    { text: "AUSTRIA", lat: 47.1, lon: 15.4 },
-    { text: "SPAIN", lat: 39.6, lon: -4.4 },
-    { text: "BULGARIA", lat: 41.6, lon: 24.6 },
-    { text: "UK", lat: 53.0, lon: -2.6 }
+    { text: "em.label.finland", lat: 62.4, lon: 25.5 },
+    { text: "em.label.poland", lat: 53.6, lon: 20.0 },
+    { text: "em.label.germany", lat: 53.4, lon: 9.6 },
+    { text: "em.label.netherlands", lat: 53.4, lon: 4.4 },
+    { text: "em.label.france", lat: 46.9, lon: 2.0 },
+    { text: "em.label.switzerland", lat: 45.2, lon: 7.6 },
+    { text: "em.label.austria", lat: 47.1, lon: 15.4 },
+    { text: "em.label.spain", lat: 39.6, lon: -4.4 },
+    { text: "em.label.bulgaria", lat: 41.6, lon: 24.6 },
+    { text: "em.label.uk", lat: 53.0, lon: -2.6 }
 ];
 
-export function EuropeMapDemo() {
+/**
+ * Prose lives in keys; `EuropeContent.astro` passes the resolved strings in as
+ * `s`. City names are deliberately not keys — a data centre is where the
+ * provider says it is, and the label placement on the map is tuned to their
+ * length.
+ */
+const EN: Record<string, string> = {
+    "em.country.germany": "Germany",
+    "em.country.france": "France",
+    "em.country.finland": "Finland",
+    "em.country.switzerland": "Switzerland",
+    "em.host.hetzner.note": "A German GmbH running its own data centres. The reason half of European side-projects are cheap.",
+    "em.host.ovh.note": "The largest European host by some distance, and it builds its own servers.",
+    "em.host.scaleway.note": "French, developer-shaped, with a managed Postgres if you would rather not run your own.",
+    "em.host.ionos.note": "The boring enterprise option, which is a compliment when the topic is where your data sleeps.",
+    "em.host.upcloud.note": "Finnish, and unusually loud about disk performance — which is the thing Postgres cares about.",
+    "em.host.exoscale.note": "Swiss-seated with EU regions, so read the jurisdiction note below before picking a Swiss one.",
+    "em.host.infomaniak.note": "Swiss, employee-owned, and noisier about renewable power than anyone else on this list.",
+    "em.label.finland": "FINLAND",
+    "em.label.poland": "POLAND",
+    "em.label.germany": "GERMANY",
+    "em.label.netherlands": "NETHERLANDS",
+    "em.label.france": "FRANCE",
+    "em.label.switzerland": "SWITZERLAND",
+    "em.label.austria": "AUSTRIA",
+    "em.label.spain": "SPAIN",
+    "em.label.bulgaria": "BULGARIA",
+    "em.label.uk": "UK",
+    "em.aria.map": "Data-centre cities of seven European hosting providers, plotted by latitude and longitude",
+    "em.caption.one": "%1 — one location, seated in %2",
+    "em.caption.many": "%1 — %2 locations, seated in %3",
+    "em.caption.idle": "Every pin is a place you could put your Postgres tonight. Pick a host to see whose it is.",
+    "em.list.title": "European hosts",
+    "em.showall": "Show all",
+    "em.seatedin": "seated in %1",
+    "em.noneu": "outside the EU",
+    "em.pricing": "Their pricing",
+    "em.idle.lead": "%1 cities. %2 companies. None of them us.",
+    "em.idle.body": "No affiliate links, no referral codes, no partner tier. A container and a Postgres connection string run anywhere, and where you put them is genuinely none of our business — which is the entire point of the page you are reading.",
+    "em.footnote": "Locations as published by each provider, and they change — check before you commit. Switzerland sits outside the EU under an adequacy decision, which is a different legal position from a member state."
+};
+
+export const EUROPE_MAP_STRINGS = Object.keys(EN);
+
+export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
+    /** Resolve a key and fill `%1`… placeholders left for the counts. */
+    const T = (k: string, ...v: (string | number)[]) =>
+        v.reduce<string>((out, x, i) => out.split(`%${i + 1}`).join(String(x)), s[k] ?? EN[k] ?? k);
+
     const [activeId, setActiveId] = useState<string | null>(null);
     const active = HOSTS.find((h) => h.id === activeId) ?? null;
 
@@ -190,7 +238,7 @@ export function EuropeMapDemo() {
                     />
 
                     <svg viewBox={`0 0 ${W} ${H}`} className="relative w-full" role="img"
-                         aria-label="Data-centre cities of seven European hosting providers, plotted by latitude and longitude">
+                         aria-label={T("em.aria.map")}>
                         <defs>
                             <radialGradient id="pinGlow">
                                 <stop offset="0%" stopColor="rgba(0,112,244,0.55)"/>
@@ -209,7 +257,7 @@ export function EuropeMapDemo() {
                                 <text key={l.text} x={x} y={y} textAnchor="middle"
                                       className="fill-surface-600 font-mono"
                                       style={{ fontSize: 9, letterSpacing: "0.14em" }}>
-                                    {l.text}
+                                    {T(l.text)}
                                 </text>
                             );
                         })}
@@ -255,8 +303,10 @@ export function EuropeMapDemo() {
 
                     <p className="relative mt-1 text-center text-[11px] text-surface-500">
                         {active
-                            ? `${active.name} — ${active.cities.length} location${active.cities.length > 1 ? "s" : ""}, seated in ${active.seat}`
-                            : "Every pin is a place you could put your Postgres tonight. Pick a host to see whose it is."}
+                            ? active.cities.length === 1
+                                ? T("em.caption.one", active.name, T(active.seat))
+                                : T("em.caption.many", active.name, active.cities.length, T(active.seat))
+                            : T("em.caption.idle")}
                     </p>
                 </div>
 
@@ -264,12 +314,12 @@ export function EuropeMapDemo() {
                 <div className="flex flex-col p-5 sm:p-6">
                     <div className="mb-4 flex items-baseline justify-between gap-3">
                         <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
-                            European hosts
+                            {T("em.list.title")}
                         </span>
                         {active && (
                             <button type="button" onClick={() => setActiveId(null)}
                                     className="text-[11px] text-surface-500 transition-colors hover:text-surface-200">
-                                Show all
+                                {T("em.showall")}
                             </button>
                         )}
                     </div>
@@ -298,21 +348,21 @@ export function EuropeMapDemo() {
                             <>
                                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                                     <span className="text-base font-semibold text-white">{active.name}</span>
-                                    <span className="text-xs text-surface-500">seated in {active.seat}</span>
+                                    <span className="text-xs text-surface-500">{T("em.seatedin", T(active.seat))}</span>
                                     {active.nonEu && (
                                         <span className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-inset ring-amber-500/25">
-                                            outside the EU
+                                            {T("em.noneu")}
                                         </span>
                                     )}
                                 </div>
-                                <p className="mt-2.5 text-sm leading-relaxed text-surface-400">{active.note}</p>
+                                <p className="mt-2.5 text-sm leading-relaxed text-surface-400">{T(active.note)}</p>
                                 <p className="mt-3 font-mono text-[11px] leading-relaxed text-surface-500">
                                     {active.cities.map((c) => c.name).join(" · ")}
                                 </p>
                                 {active.url && (
                                     <a href={active.url} target="_blank" rel="noopener noreferrer"
                                        className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-surface-500 transition-colors hover:text-primary">
-                                        Their pricing
+                                        {T("em.pricing")}
                                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round"
                                                   d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
@@ -323,22 +373,17 @@ export function EuropeMapDemo() {
                         ) : (
                             <>
                                 <p className="text-sm leading-relaxed text-surface-300">
-                                    <b className="text-white">{allCities.length} cities. {HOSTS.length} companies.
-                                    None of them us.</b>
+                                    <b className="text-white">{T("em.idle.lead", allCities.length, HOSTS.length)}</b>
                                 </p>
                                 <p className="mt-2.5 text-sm leading-relaxed text-surface-400">
-                                    No affiliate links, no referral codes, no partner tier. A container and a Postgres
-                                    connection string run anywhere, and where you put them is genuinely none of our
-                                    business — which is the entire point of the page you are reading.
+                                    {T("em.idle.body")}
                                 </p>
                             </>
                         )}
                     </div>
 
                     <p className="mt-4 pt-4 text-[11px] leading-relaxed text-surface-500 lg:mt-auto">
-                        Locations as published by each provider, and they change — check before you commit.
-                        Switzerland sits outside the EU under an adequacy decision, which is a different legal
-                        position from a member state.
+                        {T("em.footnote")}
                     </p>
                 </div>
             </div>

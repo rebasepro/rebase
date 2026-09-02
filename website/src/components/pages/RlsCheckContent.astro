@@ -1,4 +1,5 @@
 ---
+const { lang, t } = Astro.props;
 /**
  * The landing page for `@rebasepro/rls-check`.
  *
@@ -50,7 +51,7 @@ const faqs = [
     },
     {
         q: "Do I need to be using Rebase?",
-        a: "No. It knows nothing about your framework and asks nothing of your codebase — it reads the database. It works against Supabase, Neon, RDS, Cloud SQL, a container on your laptop, or anything else that speaks the Postgres wire protocol. Most people who run it are not Rebase users."
+        a: "No. It knows nothing about your framework and asks nothing of your codebase — it reads the database. It works against Supabase, Neon, RDS, Cloud SQL, a container on your laptop, or anything else that speaks the Postgres wire protocol. It needs no Rebase and asks about none."
     },
     {
         q: "What does it need to connect as?",
@@ -98,17 +99,9 @@ const appSchema = {
         ></div>
 
         <div class="px-6 mx-auto max-w-4xl lg:px-8 relative z-10">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">
-                Free tool · no account
-            </span>
-            <h1 class="mt-5 mb-6 text-display-2 text-white">
-                Audit row-level security on any Postgres
-            </h1>
-            <p class="text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl">
-                Fourteen checks for the failures that make a Postgres database leak in practice — not the ones
-                that are easy to check for. Works on Supabase, Neon, RDS, Cloud SQL, or a container on your
-                laptop. One command, nothing to install, nothing to sign up for.
-            </p>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400 uppercase tracking-wider">{t("rlscheckpage.00")}</span>
+            <h1 class="mt-5 mb-6 text-display-2 text-white">{t("rlscheckpage.01")}</h1>
+            <p class="text-lg leading-8 text-surface-300 lg:text-xl max-w-3xl">{t("rlscheckpage.02")}</p>
 
             <div class="mt-10 group relative max-w-2xl">
                 <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
@@ -137,21 +130,15 @@ const appSchema = {
             <dl class="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
                     <dt class="text-white font-semibold text-sm mb-1">Read-only</dt>
-                    <dd class="text-sm text-surface-400 leading-relaxed">
-                        SELECTs against the system catalogues and nothing else. It never reads your data.
-                    </dd>
+                    <dd class="text-sm text-surface-400 leading-relaxed">{t("rlscheckpage.07")}</dd>
                 </div>
                 <div>
-                    <dt class="text-white font-semibold text-sm mb-1">Nothing leaves the machine</dt>
-                    <dd class="text-sm text-surface-400 leading-relaxed">
-                        No telemetry, no upload, no network beyond the connection string you pass it.
-                    </dd>
+                    <dt class="text-white font-semibold text-sm mb-1">{t("rlscheckpage.08")}</dt>
+                    <dd class="text-sm text-surface-400 leading-relaxed">{t("rlscheckpage.09")}</dd>
                 </div>
                 <div>
-                    <dt class="text-white font-semibold text-sm mb-1">No Rebase required</dt>
-                    <dd class="text-sm text-surface-400 leading-relaxed">
-                        It reads the database, not your codebase. Most people who run it do not use Rebase.
-                    </dd>
+                    <dt class="text-white font-semibold text-sm mb-1">{t("rlscheckpage.10")}</dt>
+                    <dd class="text-sm text-surface-400 leading-relaxed">{t("rlscheckpage.11")}</dd>
                 </div>
             </dl>
         </div>
@@ -160,12 +147,8 @@ const appSchema = {
     <!-- What it finds -->
     <section class="relative z-0 py-16 sm:py-24 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">The fourteen checks</h2>
-            <p class="text-surface-400 mb-12 leading-relaxed max-w-2xl">
-                Each finding the tool prints carries the id below, the reason it matters, and the SQL that fixes
-                it. Severity is the worst level a check can report — several grade themselves down depending on
-                what they find.
-            </p>
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("rlscheckpage.03")}</h2>
+            <p class="text-surface-400 mb-12 leading-relaxed max-w-2xl">{t("rlscheckpage.04")}</p>
 
             {bySeverity.map(({ severity, checks }) => (
                 <div class="mb-12 last:mb-0">
@@ -199,11 +182,8 @@ const appSchema = {
     <!-- What it looks like -->
     <section class="relative z-0 py-16 sm:py-24 border-t border-surface-900/60">
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">What a run looks like</h2>
-            <p class="text-surface-400 mb-10 leading-relaxed max-w-2xl">
-                Every finding names the relation, says who can reach it and what they would get, and prints the
-                SQL that closes it. Exits non-zero above a severity you choose, so it belongs in CI.
-            </p>
+            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("rlscheckpage.05")}</h2>
+            <p class="text-surface-400 mb-10 leading-relaxed max-w-2xl">{t("rlscheckpage.06")}</p>
             <RlsCheckReport />
         </div>
     </section>

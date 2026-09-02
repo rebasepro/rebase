@@ -98,7 +98,7 @@ export default function AiAppDevelopmentDemo() {
               <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 2</span>
             </div>
             <p className="text-surface-400 text-xs leading-relaxed">
-              Configure database webhooks in the Rebase Studio UI. 
+              Configure database webhooks in Rebase Studio. 
               Route write triggers directly to decoupled Hono custom functions to invoke LLM logic asynchronously.
             </p>
           </div>

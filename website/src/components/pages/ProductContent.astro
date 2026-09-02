@@ -29,13 +29,13 @@ const adminParts = [
     { name: "Entity forms", note: "Generated from properties, with validation and relations", meta: "properties" },
     { name: "Your React", note: "Custom fields, previews, views and entity actions", meta: "admin.Field" },
     { name: "Users & roles", note: "The same roles your policies read, managed by humans", meta: "RBAC" },
-    { name: "Studio", note: "SQL editor, schema builder, policy editor, branches, logs", meta: "/studio" },
+    { name: "Rebase Studio", note: "The developer workspace, registered inside the same panel as CMS: SQL, schema, policies, branches, logs", meta: "/studio" },
 ];
 
 // What you stop maintaining. Concrete, not aspirational.
 const replaced = [
     "CRUD controllers, serializers and request validation",
-    "A hand-rolled admin UI, and the sprint it costs every quarter",
+    "A hand-rolled back office, and the sprint it costs every quarter",
     "JWT plumbing, refresh rotation and password-reset email",
     "Permission checks scattered across route handlers",
     "File-upload endpoints and signed-URL helpers",
@@ -43,6 +43,7 @@ const replaced = [
     "The OpenAPI document nobody remembered to update",
     "A second data model, kept in sync with the first by hand",
 ];
+import ClosingCta from "../ClosingCta.astro";
 ---
 
 <div class="flex flex-col isolate">
@@ -53,21 +54,15 @@ const replaced = [
 
         <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
             <div class="inline-flex items-center py-1.5 px-4 mb-8 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="text-sm font-medium">The backend · and the panel, if you want one</span>
+                <span class="text-sm font-medium">{t("productpage.00")}</span>
             </div>
-            <h1 class="mb-6 text-display-2 text-white">
-                One definition.<br/>Everything it produces.
-            </h1>
-            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-                Rebase turns a Postgres database into a product backend — REST, a typed SDK, realtime, auth,
-                storage and access control the database itself enforces. The admin panel renders from the same
-                file, and only if you ask for it.
-            </p>
+            <h1 class="mb-6 text-display-2 text-white" set:html={t("productpage.01")}></h1>
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("productpage.02")}</p>
             <div class="flex items-center justify-start gap-x-4">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+                <a href={translatePath("/demo")}
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
                    data-track id="product-hero-demo">
-                    See the live demo
+                    Try the demo
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -99,20 +94,10 @@ const replaced = [
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start mb-14">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Act one</p>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        The half that runs without a browser
-                    </h2>
-                    <p class="text-base text-surface-400 leading-relaxed mb-4">
-                        A Rebase project is a Hono server and a Drizzle schema. It serves your data over REST,
-                        streams changes over WebSocket, issues and rotates tokens, stores files, runs your
-                        scheduled jobs, and publishes an OpenAPI document that is always current because nobody
-                        writes it.
-                    </p>
-                    <p class="text-base text-surface-400 leading-relaxed mb-6">
-                        Every one of those requests executes as a restricted Postgres role. That is the part
-                        worth reading twice: authorization is a property of your database, not of this process.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.17")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("productpage.03")}</h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">{t("productpage.04")}</p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">{t("productpage.05")}</p>
                     <div class="flex flex-col items-start gap-3">
                         <a href={translatePath("/backend")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
@@ -139,9 +124,7 @@ const replaced = [
 
                 <div class="lg:col-span-7">
                     <div class="rounded-2xl border border-surface-800/80 bg-surface-950/60 p-7">
-                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-5">
-                            What you stop maintaining
-                        </p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-5">{t("productpage.06")}</p>
                         <ul class="space-y-3">
                             {replaced.map(item => (
                                     <li class="flex gap-3 text-sm text-surface-400 leading-relaxed">
@@ -188,22 +171,16 @@ const replaced = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Act three</p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Built to be operated — by your team, and by their agents
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    The same authorization model that protects a human session protects a coding agent. That is
-                    the only version of agent access we are comfortable shipping.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.18")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.07")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("productpage.08")}</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/ai")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">MCP server</h3>
-                    <p class="text-sm text-surface-400 mb-4">Thirty-odd tools an agent can call: read the schema,
-                        generate migrations, query data, manage storage and cron.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.19")}</h3>
+                    <p class="text-sm text-surface-400 mb-4">{t("productpage.09")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
                         AI &amp; agents
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -216,9 +193,8 @@ const replaced = [
                 </a>
                 <a href={translatePath("/security")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">Scoped API keys</h3>
-                    <p class="text-sm text-surface-400 mb-4">Keys carry a permission list <em>and</em> pass through
-                        row-level security. There is no key that bypasses the database.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.10")}</h3>
+                    <p class="text-sm text-surface-400 mb-4" set:html={t("productpage.11")}></p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
                         Security &amp; RLS
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -231,9 +207,8 @@ const replaced = [
                 </a>
                 <a href={translatePath("/developers")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">Agent skills</h3>
-                    <p class="text-sm text-surface-400 mb-4">Installable instructions for Claude Code, Cursor,
-                        Windsurf and Gemini, so an agent writes Rebase the way you would.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.20")}</h3>
+                    <p class="text-sm text-surface-400 mb-4">{t("productpage.12")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
                         For developers
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -252,14 +227,9 @@ const replaced = [
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">The whole product</p>
-                <h2 class="text-3xl sm:text-4xl text-white">
-                    Everything Rebase ships, on one screen
-                </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    The left column runs with nothing else installed. The right column is one dependency away,
-                    and deleting it does not move a single API response.
-                </p>
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("productpage.13")}</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("productpage.14")}</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">{t("productpage.15")}</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -270,7 +240,7 @@ const replaced = [
                     <div class="relative px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
                         <div>
                             <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 01</p>
-                            <h3 class="text-2xl font-semibold text-white">The backend</h3>
+                            <h3 class="text-2xl font-semibold text-white">{t("productpage.21")}</h3>
                         </div>
                         <span class="text-xs text-surface-500 shrink-0">always on</span>
                     </div>
@@ -304,7 +274,7 @@ const replaced = [
                     <div class="px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
                         <div>
                             <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 02</p>
-                            <h3 class="text-2xl font-semibold text-white">The admin panel</h3>
+                            <h3 class="text-2xl font-semibold text-white">{t("productpage.22")}</h3>
                         </div>
                         <span class="text-xs text-surface-500 shrink-0">opt in</span>
                     </div>
@@ -320,10 +290,7 @@ const replaced = [
                         ))}
                     </ul>
                     <div class="px-7 py-4 bg-surface-900/30 border-t border-surface-800/60">
-                        <p class="text-sm text-surface-400 leading-relaxed">
-                            The panel is a React app that talks to the endpoints on the left, under the same
-                            row-level security as your own client. There is no private back channel for data.
-                        </p>
+                        <p class="text-sm text-surface-400 leading-relaxed">{t("productpage.16")}</p>
                     </div>
                     <div class="px-7 py-5 border-t border-surface-800/80">
                         <a href={translatePath("/cms")}
@@ -342,61 +309,8 @@ const replaced = [
         </div>
     </section>
 
-    <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="relative isolate py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl sm:text-4xl text-white mb-4 animate-on-scroll fade-in-up">
-                Start with whichever half you need
-            </h2>
-            <p class="text-lg text-surface-400 mb-10 animate-on-scroll fade-in-up delay-100">
-                Scaffold a project in one command, or poke at a running one first.
-            </p>
 
-            <div class="group relative max-w-md mx-auto mb-10">
-                <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                     aria-hidden="true"></div>
-                <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                    <div class="px-5 py-4 flex items-center justify-between">
-                        <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                            <span class="text-primary mr-3">~</span>
-                            <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                        </div>
-                        <button data-track-copy="product-cta" data-command="pnpm dlx @rebasepro/cli init"
-                                class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                aria-label="Copy command" title="Copy to clipboard">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
 
-            <div class="flex flex-col sm:flex-row gap-4 justify-center animate-on-scroll fade-in-up delay-200">
-                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
-                   data-track id="product-cta-demo">
-                    See the live demo
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-                <a href={translatePath("/compare")}
-                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
-                   data-track id="product-cta-compare">
-                    How it compares
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14"/>
-                        <path d="m12 5 7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
+    <ClosingCta title={t("close.product.title")} blurb={t("close.product.blurb")} trackId="product" />
+
 </div>

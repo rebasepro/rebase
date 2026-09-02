@@ -13,11 +13,8 @@ const { lang } = Astro.params;
 const currentLang = lang || defaultLang;
 const t = useTranslations(currentLang as keyof typeof languages);
 
-const title = "Free Postgres RLS audit — check your row-level security in one command";
-const description =
-    "rls-check is a free, read-only Row-Level Security audit for any PostgreSQL database. Fourteen checks "
-    + "for the failures that make Postgres leak: RLS disabled on exposed tables, policies that are always "
-    + "true, views that read past their base table. Works on Supabase, Neon, RDS. No account, no install.";
+const title = t("rlscheckpage.meta.title");
+const description = t("rlscheckpage.meta.description");
 
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },

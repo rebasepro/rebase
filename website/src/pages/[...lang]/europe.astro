@@ -14,8 +14,8 @@ const t = useTranslations(currentLang as keyof typeof languages);
 import Layout from '../../layouts/Layout.astro';
 import EuropeContent from '../../components/pages/EuropeContent.astro';
 
-const title = "Sovereign backend for Europe — Rebase";
-const description = "Firebase and Supabase will host in Frankfurt — the company operating them is still US-seated. Run Rebase yourself and there is no second party at all; let us run it and the second party is a Spanish company under EU law. MIT-licensed, deploys to Hetzner, OVHcloud, Scaleway or your own rack.";
+const title = t("europe.meta.title");
+const description = t("europe.meta.description");
 
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },

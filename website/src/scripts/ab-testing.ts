@@ -45,7 +45,13 @@ export const EXPERIMENTS: Experiment[] = [
     {
         id: "manifesto-banner-text",
         variants: ["control", "mission", "founders"],
-        weights: [34, 33, 33],
+        // Parked at 0%, like `navigation-structure`. The banner it varied is no
+        // longer mounted on the home page: it sat ABOVE the header, which
+        // SITE-STORY §6 rules out, on the raw brand blue, which the same section
+        // rules out as a ground — and it was the first sentence a cold reader
+        // met, ahead of the product one. The manifesto link lives in the footer.
+        // Flip the weights back if the banner ever returns.
+        weights: [100, 0, 0],
         expires: "2026-09-01"
     }
 ];

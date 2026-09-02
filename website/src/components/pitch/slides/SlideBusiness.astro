@@ -5,46 +5,45 @@ const check = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" vi
 ---
 <PitchSlide id="slide-business" slideNumber={8} totalSlides={TOTAL}>
     <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase mb-4">Business Model</p>
-    <h2 class="text-4xl font-semibold text-white mb-8">Open-core with managed cloud.</h2>
+    <h2 class="text-4xl font-semibold text-white mb-8">MIT everywhere. We sell the operating.</h2>
     <div class="grid grid-cols-3 gap-6 mb-8">
         <div class="rounded-2xl border border-surface-700 bg-surface-900/40 p-6 flex flex-col">
-            <div class="text-xs font-semibold text-surface-300 uppercase tracking-wider mb-3">Community</div>
+            <div class="text-xs font-semibold text-surface-300 uppercase tracking-wider mb-3">Open source</div>
             <div class="text-2xl font-semibold text-white mb-1">Free</div>
-            <p class="text-xs text-surface-300 mb-4">MIT Licensed · Forever</p>
+            <p class="text-xs text-surface-300 mb-4">MIT licensed · the whole product</p>
             <ul class="text-xs text-surface-300 space-y-1.5 flex-1">
-                <li set:html={check + "Full admin panel"}></li>
-                <li set:html={check + "REST API"}></li>
-                <li set:html={check + "TypeScript SDK"}></li>
-                <li set:html={check + "Auth & RLS"}></li>
-                <li set:html={check + "Self-hosted"}></li>
+                <li set:html={check + "Backend, CMS and Studio"}></li>
+                <li set:html={check + "REST, typed SDK, realtime"}></li>
+                <li set:html={check + "Auth, roles and RLS"}></li>
+                <li set:html={check + "SSO via OIDC, MFA, scoped API keys"}></li>
+                <li set:html={check + "Self-hosted, no paid centre"}></li>
             </ul>
         </div>
         <div class="rounded-2xl border border-primary/30 bg-primary/5 p-6 flex flex-col ring-1 ring-primary/20">
-            <div class="text-xs font-semibold text-surface-500 uppercase tracking-wider mb-3">Pro</div>
-            <div class="text-2xl font-semibold text-white mb-1">€29<span class="text-sm text-surface-300">/mo</span></div>
-            <p class="text-xs text-surface-300 mb-4">Per project</p>
+            <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-3">Rebase Cloud · private beta</div>
+            <div class="text-2xl font-semibold text-white mb-1">Per resource</div>
+            <p class="text-xs text-surface-300 mb-4">You state the resources; the bill follows them</p>
             <ul class="text-xs text-surface-300 space-y-1.5 flex-1">
-                <li set:html={check + "Everything in Community"}></li>
-                <li set:html={check + "Priority support"}></li>
-                <li set:html={check + "Advanced analytics"}></li>
-                <li set:html={check + "White-labeling"}></li>
-                <li set:html={check + "Team management"}></li>
+                <li set:html={check + "Real tenants today, opened in batches"}></li>
+                <li set:html={check + "Managed Postgres, backups and TLS"}></li>
+                <li set:html={check + "Deploy from the CLI, roll back from the console"}></li>
+                <li set:html={check + "No seats, no plan tiers"}></li>
+                <li set:html={check + "The same code self-hosts — leaving is a redeploy"}></li>
             </ul>
         </div>
         <div class="rounded-2xl border border-surface-700 bg-surface-900/40 p-6 flex flex-col">
-            <div class="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-3">Cloud (coming)</div>
-            <div class="text-2xl font-semibold text-white mb-1">Usage</div>
-            <p class="text-xs text-surface-300 mb-4">Managed infrastructure</p>
+            <div class="text-xs font-semibold text-surface-300 uppercase tracking-wider mb-3">Enterprise</div>
+            <div class="text-2xl font-semibold text-white mb-1">Custom</div>
+            <p class="text-xs text-surface-300 mb-4">Self-hosted or on Cloud</p>
             <ul class="text-xs text-surface-300 space-y-1.5 flex-1">
-                <li set:html={check + "Hosted Rebase instances"}></li>
-                <li set:html={check + "Managed Postgres"}></li>
-                <li set:html={check + "Auto-scaling"}></li>
-                <li set:html={check + "Global CDN"}></li>
-                <li set:html={check + "SLA & enterprise support"}></li>
+                <li set:html={check + "Dedicated support and onboarding"}></li>
+                <li set:html={check + "SLAs and priority bug fixes"}></li>
+                <li set:html={check + "Architecture and security review"}></li>
+                <li set:html={check + "DPA and sub-processor disclosure"}></li>
             </ul>
         </div>
     </div>
     <div class="rounded-xl border border-surface-700 bg-surface-900/30 p-4">
-        <p class="text-sm text-surface-300"><strong class="text-white">Revenue strategy:</strong> Free open-source core drives adoption → Pro upsell for agencies & teams → Cloud captures high-value enterprise workloads. Classic open-core flywheel.</p>
+        <p class="text-sm text-surface-300"><strong class="text-white">Revenue strategy:</strong> nothing is held back from the open-source product — no feature is fenced off, so adoption is never taxed. Revenue comes from running it: metered Cloud resources for teams who would rather not operate Postgres, and support commitments for teams who must.</p>
     </div>
 </PitchSlide>
