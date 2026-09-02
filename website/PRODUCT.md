@@ -41,6 +41,23 @@ The docs exist to keep that developer building without leaving.
 - **Localisation is asymmetric and deliberate:** marketing runs 4 locales
   (`en`, `es`, `de`, `fr`, routed through `src/pages/[...lang]/`), docs run 6
   (`en`, `de`, `es`, `fr`, `it`, `pt`).
+- **Every marketing page component goes through `t()`.** Decided 2026-09-02,
+  after an audit found that 24 of 32 page components had zero translation calls
+  — so `/es`, `/de` and `/fr` served a translated header, footer and hero over
+  an English body. A page component that hardcodes a sentence is a bug: it ships
+  English into three locales. Keys are namespaced per page (`securitypage.NN`,
+  `vsdirectus.NN`), and strings repeated across pages get one shared key
+  (`vs.*`, `close.*`, `cloud.status`) rather than a copy each.
+- **Two things stay English on purpose, and both have a reason.**
+  `src/data/rls-checks.ts` is lifted verbatim from `packages/rls-check` because
+  a reader compares a finding on their terminal against that page, and the
+  terminal is English. `/pitch` is an investor deck and declares `lang="en"`.
+  **Still outstanding:** `src/data/alternatives.ts` (the seven
+  `/alternatives/*` pages) and the interactive demo components, which need a
+  `strings` prop before a React island can be localised. Demos that mock the
+  product's own UI should stay English — the product ships English — but the
+  ones that argue (`JurisdictionDemo`, `EuHostingCostDemo`, `EuropeMapDemo`)
+  are page prose and should be translated when that refactor happens.
 - Machine-readable surfaces are generated at build time: `llms.txt`, the sitemap,
   per-page `.md` variants, and the changelog copy. A page absent from the sidebar
   is absent from `llms.txt`.
