@@ -1,12 +1,47 @@
 import { CollectionSize } from "@rebasepro/cms-types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
+/**
+ * The schemes a preview link may use — everything else becomes `about:blank`.
+ *
+ * An allowlist, because the blocklist it replaces could be walked around and
+ * the walk-arounds are not exotic. Browsers strip tabs, newlines and carriage
+ * returns from a URL before parsing the scheme, so `java\tscript:alert(1)` and
+ * `java%0ascript:…` navigate exactly as `javascript:` does while matching none
+ * of the names a blocklist knows. A leading control character does the same.
+ *
+ * Turned around, none of that matters: a string is either one of these four
+ * schemes or it is not a link this panel will follow. `mailto:` and `tel:` are
+ * here because a contact field is an ordinary thing to preview; `data:` is not,
+ * even for images — a preview renders an `<img>` from its own value rather than
+ * navigating to one.
+ *
+ * Relative URLs are allowed and deliberately: a preview commonly holds
+ * `/uploads/x.png`, and a string with no scheme cannot carry one.
+ */
+const ALLOWED_URL_SCHEMES = new Set(["http:", "https:", "mailto:", "tel:"]);
+
 export function sanitizeUrl(url: string | undefined): string {
     if (!url) return "about:blank";
-    const trimmed = url.trim();
-    if (/^(?:javascript|data|vbscript):/i.test(trimmed)) {
+
+    // The characters a browser removes before it decides what the scheme is.
+    // Stripped here for the same reason, so this function is looking at the
+    // string the browser will act on rather than the one it was handed.
+    const trimmed = url.trim().replace(/[\u0000-\u001F\u007F]/g, "");
+    if (!trimmed) return "about:blank";
+
+    // No scheme at all — a relative link, which cannot navigate anywhere the
+    // page could not already reach.
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+
+    try {
+        // `new URL` normalizes percent-encoding and case, so
+        // `JaVaScRiPt%3aalert(1)` is judged as what it resolves to. The base is
+        // there only so a protocol-relative `//host/path` parses.
+        const parsed = new URL(trimmed, "https://example.invalid");
+        return ALLOWED_URL_SCHEMES.has(parsed.protocol) ? trimmed : "about:blank";
+    } catch {
         return "about:blank";
     }
-    return trimmed;
 }
 
 export const SMALL_THUMBNAIL = 40;

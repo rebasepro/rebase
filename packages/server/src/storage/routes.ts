@@ -867,6 +867,26 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
+        // A download token cannot buy another download token.
+        //
+        // This route mints them, and `checkAuthorized` deliberately does not
+        // re-run the hook for the synthetic `download-token` principal — it
+        // cannot answer an ownership question, and re-asking would break every
+        // `<img>` a client has already rendered. Together those two facts made
+        // the 300-second token self-renewing: present one here, receive a fresh
+        // one, forever. For a key ending in `/` the grant is path-prefixed, so
+        // what renewed itself was read access to a whole folder.
+        //
+        // A download token is evidence of one past authorization for one path,
+        // not a session. Minting needs the credential that was authorized.
+        const principal = c.get("user") as { uid?: string } | undefined;
+        if (principal?.uid === "download-token") {
+            throw ApiError.forbidden(
+                "A download token cannot be used to mint another. Request metadata with the " +
+                    "session or key the object was authorized against."
+            );
+        }
+
         // The load-bearing check. This route mints the short-lived path-scoped
         // download token that `/file/*` then trusts, and it used to mint one
         // for any authenticated caller for any path — which is exactly why
