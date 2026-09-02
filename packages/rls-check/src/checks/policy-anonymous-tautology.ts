@@ -158,11 +158,39 @@ const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] =
  * and what remains has to be exactly `<placeholder> is not null`.
  */
 function matchTautology(clause: string | null | undefined): string | null {
+    const matched = callerIdOnlyClause(clause);
+    return matched && !matched.guardsSentinel ? matched.shape : null;
+}
+
+/**
+ * A clause whose ENTIRE content is "the caller has an id" — in either of its
+ * two forms.
+ *
+ * `guardsSentinel` distinguishes them, and the distinction is the whole reason
+ * this is shared rather than private:
+ *
+ * - `false` — `auth.uid() IS NOT NULL` on its own. On a stack that hands
+ *   signed-out requests a sentinel id, this is true for everybody. That is
+ *   {@link policyAnonymousTautology}.
+ * - `true` — the same test plus `<> 'anonymous'`. This one really does exclude
+ *   signed-out callers, and it used to clear the policy entirely. But excluding
+ *   anonymous callers is not the same as scoping rows: what remains is "every
+ *   registered account may read every row", which is how a customer's `users`
+ *   table — email addresses, and the columns beside them — was readable by
+ *   anyone who signed up. That is {@link policyAuthenticatedTautology}.
+ *
+ * The "entire" part is what keeps both honest. `auth.uid() IS NOT NULL AND
+ * user_id = auth.uid()` contains the shape and is a perfectly scoped policy; a
+ * substring match would flag it, and flagging correct policies is the fastest
+ * way to get this tool deleted. So the caller-id call is substituted for a
+ * placeholder, casts, parens, `SELECT` wrappers and whitespace are stripped,
+ * and what remains has to be exactly the shape and nothing else.
+ */
+export function callerIdOnlyClause(
+    clause: string | null | undefined
+): { shape: string; guardsSentinel: boolean } | null {
     if (!clause) return null;
     const flat = clause.toLowerCase().replace(/\s+/g, " ");
-
-    // The corrected form guards against the anonymous sentinel; not this finding.
-    if (/(<>|!=)\s*'anonymous'/.test(flat) || /(<>|!=)\s*''/.test(flat)) return null;
 
     for (const { re, label } of CALLER_ID_CALLS) {
         const first = new RegExp(re.source).exec(flat);
@@ -176,7 +204,17 @@ function matchTautology(clause: string | null | undefined): string | null {
             .replace(/\bas [a-z0-9_]+/g, "")
             .replace(/[()\s]/g, "");
 
-        if (normalized === "calleridisnotnull") return label(first);
+        if (normalized === "calleridisnotnull") {
+            return { shape: label(first), guardsSentinel: false };
+        }
+        // The sentinel-guarded form, in the spellings Postgres renders it in.
+        // `!=` normalizes to itself; both sentinel values are covered because a
+        // stack picks one and the check cannot know which.
+        if (/^calleridisnotnullandcallerid(<>|!=)'(anonymous|anon)'$/.test(normalized)
+            || /^calleridisnotnullandcallerid(<>|!=)''$/.test(normalized)
+            || /^callerid(<>|!=)'(anonymous|anon)'andcalleridisnotnull$/.test(normalized)) {
+            return { shape: label(first), guardsSentinel: true };
+        }
     }
 
     return null;

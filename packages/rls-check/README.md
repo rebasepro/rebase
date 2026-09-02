@@ -36,7 +36,7 @@ rls-check 0.10.0  ·  read-only Row-Level Security audit
 Database  db.hjklqwertyuiop.supabase.co:5432/postgres
 Server    PostgreSQL 15.8 on aarch64-unknown-linux-gnu
 Platform  Supabase
-Scanned   1 schema · 23 tables · 31 policies · 14 checks
+Scanned   1 schema · 23 tables · 31 policies · 15 checks
 
 Note  This scan connected as a role that row-level security cannot constrain — a
       superuser, a table owner, or a role with BYPASSRLS. That is why it can read
@@ -147,7 +147,7 @@ WORTH CHECKING
 Summary
 
   critical 2   high 2   medium 2   low 1   info 0
-  5 confirmed · 2 worth checking · 14 checks run against 23 tables in 1 schema
+  5 confirmed · 2 worth checking · 15 checks run against 23 tables in 1 schema
   3 of 23 tables have row-level security disabled
 
   Exit code 1 — at least one finding is "high" or worse (--fail-on high).
@@ -168,6 +168,7 @@ Run `npx @rebasepro/rls-check --list-checks` for the catalog on your installed v
 | `policy-always-true` | critical | certain | A permissive policy whose `USING` or `WITH CHECK` expression is always true. Downgraded to medium, and to heuristic, when the policy sits behind an authentication gate. |
 | `view-bypasses-rls` | critical | certain | A view granted to an untrusted role that selects from an RLS-protected table and runs with its owner's privileges. Heuristic on servers before PG15, where `security_invoker` does not exist. |
 | `policy-anonymous-tautology` | varies | heuristic | An `auth.uid() IS NOT NULL`-shaped policy: it separates signed-in from signed-out callers and scopes no rows. Critical on Supabase-shaped databases, lower elsewhere. |
+| `policy-authenticated-tautology` | high | heuristic | The corrected form of the above — `auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'` — which excludes signed-out callers and still scopes no rows. Every account reads every row; with open registration that is everybody. |
 | `anonymous-write-allowed` | high | certain | A permissive INSERT/UPDATE/DELETE policy reachable without authentication whose check expression accepts any row, backed by a matching grant. |
 | `matview-bypasses-rls` | high | certain | A materialized view granted to an untrusted role whose defining query reads an RLS-protected table. Materialized views have no `security_invoker`. |
 | `unqualified-column-in-subquery` | high | heuristic | A bare column name in an `EXISTS`/`IN` subquery that exists on both the inner relation and the policy's own table, so Postgres binds it to the inner one. |
@@ -295,7 +296,7 @@ Being clear about this is the point of the tool. It is a **static audit of the c
 
 - **It does not execute queries as other roles.** It never connects as `anon`, never sets a JWT claim, and never tries to read a row it should not be able to read. Everything it reports is inferred from what the catalogs say, not observed.
 - **It cannot prove a policy is correct.** Deciding whether `owner_id = auth.uid()` is the right rule for your application requires knowing your application. `rls-check` can only tell you that certain *shapes* are wrong — a policy that is always true, a view that runs as its owner, a table with RLS switched off.
-- **A clean report is not a security certification.** It means these fourteen checks found nothing. It does not mean your authorization model is sound, your API layer enforces what it should, or your data is safe.
+- **A clean report is not a security certification.** It means these fifteen checks found nothing. It does not mean your authorization model is sound, your API layer enforces what it should, or your data is safe.
 - **It recognises app roles by name, and yours may not be one of them.** Every check reports a table as exposed only when a role an untrusted caller can arrive as holds privileges on it. Out of the box that means `PUBLIC`, Supabase's `anon` and `authenticated`, PostgREST's `web_anon`, and Rebase's `rebase_user`. If your application connects as `app_user`, `api` or anything else, name it — `--role app_user` — or the checks have nothing to gate on. A scan that finds a write-holding role it cannot account for says so in a `Note` rather than printing a clean report.
 - **It does not model your API layer.** Whether a table is actually reachable depends on PostgREST, your server, or your gateway. Findings say "if this table is exposed over an API" when reachability depends on something outside the database — believe that qualifier.
 - **It does not see what your connection sees.** Almost every connection string handed to a tool like this belongs to a superuser or a table owner, which RLS cannot constrain. That is what lets it read the true catalog; it also means the findings describe what *other* roles get. The report says so, prominently, every time it applies.

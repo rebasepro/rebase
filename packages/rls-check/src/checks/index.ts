@@ -15,6 +15,7 @@ import { junctionTableUnprotected } from "./junction-table-unprotected";
 import { matviewBypassesRls } from "./matview-bypasses-rls";
 import { policyAlwaysTrue } from "./policy-always-true";
 import { policyAnonymousTautology } from "./policy-anonymous-tautology";
+import { policyAuthenticatedTautology } from "./policy-authenticated-tautology";
 import { policyRoleUnreachable } from "./policy-role-unreachable";
 import { rlsDisabled } from "./rls-disabled";
 import { rlsEnabledNoPolicies } from "./rls-enabled-no-policies";
@@ -28,6 +29,7 @@ export const CHECKS: Check[] = [
     rlsDisabled,
     policyAlwaysTrue,
     policyAnonymousTautology,
+    policyAuthenticatedTautology,
     viewBypassesRls,
     matviewBypassesRls,
     anonymousWriteAllowed,
