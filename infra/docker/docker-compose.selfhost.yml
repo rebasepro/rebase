@@ -206,15 +206,16 @@ services:
     volumes:
       # Your built project.
       #
-      # Writable, because the container installs the bundle's declared
-      # dependencies into it on first start — `rebase build` emits a
-      # `package.json` but not a `node_modules`. Mounting read-only is better
-      # (a compromised hook then cannot rewrite the code that runs after the
-      # next restart), and you can do it once the dependencies are already
-      # there:
+      # `rebase build` VENDORS the bundle's dependencies by default, so
+      # `dist-bundle` already carries a node_modules and this can be read-only
+      # from the start — worth doing, because a compromised hook then cannot
+      # rewrite the code that runs after the next restart:
       #
-      #     npm install --omit=dev --prefix dist-bundle
-      #     # then change this line to: ../dist-bundle:/bundle:ro
+      #     ../dist-bundle:/bundle:ro
+      #
+      # Left writable here because `rebase build --no-vendor` produces a bundle
+      # that installs its dependencies on first start instead (40-60s per start),
+      # and that variant needs to write into this mount.
       #
       # For a real deployment, prefer baking both into an image:
       #     FROM rebasepro/server:${REBASE_VERSION}
