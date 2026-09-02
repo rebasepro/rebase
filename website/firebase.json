@@ -30,6 +30,16 @@
         "type": 301
       },
       {
+        "source": "/changelog",
+        "destination": "/docs/changelog/",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/changelog",
+        "destination": "/:lang/docs/changelog/",
+        "type": 301
+      },
+      {
         "source": "/why-rebase",
         "destination": "/compare",
         "type": 301

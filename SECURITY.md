@@ -7,7 +7,7 @@ release line only**; older lines do not receive backports.
 
 | Version | Supported |
 | ------- | --------- |
-| Latest minor (currently 0.16.x) | ✅ Yes |
+| Latest minor (currently 0.17.x) | ✅ Yes |
 | Anything older | ❌ No — please upgrade |
 
 The table names a version so you can check yourself at a glance, but the rule is

@@ -28,7 +28,7 @@ When you run `pnpm release:patch` (or any variant), it:
 1. **Validates** — ensures you're on `main`, working tree is clean, tools are installed
 2. **Calculates** the new version from the bump type
 3. **Generates a changelog** from conventional commits since the last tag
-4. **Bumps versions** in all 21 packages + `lerna.json`
+4. **Bumps versions** in every publishable package, through `tooling/scripts/publishable-packages.mjs --set-version` (the set is derived from the workspace; there is no `lerna.json`)
 5. **Updates `CHANGELOG.md`** with the new entry
 6. **Builds & tests** — runs `pnpm build` and `pnpm test`
 7. **Commits & tags** — `chore: release vX.Y.Z` + annotated tag
