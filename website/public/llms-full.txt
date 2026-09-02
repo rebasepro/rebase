@@ -477,7 +477,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). The **first** user can always register, whatever this says — an empty user table has to admit somebody. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. | — |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a deployment closes the bootstrap window without becoming unreachable: the operator names the first account instead of racing the internet for it. | — |
+| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
 | `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |
@@ -15859,6 +15861,35 @@ The suggested SQL is printed with the caller-id function your database actually 
 `rebase.uid()` on a Rebase database, `auth.uid()` on Supabase and PostgREST. Both
 spellings are recognised when reading policies, so a Rebase database mid-migration from
 the pre-1.0 `auth` schema is still checked.
+
+#### policy-authenticated-tautology
+
+**Policy admits every signed-in caller to every row.** High.
+
+The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
+'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
+not do is scope any rows: what remains is *every registered account may read every row of
+this table*, which is a different sentence from the one it is usually meant to be.
+
+That is the shape that turns a `users` table into a directory of every address on the
+platform, readable by anyone who signed up — and where registration is open, "anyone who
+signed up" is anyone at all. It is reported separately from the anonymous form because the
+fix is different and so is the severity, and because you may legitimately want to silence
+one and not the other.
+
+```sql
+-- Scope to the row
+ALTER POLICY "your_policy" ON "public"."your_table"
+    USING (user_id = rebase.uid());
+
+-- Or, where members of a shared group really may see each other's rows, say which group
+--     USING (EXISTS (SELECT 1 FROM memberships m
+--                    WHERE m.org_id = your_table.org_id AND m.user_id = rebase.uid()));
+```
+
+If the table genuinely is readable by every account — a shared price list, a list of
+countries — keep the policy and silence the finding with
+`rls-check --skip policy-authenticated-tautology`.
 
 #### view-bypasses-rls
 
