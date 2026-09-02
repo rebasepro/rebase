@@ -103,7 +103,8 @@ The docs exist to keep that developer building without leaving.
 
 Inherits the root record. Site-specific:
 
-- Design language is fixed in `SITE-STORY.md` §6 and marked *do not renegotiate*.
+- Design language is fixed in `SITE-STORY.md` §6; it is renegotiated with the
+  owner, in that file, never on a page.
 - The numbered eyebrow idiom (`01 · BADGE`) is home-page-only; deep pages use a
   plain uppercase eyebrow.
 - Nothing sits above the header.
@@ -115,11 +116,13 @@ Inherits the root record. Site-specific:
 - Live demo at `demo.rebase.pro`; real product screenshots in `public/img/`.
 - Blog under `src/content/blog`; docs under `src/content/docs`.
 - Comparison pages are built against real competitor behaviour and must stay
-  that way.
-- A client logo wall (`ClientLogos.astro`) and a three-project case-study
-  carousel (`CaseStudiesCarousel.astro`) already ship on the home page, with real
-  assets and live URLs. The logo wall is labelled *"Rebase and FireCMS"* — keep
-  that qualifier; do not restate it as Rebase-only proof.
+  that way. The facts they rest on are listed with a verification date in
+  `SITE-STORY.md` §7; re-verify and redate before changing a comparison.
+- A client logo wall (`ClientLogos.astro`) and a seven-project case-study
+  carousel (`CaseStudiesCarousel.astro`) ship on the home page and stand in for
+  proof on the campaign pages, with real assets and live URLs. Every logo wall
+  is captioned with `social.title` — *"Rebase and FireCMS"* — keep that
+  qualifier; do not restate it as Rebase-only proof.
 - **Absences:** no written testimonials or pull-quotes, no benchmarks, no user
   counts, no hosted-tier pricing. Do not invent them to fill a section.
 
