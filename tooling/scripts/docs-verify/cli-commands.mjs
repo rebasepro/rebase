@@ -68,6 +68,25 @@ export function loadCliCommands(root) {
         sub.set("db", driverSubs);
     }
 
+    // The driver's allowlist is not the whole of `rebase db`.
+    //
+    // `db.ts` answers `pull`, `stop` and `reset` ITSELF and returns before the
+    // driver is ever reached — they are about the managed development database,
+    // which no driver knows exists. Deriving the list from the driver alone made
+    // this check report three real, working, `--help`-documented commands as
+    // ones "a reader cannot run", which is the failure that gets a check
+    // switched off rather than fixed.
+    //
+    // Read from `db.ts` rather than listed here, so a fourth one is picked up
+    // the day it is written.
+    const dbSelf = read(root, "packages/cli/src/commands/db.ts");
+    const selfHandled = new Set(
+        [...dbSelf.matchAll(/subcommand === "([a-z][a-z0-9-]*)"/g)].map(m => m[1])
+    );
+    if (selfHandled.size) {
+        sub.set("db", new Set([...(sub.get("db") ?? []), ...selfHandled]));
+    }
+
     return { top, sub };
 }
 
@@ -175,6 +194,24 @@ export function loadCliFlags(root) {
     for (const rel of globSync("packages/server-postgres/src/backup/*.ts", { cwd: root })) {
         if (path.basename(rel).endsWith(".test.ts")) continue;
         add("db", read(root, rel));
+    }
+
+    // The same shape one level up: `db pull`, `stop` and `reset` are answered by
+    // `db.ts` itself, and it reads their flags straight out of argv with
+    // `readFlagValue(rawArgs, "--from")` rather than through an `arg({...})`
+    // spec. `argSpecs` cannot see those, so `--from` and `--anonymize` looked
+    // like flags the CLI rejects — again a finding against a command that works.
+    const dbSelf = read(root, "packages/cli/src/commands/db.ts");
+    if (dbSelf) {
+        const manual = [
+            ...dbSelf.matchAll(/readFlagValue\(\s*rawArgs\s*,\s*"(-{1,2}[A-Za-z][\w-]*)"/g),
+            ...dbSelf.matchAll(/rawArgs\.includes\(\s*"(-{1,2}[A-Za-z][\w-]*)"\s*\)/g)
+        ].map(m => m[1]);
+        if (manual.length) {
+            const set = flags.get("db") ?? new Set();
+            for (const f of manual) set.add(f);
+            flags.set("db", set);
+        }
     }
 
     return flags;

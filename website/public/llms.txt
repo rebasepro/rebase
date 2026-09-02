@@ -50,6 +50,7 @@
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, auth hooks, and custom auth adapters on the backend.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
+- [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
@@ -67,6 +68,7 @@
 - [Authentication & Login](https://rebase.pro/docs/frontend/authentication): Set up the auth controller, login view, and role simulation in your Rebase React frontend.
 - [Storage & File Uploads](https://rebase.pro/docs/frontend/storage): Add file upload fields to your collections, manage files programmatically, and route uploads to different storage backends.
 - [View Modes](https://rebase.pro/docs/frontend/view-modes): Configure table, cards, and Kanban board views for your collections.
+- [Firebase](https://rebase.pro/docs/frontend/firebase): @rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved.
 - [Custom Fields](https://rebase.pro/docs/frontend/custom-fields): Build custom form fields for entity editing with full access to the form context, entity values, and Rebase hooks.
 - [Form Layout](https://rebase.pro/docs/frontend/form-layout): Control how the entity form is arranged — column spans, sections, and the metadata rail.
 - [Entity Views](https://rebase.pro/docs/frontend/entity-views): Add custom tabs and views to entity detail pages for previews, analytics, related data, or custom UI.
