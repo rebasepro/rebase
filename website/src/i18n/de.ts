@@ -127,7 +127,7 @@ export const de = {
   "showcase.case2.feat3.desc":
     "Kliniker und Content-Teams tracken Engagement, pflegen die Übungsbibliothek und erstellen Reports — im selben Panel, das die Engineers zur Datenprüfung nutzen.",
   "features.title": "Alles, was dein Schema generiert",
-  "features.subtitle": "Production-ready Features, komplett aus deinem TypeScript-Schema. Jede View aktualisiert sich in Echtzeit.",
+  "features.subtitle": "Ein vollständiger Funktionsumfang, komplett aus deinem TypeScript-Schema. Jede View aktualisiert sich in Echtzeit.",
   "features.kanban.title": "Kanban-Boards",
   "features.kanban.badge": "Drag & Drop",
   "features.kanban.desc": "Zieh Karten zwischen Spalten, um Status-Felder sofort zu aktualisieren. Deine Postgres-Einträge, visuell.",

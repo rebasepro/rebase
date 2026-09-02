@@ -127,7 +127,7 @@ export const fr = {
   "showcase.case2.feat3.desc":
     "Les cliniciens et équipes contenu suivent l'engagement, gèrent la bibliothèque d'exercices et génèrent des rapports — dans le même panel que les ingénieurs utilisent pour inspecter les données.",
   "features.title": "Tout ce que votre schéma génère",
-  "features.subtitle": "Des fonctionnalités prêtes pour la production, toutes pilotées par votre schéma TypeScript. Chaque vue se met à jour en temps réel.",
+  "features.subtitle": "Un ensemble de fonctionnalités complet, entièrement piloté par votre schéma TypeScript. Chaque vue se met à jour en temps réel.",
   "features.kanban.title": "Tableaux Kanban",
   "features.kanban.badge": "Drag & drop",
   "features.kanban.desc": "Glissez vos cartes entre les colonnes pour mettre à jour les statuts instantanément. Vos enregistrements Postgres, visualisés.",

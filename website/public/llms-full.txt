@@ -56,15 +56,24 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` generates a ready-to-run `.env` for you (secrets, database password, a free local port) — no editing needed to get started. Start the bundled PostgreSQL container, create the tables, then run the dev servers:
+`init` generates a ready-to-run `.env` for you — no editing needed. Then:
 
 ```bash
-docker compose up -d db   # start the database
-pnpm run db:push          # create tables from your collections
-pnpm dev                  # start backend + frontend
+pnpm install
+pnpm run dev
 ```
 
-Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`. The first account you register becomes the admin.
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a managed PostgreSQL (PGlite) in
+the project directory, generates the schema from your collections, and creates
+the tables at boot.
+
+**Read the URLs from the output.** `rebase dev` picks a free port per project
+rather than fixed ones, so they differ between projects and between machines.
+The first account you register becomes the admin.
+
+To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
+`pnpm run dev` again.
 
 → Follow the full [Quickstart guide](/docs/getting-started/quickstart) for a complete walkthrough, including how to connect your own database.
 
@@ -133,31 +142,73 @@ This scaffolds a project with three packages:
 Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
 :::
 
-If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
+### Start the Dev Servers
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a **managed PostgreSQL (PGlite)**
+in the project directory, generates the Drizzle schema from your collections, and
+creates the tables at boot — including the example `posts`, `authors` and `tags`.
+
+It starts both halves together:
+
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
+- **Hot reload** for both
+
+Both ports are **derived from this project's path** rather than fixed, so several
+Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
+**use those**, not `localhost:3001` / `localhost:5173`. (`PORT` and `VITE_API_URL`
+in `.env` configure `rebase start`, the production server, and are ignored here.)
+Pin a port with `rebase dev --port 3001`.
+
+#### Flags worth knowing
+
+| Flag | On | What it does |
+|---|---|---|
+| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--template <name>` | `init` | Start from a template other than the default |
+| `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
+| `--no-db` | `dev` | Touch no database at all; you bring one |
+
+### Variant: use your own PostgreSQL
+
+The managed database is a convenience, not a requirement. To point the project at
+a Postgres you run, uncomment `DATABASE_URL` in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-### Start the Database
+Then start the dev servers as above. A `DATABASE_URL` that is set is never
+touched, and one pointing anywhere other than this machine is left alone
+entirely.
 
-The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
-
-```bash
-docker compose up -d db
-```
-
-(Skip this if you pointed `DATABASE_URL` at your own database.)
-
-### Create the Tables
-
-Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
+With your own database you also get the migration commands, which the managed one
+cannot offer — they plan changes with Atlas, which needs a second empty database
+to compare against, and PGlite serves exactly one:
 
 ```bash
 pnpm run db:push
 ```
 
-Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
+Boot already creates missing tables additively, so `db push` is for the two
+things it deliberately leaves alone: junction-table RLS on many-to-many
+relations, and any change that is not purely additive — a renamed column, a
+narrowed type, a removed field.
+
+The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, if you
+want a container rather than an installed Postgres:
+
+```bash
+docker compose up -d db
+```
 
 ### Introspect an Existing Database (Optional)
 
@@ -168,23 +219,6 @@ pnpm rebase schema introspect
 ```
 
 This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
-
-### Start the Dev Servers
-
-```bash
-pnpm dev
-```
-
-This starts both together:
-- **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
-- **Hot reload** for both — changes take effect instantly
-
-Both ports are **derived from this project's path** rather than fixed, so several
-Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
-use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
-`.env` configure `rebase start`, the production server, and are ignored here.)
-Pin a port with `rebase dev --port 3001`.
 
 ### First Login
 
@@ -249,13 +283,18 @@ export const collections = [
 
 ### Create the Table
 
-Push the new collection to the database:
+Restart the dev servers. `rebase dev` regenerates the schema from your
+collections and boot creates the new table, so your **Products** collection
+appears in the navigation.
+
+On your own PostgreSQL you can also apply it without restarting:
 
 ```bash
 pnpm run db:push
 ```
 
-This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
+That is also the command for the changes boot leaves alone — a renamed column, a
+narrowed type, a removed field.
 
 ### Database Commands Reference
 
@@ -16657,7 +16696,20 @@ On the first visit to a fresh deployment's admin, Rebase shows a bootstrap scree
 
 ### Docker Compose (Recommended)
 
-The generated project already includes a working `docker-compose.yml` (Postgres + backend + frontend) and the `backend/`/`frontend/` Dockerfiles — that generated file is the source of truth; use it as-is rather than hand-writing one. The shape is:
+The generated project already includes a working `docker-compose.yml` — that
+file is the source of truth; use it as-is rather than hand-writing one. It runs
+**two** containers, Postgres and the published Rebase runtime with your built
+bundle mounted into it. There is no application image to build.
+
+```bash
+rebase build          # produces ./dist-bundle
+docker compose up -d
+```
+
+`rebase build` first, always: the `api` service mounts `./dist-bundle`, and
+without it the container starts against an empty directory.
+
+The shape of the generated file:
 
 ```yaml title="docker-compose.yml (generated — abridged)"
 services:
@@ -16667,56 +16719,57 @@ services:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
 
-  backend:
-    build:
-      # Context is the PROJECT ROOT so the image can copy
-      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
-      # context would fail — the Dockerfile lives at backend/Dockerfile.
-      context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "3001:3001"
-    env_file: .env
+  api:
+    # The published runtime. Upgrading Rebase is a tag change, not a rebuild.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env}
+    volumes:
+      # Your built project, from `rebase build`.
+      - ./dist-bundle:/bundle
 
 volumes:
   postgres_data:
-  uploads:
 ```
 
-```bash
-docker compose up -d
-```
+`rebase init` generates `JWT_SECRET` and `REBASE_SERVICE_KEY` into `.env` for
+you. Both are declared with `${VAR:?…}`, so a missing one stops the stack with a
+message naming it rather than starting something half-configured.
 
-#### Create the database schema
+#### The schema
 
-Bringing the stack up is **not enough on its own.** The backend boots and
-auto-creates the **auth** tables, but it does **not** create the tables for
-your own collections — you run that once, explicitly, against the production
-database. From a checkout of your project (with dependencies installed), set
-`DATABASE_URL` to your production database and push the schema:
+The runtime creates missing tables at boot, **including your collections'** —
+`REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
+schema and applies row-level security with it. A first `docker compose up`
+against an empty database comes up serving your collections.
+
+What boot never does is change something that already exists: it does not alter
+a column type, drop anything, or edit an existing enum's labels, because a
+container restart must not reshape a schema as a side effect of a deploy. Those
+go through the CLI, from a checkout or a CI job pointed at the production
+database:
 
 ```bash
 pnpm run db:push
 ```
 
-:::caution[Required — or every collection returns errors]
-Skip this step and the app still starts and you can log in, but each of your
-collections is empty and its API calls fail with a "missing table" error until
-the schema exists. On startup the server logs a boxed warning naming exactly
-which tables are missing and the command to run.
-:::
+Run it for junction-table RLS on many-to-many relations, and for any change that
+is not purely additive — a renamed column, a narrowed type, a removed field.
 
-`db:push` is the fast option — it applies the schema directly, with no
-migration files. For a **versioned, team workflow**, commit migration files
-with `pnpm run db:generate` and run `pnpm run db:migrate` as a release step
-instead. Whichever you choose, it runs against the production `DATABASE_URL`
-from a project checkout (or your CI job), not inside the running container —
-the production image ships without the CLI.
+For a **versioned, team workflow**, commit migration files with
+`pnpm run db:generate` and run `pnpm run db:migrate` as a release step instead.
+Either way it runs from a project checkout, not inside the running container —
+the runtime image ships without the CLI.
 
 ### Production Checklist
 
@@ -16724,7 +16777,7 @@ Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
-| **Database schema** | Run `pnpm run db:push` (or `pnpm run db:migrate` for versioned migrations) against the production database once. The app boots without your collection tables, but every collection errors until they exist. |
+| **Database schema** | Boot creates your collection tables additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for junction-table RLS and for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |

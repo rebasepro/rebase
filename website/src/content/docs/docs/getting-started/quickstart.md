@@ -32,31 +32,73 @@ This scaffolds a project with three packages:
 Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
 :::
 
-If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
+## Start the Dev Servers
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a **managed PostgreSQL (PGlite)**
+in the project directory, generates the Drizzle schema from your collections, and
+creates the tables at boot — including the example `posts`, `authors` and `tags`.
+
+It starts both halves together:
+
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
+- **Hot reload** for both
+
+Both ports are **derived from this project's path** rather than fixed, so several
+Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
+**use those**, not `localhost:3001` / `localhost:5173`. (`PORT` and `VITE_API_URL`
+in `.env` configure `rebase start`, the production server, and are ignored here.)
+Pin a port with `rebase dev --port 3001`.
+
+### Flags worth knowing
+
+| Flag | On | What it does |
+|---|---|---|
+| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--template <name>` | `init` | Start from a template other than the default |
+| `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
+| `--no-db` | `dev` | Touch no database at all; you bring one |
+
+## Variant: use your own PostgreSQL
+
+The managed database is a convenience, not a requirement. To point the project at
+a Postgres you run, uncomment `DATABASE_URL` in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-## Start the Database
+Then start the dev servers as above. A `DATABASE_URL` that is set is never
+touched, and one pointing anywhere other than this machine is left alone
+entirely.
 
-The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
-
-```bash
-docker compose up -d db
-```
-
-(Skip this if you pointed `DATABASE_URL` at your own database.)
-
-## Create the Tables
-
-Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
+With your own database you also get the migration commands, which the managed one
+cannot offer — they plan changes with Atlas, which needs a second empty database
+to compare against, and PGlite serves exactly one:
 
 ```bash
 pnpm run db:push
 ```
 
-Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
+Boot already creates missing tables additively, so `db push` is for the two
+things it deliberately leaves alone: junction-table RLS on many-to-many
+relations, and any change that is not purely additive — a renamed column, a
+narrowed type, a removed field.
+
+The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, if you
+want a container rather than an installed Postgres:
+
+```bash
+docker compose up -d db
+```
 
 ## Introspect an Existing Database (Optional)
 
@@ -67,23 +109,6 @@ pnpm rebase schema introspect
 ```
 
 This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
-
-## Start the Dev Servers
-
-```bash
-pnpm dev
-```
-
-This starts both together:
-- **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
-- **Hot reload** for both — changes take effect instantly
-
-Both ports are **derived from this project's path** rather than fixed, so several
-Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
-use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
-`.env` configure `rebase start`, the production server, and are ignored here.)
-Pin a port with `rebase dev --port 3001`.
 
 ## First Login
 
@@ -150,13 +175,18 @@ export const collections = [
 
 ## Create the Table
 
-Push the new collection to the database:
+Restart the dev servers. `rebase dev` regenerates the schema from your
+collections and boot creates the new table, so your **Products** collection
+appears in the navigation.
+
+On your own PostgreSQL you can also apply it without restarting:
 
 ```bash
 pnpm run db:push
 ```
 
-This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
+That is also the command for the changes boot leaves alone — a renamed column, a
+narrowed type, a removed field.
 
 ## Database Commands Reference
 

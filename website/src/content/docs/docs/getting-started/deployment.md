@@ -25,7 +25,20 @@ On the first visit to a fresh deployment's admin, Rebase shows a bootstrap scree
 
 ## Docker Compose (Recommended)
 
-The generated project already includes a working `docker-compose.yml` (Postgres + backend + frontend) and the `backend/`/`frontend/` Dockerfiles — that generated file is the source of truth; use it as-is rather than hand-writing one. The shape is:
+The generated project already includes a working `docker-compose.yml` — that
+file is the source of truth; use it as-is rather than hand-writing one. It runs
+**two** containers, Postgres and the published Rebase runtime with your built
+bundle mounted into it. There is no application image to build.
+
+```bash
+rebase build          # produces ./dist-bundle
+docker compose up -d
+```
+
+`rebase build` first, always: the `api` service mounts `./dist-bundle`, and
+without it the container starts against an empty directory.
+
+The shape of the generated file:
 
 ```yaml title="docker-compose.yml (generated — abridged)"
 services:
@@ -35,56 +48,57 @@ services:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
 
-  backend:
-    build:
-      # Context is the PROJECT ROOT so the image can copy
-      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
-      # context would fail — the Dockerfile lives at backend/Dockerfile.
-      context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "3001:3001"
-    env_file: .env
+  api:
+    # The published runtime. Upgrading Rebase is a tag change, not a rebuild.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env}
+    volumes:
+      # Your built project, from `rebase build`.
+      - ./dist-bundle:/bundle
 
 volumes:
   postgres_data:
-  uploads:
 ```
 
-```bash
-docker compose up -d
-```
+`rebase init` generates `JWT_SECRET` and `REBASE_SERVICE_KEY` into `.env` for
+you. Both are declared with `${VAR:?…}`, so a missing one stops the stack with a
+message naming it rather than starting something half-configured.
 
-### Create the database schema
+### The schema
 
-Bringing the stack up is **not enough on its own.** The backend boots and
-auto-creates the **auth** tables, but it does **not** create the tables for
-your own collections — you run that once, explicitly, against the production
-database. From a checkout of your project (with dependencies installed), set
-`DATABASE_URL` to your production database and push the schema:
+The runtime creates missing tables at boot, **including your collections'** —
+`REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
+schema and applies row-level security with it. A first `docker compose up`
+against an empty database comes up serving your collections.
+
+What boot never does is change something that already exists: it does not alter
+a column type, drop anything, or edit an existing enum's labels, because a
+container restart must not reshape a schema as a side effect of a deploy. Those
+go through the CLI, from a checkout or a CI job pointed at the production
+database:
 
 ```bash
 pnpm run db:push
 ```
 
-:::caution[Required — or every collection returns errors]
-Skip this step and the app still starts and you can log in, but each of your
-collections is empty and its API calls fail with a "missing table" error until
-the schema exists. On startup the server logs a boxed warning naming exactly
-which tables are missing and the command to run.
-:::
+Run it for junction-table RLS on many-to-many relations, and for any change that
+is not purely additive — a renamed column, a narrowed type, a removed field.
 
-`db:push` is the fast option — it applies the schema directly, with no
-migration files. For a **versioned, team workflow**, commit migration files
-with `pnpm run db:generate` and run `pnpm run db:migrate` as a release step
-instead. Whichever you choose, it runs against the production `DATABASE_URL`
-from a project checkout (or your CI job), not inside the running container —
-the production image ships without the CLI.
+For a **versioned, team workflow**, commit migration files with
+`pnpm run db:generate` and run `pnpm run db:migrate` as a release step instead.
+Either way it runs from a project checkout, not inside the running container —
+the runtime image ships without the CLI.
 
 ## Production Checklist
 
@@ -92,7 +106,7 @@ Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
-| **Database schema** | Run `pnpm run db:push` (or `pnpm run db:migrate` for versioned migrations) against the production database once. The app boots without your collection tables, but every collection errors until they exist. |
+| **Database schema** | Boot creates your collection tables additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for junction-table RLS and for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |

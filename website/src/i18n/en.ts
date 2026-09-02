@@ -162,7 +162,7 @@ export const en = {
     "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three collections generated the entire back office — no admin screens were written.",
   "features.title": "Everything your schema generates",
   "features.subtitle":
-    "Production-grade features, all driven by your TypeScript schema. Every view updates in real time.",
+    "A complete feature set, all driven by your TypeScript schema. Every view updates in real time.",
   "features.kanban.title": "Kanban boards",
   "features.kanban.badge": "Drag & drop",
   "features.kanban.desc":

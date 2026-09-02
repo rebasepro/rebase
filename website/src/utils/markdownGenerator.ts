@@ -181,7 +181,7 @@ ${cleanHtml(tr("about.story.p3"))}
   if (page === "backend") {
     return `# Rebase — Backend & APIs
 
-Define your collections in TypeScript and get a production-ready API server.
+Define your collections in TypeScript and get a complete API server.
 
 ## Features
 - **Hono & Drizzle Engine**: Built on lightweight Hono server and Drizzle ORM.
