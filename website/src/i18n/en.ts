@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated — your schema is the only input.",
+    "Point it at the Postgres you already run. REST, a typed SDK, realtime and auth appear — and every access rule is enforced by the database itself.",
   "hero.cta.demo": "Try the demo",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
@@ -18,7 +18,16 @@ export const en = {
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ API, realtime and panel running.",
   "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
+  "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
+  // The recognition beat — before the argument starts (SITE-STORY §5).
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "What you write today",
+  "recognition.title": "You have already written this table five times.",
+  "recognition.subtitle":
+    "A migration, a type, a validator, a route and a form. Five copies of one table, each drifting from the others at its own speed — and the permission check lives in whichever of them someone remembered. Below is the version that is one file.",
+  "recognition.five": "Five files",
+  "recognition.one": "One file",
+  "recognition.oneNote": "schema · API · SDK · form · policies — generated from this",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),

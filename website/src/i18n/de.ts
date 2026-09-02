@@ -3,7 +3,7 @@ export const de = {
   "hero.title.part1": "Das Postgres, das du schon hast.",
   "hero.title.part2": "Das Backend, das du immer wolltest.",
   "hero.subtitle":
-    "Verbinde es mit deiner bestehenden Datenbank. Nichts zu provisionieren, nichts kopiert, nichts migriert — dein Schema ist der einzige Input.",
+    "Verbinde es mit dem Postgres, das du schon betreibst. REST, ein typisiertes SDK, Realtime und Auth erscheinen — und jede Zugriffsregel setzt die Datenbank selbst durch.",
   "hero.cta.demo": "Demo testen",
 
   "rlscheck.title": "Glaub uns das nicht einfach.",
@@ -16,7 +16,16 @@ export const de = {
   "demo.pull": "✔ Schema in Datenbank übertragen. Tabellen erstellt.",
   "demo.dev": "✔ API, Realtime und Panel laufen.",
   "demo.ports": "API auf <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> Panel auf <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Teams, die mit unseren Tools ausliefern — Rebase und FireCMS",
+  "social.title": "Teams, die mit unseren Tools ausliefern — Rebase, und FireCMS, das Open-Source-CMS in über 10.000 Firebase-Projekten.",
+  // The recognition beat — before the argument starts (SITE-STORY §5).
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "Was du heute schreibst",
+  "recognition.title": "Diese Tabelle hast du schon fünfmal geschrieben.",
+  "recognition.subtitle":
+    "Eine Migration, ein Typ, ein Validator, eine Route und ein Formular. Fünf Kopien derselben Tabelle, jede driftet in ihrem eigenen Tempo von den anderen weg — und die Berechtigungsprüfung steht in der, an die jemand gedacht hat. Darunter: die Version, die eine einzige Datei ist.",
+  "recognition.five": "Fünf Dateien",
+  "recognition.one": "Eine Datei",
+  "recognition.oneNote": "Schema · API · SDK · Formular · Policies — alles daraus generiert",
   "engine.badge": "Womit deine App spricht",
   "engine.title": "Das gesamte Backend, direkt einsatzbereit.",
   "engine.subtitle":

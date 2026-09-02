@@ -3,7 +3,7 @@ export const es = {
   "hero.title.part1": "El Postgres que ya tienes.",
   "hero.title.part2": "El backend que siempre quisiste.",
   "hero.subtitle":
-    "Apúntalo a la base de datos que ya tienes en marcha. Nada que aprovisionar, nada que copiar, nada que migrar — tu esquema es el único input.",
+    "Apúntalo al Postgres que ya tienes en marcha. Aparecen REST, un SDK tipado, realtime y auth — y cada regla de acceso la aplica la propia base de datos.",
   "hero.cta.demo": "Probar la demo",
 
   "rlscheck.title": "No te fíes de nuestra palabra.",
@@ -16,7 +16,16 @@ export const es = {
   "demo.pull": "✔ Esquema aplicado a la base de datos. Tablas creadas.",
   "demo.dev": "✔ API, realtime y panel en marcha.",
   "demo.ports": "API en <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel en <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Equipos que lanzan productos con nuestras herramientas — Rebase y FireCMS",
+  "social.title": "Equipos que lanzan con nuestras herramientas — Rebase, y FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
+  // The recognition beat — before the argument starts (SITE-STORY §5).
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "Lo que escribes hoy",
+  "recognition.title": "Esta tabla ya la has escrito cinco veces.",
+  "recognition.subtitle":
+    "Una migración, un tipo, un validador, una ruta y un formulario. Cinco copias de una misma tabla, cada una alejándose de las demás a su propio ritmo — y la comprobación de permisos vive en la que alguien recordó. Debajo, la versión que es un solo archivo.",
+  "recognition.five": "Cinco archivos",
+  "recognition.one": "Un archivo",
+  "recognition.oneNote": "esquema · API · SDK · formulario · políticas — generados desde aquí",
   "engine.badge": "Con lo que habla tu app",
   "engine.title": "Todo el backend, ya en marcha.",
   "engine.subtitle":
