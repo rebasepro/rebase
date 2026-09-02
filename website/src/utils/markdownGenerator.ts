@@ -82,7 +82,7 @@ Rebase is adopted in layers, and each one is additive:
 - **CMS** — the above, plus a schema-driven admin panel generated from the same collection definitions.
 - **Full** — the above, plus Studio: SQL editor, schema visualizer, RLS editor, logs and an API explorer.
 
-Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check $DATABASE_URL\` audits any Postgres, read-only, with nothing installed.
+Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check\` audits any Postgres, read-only, with nothing installed.
 
 ## In the admin panel
 

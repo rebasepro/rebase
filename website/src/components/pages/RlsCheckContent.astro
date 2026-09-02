@@ -29,7 +29,12 @@ import RlsCheckReport from "../RlsCheckReport.astro";
 import ComparisonFaq from "../ComparisonFaq.astro";
 import ClosingCta from "../ClosingCta.astro";
 
-const COMMAND = 'npx @rebasepro/rls-check "postgresql://user:pass@host:5432/db"';
+// No connection string in the command: npm echoes its own command line before
+// the program starts, and the shell records it, so an argument carries the
+// password into two places rls-check cannot redact. `$DATABASE_URL` is not a
+// fix — the shell expands it first. With no argument the tool reads
+// DATABASE_URL, POSTGRES_URL, then a .env in the working directory.
+const COMMAND = "npx @rebasepro/rls-check";
 const PAGE_URL = "https://rebase.pro/rls-check";
 
 const bySeverity = (["critical", "high", "medium"] as const).map((severity) => ({

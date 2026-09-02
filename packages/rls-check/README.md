@@ -3,8 +3,12 @@
 Audit Row-Level Security on any PostgreSQL database. One command, no configuration, no account, nothing to install.
 
 ```sh
-npx @rebasepro/rls-check "postgresql://user:password@host:5432/database"
+npx @rebasepro/rls-check
 ```
+
+Run it in your project directory and it finds the database itself: `DATABASE_URL`, then `POSTGRES_URL`, then a `.env` beside you. Point it somewhere else with `DATABASE_URL="postgresql://user:password@host:5432/database" npx @rebasepro/rls-check`.
+
+It also takes the connection string as an argument, but prefer not to: npm echoes the command line before the program starts and your shell records it, so the password lands in two places `rls-check` cannot redact. Writing `$DATABASE_URL` there does not help — the shell expands it before npm sees it.
 
 It works against Supabase, Neon, RDS, Cloud SQL, Postgres in a container on your laptop, or anything else that speaks the wire protocol. It knows nothing about your framework and asks nothing of your codebase.
 
@@ -184,6 +188,7 @@ Ids are stable. They go into `--skip` lists and CI baselines, so a rename is tre
 ## Usage
 
 ```
+DATABASE_URL="postgresql://..." npx @rebasepro/rls-check [options]
 npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.

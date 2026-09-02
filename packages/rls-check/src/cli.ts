@@ -646,10 +646,15 @@ function helpText(version: string): string {
     return `rls-check ${version} — audit Row-Level Security on any PostgreSQL database.
 
 Usage
-  npx @rebasepro/rls-check [connection-string] [options]
+  DATABASE_URL="postgresql://user:pass@host:5432/db" npx @rebasepro/rls-check
 
 The connection string is taken from, in order: the argument, $DATABASE_URL,
 $POSTGRES_URL, then DATABASE_URL in a .env file in the current directory.
+
+Prefer the environment. A connection string passed as an argument is echoed back
+by npm before this program starts, and is written to your shell history — both
+with the password in it, and neither is something rls-check can redact after the
+fact. Its own output redacts the password everywhere.
 
 Options
   --json                 Machine-readable ScanResult on stdout, and nothing else.
@@ -679,7 +684,8 @@ Exit codes
   2  The scan did not run: bad arguments, connection refused, auth failed, timeout.
 
 Examples
-  npx @rebasepro/rls-check "postgresql://user:pass@db.abcdef.supabase.co:5432/postgres"
+  DATABASE_URL="postgresql://user:pass@db.abcdef.supabase.co:5432/postgres" \\
+      npx @rebasepro/rls-check
   npx @rebasepro/rls-check --schema public --schema billing --fail-on medium
   npx @rebasepro/rls-check --json > rls-report.json
   npx @rebasepro/rls-check --html rls-report.html
@@ -692,10 +698,12 @@ and sends nothing anywhere.
 function usageText(): string {
     return `rls-check needs a PostgreSQL connection string.
 
-  npx @rebasepro/rls-check "postgresql://user:password@host:5432/database"
+  DATABASE_URL="postgresql://user:password@host:5432/database" npx @rebasepro/rls-check
 
-Or set DATABASE_URL (or POSTGRES_URL) in the environment, or put DATABASE_URL in
-a .env file in this directory.
+Or put DATABASE_URL in a .env file in this directory, or set POSTGRES_URL. It
+also accepts the string as an argument, but npm echoes the command line before
+this program starts and your shell records it, so the password ends up in two
+places rls-check cannot reach.
 
 It is read-only — it reads the system catalogs and writes nothing. Run with
 --help for all options.

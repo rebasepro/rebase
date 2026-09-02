@@ -113,9 +113,23 @@ for (const doc of DOCUMENTS) {
     for (const [locale, note] of Object.entries(ENGLISH_ONLY_NOTE)) {
         const localeFile = path.resolve(__dirname, doc.englishOnlyLocales.replace("{locale}", locale));
         const banner = `\n:::note[${note.heading}]\n${note.body}\n:::\n`;
+        // The slug has to carry the locale. Starlight keys content entries by
+        // slug, not by path, so six files declaring `docs/changelog` are six
+        // entries with one id: the last one loaded overwrites the rest, and the
+        // build says so in a warning nobody reads. The hand-written mirrors did
+        // exactly that, which is why /docs/changelog — the English page — served
+        // a Portuguese "this page is English only" banner. The routes were all
+        // present, so nothing 404'd and nothing looked wrong from outside.
+        const frontmatter = doc.frontmatter.replace(/^slug: (.+)$/m, `slug: ${locale}/$1`);
+
+        if (frontmatter === doc.frontmatter) {
+            console.error(`No slug to localise in the frontmatter for ${doc.dest}`);
+            failed = true;
+            continue;
+        }
 
         fs.mkdirSync(path.dirname(localeFile), { recursive: true });
-        fs.writeFileSync(localeFile, doc.frontmatter + banner + content, "utf-8");
+        fs.writeFileSync(localeFile, frontmatter + banner + content, "utf-8");
         console.log(`✓ Mirrored ${path.basename(sourceFile)} → ${path.relative(process.cwd(), localeFile)}`);
     }
 }

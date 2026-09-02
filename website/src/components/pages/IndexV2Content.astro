@@ -19,7 +19,7 @@ const lang = langProp ?? getLangFromUrl(Astro.url);
 const t = tProp ?? useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
 
-const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check $DATABASE_URL";
+const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check";
 
 // One source for the command the hero shows and the copy button writes, so
 // the two can never drift apart.

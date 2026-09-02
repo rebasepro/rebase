@@ -15969,8 +15969,15 @@ It works on **any** Postgres — Supabase, Neon, RDS, Cloud SQL, or a server you
 yourself. It does not require Rebase, and it is useful whether or not you ever adopt it.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Run it in your project directory and it finds the database itself: `DATABASE_URL`,
+then `POSTGRES_URL`, then a `.env` beside you. Pass the connection string as an
+argument only when you cannot do that — npm echoes the command line before the
+program starts, and your shell records it, so a password in an argument ends up in
+two places `rls-check` cannot redact. `$DATABASE_URL` is no safer there: the shell
+expands it before npm ever sees it.
 
 It is read-only by construction: it opens a read-only transaction and issues catalog
 queries. It writes nothing, and it sends nothing anywhere — there is no telemetry and no
@@ -15979,11 +15986,14 @@ network call other than the one to your database.
 ### Running it
 
 ```bash
-# Explicit connection string
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Or from the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
+# From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
+
+# For a database that is not the one in your environment
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# As an argument. Works, but see the warning above about where the password lands
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. That is by far the
@@ -16022,7 +16032,7 @@ database.
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
