@@ -150,9 +150,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <p class="text-emerald-400">{t("demo.init")}</p>
                                 <p class="text-emerald-400">{t("demo.pull")}</p>
                                 <p class="text-emerald-400">{t("demo.dev")}</p>
-                                <p class="mt-3 text-surface-500">
-                                    API on <span class="text-surface-200">:3001</span> <span class="text-surface-700">·</span> panel on <span class="text-surface-200">:5173</span>
-                                </p>
+                                <p class="mt-3 text-surface-500" set:html={t("demo.ports")}></p>
                                 <p class="mt-1"><span class="select-none text-surface-500">$</span> <span class="terminal-caret inline-block h-4 w-[7px] translate-y-[2px] bg-primary"></span></p>
                             </div>
                         </div>

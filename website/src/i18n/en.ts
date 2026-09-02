@@ -5,8 +5,6 @@ export const en = {
   "hero.subtitle":
     "Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated — your schema is the only input.",
   "hero.cta.demo": "Try the demo",
-  "hero.cli.label": "No signup for the demo. Yours is one command away:",
-  "hero.cta.github": "View on GitHub",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
@@ -14,13 +12,12 @@ export const en = {
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> reads your database's own catalogue and reports what is actually exposed — tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. Fourteen checks. Any Postgres: Supabase, Neon, RDS, your own server. It is read-only, it needs no account, and it does not care whether you use Rebase.",
   "rlscheck.note": "SELECTs against the system catalogues and nothing else. No telemetry, no upload, and it never reads your data.",
   "rlscheck.cta": "See all 14 checks",
-  "demo.badge": "The first five minutes",
-  "demo.title": "Init. Push. Run.",
   "copy.command": "Copy",
   "copy.command.done": "Copied",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
-  "demo.dev": "✔ API and realtime on :3001, panel on :5173.",
+  "demo.dev": "✔ API, realtime and panel running.",
+  "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
@@ -37,12 +34,6 @@ export const en = {
   "agentera.title": 'The backend an agent can\'t screw up',
   "agentera.p1":
     "An AI agent can scaffold a backend in an hour. It can't tell you whether that backend is safe. Agents are extremely good at producing <em>plausible</em> backends — and famously bad at producing <em>secure</em> ones. Rebase makes the safe outcome the only outcome, by construction.",
-  "agentera.p2":
-    "And the surface it has to get right is small: one TypeScript file per collection, no React in it, no endpoints to hand-write, no ORM layer to keep in sync. The schema <em>is</em> the API, and the permissions live in Postgres — where an agent's mistake gets rejected by the database instead of shipped.",
-  "agentera.card.title":
-    'Boilerplate depreciates. Guarantees appreciate.',
-  "agentera.card.desc":
-    "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore AI and agent features",
   // This beat proves claim 3 — the panel is a client of the same API and the
   // response does not move — which is what its figure actually models. The
@@ -65,14 +56,6 @@ export const en = {
   "modes.full.title": "Rebase Studio",
   "modes.full.desc": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.",
   "modes.full.tag": "Developer tools, in the same panel",
-  "modes.link": "Why we built it this way",
-  "stack.deps": "Your dependencies",
-  "stack.capabilities": "What you get",
-  "stack.always": "always on",
-  "stack.optional": "off",
-  "stack.unchanged": "unchanged",
-  "stack.api.note": "Identical in every configuration above. The layers change what a human can see — never what your app can call.",
-  "stack.hint": "Click a layer to see what it adds.",
   "showcase.badge": "Built for real products",
   "showcase.title.part1": "Teams ship faster with",
   "showcase.title.part2": "Rebase",
@@ -83,59 +66,15 @@ export const en = {
   "showcase.case0.title": "Dadaki",
   "showcase.case0.desc":
     "Our own product: a fast, in-browser vector editor with cloud sync. Dadaki runs on a completely standard Rebase backend — the same auth, storage, and generated APIs every project gets.",
-  "showcase.case0.feat1.title": "Cloud-synced design files",
-  "showcase.case0.feat1.desc":
-    "Documents live in Postgres and assets in Rebase storage. Sign in on any device and your artwork is there — no sync service was written.",
-  "showcase.case0.feat2.title": "A pure frontend",
-  "showcase.case0.feat2.desc":
-    "Sign-in, sessions and every read go through the Rebase client. The editor ships as a static frontend with no server of its own.",
-  "showcase.case0.feat3.title": "Dogfooding Rebase Cloud",
-  "showcase.case0.feat3.desc": "Rebase Cloud — our managed hosting — is in private beta, and this editor is one of the products we run on it. Our own work deploys there first.",
   "showcase.case.badge": "Marketplace & Job Portal",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
     "A two-sided marketplace connecting sustainability professionals with green companies. Rebase powers both sides of the market: role-based auth, typed matching APIs, and the moderation back office.",
-  "showcase.case.feat1.title": "Dual-Role Authentication",
-  "showcase.case.feat1.desc":
-    "One account can hold talent and company profiles simultaneously — Rebase roles drive routing and permissions, with no custom auth service.",
-  "showcase.case.feat2.title": "Typed Matching APIs",
-  "showcase.case.feat2.desc":
-    "Vacancy matching runs through the generated TypeScript SDK, keeping queries type-safe from Postgres all the way into the React frontend.",
-  "showcase.case.feat3.title": "A Back Office They Never Built",
-  "showcase.case.feat3.desc":
-    "Postings are moderated, companies verified, and the skills taxonomy curated in the generated admin panel — zero internal-tools code.",
   "showcase.case2.badge": "Digital Pain Therapy",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
     "A certified digital medical device delivering AI-personalized pain therapy. Rebase runs the entire backend — patient records, therapy plans, the exercise content library, and the clinical dashboards on top of them.",
-  "showcase.case2.feat1.title": "Patient Data Under Row-Level Security",
-  "showcase.case2.feat1.desc":
-    "Profiles, therapy plans, and health records are isolated with Postgres RLS defined in the Rebase schema — compliance-grade access control without custom middleware.",
-  "showcase.case2.feat2.title": "Content Via Generated APIs",
-  "showcase.case2.feat2.desc":
-    "Daily therapy plans and the full physiotherapy video library are served through the same typed APIs the clinical dashboards read from.",
-  "showcase.case2.feat3.title": "Clinical Operations in the Admin",
-  "showcase.case2.feat3.desc":
-    "Clinicians and content teams monitor engagement, manage the exercise library, and produce reports — in the same panel the engineers use to inspect the data.",
-  "showcase.case3.badge": "Public data · Built by the Rebase team",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc":
-    "A public reading of Spanish government spending, from €725bn down to a single budget line. There is no database in the read path: a cron recompiles the official figures each month, storage serves them as JSON, and the page itself makes zero API calls.",
-  "showcase.case4.badge": "AI sales agent · Built by the Rebase team",
-  "showcase.case4.title": "Prospector",
-  "showcase.case4.desc":
-    "An outbound agent that reads your site, plans audiences, then finds real companies and the people at them — each one verified against its own website. Crons, functions and the review board are stock Rebase. It drafts; the schema has no state in which it sends.",
-  "showcase.case5.badge": "Retail loyalty",
-  "showcase.case5.title": "Unfeigned",
-  "showcase.case5.desc":
-    "The loyalty programme behind an apparel brand. Orders from Odoo POS and Shopify land in Postgres, a tier engine recomputes points and discounts, and the Apple and Google Wallet passes customers scan at the till are issued from the same schema.",
-  "showcase.case6.badge": "Internal tool · CRM and workflow automation",
-  "showcase.case6.title": "Edith",
-  "showcase.case6.desc":
-    "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three collections generated the entire back office — no admin screens were written.",
   "cta.title": "Point it at your database.",
-  "cta.subtitle":
-    'Three ways to run it.<br class="hidden sm:block"/>Pick the one that matches how you already deploy.',
   // The close is a fork, not a fourth copy of the hero's install command. The
   // cloud lane offers access rather than a deploy button, because Rebase Cloud
   // opens in batches — see `cloud.status`, the one key every surface quotes.
@@ -154,7 +93,6 @@ export const en = {
   "cta.lane.cloud.link": "Request access",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
-  "cta.button.github": "GitHub",
   "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups — all against the database you already own, under the same policies.",
   "personas.badge": "Who touches it",
   "personas.title": "Three people touch this. None of them the same way.",
@@ -280,23 +218,17 @@ export const en = {
   "roadmap.later.item2": "Text-to-Schema AI generation",
   "roadmap.later.item3": "Edge functions / Serverless logic",
   "roadmap.later.item4": "Advanced migration pipelines",
-  "footer.product": "Product",
   "footer.developers": "Developers",
-  "footer.solutions": "Solutions",
   "footer.compare": "Compare",
   "footer.allComparisons": "All comparisons",
   "footer.company": "Company",
   "footer.legal": "Legal",
-  "footer.studio": "Rebase Studio",
   "footer.backend": "Backend & APIs",
   "footer.cms": "Rebase CMS",
-  "footer.ai": "AI & Agents",
   "footer.demo": "Demo",
   "footer.devOverview": "Overview",
   "footer.sdk": "Client SDK",
   "footer.cli": "CLI & Tooling",
-  "footer.security": "Security & Auth",
-  "footer.ui": "UI Components",
   "footer.startups": "For Startups",
   "footer.agencies": "For Agencies",
   "footer.europe": "Sovereignty in Europe",
@@ -708,14 +640,10 @@ export const en = {
   "banner.title.mission": "We are taking back control of our stack.",
   "banner.title.founders": "An open letter to developers who care about data ownership.",
   "banner.cta": "Read the Manifesto",
-  "banner.subtitle": "Our manifesto on why developer tools must be open, portable, and database-native.",
 
 
 
   // AI & Agents Section
-  "ai.badge": "Agent Infrastructure",
-  "ai.title": "The backend AI agents need.",
-  "ai.subtitle": "Vector search, scoped API keys, custom functions, realtime subscriptions with broadcast channels, and cron jobs — everything your AI agents need to read, write, and act on your Postgres data autonomously.",
 
   // Grouped Features Section
 
@@ -1162,7 +1090,6 @@ export const en = {
   "securitypage.88": "Found a vulnerability?",
   "securitypage.89": "Read our security policy",
   "securitypage.90": "See how it works",
-  "securitypage.meta.title": "Security, roles and RLS policies — Rebase",
 
   // ── startupspage ────────────────────────────────────────────────
   "startupspage.00": "The backend first.<br/>The back office when you need it.",
@@ -1235,7 +1162,7 @@ export const en = {
   "vssupabase.17": "No opaque binaries between you and the database.",
   "vssupabase.18": "Schema as code",
   "vssupabase.20": "With Supabase, the database is the state. Local, staging and production drift apart unless somebody keeps them in step, and version-controlling RPCs, triggers and RLS as raw SQL files takes discipline nobody has on a Friday.",
-  "vssupabase.22": "In Rebase the schema definition is a standalone TypeScript file — <code class=\"font-mono text-surface-300\">config/collections/products.ts</code> — and Git is the source of truth.",
+  "vssupabase.22": "In Rebase the schema definition is a standalone TypeScript file — config/collections/products.ts — and Git is the source of truth.",
   "vssupabase.23": "Rebase Studio uses AST manipulation to inject fields into your code safely.",
   "vssupabase.24": "Drizzle migrations are generated and applied from the same definition.",
   "vssupabase.25": "The code is the source of truth, so environments agree by construction.",
