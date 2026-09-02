@@ -188,9 +188,37 @@ export function compileStoragePolicies(
 export function resolveStorageAccessControl(config: {
     storagePolicies?: StoragePolicy[];
     storageAuthorize?: StorageAuthorize;
+    /** `storagePublicRead: true` — see {@link publicReadOnlyAuthorize}. */
+    storagePublicRead?: boolean;
 }): StorageAuthorize | undefined {
     if (config.storagePolicies?.length) {
         return compileStoragePolicies(config.storagePolicies, config.storageAuthorize);
     }
-    return config.storageAuthorize;
+    if (config.storageAuthorize) return config.storageAuthorize;
+    if (config.storagePublicRead) return publicReadOnlyAuthorize;
+    return undefined;
 }
+
+/**
+ * What `storagePublicRead: true` on its own has to mean.
+ *
+ * The flag says "reads are public", and it satisfies the boot guard that
+ * refuses a storage configuration with no access-control model. Those two facts
+ * together were the hole: the flag only ever relaxed the READ gate, so writes,
+ * deletes and listings fell back to the global `requireAuth` — and the
+ * configuration this flag exists FOR is the public site, which the docs
+ * themselves suggest running with auth off. The result was a bucket where an
+ * anonymous caller could list every key, overwrite any file and delete it,
+ * having passed a guard whose whole job is to prevent exactly that.
+ *
+ * So a bucket declared public-read, and nothing else, is public READ:
+ * everything else is an admin's. A deployment that wants anonymous writes has
+ * to say so, with a policy or a hook that spells out where.
+ *
+ * Reached only when neither policies nor a hook were configured, so it can
+ * never narrow a decision someone actually made.
+ */
+export const publicReadOnlyAuthorize: StorageAuthorize = ({ operation, user }) => {
+    if (operation === "read") return true;
+    return (user?.roles ?? []).includes("admin");
+};

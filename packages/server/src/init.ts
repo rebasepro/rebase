@@ -544,9 +544,16 @@ export interface RebaseBackendConfig {
      * Allow unauthenticated read access to stored files (default: false).
      *
      * Set this only when the bucket is genuinely a public, read-only CDN.
-     * Writes, deletes and listing still require authentication. Because it is a
-     * deliberate statement that reads are public, it also satisfies the
-     * production storage boot guard (see {@link storageAuthorize}).
+     * Because it is a deliberate statement that reads are public, it also
+     * satisfies the production storage boot guard (see {@link storageAuthorize}).
+     *
+     * On its own — no {@link storagePolicies}, no {@link storageAuthorize} — it
+     * means public READ and nothing else: writes, deletes and listings are
+     * admin-only. The sentence "writes still require authentication" used to be
+     * the whole of it, and it was not enough, because the deployment this flag
+     * is for is the public site, which commonly runs with `requireAuth` off —
+     * so "requires authentication" required nothing. A deployment that wants
+     * anonymous or per-user writes says where, with a policy or a hook.
      */
     storagePublicRead?: boolean;
 
@@ -2056,7 +2063,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // here rather than on the first upload.
         const storageAccessControl = resolveStorageAccessControl({
             storagePolicies: config.storagePolicies,
-            storageAuthorize: config.storageAuthorize
+            storageAuthorize: config.storageAuthorize,
+            // `storagePublicRead` alone satisfies the guard below but only
+            // relaxes the READ gate, leaving write/delete/list on the global
+            // requireAuth — which is off on precisely the public-site
+            // configuration this flag is for. See publicReadOnlyAuthorize.
+            storagePublicRead: config.storagePublicRead === true
         });
 
         assertStorageAccessControlConfigured(
