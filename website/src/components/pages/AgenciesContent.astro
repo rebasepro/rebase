@@ -421,13 +421,9 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
         <section class="relative isolate py-16 sm:py-24">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="mb-12 max-w-2xl">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        Built on it
-                    </p>
-                    <h2 class="text-3xl sm:text-4xl text-white">Products shipped on Rebase</h2>
-                    <p class="mt-4 text-lg text-surface-400">
-                        Each of these runs on a Postgres database its owner controls. Built by the Rebase team.
-                    </p>
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("agenciespage.00")}</p>
+                    <h2 class="text-3xl sm:text-4xl text-white">{t("agenciespage.01")}</h2>
+                    <p class="mt-4 text-lg text-surface-400">{t("agenciespage.02")}</p>
                 </div>
             </div>
             <CaseStudiesCarousel t={t} />

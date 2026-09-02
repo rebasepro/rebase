@@ -30,15 +30,8 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <h1 class="mb-6 text-display-2 text-white">
-          The backend first.<br/>The back office when you need it.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-          Point Rebase at the Postgres you already run and you have REST, a typed SDK, auth, storage and
-          realtime the same afternoon — with the access rules enforced by the database rather than by
-          middleware nobody has time to review yet. Add the panel the day someone who is not an engineer
-          needs to touch the data. <b>Minutes, not months</b>, and no second data model either way.
-        </p>
+        <h1 class="mb-6 text-display-2 text-white" set:html={t("startupspage.00")}></h1>
+        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl" set:html={t("startupspage.01")}></p>
         <a href="/demo" class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
           Try the demo
           <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -68,8 +61,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">The layer you were going to build twice</h2>
-          <p class="mt-6 text-lg leading-8 text-surface-400">Every product needs the same plumbing before it needs anything interesting: CRUD endpoints, a client, sessions, uploads, permissions. Rebase reads your existing Postgres and generates it — API first, and the back office off the same definition when a human needs one.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.02")}</h2>
+          <p class="mt-6 text-lg leading-8 text-surface-400">{t("startupspage.03")}</p>
         </div>
 
         <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
@@ -85,23 +78,23 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">What arrives on day one</h2>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.04")}</h2>
         </div>
         <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={zapIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">Your schema is the input</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Point Rebase at an existing Postgres and it reads your tables, columns, foreign keys, enums and constraints. Nothing is copied and nothing is migrated.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.05")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.06")}</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={cloudIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">It runs where you already deploy</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">A published container and a connection string: Docker, Fly, Railway, Hetzner or your own metal. Or Rebase Cloud, which is in private beta and runs the same image.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.07")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.08")}</p>
           </div>
           <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
             <Fragment set:html={spreadsheetIcon} />
-            <h3 class="text-xl font-semibold mb-2 text-white">The panel is a client, not a back door</h3>
-            <p class="text-surface-400 text-sm leading-relaxed">Support and ops edit rows through the same API and the same row-level security your app runs under. Whatever they can see, your policies said so.</p>
+            <h3 class="text-xl font-semibold mb-2 text-white">{t("startupspage.09")}</h3>
+            <p class="text-surface-400 text-sm leading-relaxed">{t("startupspage.10")}</p>
           </div>
         </div>
       </div>
@@ -111,8 +104,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center">
-                <h2 class="text-3xl sm:text-4xl text-white mb-6">Generated first, yours afterwards</h2>
-                <p class="text-lg text-surface-400 mb-8">The generated views are the starting point, not the ceiling. Drop your own React in wherever the default field is not enough, rebrand the whole thing from configuration, and keep the code — it is MIT, and it is in your repository.</p>
+                <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.11")}</h2>
+                <p class="text-lg text-surface-400 mb-8">{t("startupspage.12")}</p>
             </div>
             <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 mt-12">
                 <SpreadsheetDemo client:load />
@@ -124,8 +117,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16">
-                <h2 class="text-3xl sm:text-4xl text-white">What comes in the box</h2>
-                <p class="mt-6 text-lg leading-8 text-surface-400">All of it MIT, all of it on a database you own.</p>
+                <h2 class="text-3xl sm:text-4xl text-white">{t("startupspage.13")}</h2>
+                <p class="mt-6 text-lg leading-8 text-surface-400">{t("startupspage.14")}</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -148,8 +141,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">PostgreSQL Native</h3>
-                        <p class="text-sm text-surface-400">Leverages PostgreSQL's reliability, scalability, and advanced querying directly.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.36")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.15")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -172,8 +165,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Your server, or ours</h3>
-                        <p class="text-sm text-surface-400">Self-host it on a box you own, or hand it to Rebase Cloud — in private beta today, opened in batches.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.16")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.17")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -195,8 +188,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Schema Editor & Inference</h3>
-                        <p class="text-sm text-surface-400">Visual building & auto-detection adapt to your data fast.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.18")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.19")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -219,8 +212,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Powerful Editing Tools</h3>
-                        <p class="text-sm text-surface-400">Spreadsheet & form views, file storage, references, and more.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.20")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.21")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -242,8 +235,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Role-Based Access Control</h3>
-                        <p class="text-sm text-surface-400">Configure views and permissions per user role easily.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.22")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.23")}</p>
                     </div>
                 </div>
                 <div class="flex items-start space-x-4 rounded-lg bg-surface-900/50 p-4 ring-1 ring-inset ring-surface-800 p-8">
@@ -264,8 +257,8 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                     <div>
-                        <h3 class="font-semibold text-white">Flexible Customization</h3>
-                        <p class="text-sm text-surface-400">Add custom fields, logic, hooks, and full React views.</p>
+                        <h3 class="font-semibold text-white">{t("startupspage.37")}</h3>
+                        <p class="text-sm text-surface-400">{t("startupspage.24")}</p>
                     </div>
                 </div>
             </div>
@@ -281,11 +274,8 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-start">
                 <div>
-                    <h2 class="text-3xl sm:text-4xl text-white mb-6">It is a backend, and a CMS is one thing you can render from it</h2>
-                    <p class="text-xl text-surface-400 mb-8">
-                        The same collection definition that serves your app also renders the screens your
-                        team works in — and your own React goes wherever the generated one stops.
-                    </p>
+                    <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.25")}</h2>
+                    <p class="text-xl text-surface-400 mb-8">{t("startupspage.26")}</p>
                 </div>
                 <ul class="text-left text-lg space-y-4">
                     <li class="flex items-start">
@@ -294,7 +284,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/>
                         </svg>
-                        <span><b>Internal Tools:</b> Tailored dashboards for support, ops, sales, or data admin on your backend.</span>
+                        <span set:html={t("startupspage.27")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -303,7 +293,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        <span><b>Headless Content:</b> Manage content for web/mobile apps, marketing sites, blogs, docs.</span>
+                        <span set:html={t("startupspage.28")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -312,7 +302,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>
-                        <span><b>User Management:</b> View, edit, and manage user profiles and permissions.</span>
+                        <span set:html={t("startupspage.29")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -321,7 +311,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <path stroke-linecap="round" stroke-linejoin="round"
                                   d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                         </svg>
-                        <span><b>Product/E-commerce Data:</b> Manage catalogs, variants, pricing, inventory easily.</span>
+                        <span set:html={t("startupspage.30")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -331,7 +321,7 @@ import ClosingCta from "../ClosingCta.astro";
                                   d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.096 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        <span><b>App Configuration:</b> Control settings, feature flags, or A/B tests via a UI.</span>
+                        <span set:html={t("startupspage.31")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -339,7 +329,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span><b>Background Jobs:</b> Cron jobs for scheduled data processing, report generation, and external API syncs.</span>
+                        <span set:html={t("startupspage.32")}></span>
                     </li>
                     <li class="flex items-start">
                         <svg
@@ -347,7 +337,7 @@ import ClosingCta from "../ClosingCta.astro";
                              stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                         </svg>
-                        <span><b>Third-Party Integrations:</b> Webhooks and custom functions for Stripe, Slack, or any external service.</span>
+                        <span set:html={t("startupspage.33")}></span>
                     </li>
                 </ul>
             </div>
@@ -359,11 +349,9 @@ import ClosingCta from "../ClosingCta.astro";
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-16 gap-y-8 items-center">
           <div class="lg:order-last self-start">
-            <h2 class="text-3xl sm:text-4xl text-white mb-6">Built for the pivot</h2>
-            <p class="text-lg text-surface-400 mb-8">Change a collection and the schema, the REST routes, the OpenAPI document, the typed SDK, the policies and the panel all move with it. There is no second data model to remember to update, which is the part that usually rots.</p>
-            <a href="/product" class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">
-              See both layers
-            </a>
+            <h2 class="text-3xl sm:text-4xl text-white mb-6">{t("startupspage.34")}</h2>
+            <p class="text-lg text-surface-400 mb-8">{t("startupspage.35")}</p>
+            <a href="/product" class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all duration-200 ease-in-out">{t("startupspage.38")}</a>
           </div>
           <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800">
             <img src="/img/widgets.png" width="1400" height="1408" alt="Rebase Widgets" class="w-full h-auto"/>
