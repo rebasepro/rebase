@@ -126,11 +126,14 @@ describe("normalizeEsmSpecifiers", () => {
 
 describe("collectDeclaredDependencies", () => {
     it("gathers dependencies from the project's packages", () => {
+        // Not zod: the image supplies that one, and a bundle carrying a second
+        // copy makes `loadEnv({ extend })` reject every defaulted field. See
+        // RUNTIME_PROVIDED, and the test below.
         write("backend/package.json", JSON.stringify({ dependencies: { pg: "^8.0.0" } }));
-        write("config/package.json", JSON.stringify({ dependencies: { zod: "^4.0.0" } }));
+        write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0",
-zod: "^4.0.0" });
+dayjs: "^1.11.0" });
     });
 
     it("omits packages the runtime image already provides", () => {
@@ -184,9 +187,20 @@ pg: "^8.0.0" }
 
     it("ignores an unparseable package.json rather than failing the build", () => {
         write("backend/package.json", "{ broken");
-        write("config/package.json", JSON.stringify({ dependencies: { zod: "^4.0.0" } }));
+        write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
-        expect(collectDeclaredDependencies(scratch)).toEqual({ zod: "^4.0.0" });
+        expect(collectDeclaredDependencies(scratch)).toEqual({ dayjs: "^1.11.0" });
+    });
+
+    it("strips zod, which the image supplies", () => {
+        // A project declaring zod is completely ordinary — it is how you extend
+        // `loadEnv`. Carrying it into the bundle is what breaks: the schema is
+        // then built by a different zod than the one parsing it, every
+        // `.default()` is rejected, and the deploy reports success while running
+        // no crons.
+        write("backend/package.json", JSON.stringify({ dependencies: { zod: "^4.0.0", pg: "^8.0.0" } }));
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
     });
 });
 

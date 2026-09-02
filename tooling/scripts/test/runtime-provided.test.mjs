@@ -27,16 +27,47 @@ import { test } from "node:test";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-/** The `@rebasepro/*` entries of a `RUNTIME_PROVIDED` declaration, by source text. */
+/**
+ * The entries of a `RUNTIME_PROVIDED` declaration, by source text.
+ *
+ * This used to filter to `@rebasepro/*`, and that filter is the reason the
+ * three lists could disagree about `zod` for four releases without any of these
+ * tests noticing. A non-scoped entry is exactly the case that matters: the
+ * runtime exports `loadEnv({ extend })`, which parses with zod, and a second
+ * zod in the bundle makes every `.default()` field reject — so a managed deploy
+ * reports success and runs no crons.
+ *
+ * Comment lines are dropped rather than parsed, since the lists now carry the
+ * explanation beside the entry.
+ */
 function runtimeProvided(file) {
     const source = fs.readFileSync(path.join(ROOT, file), "utf8");
     const match = source.match(/RUNTIME_PROVIDED(?:_PACKAGES)?\s*=\s*(?:new Set\()?\[([\s\S]*?)\]/);
     assert.ok(match, `${file} declares no RUNTIME_PROVIDED array`);
     return match[1]
-        .split(",")
-        .map(entry => entry.trim().replace(/^["']|["'].*$/g, ""))
-        .filter(name => name.startsWith("@rebasepro/"));
+        .split("\n")
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith("//") && !line.startsWith("*"))
+        .flatMap(line => [...line.matchAll(/["']([^"']+)["']/g)].map(m => m[1]));
 }
+
+/**
+ * Packages the two lists must agree about, out of everything they name.
+ *
+ * The lists mean different things and legitimately differ. `bundle.ts` names
+ * what a bundle must NOT install; `entrypoint.mjs` names what to collapse onto
+ * the image's copy when the bundle installed it anyway. `hono`, `tsx` and
+ * `typescript` are in the first and not the second because the bundle never
+ * carries them — the image supplies them by being the tree the bundle sits in,
+ * so there is nothing to collapse.
+ *
+ * What must agree is everything a project can install for itself and then load
+ * a second copy of: every `@rebasepro/*` package, and `zod`. Comparing the raw
+ * lists would fail on the legitimate difference; comparing only `@rebasepro/*`
+ * is what let `zod` diverge for four releases.
+ */
+const ALSO_DEDUPED = ["zod"];
+const mustAgree = names => names.filter(n => n.startsWith("@rebasepro/") || ALSO_DEDUPED.includes(n));
 
 const fromBundler = runtimeProvided("packages/cli/src/bundle.ts");
 const fromEntrypoint = runtimeProvided("infra/docker/entrypoint.mjs");
@@ -50,7 +81,7 @@ test("both files actually declare some @rebasepro packages", () => {
 });
 
 test("every package the bundler strips is one the entrypoint supplies", () => {
-    const unsupplied = fromBundler.filter(name => !fromEntrypoint.includes(name));
+    const unsupplied = mustAgree(fromBundler).filter(name => !fromEntrypoint.includes(name));
     assert.deepEqual(
         unsupplied,
         [],
@@ -65,7 +96,7 @@ test("the entrypoint supplies nothing the bundler still expects a bundle to inst
     // bundle also installed replaces a complete dependency tree with the image's
     // deliberately narrow one. That is how redirecting @rebasepro/server-postgres
     // once took the database driver down.
-    const unexpected = fromEntrypoint.filter(name => !fromBundler.includes(name));
+    const unexpected = mustAgree(fromEntrypoint).filter(name => !fromBundler.includes(name));
     assert.deepEqual(
         unexpected,
         [],
@@ -77,11 +108,21 @@ test("the entrypoint supplies nothing the bundler still expects a bundle to inst
 test("the image ships every package the entrypoint promises to link", () => {
     const dockerfile = fs.readFileSync(path.join(ROOT, "infra", "docker", "server.Dockerfile"), "utf8");
     for (const name of fromEntrypoint) {
-        const shortName = name.slice("@rebasepro/".length);
+        if (name.startsWith("@rebasepro/")) {
+            const shortName = name.slice("@rebasepro/".length);
+            assert.ok(
+                dockerfile.includes(`./node_modules/@rebasepro/${shortName}/package.json`),
+                `${name} is linked by the entrypoint but server.Dockerfile never copies it into the image, `
+                + "so the link would point at nothing."
+            );
+            continue;
+        }
+        // A third-party package the image installs rather than builds. Same
+        // promise, different line in the Dockerfile: `npm install "zod@^4.4.3"`.
         assert.ok(
-            dockerfile.includes(`./node_modules/@rebasepro/${shortName}/package.json`),
-            `${name} is linked by the entrypoint but server.Dockerfile never copies it into the image, `
-            + "so the link would point at nothing."
+            new RegExp(`"${name}@`).test(dockerfile),
+            `${name} is linked by the entrypoint but server.Dockerfile never installs it into the `
+            + "image, so the link would point at nothing."
         );
     }
 });
@@ -100,6 +141,21 @@ test("the image ships every package the entrypoint promises to link", () => {
 
 test("the fetch path declares some @rebasepro packages", () => {
     assert.ok(fromFetchPath.length > 0, "parsed nothing out of fetch-bundle.ts");
+});
+
+test("zod is deduped everywhere, not just the @rebasepro packages", () => {
+    // The runtime exports `loadEnv({ extend })`, which calls `.parse()` on a
+    // caller-supplied zod schema. A second zod in the bundle builds that schema
+    // from a different module instance, every field carrying a `.default()` is
+    // rejected, and the managed deploy comes up reporting success with zero
+    // crons running. Nothing about that failure mentions zod.
+    for (const [name, list] of [
+        ["bundle.ts", fromBundler],
+        ["entrypoint.mjs", fromEntrypoint],
+        ["fetch-bundle.ts", fromFetchPath]
+    ]) {
+        assert.ok(list.includes("zod"), `${name} does not name zod as runtime-provided`);
+    }
 });
 
 test("the fetch path supplies exactly what the entrypoint does", () => {

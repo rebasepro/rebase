@@ -311,12 +311,22 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModu
 // downloaded and installed — running it here would dedupe an empty directory.
 // That file must carry this same list, and `runtime-provided.test.mjs` checks
 // it does.
+// `zod` is not a @rebasepro package and belongs here anyway.
+//
+// The runtime exports `loadEnv`, whose `extend` option takes a zod schema and
+// calls `.parse()` on it. When the bundle carries its own zod, that schema is
+// built from a DIFFERENT zod than the one doing the parsing, and every field
+// carrying a `.default()` is rejected — so a managed deploy came up, reported
+// success, and ran zero crons. The image installs zod (see
+// infra/docker/server.Dockerfile); naming it here is what makes the bundle's
+// copy collapse onto it.
 const RUNTIME_PROVIDED = [
     "@rebasepro/server",
     "@rebasepro/types",
     "@rebasepro/client",
     "@rebasepro/common",
-    "@rebasepro/utils"
+    "@rebasepro/utils",
+    "zod"
 ];
 
 const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");

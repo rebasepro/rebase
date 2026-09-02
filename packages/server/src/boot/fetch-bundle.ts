@@ -391,13 +391,23 @@ export function imageModulesDir(): string | undefined {
  * the same four-package gap that broke the non-fetch path, reproduced on the
  * fetch path because this list was written before that fix and no gate watched
  * this file.
+ *
+ * `zod` is not a @rebasepro package and belongs here anyway. The runtime
+ * exports `loadEnv`, whose `extend` option takes a zod schema and calls
+ * `.parse()` on it. When the bundle carries its own zod that schema is built
+ * from a DIFFERENT zod than the one doing the parsing, and every field carrying
+ * a `.default()` is rejected — so a managed deploy came up, reported success,
+ * and ran zero crons. The image installs zod (see
+ * infra/docker/server.Dockerfile); naming it here is what makes the bundle's
+ * copy collapse onto it.
  */
 export const RUNTIME_PROVIDED_PACKAGES = [
     "@rebasepro/server",
     "@rebasepro/types",
     "@rebasepro/client",
     "@rebasepro/common",
-    "@rebasepro/utils"
+    "@rebasepro/utils",
+    "zod"
 ] as const;
 
 /**
