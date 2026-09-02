@@ -117,6 +117,7 @@ import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
+import { enforceAuthSecretExclusion } from "./auth/exclude-auth-secrets";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
@@ -1186,6 +1187,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     const driverRegistry = DefaultDriverRegistry.create(delegates);
+
+    // A redeclared `users` collection must not lose the exclusions the default
+    // one carries. Here rather than in the auth block below, because the
+    // registries copy what they are handed and a flag set after registration
+    // reaches only the copy it was set on. See exclude-auth-secrets.ts.
+    enforceAuthSecretExclusion(activeCollections);
+
     activeCollections.forEach(collection => collectionRegistry.register(collection));
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
