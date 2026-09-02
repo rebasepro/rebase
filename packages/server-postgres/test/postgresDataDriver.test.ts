@@ -642,12 +642,20 @@ properties: {} } as unknown as CollectionConfig });
             // check. Objects without `id` → "[object Object]", 42 → "42",
             // null → "null" (the `?.` short-circuits before `String()` sees it).
             //
-            // Params are positional: uid, uid, user_roles, jwt.
-            expect(params[2]).toBe("[object Object],42,null");
+            // Found by shape rather than by index. These used to be
+            // `params[2]` and `params[3]`, which broke the moment a fifth GUC
+            // was added between them — a test that fails because a neighbour
+            // moved is a test about the neighbour.
+            expect(params).toContain("[object Object],42,null");
             // The JWT keeps the ORIGINAL role values, not the normalized ones —
             // `auth.jwt()` is meant to reflect what the caller presented.
-            expect(params[3]).toBe(JSON.stringify({ sub: "u1",
-roles: [{ name: "viewer" }, 42, null] }));
+            const claims = params.find(
+                (p): p is string => typeof p === "string" && p.startsWith("{")
+            );
+            expect(JSON.parse(claims!)).toMatchObject({
+                sub: "u1",
+                roles: [{ name: "viewer" }, 42, null]
+            });
         });
 
         it("should wrap delete in a transaction with RLS", async () => {
