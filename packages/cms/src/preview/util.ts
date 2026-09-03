@@ -26,6 +26,12 @@ export function sanitizeUrl(url: string | undefined): string {
     // The characters a browser removes before it decides what the scheme is.
     // Stripped here for the same reason, so this function is looking at the
     // string the browser will act on rather than the one it was handed.
+    //
+    // The control characters are the point, so the rule that objects to them is
+    // off for this line rather than the expression rewritten to hide them from
+    // it: `java\tscript:` and `java\nscript:` are the bypasses this exists to
+    // close, and a regex that cannot name a control character cannot remove one.
+    // eslint-disable-next-line no-control-regex
     const trimmed = url.trim().replace(/[\u0000-\u001F\u007F]/g, "");
     if (!trimmed) return "about:blank";
 

@@ -89,6 +89,41 @@ describe("seeding the initial admin from the environment", () => {
     });
 
     /**
+     * An address the login route will not parse is an account nobody can use.
+     *
+     * `admin@localhost` was quickstart.sh's default. It seeds without complaint
+     * — nothing here looked at the address — and `POST /auth/login` parses its
+     * body with `z.string().email()`, which rejects a domain with no dot. So the
+     * documented self-host path produced a server with an admin row, a
+     * `needsSetup` of false (the account exists, so the first-run path is gone
+     * too), and a 400 on every attempt to sign in. Refused at boot instead,
+     * while somebody is still reading the log.
+     */
+    it("refuses an address the login route would reject", async () => {
+        const { adapter } = mockUsers();
+
+        const outcome = await seedInitialAdmin(adapter, {
+            REBASE_ADMIN_EMAIL: "admin@localhost",
+            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password"
+        });
+
+        expect(outcome.status).toBe("skipped");
+        expect(adapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it("still accepts an ordinary address", async () => {
+        const { adapter } = mockUsers();
+
+        const outcome = await seedInitialAdmin(adapter, {
+            REBASE_ADMIN_EMAIL: "ops@acme.test",
+            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password"
+        });
+
+        expect(outcome.status).toBe("created");
+        expect(adapter.createUser).toHaveBeenCalled();
+    });
+
+    /**
      * Losing the race to a sibling replica is the normal outcome on a scaled
      * deployment, not an error, so a failed create must not take the boot down.
      */
