@@ -19,16 +19,15 @@ export const en = {
   "demo.dev": "✔ API, realtime and panel running.",
   "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
-  // The recognition beat — before the argument starts (SITE-STORY §5). It is
-  // claim 1's beat: five ways into one table, and the rule lives in one of them.
-  // Code in the figure stays English; only this prose is translated.
+  // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
+  // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Where the rule lives today",
-  "recognition.title": "Where is your permission check?",
-  "recognition.subtitle":
-    "Five ways into the same table, and the rule lives in one of them. The route checks. The cron job, the backfill script, the agent holding a service key and the hosted dashboard do not — because a rule in application code protects the door, not the room. Below: the rule moved into Postgres, where every path hits it.",
   "recognition.five": "Five ways in",
   "recognition.one": "One rule",
   "recognition.oneNote": "one rule, in Postgres, on every path",
+  // Beat 04 — the panel, when you want one (carousel + the three products).
+  "panel.badge": "The panel, when you want one",
+  "panel.title": "Add it the day a human needs to touch the data.",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
@@ -52,8 +51,6 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.badge": "One definition, every part",
-  "modes.title": "Take only the parts you need.",
   "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":

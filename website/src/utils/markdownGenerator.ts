@@ -66,13 +66,11 @@ ${cleanHtml(tr("hero.title.part1"))} ${cleanHtml(tr("hero.title.part2"))}
 
 ${cleanHtml(tr("hero.subtitle"))}
 
-${cleanHtml(tr("recognition.title"))} ${cleanHtml(tr("recognition.subtitle"))}
-
 ## The claims, in the order the page makes them
 
 1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
 2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
-3. **Take only the parts you need** — ${inline(tr("modes.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+3. **The panel, when you want one** — ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
 4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
 5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
 

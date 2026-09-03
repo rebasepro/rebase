@@ -2,12 +2,11 @@
 import { NeatBackground } from "../NeatBackground";
 import CollectionPowerSection from "../CollectionPowerSection.astro";
 import ClientLogos from "../ClientLogos.astro";
-import RecognitionSection from "../RecognitionSection.astro";
+import PolicyPathsFigure from "../PolicyPathsFigure.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 import { ApiMiniDemo } from "../demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../demos/SdkMiniDemo";
 import { RealtimeMiniDemo } from "../demos/RealtimeMiniDemo";
-import { RLSEditorDemo } from "../demos/RLSEditorDemo";
 import { AdminDemoCarousel } from "../demos/AdminDemoCarousel";
 import { AgentConsoleDemo } from "../demos/AgentConsoleDemo";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../../i18n/ui";
@@ -173,11 +172,6 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <ClientLogos />
         </div>
 
-        <!-- RECOGNITION — before the argument starts. Unnumbered, like the
-             rls-check band: the numerals are the spine and this precedes it.
-             SITE-STORY §5 recorded it as the beat the page was missing. -->
-        <RecognitionSection lang={lang} t={t} />
-
         <!-- ============================================================
              NEAT DIVIDER → chapter 01. The strip is the real canvas; the
              chapter below inherits its cyan on rules, eyebrow and link.
@@ -273,8 +267,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 grounds on the page.
 
                 It qualifies because its claim is the absence of an event: "not by
-                middleware someone has to remember to call". The RLS editor beside
-                it can show a policy; it cannot show that nobody forgot. The colour
+                middleware someone has to remember to call". The figure beside
+                it shows five paths and one check; it cannot show that nobody forgot. The colour
                 carries the half of the argument the demo cannot.
 
                 Brand blue deepened, because this promise holds by construction —
@@ -317,19 +311,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 </a>
                             </div>
                         </div>
-                        {/* Bleeds, like 07. The policy editor is a two-pane
-                            studio view and every extra pixel shows another
-                            policy; narrowed to seven columns it cropped the
-                            USING clauses it exists to show. */}
+                        {/* The villain and the fix in one frame: five ways into
+                            the same table with the rule in one of them, folding
+                            into the policy as Postgres holds it. The RLS editor
+                            that stood here lives on /security and /studio; a demo
+                            appears on the home page and at most one deep page,
+                            and it was on two. */}
                         <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
-                            <div class="frame">
-                                <div class="frame-head">studio · row-level security</div>
-                                <!-- The demo reserves room for a longer policy list than it
-                                     shows, which left a tall empty well under the last card. -->
-                                <div class="p-4 bg-[#09090b] h-[430px] overflow-hidden">
-                                    <RLSEditorDemo client:visible />
-                                </div>
-                            </div>
+                            <PolicyPathsFigure lang={lang} t={t} />
                         </div>
                     </div>
 
@@ -393,85 +382,57 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </div>
         </section>
 
-        <!-- CHAPTER 04 — MODES. No Neat here, but it still carries the accent:
-             an all-grey section between two coloured ones read as a dead zone. -->
-        <section class="chapter relative border-y border-white/8 ground-raised">
-            <div class="relative mx-auto max-w-6xl px-6 lg:px-8 pt-20 pb-4">
-                <div class="max-w-[42rem] animate-on-scroll fade-in-up">
-                    <p class="eyebrow">
-                        <span class="font-mono">04</span>
-                        <span class="mx-2 text-surface-700">·</span>{t("modes.badge")}
-                    </p>
-                    <h2 class="mt-4 font-headers text-display-2 text-balance">
-                        {t("modes.title")}
-                    </h2>
-                    <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
-                </div>
-            </div>
-            <div class="mx-auto max-w-6xl px-6 lg:px-8 pb-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 border-t border-white/8 mt-10">
-                    <div class="md:border-r border-white/8 py-10 md:pr-8">
-                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.baas.tag")}</p>
-                        <h3 class="mt-4 font-headers text-xl">{t("modes.baas.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.baas.desc")}</p>
-                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/server</p>
-                    </div>
-                    <div class="md:border-r border-white/8 py-10 md:px-8 border-t md:border-t-0">
-                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.cms.tag")}</p>
-                        <h3 class="mt-4 font-headers text-xl">{t("modes.cms.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.cms.desc")}</p>
-                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/cms</p>
-                    </div>
-                    <div class="py-10 md:pl-8 border-t md:border-t-0 border-white/8">
-                        <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.full.tag")}</p>
-                        <h3 class="mt-4 font-headers text-xl">{t("modes.full.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.full.desc")}</p>
-                        <p class="mt-5 font-mono text-2xs text-surface-600">@rebasepro/app</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- NEAT DIVIDER → chapter 05, gold. -->
-        <!-- Neat gradient divider, bled behind the sections either side.
-             `--divider-h` is the only number here: .neat-divider derives the box
-             and the margins that cancel it out of the flow. -->
+        <!-- NEAT DIVIDER → chapter 04, gold. -->
         <div class="neat-divider relative pointer-events-none overflow-hidden"
              style="z-index: -1; --divider-h: 600px;">
             <NeatBackground variant="a" client:visible />
         </div>
 
-        <!-- CHAPTER 05 — THE PANEL. -->
+        <!-- CHAPTER 04 — THE PANEL, WHEN YOU WANT ONE. One beat, not two: the
+             carousel shows the panel; the three columns under it say what the
+             panel is made of and that the API does not move without it. The
+             "modes" chapter that used to precede the carousel said the same
+             thing in prose a screen earlier (cut 2026-09-03). -->
         <div>
-            {/* No `overflow-hidden` on this one, and no z-0: the gold divider
-                above it bleeds THROUGH this section by design (§6), and a clip
-                or a new stacking context would cut it off at the seam. The
-                numeral is cropped by the section's own top edge anyway, because
-                the divider sits behind it. */}
+            {/* No `overflow-hidden` here and no z-0: the gold divider above
+                bleeds THROUGH this section by design (§6). */}
             <section class="chapter relative py-24 sm:py-32">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="max-w-[42rem] animate-on-scroll fade-in-up">
                         <p class="eyebrow">
-                            <span class="font-mono">05</span>
-                            <span class="mx-2 text-surface-700">·</span>{t("showcase.sync.badge")}
+                            <span class="font-mono">04</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("panel.badge")}
                         </p>
                         <h2 class="mt-4 font-headers text-display-2 text-balance">
-                            {t("showcase.sync.tab1.title")}
+                            {t("panel.title")}
                         </h2>
-                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("showcase.sync.tab1.desc")}</p>
+                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
                     </div>
-                    {/* No `.frame` here. The carousel draws its own browser
-                        chrome — traffic lights and a URL bar — so wrapping it
-                        gave the section two nested borders, and §6 allows a demo
-                        one frame, not two.
-
-                        It also put the List / Spreadsheet / Kanban toggle inside
-                        the product's border, which reads as though the panel
-                        itself has a view switcher at the bottom of its window.
-                        The toggle is page furniture: it drives the carousel, not
-                        the product. It belongs outside the edge. */}
+                    {/* No `.frame`: the carousel draws its own browser chrome, and
+                        §6 allows a demo one frame, not two. The view toggle is page
+                        furniture and sits outside the product's edge. */}
                     <div class="mt-12 animate-on-scroll fade-in-up">
                         <AdminDemoCarousel client:visible height={620} />
+                    </div>
+                    <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
+                        <div class="md:border-r border-white/8 py-8 md:pr-8">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.baas.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.baas.title")}</h3>
+                            <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.baas.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/server</p>
+                        </div>
+                        <div class="md:border-r border-white/8 py-8 md:px-8 border-t md:border-t-0">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.cms.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.cms.title")}</h3>
+                            <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.cms.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/cms</p>
+                        </div>
+                        <div class="py-8 md:pl-8 border-t md:border-t-0 border-white/8">
+                            <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.full.tag")}</p>
+                            <h3 class="mt-3 font-headers text-lg">{t("modes.full.title")}</h3>
+                            <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.full.desc")}</p>
+                            <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/app</p>
+                        </div>
                     </div>
                     <a href={translatePath("/cms")} class="accent-link mt-8">
                         {t("showcase.exploreCms")}
@@ -481,60 +442,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </section>
         </div>
 
-        {/* CHAPTER 06 — PERSONAS. Prose and hairlines; the only place a person
-            appears. It is the sequence's rest bar, so it takes a NEUTRAL numeral
-            rather than a hue — but it does take one. Skipping it left the count
-            reading 01-05, 07, 08, which is a gap a reader notices and cannot
-            explain. Quiet is a different thing from absent. */}
-        <section class="chapter relative border-t border-white/8 py-24 sm:py-32">
-            <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                <p class="eyebrow mb-4">
-                    <span class="font-mono">06</span>
-                    <span class="mx-2 text-surface-700">·</span>{t("personas.badge")}
-                </p>
-                <h2 class="font-headers text-display-2 max-w-xl text-balance">
-                    {t("personas.title")}
-                </h2>
-                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
-                    <div class="md:border-r border-white/8 py-9 md:pr-8">
-                        <h3 class="text-base font-semibold tracking-tight">{t("personas.dev.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            {t("personas.dev.desc")}
-                        </p>
-                        {/* This used to end "never opens the panel", which reads well and is
-                            wrong: Studio is IN the panel, and it is built for exactly this
-                            person. The page then had no route to Studio at all except a link
-                            buried in the security section. */}
-                        <a href={translatePath("/backend")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            {t("personas.dev.link")} <ArrowRight size={14} />
-                        </a>
-                        <a href={translatePath("/studio")} class="accent-link mt-2 !text-surface-300 hover:!text-white">
-                            {t("personas.dev.link2")} <ArrowRight size={14} />
-                        </a>
-                    </div>
-                    <div class="md:border-r border-white/8 py-9 md:px-8 border-t md:border-t-0">
-                        <h3 class="text-base font-semibold tracking-tight">{t("personas.operator.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            {t("personas.operator.desc")}
-                        </p>
-                        <a href={translatePath("/cms")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            {t("personas.operator.link")} <ArrowRight size={14} />
-                        </a>
-                    </div>
-                    <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/8">
-                        <h3 class="text-base font-semibold tracking-tight">{t("personas.agent.title")}</h3>
-                        <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">
-                            {t("personas.agent.desc")}
-                        </p>
-                        <a href={translatePath("/ai")} class="accent-link mt-5 !text-surface-300 hover:!text-white">
-                            <Fragment set:html={t("personas.agent.link")} /> <ArrowRight size={14} />
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {/* CHAPTER 07 — a HAZARD guarantee, and the second and last coloured
+        {/* CHAPTER 05 — a HAZARD guarantee, and the second and last coloured
             ground on the page.
 
             Same test as 03, the other side of it. The claim is again the absence
@@ -556,7 +464,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
                         <div class="lg:col-span-5">
                             <p class="eyebrow">
-                                <span class="font-mono">07</span>
+                                <span class="font-mono">05</span>
                                 <span class="mx-2 opacity-40">·</span>{t("agentera.badge")}
                             </p>
                             <h2 class="mt-4 font-headers text-display-2 text-balance">
@@ -580,7 +488,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </section>
         </div>
 
-        <!-- CHAPTER 08 — CUSTOMERS. The carousel renders its own eyebrow, title
+        <!-- CHAPTER 06 — CUSTOMERS. The carousel renders its own eyebrow, title
              and subtitle; wrapping it in a second header duplicated all three.
              It also renders its own `py-28 sm:py-36`, and this wrapper used to
              add `py-24 sm:py-32` on top — 272px of ground above the heading and
@@ -598,52 +506,6 @@ const SELFHOST_COMMAND = "docker compose up -d";
             still ships on /about, where "what are you building next" is the
             page's own question. */}
 
-        <!-- CHAPTER 09 — OWNERSHIP. Claim 5 (SITE-STORY §2), and the page's
-             last argument before the ask.
-
-             This is a RESTORATION, not a new section. The copy has existed and
-             been translated into all four locales the whole time
-             (`opensource.*`); it rendered on `IndexContent.astro` and was
-             simply not carried across in the V2 rework, which is how the one
-             claim no competitor in this category can answer came to be absent
-             from the page that argues against them.
-
-             It sits here, immediately before the CTA, because it is a fact
-             about the TERMS rather than about the software: worth nothing to a
-             reader who has not yet decided the product is good, and worth more
-             than any of the other four to one who has. -->
-        <div>
-            <section class="chapter relative border-t border-white/8 py-24 sm:py-32">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-                        <div class="lg:col-span-5">
-                            <p class="eyebrow">
-                                <span class="font-mono">09</span>
-                                <span class="mx-2 opacity-40">·</span>{t("opensource.badge")}
-                            </p>
-                            <h2 class="mt-4 font-headers text-display-2 text-balance"
-                                set:html={t("opensource.title")}></h2>
-                        </div>
-                        <div class="lg:col-span-7">
-                            <p class="text-lg leading-relaxed text-[#b4b8bd] max-w-measure-lead">
-                                {t("opensource.desc")}
-                            </p>
-                            <div class="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
-                                <a href={translatePath("/developers")} class="accent-link">
-                                    {t("opensource.link1")}
-                                    <ArrowRight size={15} />
-                                </a>
-                                <a href={translatePath("/compare")}
-                                   class="text-sm font-semibold text-surface-400 transition-colors hover:text-white">
-                                    {t("opensource.link2")}
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        </div>
-
         {/* FINAL CTA — the three lanes, as one band, and the page's second and
             last chroma ground.
 
@@ -659,9 +521,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
             persuaded, flat colour when you are being asked. */}
         <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 py-24 sm:py-32">
-                <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
+                {/* Claim 5 is the close's headline, not a chapter before it: a
+                    fact about the terms is worth nothing to a reader who has not
+                    yet decided the product is good, and worth more than any
+                    other to one who has — which is who is standing here. */}
+                <p class="eyebrow">{t("opensource.badge")}</p>
+                <h2 class="mt-4 font-headers text-display-2 max-w-2xl text-balance" set:html={t("opensource.title")}></h2>
+                <p class="mt-5 max-w-[38rem] text-lg leading-relaxed">{t("opensource.desc")}</p>
+                <p class="mt-12 font-headers text-xl sm:text-2xl max-w-xl text-balance">
                     {t("cta.title")}
-                </h2>
+                </p>
 
                 <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
                     <div class="md:border-r border-white/10 py-9 md:pr-8">
