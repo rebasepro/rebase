@@ -196,7 +196,7 @@ function validatePasswordStrength
 function verifyOidcIdToken
 function verifyPassword
 function waitUntil
-interface AccessTokenPayload { aal, amr, displayName, email, iat, mfa_verified, photoURL, roles, uid }
+interface AccessTokenPayload { aal, amr, displayName, email, iat, isAnonymous, mfa_verified, photoURL, roles, uid }
 interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
@@ -391,12 +391,13 @@ const RELEVANCE_SORT_FIELD
 const RESERVED_BACKEND_PREFIXES
 const RESOURCE_GRAPH_VERSION
 const REST_TO_CANONICAL
+const RLS_IS_ANONYMOUS_SQL
 const RLS_JWT_SQL
 const RLS_ROLES_SQL
 const RLS_UID_SQL
 const RUNTIME_CONTRACT_VERSION
 const SCHEMA_VERSION_HEADER
-const policy { and, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, rolesContain, rolesOverlap, serverContext, true }
+const policy { and, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
 function bucket
 function buildResourceGraph
 function canonicalSchemaPayload
@@ -489,7 +490,7 @@ interface AuthUserData { createdAt, displayName, email, emailVerified, id, metad
 interface AuthUserListOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
-interface AuthenticatedUser { claims, displayName, email, isAdmin, photoUrl, rawToken, roles, uid }
+interface AuthenticatedUser { claims, displayName, email, isAdmin, isAnonymous, photoUrl, rawToken, roles, uid }
 interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
@@ -626,6 +627,7 @@ interface RebaseStorageSourceConfig { engine, label, transport }
 interface RebaseWebSocket { authenticate, disconnect, on, setAuthTokenGetter }
 interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy, values }
 interface ReferenceProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
+interface RegisteredPolicyExpression { kind }
 interface RelationAggregateSort { agg, field, relation }
 interface RelationBase { onDelete, onUpdate, overrides, relationName, target, validation }
 interface RelationProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
@@ -1026,7 +1028,7 @@ interface JunctionDeclaringSide { collection, junctionColumn, relation }
 interface JunctionEndpoint { collection, junctionColumn }
 interface JunctionSpec { declaringSides, endpoints, schema, table }
 interface PolicyCompileOptions { resolveCollection }
-interface PolicyEvalContext { entity, roles, uid }
+interface PolicyEvalContext { entity, isAnonymous, roles, uid }
 interface PrimaryKeyInfo { fieldName, isUUID, type }
 interface RelationRef { id, path }
 interface RelationRefWithData { data, id, path }

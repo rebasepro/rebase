@@ -130,7 +130,19 @@ const SKIP_FILES = new Set([
     "website/public/llms.txt",
     "website/public/llms-full.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
-    "tooling/scripts/deprecate-old-packages.sh"
+    "tooling/scripts/deprecate-old-packages.sh",
+    // A dated post narrating a debugging session, quoting the commands that
+    // were actually typed during it — at a time when `@rebasepro/admin` was
+    // the package's real name. Rewriting the quoted grep to today's name would
+    // make the anecdote false, and the anecdote is the article: the point is
+    // that a repo-wide grep skipped a gitignored file and read as a clean
+    // sweep. Same exemption as CHANGELOG.md, and for the same reason — a
+    // record of what was true then is not a stale reference.
+    //
+    // Deliberately this one file, not the blog directory: a post written now
+    // should use the names that exist now, and only a post that quotes history
+    // earns a line here.
+    "website/src/content/blog/2026-09-01-nothing-matched-and-nothing-said-so.md"
 ]);
 
 /**
