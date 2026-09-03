@@ -190,10 +190,18 @@ check("static app folded in", Array.isArray(
 // Written the way `infra/docker/quickstart.sh` writes it, so this exercises the
 // documented shape rather than a private one.
 const SERVICE_KEY = secret();
+// The first administrator, named rather than raced for. The compose file makes
+// both of these required — `${VAR:?…}` — so omitting them does not produce a
+// deployment without an admin, it produces a compose file that refuses to
+// interpolate, and this harness failed there rather than at any check.
+const ADMIN_EMAIL = "admin@localhost";
+const ADMIN_PASSWORD = secret(); // 64 hex chars, well past the 12-char floor
 fs.writeFileSync(envFile, [
     `POSTGRES_PASSWORD=${secret()}`,
     `JWT_SECRET=${secret()}`,
     `REBASE_SERVICE_KEY=${SERVICE_KEY}`,
+    `REBASE_ADMIN_EMAIL=${ADMIN_EMAIL}`,
+    `REBASE_ADMIN_PASSWORD=${ADMIN_PASSWORD}`,
     `CORS_ORIGINS=http://localhost:${HTTP_PORT}`,
     `REBASE_VERSION=${image.split(":").slice(1).join(":") || "latest"}`,
     `PORT=${HTTP_PORT}`,
@@ -308,12 +316,35 @@ check(
 const authConfig = await get("/api/auth/config");
 check("GET /api/auth/config answers", authConfig.status === 200, `${authConfig.status}`);
 
-// A fresh database has no users, so the first-run path must be reachable —
-// otherwise a self-hoster has a running server and no way into it.
+// A seeded deployment is set up, and this assertion used to say the opposite.
+//
+// `needsSetup` is `users.total === 0`, and it was true because a fresh
+// deployment had no way in except to let the first stranger who found it
+// register and become admin. Naming the admin in the environment closed that,
+// which also means the old expectation now describes a deployment where the
+// seed did NOT run — the seeder is deliberately quiet about most of its refusals
+// (no user store, half a credential), so the visible symptom of a broken seed is
+// exactly this flag staying true.
 check(
-    "a fresh deployment reports it needs setup",
-    /"needsSetup"\s*:\s*true/.test(authConfig.body),
+    "a seeded deployment does not need setup",
+    /"needsSetup"\s*:\s*false/.test(authConfig.body),
     authConfig.body.slice(0, 90)
+);
+
+// And the account it seeded is one somebody can actually sign in to. Worth
+// asserting rather than inferring from `needsSetup`: a row in `users` with a
+// hash nothing can verify would satisfy the count and leave the operator
+// locked out, which is the failure the seeding exists to prevent.
+const login = await fetch(`${base}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
+});
+const loginBody = await login.text();
+check(
+    "the seeded admin can sign in",
+    login.status === 200 && /"(access_?[Tt]oken|token)"\s*:/.test(loginBody),
+    `${login.status}`
 );
 
 // ── A restart must be uneventful ─────────────────────────────────────────────
