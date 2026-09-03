@@ -232,15 +232,13 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 
 ### Define Your First Collection
 
-Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
+Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up. The table name is optional: it defaults to the slug, so set it only when they differ:
 
 ```typescript title="config/collections/products.ts"
 
 const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    singularName: "Product",
-    table: "products",
     properties: {
         name: {
             type: "string",
