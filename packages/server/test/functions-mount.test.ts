@@ -5,6 +5,7 @@ import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
 
 /**
@@ -62,6 +63,13 @@ function fakeBootstrapper(driver: DataDriver): BackendBootstrapper {
 
 /** A directory with no loadable function files — only subdirectories. */
 const EMPTY_FUNCTIONS_DIR = path.join(__dirname, "fixtures");
+// The listing at GET /api/functions requires a resolved identity. This fixture
+// has no auth repository to hang a service key on, and configures no JWT of
+// its own, so configure one here and mint a token the middleware will verify.
+const asUser = async () => {
+    configureJwt({ secret: "functions-mount-test-secret-key-that-is-32-chars!", accessExpiresIn: "1h" });
+    return { headers: { authorization: `Bearer ${await generateAccessToken("u1", [])}` } };
+};
 
 async function boot(extra: Record<string, unknown> = {}, mode: "resolves" | "hangs" = "resolves") {
     const app = new Hono();
@@ -99,7 +107,7 @@ describe("the functions router is mounted for the directory, not for the functio
         // with them: /api/functions 404ed, and `rebase cloud debug` read that
         // 404 as "this build shipped no functions". An empty list is the
         // honest answer, and it is a debuggable one.
-        const res = await app.request("/api/functions");
+        const res = await app.request("/api/functions", await asUser());
         expect(res.status).toBe(200);
 
         const body = await res.json() as { functions: unknown[]; skipped?: number; note?: string };
@@ -131,8 +139,11 @@ describe("anonymous rate limiting on the functions router", () => {
     it("bounds anonymous callers, and honours `rateLimit.anonymousFunctions`", async () => {
         const app = await boot({ rateLimit: { windowMs: 60_000, anonymousFunctions: 2 } });
 
-        expect((await app.request("/api/functions")).status).toBe(200);
-        expect((await app.request("/api/functions")).status).toBe(200);
+        // The bucket sits in front of the router, so it answers before the
+        // listing's own identity guard does: two anonymous calls reach the
+        // guard (401), the third never gets that far.
+        expect((await app.request("/api/functions")).status).toBe(401);
+        expect((await app.request("/api/functions")).status).toBe(401);
 
         // The bucket used to be hardcoded off (`anonymous: null`) with no
         // override — so the one router that is public by default was also the
@@ -144,7 +155,7 @@ describe("anonymous rate limiting on the functions router", () => {
         const app = await boot({ rateLimit: { windowMs: 60_000, anonymousFunctions: null } });
 
         for (let i = 0; i < 5; i++) {
-            expect((await app.request("/api/functions")).status).toBe(200);
+            expect((await app.request("/api/functions")).status).toBe(401);
         }
     });
 });

@@ -342,7 +342,7 @@ into the 503 body, and secondary data sources add `dataSources: [{ key, error }]
 route carries no auth and orchestrators are expected to reach it.
 
 **Failure scenario.** During any database incident, an anonymous request to `/health`
-returns the pg client's message — `connect ECONNREFUSED 10.132.0.7:5432`, an auth
+returns the pg client's message — `connect ECONNREFUSED 10.0.0.7:5432`, an auth
 failure naming the role and database, or a `relation "…" does not exist` — i.e.
 internal addressing and schema names, on the one endpoint guaranteed to be exposed
 through the load balancer. The rest of the codebase already draws this line:

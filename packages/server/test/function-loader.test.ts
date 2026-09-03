@@ -1,4 +1,6 @@
 import * as path from "path";
+import { Hono } from "hono";
+import type { HonoEnv } from "../src/api/types";
 import { loadFunctionsFromDirectory, loadFunctionsWithDiagnostics } from "../src/functions/function-loader";
 import { createFunctionRoutes } from "../src/functions/function-routes";
 import { requireImporter } from "./helpers/require-importer";
@@ -88,8 +90,22 @@ describe("Function Loader & Routes", () => {
             const loaded = await loadFunctionsFromDirectory(functionsDir, requireImporter);
             const routes = createFunctionRoutes(loaded);
 
-            // 1. Verify GET / lists loaded functions
-            const listRes = await routes.request("/");
+            // 1. Verify GET / lists loaded functions — to a resolved identity.
+            // In the server the auth middleware runs ahead of this router and
+            // sets `user` (or `driver` for an anonymous caller); stand in for it.
+            const withIdentity = (identity: Record<string, unknown>) => {
+                const app = new Hono<HonoEnv>();
+                app.use("*", async (c, next) => {
+                    for (const [key, value] of Object.entries(identity)) c.set(key as never, value as never);
+                    await next();
+                });
+                app.route("/", routes);
+                return app;
+            };
+            const anonymousRes = await withIdentity({ driver: {} }).request("/");
+            expect(anonymousRes.status).toBe(401);
+
+            const listRes = await withIdentity({ driver: {}, user: { uid: "u1", roles: [] } }).request("/");
             expect(listRes.status).toBe(200);
 
             const listData = await listRes.json();

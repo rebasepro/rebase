@@ -29,7 +29,7 @@ import { assertMfaSatisfied } from "./mfa-gate";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { mountOtpRoutes } from "./otp-routes";
-import { isSteadyStateRegistrationOpen } from "./registration-policy";
+import { isBootstrapWindowOpen, isSteadyStateRegistrationOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import type { Context } from "hono";
@@ -436,6 +436,13 @@ refreshToken };
             if (!bootstrapRegistration) {
                 throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
             }
+            // An empty table admits the first registration because someone has
+            // to become the admin — but only where that someone is the person
+            // at the keyboard. In production the operator names the admin
+            // instead (`isBootstrapWindowOpen`), so there is nothing to admit.
+            if (!isBootstrapWindowOpen()) {
+                throw ApiError.forbidden(SETUP_REQUIRED_MESSAGE, "SETUP_REQUIRED");
+            }
         }
 
         // Validate password strength
@@ -477,11 +484,19 @@ refreshToken };
             throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
         }
 
-        if (isFirstUser) {
+        if (isFirstUser && isBootstrapWindowOpen()) {
             await authRepo.setUserRoles(user.id, ["admin"]);
-        } else if (config.defaultRole) {
-            // Assign configured default role (never auto-assign admin via registration)
-            await authRepo.assignDefaultRole(user.id, config.defaultRole);
+        } else {
+            if (isFirstUser) {
+                // Registration was open, so the first account was created as an
+                // ordinary one. The boot log already said how to get an admin.
+                logger.warn("[Auth] First account registered in production without promotion; " +
+                    "set REBASE_ADMIN_EMAIL/REBASE_ADMIN_PASSWORD or use the service key to assign admin.");
+            }
+            if (config.defaultRole) {
+                // Assign configured default role (never auto-assign admin via registration)
+                await authRepo.assignDefaultRole(user.id, config.defaultRole);
+            }
         }
 
         const { roleIds, accessToken, refreshToken } = await createSessionAndTokens(
@@ -674,6 +689,11 @@ displayName: user.displayName });
                             if (!bootstrapRegistration) {
                                 throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                             }
+                            // Same rule as POST /auth/register: the empty-table
+                            // exception exists for a laptop, not a hostname.
+                            if (!isBootstrapWindowOpen()) {
+                                throw ApiError.forbidden(SETUP_REQUIRED_MESSAGE, "SETUP_REQUIRED");
+                            }
                         }
 
                         // Create new user. `emailVerified` was computed for the
@@ -710,7 +730,7 @@ displayName: user.displayName });
                             throw ApiError.forbidden(noSignupsMessage, "REGISTRATION_DISABLED");
                         }
 
-                        if (isFirstUser) {
+                        if (isFirstUser && isBootstrapWindowOpen()) {
                             await authRepo.setUserRoles(user.id, ["admin"]);
                         } else if (config.defaultRole) {
                             // Assign configured default role (never auto-assign admin via registration)
@@ -1274,7 +1294,8 @@ aal: sessionAal };
         parseBody,
         buildAuthResponse,
         createSessionAndTokens,
-        applyTransformHook
+        applyTransformHook,
+        requireLiveSession
     });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1287,7 +1308,8 @@ aal: sessionAal };
         parseBody,
         buildAuthResponse,
         createSessionAndTokens,
-        applyTransformHook
+        applyTransformHook,
+        requireLiveSession
     });
 
     // ═══════════════════════════════════════════════════════════════════════

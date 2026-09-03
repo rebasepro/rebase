@@ -28,7 +28,7 @@ import { Hono } from "hono";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
-import { isRegistrationOpen, isSteadyStateRegistrationOpen } from "../src/auth/registration-policy";
+import { isBootstrapWindowOpen, isRegistrationOpen, isSteadyStateRegistrationOpen } from "../src/auth/registration-policy";
 import type { AuthRepository } from "../src/auth/interfaces";
 import { configureJwt } from "../src/auth/jwt";
 
@@ -209,7 +209,7 @@ function build(scenario: Scenario) {
     // Mounted exactly as init.ts mounts it.
     app.route("/auth", adapter.createAuthRoutes()!);
 
-    return { adapter, app };
+    return { adapter, app, repo };
 }
 
 const SCENARIOS: Scenario[] = [false, true].flatMap(disableSelfRegistration =>
@@ -260,6 +260,64 @@ describe("what /auth/config advertises is what /auth/register does", () => {
             allowRegistration: scenario.allowRegistration,
             needsSetup: scenario.existingUsers === 0
         }));
+    });
+});
+
+describe("the bootstrap window", () => {
+    it("is open everywhere but production", () => {
+        expect(isBootstrapWindowOpen({})).toBe(true);
+        expect(isBootstrapWindowOpen({ NODE_ENV: "development" })).toBe(true);
+        expect(isBootstrapWindowOpen({ NODE_ENV: "test" })).toBe(true);
+        expect(isBootstrapWindowOpen({ NODE_ENV: "production" })).toBe(false);
+    });
+
+    it("once shut, an empty table no longer admits anyone registration would not", () => {
+        expect(isRegistrationOpen({ allowRegistration: false, needsSetup: true, bootstrapWindowOpen: false })).toBe(false);
+        expect(isRegistrationOpen({ allowRegistration: true, needsSetup: true, bootstrapWindowOpen: false })).toBe(true);
+        expect(isRegistrationOpen({ allowRegistration: false, needsSetup: true, bootstrapWindowOpen: true })).toBe(true);
+    });
+});
+
+describe("in production, an empty table is not a prize", () => {
+    const previous = process.env.NODE_ENV;
+    beforeEach(() => { process.env.NODE_ENV = "production"; });
+    afterEach(() => { process.env.NODE_ENV = previous; });
+
+    const register = (app: Hono<HonoEnv>) => app.request("/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "stranger@test.dev", password: "a-sufficiently-long-password", displayName: "Stranger" })
+    });
+
+    it("refuses the bootstrap registration, says what to do, and advertises no setup", async () => {
+        const { adapter, app, repo } = build({ disableSelfRegistration: false, allowRegistration: false, existingUsers: 0 });
+        const capabilities = await adapter.getCapabilities();
+        expect(capabilities.needsSetup).toBe(false);
+        expect(capabilities.registrationEnabled).toBe(false);
+
+        const res = await register(app);
+        expect(res.status).toBe(403);
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("SETUP_REQUIRED");
+        expect(body.error.message).toContain("REBASE_ADMIN_EMAIL");
+        expect(repo.setUserRoles).not.toHaveBeenCalled();
+    });
+
+    it("creates an ordinary account, never an admin, when registration is open", async () => {
+        const { adapter, app, repo } = build({ disableSelfRegistration: false, allowRegistration: true, existingUsers: 0 });
+        expect((await adapter.getCapabilities()).registrationEnabled).toBe(true);
+
+        const res = await register(app);
+        expect(res.status).toBeLessThan(400);
+        expect(repo.setUserRoles).not.toHaveBeenCalled();
+    });
+
+    it("still promotes the first user outside production", async () => {
+        process.env.NODE_ENV = "development";
+        const { app, repo } = build({ disableSelfRegistration: false, allowRegistration: false, existingUsers: 0 });
+        const res = await register(app);
+        expect(res.status).toBeLessThan(400);
+        expect(repo.setUserRoles).toHaveBeenCalledWith(expect.any(String), ["admin"]);
     });
 });
 

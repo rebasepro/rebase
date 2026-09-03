@@ -67,7 +67,9 @@ the tables at boot.
 
 **Read the URLs from the output.** `rebase dev` picks a free port per project
 rather than fixed ones, so they differ between projects and between machines.
-The first account you register becomes the admin.
+The first account you register becomes the admin — on your machine. A
+production deployment names its admin instead, with `REBASE_ADMIN_EMAIL` and
+`REBASE_ADMIN_PASSWORD` (see [Configuration](/docs/getting-started/configuration/)).
 
 To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again.
