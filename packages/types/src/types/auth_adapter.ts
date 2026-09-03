@@ -30,7 +30,30 @@
  * @group Auth
  */
 
-import type { Hono } from "hono";
+/**
+ * A sub-app an adapter hands back for the framework to mount.
+ *
+ * Structural on purpose. This was `Hono<any, any, any>`, and that one
+ * `import type { Hono } from "hono"` was the whole reason `@rebasepro/types`
+ * peer-depended on hono — which npm and pnpm auto-install, so **every browser
+ * app that installed `@rebasepro/client` got a 2.8 MB server framework in its
+ * lockfile and its security scanners**, for a type used by two optional methods
+ * that a browser app can never call.
+ *
+ * The shape is the same duck-type the function loader already validates at
+ * runtime (`isHonoLike`: a `fetch` method and a `routes` array), and a real
+ * `Hono` satisfies it — asserted in `auth_adapter.test.ts`, which does import
+ * hono, because a structural type is only worth having if something proves the
+ * real thing still fits.
+ *
+ * @group Auth
+ */
+export interface MountableRouter {
+    /** Handle a request. Hono, Elysia and a hand-rolled router all have this. */
+    fetch: (request: Request) => Response | Promise<Response>;
+    /** The routes the sub-app declares. Only its presence is contractual. */
+    routes: readonly unknown[];
+}
 
 // ─── Authenticated User ──────────────────────────────────────────────────────
 
@@ -414,20 +437,20 @@ export interface AuthAdapter {
      * - External adapter: typically returns `undefined` (auth is handled externally).
      * - Custom adapter: user mounts their own routes.
      *
-     * The return type uses `Hono<any, any, any>` because this sub-app will be
-     * mounted into a parent app via `.route()`, which accepts any Hono env type.
-     * Adapter implementations are free to use their own env (e.g. `Hono<HonoEnv>`).
+     * The return type is the structural {@link MountableRouter} rather than
+     * `Hono`, so this package needs no hono dependency. A real `Hono<HonoEnv>`
+     * satisfies it, and implementations are free to use their own env.
      *
      * @returns A Hono sub-app with auth routes, or `undefined` to skip route mounting.
      */
-    createAuthRoutes?(): Hono<any, any, any> | undefined;
+    createAuthRoutes?(): MountableRouter | undefined;
 
     /**
      * Mount admin routes (e.g. password reset for users).
      *
      * @returns A Hono sub-app with admin routes, or `undefined` to skip.
      */
-    createAdminRoutes?(): Hono<any, any, any> | undefined;
+    createAdminRoutes?(): MountableRouter | undefined;
 
     // ── Feature Detection ───────────────────────────────────────────────
 

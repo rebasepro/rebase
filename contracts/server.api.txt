@@ -590,6 +590,7 @@ interface ManagedCompatibility { eligible, reasons }
 interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through, validation }
 interface MapProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
 interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
+interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
 interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, propertyConfig, type, validation }
