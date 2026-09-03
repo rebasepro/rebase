@@ -5,6 +5,11 @@ site, and the places webhook destinations are configured (`tooling/rebase-agent-
 `website/src/content/docs/docs/recipes/webhooks.md`, `saas/config/collections/webhooks.ts`).
 **Method:** read-only. Nothing was run, edited or fetched.
 
+> **Status, 2026-09-03.** The finding below was fixed in `5e6f85b55` (2026-08-08): every
+> destination is resolved before delivery, and loopback, link-local and private ranges are
+> refused unless the dispatcher is built with `allowPrivateNetworks`. The text is kept as
+> written, as a record of the code on the audit date, not of the code today.
+
 ## Verdict
 
 `WebhookDispatcher` is a 161-line class that does exactly what its tests check and nothing that a
@@ -42,7 +47,7 @@ const response = await fetch(webhook.url, { method: "POST", headers, body, signa
 scheme allowlist, no rejection of loopback / link-local / RFC1918 / `.internal` hosts, no port
 restriction, no proxy, and no DNS resolution step — so `http://169.254.169.254/latest/meta-data/`,
 `http://metadata.google.internal/computeMetadata/v1/`, `http://localhost:5432/`,
-`http://postgres-rw.rebase-saas.svc.cluster.local:5432/` and `http://kubernetes.default.svc/` are
+`http://postgres.<namespace>.svc.cluster.local:5432/` and `http://kubernetes.default.svc/` are
 all ordinary destinations. A repo-wide grep for `ssrf`, `169.254`, `isPrivateIp` and `link-local`
 across `packages/*/src` returns nothing: no such guard exists anywhere in the monorepo.
 
