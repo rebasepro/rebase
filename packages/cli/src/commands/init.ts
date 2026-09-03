@@ -705,11 +705,11 @@ async function createProject(options: InitOptions) {
         }
     } else if (isBaas) {
         // One step, then the thing that is actually this mode's job. `dev`
-        // starts the database itself; a headless project has no collections, so
-        // there is no schema to push and the tables are the developer's to
-        // create.
+        // starts the database container itself; a headless project has no
+        // collections, so there is no schema to push and the tables are the
+        // developer's to create.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start everything — the database comes up with it:"));
+        console.log(chalk.gray("  # 1. Start everything — the database container comes up with it:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         console.log("");
         console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
@@ -718,26 +718,14 @@ async function createProject(options: InitOptions) {
         console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
         console.log(chalk.gray("  #    The API logs any table it skips, and why."));
     } else {
-        // The whole first run, in one command.
-        //
-        // Deliberately does NOT say "container". This branch is the one a new
-        // project takes, and it is precisely the branch with no container in it:
-        // `.env` ships DATABASE_URL commented out, so `dev` starts the managed
-        // PGlite database rather than Docker. Saying otherwise sent a reader who
-        // had no Docker installed off to install it, to satisfy a step that was
-        // never going to run — and made the whole quickstart look like it
-        // required a daemon it does not.
-        //
-        // "schema" covers two things `dev` now does before serving: generating
-        // the Drizzle schema from the collections, and applying the collections
-        // to the database. The push-and-Docker steps that used to be printed
-        // here are still documented under `rebase dev --help`.
+        // The whole first run, in one command: `dev` starts the database
+        // container and pushes the schema before it starts the servers. The two
+        // steps that used to be printed here are still available — and still
+        // documented under `rebase dev --help` — for anyone who wants to drive
+        // them separately.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # Start everything — the database and schema are set up for you,"));
-        console.log(chalk.gray("  # with no Docker and nothing else to install:"));
+        console.log(chalk.gray("  # Start everything — the database container and schema are set up for you:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
-        console.log("");
-        console.log(chalk.gray("  # To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
     }
 
     console.log("");
