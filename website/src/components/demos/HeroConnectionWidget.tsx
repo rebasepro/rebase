@@ -71,7 +71,7 @@ export default function HeroConnectionWidget() {
                                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
                                     <Database size={24} />
                                 </div>
-                                <h3 className="text-white font-semibold text-base">Connect to Your Postgres Database</h3>
+                                <p className="text-white font-semibold text-base">Connect to your Postgres database</p>
                                 <p className="text-xs text-surface-400 max-w-sm mx-auto">
                                     Point Rebase at your connection string. Everything runs on your infrastructure.
                                 </p>

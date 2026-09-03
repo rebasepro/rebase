@@ -21,7 +21,7 @@ Here's the field: **Supabase**, **Appwrite**, **Firebase**, **PocketBase**, **Co
 | Authorization | **Postgres RLS, enforced** — tables without RLS aren't served | Postgres RLS (opt-in) | Role/permission rules | Security rules DSL | JS-like filter rules | TypeScript functions | TS access-control functions |
 | Schema source of truth | TypeScript collections → migrations, or inferred from an existing DB | The database itself (SQL) | Console/API-defined | Schemaless | Admin UI / JS migrations | TS schema | TS config |
 | Realtime | Live queries, broadcast, presence + **DB-level CDC** | Postgres WAL-based | WebSocket events | Native listeners | SSE subscriptions | **Best-in-class** reactive queries | None built in |
-| Admin UI | **Opt-in**: spreadsheet CMS + Studio (SQL, RLS editor, ER diagram) | Studio (DB-centric) | Console | Firebase console | Minimal | Dashboard | **Excellent**, content-centric |
+| Admin panel | **Opt-in**: spreadsheet CMS + Studio (SQL, RLS editor, ER diagram) | Studio (DB-centric) | Console | Firebase console | Minimal | Dashboard | **Excellent**, content-centric |
 | Typed client | Generated TS SDK from collections | Generated types from DB | SDKs (many languages) | SDKs | SDKs | **End-to-end types** | Generated types |
 | Managed cloud | Early | Mature ($25 Pro / $599 Team) | $15/member Pro | Pay-per-operation | **None** | $25/dev + usage | Payload Cloud |
 
@@ -54,7 +54,7 @@ Firebase remains excellent at what made it famous: mobile SDKs, offline sync, pu
 - **Pricing is inseparable from architecture.** The Blaze plan [bills per operation](https://www.sashido.io/en/blog/firebase-guide-and-pricing-traps-2026) — reads, writes, deletes — so a data-modeling decision is a billing decision, and traffic spikes translate directly into invoice spikes.
 - **The lock-in is real.** Firestore is proprietary NoSQL, locked to Google Cloud, and [exports in a custom format](https://encore.dev/articles/firebase-alternatives) that doesn't map cleanly onto anything else. The deeper you embed Firestore semantics, the more expensive leaving becomes.
 
-The migration path away from Firebase usually leads to SQL and flat, predictable costs — which is exactly the profile of Supabase, Appwrite self-hosted, or Rebase. One thing specific to us: Rebase ships a Firestore adapter, so you can put the Rebase admin panel on your existing Firebase project *first* and migrate the data to Postgres on your own schedule. More: [Rebase vs Firebase](/rebase-vs-firebase).
+The migration path away from Firebase usually leads to SQL and flat, predictable costs — which is exactly the profile of Supabase, Appwrite self-hosted, or Rebase. One thing specific to us: Rebase ships a Firestore adapter, so you can put the Rebase panel on your existing Firebase project *first* and migrate the data to Postgres on your own schedule. More: [Rebase vs Firebase](/rebase-vs-firebase).
 
 ## PocketBase: the minimalist ceiling
 
@@ -75,7 +75,7 @@ The trade-offs are just as clear:
 - **Authorization is imperative** — access rules are code you write in each function, not policies the database enforces regardless of the caller.
 - There's no admin panel a non-developer could use.
 
-Rebase's counter-position is almost a mirror image: standard Postgres you own, SQL when you want it, authorization enforced *by the database* (so it also binds cron jobs, scripts, and anything else that touches the data), and a spreadsheet-grade admin UI for your team. Convex's realtime ergonomics are the bar we measure our live queries against.
+Rebase's counter-position is almost a mirror image: standard Postgres you own, SQL when you want it, authorization enforced *by the database* (so it also binds cron jobs, scripts, and anything else that touches the data), and a spreadsheet-grade panel for your team. Convex's realtime ergonomics are the bar we measure our live queries against.
 
 ## Payload: the philosophical twin, post-acquisition
 

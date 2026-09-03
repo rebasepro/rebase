@@ -560,7 +560,7 @@ export function SchemaEditorDemo() {
                                 >
                                     <div className="flex flex-row text-text-secondary dark:text-text-secondary-dark items-center">
                                         <Icon iconKey="CheckSquare" size={24} className="select-none" />
-                                        <h6 className="typography-subtitle2 text-text-primary dark:text-text-primary-dark ml-2">Validation</h6>
+                                        <span className="block typography-subtitle2 text-text-primary dark:text-text-primary-dark ml-2">Validation</span>
                                     </div>
                                     <Icon iconKey="ChevronDown" size={24} className="select-none transition" />
                                 </button>
@@ -636,9 +636,9 @@ export function SchemaEditorDemo() {
                                 transform: `translateY(-${scrollPosition}px)`,
                                 transition: "none"
                             }}>
-                                <h6 className="typography-subtitle2 text-text-primary dark:text-text-primary-dark mb-4 mt-6 flex-shrink-0">
+                                <span className="block typography-subtitle2 text-text-primary dark:text-text-primary-dark mb-4 mt-6 flex-shrink-0">
                                     Select a property widget
-                                </h6>
+                                </span>
 
                                 <div>
                                     {/* Text */}
