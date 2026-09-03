@@ -1447,3 +1447,44 @@ describe("choosing a free port for the local database", () => {
         expect(await isPortAvailable(await free())).toBe(true);
     });
 });
+
+/**
+ * The scaffold has to tell *both* supported package managers that
+ * `@ariga/atlas` may run its install script, in each one's own dialect.
+ *
+ * pnpm 10 and npm 12 both refuse a dependency's lifecycle scripts unless the
+ * project allowlists them, and `@ariga/atlas` downloads its binary in
+ * `preinstall`. The scaffold has carried pnpm's key for a long time; npm's
+ * (`allowScripts`) was missing, so on npm the install exited 0 with a warning,
+ * `node_modules/.bin/atlas` never appeared, and `db:push` — the command the
+ * quickstart points at for your own Postgres — failed on a binary nobody had
+ * been told was skipped.
+ *
+ * Asserted as a pair rather than as two separate facts, because the failure is
+ * silent on whichever manager gets forgotten and is only ever noticed by
+ * somebody who already has a broken project.
+ */
+describe("the template's install-script allowlists", () => {
+    const templates: Array<[string, string]> = [
+        ["template", path.join(findCliRoot(), "templates", "template", "package.json")],
+        ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas", "package.json")]
+    ];
+
+    it.each(templates)("%s allows @ariga/atlas under both pnpm and npm", (_name, pkgPath) => {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+        expect(pkg.allowScripts?.["@ariga/atlas"]).toBe(true);
+    });
+
+    it.each(templates)("%s grants npm no more than it needs", (_name, pkgPath) => {
+        // The npm list is deliberately the shorter one. esbuild and sharp are in
+        // pnpm's for historical reasons; under npm their binaries arrive through
+        // platform optionalDependencies with no script running at all — verified
+        // on npm 12, where the blocked `postinstall` is only a fallback and
+        // `esbuild --version` answers anyway. Allowing a script that is not
+        // needed is a grant with no benefit, so this fails if one is added here
+        // without a reason.
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
+    });
+});
