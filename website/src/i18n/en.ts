@@ -83,6 +83,22 @@ export const en = {
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
     "A certified digital medical device delivering AI-personalized pain therapy. Rebase runs the entire backend — patient records, therapy plans, the exercise content library, and the clinical dashboards on top of them.",
+  "showcase.case3.badge": "Public data · Built by the Rebase team",
+  "showcase.case3.title": "A dónde va el dinero de España",
+  "showcase.case3.desc":
+    "A public reading of Spanish government spending, from €725bn down to a single budget line. There is no database in the read path: a cron recompiles the official figures each month, storage serves them as JSON, and the page itself makes zero API calls.",
+  "showcase.case4.badge": "AI sales agent · Built by the Rebase team",
+  "showcase.case4.title": "Prospector",
+  "showcase.case4.desc":
+    "An outbound agent that reads your site, plans audiences, then finds real companies and the people at them — each one verified against its own website. Crons, functions and the review board are stock Rebase. It drafts; the schema has no state in which it sends.",
+  "showcase.case5.badge": "Retail loyalty",
+  "showcase.case5.title": "Unfeigned",
+  "showcase.case5.desc":
+    "The loyalty programme behind an apparel brand. Orders from Odoo POS and Shopify land in Postgres, a tier engine recomputes points and discounts, and the Apple and Google Wallet passes customers scan at the till are issued from the same schema.",
+  "showcase.case6.badge": "Internal tool · CRM and workflow automation",
+  "showcase.case6.title": "Edith",
+  "showcase.case6.desc":
+    "A CRM the team can rebuild without a deploy: pipelines, tags, tasks and an automation canvas whose triggers, branches and actions are all rows in Postgres. Twenty-three collections generated the entire back office — no admin screens were written.",
   "cta.title": "Point it at your database.",
   // The close is a fork, not a fourth copy of the hero's install command. The
   // cloud lane offers access rather than a deploy button, because Rebase Cloud
