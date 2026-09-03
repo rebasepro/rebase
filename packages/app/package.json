@@ -47,12 +47,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     },
     "./vitePlugin": {
       "types": "./dist/vitePlugin.d.ts",
       "development": "./dist/vitePlugin.js",
-      "import": "./dist/vitePlugin.js"
+      "import": "./dist/vitePlugin.js",
+      "default": "./dist/vitePlugin.js"
     },
     "./package.json": "./package.json"
   },

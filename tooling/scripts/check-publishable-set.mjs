@@ -215,6 +215,32 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
                 `${pkg.dir} is where it actually lives — npm links the declared path from the package page.`
             );
         }
+
+        /* ── 6. Every exports entry resolves for `require` ──────────── */
+
+        // Node resolves an `exports` map against a condition set that, for
+        // `require(...)`, is ["node", "require"] — never "import". A map whose
+        // JS entry lists only `types`/`development`/`import` therefore matches
+        // nothing and Node refuses with ERR_PACKAGE_PATH_NOT_EXPORTED *before*
+        // it looks at the file. That is not the ESM-only error anyone expects:
+        // Node 22.12+ can `require()` an ES module perfectly well, so the
+        // package was turning a supported call into what reads as a broken
+        // install, for every Jest suite, `ts-node` project and `.cjs` script.
+        //
+        // A trailing `default` costs nothing, is the last condition tried, and
+        // makes `require` land on the same file `import` does.
+        for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+            if (typeof target !== "object" || target === null) continue;   // a plain string already matches every condition
+            if (typeof target.default === "string") continue;
+            fail(
+                `${pkg.name} exports "${subpath}" with no \`default\` condition`,
+                `${pkg.dir} — conditions are [${Object.keys(target).join(", ")}].`
+                + "\n      `require()` resolves against [\"node\", \"require\"], matches none of them,"
+                + "\n      and fails with ERR_PACKAGE_PATH_NOT_EXPORTED on every Node version —"
+                + "\n      including the ones that support require(esm). Add"
+                + `\n      \`"default": ${JSON.stringify(target.import ?? "./dist/index.es.js")}\` as the LAST condition.`
+            );
+        }
     }
 
     return findings;

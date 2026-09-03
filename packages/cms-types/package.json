@@ -78,7 +78,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     },
     "./package.json": "./package.json"
   },
