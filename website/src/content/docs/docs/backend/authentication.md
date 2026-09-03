@@ -14,7 +14,7 @@ Rebase includes a complete backend authentication system:
 - **Auth hooks** — Lifecycle hooks for user creation and more
 - **Custom auth adapters** — Plug in Firebase Auth, Auth0, Clerk, or any external provider
 - **Service key** — Static key for server-to-server authentication
-- **Auto-bootstrapping** — First user automatically gets the admin role
+- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ## Configuration
 
@@ -76,7 +76,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
-| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. The first user on an empty table is admitted either way |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
@@ -454,7 +454,7 @@ service key:
 | `DELETE` | `/api/admin/users/:uid` | Delete one user |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
 | `GET` | `/api/admin/roles` | List the roles this backend knows |
-| `POST` | `/api/admin/bootstrap` | Create the first administrator on an empty user table — see [First User Bootstrap](#first-user-bootstrap) |
+| `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
@@ -646,9 +646,11 @@ CREATE POLICY owner_access ON posts
 
 ## First User Bootstrap
 
-When no users exist in the database, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
+When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 
-This ensures you can always bootstrap a fresh deployment without needing to seed the database manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
+In production that window is closed, because a host with a public name is reachable before its operator has registered, and whoever got there first would own it. A production deployment names its first admin in the environment instead — `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`, created at boot while the table is still empty — or assigns the role with the service key. With the window closed, an empty table refuses the bootstrap registration with `SETUP_REQUIRED` (and says so), a first account created through open registration is an ordinary account, `GET /api/auth/config` never reports `needsSetup`, `POST /api/admin/bootstrap` refuses, and the boot log warns when the table is empty and no admin is named.
+
+On a laptop this means you can always bootstrap a fresh database without seeding it manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
 ```sql
 SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```

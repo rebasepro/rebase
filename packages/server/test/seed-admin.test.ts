@@ -1,5 +1,6 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { seedInitialAdmin } from "../src/auth/seed-admin";
+import { logger } from "../src/utils/logger";
 import type { UserManagementAdapter, AuthUserData } from "@rebasepro/types";
 
 /**
@@ -57,6 +58,30 @@ describe("seeding the initial admin from the environment", () => {
 
         expect(outcome).toEqual({ status: "already-bootstrapped" });
         expect(adapter.createUser).not.toHaveBeenCalled();
+    });
+
+    it("warns at boot when production has no users and nothing named to seed", async () => {
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        try {
+            const { adapter } = mockUsers();
+            const outcome = await seedInitialAdmin(adapter, { NODE_ENV: "production" });
+            expect(outcome).toEqual({ status: "not-requested" });
+            expect(adapter.listUsers).toHaveBeenCalled();
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("REBASE_ADMIN_EMAIL"));
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it("stays quiet in production once the deployment has users", async () => {
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        try {
+            const { adapter } = mockUsers([{ id: "u1", email: "someone@acme.test" } as AuthUserData]);
+            await seedInitialAdmin(adapter, { NODE_ENV: "production" });
+            expect(warn).not.toHaveBeenCalled();
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it("does nothing when neither variable is set", async () => {

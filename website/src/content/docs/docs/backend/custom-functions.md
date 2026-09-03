@@ -498,7 +498,7 @@ If loading fails, the loader provides diagnostic output:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The reasons stay in the boot log.
+The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The listing itself requires a signed-in caller, an API key or the service key — the functions stay callable by whoever each one admits, but the inventory of them is not public. The reasons stay in the boot log.
 
 ## Timeouts and Rate Limits
 

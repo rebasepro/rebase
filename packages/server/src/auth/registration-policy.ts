@@ -44,12 +44,45 @@ export interface RegistrationPolicy {
      * first and only pays for the count when that says no.
      */
     needsSetup: boolean;
+    /**
+     * Whether an empty table may still be claimed by whoever registers first.
+     * Defaults to {@link isBootstrapWindowOpen}; tests pass it explicitly.
+     */
+    bootstrapWindowOpen?: boolean;
 }
+
+/**
+ * Whether the first-come-first-admin window exists at all.
+ *
+ * On a laptop it should: the person at the keyboard is the operator, and a
+ * fresh database that nobody can administer is a dead end. On anything with a
+ * public hostname it must not: the shipped artifacts bring DNS and TLS up
+ * before the operator has typed anything, `GET /auth/config` advertises
+ * `needsSetup`, and whoever reaches `POST /auth/register` first owns the
+ * deployment. So the window is open outside production and closed inside it,
+ * where the operator names the first admin with `REBASE_ADMIN_EMAIL` /
+ * `REBASE_ADMIN_PASSWORD` (see `seed-admin.ts`) or assigns the role with the
+ * service key — two ways in, neither of which is a race.
+ */
+export function isBootstrapWindowOpen(env: { NODE_ENV?: string } = process.env): boolean {
+    return env.NODE_ENV !== "production";
+}
+
+/**
+ * What to tell a caller who hit an empty production database with the window
+ * shut. Named here so the register route and the bootstrap route say the same
+ * thing.
+ */
+export const SETUP_REQUIRED_MESSAGE =
+    "This deployment has no administrator yet, and in production the first account is not " +
+    "promoted automatically. Set REBASE_ADMIN_EMAIL and REBASE_ADMIN_PASSWORD before the first " +
+    "boot, or assign the admin role with the service key.";
 
 /** The full predicate, for callers that already know whether setup is needed. */
 export function isRegistrationOpen(policy: RegistrationPolicy): boolean {
     if (policy.disableSelfRegistration) return false;
-    return policy.needsSetup || !!policy.allowRegistration;
+    const window = policy.needsSetup && (policy.bootstrapWindowOpen ?? isBootstrapWindowOpen());
+    return window || !!policy.allowRegistration;
 }
 
 /**

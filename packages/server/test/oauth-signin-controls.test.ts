@@ -233,6 +233,29 @@ describe("POST /auth/<provider> — registration policy", () => {
         expect(repo.setUserRoles).not.toHaveBeenCalled();
     });
 
+    it("in production, refuses the empty-table exception and never promotes a first sign-in", async () => {
+        const previous = process.env.NODE_ENV;
+        process.env.NODE_ENV = "production";
+        try {
+            const closed = createApp({ allowRegistration: false });
+            repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
+            repo.listUsers.mockResolvedValue([mockUser({ id: "new-user" })]);
+            const refused = await signIn(closed);
+            expect(refused.status).toBe(403);
+            expect((await refused.json() as { error: { code: string } }).error.code).toBe("SETUP_REQUIRED");
+            expect(repo.setUserRoles).not.toHaveBeenCalled();
+
+            const open = createApp({ allowRegistration: true });
+            repo.listUsersPaginated.mockResolvedValue({ users: [], total: 0, limit: 1, offset: 0 });
+            repo.listUsers.mockResolvedValue([mockUser({ id: "new-user" })]);
+            const admitted = await signIn(open);
+            expect(admitted.status).toBe(200);
+            expect(repo.setUserRoles).not.toHaveBeenCalled();
+        } finally {
+            process.env.NODE_ENV = previous;
+        }
+    });
+
     it("creates the account normally when registration is open", async () => {
         const app = createApp({ allowRegistration: true });
 
