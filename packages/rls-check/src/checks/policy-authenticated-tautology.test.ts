@@ -38,24 +38,29 @@ describe("policy-authenticated-tautology", () => {
     });
 
     /**
-     * `'anon'` is NOT this check's case, and used to be asserted here as if it
-     * were.
+     * `'anon'` is a decoy, not a guard — which makes it the *worse* finding.
      *
-     * A guard only belongs to this finding if it excludes an id a signed-out
-     * caller can actually arrive with. `'anon'` is the id the request path
-     * reported before the sentinel was unified on `'anonymous'`, so a policy
-     * excluding only `'anon'` excludes nobody on any server shipping today — it
-     * is still wide open to anonymous callers, not merely to signed-in ones.
+     * This case asserted the opposite when it was written, on the reasonable
+     * assumption that any `<>` against an anonymous-looking literal excludes
+     * signed-out callers. It does not. `'anon'` is the id the request path
+     * reported before the sentinel was unified, so on every server shipping
+     * today a policy excluding only `'anon'` excludes nobody: the null test
+     * stands on its own and signed-out callers read every row. That is the
+     * anonymous tautology at `critical`, not the authenticated one at `high`.
      *
-     * So it stays with {@link policyAnonymousTautology}, which is `critical`
-     * rather than this check's `high`, and which names the decoy in its title.
-     * Routing it here would have quietly downgraded the severity of the exact
-     * predicate that leaked a production `users` table.
+     * Reporting it here would understate a policy open to the internet as one
+     * merely open to every account, so the clearing list stays narrow and this
+     * check stays quiet.
      */
-    it("leaves `<> 'anon'` to the anonymous check, which rates it higher", () => {
-        expect(policyAuthenticatedTautology.run(
-            withPolicy("(auth.uid() IS NOT NULL AND auth.uid() <> 'anon')")
-        )).toEqual([]);
+    it("treats 'anon' as a decoy and leaves it to the anonymous check", () => {
+        const decoyGuarded = withPolicy("(auth.uid() IS NOT NULL AND auth.uid() <> 'anon')");
+
+        expect(policyAuthenticatedTautology.run(decoyGuarded)).toEqual([]);
+
+        const anonymous = policyAnonymousTautology.run(decoyGuarded);
+        expect(anonymous).toHaveLength(1);
+        expect(anonymous[0].severity).toBe("critical");
+        expect(anonymous[0].title).toContain("'anon'");
     });
 
     it("recognises the empty-string sentinel", () => {
