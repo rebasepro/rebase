@@ -492,6 +492,15 @@ const REFUSAL_CASES = [
         "--set", "bundle.mode=url", "--set", "bundle.url=https://example.com/b.tgz",
         "--set", "image.repository=rebasepro/server", "--set", "image.tag=0.16.0"
     ]],
+    // An address the login route will not parse. `admin@localhost` was
+    // quickstart.sh's default: it seeds without complaint and then 400s on every
+    // sign-in, because `POST /auth/login` parses its body with
+    // `z.string().email()` and that wants a dot in the domain. A release like
+    // that installs cleanly, reports itself set up, and cannot be signed in to.
+    ["admin email the login route would reject", [
+        "--set", "config.adminEmail=admin@localhost",
+        "--set", "config.adminPassword=a-perfectly-long-password"
+    ]],
     ["stock image with mode=image", ["--set", "image.repository=rebasepro/server"]],
     ["units enabled without a split", ["--set", "functions.enabled=true"]],
     ["only and exclude together", [
