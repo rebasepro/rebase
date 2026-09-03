@@ -34,11 +34,11 @@ const s = (v: string) => `<span class="s">${v}</span>`;
 const dim = (v: string) => `<span class="c">${v}</span>`;
 
 const TODAY: { path: string; code: string; ok: boolean; verdict: string }[] = [
-    { path: "routes/orders.ts", code: `${k("if")} (order.ownerId !== req.user.id) ${k("return")} res.status(403).end();`, ok: true, verdict: "checks" },
-    { path: "jobs/nightly-report.ts", code: `${k("const")} rows = ${k("await")} db.select().from(orders);  ${dim("// every row")}`, ok: false, verdict: "no check" },
-    { path: "scripts/backfill.ts", code: `${k("await")} db.update(orders).set({ status: ${s('"shipped"')} });  ${dim("// run once, kept forever")}`, ok: false, verdict: "no check" },
-    { path: "agents/tools.ts", code: `createClient(URL, SERVICE_ROLE_KEY);  ${dim("// service role")}`, ok: false, verdict: "bypasses RLS" },
-    { path: "the hosted dashboard", code: `${k("select")} * ${k("from")} orders;  ${dim("-- as the project owner")}`, ok: false, verdict: "no policy" },
+    { path: "routes/orders.ts", code: `${k("if")} (order.ownerId !== req.user.id) ${k("return")} 403;`, ok: true, verdict: "checks" },
+    { path: "jobs/nightly-report.ts", code: `db.select().from(orders)  ${dim("// every row")}`, ok: false, verdict: "no check" },
+    { path: "scripts/backfill.ts", code: `db.update(orders).set(…)  ${dim("// run once, kept forever")}`, ok: false, verdict: "no check" },
+    { path: "agents/tools.ts", code: `createClient(URL, SERVICE_ROLE_KEY)`, ok: false, verdict: "bypasses RLS" },
+    { path: "the hosted dashboard", code: `${k("select")} * ${k("from")} orders  ${dim("-- as the owner")}`, ok: false, verdict: "no policy" },
 ];
 
 const RULE = `securityRules: [
@@ -74,7 +74,7 @@ const AFTER: { path: string; role: string }[] = [
         </div>
     </div>
 
-    <div class="relative bg-[#09090b] lg:h-[430px] overflow-hidden">
+    <div class="relative bg-[#09090b] lg:h-[380px] overflow-hidden">
         <div class="pane only-today">
             {TODAY.map((row) => (
                 <div class="row">
