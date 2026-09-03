@@ -742,3 +742,110 @@ describe("a connection that turns out to be inside a transaction", () => {
         expect(outcome.failures.filter(f => f.kind === "create-index")).toHaveLength(0);
     });
 });
+
+/**
+ * What a renamed property looks like to an additive provisioner.
+ *
+ * Rename `title` to `headline` and boot does exactly what it promises: it adds
+ * `headline` — nullable, correctly, and it says why — and leaves `title` alone,
+ * because dropping a column is destructive and this runs unattended. The table
+ * is then unwritable, and the error names a field the author already deleted:
+ *
+ *     POST /api/data/posts -> 400 PG_23502
+ *     Missing required field: "title" in "posts" cannot be empty.
+ *
+ * On the default first-run path there is no way out inside the product either:
+ * the managed database is PGlite, and `db push` — the documented repair —
+ * refuses there, because Atlas diffs by replaying into a second database and
+ * PGlite serves exactly one.
+ *
+ * So boot reports it. Reported and never acted on: dropping the column is the
+ * right fix nearly always, and destructive exactly once.
+ */
+describe("a required column no property declares any more", () => {
+    const renamed = {
+        name: "Posts",
+        slug: "posts",
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            headline: { name: "Headline", type: "string", validation: { required: true } }
+        }
+    } as unknown as CollectionConfig;
+
+    /** A live table that still has the pre-rename column, NOT NULL, no default. */
+    const afterRename = (): ExistingSchema => ({
+        tables: new Map([["public.posts", new Set(["id", "title", "headline"])]]),
+        enums: new Set(),
+        notNullColumns: new Set(["public.posts.id", "public.posts.title"]),
+        columnDefaults: new Set(["public.posts.id"]),
+        populatedTables: new Set(["public.posts"])
+    });
+
+    it("reports the orphan, with the collection that stopped declaring it", () => {
+        const plan = planCollectionSchemaEnsure([renamed], afterRename());
+        expect(plan.orphanedRequiredColumns).toEqual([
+            { table: "public.posts", column: "title", slug: "posts" }
+        ]);
+    });
+
+    it("reports it rather than dropping it — nothing destructive is planned", () => {
+        const plan = planCollectionSchemaEnsure([renamed], afterRename());
+        expect(plan.statements.join("\n")).not.toMatch(/DROP COLUMN/i);
+    });
+
+    it("says nothing about a leftover that is nullable, which still accepts writes", () => {
+        const existing = afterRename();
+        existing.notNullColumns = new Set(["public.posts.id"]);
+        expect(planCollectionSchemaEnsure([renamed], existing).orphanedRequiredColumns).toEqual([]);
+    });
+
+    it("says nothing about a leftover with a default, which is filled in for you", () => {
+        const existing = afterRename();
+        existing.columnDefaults = new Set(["public.posts.id", "public.posts.title"]);
+        expect(planCollectionSchemaEnsure([renamed], existing).orphanedRequiredColumns).toEqual([]);
+    });
+
+    it("says nothing about a table this run is creating, which cannot have leftovers", () => {
+        const plan = planCollectionSchemaEnsure([renamed], {
+            tables: new Map(), enums: new Set(),
+            notNullColumns: new Set(), columnDefaults: new Set()
+        });
+        expect(plan.orphanedRequiredColumns).toEqual([]);
+    });
+
+    it("does not mistake a foreign key for an orphan — relation columns are derived, not declared", () => {
+        const authors = {
+            name: "Authors", slug: "authors",
+            properties: { id: { name: "ID", type: "number", isId: "increment" } }
+        } as unknown as CollectionConfig;
+        const withRelation = {
+            name: "Posts", slug: "posts",
+            properties: {
+                id: { name: "ID", type: "string", isId: "uuid" },
+                author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } }
+            }
+        } as unknown as CollectionConfig;
+
+        const plan = planCollectionSchemaEnsure([withRelation, authors], {
+            tables: new Map([
+                ["public.posts", new Set(["id", "author_id"])],
+                ["public.authors", new Set(["id"])]
+            ]),
+            enums: new Set(),
+            notNullColumns: new Set(["public.posts.author_id"]),
+            columnDefaults: new Set(),
+            populatedTables: new Set(["public.posts"])
+        });
+        expect(plan.orphanedRequiredColumns).toEqual([]);
+    });
+
+    it("reports nothing when the database's nullability is unknown", () => {
+        // Absent reads as "cannot tell", and guessing here would report every
+        // column of every table on a driver that does not supply the facts.
+        const plan = planCollectionSchemaEnsure([renamed], {
+            tables: new Map([["public.posts", new Set(["id", "title", "headline"])]]),
+            enums: new Set()
+        });
+        expect(plan.orphanedRequiredColumns).toEqual([]);
+    });
+});
