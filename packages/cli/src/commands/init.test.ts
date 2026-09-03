@@ -626,41 +626,6 @@ describe("dual PM compatibility", () => {
             const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, "npmrc"), "utf-8");
             expect(npmrc).toContain("link-workspace-packages=true");
         });
-
-        /**
-         * Two settings that must live in `pnpm-workspace.yaml` and not in
-         * `.npmrc`, in both scaffolds.
-         *
-         * pnpm 11 stopped reading `verify-deps-before-run` and
-         * `confirm-modules-purge` from `.npmrc` — with the file in place,
-         * `pnpm config get verify-deps-before-run` answers `undefined`, while
-         * `verifyDepsBeforeRun` in the workspace file answers `false`. So they
-         * had quietly stopped applying, and npm 12 was warning about both on
-         * every install and every `npm run`: noise in a first run, for settings
-         * that were no longer doing anything.
-         *
-         * Asserted from both directions because a later edit is as likely to
-         * put them back in `.npmrc` as to drop them from the workspace file, and
-         * neither shows up as a failure anywhere else.
-         */
-        it.each([
-            ["template", path.join(findCliRoot(), "templates", "template")],
-            ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas")]
-        ])("%s keeps the pnpm-11 settings out of .npmrc", (_name, dir) => {
-            const workspace = fs.readFileSync(path.join(dir, "pnpm-workspace.yaml"), "utf-8");
-            expect(workspace).toContain("verifyDepsBeforeRun: false");
-            expect(workspace).toContain("confirmModulesPurge: false");
-
-            const npmrcPath = path.join(dir, "npmrc");
-            if (!fs.existsSync(npmrcPath)) return;
-            const npmrc = fs.readFileSync(npmrcPath, "utf-8");
-            const settings = npmrc
-                .split("\n")
-                .filter(line => !line.trim().startsWith("#"))
-                .join("\n");
-            expect(settings).not.toContain("verify-deps-before-run");
-            expect(settings).not.toContain("confirm-modules-purge");
-        });
     });
 
     describe("README documents both package managers", () => {
@@ -1480,46 +1445,5 @@ describe("choosing a free port for the local database", () => {
     it("still accepts a genuinely free port", async () => {
         // A probe that never says yes would "fix" this by scanning forever.
         expect(await isPortAvailable(await free())).toBe(true);
-    });
-});
-
-/**
- * The scaffold has to tell *both* supported package managers that
- * `@ariga/atlas` may run its install script, in each one's own dialect.
- *
- * pnpm 10 and npm 12 both refuse a dependency's lifecycle scripts unless the
- * project allowlists them, and `@ariga/atlas` downloads its binary in
- * `preinstall`. The scaffold has carried pnpm's key for a long time; npm's
- * (`allowScripts`) was missing, so on npm the install exited 0 with a warning,
- * `node_modules/.bin/atlas` never appeared, and `db:push` — the command the
- * quickstart points at for your own Postgres — failed on a binary nobody had
- * been told was skipped.
- *
- * Asserted as a pair rather than as two separate facts, because the failure is
- * silent on whichever manager gets forgotten and is only ever noticed by
- * somebody who already has a broken project.
- */
-describe("the template's install-script allowlists", () => {
-    const templates: Array<[string, string]> = [
-        ["template", path.join(findCliRoot(), "templates", "template", "package.json")],
-        ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas", "package.json")]
-    ];
-
-    it.each(templates)("%s allows @ariga/atlas under both pnpm and npm", (_name, pkgPath) => {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
-        expect(pkg.allowScripts?.["@ariga/atlas"]).toBe(true);
-    });
-
-    it.each(templates)("%s grants npm no more than it needs", (_name, pkgPath) => {
-        // The npm list is deliberately the shorter one. esbuild and sharp are in
-        // pnpm's for historical reasons; under npm their binaries arrive through
-        // platform optionalDependencies with no script running at all — verified
-        // on npm 12, where the blocked `postinstall` is only a fallback and
-        // `esbuild --version` answers anyway. Allowing a script that is not
-        // needed is a grant with no benefit, so this fails if one is added here
-        // without a reason.
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
     });
 });

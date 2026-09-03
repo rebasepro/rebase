@@ -506,6 +506,40 @@ const SELFHOST_COMMAND = "docker compose up -d";
             still ships on /about, where "what are you building next" is the
             page's own question. */}
 
+        <!-- CHAPTER 07 — OWNERSHIP. Claim 5 (SITE-STORY §2), the page's last
+             argument before the ask. Cut on 2026-09-03 into the close's
+             headline, restored the same day from #45 as its own beat: a fact
+             about the terms is worth nothing to a reader who has not yet
+             decided the product is good, and worth more than any other to
+             one who has — which is who is standing here. The close goes back
+             to asking. -->
+        <section class="chapter relative border-t border-white/8 py-24 sm:py-32">
+            <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                    <div class="lg:col-span-5">
+                        <p class="eyebrow">
+                            <span class="font-mono">07</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("opensource.badge")}
+                        </p>
+                        <h2 class="mt-4 font-headers text-display-2 text-balance" set:html={t("opensource.title")}></h2>
+                    </div>
+                    <div class="lg:col-span-7">
+                        <p class="text-lg leading-relaxed text-[#b4b8bd] max-w-measure-lead">{t("opensource.desc")}</p>
+                        <div class="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+                            <a href={translatePath("/developers")} class="accent-link">
+                                {t("opensource.link1")}
+                                <ArrowRight size={15} />
+                            </a>
+                            <a href={translatePath("/compare")}
+                               class="text-sm font-semibold text-surface-400 transition-colors hover:text-white">
+                                {t("opensource.link2")}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         {/* FINAL CTA — the three lanes, as one band, and the page's second and
             last chroma ground.
 
@@ -521,16 +555,9 @@ const SELFHOST_COMMAND = "docker compose up -d";
             persuaded, flat colour when you are being asked. */}
         <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 py-24 sm:py-32">
-                {/* Claim 5 is the close's headline, not a chapter before it: a
-                    fact about the terms is worth nothing to a reader who has not
-                    yet decided the product is good, and worth more than any
-                    other to one who has — which is who is standing here. */}
-                <p class="eyebrow">{t("opensource.badge")}</p>
-                <h2 class="mt-4 font-headers text-display-2 max-w-2xl text-balance" set:html={t("opensource.title")}></h2>
-                <p class="mt-5 max-w-[38rem] text-lg leading-relaxed">{t("opensource.desc")}</p>
-                <p class="mt-12 font-headers text-xl sm:text-2xl max-w-xl text-balance">
+                <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
                     {t("cta.title")}
-                </p>
+                </h2>
 
                 <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
                     <div class="md:border-r border-white/10 py-9 md:pr-8">

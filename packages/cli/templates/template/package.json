@@ -36,8 +36,5 @@
             "sharp",
             "@ariga/atlas"
         ]
-    },
-    "allowScripts": {
-        "@ariga/atlas": true
     }
 }

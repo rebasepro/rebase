@@ -4,10 +4,6 @@ packages:
 linkWorkspacePackages: true
 blockExoticSubdeps: false
 minimumReleaseAge: 0
-# See the note in templates/template/pnpm-workspace.yaml: pnpm 11 reads these
-# here and no longer from `.npmrc`, where npm 12 also warns about them.
-verifyDepsBeforeRun: false
-confirmModulesPurge: false
 allowBuilds:
   esbuild: true
   sharp: true

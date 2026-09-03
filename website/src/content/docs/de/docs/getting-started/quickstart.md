@@ -21,9 +21,8 @@ Dies erstellt ein Projekt mit drei Paketen:
 ## Voraussetzungen
 
 - **Node.js** 18+
+- **Docker** — um den mitgelieferten PostgreSQL-Container auszuführen. (Oder bringen Sie Ihre eigene PostgreSQL mit: lokale Installation, Neon, Supabase usw.)
 - **pnpm** (empfohlen) oder npm
-
-Keine Datenbank zu installieren, und kein Docker. `rebase dev` betreibt eine verwaltete PostgreSQL für das Projekt, deren Daten unter `.rebase/` liegen. Siehe [Variante: Ihre eigene PostgreSQL](#variante-ihre-eigene-postgresql), wenn Sie lieber selbst eine bereitstellen — eine lokale Installation, Neon, Supabase oder den Container, den dieser Scaffold mitliefert.
 
 ## Ihre Umgebung ist bereits konfiguriert
 
@@ -193,11 +192,11 @@ Dies regeneriert das Schema aus Ihren Sammlungen und wendet es an. Starten Sie d
 
 | Befehl | Beschreibung |
 |---------|-------------|
-| `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Sammlungen generieren. Braucht keine Datenbank — `rebase dev` führt es für Sie aus |
+| `rebase schema generate` | Drizzle-Schema aus Ihren TypeScript-Sammlungen generieren |
 | `rebase schema introspect` | TypeScript-Sammlungen aus einer bestehenden Datenbank generieren |
-| `rebase db push` | Schema-Änderungen direkt an die Datenbank übertragen. Braucht Ihre eigene PostgreSQL |
-| `rebase db generate` | SQL-Migrationsdateien generieren. Braucht Ihre eigene PostgreSQL |
-| `rebase db migrate` | Ausstehende Migrationen ausführen. Braucht Ihre eigene PostgreSQL |
+| `rebase db push` | Schema-Änderungen direkt an die Datenbank übertragen (nur Entwicklung) |
+| `rebase db generate` | SQL-Migrationsdateien generieren |
+| `rebase db migrate` | Ausstehende Migrationen ausführen |
 
 ## Was kommt als Nächstes
 
