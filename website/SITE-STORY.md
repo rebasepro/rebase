@@ -152,7 +152,7 @@ Every major page is a variation on the same three acts:
 ## 4. Information architecture
 
 ```
-/                    Home — six beats, for someone who arrived cold: run it, see it, play, trust it, add the panel, who runs it — then it is yours
+/                    Home — seven beats, for someone who arrived cold: run it, see it, play, trust it, add the panel, who runs it, it is yours — then the ask
 /product             The platform map — every product, every subsystem, one screen each
 ├── /backend         Rebase Backend, in depth. Live proof per API surface.
 │   ├── /security    RLS-first security, rls-check, hosting & GDPR
@@ -235,9 +235,9 @@ its own close and drops `ClosingCta`.
 
 **The home page's beat order, and why it is that order.** Revised 2026-09-03.
 The page's job is to get a developer to run the command, not to win an
-argument. Six beats, each with a product artifact, in the order a developer's
+argument. Seven beats, each with a product artifact, in the order a developer's
 curiosity runs: run it, see what appears, play with it, trust it, add the
-panel if you want, see who runs it — then it is yours. The argument lives on
+panel if you want, see who runs it, it is yours — then the ask. The argument lives on
 the deep pages. This replaced a nine-beat page (thirteen sections, ~13,400px)
 that made five claims in sequence and read as a thesis.
 
@@ -252,7 +252,8 @@ that made five claims in sequence and read as a thesis.
 | 04 | `s-panel` | Claim 3 — the panel, when you want one: the carousel, then Rebase Backend / CMS / Studio beneath it |
 | 05 | `s-agent-era` | Claim 4 — the backend an agent can't screw up |
 | 06 | `s-case-study` | Real products, seven of them |
-| — | `ground-close` | Claim 5 — "Your code. Your infra. Zero lock-in." — then the three lanes |
+| 07 | `s-opensource` | Claim 5 — it is yours. Cut into the close on 2026-09-03 and restored the same day from #45 as its own beat: the last argument before the ask |
+| — | `ground-close` | The ask: "Point it at your database." and the three lanes |
 
 **Cut on 2026-09-03, and why.** The standalone recognition section: its figure
 moved into 03. A screen of someone else's broken code before the first product
@@ -260,9 +261,9 @@ artifact was a tonal drop after the hero, and with the hero sub now carrying
 claim 1 the claim was being made four times in the top half. The personas
 prose: a rest bar on a page that needed to be shorter; the deep pages carry
 the scenarios. The "modes" columns as their own chapter: they said in prose
-what the carousel shows a screen later, so they sit under it now. The
-ownership chapter: a fact about the terms is the close's headline, not a
-chapter before it. The roadmap (2026-09-02): it ships on /about.
+what the carousel shows a screen later, so they sit under it now. The ownership chapter was cut into the close and restored the same
+day from #45 as beat 07: the last argument before the ask keeps its own beat,
+and the close goes back to asking. The roadmap (2026-09-02): it ships on /about.
 
 **One recognition moment, in the beat that owns the claim.** The figure in 03
 is where the reader recognises their own week — the route checks; the cron
