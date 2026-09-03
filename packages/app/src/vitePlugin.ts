@@ -24,6 +24,55 @@ export interface RebaseCollectionsPluginOptions {
 const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter"]);
 
 /**
+ * Callbacks that only ever run on the server, and whose bodies must not travel
+ * to the browser.
+ *
+ * `config/collections/*.ts` is shared: the backend loads it from disk, and this
+ * plugin globs the same directory into the admin bundle. Everything in those
+ * files therefore shipped to every visitor — including the body of a
+ * `beforeSave` that calls a third-party API with a key from `process.env`. In
+ * the example app's own built bundle you could read the compiled
+ * `beforeSave:({values:e` and the fixed regex beside it.
+ *
+ * Replacing the body with `undefined` also lets Rollup tree-shake whatever the
+ * callback imported, so a server-only dependency reached from one hook stops
+ * being bundled — or stops breaking the build.
+ *
+ * The four here have **zero** client-side call sites. Two callbacks are
+ * deliberately NOT in the list because the panel genuinely runs them:
+ *
+ *   - `afterRead` — `useDataTableController` and `useBoardDataController` call
+ *     it to transform rows before rendering.
+ *   - `afterSave` — `useNavigationResolution` wraps it for the user-creation
+ *     dialog.
+ *
+ * Dropping the value rather than the key keeps the source's comma structure
+ * intact, and `callbacks.beforeSave === undefined` is what "not present" means
+ * to every consumer. The collection editor already drops callbacks when it
+ * serializes a collection back to TypeScript, so nothing round-trips through
+ * this and no user code can be lost by it.
+ */
+const SERVER_ONLY_CALLBACK_KEYS = new Set([
+    "beforeSave",
+    "beforeDelete",
+    "afterDelete",
+    "afterSaveError"
+]);
+
+/**
+ * True when `node` is a property of an object that is itself the value of a
+ * `callbacks:` property — i.e. a real lifecycle hook, on a collection or on a
+ * property, and not something that merely shares a name.
+ */
+function isInsideCallbacksBlock(node: ts.PropertyAssignment): boolean {
+    const objectLiteral = node.parent;
+    if (!objectLiteral || !ts.isObjectLiteralExpression(objectLiteral)) return false;
+    const owner = objectLiteral.parent;
+    if (!owner || !ts.isPropertyAssignment(owner)) return false;
+    return getPropertyName(owner) === "callbacks";
+}
+
+/**
  * Walk a TypeScript AST node tree, invoking `visitor` for every node.
  */
 function walkAST(node: ts.Node, visitor: (n: ts.Node) => void): void {
@@ -75,8 +124,18 @@ export function transformCollectionSource(
         // Only look at PropertyAssignment nodes (key: value in object literals)
         if (!ts.isPropertyAssignment(node)) return;
 
+        const name = getPropertyName(node);
+
+        // Server-only lifecycle hooks: keep the key, drop the body.
+        if (name && SERVER_ONLY_CALLBACK_KEYS.has(name) && isInsideCallbacksBlock(node)) {
+            const value = node.initializer;
+            ms.overwrite(value.getStart(sourceFile), value.getEnd(), "undefined");
+            replaced = true;
+            return;
+        }
+
         // Check the property name matches one of the lazy component keys
-        const propName = getPropertyName(node);
+        const propName = name;
         if (!propName || !LAZY_COMPONENT_KEYS.has(propName)) return;
 
         // Check the initializer is a string literal

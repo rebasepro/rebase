@@ -428,3 +428,61 @@ describe("rebaseCollectionsPlugin — virtual collections module", () => {
         expect(collections[0].securityRules).toBeUndefined();
     });
 });
+
+/**
+ * `config/collections/*.ts` is shared between the backend, which loads it from
+ * disk, and the admin bundle, which this plugin globs the same directory into.
+ * So everything in those files shipped to every visitor: in the example app's
+ * own built bundle you could read the compiled `beforeSave:({values:e` and the
+ * raw policy string beside it.
+ *
+ * These assert the strip, and — just as important — that the two callbacks the
+ * panel actually runs are left alone.
+ */
+describe("server-only callbacks are stripped from the browser bundle", () => {
+    const wrap = (callbacks: string) =>
+        `const c = { slug: "posts", callbacks: { ${callbacks} } };`;
+
+    it.each(["beforeSave", "beforeDelete", "afterDelete", "afterSaveError"])(
+        "drops the body of %s", (hook) => {
+            const transform = createTransform();
+            const result = transform(wrap(`${hook}: async ({ values }) => { await chargeCard(values, process.env.STRIPE_KEY); return values; }`));
+            expect(result).not.toBeNull();
+            expect(result!.code).toContain(`${hook}: undefined`);
+            expect(result!.code).not.toContain("chargeCard");
+            expect(result!.code).not.toContain("STRIPE_KEY");
+        });
+
+    it.each(["afterRead", "afterSave"])(
+        "keeps %s, which the panel calls client-side", (hook) => {
+            const transform = createTransform();
+            // `useDataTableController` / `useBoardDataController` call afterRead to
+            // transform rows before rendering; `useNavigationResolution` wraps
+            // afterSave for the user-creation dialog. Stripping either breaks the UI.
+            const result = transform(wrap(`${hook}: async ({ row }) => decorate(row)`));
+            expect(result).toBeNull();
+        });
+
+    it("keeps the key so the comma structure and every other callback survive", () => {
+        const transform = createTransform();
+        const result = transform(wrap(
+            "beforeSave: (p) => p, afterRead: async ({ row }) => decorate(row)"));
+        expect(result!.code).toContain("beforeSave: undefined");
+        expect(result!.code).toContain("afterRead: async ({ row }) => decorate(row)");
+    });
+
+    it("strips property-level callbacks too, which are also server-only", () => {
+        const transform = createTransform();
+        const result = transform(
+            'const c = { properties: { price: { type: "number", callbacks: { beforeSave: ({ value }) => secretRound(value) } } } };');
+        expect(result!.code).toContain("beforeSave: undefined");
+        expect(result!.code).not.toContain("secretRound");
+    });
+
+    it("leaves a `beforeSave` that is not a lifecycle hook alone", () => {
+        const transform = createTransform();
+        // Same name, not inside a `callbacks` block — must not be touched.
+        const result = transform('const c = { admin: { beforeSave: "a label" } };');
+        expect(result).toBeNull();
+    });
+});
