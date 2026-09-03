@@ -70,7 +70,9 @@ the tables at boot.
 
 **Read the URLs from the output.** `rebase dev` picks a free port per project
 rather than fixed ones, so they differ between projects and between machines.
-The first account you register becomes the admin.
+The first account you register becomes the admin — on your machine. A
+production deployment names its admin instead, with `REBASE_ADMIN_EMAIL` and
+`REBASE_ADMIN_PASSWORD` (see [Configuration](/docs/getting-started/configuration/)).
 
 To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again.
@@ -131,9 +133,8 @@ This scaffolds a project with three packages:
 ### Prerequisites
 
 - **Node.js** 18+
+- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
-
-No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ### Your Environment Is Already Configured
 
@@ -301,11 +302,11 @@ narrowed type, a removed field.
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
+| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
-| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
-| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
+| `rebase db push` | Push schema changes directly to the database (dev only) |
+| `rebase db generate` | Generate SQL migration files |
+| `rebase db migrate` | Run pending migrations |
 
 ### What's Next
 
@@ -516,9 +517,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `JWT_KEY_ID` | Names `JWT_PRIVATE_KEY` in the token header and in the JWKS. Change it whenever the key changes — rotation depends on old and new being distinguishable. | `default` |
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
-| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). The **first** user can always register, whatever this says — an empty user table has to admit somebody. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
-| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a deployment closes the bootstrap window without becoming unreachable: the operator names the first account instead of racing the internet for it. | — |
+| `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
 | `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
@@ -5187,7 +5188,7 @@ Rebase includes a complete backend authentication system:
 - **Auth hooks** — Lifecycle hooks for user creation and more
 - **Custom auth adapters** — Plug in Firebase Auth, Auth0, Clerk, or any external provider
 - **Service key** — Static key for server-to-server authentication
-- **Auto-bootstrapping** — First user automatically gets the admin role
+- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ### Configuration
 
@@ -5249,7 +5250,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
-| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. The first user on an empty table is admitted either way |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
@@ -5626,7 +5627,7 @@ service key:
 | `DELETE` | `/api/admin/users/:uid` | Delete one user |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
 | `GET` | `/api/admin/roles` | List the roles this backend knows |
-| `POST` | `/api/admin/bootstrap` | Create the first administrator on an empty user table — see [First User Bootstrap](#first-user-bootstrap) |
+| `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
@@ -5818,9 +5819,11 @@ CREATE POLICY owner_access ON posts
 
 ### First User Bootstrap
 
-When no users exist in the database, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
+When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 
-This ensures you can always bootstrap a fresh deployment without needing to seed the database manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
+In production that window is closed, because a host with a public name is reachable before its operator has registered, and whoever got there first would own it. A production deployment names its first admin in the environment instead — `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`, created at boot while the table is still empty — or assigns the role with the service key. With the window closed, an empty table refuses the bootstrap registration with `SETUP_REQUIRED` (and says so), a first account created through open registration is an ordinary account, `GET /api/auth/config` never reports `needsSetup`, `POST /api/admin/bootstrap` refuses, and the boot log warns when the table is empty and no admin is named.
+
+On a laptop this means you can always bootstrap a fresh database without seeding it manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
 ```sql
 SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
@@ -9200,7 +9203,7 @@ If loading fails, the loader provides diagnostic output:
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
 ```
 
-The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The reasons stay in the boot log.
+The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The listing itself requires a signed-in caller, an API key or the service key — the functions stay callable by whoever each one admits, but the inventory of them is not public. The reasons stay in the boot log.
 
 ### Timeouts and Rate Limits
 

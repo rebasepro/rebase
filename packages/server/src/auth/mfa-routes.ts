@@ -2,7 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { z } from "zod";
 import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { requireAuth, extractBearerToken } from "./middleware";
+import { extractBearerToken } from "./middleware";
 import { logger } from "../utils/logger";
 import { createRateLimiter, strictAuthLimiter } from "./rate-limiter";
 import {
@@ -41,6 +41,15 @@ const MFA_VERIFICATION_ATTEMPTS_PER_WINDOW = 10;
 interface MfaRoutesConfig {
     router: Hono<HonoEnv>;
     config: AuthModuleConfig;
+    /**
+     * The caller's guard for a signed-in user, with the revocation watermark
+     * consulted. Enrolling, confirming or removing a factor is a persistence
+     * move — the second one the 2026-09-02 audit named — so a token the user
+     * has signed out everywhere must not reach it. `routes.ts` builds this
+     * from the same repository the refresh path checks; the plain
+     * `requireAuth` only verifies the signature.
+     */
+    requireLiveSession: MiddlewareHandler<HonoEnv>;
     ops: ReturnType<typeof resolveAuthHooks>;
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     buildAuthResponse: (
@@ -168,7 +177,7 @@ const mfaVerificationLimiter: MiddlewareHandler<HonoEnv> = createRateLimiter({
 });
 
 export function mountMfaRoutes(opts: MfaRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
     const authRepo = config.authRepo;
     const emailConfig = config.emailConfig;
 
@@ -217,7 +226,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * POST /auth/mfa/enroll
      * Start MFA enrollment: generate TOTP secret and recovery codes
      */
-    router.post("/mfa/enroll", strictAuthLimiter, requireAuth, async (c) => {
+    router.post("/mfa/enroll", strictAuthLimiter, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -274,7 +283,7 @@ export function mountMfaRoutes(opts: MfaRoutesConfig): void {
      * POST /auth/mfa/verify
      * Verify TOTP code to complete MFA enrollment
      */
-    router.post("/mfa/verify", strictAuthLimiter, requireAuth, mfaVerificationLimiter, async (c) => {
+    router.post("/mfa/verify", strictAuthLimiter, requireLiveSession, mfaVerificationLimiter, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -472,7 +481,7 @@ aal: "aal2" }
      * GET /auth/mfa/factors
      * List enrolled MFA factors for the current user
      */
-    router.get("/mfa/factors", strictAuthLimiter, requireAuth, async (c) => {
+    router.get("/mfa/factors", strictAuthLimiter, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -494,7 +503,7 @@ aal: "aal2" }
      * DELETE /auth/mfa/unenroll
      * Remove an MFA factor
      */
-    router.delete("/mfa/unenroll", strictAuthLimiter, requireAuth, async (c) => {
+    router.delete("/mfa/unenroll", strictAuthLimiter, requireLiveSession, async (c) => {
         const userCtx = c.get("user") as AccessTokenPayload | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");

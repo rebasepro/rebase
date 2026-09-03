@@ -30,6 +30,7 @@ import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
 import type { CaptchaConfig } from "./captcha";
 import { buildBuiltinAuthCapabilities } from "./capabilities";
+import { isBootstrapWindowOpen } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
@@ -358,11 +359,15 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         },
 
         async getCapabilities(): Promise<AuthAdapterCapabilities> {
-            // Detect bootstrap mode: are there any users?
+            // Detect bootstrap mode: are there any users, and may the first one
+            // still claim the deployment? In production the answer to the second
+            // is no (`isBootstrapWindowOpen`), and advertising `needsSetup` there
+            // would put a "create the first admin" form in front of a route that
+            // refuses it — and tell a scanner which hosts are unclaimed.
             let needsSetup = false;
             try {
                 const result = await authRepository.listUsersPaginated({ limit: 1 });
-                needsSetup = result.total === 0;
+                needsSetup = result.total === 0 && isBootstrapWindowOpen();
             } catch (error) {
                 // Fail closed — an unreadable users table must not open the
                 // first-admin window — but say so. Silently answering "not in

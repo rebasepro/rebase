@@ -4,7 +4,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { requireAuth } from "./middleware";
+import type { MiddlewareHandler } from "hono";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
@@ -19,6 +19,15 @@ import type { CreateUserData } from "./interfaces";
 interface SessionRoutesConfig {
     router: Hono<HonoEnv>;
     config: AuthModuleConfig;
+    /**
+     * The caller's guard for a signed-in user, with the revocation watermark
+     * consulted. Listing and revoking sessions, `/me`, user lookup and linking
+     * an anonymous account all describe or change the account, and a token the
+     * user has signed out everywhere must not reach them. `routes.ts` builds
+     * this from the same repository the refresh path checks; the plain
+     * `requireAuth` only verifies the signature.
+     */
+    requireLiveSession: MiddlewareHandler<HonoEnv>;
     ops: ReturnType<typeof resolveAuthHooks>;
     parseBody: <T>(schema: z.ZodSchema<T>, body: unknown) => T;
     buildAuthResponse: (
@@ -42,7 +51,7 @@ interface SessionRoutesConfig {
 }
 
 export function mountSessionRoutes(opts: SessionRoutesConfig): void {
-    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook } = opts;
+    const { router, config, ops, parseBody, buildAuthResponse, createSessionAndTokens, applyTransformHook, requireLiveSession } = opts;
     const authRepo = config.authRepo;
 
     /**
@@ -134,7 +143,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * GET /auth/sessions
      * Get active refresh tokens (sessions) for the current user
      */
-    router.get("/sessions", requireAuth, async (c) => {
+    router.get("/sessions", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -180,7 +189,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * DELETE /auth/sessions
      * Delete all refresh tokens for the current user (remote logout every device)
      */
-    router.delete("/sessions", requireAuth, async (c) => {
+    router.delete("/sessions", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -201,7 +210,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * DELETE /auth/sessions/:id
      * Delete a specific refresh token (remote logout)
      */
-    router.delete("/sessions/:id", requireAuth, async (c) => {
+    router.delete("/sessions/:id", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -232,7 +241,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * GET /auth/me
      * Get current authenticated user
      */
-    router.get("/me", requireAuth, async (c) => {
+    router.get("/me", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -267,7 +276,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * field of the looked-up user.
      */
     if (config.allowUserLookup) {
-        router.post("/find-user", defaultAuthLimiter, requireAuth, async (c) => {
+        router.post("/find-user", defaultAuthLimiter, requireLiveSession, async (c) => {
             const userCtx = c.get("user") as { uid: string } | undefined;
             if (!userCtx) {
                 throw ApiError.unauthorized("Not authenticated");
@@ -286,7 +295,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * PATCH /auth/me
      * Update current authenticated user profile
      */
-    router.patch("/me", requireAuth, async (c) => {
+    router.patch("/me", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -389,7 +398,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * POST /auth/anonymous/link
      * Upgrade an anonymous user to a permanent account with email/password
      */
-    router.post("/anonymous/link", strictAuthLimiter, requireAuth, async (c) => {
+    router.post("/anonymous/link", strictAuthLimiter, requireLiveSession, async (c) => {
         // Gated on the same predicate as `/anonymous`, not on registration: this
         // route cannot create an account, only put credentials on one that
         // `/anonymous` already made. If anonymous auth is off, any session

@@ -55,6 +55,9 @@ jest.mock("../src/utils/dynamic-import", () => ({
 const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
 const FUNCTIONS_DIR = path.join(__dirname, "fixtures", "functions");
 const JWT_SECRET = "runtime-surfaces-test-secret-1234567890";
+// GET /api/functions lists to a resolved identity only; the service key is one.
+const SERVICE_KEY = "runtime-surfaces-test-service-key-32-chars!";
+const asService = { headers: { authorization: `Bearer ${SERVICE_KEY}` } };
 
 /** One probe per mount point, mapped to the surface that owns it. */
 const PROBES: ReadonlyArray<{ surface: RuntimeSurface; url: string; method?: string }> = [
@@ -153,7 +156,7 @@ async function boot(
         cronPersistence: false,
         functionsDir: FUNCTIONS_DIR,
         bootstrappers: [bootstrapper],
-        auth: { jwtSecret: JWT_SECRET },
+        auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         ...(surfaces ? { surfaces } : {}),
         ...(functionsSelection ? { functionsSelection } : {})
     } as never);
@@ -259,7 +262,7 @@ describe("runtime surfaces", () => {
 
         // The listing has to agree with what is mounted, or a caller reading it
         // is told about a function this process will 404.
-        const listed = await (await app.request("/api/functions")).json() as { functions: { name: string }[] };
+        const listed = await (await app.request("/api/functions", asService)).json() as { functions: { name: string }[] };
         expect(listed.functions.map(f => f.name)).toEqual(["valid-app"]);
     });
 

@@ -55,18 +55,13 @@ vi.mock("../utils/project", async importOriginal => {
 vi.mock("execa", () => ({ execa: vi.fn(async () => ({ exitCode: 0 })) }));
 vi.mock("../dev-db/prepare", () => ({
     // A DSN the developer named, which is what these tests mean by "a real
-    // invocation". `database` is not optional in the real return type, and
-    // omitting it made this fake describe a shape that cannot occur — `rebase
-    // db push` reads `database.kind` to refuse Atlas on the managed database,
-    // and against this fake that read threw, so the one test asserting a real
-    // invocation still reaches the driver failed on a TypeError instead.
-    //
-    // `external` rather than any other kind for the same reason: it is the one
-    // `resolveDevDatabase` returns for a DSN that was named, and a fake that
-    // invents a kind is the defect this comment is about.
+    // invocation". The `database` field is not optional in the real return type,
+    // and omitting it made this fake describe a shape that cannot occur —
+    // `rebase db push` reads `database.kind` to refuse Atlas on the managed
+    // database, and against this fake that read threw.
     prepareDatabaseEnv: vi.fn(async () => ({
         env: {},
-        database: { kind: "external" as const, url: "postgresql://u@127.0.0.1:5432/db", source: "env-file" as const },
+        database: { kind: "url" as const },
         description: "the configured database"
     })),
     managedNotices: () => []

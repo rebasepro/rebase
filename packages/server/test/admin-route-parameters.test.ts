@@ -95,7 +95,13 @@ describe("GET /functions", () => {
             0,
             "/api/functions"
         );
-        const res = await mount(router, "/api/functions").request("/api/functions");
+        // The listing needs a resolved identity; the server's auth middleware
+        // runs ahead of this router, so stand in for it here.
+        const app = new Hono<HonoEnv>();
+        app.use("*", async (c, next) => { c.set("user", { uid: "u1", roles: [] }); await next(); });
+        app.route("/api/functions", router);
+        const res = await app.request("/api/functions");
+        expect(res.status).toBe(200);
         const body = await res.json() as { functions: { name: string; endpoint: string }[] };
         expect(body.functions).toEqual([{ name: "hello", endpoint: "/api/functions/hello" }]);
     });

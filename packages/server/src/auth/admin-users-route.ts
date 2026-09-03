@@ -12,6 +12,7 @@
 
 import { Hono } from "hono";
 import { isAnonymousUid } from "@rebasepro/types";
+import { isBootstrapWindowOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
@@ -97,6 +98,19 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
 
         if (hasAdmin) {
             throw ApiError.forbidden("Admin users already exist. Bootstrap not allowed.", "BOOTSTRAP_COMPLETED");
+        }
+
+        // "Earliest registered user" is the same race as "first to register",
+        // one request later: on a public hostname with registration open, the
+        // stranger who signs up first can claim this too. The window that
+        // makes an empty laptop database usable is shut in production — see
+        // `isBootstrapWindowOpen` — and the ways in there are the named admin
+        // seed and the service key, neither of which anyone can race for.
+        if (!isBootstrapWindowOpen()) {
+            logger.warn("[Security Audit] Bootstrap denied: the first-admin window is closed in production", {
+                eventType: "auth.bootstrap.denied.production"
+            });
+            throw ApiError.forbidden(SETUP_REQUIRED_MESSAGE, "SETUP_REQUIRED");
         }
 
         const uid = "uid" in user ? (user as { uid: string }).uid : undefined;

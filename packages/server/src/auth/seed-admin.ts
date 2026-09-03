@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { UserManagementAdapter } from "@rebasepro/types";
 import { logger } from "../utils/logger";
+import { isBootstrapWindowOpen } from "./registration-policy";
 
 /**
  * Create the operator's admin account from the environment, before anyone else
@@ -29,6 +30,8 @@ import { logger } from "../utils/logger";
 export interface SeedAdminEnv {
     REBASE_ADMIN_EMAIL?: string;
     REBASE_ADMIN_PASSWORD?: string;
+    /** Read only to decide whether an unrequested seed is worth a warning. */
+    NODE_ENV?: string;
 }
 
 export type SeedAdminOutcome =
@@ -54,7 +57,30 @@ export async function seedInitialAdmin(
     const email = env.REBASE_ADMIN_EMAIL?.trim();
     const password = env.REBASE_ADMIN_PASSWORD;
 
-    if (!email && !password) return { status: "not-requested" };
+    if (!email && !password) {
+        // Outside production the first registration becomes the admin, so an
+        // absent seed is the normal laptop case and not worth a line. In
+        // production that window is shut (`isBootstrapWindowOpen`), which
+        // means an empty table with no seed is a deployment nobody can
+        // administer yet — say so at boot, once, while the operator is still
+        // looking at the log.
+        if (users && !isBootstrapWindowOpen(env)) {
+            try {
+                const existing = await users.listUsers({ limit: 1 });
+                if ((existing.total ?? existing.users.length) === 0) {
+                    logger.warn(
+                        "⚠️ No users exist and REBASE_ADMIN_EMAIL is not set. In production the first " +
+                        "account to register is NOT promoted to admin; set REBASE_ADMIN_EMAIL and " +
+                        "REBASE_ADMIN_PASSWORD before the first sign-up, or assign the admin role " +
+                        "with the service key."
+                    );
+                }
+            } catch {
+                // A count that fails here fails louder elsewhere at boot.
+            }
+        }
+        return { status: "not-requested" };
+    }
 
     // Half a credential is a typo, not a request, and the deployment it
     // produces — self-registration off, no admin, no way in — is one nobody can

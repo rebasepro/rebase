@@ -70,6 +70,26 @@ describe("POST /bootstrap", () => {
         expect(setUserRoles).not.toHaveBeenCalled();
     });
 
+    it("is shut in production, where an earliest-user claim is first-to-register one request later", async () => {
+        const previous = process.env.NODE_ENV;
+        process.env.NODE_ENV = "production";
+        try {
+            const users = [user("u1", "2026-01-01")];
+            const { repo, setUserRoles } = mockRepo(users);
+            const app = createAdminUsersRoute({ authRepo: repo });
+
+            const res = await app.request("/bootstrap", { method: "POST", headers: await bearer("u1") });
+
+            expect(res.status).toBe(403);
+            expect(setUserRoles).not.toHaveBeenCalled();
+            const body = await res.json() as { error?: { code?: string; message?: string } };
+            expect(body.error?.code).toBe("SETUP_REQUIRED");
+            expect(body.error?.message).toContain("REBASE_ADMIN_EMAIL");
+        } finally {
+            process.env.NODE_ENV = previous;
+        }
+    });
+
     it("is closed once an admin already exists", async () => {
         const users = [user("u1", "2026-01-01"), user("u2", "2026-02-01")];
         const { repo, setUserRoles } = mockRepo(users, ["u1"]);
