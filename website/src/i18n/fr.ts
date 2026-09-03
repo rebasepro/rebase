@@ -3,7 +3,7 @@ export const fr = {
   "hero.title.part1": "Le Postgres que vous avez déjà.",
   "hero.title.part2": "Le backend que vous avez toujours voulu.",
   "hero.subtitle":
-    "Pointez-le vers la base de données que vous utilisez déjà. Rien à provisionner, rien de copié, rien de migré — votre schéma est la seule entrée.",
+    "Pointez-le vers le Postgres que vous utilisez déjà. REST, un SDK typé, le temps réel et l'auth apparaissent — et chaque règle d'accès est appliquée par la base de données elle-même.",
   "hero.cta.demo": "Tester la démo",
 
   "rlscheck.title": "Ne nous croyez pas sur parole.",
@@ -16,7 +16,17 @@ export const fr = {
   "demo.pull": "✔ Schéma appliqué à la base de données. Tables créées.",
   "demo.dev": "✔ API, temps réel et panneau démarrés.",
   "demo.ports": "API sur <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panneau sur <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Des équipes qui livrent avec nos outils — Rebase et FireCMS",
+  "social.title": "Des équipes qui livrent avec nos outils — Rebase, et FireCMS, le CMS open source de plus de 10 000 projets Firebase.",
+  // The recognition beat — before the argument starts (SITE-STORY §5). It is
+  // claim 1's beat: five ways into one table, and the rule lives in one of them.
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "Où vit la règle aujourd'hui",
+  "recognition.title": "Où est votre vérification des permissions ?",
+  "recognition.subtitle":
+    "Cinq façons d'entrer dans la même table, et la règle vit dans une seule. La route vérifie. Le cron, le script de backfill, l'agent muni d'une clé de service et le tableau de bord hébergé ne vérifient rien — parce qu'une règle dans le code applicatif protège la porte, pas la pièce. Ci-dessous : la règle déplacée dans Postgres, où chaque chemin la traverse.",
+  "recognition.five": "Cinq entrées",
+  "recognition.one": "Une règle",
+  "recognition.oneNote": "une règle, dans Postgres, sur chaque chemin",
   "engine.badge": "Ce avec quoi votre app communique",
   "engine.title": "Tout le backend, déjà opérationnel.",
   "engine.subtitle":

@@ -3,7 +3,7 @@ export const es = {
   "hero.title.part1": "El Postgres que ya tienes.",
   "hero.title.part2": "El backend que siempre quisiste.",
   "hero.subtitle":
-    "Apúntalo a la base de datos que ya tienes en marcha. Nada que aprovisionar, nada que copiar, nada que migrar — tu esquema es el único input.",
+    "Apúntalo al Postgres que ya tienes en marcha. Aparecen REST, un SDK tipado, realtime y auth — y cada regla de acceso la aplica la propia base de datos.",
   "hero.cta.demo": "Probar la demo",
 
   "rlscheck.title": "No te fíes de nuestra palabra.",
@@ -16,7 +16,17 @@ export const es = {
   "demo.pull": "✔ Esquema aplicado a la base de datos. Tablas creadas.",
   "demo.dev": "✔ API, realtime y panel en marcha.",
   "demo.ports": "API en <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel en <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Equipos que lanzan productos con nuestras herramientas — Rebase y FireCMS",
+  "social.title": "Equipos que lanzan con nuestras herramientas — Rebase, y FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
+  // The recognition beat — before the argument starts (SITE-STORY §5). It is
+  // claim 1's beat: five ways into one table, and the rule lives in one of them.
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "Dónde vive la regla hoy",
+  "recognition.title": "¿Dónde está tu comprobación de permisos?",
+  "recognition.subtitle":
+    "Cinco formas de entrar en la misma tabla, y la regla vive en una de ellas. La ruta comprueba. El cron, el script de backfill, el agente con una clave de servicio y el panel alojado no — porque una regla en el código de la aplicación protege la puerta, no la habitación. Debajo: la regla movida a Postgres, donde todos los caminos la atraviesan.",
+  "recognition.five": "Cinco entradas",
+  "recognition.one": "Una regla",
+  "recognition.oneNote": "una regla, en Postgres, en cada camino",
   "engine.badge": "Con lo que habla tu app",
   "engine.title": "Todo el backend, ya en marcha.",
   "engine.subtitle":

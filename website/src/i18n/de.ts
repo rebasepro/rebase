@@ -3,7 +3,7 @@ export const de = {
   "hero.title.part1": "Das Postgres, das du schon hast.",
   "hero.title.part2": "Das Backend, das du immer wolltest.",
   "hero.subtitle":
-    "Verbinde es mit deiner bestehenden Datenbank. Nichts zu provisionieren, nichts kopiert, nichts migriert — dein Schema ist der einzige Input.",
+    "Verbinde es mit dem Postgres, das du schon betreibst. REST, ein typisiertes SDK, Realtime und Auth erscheinen — und jede Zugriffsregel setzt die Datenbank selbst durch.",
   "hero.cta.demo": "Demo testen",
 
   "rlscheck.title": "Glaub uns das nicht einfach.",
@@ -16,7 +16,17 @@ export const de = {
   "demo.pull": "✔ Schema in Datenbank übertragen. Tabellen erstellt.",
   "demo.dev": "✔ API, Realtime und Panel laufen.",
   "demo.ports": "API auf <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> Panel auf <span class=\"text-surface-200\">:5173</span>",
-  "social.title": "Teams, die mit unseren Tools ausliefern — Rebase und FireCMS",
+  "social.title": "Teams, die mit unseren Tools ausliefern — Rebase, und FireCMS, das Open-Source-CMS in über 10.000 Firebase-Projekten.",
+  // The recognition beat — before the argument starts (SITE-STORY §5). It is
+  // claim 1's beat: five ways into one table, and the rule lives in one of them.
+  // Code in the figure stays English; only this prose is translated.
+  "recognition.badge": "Wo die Regel heute lebt",
+  "recognition.title": "Wo steht deine Berechtigungsprüfung?",
+  "recognition.subtitle":
+    "Fünf Wege in dieselbe Tabelle, und die Regel steht in einem davon. Die Route prüft. Der Cron-Job, das Backfill-Skript, der Agent mit dem Service-Key und das gehostete Dashboard prüfen nicht — denn eine Regel im Anwendungscode schützt die Tür, nicht den Raum. Darunter: die Regel, verschoben nach Postgres, wo jeder Weg durch sie hindurchführt.",
+  "recognition.five": "Fünf Wege hinein",
+  "recognition.one": "Eine Regel",
+  "recognition.oneNote": "eine Regel, in Postgres, auf jedem Weg",
   "engine.badge": "Womit deine App spricht",
   "engine.title": "Das gesamte Backend, direkt einsatzbereit.",
   "engine.subtitle":

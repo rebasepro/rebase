@@ -24,6 +24,26 @@ See `~/.claude/.../memory/backend-first-positioning.md` — the site used to sel
 the panel first, which undersells the product and mispositions it against
 Supabase-class competitors.
 
+### Who we win first
+
+Added 2026-09-02. The reader every page is written for is the developer who
+already owns a Postgres database and has just written, or is about to write, the
+backend in front of it — on Supabase, or by hand with an ORM and a permissions
+middleware. They are not shopping for a CMS. They suspect, usually correctly,
+that their access rules do not hold: a service role that bypasses RLS, a table
+served with no policy, a check that lives in one route and not the next.
+`rls-check` is written for that suspicion, and it is the first thing we hand
+them. It is useful whether or not they ever adopt Rebase, which is why they
+trust it.
+
+Everyone else arrives through that developer. The operator team, the agency,
+the agent holding a key and the European buyer are real audiences, and each has
+a deep page — but none of them is addressed on `/` at the developer's expense,
+and none of them is the reason the hero says what it says. Naming the
+beachhead is what settles the hero: it leads with claim 1 because that is the
+claim this reader is already looking for, and "the Postgres you already have"
+is the sentence that tells them they will not have to move to get it.
+
 ## 2. The four claims we are allowed to lead with
 
 Ranked. Anything below the line is a feature, not a claim.
@@ -220,7 +240,8 @@ after the brand audit.
 | Beat | Section | Carries |
 |------|---------|---------|
 | — | `s-hero` | Headline, one action, and the install terminal — whose output names the API and realtime before the panel |
-| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" |
+| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" — and, since 2026-09-02, naming FireCMS's 10,000+ projects, the heritage the star count cannot supply |
+| — | `s-recognition` | Recognition, before the argument — and it is **claim 1's**: five ways into the same table (route, cron, backfill script, agent with a service key, hosted dashboard) and the rule lives in one of them, folding into the policy as Postgres holds it. Unnumbered because it precedes the argument the numerals carry |
 | 01 | `s-collection-power` | Claim 2 — one definition, every surface; the chips run schema → REST → SDK → forms → views |
 | 02 | `s-backend-engine` | What that definition generates |
 | 03 | `s-security` | **Claim 1** — security lives in the database; links to `/security`, the page that carries it |
@@ -239,15 +260,30 @@ customers and the close. The manifesto banner (§6). The FAQ, the "what you will
 never build again" list and the feature bento from the pre-V2 page — their keys
 were deleted with `IndexContent.astro`, so they cannot come back by accident.
 
-**One beat the page is still missing.** Recorded 2026-08-29 while rebuilding the
-intro film against `docs/PRODUCT.md`: **recognition, before the argument
-starts.** Every beat above is an assertion — here is what it does, here is what
-it generates, here is why that is safe. Nothing asks the reader to recognise a
-problem they already have, so "there is no second data model" arrives as a
-feature rather than as relief. The film opens its argument by showing the same
-table declared five times (a schema, a type, a validator, a route file, a form
-field) and collapsing them into one. That beat belongs here too, above 01. (The
-other beat recorded missing that day, ownership at the close, is 09 now.)
+**Both beats recorded missing on 2026-08-29 are on the page now.** Ownership at
+the close is 09. Recognition, before the argument starts, is the unnumbered
+section above 01.
+
+**Recognition is claim 1's beat, not claim 2's.** Decided 2026-09-03, after a
+day in which it was the other. The first version showed the same table declared
+five times — migration, type, validator, route, form — folding into one
+collection file, which is the beat the intro film opens on. It asks the reader
+to recognise boilerplate, and boilerplate stopped hurting: an agent writes those
+five files in a minute, and beat 07 says so in as many words ("boilerplate
+depreciates, guarantees appreciate"). Every code-first tool in the category
+makes the write-it-once claim; it is the mechanism, not the story. The pain
+that is real is "I do not know whether my access rules hold" — the suspicion
+§1 names as the reason we win the reader at all. So the figure is five ways
+into the same `orders` table with the rule in one of them (the route checks;
+the cron job, the backfill script, the agent holding a service key and the
+hosted dashboard do not), folding into the rule as Postgres holds it, with
+every path reading "policy applies". The manifesto's line is the beat's
+argument: a rule in application code protects the door, not the room. 01 then
+shows where the rule is written, 03 what enforces it, and the rls-check band
+proves it. The page opens, argues and closes on the same claim.
+
+The film still opens on the five-declarations figure; that is a film decision
+to revisit separately, and the two need not match.
 
 Three rules are encoded in that table and should not be quietly undone:
 

@@ -1,0 +1,214 @@
+---
+/**
+ * The recognition beat — before the argument starts.
+ *
+ * Sits between the logo wall and 01, unnumbered for the same reason the
+ * rls-check band is: the numerals are the argument, and this comes before it.
+ *
+ * It is CLAIM 1's beat, not claim 2's. The first version (2026-09-02) showed
+ * the same table declared five times — migration, type, validator, route,
+ * form — folding into one collection file. That asks the reader to recognise
+ * boilerplate, and boilerplate stopped hurting: an agent writes those five
+ * files in a minute, and the page's own beat 07 says so ("boilerplate
+ * depreciates, guarantees appreciate"). The pain that is real is not "I wrote
+ * this twice"; it is "I do not know whether my access rules hold".
+ *
+ * So the figure is five ways into the same table, and the rule lives in one of
+ * them: the route checks; the cron job, the backfill script, the agent holding
+ * a service key and the hosted dashboard do not. A rule in application code
+ * protects the door, not the room (manifesto, belief 1). Press "One rule" —
+ * or scroll it into view — and the five fold into the rule as Postgres now
+ * holds it, with every path reading "policy applies".
+ *
+ * 01 then shows where that rule is written, 03 what enforces it, and the
+ * rls-check band proves it against the reader's own database.
+ *
+ * Base ground, not raised: the reader is being shown their own code, not a
+ * machine being opened. Code stays English; only the prose is translated.
+ *
+ * The snippets live here as strings and render through `set:html`, because an
+ * Astro template reads every `{` in a `<pre>` as an expression.
+ */
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+
+const { lang: langProp, t: tProp } = Astro.props;
+const lang = langProp ?? getLangFromUrl(Astro.url);
+const t = tProp ?? useTranslations(lang);
+
+const k = (s: string) => `<span class="k">${s}</span>`;
+const s = (v: string) => `<span class="s">${v}</span>`;
+const ok = (v: string) => `<span class="ok">${v}</span>`;
+const no = (v: string) => `<span class="w">${v}</span>`;
+const dim = (v: string) => `<span class="c">${v}</span>`;
+
+const FILES: { name: string; code: string }[] = [
+    {
+        name: "routes/orders.ts",
+        code: `app.get(${s('"/orders/:id"')}, ${k("async")} (req, res) =&gt; {
+  ${k("const")} order = ${k("await")} db.orders.find(req.params.id);
+  ${ok(`${k("if")} (order.ownerId !== req.user.id) ${k("return")} res.status(403).end();`)}
+  res.json(order);
+});`,
+    },
+    {
+        name: "jobs/nightly-report.ts",
+        code: `cron(${s('"0 2 * * *"')}, ${k("async")} () =&gt; {
+  ${k("const")} rows = ${k("await")} db.select().from(orders);   ${no("// every row, nobody's check")}
+  ${k("await")} mail(report(rows));
+});`,
+    },
+    {
+        name: "scripts/backfill-status.ts",
+        code: `${no("// run once from a laptop, kept forever")}
+${k("await")} db.update(orders).set({ status: ${s('"shipped"')} })
+        .where(isNull(orders.status));`,
+    },
+    {
+        name: "agents/tools.ts",
+        code: `${k("const")} admin = createClient(URL, SERVICE_ROLE_KEY);   ${no("// bypasses RLS")}
+tool(${s('"delete_order"')}, ${k("async")} ({ id }) =&gt;
+  admin.from(${s('"orders"')}).delete().eq(${s('"id"')}, id));`,
+    },
+    {
+        name: "the hosted dashboard",
+        code: `${dim("-- signed in as the project owner")}
+${k("select")} * ${k("from")} orders;          ${no("-- 48,211 rows, no policy consulted")}`,
+    },
+];
+
+const ONE = `securityRules: [
+  { operation: ${s('"select"')}, using: ${s('"owner_id = rebase.uid()"')} },
+  { operation: ${s('"update"')}, using: ${s('"owner_id = rebase.uid()"')} },
+],
+
+${dim("-- compiled into Postgres; enforced on every statement, for every caller")}
+${k("CREATE POLICY")} orders_select ${k("ON")} orders ${k("FOR SELECT")} ${k("USING")} (owner_id = rebase.uid());
+${dim("-- a table with no policy is not served at all")}
+
+routes/orders.ts           rebase_user   ${ok("→ policy applies")}
+jobs/nightly-report.ts     rebase_user   ${ok("→ policy applies")}
+scripts/backfill-status.ts rebase_user   ${ok("→ policy applies")}
+agents/tools.ts            scoped key    ${ok("→ policy applies")}
+the panel                  rebase_user   ${ok("→ policy applies")}`;
+---
+
+<section class="chapter relative border-t border-white/8 py-24 sm:py-32" data-recognition>
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            <div class="lg:col-span-5">
+                <p class="eyebrow">{t("recognition.badge")}</p>
+                <h2 class="mt-4 font-headers text-display-2 text-balance">{t("recognition.title")}</h2>
+                <p class="mt-5 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("recognition.subtitle")}</p>
+                <div class="mt-8 inline-flex overflow-hidden rounded-lg border border-white/10" role="group" aria-label={`${t("recognition.five")} / ${t("recognition.one")}`}>
+                    <button type="button" data-fold="five" aria-pressed="true"
+                            class="px-4 py-2 text-sm text-[#b4b8bd] transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        {t("recognition.five")}
+                    </button>
+                    <button type="button" data-fold="one" aria-pressed="false"
+                            class="px-4 py-2 text-sm text-[#b4b8bd] transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        {t("recognition.one")}
+                    </button>
+                </div>
+            </div>
+
+            {/* Reserved height on desktop (§6: an animating demo must not resize
+                the page). On small screens the fold happens on a press, where a
+                resize is the reader's own doing. */}
+            <div class="lg:col-span-7 lg:bleed-right">
+                <div class="fold relative lg:h-[640px] lg:overflow-hidden" data-fold-figure>
+                    {FILES.map((file, i) => (
+                        <div class="fold-file frame" style={`--i:${i}`}>
+                            <div class="frame-head">{file.name}</div>
+                            <pre set:html={file.code} />
+                        </div>
+                    ))}
+                    <div class="fold-one frame" aria-hidden="true">
+                        <div class="frame-head">collections/orders.ts <span class="ml-auto truncate">{t("recognition.oneNote")}</span></div>
+                        <pre set:html={ONE} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .fold { display: grid; gap: 0.5rem; }
+    .fold .frame-head { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+    .fold pre {
+        margin: 0;
+        padding: 0.6rem 0.9rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        line-height: 1.45;
+        color: #c9ced6;
+        overflow-x: auto;
+        white-space: pre;
+    }
+    .fold :global(.k) { color: #7fb3ff; }
+    .fold :global(.s) { color: #a6e3a1; }
+    .fold :global(.c) { color: #6b7280; font-style: italic; }
+    .fold :global(.w) { color: #fb5066; }
+    .fold :global(.ok) { color: #34d399; }
+
+    .fold-file { transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1), opacity 500ms ease; }
+    .fold.is-one .fold-file {
+        position: absolute; top: 0; left: 0; right: 0;
+        opacity: 0;
+        transform: translateY(calc(var(--i) * 14px)) scale(0.98);
+        pointer-events: none;
+    }
+    .fold-one {
+        position: absolute; inset: 0 0 auto 0;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: opacity 500ms ease 350ms, transform 500ms ease 350ms;
+        pointer-events: none;
+    }
+    .fold.is-one .fold-one { position: relative; opacity: 1; transform: none; pointer-events: auto; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .fold-file, .fold-one { transition: none; }
+    }
+</style>
+
+<script>
+    function initRecognition() {
+        document.querySelectorAll<HTMLElement>("[data-recognition]").forEach((section) => {
+            if (section.dataset.bound === "1") return;
+            section.dataset.bound = "1";
+
+            const figure = section.querySelector<HTMLElement>("[data-fold-figure]");
+            const buttons = Array.from(section.querySelectorAll<HTMLButtonElement>("[data-fold]"));
+            if (!figure || buttons.length !== 2) return;
+
+            const set = (one: boolean) => {
+                figure.classList.toggle("is-one", one);
+                for (const b of buttons) b.setAttribute("aria-pressed", String((b.dataset.fold === "one") === one));
+                figure.querySelector(".fold-one")?.setAttribute("aria-hidden", String(!one));
+            };
+            for (const b of buttons) b.addEventListener("click", () => set(b.dataset.fold === "one"));
+
+            // Fold once, unprompted, the first time the figure is mostly in view —
+            // only on a viewport wide enough for the reserved height, and never for
+            // a reader who asked for reduced motion.
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const wide = window.matchMedia("(min-width: 1024px)").matches;
+            if (reduce || !wide || !("IntersectionObserver" in window)) return;
+            let played = false;
+            const io = new IntersectionObserver((entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting && !played) {
+                        played = true;
+                        window.setTimeout(() => set(true), 1800);
+                        io.disconnect();
+                    }
+                }
+            }, { threshold: 0.6 });
+            io.observe(figure);
+        });
+    }
+
+    initRecognition();
+    document.addEventListener("astro:page-load", initRecognition);
+</script>
