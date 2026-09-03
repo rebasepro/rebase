@@ -3,8 +3,9 @@
 # This makes the project compatible with both pnpm and npm workspaces.
 link-workspace-packages=true
 
-# Disable automatic dependency check before running scripts to prevent background install failures in read-only environments
-verify-deps-before-run=false
-
-# Prevent pnpm from prompting for confirmation when purging modules in non-TTY environments (e.g. Docker, CI)
-confirm-modules-purge=false
+# `verify-deps-before-run` and `confirm-modules-purge` used to be here too.
+# They moved to pnpm-workspace.yaml, in their camelCase spelling: pnpm 11 no
+# longer reads them from this file (it answers `undefined` for both), so they
+# were doing nothing, while npm 12 warned about them on every install and every
+# `npm run` — two lines of noise, in a first run, for settings that had already
+# stopped applying.
