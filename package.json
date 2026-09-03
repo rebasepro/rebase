@@ -64,6 +64,7 @@
     "check:names": "node tooling/scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node tooling/scripts/check-undeclared-deps.mjs",
     "check:publishable-set": "node tooling/scripts/check-publishable-set.mjs",
+  "check:package-contents": "node tooling/scripts/check-package-contents.mjs",
     "check:api-surface": "node tooling/scripts/check-api-surface.mjs",
     "check:dts": "node tooling/scripts/assert-dts-resolution.mjs --all",
     "write:api-surface": "node tooling/scripts/api-surface.mjs --write",

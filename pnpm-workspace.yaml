@@ -103,4 +103,25 @@ overrides:
   # reason at the top of this block.
   brace-expansion: ">=5.0.8 <6"
   react-router: ">=8.3.0 <9"
+  # GHSA-f65p-4m7j-42xc, -jqff-g426-hqxp, -fph4-wmhf-6fwf, -5jgf-p345-68v8:
+  # four ways to make fast-uri disagree with the host a request will actually
+  # reach — a malformed IPv6 literal, a percent-encoded scheme, a repeated
+  # hostname, and skipped IDN canonicalization. All four are the same defect
+  # class: the parser's answer and the fetcher's answer differ, which is what
+  # turns a URL check into an SSRF.
+  #
+  # Not build tooling. It arrives twice: through webpack/Remotion, which is,
+  # and through `@rebasepro/mcp` as a runtime dependency, which ships. An MCP
+  # server is handed URLs by a model, so a parser that can be talked into
+  # naming the wrong host is exactly the wrong thing to have there.
+  fast-uri: ">=3.1.6 <4"
+  # GHSA-73wf-gq98-2v4g: an untrusted BROWSERSLIST value crashes the process or
+  # writes through the prototype. devDependencies only, via @babel/core — the
+  # value is ours, so this is hygiene rather than exposure.
+  browserslist: ">=4.28.7 <5"
+  # GHSA-x5fp-wj9c-mxmx and -4mjr-xmp4-gh2g: an array-limit bypass through
+  # comma-separated bracket keys, and a denial of service through an
+  # attacker-controlled `isBuffer`. Reaches `@rebasepro/mcp` at runtime through
+  # @modelcontextprotocol/sdk, and express independently.
+  qs: ">=6.16.0 <7"
 verifyDepsBeforeRun: false
