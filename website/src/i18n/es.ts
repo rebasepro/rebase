@@ -754,6 +754,14 @@ export const es = {
   "productpage.20": "Skills de agente",
   "productpage.21": "El backend",
   "productpage.22": "El panel",
+  "productpage.layers.badge": "Una entrada, dos lectores",
+  "productpage.layers.title": "Las dos capas leen el mismo archivo.",
+  "productpage.layers.subtitle": "products.ts declara la colección una sola vez. Rebase Backend lo lee y sirve la tabla, las rutas y el cliente tipado; Rebase CMS lee el mismo archivo y dibuja las vistas y el formulario. No hay un segundo esquema que mantener sincronizado.",
+  "productpage.layers.file": "el único archivo escrito a mano",
+  "productpage.layers.l1": "Rebase Backend",
+  "productpage.layers.l1.note": "Funciona sin instalar nada más. Todo lo de arriba se genera a partir del archivo y se regenera cuando cambia.",
+  "productpage.layers.l2": "Rebase CMS",
+  "productpage.layers.l2.note": "Una dependencia, y opcional. Lee estas filas a través de los mismos endpoints, bajo las mismas políticas a nivel de fila que tu propio cliente.",
 
   // ── studiopage ──────────────────────────────────────────────────
   "studiopage.00": "SQL · Schema · RLS · Logs",

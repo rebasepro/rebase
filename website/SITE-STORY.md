@@ -146,7 +146,7 @@ Every major page is a variation on the same three acts:
 | Act | Beat | Proof we own |
 |-----|------|--------------|
 | I | Point it at Postgres → APIs appear | `TerminalInit`, `HeroConnectionWidget`, `ApiMiniDemo` |
-| II | One collection is the source of truth | `CollectionPowerSection`, `SdkMiniDemo`, `RLSEditorDemo` |
+| II | One collection is the source of truth | `CollectionPowerSection` (home), `CollectionLayersSection` (/product — same sample, forked into the two layers), `SdkMiniDemo`, `RLSEditorDemo` |
 | III | The panel is optional | `SplitLayerDemo`, `AdoptionStackDemo`, `AdminDemoCarousel` |
 
 ## 4. Information architecture
@@ -211,7 +211,7 @@ its own close and drops `ClosingCta`.
 | Page | The one question it answers | Demos it owns |
 |------|------------------------------|---------------|
 | `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, PolicyPathsFigure, AdminCarousel, AgentConsole |
-| `/product` | What do I actually get, in every product? | AdoptionStack, per-subsystem strip, AdminDemoCarousel |
+| `/product` | What do I actually get, in every product? | CollectionLayersSection (the home figure's sample, sorted into Backend and CMS — never the home component itself), ScrollSync, RebaseMosaicDemo, the two-layer map |
 | `/backend` | Is the backend good enough on its own? | HeroConnection, ApiMini, SdkMini, RealtimeMini, RLSEditor, SplitLayer |
 | `/cms` | Will non-developers actually live in this? | AdminDemoCarousel, ScrollSync, the editor, Kanban, Spreadsheet, CustomFields, ReactExt — each mounted once |
 | `/studio` | Can I run my database from here? | SQLEditor, SchemaBuilder, RLSEditor, OrdersList, JSEditor |

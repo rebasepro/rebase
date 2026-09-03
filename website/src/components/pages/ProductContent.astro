@@ -2,7 +2,7 @@
 const { lang, t } = Astro.props;
 
 import { NeatBackground } from '../../components/NeatBackground';
-import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
+import CollectionLayersSection from '../CollectionLayersSection.astro';
 import ScrollSyncShowcase from '../../components/ScrollSyncShowcase.astro';
 import RebaseMosaicDemo from '../../components/demos/RebaseMosaicDemo';
 import { useTranslatedPath } from '../../i18n/ui';
@@ -62,12 +62,8 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
     </section>
 
-    <!-- ═══════════════════════ ONE DEFINITION ═══════════════════════ -->
-    <div class="relative z-0">
-        <CollectionPowerSection
-            badge="What the definition produces"
-            title='Both layers come out of the same file.'/>
-    </div>
+    <!-- ═══════════════════════ ONE FILE, TWO LAYERS ═══════════════════════ -->
+    <CollectionLayersSection />
 
     <!-- ═══════════════════════ ACT I — THE BACKEND ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">

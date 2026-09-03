@@ -1,50 +1,22 @@
 ---
-import { TableProperties, LayoutDashboard, Database, Code, Globe, GitFork } from "lucide-react";
+import { TableProperties, LayoutDashboard, Database, Code, Globe } from "lucide-react";
 import { getLangFromUrl, useTranslations } from '../i18n/ui';
+import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS } from "../data/collection-sample";
 
-// `index` renders the numbered eyebrow used by the home page's beat sequence;
-// deep pages pass nothing and get a plain badge.
+// Home page, beat 01: the file in the middle, its five artifacts fanned around
+// it. `index` renders the numbered eyebrow of the home page's beat sequence.
 //
-// `badge` / `title` let a deep page frame the same figure for its own question.
-// SITE-STORY deleted /features for being "a near-verbatim copy of /product: same
-// hero claim, same section", and this component was reproducing that failure at
-// section level — / and /product both rendered the identical heading. The demo
-// budget allows the figure on home plus one deep page; it does not license the
-// copy to be identical, because /product answers "what do I actually get, in
-// both layers?" rather than restating the home page's claim.
-const { index, badge, title } = Astro.props;
+// This component is mounted on the home page ONLY. Until 2026-09-03 /product
+// mounted it too, with `badge`/`title` props swapping the heading — and the two
+// pages showed the same picture under the same lead, which is the section-level
+// version of the /features duplicate SITE-STORY §4 deleted. /product now has its
+// own composition (CollectionLayersSection: the same file forked into the two
+// layers); the sample both draw lives in src/data/collection-sample.ts so the
+// code, the rows and the endpoints cannot drift between the two.
+const { index } = Astro.props;
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
-
-// Code is defined in frontmatter so whitespace is preserved exactly
-const codeHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig }
-  <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
-
-<span class="text-primary-light">export const</span> <span class="text-white">products</span>: PostgresCollectionConfig = {
-  <span class="text-blue-300">name</span>: <span class="text-green-400">"Products"</span>,
-  <span class="text-blue-300">slug</span>: <span class="text-green-400">"products"</span>,
-  <span class="text-blue-300">table</span>: <span class="text-green-400">"products"</span>,
-  <span class="text-blue-300">properties</span>: {
-    <span class="text-blue-300">name</span>: {
-      <span class="text-blue-300">name</span>: <span class="text-green-400">"Name"</span>,
-      <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>,
-      <span class="text-blue-300">validation</span>: { <span class="text-blue-300">required</span>: <span class="text-primary-light">true</span> },
-    },
-    <span class="text-blue-300">category</span>: {
-      <span class="text-blue-300">name</span>: <span class="text-green-400">"Category"</span>,
-      <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>,
-      <span class="text-blue-300">enum</span>: {
-        <span class="text-blue-300">electronics</span>: <span class="text-green-400">"Electronics"</span>,
-        <span class="text-blue-300">fashion</span>: <span class="text-green-400">"Fashion"</span>,
-        <span class="text-blue-300">home</span>: <span class="text-green-400">"Home &amp; Garden"</span>,
-      },
-    },
-    <span class="text-blue-300">price</span>:     { <span class="text-blue-300">name</span>: <span class="text-green-400">"Price"</span>, <span class="text-blue-300">type</span>: <span class="text-green-400">"number"</span> },
-    <span class="text-blue-300">in_stock</span>:  { <span class="text-blue-300">name</span>: <span class="text-green-400">"In Stock"</span>, <span class="text-blue-300">type</span>: <span class="text-green-400">"boolean"</span> },
-    <span class="text-blue-300">image_url</span>: { <span class="text-blue-300">name</span>: <span class="text-green-400">"Image"</span>, <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>, <span class="text-blue-300">url</span>: <span class="text-primary-light">true</span> },
-  },
-};`;
 ---
 
 <section id="collection-power" class="chapter ground-raised relative z-0 py-28 overflow-hidden border-y border-white/8">
@@ -55,33 +27,11 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
         edges line up, and a grid this deliberate is what lets the numerals and
         chroma fields read as structure rather than as decoration. */}
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8 mb-10 animate-on-scroll fade-in-up">
-        <p class="mb-4 eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{badge ?? t('power.badge')}</p>
-        <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={title ?? t('power.title')}></h2>
+        <p class="mb-4 eyebrow">{index && (<><span class="font-mono">{index}</span><span class="mx-2 text-surface-700">·</span></>)}{t('power.badge')}</p>
+        <h2 class="max-w-[42rem] font-headers text-display-2 text-white text-balance" set:html={t('power.title')}></h2>
         <p class="mt-6 max-w-[38rem] text-lg text-surface-400">
             {t('power.subtitle')}
         </p>
-        <div class="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-surface-700 bg-surface-900/60 text-surface-300 text-sm font-medium">
-
-<svg
-  class="lucide lucide-sparkles"
-  xmlns="http://www.w3.org/2000/svg"
-  width="16"
-  height="16"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-  <path d="M20 2v4" />
-  <path d="M22 4h-4" />
-  <circle cx="4" cy="20" r="2" />
-</svg>
-
-            {badge ?? t('power.badge')}
-        </div>
     </div>
 
     {/*
@@ -260,12 +210,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     <div class="px-3 py-2.5 w-14 text-center">Stock</div>
                 </div>
                 {/* Data rows — no vertical borders, horizontal dividers only */}
-                {[
-                    { id: "x7kQ2p", name: "Wireless Headphones", cat: "Electronics",   catColor: "chip chip-xs chip-blue",   price: "€129", stock: true  },
-                    { id: "mR9vLw", name: "Silk Scarf",          cat: "Fashion",       catColor: "chip chip-xs chip-pink",   price: "€99",  stock: false },
-                    { id: "p4tN8x", name: "Mechanical Keyboard", cat: "Electronics",   catColor: "chip chip-xs chip-blue",   price: "€149", stock: true  },
-                    { id: "b2vF1z", name: "Ceramic Mug",         cat: "Home",          catColor: "chip chip-xs chip-green", price: "€24",  stock: true  },
-                ].map((row) => (
+                {SAMPLE_ROWS.map((row) => (
                     <div class="flex text-sm border-b border-surface-800/40 last:border-0 hover:bg-surface-800/30 cursor-pointer">
                         <div class="px-3 py-3 w-[72px] text-surface-500 font-mono text-xs text-center truncate">{row.id}</div>
                         <div class="px-3 py-3 text-surface-200 flex-1 truncate">{row.name}</div>
@@ -374,7 +319,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                         </div>
                         <span class="text-2xs text-surface-500 font-mono">products.ts</span>
                     </div>
-                    <pre class="bg-surface-950 px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={codeHtml}></pre>
+                    <pre class="bg-surface-950 px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
                 </div>
             </div>
 
@@ -429,17 +374,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     <img src="/img/postgres_elephant.webp" loading="lazy" decoding="async" width="540" height="557" class="h-3 w-auto opacity-35 grayscale filter brightness-200 ml-auto" alt="postgres"/>
                 </div>
                 <div class="p-4 font-mono text-2xs leading-relaxed text-surface-400">
-                    <pre set:html={`<span class="text-primary-light">CREATE TABLE</span> <span class="text-white">"products"</span> (
-  <span class="text-blue-300">"id"</span>         <span class="text-white">uuid PRIMARY KEY</span>,
-  <span class="text-blue-300">"name"</span>       <span class="text-white">text NOT NULL</span>,
-  <span class="text-blue-300">"category"</span>   <span class="text-white">text</span>,
-  <span class="text-blue-300">"price"</span>      <span class="text-white">numeric(10,2)</span>,
-  <span class="text-blue-300">"in_stock"</span>   <span class="text-white">boolean</span>
-                 <span class="text-white">DEFAULT false</span>,
-  <span class="text-blue-300">"image_url"</span>  <span class="text-white">text</span>,
-  <span class="text-blue-300">"created_at"</span> <span class="text-white">timestamptz</span>
-                 <span class="text-white">DEFAULT now()</span>
-);`}></pre>
+                    <pre set:html={SQL_HTML}></pre>
                 </div>
             </div>
 
@@ -467,32 +402,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                     <span class="ml-auto text-3xs font-semibold text-blue-400 font-mono">TS</span>
                 </div>
                 <div class="p-4 font-mono text-2xs leading-relaxed text-surface-400">
-                    <pre set:html={`<span class="text-primary-light">import</span> <span class="text-white">{ createRebaseClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
-
-<span class="text-primary-light">const</span> <span class="text-white">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createRebaseClient</span>&lt;Database&gt;({
-  <span class="text-blue-300">baseUrl</span>: <span class="text-green-400">"http://localhost:3001"</span>
-});
-
-<span class="text-surface-500">// Fully typed queries</span>
-<span class="text-primary-light">const</span> <span class="text-white">{ data }</span> <span class="text-primary-light">=</span> <span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">find</span>({
-  <span class="text-blue-300">where</span>: {
-    <span class="text-blue-300">category</span>: [<span class="text-green-400">"=="</span>, <span class="text-green-400">"Electronics"</span>],
-    <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>]
-  }
-});
-
-<span class="text-surface-500">// Type-safe inserts</span>
-<span class="text-primary-light">await</span> <span class="text-white">client</span>.data.products.<span class="text-blue-300">create</span>({
-  <span class="text-blue-300">name</span>: <span class="text-green-400">"Camera"</span>,
-  <span class="text-blue-300">price</span>: <span class="text-amber-500">299</span>,
-  <span class="text-blue-300">category</span>: <span class="text-green-400">"Electronics"</span>
-});
-
-<span class="text-surface-500">// Realtime, over the same collection</span>
-<span class="text-primary-light">const</span> <span class="text-white">unsubscribe</span> = <span class="text-white">client</span>.data.products.<span class="text-blue-300">listen</span>(
-  { <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: [<span class="text-green-400">"=="</span>, <span class="text-primary-light">true</span>] } },
-  (<span class="text-white">res</span>) =&gt; <span class="text-white">setRows</span>(<span class="text-white">res</span>.<span class="text-blue-300">data</span>)
-);`}></pre>
+                    <pre set:html={SDK_HTML}></pre>
                 </div>
             </div>
 
@@ -522,12 +432,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                         <span class="text-2xs uppercase tracking-wider font-semibold text-surface-400 font-mono">REST API</span>
                     </div>
                     <div class="divide-y divide-surface-800/50">
-                        {[
-                            { method: "GET",    color: "bg-blue-950 text-blue-300 border-blue-800/40",       path: "/api/products" },
-                            { method: "POST",   color: "bg-green-950 text-green-300 border-green-800/40",    path: "/api/products" },
-                            { method: "PATCH",  color: "bg-amber-950 text-amber-300 border-amber-800/40",    path: "/api/products/:id" },
-                            { method: "DELETE", color: "bg-red-950 text-red-300 border-red-800/40",          path: "/api/products/:id" },
-                        ].map(ep => (
+                        {SAMPLE_ENDPOINTS.map(ep => (
                             <div class="flex items-center justify-between px-3 py-2.5">
                                 <span class={`flex-shrink-0 text-3xs font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
                                 <span class="font-mono text-3xs text-surface-400 truncate text-right">{ep.path}</span>
@@ -548,7 +453,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
             <div class="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-surface-800">
                 <span class="text-2xs text-surface-400 font-mono uppercase font-semibold">{t('power.appcode')} — products.ts</span>
             </div>
-            <pre class="bg-surface-950 p-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={codeHtml}></pre>
+            <pre class="bg-surface-950 p-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
         </div>
         <p class="text-center text-xs text-surface-500 font-mono">{t('power.mobile.generates')}</p>
     </div>

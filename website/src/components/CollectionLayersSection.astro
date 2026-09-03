@@ -1,0 +1,233 @@
+---
+import { TableProperties, LayoutDashboard, Database, Code, Globe } from "lucide-react";
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS } from "../data/collection-sample";
+
+// /product's rendering of the sample that CollectionPowerSection fans out on the
+// home page. Same file, same five artifacts — but sorted into the two layers,
+// because /product answers "what do I get, in each layer?" (SITE-STORY §5), not
+// the home page's "one file generates everything". The two components share the
+// sample (src/data/collection-sample.ts) and nothing else: the home draws a star
+// around the file, this draws a fork below it. Until 2026-09-03 /product mounted
+// the home component with a different heading, and the two pages showed the same
+// picture under the same lead — the section-level version of the /features
+// duplicate SITE-STORY §4 deleted.
+//
+// Base ground, not raised: the plates carry their own surface, and the hero
+// above already lifted the page once. The fork is CSS, not a measured SVG —
+// the lane centres are known from the grid, so nothing needs a resize handler.
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+
+// Cell heads reuse the home figure's labels, so the five artifacts are named the
+// same way on both pages.
+const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
+---
+
+<section id="collection-layers" class="relative z-0 py-24 sm:py-32">
+    <div class="mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+            <p class="eyebrow">{t("productpage.layers.badge")}</p>
+            <h2 class="mt-4 font-headers text-display-2 text-white text-balance">{t("productpage.layers.title")}</h2>
+            <p class="mt-6 max-w-[38rem] text-lg text-surface-400">{t("productpage.layers.subtitle")}</p>
+        </div>
+
+        {/* The figure is a picture of the product: nothing in it is a control. */}
+        <div class="cl-figure mt-14 animate-on-scroll fade-in-up delay-100" inert aria-hidden="true">
+
+            {/* ── The file ─────────────────────────────────────────────── */}
+            <div class="frame mx-auto w-full max-w-[34rem]">
+                <div class="frame-head">
+                    <span class="text-surface-200">products.ts</span>
+                    <span class="ml-auto">{t("productpage.layers.file")}</span>
+                </div>
+                <pre class="px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+            </div>
+
+            {/* ── The fork: one stem, one bar, two drops ───────────────── */}
+            <div class="cl-fork">
+                <i class="cl-stem"></i>
+                <i class="cl-bar"></i>
+                <i class="cl-drop cl-l"></i>
+                <i class="cl-drop cl-r"></i>
+                <i class="cl-node cl-l"></i>
+                <i class="cl-node cl-r"></i>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+
+                {/* ── Layer 01 · Rebase Backend ────────────────────────── */}
+                <div class="cl-layer relative overflow-hidden rounded-2xl border border-primary/25 bg-surface-950/70">
+                    <div class="pointer-events-none absolute inset-0"
+                         style="background: radial-gradient(520px 240px at 50% 0%, rgba(0,112,244,0.14), transparent 70%);"></div>
+
+                    <div class="relative flex items-baseline gap-3 px-6 py-4 border-b border-white/8">
+                        <span class="eyebrow">01</span>
+                        <span class="text-lg text-white">{t("productpage.layers.l1")}</span>
+                        <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-primary-light">{t("productpage.layer1.state")}</span>
+                    </div>
+
+                    <div class="relative grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_13.5rem] border-b border-white/8">
+                        {/* DB schema */}
+                        <div class="md:border-r border-b md:border-b-0 border-white/8">
+                            <div class="frame-head"><DbIcon class="w-3 h-3" />{t("power.label.db")}<img src="/img/postgres_elephant.webp" loading="lazy" decoding="async" width="540" height="557" class="h-3 w-auto opacity-35 grayscale filter brightness-200 ml-auto" alt=""/></div>
+                            <pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={SQL_HTML}></pre>
+                        </div>
+                        {/* REST */}
+                        <div>
+                            <div class="frame-head"><RestIcon class="w-3 h-3" />{t("power.label.rest")}</div>
+                            <div class="divide-y divide-white/6">
+                                {SAMPLE_ENDPOINTS.map(ep => (
+                                    <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                                        <span class={`flex-shrink-0 text-3xs font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
+                                        <span class="font-mono text-3xs text-surface-400 truncate text-right">{ep.path}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Typed SDK */}
+                    <div class="relative">
+                        <div class="frame-head"><SdkIcon class="w-3 h-3" />{t("power.label.sdk")}<span class="ml-auto text-3xs font-semibold text-blue-400">TS</span></div>
+                        <pre class="p-4 font-mono text-2xs leading-relaxed text-surface-400 overflow-x-auto" set:html={SDK_HTML}></pre>
+                    </div>
+
+                    <p class="relative px-6 py-4 text-sm text-surface-400 border-t border-white/8">{t("productpage.layers.l1.note")}</p>
+                </div>
+
+                {/* ── Layer 02 · Rebase CMS ────────────────────────────── */}
+                <div class="cl-layer relative overflow-hidden rounded-2xl border border-white/10 bg-surface-950/50">
+                    <div class="flex items-baseline gap-3 px-6 py-4 border-b border-white/8">
+                        <span class="eyebrow">02</span>
+                        <span class="text-lg text-white">{t("productpage.layers.l2")}</span>
+                        <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer2.state")}</span>
+                    </div>
+
+                    {/* Collection view — the real VirtualTable's proportions */}
+                    <div class="border-b border-white/8">
+                        <div class="frame-head"><ViewIcon class="w-3 h-3" />{t("power.label.admin")}</div>
+                        <div class="flex items-center justify-between px-4 py-2 border-b border-white/6">
+                            <span class="text-sm text-white font-medium">Products</span>
+                            <div class="flex items-center gap-1.5">
+                                <div class="h-8 rounded-lg px-2.5 flex items-center gap-1.5 border border-surface-700/60 bg-surface-900">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+                                    <span class="text-2xs text-surface-500">Search…</span>
+                                </div>
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center border border-surface-700/60 bg-surface-900">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex text-3xs font-semibold text-surface-500 tracking-wider uppercase border-b border-white/6 bg-surface-900">
+                            <div class="hidden sm:block px-3 py-2.5 w-[72px] text-center">ID</div>
+                            <div class="px-3 py-2.5 flex-1">Name</div>
+                            <div class="px-3 py-2.5 w-[100px]">Category</div>
+                            <div class="px-3 py-2.5 w-14 text-right">Price</div>
+                            <div class="px-3 py-2.5 w-14 text-center">Stock</div>
+                        </div>
+                        {SAMPLE_ROWS.map((row) => (
+                            <div class="flex text-sm border-b border-white/5 last:border-0">
+                                <div class="hidden sm:block px-3 py-3 w-[72px] text-surface-500 font-mono text-xs text-center truncate">{row.id}</div>
+                                <div class="px-3 py-3 text-surface-200 flex-1 truncate">{row.name}</div>
+                                <div class="px-3 py-3 w-[100px]"><span class={row.catColor}>{row.cat}</span></div>
+                                <div class="px-3 py-3 text-surface-200 text-right w-14">{row.price}</div>
+                                <div class="px-3 py-3 w-14 flex justify-center">
+                                    <div class={`switch-track scale-[0.68] origin-center ${row.stock ? 'switch-track-on' : ''}`}>
+                                        <div class={`switch-knob ${row.stock ? 'switch-knob-on' : ''}`}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Entity form — the real EntityForm's fields */}
+                    <div>
+                        <div class="frame-head"><FormIcon class="w-3 h-3" />{t("power.label.form")}</div>
+                        <div class="px-5 pt-5 pb-5 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-base font-medium text-white">Wireless Headphones</span>
+                                <span class="inline-flex items-center gap-1 text-3xs font-medium text-green-400 bg-green-950/60 border border-green-800/40 px-1.5 py-0.5 rounded-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                    Saved
+                                </span>
+                            </div>
+                            <div class="rounded-md bg-surface-800/40 px-3 py-1.5">
+                                <code class="text-3xs text-surface-500">products/x7kQ2p</code>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="field min-h-[48px] flex flex-col justify-center">
+                                    <span class="field-label text-primary">Name <span class="text-red-500">*</span></span>
+                                    <div class="px-3 pt-6 pb-2 text-sm text-surface-200">Wireless Headphones</div>
+                                </div>
+                                <div class="field min-h-[48px] flex flex-col justify-center">
+                                    <span class="field-label">Category</span>
+                                    <div class="px-3 pt-6 pb-2 flex items-center justify-between">
+                                        <span class="chip chip-blue">Electronics</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                    </div>
+                                </div>
+                                <div class="field min-h-[48px] flex flex-col justify-center">
+                                    <span class="field-label">Price</span>
+                                    <div class="px-3 pt-6 pb-2 text-sm text-surface-200 flex items-center gap-1"><span class="text-surface-500">€</span> 129</div>
+                                </div>
+                                <div class="field min-h-[48px] pl-4 pr-6 flex items-center justify-between">
+                                    <span class="text-sm text-surface-200">In Stock</span>
+                                    <div class="switch-track switch-track-on"><div class="switch-knob switch-knob-on"></div></div>
+                                </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <span class="inline-flex items-center min-h-[40px] px-6 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">Save</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="px-6 py-4 text-sm text-surface-400 border-t border-white/8">{t("productpage.layers.l2.note")}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    /* The fork's geometry comes from the grid: two lanes, `gap-8` (2rem), so the
+       lane centres sit at 25% − 0.5rem and 75% + 0.5rem of the row. The file is
+       centred, so the stem is at 50%. Nothing here needs to be measured. */
+    .cl-figure { --cl-line: rgb(0 112 244 / 0.55); }
+
+    .cl-fork {
+        position: relative;
+        height: 4.5rem;
+        filter: drop-shadow(0 0 4px rgb(0 112 244 / 0.45));
+    }
+    .cl-fork i { position: absolute; display: block; }
+
+    .cl-stem { left: 50%; top: 0; height: 100%; border-left: 1px solid var(--cl-line); }
+    .cl-bar, .cl-drop, .cl-node.cl-r { display: none; }
+
+    .cl-node {
+        bottom: -3.5px;
+        width: 7px;
+        height: 7px;
+        margin-left: -3.5px;
+        border-radius: 9999px;
+        background: var(--color-primary);
+        box-shadow: 0 0 0 3px #08090a;
+    }
+    .cl-node.cl-l { left: 50%; }
+
+    @media (min-width: 64rem) {
+        .cl-stem { height: 50%; }
+        .cl-bar, .cl-drop, .cl-node.cl-r { display: block; }
+        .cl-bar {
+            top: 50%;
+            left: calc(25% - 0.5rem);
+            right: calc(25% - 0.5rem);
+            border-top: 1px solid var(--cl-line);
+        }
+        .cl-drop { top: 50%; height: 50%; border-left: 1px solid var(--cl-line); }
+        .cl-l { left: calc(25% - 0.5rem); }
+        .cl-r { left: calc(75% + 0.5rem); }
+        .cl-node.cl-l { left: calc(25% - 0.5rem); }
+    }
+</style>
