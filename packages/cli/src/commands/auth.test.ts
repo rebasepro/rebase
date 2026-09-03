@@ -22,12 +22,7 @@
  * happened to be running.
  */
 import { describe, it, expect, vi } from "vitest";
-import {
-    authCommand,
-    RESET_PASSWORD_FLAGS,
-    resolveResetPasswordArgs,
-    selectUserForEmail
-} from "./auth";
+import { authCommand, RESET_PASSWORD_FLAGS, resolveResetPasswordArgs, selectUserForEmail, generatePassword } from "./auth";
 
 describe("selectUserForEmail", () => {
     it("finds the user whose email matches exactly", () => {
@@ -165,6 +160,37 @@ describe("resolveResetPasswordArgs", () => {
         expect(advertised.length).toBeGreaterThan(0);
         for (const alias of advertised) {
             expect(Object.keys(RESET_PASSWORD_FLAGS)).toContain(alias);
+        }
+    });
+});
+
+/**
+ * What a reset sets when nobody said what to set it to.
+ *
+ * The answer used to be the string `NewPassword123!`, and `--help` advertised
+ * it. Reset is the documented way back into an account nobody can sign in to,
+ * which in practice means an admin — so the recovery path put every recovered
+ * account on one constant, published in a public repository and inside the npm
+ * package, until a human remembered to change it. On a deployment where the
+ * first registration becomes admin, that is the whole chain.
+ */
+describe("the generated reset password", () => {
+    it("is not a constant", () => {
+        const seen = new Set(Array.from({ length: 50 }, () => generatePassword()));
+        expect(seen.size).toBe(50);
+    });
+
+    it("carries enough entropy to be worth generating", () => {
+        const pw = generatePassword();
+        // 18 random bytes in base64url — 24 characters, ~144 bits.
+        expect(pw).toMatch(/^[A-Za-z0-9_-]{24}$/);
+    });
+
+    it("needs no shell quoting, so it survives being pasted", () => {
+        for (let i = 0; i < 200; i++) {
+            // base64url excludes the whole set that changes meaning in a shell,
+            // in a .env line, or in a URL: quotes, spaces, $ ` \ ; & | < > and +/=.
+            expect(generatePassword()).not.toMatch(/[^A-Za-z0-9_-]/);
         }
     });
 });
