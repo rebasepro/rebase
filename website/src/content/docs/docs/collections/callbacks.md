@@ -95,7 +95,8 @@ beforeSave: async ({
 }
 ```
 
-Throw an error to **block the save**:
+Throw an error to **block the save**. The write never reaches the database, and
+the caller gets **400** with your message and the code `CALLBACK_REJECTED`:
 
 ```typescript
 beforeSave: async ({ values }) => {
@@ -105,6 +106,32 @@ beforeSave: async ({ values }) => {
     return values;
 }
 ```
+
+```json
+{ "error": { "message": "Price cannot be negative", "code": "CALLBACK_REJECTED",
+             "details": { "stage": "beforeSave", "path": "products" } } }
+```
+
+To choose the status and code yourself — a 409 for a clash, a 422 for something
+well-formed but unacceptable — throw a `RebaseApiError`:
+
+```typescript
+import { RebaseApiError } from "@rebasepro/types";
+
+beforeSave: async ({ values }) => {
+    if (await isTaken(values.slug)) {
+        throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+    }
+    return values;
+}
+```
+
+:::note
+Import it from `@rebasepro/types`, not from `@rebasepro/server`. A collection file
+is shared with the frontend — the admin panel's Vite build reads this same
+directory — so it may only import packages that run in a browser. `RebaseApiError`
+is the browser-safe one, and it is the same class the client SDK throws.
+:::
 
 ### `afterSave`
 

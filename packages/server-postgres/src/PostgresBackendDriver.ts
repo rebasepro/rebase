@@ -31,7 +31,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildSdkData, classifyTable, detectJunctionTables, resolveCollectionRelations, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { HistoryService } from "./history/HistoryService";
@@ -701,49 +701,56 @@ export class PostgresBackendDriver implements DataDriver {
             }
         }
 
-        if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
-            // 1. Global callbacks first
-            if (globalCallbacks?.beforeSave) {
-                const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
-            }
+        // A `before*` callback is the application speaking, not the server
+        // failing: a bare `throw` is the documented way to block a write, so it
+        // answers 400 with the author's message rather than a masked 500.
+        try {
+            if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.beforeSave) {
+                    const result = await globalCallbacks.beforeSave({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
 
-            // 2. Collection callbacks second
-            if (callbacks?.beforeSave) {
-                const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
-            }
+                // 2. Collection callbacks second
+                if (callbacks?.beforeSave) {
+                    const result = await callbacks.beforeSave({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
 
-            // 3. Property callbacks third
-            if (propertyCallbacks?.beforeSave) {
-                const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
-            }
+                // 3. Property callbacks third
+                if (propertyCallbacks?.beforeSave) {
+                    const result = await propertyCallbacks.beforeSave({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
 
+            }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "beforeSave", path);
         }
 
         // Apply autoValue timestamps (on_create / on_update) at the application layer.
@@ -1152,50 +1159,57 @@ export class PostgresBackendDriver implements DataDriver {
 
         const contextForCallback = this.buildCallContext();
 
-        if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
-            let preventDefault = false;
-            // 1. Global callbacks first
-            if (globalCallbacks?.beforeDelete) {
-                const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
+        // A `before*` callback is the application speaking, not the server
+        // failing: a bare `throw` is the documented way to block a write, so it
+        // answers 400 with the author's message rather than a masked 500.
+        try {
+            if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+                let preventDefault = false;
+                // 1. Global callbacks first
+                if (globalCallbacks?.beforeDelete) {
+                    const result = await globalCallbacks.beforeDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                // 2. Collection callbacks second
+                if (callbacks?.beforeDelete) {
+                    const result = await callbacks.beforeDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                // 3. Property callbacks third
+                if (propertyCallbacks?.beforeDelete) {
+                    const result = await propertyCallbacks.beforeDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                if (preventDefault) {
+                    return;
                 }
             }
-            // 2. Collection callbacks second
-            if (callbacks?.beforeDelete) {
-                const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
-                }
-            }
-            // 3. Property callbacks third
-            if (propertyCallbacks?.beforeDelete) {
-                const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
-                }
-            }
-            if (preventDefault) {
-                return;
-            }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "beforeDelete", targetPath);
         }
 
         await this.dataService.delete(

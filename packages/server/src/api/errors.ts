@@ -175,7 +175,23 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     const error: RebaseApiError = err;
     const reqId = typeof c.get === "function" ? c.get("requestId") : undefined;
 
-    if (error instanceof ApiError || error.name === "ApiError") {
+    // `RebaseApiError` from `@rebasepro/types` is the browser-safe error class,
+    // and the only one a `config/collections/*.ts` file can throw — that file is
+    // bundled into the admin SPA, so it may not import the server package. It
+    // spells its status `status` rather than `statusCode`, so normalize it here
+    // and one class then works from a collection callback, a custom function and
+    // the SDK alike.
+    //
+    // Matched by name rather than `instanceof`: a monorepo can resolve two
+    // copies of @rebasepro/types, and `instanceof` is false across them.
+    const isBrowserSafeError = /^Rebase(Api|Client)Error$/.test(error.name);
+    if (isBrowserSafeError && error.statusCode === undefined) {
+        const status = (error as unknown as { status?: unknown }).status;
+        if (typeof status === "number") error.statusCode = status;
+    }
+
+    if (error instanceof ApiError || error.name === "ApiError"
+        || (isBrowserSafeError && typeof error.statusCode === "number")) {
         // Operational errors — log at warn, unless the error declares itself a
         // routine outcome (see ApiError.expected), which would otherwise put a
         // warning in the log for every anonymous page view.

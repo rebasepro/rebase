@@ -898,6 +898,7 @@ class OrderBySpecError { code }
 class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
 class RebasePaginationError { code }
 class UnknownFilterOperatorError { code, details, field, operator, statusCode, validOperators }
+const CALLBACK_REJECTED
 const COLLECTION_PATH_SEPARATOR
 const COMPOSITE_ID_SEPARATOR
 const DEFAULT_FIND_ALL_MAX_ROWS
@@ -1015,6 +1016,7 @@ function sortCollectionsBySlug
 function sortProperties
 function sqlToPolicy
 function stripCollectionPath
+function toCallbackError
 function toFilterTuples
 function traverseValueProperty
 function traverseValuesProperties
