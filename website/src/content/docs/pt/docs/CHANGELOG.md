@@ -13,7 +13,92 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Security
 
-- **In production, whoever registered first owned the deployment.** An empty
+An external audit of the framework and Rebase Cloud on 2 September 2026. Every
+item below was reproduced before it was fixed. Read the first one if you read
+nothing else: it is the only one that can have been silently true on a
+deployment you already run.
+
+- **A server's first boot on an empty database served every request with RLS
+  effectively off.** The driver decides whether to drop to the restricted
+  `rebase_user` role by asking whether its connection role is a superuser, has
+  `BYPASSRLS`, or owns any tables. On a fresh database with an ordinary owner
+  the answer to all three is no, so no role switch was configured — and the
+  same process then created and owned every table, which makes it exempt from
+  every non-`FORCE` policy for the rest of its life. It logged "subject to RLS
+  natively; no role switch needed" while it did so. The next restart answered
+  differently and quietly fixed it, which is why it survived: the window is one
+  process lifetime, and it is the first one, when a deployment has its first
+  users and nobody is looking yet. Reproduced end to end — a second user
+  listed, counted and rewrote the first user's rows under an `ownerField` rule.
+  The posture is now decided after the schema is provisioned, from ownership
+  Postgres would actually recognise (`pg_has_role`), and a connection that just
+  created tables and still reports "no switch needed" fails the boot instead of
+  logging past it.
+
+- **`excludeFromApi` was a read-side rule that stopped at the top-level row.**
+  It was stripped from a row and from an inline relation target, but the "ref"
+  rendering used by WebSocket fetches and by every realtime subscription frame
+  copied the target's columns unfiltered — so a `posts.author` relation to
+  `users`, which is what the scaffold ships, delivered password hashes to
+  anyone subscribed. REST was clean the whole time, which is why it was not
+  noticed. It was also read-side only in the other direction: any caller who
+  could write a row could write the columns it hid, and the OpenAPI generator
+  documented that as intended. Both directions now hold, in every rendering.
+
+- **`storagePublicRead` satisfied the production access-control gate and left
+  write, delete and list open.** The boot check treated it as "access control
+  is configured", after which no authorize hook was required — but public read
+  only relaxes reads. Writes fell back to the global `requireAuth`, which is
+  off in exactly the public-site configuration the docs recommend alongside it.
+  Proven anonymous: upload over another user's key, list, read, delete. Public
+  read without a hook now installs one that denies write, delete and list to
+  anyone who is not an admin.
+
+- **Resumable uploads were not bound to their owner.** `HEAD`, `PATCH` and
+  `DELETE` looked an upload up by id and never compared the recorded owner, so
+  a leaked upload id let somebody else finish or cancel it under the owner's
+  authorized key. The per-upload ceiling was 5 GB regardless of the
+  controller's `maxFileSize`, which was checked only after finalize had read
+  the whole temp file into memory. Ownership is now checked, the declared
+  length is refused up front, and the file is streamed.
+
+- **Revoked and demoted admin tokens kept working on the most valuable
+  routes.** The user-management routers re-read roles and the revocation
+  watermark on every request; the gate in front of backups, cron, logs, the
+  schema editors, the RLS audit and dev mail did not, and neither did the
+  API-key router or the auth router's self-service routes. So a revoked token
+  still downloaded a full database dump and read captured reset emails for up
+  to an hour; a demoted admin could still mint an `admin: true` API key that
+  never expires; and a stolen access token could still link an attacker's
+  GitHub identity to the account *after* the victim had reset their password
+  and signed out everywhere. All of them re-read now.
+
+- **The DDL builders interpolated schema and table names straight into
+  `CREATE TABLE` and `ALTER TABLE`.** Identifier validation ran on the
+  introspection reads and not on the statements built from them, and the
+  live-schema router is mounted regardless of `NODE_ENV`, so a crafted table
+  name executed on the owner connection — which bypasses RLS entirely. The AST
+  schema editor had the matching hole on the TypeScript side: top-level keys
+  were emitted unquoted into a collection file and a relation target containing
+  an arrow was emitted verbatim, and `rebase dev` re-imports on change, so the
+  payload ran as soon as it was written. Names that become SQL identifiers or
+  source are now validated where they are used, not only where they are read.
+  Database introspection had the same shape — a table name from `pg_class` went
+  into both a query and a file path — so a hostile table in a database you
+  onboard could run SQL as your role and write outside the collections
+  directory.
+
+- **A fresh deployment gave admin to whoever registered first.** No shipped
+  artifact set `DISABLE_SELF_REGISTRATION` — not the compose file, the Helm
+  chart, the platform blueprints, or the Hetzner module whose README brings DNS
+  and TLS up before the operator has had a chance to register. The first
+  administrator is now seeded from `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
+  and self-registration ships off. The address is checked against the same rule
+  the login route parses its body with, and a boot refuses one that rule would
+  reject — an admin nobody can sign in to is worse than the race it replaced,
+  because the account existing is also what removes the first-run path.
+
+- **The same window, closed in the framework and not only in the artifacts.** An empty
   user table admitted the first registration and promoted it to admin — the
   right rule for a laptop, and an open window on every host with a public
   hostname, since the shipped artifacts bring DNS and TLS up before the
@@ -42,6 +127,55 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   replaced with placeholders, and the webhook audit carries a dated status
   line, since the SSRF guard it says does not exist has existed since
   2026-08-08.
+
+- **Smaller, and all reproduced:** preview URLs were sanitized by a blocklist
+  that tab and newline variants walked past, and the rich-text editor assigned
+  AI completions to `innerHTML`; a download token could mint itself a fresh one
+  for the same path, which on a trailing-slash key is a perpetual folder-wide
+  grant; static SPA serving returned dotfiles and followed symlinks out of the
+  build directory, so `/.env` and `/.git/config` answered 200; 4xx responses
+  echoed Postgres `DETAIL` in production, an existence oracle for rows RLS
+  hides; image transforms decoded at sharp's defaults with no pixel ceiling and
+  trusted the uploader's declared content type; the email-OTP send route
+  reintroduced timing enumeration and had no per-recipient limit; and
+  `customizeAccessToken` could overwrite `uid` and `roles`, because custom
+  claims were spread over them.
+
+- **`rebase auth reset-password` with no password set a constant.** Both reset
+  paths used the literal `NewPassword123!` and `--help` printed it as the
+  default — a string that is in a public repository and in a published package.
+  Reset is the documented way back into an account nobody can sign in to, which
+  in practice means an admin. A password is now generated and printed, and one
+  you supply is masked rather than echoed back.
+
+- **Published tarballs carried their own tests.** Sixteen packages ship
+  `files: ["dist", "src"]` on purpose; seven of them keep tests beside the code
+  in `src/`, so `src` swept them in — `@rebasepro/client` published 27 test
+  files. `check:package-contents` now asks npm what it would pack and fails on
+  anything test-shaped.
+
+- **Dependency advisories.** `fast-uri` (four highs, all of them the parser's
+  idea of a host disagreeing with the fetcher's — malformed IPv6, a
+  percent-encoded scheme, a repeated hostname, skipped IDN canonicalization) and
+  `qs` both reach `@rebasepro/mcp` as runtime dependencies, not only build
+  tooling. Both raised, with `browserslist` alongside them.
+
+### Added
+
+- **`policy.registered()`.** `POST /auth/anonymous` mints a real user row with a
+  real uid, so a guest satisfies `policy.authenticated()` — which is the point
+  of the feature, and also means "signed in" was true for anyone who pressed
+  *Continue as guest*. `registered()` is `authenticated()` plus "not a guest";
+  reach for it wherever a rule is about somebody who could be held responsible
+  for something. The flag travels in the access token and reaches the database
+  as `rebase.is_anonymous()`, so a policy can ask without a lookup.
+
+- **`rls-check` gained `policy-authenticated-tautology`.** Correcting an
+  anonymous tautology by excluding the sentinel is where people stop, and what
+  remains — "every account may read every row" — is the shape that made a
+  customer's `users` table readable by anyone who could sign up. It is a
+  separate id from the anonymous finding on purpose: different severity,
+  different fix, and `--skip` should be able to silence one without the other.
 
 ### Fixed
 

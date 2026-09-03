@@ -44,6 +44,14 @@ failed `helm install` and has one screen to work from.
 {{- if and .Values.config.adminPassword (lt (len .Values.config.adminPassword) 12) }}
   {{- fail "config.adminPassword must be at least 12 characters — the runtime refuses to create the account otherwise, and the release would come up with no way to sign in." }}
 {{- end }}
+{{/* The login route parses its body with `z.string().email()`, which wants a dot
+     in the domain. `admin@localhost` seeds fine and then 400s on every sign-in,
+     leaving a release with an admin account and no way to reach it. Caught here
+     rather than at boot, because a chart that installs and cannot be signed in
+     to looks like a working install. */}}
+{{- if and .Values.config.adminEmail (not (regexMatch "^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$" .Values.config.adminEmail)) }}
+  {{- fail (printf "config.adminEmail must be an address the login route accepts — %s has no dot in its domain, so the account would seed and then refuse every sign-in." .Values.config.adminEmail) }}
+{{- end }}
 
 {{/* ── Bundle ───────────────────────────────────────────────────────────── */}}
 {{- if not (has .Values.bundle.mode (list "image" "url")) }}

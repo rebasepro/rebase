@@ -19,15 +19,15 @@ export const en = {
   "demo.dev": "✔ API, realtime and panel running.",
   "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
-  // The recognition beat — before the argument starts (SITE-STORY §5).
-  // Code in the figure stays English; only this prose is translated.
-  "recognition.badge": "What you write today",
-  "recognition.title": "You have already written this table five times.",
-  "recognition.subtitle":
-    "A migration, a type, a validator, a route and a form. Five copies of one table, each drifting from the others at its own speed — and the permission check lives in whichever of them someone remembered. Below is the version that is one file.",
-  "recognition.five": "Five files",
-  "recognition.one": "One file",
-  "recognition.oneNote": "schema · API · SDK · form · policies — generated from this",
+  // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
+  // lives today, and the rule as Postgres holds it. Code stays English.
+  "recognition.badge": "Where the rule lives today",
+  "recognition.five": "Five ways in",
+  "recognition.one": "One rule",
+  "recognition.oneNote": "one rule, in Postgres, on every path",
+  // Beat 04 — the panel, when you want one (carousel + the three products).
+  "panel.badge": "The panel, when you want one",
+  "panel.title": "Add it the day a human needs to touch the data.",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
@@ -51,8 +51,6 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.badge": "One definition, every part",
-  "modes.title": "Take only the parts you need.",
   "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
@@ -215,14 +213,6 @@ export const en = {
   "nav.security.desc": "Row-level security, enforced by Postgres.",
   "nav.docs": "Docs",
   "nav.tryDemo": "Try the demo",
-  "roadmappage.meta.title": "Roadmap — Rebase",
-  "roadmappage.meta.description": "What Rebase is building next, from the roadmap issues on GitHub, and which of it is required for 1.0.",
-  "roadmappage.title": "Roadmap",
-  "roadmappage.intro": "Seven things we intend to build, each an issue on GitHub where the discussion actually happens. Comment on the one you care about — that is the fastest way to move it.",
-  "roadmappage.note": "This is what is missing. For what already works and how ready each part is, see the",
-  "roadmappage.readiness": "readiness table",
-  "roadmappage.required": "Required for 1.0",
-  "roadmappage.gate": "1.0 is gated on criteria rather than a date. Two items above carry the badge because 1.0 would be embarrassing without them; the rest are wanted, not owed.",
   "roadmap.badge": "Roadmap",
   "roadmap.title": "What's next for Rebase",
   "roadmap.subtitle":
@@ -953,7 +943,7 @@ export const en = {
   "backendpage.10": "config/collections/orders.ts",
   "backendpage.11": "what you write",
   "backendpage.12": "psql — what the database enforces",
-  "backendpage.13": "Already on Postgres? <code class=\"font-mono text-surface-400\">npx @rebasepro/rls-check</code> audits it without installing anything.",
+  "backendpage.13": "Already on Postgres? <code class=\"font-mono text-surface-400\">npx @rebasepro/rls-check $DATABASE_URL</code> audits it without installing anything.",
   "backendpage.14": "Everything mounted, nothing assembled",
   "backendpage.15": "This is the routing table of a default project — one process, one deployment, no service mesh to draw. Each of these exists because building it yourself is a week you would rather spend elsewhere.",
   "backendpage.16": "One process is the default, not the ceiling. The same build also boots as an API, a functions tier and a worker — one variable per process decides which routes mount, which timers fire and which one owns the schema.",
@@ -1039,7 +1029,7 @@ export const en = {
   "securitypage.04": "Free tool · no signup · nothing installed",
   "securitypage.05": "Check the database you already have",
   "securitypage.06": "You do not have to take any of this on faith. <code class=\"font-mono text-surface-300\">rls-check</code> reads your database's own catalog and reports what is actually exposed: tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. It works on any Postgres — Supabase, Neon, RDS or your own server.",
-  "securitypage.07": "npx @rebasepro/rls-check",
+  "securitypage.07": "npx @rebasepro/rls-check $DATABASE_URL",
   "securitypage.08": "Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes nothing, and no data leaves your machine.",
   "securitypage.09": "Row-level security, written where the collection is",
   "securitypage.10": "Define who can read, create, update, and delete each row — enforced directly by PostgreSQL. Policies are written as code in your schema, version-controlled, and applied via migrations. No middleware, no ORM hacks. And it fails closed: a table without RLS has no authorization model, so Rebase refuses to serve it — and prints the exact SQL to protect it at boot. There is no auth check to forget.",
@@ -1213,7 +1203,7 @@ export const en = {
   "vsfirebase.09": "Constraints and foreign keys keep integrity where it belongs.",
   "vsfirebase.10": "A console for your data, or a back office for your team",
   "vsfirebase.12": "The Firebase Console is a developer tool. If the customer-success team or a content writer needs a dashboard, you build an entire admin panel yourself and wire it to the Firebase SDK.",
-  "vsfirebase.14": "Rebase generates Rebase CMS, a complete React back office, from the same collection definition.",
+  "vsfirebase.14": "Rebase generates Rebase CMS, a production-ready React back office, from the same collection definition.",
   "vsfirebase.15": "Tables, kanban boards and edit screens, generated from the schema.",
   "vsfirebase.16": "Safe to hand to non-technical teammates, because the policies are in the database.",
   "vsfirebase.17": "Replace any part of it with your own React components.",

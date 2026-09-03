@@ -10,13 +10,24 @@ dist
 
 # misc
 .DS_Store
+# Environment files.
+#
+# A glob, not a list. This used to enumerate the variants somebody had thought
+# of — .env, .env.local, .env.production, .env.prod — which meant every name
+# nobody had thought of was committable. `saas_datatalk/.env.sentry-build-plugin`
+# went into this repository's history that way, carrying a Sentry auth token,
+# in a file whose own first line reads "DO NOT commit this file to your
+# repository!". `.env.staging` followed it. Neither matched a single line above,
+# and the repository is public.
+#
+# So: ignore every .env, and name the exceptions. An example or a template is
+# the whole point of committing an env file, and both are values-free by
+# definition — if one ever is not, that is the bug, not this rule.
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.production
-.env.prod
+.env.*
+!.env.example
+!.env.template
+!.env.sample
 *.tfstate
 *.tfstate.backup
 

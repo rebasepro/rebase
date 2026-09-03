@@ -1,0 +1,183 @@
+---
+/**
+ * The figure inside beat 03: the villain and the fix in one frame.
+ *
+ * State one — "where the rule lives today": five ways into the same `orders`
+ * table, and the rule lives in one of them. The route checks; the cron job,
+ * the backfill script, the agent holding a service key and the hosted
+ * dashboard do not. A rule in application code protects the door, not the
+ * room (manifesto, belief 1).
+ *
+ * State two — the rule as Postgres holds it: the `securityRules` block, the
+ * policy it compiles to, and the same five paths each reading "policy
+ * applies". Press the toggle, or scroll it into view.
+ *
+ * This replaced a standalone recognition chapter (2026-09-02/03). A screen of
+ * someone else's broken code before the first product artifact was a tonal
+ * drop after the hero, and with the hero sub carrying claim 1 the claim was
+ * being made four times in the top half. Folded here, the page has one
+ * recognition moment, in the beat that owns the claim, with the rls-check
+ * band directly beneath as the proof.
+ *
+ * Reserved height on desktop (§6: an animating demo must not resize the page).
+ * Code stays English; only the prose is translated. Strings render through
+ * `set:html` because an Astro template reads `{` in a `<pre>` as an expression.
+ */
+import { getLangFromUrl, useTranslations } from "../i18n/ui";
+
+const { lang: langProp, t: tProp } = Astro.props;
+const lang = langProp ?? getLangFromUrl(Astro.url);
+const t = tProp ?? useTranslations(lang);
+
+const k = (s: string) => `<span class="k">${s}</span>`;
+const s = (v: string) => `<span class="s">${v}</span>`;
+const dim = (v: string) => `<span class="c">${v}</span>`;
+
+const TODAY: { path: string; code: string; ok: boolean; verdict: string }[] = [
+    { path: "routes/orders.ts", code: `${k("if")} (order.ownerId !== req.user.id) ${k("return")} 403;`, ok: true, verdict: "checks" },
+    { path: "jobs/nightly-report.ts", code: `db.select().from(orders)  ${dim("// every row")}`, ok: false, verdict: "no check" },
+    { path: "scripts/backfill.ts", code: `db.update(orders).set(…)  ${dim("// run once, kept forever")}`, ok: false, verdict: "no check" },
+    // Deliberately not the SDK-factory spelling that
+    // check-marketing-snippets.mjs denylists — a landing page once shipped that
+    // name as though this SDK exported it, and the checker greps this file's
+    // source, comments included. The row is about somebody else's stack, a
+    // privileged key handed to an agent, so it says so without borrowing a name
+    // a reader might then try to import.
+    { path: "agents/tools.ts", code: `connect(URL, SERVICE_ROLE_KEY)`, ok: false, verdict: "bypasses RLS" },
+    { path: "the hosted dashboard", code: `${k("select")} * ${k("from")} orders  ${dim("-- as the owner")}`, ok: false, verdict: "no policy" },
+];
+
+const RULE = `securityRules: [
+  { operation: ${s('"select"')}, using: ${s('"owner_id = rebase.uid()"')} },
+  { operation: ${s('"update"')}, using: ${s('"owner_id = rebase.uid()"')} },
+]
+${dim("-- compiled into Postgres; enforced on every statement, for every caller")}
+${k("CREATE POLICY")} orders_select ${k("ON")} orders ${k("FOR SELECT")} ${k("USING")} (owner_id = rebase.uid());
+${dim("-- a table with no policy is not served at all")}`;
+
+const AFTER: { path: string; role: string }[] = [
+    { path: "routes/orders.ts", role: "rebase_user" },
+    { path: "jobs/nightly-report.ts", role: "rebase_user" },
+    { path: "scripts/backfill.ts", role: "rebase_user" },
+    { path: "agents/tools.ts", role: "scoped key" },
+    { path: "the panel", role: "rebase_user" },
+];
+---
+
+<div class="frame paths" data-paths data-state="today">
+    <div class="frame-head">
+        <span class="only-today truncate">{t("recognition.badge")}</span>
+        <span class="only-rule truncate">collections/orders.ts · {t("recognition.oneNote")}</span>
+        <div class="ml-auto inline-flex overflow-hidden rounded-md border border-white/10" role="group">
+            <button type="button" data-paths-set="today" aria-pressed="true"
+                    class="px-2.5 py-1 font-sans text-2xs text-surface-400 transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                {t("recognition.five")}
+            </button>
+            <button type="button" data-paths-set="rule" aria-pressed="false"
+                    class="px-2.5 py-1 font-sans text-2xs text-surface-400 transition-colors aria-pressed:bg-white/10 aria-pressed:text-white hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                {t("recognition.one")}
+            </button>
+        </div>
+    </div>
+
+    <div class="relative bg-[#09090b] lg:h-[380px] overflow-hidden">
+        <div class="pane only-today">
+            {TODAY.map((row) => (
+                <div class="row">
+                    <span class="path">{row.path}</span>
+                    <span class="code" set:html={row.code} />
+                    <span class={row.ok ? "verdict ok" : "verdict no"}>{row.ok ? "✓" : "✗"} {row.verdict}</span>
+                </div>
+            ))}
+        </div>
+        <div class="pane only-rule">
+            <pre set:html={RULE} />
+            <div class="mt-2">
+                {AFTER.map((row) => (
+                    <div class="row">
+                        <span class="path">{row.path}</span>
+                        <span class="code c">{row.role}</span>
+                        <span class="verdict ok">→ policy applies</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .paths .only-rule { display: none; }
+    .paths[data-state="rule"] .only-rule { display: block; }
+    .paths[data-state="rule"] .only-today { display: none; }
+    .paths .frame-head .only-rule { display: none; }
+    .paths[data-state="rule"] .frame-head .only-rule { display: inline; }
+
+    .pane { padding: 0.75rem 1rem; }
+    .row {
+        display: grid;
+        grid-template-columns: 11rem minmax(0, 1fr) auto;
+        gap: 0 1rem;
+        align-items: baseline;
+        padding: 0.55rem 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        line-height: 1.45;
+    }
+    .row:first-child { border-top: 0; }
+    .row .path { color: #e5e7eb; }
+    .row .code { color: #9aa0a8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .verdict { white-space: nowrap; }
+    .verdict.ok { color: #34d399; }
+    .verdict.no { color: #fb5066; }
+    @media (max-width: 640px) {
+        .row { grid-template-columns: minmax(0, 1fr) auto; }
+        .row .code { display: none; }
+    }
+
+    .pane pre {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        line-height: 1.5;
+        color: #c9ced6;
+        white-space: pre;
+        overflow-x: auto;
+    }
+    .paths :global(.k) { color: #7fb3ff; }
+    .paths :global(.s) { color: #a6e3a1; }
+    .paths :global(.c) { color: #6b7280; font-style: italic; }
+</style>
+
+<script>
+    function initPolicyPaths() {
+        document.querySelectorAll<HTMLElement>("[data-paths]").forEach((fig) => {
+            if (fig.dataset.bound === "1") return;
+            fig.dataset.bound = "1";
+            const buttons = Array.from(fig.querySelectorAll<HTMLButtonElement>("[data-paths-set]"));
+            const set = (state: "today" | "rule") => {
+                fig.dataset.state = state;
+                for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.pathsSet === state));
+            };
+            for (const b of buttons) b.addEventListener("click", () => set(b.dataset.pathsSet === "rule" ? "rule" : "today"));
+
+            // Fold once, unprompted, the first time the figure is mostly in view —
+            // never for a reader who asked for reduced motion.
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (reduce || !("IntersectionObserver" in window)) return;
+            let played = false;
+            const io = new IntersectionObserver((entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting && !played) {
+                        played = true;
+                        window.setTimeout(() => set("rule"), 2200);
+                        io.disconnect();
+                    }
+                }
+            }, { threshold: 0.6 });
+            io.observe(fig);
+        });
+    }
+    initPolicyPaths();
+    document.addEventListener("astro:page-load", initPolicyPaths);
+</script>
