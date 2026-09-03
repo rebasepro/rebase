@@ -132,7 +132,7 @@ import ClosingCta from "../ClosingCta.astro";
                         </a>
                         <a href="/docs"
                            class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                            Read the docs
+                            {t("cta.button.docs")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -165,7 +165,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <div class="relative">
                                 <p class="font-mono text-xs text-surface-600 mb-3">0{i + 1}</p>
                                 <code class="block font-mono text-sm text-primary-light mb-3">{step.cmd}</code>
-                                <h3 class="text-base font-semibold text-white mb-2">{step.title}</h3>
+                                <h3 class="text-base text-white mb-2">{step.title}</h3>
                                 <p class="text-sm text-surface-400 leading-relaxed">{step.desc}</p>
                             </div>
                         </div>
@@ -175,7 +175,7 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="mt-6">
                 <a href={translatePath("/cli")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The whole CLI, command by command
+                    {t("devpage.link.cli")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -252,7 +252,7 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="mt-8 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-8">
                 <a href={translatePath("/cms")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    Custom React inside the panel
+                    {t("devpage.link.react")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -261,7 +261,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href={translatePath("/ui")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The component library
+                    {t("devpage.link.ui")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -270,7 +270,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href={translatePath("/sdk")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The client SDK
+                    {t("devpage.link.sdk")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -388,7 +388,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
                 <a href={translatePath("/ai")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The agent story in full
+                    {t("devpage.link.ai")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>

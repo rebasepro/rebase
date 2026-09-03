@@ -49,7 +49,7 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="flex items-center justify-start gap-x-4">
           <a href="/demo"
              class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-            Try the demo
+            {t("cta.button.demo")}
             
 <svg
   class="lucide lucide-arrow-right"
@@ -83,9 +83,9 @@ import ClosingCta from "../ClosingCta.astro";
             <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("studiopage.27")}</h2>
             <p class="text-lg text-surface-400 mb-6">{t("studiopage.04")}</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Visual edits write to real TypeScript files</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Full collection config: properties, callbacks, security rules</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Zod schema generation for runtime validation</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("studiopage.f1")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("studiopage.f2")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("studiopage.f3")}</li>
             </ul>
           </div>
           <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
@@ -147,13 +147,13 @@ import ClosingCta from "../ClosingCta.astro";
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <SchemaBuilderMiniDemo client:load />
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.10")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.10")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.11")}</p>
           </div>
 
           <div class="group relative p-6 pb-8 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/40 transition-all duration-300 flex flex-col">
             <RbacMiniDemo client:load />
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.12")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.12")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.13")}</p>
           </div>
 
@@ -176,7 +176,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.30")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.30")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.14")}</p>
           </div>
 
@@ -204,7 +204,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.32")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.32")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.15")}</p>
           </div>
 
@@ -222,7 +222,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="text-emerald-400 mt-0.5">// → 3 results</div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">JS Console</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">JS Console</h3>
             <p class="text-sm text-surface-400">{t("studiopage.16")}</p>
           </div>
 
@@ -250,7 +250,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.34")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.34")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.17")}</p>
           </div>
 
@@ -275,7 +275,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.36")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.36")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.19")}</p>
           </div>
 
@@ -291,7 +291,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400">INFO</span><span class="text-surface-300">{t("studiopage.22")}</span><span class="ml-auto text-[7px] text-surface-500">31ms</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.38")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.38")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.23")}</p>
           </div>
 
@@ -306,7 +306,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-surface-500">◦</span><span class="text-surface-300">logo-v2.svg</span><span class="ml-auto text-[7px] text-surface-500">14 KB</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Storage</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">Storage</h3>
             <p class="text-sm text-surface-400">{t("studiopage.24")}</p>
           </div>
 
@@ -321,7 +321,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-emerald-400"><svg class="inline-block h-2 w-2 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span class="text-surface-300">2026-08-25 03:00</span><span class="ml-auto text-[7px] text-surface-500">406 MB</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">Backups</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">Backups</h3>
             <p class="text-sm text-surface-400">{t("studiopage.25")}</p>
           </div>
 
@@ -336,7 +336,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="flex items-center gap-2 text-[8px] font-mono"><span class="text-surface-500">▪</span><span class="text-surface-300">legacy-import</span><span class="ml-auto text-[7px] px-1.5 py-0.5 rounded bg-surface-700 text-surface-400">revoked</span></div>
               </div>
             </div>
-            <h3 class="text-base font-semibold text-white mb-2 mt-auto">{t("studiopage.40")}</h3>
+            <h3 class="text-base text-white mb-2 mt-auto">{t("studiopage.40")}</h3>
             <p class="text-sm text-surface-400">{t("studiopage.26")}</p>
           </div>
 

@@ -63,10 +63,10 @@ const translatePath = useTranslatedPath(getLangFromUrl(Astro.url));
             <div class="relative z-10 bg-white dark:bg-surface-900 rounded-2xl shadow-[0_25px_50px_rgba(0,0,0,0.25),0_0_0_1px_rgba(0,0,0,0.05)_inset] w-full max-w-[420px] overflow-hidden border border-surface-200 dark:border-surface-800">
                 <div class="p-6">
                     <div class="mb-5">
-                        <h2 class="text-lg font-semibold text-surface-900 dark:text-white mb-3">{t("cookies.title")}</h2>
+                        <h2 class="text-lg text-surface-900 dark:text-white mb-3">{t("cookies.title")}</h2>
                         <p class="text-sm leading-relaxed text-surface-800 dark:text-surface-200 m-0">
                             <Fragment set:html={t("cookies.body")} />
-                            <a href={translatePath("/policy/cookies_policy")} target="_blank"
+                            <a href="/policy/cookies_policy" target="_blank"
                                class="text-primary-light hover:text-primary underline transition-colors">{t("cookies.link")}</a>.
                         </p>
                     </div>

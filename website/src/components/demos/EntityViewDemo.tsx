@@ -1041,13 +1041,13 @@ width: "100%" }}
                     >
                       {/* Column header */}
                       <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-50 dark:bg-surface-800">
-                        <h4 className="py-3 px-3 flex-grow select-none flex items-center gap-3 text-sm font-semibold text-surface-800 dark:text-surface-200">
+                        <div className="py-3 px-3 flex-grow select-none flex items-center gap-3 text-sm font-semibold text-surface-800 dark:text-surface-200">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
                             style={{ backgroundColor: col.color }}
                           />
                           {col.title}
-                        </h4>
+                        </div>
                         <span className="text-xs text-surface-500 dark:text-surface-400 mr-1">
                           {col.cards.length}
                         </span>
