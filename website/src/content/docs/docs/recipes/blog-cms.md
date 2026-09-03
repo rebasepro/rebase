@@ -127,7 +127,24 @@ export const articlesCollection = defineCollection({
         author: {
             type: "relation",
             name: "Author",
-            relationName: "author"
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+                localKey: "author_id"
+            }
+        },
+        categories: {
+            type: "relation",
+            name: "Categories",
+            relation: {
+                kind: "manyToMany",
+                target: () => categoriesCollection,
+                through: {
+                    table: "article_categories",
+                    sourceColumn: "article_id",
+                    targetColumn: "category_id"
+                }
+            }
         },
         status: {
             type: "string",
@@ -169,24 +186,6 @@ export const articlesCollection = defineCollection({
             admin: { readOnly: true }
         }
     },
-    relations: [
-        {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => authorsCollection,
-            localKey: "author_id"
-        },
-        {
-            kind: "manyToMany",
-            relationName: "categories",
-            target: () => categoriesCollection,
-            through: {
-                table: "article_categories",
-                sourceColumn: "article_id",
-                targetColumn: "category_id"
-            }
-        }
-    ],
     callbacks: {
         beforeSave: async ({ values, status }) => {
             // Auto-generate slug

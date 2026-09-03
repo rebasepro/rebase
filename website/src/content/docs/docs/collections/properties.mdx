@@ -94,13 +94,15 @@ name: {
 
 ### Multiline text
 
-Set `multiline: true` to render as a textarea.
+Set `admin.multiline` to render as a textarea. It changes how the field is drawn,
+not what the column holds, so it lives in the `admin` block with the rest of the
+presentation options.
 
 ```typescript
 description: {
     type: "string",
     name: "Description",
-    multiline: true
+    admin: { multiline: true }
 }
 ```
 
@@ -108,13 +110,13 @@ description: {
 
 ### Markdown editor
 
-Set `markdown: true` to render a full markdown editor with toolbar.
+Set `admin.markdown` to render a full markdown editor with toolbar.
 
 ```typescript
 body: {
     type: "string",
     name: "Blog text",
-    markdown: true
+    admin: { markdown: true }
 }
 ```
 
@@ -186,18 +188,24 @@ category: {
 
 ### Multi-select
 
-Set `enum` + `multiSelect: true` to allow picking multiple values.
+Several values out of a fixed set is an **array of an enum string**, not a flag on
+one: the column holds many values, so the property that describes it is the array.
+`columnType: "text[]"` is what makes it one Postgres column rather than a join.
 
 ```typescript no-verify
 locales: {
-    type: "string",
+    type: "array",
     name: "Available locales",
-    multiSelect: true,
-    enum: [
-        { id: "es", label: "Spanish", color: "pink" },
-        { id: "en", label: "English", color: "blueLight" },
-        { id: "fr", label: "French", color: "purpleLight" },
-    ]
+    columnType: "text[]",
+    of: {
+        type: "string",
+        name: "Locale",
+        enum: [
+            { id: "es", label: "Spanish", color: "pink" },
+            { id: "en", label: "English", color: "blueLight" },
+            { id: "fr", label: "French", color: "purpleLight" },
+        ]
+    }
 }
 ```
 
@@ -213,7 +221,6 @@ locales: {
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `multiSelect` | `boolean` | Allow multiple enum selections |
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
@@ -368,7 +375,7 @@ content: {
             text: {
                 type: "map",
                 properties: {
-                    body: { type: "string", name: "Text", markdown: true }
+                    body: { type: "string", name: "Text", admin: { markdown: true } }
                 }
             },
             image: {

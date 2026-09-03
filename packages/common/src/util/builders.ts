@@ -2,11 +2,15 @@ import {
     CollectionConfig,
     FirebaseCollectionConfig,
     FirebaseProperties,
+    FirebaseProperty,
     InferEntityType,
     MongoDBCollectionConfig,
     MongoProperties,
+    MongoProperty,
     PostgresCollectionConfig,
     PostgresProperties,
+    PostgresProperty,
+    StrictProperties,
     User
 } from "@rebasepro/types";
 
@@ -45,7 +49,7 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, PostgresProperty> }
 ): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
@@ -56,7 +60,7 @@ export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, FirebaseProperty> }
 ): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
@@ -67,7 +71,7 @@ export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: P }
+    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, MongoProperty> }
 ): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**

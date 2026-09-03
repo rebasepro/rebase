@@ -807,8 +807,10 @@ type StorageAuthorize
 type StorageConfig { acceptedFiles, fileName, imageResize, includeBucketUrl, maxSize, metadata, postProcess, previewUrl, processFile, public, storagePath, storageSource, storeUrl }
 type StorageOperation
 type StorageSourceTransport
+type StrictProperties
 type TopicDelivery
 type TopicHandler
+type UnknownPropertyKey
 type UpdateOf
 type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 type VectorDistance

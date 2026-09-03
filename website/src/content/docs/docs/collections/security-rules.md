@@ -67,13 +67,21 @@ This generates: `USING (true)`
 
 ### Authenticated Access
 
-Allow any authenticated user:
+Allow any signed-in user. This one is a `condition` rather than an `access`
+shortcut — `access` has exactly one value, `"public"` — because "signed in" is a
+test against the caller, and the builder is where tests against the caller live:
 
 ```typescript
+import { policy } from "@rebasepro/types";
+
 securityRules: [
-    { operation: "select", access: "authenticated" }
+    { operation: "select", condition: policy.authenticated() }
 ]
 ```
+
+`policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
+user row and a real session. Use `policy.registered()` where a guest should not
+qualify — writing a review, joining an organization, spending money.
 
 ### Role-based Access
 
@@ -278,7 +286,7 @@ interface SecurityRuleBase {
 
 // …plus exactly one of:
 { ownerField: string }                        // <column> = rebase.uid()
-{ access: "public" | "authenticated" }        // the shortcut forms
+{ access: "public" }                          // the one shortcut — "no row filter"
 { condition: PolicyExpression;                // the structured builder — `policy.*`
   check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
 { using?: string; withCheck?: string }        // raw SQL
@@ -385,7 +393,7 @@ This means:
 - `rebase.uid()` returns `'anonymous'`
 - `rebase.roles()` returns an empty string
 - `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
-- `access: "authenticated"` policies fail because they check for a real user ID
+- `policy.authenticated()` conditions fail because they check for a real user ID
 - `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
 
 ### Advanced: Raw SQL for Anonymous

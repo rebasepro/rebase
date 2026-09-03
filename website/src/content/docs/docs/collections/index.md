@@ -315,8 +315,9 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
 | `overrides` | `EntityOverrides` | Overrides for the entity view |
 | `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
-| `driver` | `string` | Database driver to use (default: `"(default)"`) |
-| `databaseId` | `string` | Database/schema ID within the driver |
+| `dataSource` | `string` | Which registered data source backs this collection (default: the unnamed one) |
+| `engine` | `string` | The engine behind it — `"postgres"`, `"firestore"`, `"mongodb"`. Resolved from `dataSource`; set it only to override |
+| `databaseId` | `string` | Database or schema within the engine |
 
 ## Entity display
 

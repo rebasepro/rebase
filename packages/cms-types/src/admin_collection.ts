@@ -22,12 +22,16 @@ import type {
     FilterValues,
     FirebaseCollectionConfig,
     FirebaseProperties,
+    FirebaseProperty,
     InferEntityType,
     MongoDBCollectionConfig,
     MongoProperties,
+    MongoProperty,
     OrderBySpec,
     PostgresCollectionConfig,
     PostgresProperties,
+    PostgresProperty,
+    StrictProperties,
     User
 } from "@rebasepro/types";
 // A value, not a type: the runtime list core owns.
@@ -631,7 +635,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, PostgresProperty> }
 ): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a Firestore-backed collection with the admin block checked. @group Builder */
@@ -640,7 +644,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, FirebaseProperty> }
 ): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a MongoDB-backed collection with the admin block checked. @group Builder */
@@ -649,7 +653,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, MongoProperty> }
 ): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Identity at runtime; the overloads above are the whole point. @group Builder */
