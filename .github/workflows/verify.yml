@@ -208,6 +208,14 @@ jobs:
       - name: Publishable-set guard
         run: pnpm run check:publishable-set
 
+      # `files: ["dist", "src"]` ships the sources on purpose and the tests
+      # beside them by accident. Invisible from the repository: whether a
+      # package publishes its tests depends only on whether its author put them
+      # in `src/` or in `test/`. @rebasepro/client was shipping twenty-seven of
+      # them, and these tests are written to name the defect they pin.
+      - name: Published-tarball contents
+        run: pnpm run check:package-contents
+
       # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
       # a script a human chooses to run, so a lint error could sit on main
       # indefinitely — and one was: a `no-control-regex` error in
