@@ -21,8 +21,9 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 18+
-- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
+
+No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Bring your own PostgreSQL](#bring-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ## Your Environment Is Already Configured
 
@@ -32,31 +33,52 @@ This scaffolds a project with three packages:
 Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
 :::
 
-If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
+## Start the Dev Servers
+
+```bash
+pnpm install   # only if you declined the install `init` offered
+pnpm dev
+```
+
+That is the whole first run — there is no database to start and no schema step to remember. `rebase dev` does three things before it serves:
+
+1. Generates `backend/src/schema.generated.ts` from `config/collections/`.
+2. Starts a managed PostgreSQL for this project, with its data under `.rebase/`.
+3. Applies your collections to it, so the example `posts`, `authors` and `tags` tables exist.
+
+Then it starts both halves together:
+
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
+- **Hot reload** for both — changes take effect instantly
+
+Both ports are **derived from this project's path** rather than fixed, so several
+Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
+use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
+`.env` configure `rebase start`, the production server, and are ignored here.)
+Pin a port with `rebase dev --port 3001`.
+
+## Bring Your Own PostgreSQL
+
+`DATABASE_URL` is commented out in `.env` on purpose — that is what makes the managed database the default. Set it to any PostgreSQL you like (a local install, Neon, Supabase) and it wins over the managed one:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-## Start the Database
-
-The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
+The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, and the URL already in `.env` points at it. Uncomment that line, then:
 
 ```bash
 docker compose up -d db
-```
-
-(Skip this if you pointed `DATABASE_URL` at your own database.)
-
-## Create the Tables
-
-Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
-
-```bash
 pnpm run db:push
+pnpm dev
 ```
 
-Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
+`db:push` is what creates your collection tables on a database Rebase does not manage for you.
+
+:::caution
+`db:push`, `db:generate` and `db:migrate` plan their changes with [Atlas](https://atlasgo.io), which diffs your schema against a second, empty database. The managed development database serves exactly one, so all three refuse to run against it and say so rather than failing part-way. You do not need them there — `rebase dev` applies your collections at boot. Reach for them once you are on a PostgreSQL of your own, and for migrations, column drops and renames.
+:::
 
 ## Introspect an Existing Database (Optional)
 
@@ -67,23 +89,6 @@ pnpm rebase schema introspect
 ```
 
 This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
-
-## Start the Dev Servers
-
-```bash
-pnpm dev
-```
-
-This starts both together:
-- **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
-- **Hot reload** for both — changes take effect instantly
-
-Both ports are **derived from this project's path** rather than fixed, so several
-Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
-use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
-`.env` configure `rebase start`, the production server, and are ignored here.)
-Pin a port with `rebase dev --port 3001`.
 
 ## First Login
 
