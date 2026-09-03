@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { UserManagementAdapter } from "@rebasepro/types";
 import { logger } from "../utils/logger";
 
@@ -67,6 +69,22 @@ export async function seedInitialAdmin(
     if (!users) {
         const reason = "this deployment has no built-in user store to seed an admin into.";
         logger.warn(`⚠️ REBASE_ADMIN_EMAIL is set, but ${reason}`);
+        return { status: "skipped", reason };
+    }
+
+    // The same rule POST /auth/login parses its body with, deliberately reusing
+    // zod rather than approximating it — an address this refuses is an account
+    // nobody can sign in to, and the two have to agree about which those are.
+    //
+    // `admin@localhost` is the case that found this. It was the default in
+    // quickstart.sh, it seeds without complaint, and it is not a valid address
+    // to `z.string().email()`, so every login with it was a 400. The operator
+    // got a running server, an admin row, `needsSetup: false` — so no first-run
+    // path either — and no way in. Refused here, at boot, where there is still
+    // something to read the message.
+    if (!z.string().email().max(255).safeParse(email).success) {
+        const reason = `REBASE_ADMIN_EMAIL is not an address the login route accepts: ${email}`;
+        logger.error(`❌ ${reason} The initial admin was not created.`);
         return { status: "skipped", reason };
     }
 

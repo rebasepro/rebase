@@ -194,7 +194,10 @@ const SERVICE_KEY = secret();
 // both of these required — `${VAR:?…}` — so omitting them does not produce a
 // deployment without an admin, it produces a compose file that refuses to
 // interpolate, and this harness failed there rather than at any check.
-const ADMIN_EMAIL = "admin@localhost";
+// Not `admin@localhost`: the login route parses with `z.string().email()`,
+// which rejects a dotless domain. That was quickstart.sh's default, and this
+// check is what found it.
+const ADMIN_EMAIL = "admin@example.com";
 const ADMIN_PASSWORD = secret(); // 64 hex chars, well past the 12-char floor
 fs.writeFileSync(envFile, [
     `POSTGRES_PASSWORD=${secret()}`,
