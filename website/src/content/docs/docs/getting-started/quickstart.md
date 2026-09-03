@@ -155,23 +155,23 @@ export const collections = [
 
 ## Create the Table
 
-Push the new collection to the database:
+Restart `rebase dev`. It regenerates the schema from your collections and applies the new table before it serves, so **Products** appears in the navigation.
+
+On a PostgreSQL of your own, that is `db:push`'s job instead:
 
 ```bash
 pnpm run db:push
 ```
 
-This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
-
 ## Database Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database (dev only) |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending migrations |
+| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
+| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
+| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
 
 ## What's Next
 

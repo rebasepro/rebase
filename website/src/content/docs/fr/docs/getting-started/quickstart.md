@@ -21,8 +21,9 @@ Ceci échafaude un projet avec trois packages :
 ## Prérequis
 
 - **Node.js** 18+
-- **Docker** — pour exécuter le conteneur PostgreSQL inclus. (Ou apportez votre propre PostgreSQL : installation locale, Neon, Supabase, etc.)
 - **pnpm** (recommandé) ou npm
+
+Aucune base de données à installer, et **pas de Docker**. `rebase dev` exécute un PostgreSQL géré pour le projet, dont les données vivent sous `.rebase/`. Voir [Utiliser votre propre PostgreSQL](#utiliser-votre-propre-postgresql) si vous préférez en fournir un — une installation locale, Neon, Supabase, ou le conteneur livré avec cet échafaudage.
 
 ## Votre environnement est déjà configuré
 
@@ -32,31 +33,52 @@ Ceci échafaude un projet avec trois packages :
 N'exécutez pas `cp .env.example .env`. `.env.example` est une référence des variables disponibles — le copier par-dessus votre `.env` supprime les secrets générés et fait pointer `DATABASE_URL` vers une base de données qui n'existe pas. Modifiez directement `.env` si vous voulez changer une valeur.
 :::
 
-Si vous préférez pointer vers votre propre PostgreSQL plutôt que vers le conteneur inclus, modifiez `DATABASE_URL` dans `.env` :
+## Démarrer les serveurs de développement
+
+```bash
+pnpm install   # only if you declined the install `init` offered
+pnpm dev
+```
+
+C'est tout le premier lancement — aucune base de données à démarrer, aucune étape de schéma à retenir. `rebase dev` fait trois choses avant de servir :
+
+1. Il génère `backend/src/schema.generated.ts` à partir de `config/collections/`.
+2. Il démarre un PostgreSQL géré pour ce projet, dont les données vivent sous `.rebase/`.
+3. Il y applique vos collections, de sorte que les tables d'exemple `posts`, `authors` et `tags` existent.
+
+Puis il démarre les deux moitiés ensemble :
+
+- **Backend** — API REST, authentification, stockage, WebSocket
+- **Frontend** — le panneau d'administration Rebase
+- **Hot reload** pour les deux — les changements prennent effet instantanément
+
+Les deux ports sont **dérivés du chemin du projet** plutôt que fixes, ce qui permet
+d'exécuter plusieurs projets Rebase en parallèle. `rebase dev` affiche les deux URLs
+qu'il a liées — utilisez celles-ci, pas `localhost:3001`/`localhost:5173`. (`PORT` et
+`VITE_API_URL` dans `.env` configurent `rebase start`, le serveur de production, et
+sont ignorés ici.) Fixez un port avec `rebase dev --port 3001`.
+
+## Utiliser votre propre PostgreSQL
+
+`DATABASE_URL` est commentée dans `.env` à dessein — c'est ce qui fait de la base gérée l'option par défaut. Pointez-la vers le PostgreSQL de votre choix (installation locale, Neon, Supabase) et elle l'emporte sur la base gérée :
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-## Démarrer la base de données
-
-L'échafaudage fournit un `docker-compose.yml` avec un service PostgreSQL. Démarrez-le :
+L'échafaudage fournit également un `docker-compose.yml` avec un service PostgreSQL, et l'URL déjà présente dans `.env` pointe dessus. Décommentez cette ligne, puis :
 
 ```bash
 docker compose up -d db
-```
-
-(Ignorez cette étape si vous avez fait pointer `DATABASE_URL` vers votre propre base de données.)
-
-## Créer les tables
-
-Poussez vos collections vers la base de données. Ceci crée les tables pour les collections d'exemple `posts`, `authors` et `tags` :
-
-```bash
 pnpm run db:push
+pnpm dev
 ```
 
-Sans cette étape, le panneau d'administration s'ouvre quand même, mais chaque collection est vide et ses appels API échouent tant que les tables n'existent pas.
+`db:push` est ce qui crée les tables de vos collections sur une base de données que Rebase ne gère pas pour vous.
+
+:::caution
+`db:push`, `db:generate` et `db:migrate` planifient leurs changements avec [Atlas](https://atlasgo.io), qui compare votre schéma à une seconde base de données vide. La base de développement gérée n'en sert qu'une seule, donc les trois refusent de s'exécuter contre elle et le disent, plutôt que d'échouer à mi-parcours. Vous n'en avez pas besoin là — `rebase dev` applique vos collections au démarrage. Recourez-y une fois sur votre propre PostgreSQL, et pour les migrations, les suppressions et les renommages de colonnes.
+:::
 
 ## Introspection d'une Base de Données Existante (Optionnel)
 
@@ -67,23 +89,6 @@ pnpm rebase schema introspect
 ```
 
 Cela analysera les tables, enums et relations de votre base de données et créera les fichiers de collection correspondants dans `config/collections/`.
-
-## Démarrer les serveurs de développement
-
-```bash
-pnpm dev
-```
-
-Ceci démarre les deux ensemble :
-- **Backend** — API REST, authentification, stockage, WebSocket
-- **Frontend** — le panneau d'administration Rebase
-- **Hot reload** pour les deux — les changements prennent effet instantanément
-
-Les deux ports sont **dérivés du chemin du projet** plutôt que fixes, ce qui permet
-d'exécuter plusieurs projets Rebase en parallèle. `rebase dev` affiche les deux URLs
-qu'il a liées — utilisez celles-ci, pas `localhost:3001`/`localhost:5173`. (`PORT` et
-`VITE_API_URL` dans `.env` configurent `rebase start`, le serveur de production, et
-sont ignorés ici.) Fixez un port avec `rebase dev --port 3001`.
 
 ## Première connexion
 
@@ -150,23 +155,23 @@ export const collections = [
 
 ## Créer la table
 
-Poussez la nouvelle collection vers la base de données :
+Redémarrez `rebase dev`. Il régénère le schéma à partir de vos collections et applique la nouvelle table avant de servir, si bien que **Products** apparaît dans la navigation.
+
+Sur un PostgreSQL à vous, c'est le travail de `db:push` à la place :
 
 ```bash
 pnpm run db:push
 ```
 
-Ceci régénère le schéma à partir de vos collections et l'applique. Redémarrez les serveurs de développement et votre nouvelle collection **Products** apparaîtra dans la navigation.
-
 ## Référence des commandes de base de données
 
 | Commande | Description |
 |---------|-------------|
-| `rebase schema generate` | Générer le schéma Drizzle à partir de vos collections TypeScript |
+| `rebase schema generate` | Générer le schéma Drizzle à partir de vos collections TypeScript. Aucune base de données requise — `rebase dev` l'exécute pour vous |
 | `rebase schema introspect` | Générer des collections TypeScript à partir d'une base de données existante |
-| `rebase db push` | Pousser les modifications de schéma directement dans la base de données (dev seulement) |
-| `rebase db generate` | Générer les fichiers de migration SQL |
-| `rebase db migrate` | Exécuter les migrations en attente |
+| `rebase db push` | Pousser les modifications de schéma directement dans la base de données. Nécessite votre propre PostgreSQL |
+| `rebase db generate` | Générer les fichiers de migration SQL. Nécessite votre propre PostgreSQL |
+| `rebase db migrate` | Exécuter les migrations en attente. Nécessite votre propre PostgreSQL |
 
 ## Et ensuite ?
 
