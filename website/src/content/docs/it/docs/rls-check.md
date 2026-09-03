@@ -15,8 +15,14 @@ Funziona su **qualsiasi** Postgres — Supabase, Neon, RDS, Cloud SQL o un serve
 Non richiede Rebase ed è utile indipendentemente dal fatto che tu decida di adottarlo o meno.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Eseguilo nella directory del tuo progetto e troverà il database da solo: `DATABASE_URL`, poi
+`POSTGRES_URL`, poi un `.env` lì accanto. Passa la stringa di connessione come argomento solo quando
+non puoi fare altrimenti — npm stampa la riga di comando prima che il programma parta, e la tua shell
+la registra, quindi una password in un argomento finisce in due posti che `rls-check` non può
+oscurare. `$DATABASE_URL` non è più sicuro lì: la shell lo espande prima ancora che npm lo veda.
 
 È in sola lettura per progettazione: apre una transazione in sola lettura ed esegue query sul catalogo.
 Non scrive nulla e non invia nulla da nessuna parte — non c'è telemetria né chiamate di rete oltre a
@@ -25,11 +31,14 @@ quella verso il tuo database.
 ## Esecuzione
 
 ```bash
-# Stringa di connessione esplicita
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Oppure dall'ambiente — DATABASE_URL, poi POSTGRES_URL, poi un file .env nella cwd
+# Dall'ambiente — DATABASE_URL, poi POSTGRES_URL, poi un file .env nella cwd
 npx @rebasepro/rls-check
+
+# Per un database diverso da quello nel tuo ambiente
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# Come argomento. Funziona, ma vedi sopra dove finisce la password
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 Se la tua password contiene `@`, `:`, `/`, `?` o `#`, eseguine l'encoding percentuale (percent-encoding).
@@ -67,7 +76,7 @@ poiché un refuso indebolirebbe silenziosamente la scansione.
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```

@@ -15,8 +15,15 @@ Il fonctionne sur **n'importe quel** Postgres — Supabase, Neon, RDS, Cloud SQL
 que vous gérez vous-même. Il ne nécessite pas Rebase et s'avère utile que vous l'adoptiez ou non.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Lance-le dans le répertoire de ton projet et il trouvera la base de données tout seul : `DATABASE_URL`,
+puis `POSTGRES_URL`, puis un `.env` à côté. Ne passe la chaîne de connexion en argument que si tu ne
+peux pas faire autrement — npm affiche la ligne de commande avant que le programme ne démarre, et ton
+shell l'enregistre, donc un mot de passe passé en argument se retrouve à deux endroits que `rls-check`
+ne peut pas masquer. `$DATABASE_URL` n'y est pas plus sûr : le shell le développe avant même que npm
+ne le voie.
 
 Il est conçu en lecture seule par construction : il ouvre une transaction en lecture seule
 et exécute des requêtes sur le catalogue. Il n'écrit rien et n'envoie rien nulle part — il
@@ -25,11 +32,14 @@ n'y a aucune télémétrie ni aucun appel réseau autre que celui vers votre bas
 ## Utilisation
 
 ```bash
-# Explicit connection string
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Or from the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
+# From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
+
+# For a database that is not the one in your environment
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# As an argument. Works, but see the warning above about where the password lands
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 Si votre mot de passe contient `@`, `:`, `/`, `?` ou `#`, encodez-le en pourcentage (percent-encoding).
@@ -67,7 +77,7 @@ ignorance silencieuse, car une faute de frappe affaiblirait discrètement le sca
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```

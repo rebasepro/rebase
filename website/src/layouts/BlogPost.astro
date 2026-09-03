@@ -23,7 +23,10 @@ const ogImageUrl = image
 	? `https://rebase.pro${image}`
 	: heroImage
 		? `https://rebase.pro${heroImage.src}`
-		: undefined;
+		// A post with neither used to fall through to the site-wide teaser, so
+		// it previewed identically to the home page. The blog card at least says
+		// which section the link belongs to.
+		: "https://rebase.pro/img/og/blog.png";
 
 // BlogPosting structured data for rich snippets
 const articleSchema = {

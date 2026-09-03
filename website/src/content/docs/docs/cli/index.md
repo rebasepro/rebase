@@ -32,6 +32,18 @@ rebase init [directory]
 
 Sets up the project structure with frontend, backend, and shared packages.
 
+| Flag | What it does |
+|---|---|
+| `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
+| `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
+| `-y, --yes` | Accept every default and never prompt. **Required wherever there is no terminal to answer**, such as CI |
+| `-i, --install` | Install dependencies after scaffolding |
+| `-g, --git` | Initialize a repository and make the first commit |
+| `--database-url <url>` | Use an existing database instead of the managed one |
+| `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
+| `--project <slug>` | Link the scaffold to a Rebase Cloud project |
+| `--setup-key <key>` | The one-time key authenticating that link |
+
 ### `rebase dev`
 
 Start the development server:
@@ -148,6 +160,104 @@ rebase db migrate
 ```
 
 Applies all unapplied migrations to the database.
+
+### `rebase db backup` / `backups` / `restore`
+
+```bash
+rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
+rebase db backups                       # list what is stored
+rebase db restore ./backups/<file>.dump --yes
+```
+
+`backup` runs `pg_dump`; `restore` runs `pg_restore` and is destructive, so it
+requires `--yes`. `--out` accepts a local path or an object-storage URL, and
+defaults to `$BACKUP_DESTINATION` or `./backups`.
+
+### `rebase db pull`
+
+Copy another database into the local development one:
+
+```bash
+rebase db pull --from postgres://…  [--anonymize]
+```
+
+`--anonymize` replaces personal fields on the way in, so a production copy can be
+worked on locally without carrying real customer data onto a laptop.
+
+### `rebase db stop` / `rebase db reset`
+
+For the managed development database only:
+
+```bash
+rebase db stop     # stop it; the data is kept
+rebase db reset    # delete it and start over
+```
+
+### `rebase db branch`
+
+```bash
+rebase db branch create <name>
+rebase db branch list
+rebase db branch info <name>
+rebase db branch delete <name>
+```
+
+:::note[Not on the managed development database]
+`push`, `generate` and `migrate` plan their work with Atlas, which needs a second
+empty database to compare against — and the managed PGlite serves exactly one.
+Running them there stops with a message saying so. Point `DATABASE_URL` at a real
+PostgreSQL for the migration workflow; `rebase dev` already creates missing tables
+additively on the managed one.
+:::
+
+### `rebase apps init` / `rebase apps config`
+
+```bash
+rebase apps list             # the apps this project declares
+rebase apps init <name>      # register a new app in rebase.json
+rebase apps config <app>     # what one app resolves to
+```
+
+### `rebase resources`
+
+What this project declares it needs — the databases, buckets and topics its
+config code asks for:
+
+```bash
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if the committed graph is stale
+rebase resources --json     # machine-readable
+```
+
+A resource is declared in config code — `database("analytics")`,
+`bucket("media")`, `topic("signups")` — and never by hand in
+`rebase.resources.json`, which is generated from those declarations so a host can
+read what a project needs without building it.
+
+### `rebase cloud`
+
+Everything to do with Rebase Cloud, which is in private beta. See the
+[Rebase Cloud guide](/docs/deployment/cloud/) for what it is and what the beta
+does not include.
+
+```bash
+rebase cloud login | logout | whoami
+rebase cloud link | unlink | use | open
+rebase cloud projects list | create | info | delete
+rebase cloud deploy [--bundle]
+rebase cloud logs [--runtime]
+rebase cloud deployments | rollback | cancel
+rebase cloud start | stop | restart
+rebase cloud status | metrics | debug
+rebase cloud env list | set | unset | reveal | pull
+rebase cloud domains list | add | verify | remove
+rebase cloud db list | create | info | test | backup | pitr
+rebase cloud extensions list | enable | disable
+rebase cloud storage | settings | orgs | webhooks | billing | clusters
+```
+
+Every group answers `--help`, and `--help` never runs the command.
 
 ### `rebase generate-sdk`
 

@@ -46,7 +46,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
-import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
@@ -153,7 +153,16 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
     };
 
     beforeAll(async () => {
-        container = await startPgContainer();
+        // pgvector's image: a recorded snapshot carries whatever the release
+        // provisioned, and since the reference fixture gained a vector property
+        // that includes `CREATE EXTENSION vector` and a `vector(1536)` column.
+        // Restoring it on the suites' Alpine default fails at the first line of
+        // the dump.
+        //
+        // Safe here specifically because this suite asserts on schema and rows,
+        // never on text ordering — which is why the image is per-caller and this
+        // one opts in rather than the default moving. See pg-setup.ts.
+        container = await startPgContainer({ image: PGVECTOR_IMAGE });
 
         const admin = new pg.Client({ connectionString: container.connectionString });
         await admin.connect();
@@ -209,7 +218,25 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         // 63-byte limit is stored truncated and never matches the derived name
         // it is compared against.
         const second = await ensureCollectionTables(client, collections);
-        expect(second.actions.map(a => `${a.kind} ${a.target}`)).toEqual([]);
+
+        // Index creations are excluded, and only the ones carrying
+        // `IF NOT EXISTS`.
+        //
+        // They are not probe-guarded and are not meant to be: the planner emits
+        // them on every boot and lets Postgres decide, which is the correct
+        // shape for a statement that is free when the object is already there
+        // and is the only safe way to add one CONCURRENTLY. So they are outside
+        // the property this test exists for — "a guard that reads a name the
+        // catalogue stores differently re-issues forever" — and asserting on
+        // them fails for every project that declares an index, which since 0.14
+        // is most of them.
+        //
+        // An index statement WITHOUT `IF NOT EXISTS` is still asserted, because
+        // that one really would fail on the second boot.
+        const reissued = second.actions.filter(
+            a => !(a.kind === "create-index" && /IF\s+NOT\s+EXISTS/i.test(a.sql))
+        );
+        expect(reissued.map(a => `${a.kind} ${a.target}`)).toEqual([]);
     });
 
     it("keeps every row it was given", async () => {

@@ -53,15 +53,18 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` genera un archivo `.env` listo para usar (secretos, contraseña de base de datos, un puerto local libre) y se ofrece a instalar las dependencias — no necesitas editar nada para empezar. Entonces:
+`init` genera un `.env` listo para usar — no hace falta editar nada. Después:
 
 ```bash
-pnpm dev                  # base de datos, esquema, backend + frontend
+pnpm install
+pnpm run dev
 ```
 
-Esa es toda la primera ejecución. `rebase dev` arranca un PostgreSQL gestionado para el proyecto, genera el esquema de la base de datos a partir de tus colecciones, lo aplica y sirve — sin Docker y sin nada más que instalar.
+Ese es todo el primer arranque. No hay base de datos que instalar ni paso de esquema: sin `DATABASE_URL` definida, `rebase dev` levanta una PostgreSQL gestionada (PGlite) en el directorio del proyecto, genera el esquema a partir de tus colecciones y crea las tablas en el arranque.
 
-Imprime los dos URLs a los que se asoció. Esos puertos se derivan de la ruta del proyecto para que varios proyectos Rebase puedan ejecutarse a la vez, así que usa los URLs de tu terminal en lugar de `localhost:5173`. La primera cuenta que registres se convierte en administrador.
+**Lee las URLs de la salida.** `rebase dev` elige un puerto libre por proyecto en lugar de puertos fijos, así que difieren entre proyectos y entre máquinas. La primera cuenta que registres se convierte en administradora.
+
+Para usar tu propia PostgreSQL, descomenta `DATABASE_URL` en `.env` y ejecuta `pnpm run dev` de nuevo.
 
 → Sigue la [guía de Inicio Rápido](/docs/getting-started/quickstart) completa para una explicación detallada, incluyendo cómo conectar tu propia base de datos.
 

@@ -1,10 +1,12 @@
 /**
  * Guard the exports that change underneath already-deployed bundles.
  *
- * See `api-surface.mjs` for why only `@rebasepro/server` is tracked. The short
- * version: it is the one package `infra/docker/entrypoint.mjs` symlinks over a
- * bundle's own copy, so its exports move under tenant code that is already
- * built, during a fleet rollout nobody asked for.
+ * See `api-surface.mjs` for which packages are tracked and why. The short
+ * version: these are the packages `infra/docker/entrypoint.mjs` symlinks over a
+ * bundle's own copies — `@rebasepro/server`, `types`, `client`, `common` and
+ * `utils`, plus the `@rebasepro/server/functions` entry point — so their exports
+ * move under tenant code that is already built, during a fleet rollout nobody
+ * asked for.
  *
  * The diff is classified rather than just reported, because the three kinds of
  * change are not equally serious:

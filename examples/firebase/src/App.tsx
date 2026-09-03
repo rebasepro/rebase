@@ -23,11 +23,6 @@ function App() {
                                                                                        authController
                                                                                    }) => {
 
-        if (user?.email?.includes("flanders")) {
-            // You can throw an error to prevent access
-            throw Error("Stupid Flanders!");
-        }
-
         const idTokenResult = await user?.firebaseUser?.getIdTokenResult();
         const userIsAdmin = idTokenResult?.claims.admin || user?.email?.endsWith("@rebase.pro");
 

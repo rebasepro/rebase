@@ -290,6 +290,19 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
         // library — it replays the whole thing on arrival and the pageview is
         // still recorded. Load it once the page is idle, or sooner if the user
         // interacts, whichever comes first.
+        //
+        // **And not before consent is granted.** Consent Mode was already set to
+        // deny everything by default, which is what stops gtag STORING anything
+        // — but the script was fetched regardless, on every visit, before the
+        // banner had been answered. That is still a request to Google carrying
+        // the visitor's IP and referrer from a page that has just told them
+        // nothing has been agreed to yet. Denying storage and not making the
+        // request are different promises, and the banner implies the second.
+        //
+        // So: load on consent. The idle and interaction triggers still apply,
+        // but only once `cookie-consent=accepted` exists — either from a
+        // previous visit (read above) or from the banner, which dispatches
+        // `rebase:consent` when the visitor accepts.
         (function () {
             var loaded = false;
 
@@ -302,16 +315,29 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
                 document.head.appendChild(s);
             }
 
-            ["pointerdown", "keydown", "scroll"].forEach(function (evt) {
-                addEventListener(evt, loadGtag, { once: true, passive: true });
-            });
+            function armLoaders() {
+                ["pointerdown", "keydown", "scroll"].forEach(function (evt) {
+                    addEventListener(evt, loadGtag, { once: true, passive: true });
+                });
 
-            // requestIdleCallback can be starved indefinitely on a busy page, so
-            // the timeout is what actually bounds this on slow devices.
-            if ("requestIdleCallback" in window) {
-                requestIdleCallback(loadGtag, { timeout: 3500 });
+                // requestIdleCallback can be starved indefinitely on a busy page,
+                // so the timeout is what actually bounds this on slow devices.
+                if ("requestIdleCallback" in window) {
+                    requestIdleCallback(loadGtag, { timeout: 3500 });
+                } else {
+                    setTimeout(loadGtag, 3500);
+                }
+            }
+
+            if (cookieConsent === "accepted") {
+                armLoaders();
             } else {
-                setTimeout(loadGtag, 3500);
+                // Accepting mid-visit should start analytics on this page view,
+                // not the next one — the queued `config` call above is replayed
+                // when the library arrives, so the pageview is not lost.
+                addEventListener("rebase:consent", function (event) {
+                    if (event.detail === "accepted") armLoaders();
+                }, { once: true });
             }
         })();
 

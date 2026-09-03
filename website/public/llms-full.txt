@@ -56,15 +56,24 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-`init` generates a ready-to-run `.env` for you (secrets, database password, a free local port) — no editing needed to get started. Start the bundled PostgreSQL container, create the tables, then run the dev servers:
+`init` generates a ready-to-run `.env` for you — no editing needed. Then:
 
 ```bash
-docker compose up -d db   # start the database
-pnpm run db:push          # create tables from your collections
-pnpm dev                  # start backend + frontend
+pnpm install
+pnpm run dev
 ```
 
-Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`. The first account you register becomes the admin.
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a managed PostgreSQL (PGlite) in
+the project directory, generates the schema from your collections, and creates
+the tables at boot.
+
+**Read the URLs from the output.** `rebase dev` picks a free port per project
+rather than fixed ones, so they differ between projects and between machines.
+The first account you register becomes the admin.
+
+To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
+`pnpm run dev` again.
 
 → Follow the full [Quickstart guide](/docs/getting-started/quickstart) for a complete walkthrough, including how to connect your own database.
 
@@ -133,31 +142,73 @@ This scaffolds a project with three packages:
 Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
 :::
 
-If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
+### Start the Dev Servers
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a **managed PostgreSQL (PGlite)**
+in the project directory, generates the Drizzle schema from your collections, and
+creates the tables at boot — including the example `posts`, `authors` and `tags`.
+
+It starts both halves together:
+
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
+- **Hot reload** for both
+
+Both ports are **derived from this project's path** rather than fixed, so several
+Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
+**use those**, not `localhost:3001` / `localhost:5173`. (`PORT` and `VITE_API_URL`
+in `.env` configure `rebase start`, the production server, and are ignored here.)
+Pin a port with `rebase dev --port 3001`.
+
+#### Flags worth knowing
+
+| Flag | On | What it does |
+|---|---|---|
+| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--template <name>` | `init` | Start from a template other than the default |
+| `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
+| `--no-db` | `dev` | Touch no database at all; you bring one |
+
+### Variant: use your own PostgreSQL
+
+The managed database is a convenience, not a requirement. To point the project at
+a Postgres you run, uncomment `DATABASE_URL` in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-### Start the Database
+Then start the dev servers as above. A `DATABASE_URL` that is set is never
+touched, and one pointing anywhere other than this machine is left alone
+entirely.
 
-The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
-
-```bash
-docker compose up -d db
-```
-
-(Skip this if you pointed `DATABASE_URL` at your own database.)
-
-### Create the Tables
-
-Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
+With your own database you also get the migration commands, which the managed one
+cannot offer — they plan changes with Atlas, which needs a second empty database
+to compare against, and PGlite serves exactly one:
 
 ```bash
 pnpm run db:push
 ```
 
-Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
+Boot already creates missing tables additively, so `db push` is for the two
+things it deliberately leaves alone: junction-table RLS on many-to-many
+relations, and any change that is not purely additive — a renamed column, a
+narrowed type, a removed field.
+
+The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, if you
+want a container rather than an installed Postgres:
+
+```bash
+docker compose up -d db
+```
 
 ### Introspect an Existing Database (Optional)
 
@@ -168,23 +219,6 @@ pnpm rebase schema introspect
 ```
 
 This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
-
-### Start the Dev Servers
-
-```bash
-pnpm dev
-```
-
-This starts both together:
-- **Backend** — REST API, auth, storage, WebSocket
-- **Frontend** — the Rebase admin panel
-- **Hot reload** for both — changes take effect instantly
-
-Both ports are **derived from this project's path** rather than fixed, so several
-Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
-use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
-`.env` configure `rebase start`, the production server, and are ignored here.)
-Pin a port with `rebase dev --port 3001`.
 
 ### First Login
 
@@ -249,13 +283,18 @@ export const collections = [
 
 ### Create the Table
 
-Push the new collection to the database:
+Restart the dev servers. `rebase dev` regenerates the schema from your
+collections and boot creates the new table, so your **Products** collection
+appears in the navigation.
+
+On your own PostgreSQL you can also apply it without restarting:
 
 ```bash
 pnpm run db:push
 ```
 
-This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
+That is also the command for the changes boot leaves alone — a renamed column, a
+narrowed type, a removed field.
 
 ### Database Commands Reference
 
@@ -1473,11 +1512,59 @@ the rows survive — not merely that the boot did.
 What beta does mean: features are still missing, some subsystems are newer than
 others, and the shape of a rough edge is that something is absent or awkward,
 not that it silently corrupts something. Which subsystems are which is published
-and dated rather than left to be discovered.
+and dated rather than left to be discovered — the table below is that
+publication.
+
+### Readiness by subsystem
+
+**Dated 2 September 2026, against 0.17.3.** Re-read it at each minor; a rating
+that has not moved in three releases is either settled or forgotten, and this
+note is here so the difference gets checked.
+
+The three ratings mean:
+
+- **Stable** — the shape is settled and covered by a gate in CI. It can still
+  gain features; it will not be redesigned under you inside 0.x, and a change to
+  it that would break you is announced in the changelog.
+- **Beta** — it works and is used in production, and something about it is known
+  to be rough: a limit you can reach, an edge that is awkward, a design decision
+  not yet made. The rough part is named in the notes, because "beta" on its own
+  tells you nothing you can plan around.
+- **Experimental** — shipped so it can be used and reported on. Expect to hit
+  the parts nobody has.
+
+| Subsystem | Rating | What the rating rests on |
+|---|---|---|
+| REST API + generated SDK | Stable | The wire contract is versioned and gated; `client-sdk-e2e` drives register → sign-in → RLS-scoped reads → refresh → storage → realtime end to end |
+| Auth — email/password, OAuth, OIDC, magic link, one-time code | Stable | Twelve OAuth providers ship. The auth schema is a versioned contract, stamped and checked at boot |
+| Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
+| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fourteen checks, and the RLS e2e suite runs on every push |
+| Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
+| Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
+| Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
+| Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
+| Entity history | Stable | Snapshot-based, gated by its own suite |
+| Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
+| MCP server + agent skills | Beta | Thirty-odd tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. stdio transport only — there is no remote/HTTP transport yet |
+| Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
+| CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
+| PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) do not work there and say so |
+| Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
+| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations |
+| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over |
+| Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
+
+Two entries above are the honest cost of publishing this table at all: the
+realtime refetch and the data table's accessibility are open defects, not
+roadmap items, and both are listed rather than left for a reader to discover.
+
+This table is what exists. What does not yet is on the
+[roadmap](https://rebase.pro/roadmap), one entry per GitHub issue, with the
+subset required for 1.0 marked.
 
 ### The 0.x promise
 
-Rebase is `0.x` — 0.16 at the time of writing. This section is written to hold
+Rebase is `0.x` — 0.17 at the time of writing. This section is written to hold
 for every 0.x release rather than for one of them, so it does not go stale on
 each cut. **Breaking changes to the authored TypeScript API are still allowed in
 a minor**, and the changelog is where they are announced. What is
@@ -1664,7 +1751,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
-| `pnpm check:api-surface` | every export of `@rebasepro/server`, and its members, against `contracts/server.api.txt`. This is the package `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copy, so removing an export from it is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
+| `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
 | `pnpm test:gates` | the two gates above, over fixtures. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
@@ -6846,6 +6933,68 @@ file. That never happens in production, or on the managed runtime: a bucket
 invented there would write uploads to a container filesystem that vanishes on
 the next rollout.
 
+## MongoDB
+
+`@rebasepro/server-mongo` implements Rebase's `BackendBootstrapper` against
+MongoDB. The REST API, the generated SDK, the admin panel and the auth surface
+all work over it.
+
+:::caution[Experimental, and it does not have row-level security]
+Read this section before choosing it. MongoDB has no equivalent of PostgreSQL's
+row-level security, so **the isolation model the rest of Rebase rests on does not
+apply here**. `securityRules` on a collection are not enforced by the database;
+authorization is whatever your own code checks.
+
+That is not a gap waiting to be filled — it is a property of the engine. If
+per-row authorization enforced below the application is why you are looking at
+Rebase, use the [PostgreSQL driver](/docs/backend/database/).
+:::
+
+### Installation
+
+```bash
+pnpm add @rebasepro/server-mongo
+```
+
+```ts title="backend/src/index.ts" no-verify
+
+rebase({
+    backend: createMongoBootstrapper({ url: process.env.DATABASE_URL! })
+});
+```
+
+Set `DATABASE_URL` to a MongoDB connection string
+(`mongodb://…` or `mongodb+srv://…`).
+
+### What works
+
+| | |
+|---|---|
+| **Data API** | The full REST surface: list, get, create, update, delete, filters, ordering, pagination |
+| **Generated SDK** | The same typed client as on Postgres |
+| **Realtime** | Change streams. This needs a replica set — a standalone `mongod` has no oplog to tail, so realtime is silently unavailable there |
+| **History** | Snapshot-based, the same shape as on Postgres |
+| **Auth** | The full auth surface, with its repositories stored in MongoDB |
+| **Admin panel** | Collections, forms, relations in the UI, storage fields |
+
+### What is different
+
+- **No row-level security.** See the warning above. This is the important one.
+- **No SQL surface.** Studio's SQL editor, the RLS policy editor and
+  `pnpm rls:check` are Postgres features and are not available.
+- **No relational integrity.** A relation is a stored reference the application
+  resolves; there is no foreign key, so nothing at the database level stops a
+  dangling one.
+- **No `rebase db push` / `generate` / `migrate`.** MongoDB has no schema to
+  migrate. Collections appear as documents are written.
+
+### Choosing between the two
+
+Take MongoDB when the data is genuinely document-shaped and the authorization
+model lives in your application anyway. Take PostgreSQL when you want the
+database itself to be the thing enforcing who sees which row — which is the
+argument Rebase makes everywhere else on this site.
+
 ## Realtime & WebSocket
 
 Rebase includes a built-in realtime engine that pushes data changes to connected clients over WebSocket.
@@ -10806,6 +10955,71 @@ const articlesCollection = defineCollection({
 
 - **[Entity Views](/docs/frontend/entity-views)** — Custom tabs on entity forms
 - **[Entity Actions](/docs/frontend/entity-actions)** — Custom entity actions
+
+## Firebase
+
+`@rebasepro/firebase` points the Rebase admin panel at Firebase. Your
+collections describe Firestore documents, and the panel reads and writes them
+through the Firebase SDK.
+
+:::caution[Experimental, and structurally different from the rest of Rebase]
+This is a **client-side adapter**. There is no Rebase server in the picture: the
+browser talks to Firebase directly, so everything Rebase's backend provides —
+row-level security, the REST API, the generated SDK, functions, crons, the
+storage access model — is not part of this arrangement.
+
+Authorization is **Firebase Security Rules**, written and deployed in Firebase.
+Rebase's `securityRules` on a collection do not apply.
+:::
+
+### Installation
+
+```bash
+pnpm add @rebasepro/firebase firebase
+```
+
+Peer dependencies: `firebase` (10, 11 or 12), `react` ≥ 19, `react-dom` ≥ 19, and
+optionally `typesense` for text search.
+
+### What it gives you
+
+- **`RebaseFirebaseApp`** — a complete admin app: Firebase Auth login, routing,
+  and CRUD over Firestore built from your collection definitions.
+- **Hooks per service** — auth, Firestore, storage, App Check, user management.
+- **Text search adapters** — Algolia, Typesense, Pinecone, or local.
+
+```tsx title="src/App.tsx" no-verify
+
+export default function App() {
+    return <RebaseFirebaseApp
+        name="My Project"
+        firebaseConfig={firebaseConfig}
+        collections={[posts, authors]}
+    />;
+}
+```
+
+A working example lives in [`examples/firebase`](https://github.com/rebasepro/rebase/tree/main/examples/firebase).
+
+### What does not carry over
+
+Everything on this site that describes the Rebase **backend** describes the
+PostgreSQL (or MongoDB) path, not this one:
+
+| | |
+|---|---|
+| Row-level security | Firebase Security Rules instead, written in Firebase |
+| REST API and generated SDK | Absent — the browser uses the Firebase SDK |
+| Functions and crons | Cloud Functions for Firebase instead |
+| Storage access model | Firebase Storage rules instead |
+| Studio, `rls-check`, migrations | Postgres features; not applicable |
+
+### Choosing it
+
+Take this when you already have a Firebase project and want a better admin panel
+over it. If you are choosing a backend rather than adapting to one you have,
+the [PostgreSQL path](/docs/getting-started/quickstart/) is the one the rest of
+this documentation is about.
 
 ## Custom Fields
 
@@ -15050,6 +15264,18 @@ rebase init [directory]
 
 Sets up the project structure with frontend, backend, and shared packages.
 
+| Flag | What it does |
+|---|---|
+| `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
+| `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
+| `-y, --yes` | Accept every default and never prompt. **Required wherever there is no terminal to answer**, such as CI |
+| `-i, --install` | Install dependencies after scaffolding |
+| `-g, --git` | Initialize a repository and make the first commit |
+| `--database-url <url>` | Use an existing database instead of the managed one |
+| `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
+| `--project <slug>` | Link the scaffold to a Rebase Cloud project |
+| `--setup-key <key>` | The one-time key authenticating that link |
+
 #### `rebase dev`
 
 Start the development server:
@@ -15166,6 +15392,104 @@ rebase db migrate
 ```
 
 Applies all unapplied migrations to the database.
+
+#### `rebase db backup` / `backups` / `restore`
+
+```bash
+rebase db backup --out ./backups        # or s3://bucket/prefix, gs://bucket/prefix
+rebase db backups                       # list what is stored
+rebase db restore ./backups/<file>.dump --yes
+```
+
+`backup` runs `pg_dump`; `restore` runs `pg_restore` and is destructive, so it
+requires `--yes`. `--out` accepts a local path or an object-storage URL, and
+defaults to `$BACKUP_DESTINATION` or `./backups`.
+
+#### `rebase db pull`
+
+Copy another database into the local development one:
+
+```bash
+rebase db pull --from postgres://…  [--anonymize]
+```
+
+`--anonymize` replaces personal fields on the way in, so a production copy can be
+worked on locally without carrying real customer data onto a laptop.
+
+#### `rebase db stop` / `rebase db reset`
+
+For the managed development database only:
+
+```bash
+rebase db stop     # stop it; the data is kept
+rebase db reset    # delete it and start over
+```
+
+#### `rebase db branch`
+
+```bash
+rebase db branch create <name>
+rebase db branch list
+rebase db branch info <name>
+rebase db branch delete <name>
+```
+
+:::note[Not on the managed development database]
+`push`, `generate` and `migrate` plan their work with Atlas, which needs a second
+empty database to compare against — and the managed PGlite serves exactly one.
+Running them there stops with a message saying so. Point `DATABASE_URL` at a real
+PostgreSQL for the migration workflow; `rebase dev` already creates missing tables
+additively on the managed one.
+:::
+
+#### `rebase apps init` / `rebase apps config`
+
+```bash
+rebase apps list             # the apps this project declares
+rebase apps init <name>      # register a new app in rebase.json
+rebase apps config <app>     # what one app resolves to
+```
+
+#### `rebase resources`
+
+What this project declares it needs — the databases, buckets and topics its
+config code asks for:
+
+```bash
+rebase resources            # list them
+rebase resources --write    # regenerate rebase.resources.json
+rebase resources --check    # fail if the committed graph is stale
+rebase resources --json     # machine-readable
+```
+
+A resource is declared in config code — `database("analytics")`,
+`bucket("media")`, `topic("signups")` — and never by hand in
+`rebase.resources.json`, which is generated from those declarations so a host can
+read what a project needs without building it.
+
+#### `rebase cloud`
+
+Everything to do with Rebase Cloud, which is in private beta. See the
+[Rebase Cloud guide](/docs/deployment/cloud/) for what it is and what the beta
+does not include.
+
+```bash
+rebase cloud login | logout | whoami
+rebase cloud link | unlink | use | open
+rebase cloud projects list | create | info | delete
+rebase cloud deploy [--bundle]
+rebase cloud logs [--runtime]
+rebase cloud deployments | rollback | cancel
+rebase cloud start | stop | restart
+rebase cloud status | metrics | debug
+rebase cloud env list | set | unset | reveal | pull
+rebase cloud domains list | add | verify | remove
+rebase cloud db list | create | info | test | backup | pitr
+rebase cloud extensions list | enable | disable
+rebase cloud storage | settings | orgs | webhooks | billing | clusters
+```
+
+Every group answers `--help`, and `--help` never runs the command.
 
 #### `rebase generate-sdk`
 
@@ -15647,8 +15971,15 @@ It works on **any** Postgres — Supabase, Neon, RDS, Cloud SQL, or a server you
 yourself. It does not require Rebase, and it is useful whether or not you ever adopt it.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Run it in your project directory and it finds the database itself: `DATABASE_URL`,
+then `POSTGRES_URL`, then a `.env` beside you. Pass the connection string as an
+argument only when you cannot do that — npm echoes the command line before the
+program starts, and your shell records it, so a password in an argument ends up in
+two places `rls-check` cannot redact. `$DATABASE_URL` is no safer there: the shell
+expands it before npm ever sees it.
 
 It is read-only by construction: it opens a read-only transaction and issues catalog
 queries. It writes nothing, and it sends nothing anywhere — there is no telemetry and no
@@ -15657,11 +15988,14 @@ network call other than the one to your database.
 ### Running it
 
 ```bash
-# Explicit connection string
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Or from the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
+# From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
+
+# For a database that is not the one in your environment
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# As an argument. Works, but see the warning above about where the password lands
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. That is by far the
@@ -15700,7 +16034,7 @@ database.
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
@@ -16644,7 +16978,20 @@ On the first visit to a fresh deployment's admin, Rebase shows a bootstrap scree
 
 ### Docker Compose (Recommended)
 
-The generated project already includes a working `docker-compose.yml` (Postgres + backend + frontend) and the `backend/`/`frontend/` Dockerfiles — that generated file is the source of truth; use it as-is rather than hand-writing one. The shape is:
+The generated project already includes a working `docker-compose.yml` — that
+file is the source of truth; use it as-is rather than hand-writing one. It runs
+**two** containers, Postgres and the published Rebase runtime with your built
+bundle mounted into it. There is no application image to build.
+
+```bash
+rebase build          # produces ./dist-bundle
+docker compose up -d
+```
+
+`rebase build` first, always: the `api` service mounts `./dist-bundle`, and
+without it the container starts against an empty directory.
+
+The shape of the generated file:
 
 ```yaml title="docker-compose.yml (generated — abridged)"
 services:
@@ -16654,56 +17001,57 @@ services:
       POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
 
-  backend:
-    build:
-      # Context is the PROJECT ROOT so the image can copy
-      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
-      # context would fail — the Dockerfile lives at backend/Dockerfile.
-      context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "3001:3001"
-    env_file: .env
+  api:
+    # The published runtime. Upgrading Rebase is a tag change, not a rebuild.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env}
+    volumes:
+      # Your built project, from `rebase build`.
+      - ./dist-bundle:/bundle
 
 volumes:
   postgres_data:
-  uploads:
 ```
 
-```bash
-docker compose up -d
-```
+`rebase init` generates `JWT_SECRET` and `REBASE_SERVICE_KEY` into `.env` for
+you. Both are declared with `${VAR:?…}`, so a missing one stops the stack with a
+message naming it rather than starting something half-configured.
 
-#### Create the database schema
+#### The schema
 
-Bringing the stack up is **not enough on its own.** The backend boots and
-auto-creates the **auth** tables, but it does **not** create the tables for
-your own collections — you run that once, explicitly, against the production
-database. From a checkout of your project (with dependencies installed), set
-`DATABASE_URL` to your production database and push the schema:
+The runtime creates missing tables at boot, **including your collections'** —
+`REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
+schema and applies row-level security with it. A first `docker compose up`
+against an empty database comes up serving your collections.
+
+What boot never does is change something that already exists: it does not alter
+a column type, drop anything, or edit an existing enum's labels, because a
+container restart must not reshape a schema as a side effect of a deploy. Those
+go through the CLI, from a checkout or a CI job pointed at the production
+database:
 
 ```bash
 pnpm run db:push
 ```
 
-:::caution[Required — or every collection returns errors]
-Skip this step and the app still starts and you can log in, but each of your
-collections is empty and its API calls fail with a "missing table" error until
-the schema exists. On startup the server logs a boxed warning naming exactly
-which tables are missing and the command to run.
-:::
+Run it for junction-table RLS on many-to-many relations, and for any change that
+is not purely additive — a renamed column, a narrowed type, a removed field.
 
-`db:push` is the fast option — it applies the schema directly, with no
-migration files. For a **versioned, team workflow**, commit migration files
-with `pnpm run db:generate` and run `pnpm run db:migrate` as a release step
-instead. Whichever you choose, it runs against the production `DATABASE_URL`
-from a project checkout (or your CI job), not inside the running container —
-the production image ships without the CLI.
+For a **versioned, team workflow**, commit migration files with
+`pnpm run db:generate` and run `pnpm run db:migrate` as a release step instead.
+Either way it runs from a project checkout, not inside the running container —
+the runtime image ships without the CLI.
 
 ### Production Checklist
 
@@ -16711,7 +17059,7 @@ Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
-| **Database schema** | Run `pnpm run db:push` (or `pnpm run db:migrate` for versioned migrations) against the production database once. The app boots without your collection tables, but every collection errors until they exist. |
+| **Database schema** | Boot creates your collection tables additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for junction-table RLS and for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |
@@ -16849,6 +17197,134 @@ catch-all serves `index.html` for both `/` and `/admin/*`.
 - **[Backend Overview](/docs/backend)** — Full backend configuration
 - **[Storage Configuration](/docs/backend/storage)** — S3 setup for production
 
+## Rebase Cloud
+
+Rebase Cloud runs the same open-source Rebase you would self-host — the same
+published `rebasepro/server` image, the same bundle, the same Postgres. The
+difference is who operates it.
+
+:::note[Private beta]
+Rebase Cloud is in **private beta**. It runs real tenants today and opens in
+batches. [Request access](https://rebase.pro/pricing).
+
+It is not self-serve, so the commands below need an account that has been let in.
+Everything else on this site works without one.
+:::
+
+### What it is
+
+A Cloud **project** is three things the platform operates for you:
+
+| | What you get |
+|---|---|
+| **App** | Your bundle, running on the published runtime image. Deploys are a bundle upload, not a container build |
+| **Database** | A managed PostgreSQL, with automated backups and point-in-time recovery |
+| **Storage** | A bucket of your own, if your project uses file storage |
+
+Each is provisioned when you first deploy, and each is billed for what it
+reserves rather than per seat.
+
+**Nothing about your project changes to run there.** The same repository
+self-hosts with `docker compose`, and the escape hatch is real: `rebase build`
+produces a bundle that boots anywhere the runtime image runs.
+
+### Link a project
+
+From a project directory:
+
+```bash
+rebase cloud login
+rebase cloud projects create my-app
+rebase cloud link
+```
+
+`link` writes `.rebase/cloud.json`, which records the project id and slug. It is
+not a secret and it is not your credentials — those live in
+`~/.rebase/credentials.json`, written by `login`.
+
+An existing project links to an existing Cloud project without creating one:
+
+```bash
+rebase cloud projects list
+rebase cloud link
+```
+
+### Deploy
+
+```bash
+rebase build
+rebase cloud deploy --bundle
+```
+
+`--bundle` uploads the built bundle and runs it on the platform image. That is
+the path to use: a bare `rebase cloud deploy` builds from **source** instead,
+which is a different and slower mechanism.
+
+Watch it:
+
+```bash
+rebase cloud logs            # the build log
+rebase cloud logs --runtime  # what the running container is printing
+rebase cloud status          # what the platform thinks the project is doing
+```
+
+`status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
+platform is genuinely working and polling is the right thing to do; when it names
+something, that something is waiting for you.
+
+### Roll back
+
+```bash
+rebase cloud deployments
+rebase cloud rollback
+```
+
+A rollback re-points the project at a previous successful deployment's image. It
+needs one that recorded an image, so it is available for a project that has
+deployed successfully at least twice.
+
+### The rest of the surface
+
+| Command group | What it covers |
+|---|---|
+| `login`, `logout`, `whoami` | Your session |
+| `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
+| `projects` | Create, list, inspect, delete |
+| `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back |
+| `status`, `metrics`, `debug` | What it is doing, and why it is not |
+| `env` | Environment variables. `list` never prints values; `--secret` is write-only |
+| `domains` | Custom domains, the DNS records to add, and verification |
+| `db` | Attach or create a database, backups, restore, and point-in-time recovery |
+| `extensions` | The Postgres extension allowlist |
+| `storage` | The project's bucket |
+| `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
+
+Every group answers `--help`, and `--help` never runs the command.
+
+### What the beta does not include
+
+Stated plainly, because finding out later is worse:
+
+- **No region choice.** Everything runs in one region today. The placement model
+  exists in the platform, but a project cannot pick a region.
+- **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
+- **No published SLA**, and no SOC 2. If you need either, say so when you request
+  access rather than assuming.
+- **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
+  secret URLs you point a repository webhook at — are the supported automation.
+- **CI needs a human's credentials.** There is no machine token yet;
+  `rebase cloud login` takes an email and a password.
+- **Point-in-time recovery is CLI-only.** The console shows backups; the staged
+  PITR workflow is `rebase cloud db pitr`.
+
+### Self-hosting instead
+
+Nothing here is a lock-in. The [self-hosting guide](/docs/deployment/self-hosting/)
+runs the identical image and bundle with `docker compose`, and the
+[Kubernetes guide](/docs/deployment/kubernetes/) renders the same topology from
+the Helm chart.
+
 ## Self-Hosting
 
 ### Overview
@@ -16863,67 +17339,76 @@ why it is split that way.
 
 ### Docker Compose
 
+The compose file lives in the repository, at
+[`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml).
+Use that one rather than copying a snippet out of this page: it is the file the
+project's own acceptance gate boots on every push, so it cannot drift from what
+actually works.
+
 ```bash
-rebase build                     # produces ./dist-bundle
-docker compose up -d db          # start Postgres
-rebase db push                   # create the collection tables, once
-docker compose up                # start the runtime
+rebase build                    # produces ./dist-bundle
+./infra/docker/quickstart.sh    # writes infra/docker/.env if absent, then brings it up
 ```
 
-A minimal `docker-compose.yml`:
+`quickstart.sh` is one command doing two obvious things and printing both. The
+long form, if you would rather own each step:
 
-```yaml
-services:
-  db:
-    image: pgvector/pgvector:pg18
-    environment:
-      POSTGRES_USER: rebase_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: rebase
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
-      interval: 5s
-      retries: 12
-
-  api:
-    image: rebasepro/server:latest
-    depends_on:
-      db: { condition: service_healthy }
-    environment:
-      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-    volumes:
-      # Writable: the container installs the bundle's declared dependencies into
-      # it on first start. See "Dependencies" below for the read-only variant.
-      - ./dist-bundle:/bundle
-    ports:
-      - "8080:8080"
-
-volumes:
-  db-data:
+```bash
+docker compose -f infra/docker/docker-compose.selfhost.yml \
+  --env-file infra/docker/.env up
 ```
+
+You do not need to start the database separately — `api` waits on its
+healthcheck.
+
+#### The four values it needs
+
+`quickstart.sh` generates these for you. To write the `.env` yourself:
+
+```bash
+cat > infra/docker/.env <<EOF
+POSTGRES_PASSWORD=$(openssl rand -hex 32)
+JWT_SECRET=$(openssl rand -hex 32)
+REBASE_SERVICE_KEY=$(openssl rand -hex 32)
+CORS_ORIGINS=https://app.example.com
+EOF
+```
+
+Three secrets and one fact:
+
+- **`POSTGRES_PASSWORD`** — the database password. Changing it later means
+  changing it in the volume too, so pick it once.
+- **`JWT_SECRET`** — signs every session. Rotating it signs everybody out.
+- **`REBASE_SERVICE_KEY`** — the credential that bypasses row-level security for
+  server-to-server calls. Treat it like a root password: anything holding it can
+  read every row.
+- **`CORS_ORIGINS`** — the origins your frontend is served from, comma-separated.
+  Not a secret, and not optional: the runtime refuses to start in production
+  without it rather than guessing, because an API that guesses its allowed
+  origins eventually allows the wrong one.
+
+Each of the three secrets must be at least 32 characters. The compose file
+declares them with `${VAR:?…}`, so a missing one stops the stack with a message
+naming it rather than starting something half-configured.
 
 ### Dependencies
 
-`rebase build` writes a `package.json` next to your bundle listing the
-dependencies your project declared. The container installs them on first start,
-which is why the mount above is writable.
+`rebase build` **installs your project's dependencies into the bundle** by
+default, so `dist-bundle` arrives with a `node_modules` and a `package-lock.json`
+beside its `package.json`. A vendored bundle starts in about five seconds.
 
-To mount read-only instead — worth doing, because a compromised hook then cannot
-rewrite the code that runs after the next restart — install them first:
-
-```bash
-npm install --omit=dev --prefix dist-bundle
-```
+Because they are already there, you can mount the bundle read-only — worth
+doing, since a compromised hook then cannot rewrite the code that runs after the
+next restart:
 
 ```yaml
     volumes:
       - ./dist-bundle:/bundle:ro
 ```
+
+`rebase build --no-vendor` opts out and produces a bundle that installs its
+dependencies on first start instead, which takes 40–60 seconds per start and
+needs the mount to be writable.
 
 For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
@@ -16935,22 +17420,57 @@ COPY dist-bundle /bundle
 
 ### Creating the schema
 
-The runtime creates its own **auth** tables at boot. **Collection tables are a
-separate, deliberate step**, and the runtime image does not do it — a container
-restart must not be able to change a schema as a side effect of a deploy.
+**The runtime creates missing tables at boot, including your collections'.**
+`REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
+schema: it creates missing tables, columns and enum types, and applies their
+row-level security. A first start against an empty database comes up serving
+your collections, with no separate step.
+
+What `ensure` deliberately never does is change anything that already exists. It
+does not alter a column type, does not drop a table or a column, and does not
+edit an existing enum's labels — because a container restart must not be able to
+reshape a schema as a side effect of a deploy.
+
+So `rebase db push` is still worth running, for the two things boot leaves
+alone:
 
 ```bash
 rebase db push
 ```
 
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed
+  type, a removed field.
+
 Run it from a checkout or a CI job, pointed at the deployment's database. It
 dry-runs the change first, refuses destructive ones without explicit
-confirmation, and can take a backup before applying.
+confirmation, and can take a backup before applying. The database publishes a
+port in the compose file so this can reach it from the host; remove that mapping
+once the schema is in place if the database should not be reachable from
+outside.
 
-`REBASE_MIGRATE_ON_BOOT` accepts `ensure` (the default) and `none`, and nothing
-else — the image **refuses to boot** on `push`, for the reason above. `ensure` is
-additive across the whole schema, not just the auth tables: it creates missing
-tables, columns and enum types, and never drops or rewrites one.
+`REBASE_MIGRATE_ON_BOOT` accepts `ensure` and `none`, and nothing else — the
+image **refuses to boot** on `push`, for the reason above.
+
+### File storage
+
+Storage is **off** unless a bucket is configured, and that is deliberate: the
+alternative default is the container filesystem, which silently loses every
+uploaded file on the next restart. Uploads are refused with
+`501 STORAGE_NOT_CONFIGURED` until you set one up.
+
+For a bucket, set `STORAGE_TYPE=s3` (or `gcs`) plus its bucket and credentials —
+the compose file lists the variables, commented out.
+
+For local disk, which is only appropriate when the path is a real volume that
+outlives the container:
+
+```yaml
+      STORAGE_TYPE: local
+      STORAGE_PATH: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+```
 
 ### Other platforms
 

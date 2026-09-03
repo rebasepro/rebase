@@ -9,7 +9,7 @@ means agreeing to our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Prerequisites
 
-- **Node.js** ≥ 20
+- **Node.js** ≥ 22.22 (CI runs 22.x; `packages/app` and `packages/cms` declare this floor)
 - **pnpm** ≥ 11 (`corepack enable` to activate)
 - **Docker** (for the local PostgreSQL database)
 
@@ -62,11 +62,11 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 | `packages/` | All library packages (published to npm) |
 | `app/` | Example application that consumes the packages |
 | `website/` | Documentation site |
-| `e2e/` | End-to-end tests (Playwright) |
+| `tests/e2e/` | End-to-end tests (Playwright) |
 | `tooling/scripts/` | Build, release, and utility scripts |
 | `examples/` | Standalone example apps |
 | `tooling/rebase-agent-skills/` | Agent skills installed by `rebase skills install` |
-| `videos/` | Remotion project for the product videos on the website (a workspace package, not part of the library) |
+| `tooling/videos/` | Remotion project for the product videos on the website (a workspace package, not part of the library) |
 
 One-off scripts, codemods and utilities go in `tooling/scripts/`, never at the repo root
 or inside a package directory.

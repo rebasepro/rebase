@@ -102,7 +102,7 @@ The docs exist to keep that developer building without leaving.
   on either side.
 - Removed routes carry 301s in `firebase.json` (`/features` → `/product`,
   `/why-rebase` → `/compare`). Do not resurrect them.
-- Legal pages exist under `/policy`; open items are tracked in `LEGAL-TODO.md`.
+- Legal pages exist under `/policy`; open items are tracked privately.
 
 ## Brand Commitments
 

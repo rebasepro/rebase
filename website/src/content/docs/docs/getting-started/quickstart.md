@@ -21,9 +21,8 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 18+
+- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
-
-No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Bring your own PostgreSQL](#bring-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ## Your Environment Is Already Configured
 
@@ -36,49 +35,70 @@ Don't run `cp .env.example .env`. `.env.example` is a reference for the availabl
 ## Start the Dev Servers
 
 ```bash
-pnpm install   # only if you declined the install `init` offered
-pnpm dev
+pnpm install
+pnpm run dev
 ```
 
-That is the whole first run — there is no database to start and no schema step to remember. `rebase dev` does three things before it serves:
+That is the whole first run. There is no database to install and no schema step:
+with no `DATABASE_URL` set, `rebase dev` starts a **managed PostgreSQL (PGlite)**
+in the project directory, generates the Drizzle schema from your collections, and
+creates the tables at boot — including the example `posts`, `authors` and `tags`.
 
-1. Generates `backend/src/schema.generated.ts` from `config/collections/`.
-2. Starts a managed PostgreSQL for this project, with its data under `.rebase/`.
-3. Applies your collections to it, so the example `posts`, `authors` and `tags` tables exist.
-
-Then it starts both halves together:
+It starts both halves together:
 
 - **Backend** — REST API, auth, storage, WebSocket
 - **Frontend** — the Rebase admin panel
-- **Hot reload** for both — changes take effect instantly
+- **Hot reload** for both
 
 Both ports are **derived from this project's path** rather than fixed, so several
 Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
-use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
-`.env` configure `rebase start`, the production server, and are ignored here.)
+**use those**, not `localhost:3001` / `localhost:5173`. (`PORT` and `VITE_API_URL`
+in `.env` configure `rebase start`, the production server, and are ignored here.)
 Pin a port with `rebase dev --port 3001`.
 
-## Bring Your Own PostgreSQL
+### Flags worth knowing
 
-`DATABASE_URL` is commented out in `.env` on purpose — that is what makes the managed database the default. Set it to any PostgreSQL you like (a local install, Neon, Supabase) and it wins over the managed one:
+| Flag | On | What it does |
+|---|---|---|
+| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--template <name>` | `init` | Start from a template other than the default |
+| `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
+| `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
+| `--no-db` | `dev` | Touch no database at all; you bring one |
+
+## Variant: use your own PostgreSQL
+
+The managed database is a convenience, not a requirement. To point the project at
+a Postgres you run, uncomment `DATABASE_URL` in `.env`:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, and the URL already in `.env` points at it. Uncomment that line, then:
+Then start the dev servers as above. A `DATABASE_URL` that is set is never
+touched, and one pointing anywhere other than this machine is left alone
+entirely.
+
+With your own database you also get the migration commands, which the managed one
+cannot offer — they plan changes with Atlas, which needs a second empty database
+to compare against, and PGlite serves exactly one:
+
+```bash
+pnpm run db:push
+```
+
+Boot already creates missing tables additively, so `db push` is for the two
+things it deliberately leaves alone: junction-table RLS on many-to-many
+relations, and any change that is not purely additive — a renamed column, a
+narrowed type, a removed field.
+
+The scaffold also ships a `docker-compose.yml` with a PostgreSQL service, if you
+want a container rather than an installed Postgres:
 
 ```bash
 docker compose up -d db
-pnpm run db:push
-pnpm dev
 ```
-
-`db:push` is what creates your collection tables on a database Rebase does not manage for you.
-
-:::caution
-`db:push`, `db:generate` and `db:migrate` plan their changes with [Atlas](https://atlasgo.io), which diffs your schema against a second, empty database. The managed development database serves exactly one, so all three refuse to run against it and say so rather than failing part-way. You do not need them there — `rebase dev` applies your collections at boot. Reach for them once you are on a PostgreSQL of your own, and for migrations, column drops and renames.
-:::
 
 ## Introspect an Existing Database (Optional)
 
@@ -155,23 +175,28 @@ export const collections = [
 
 ## Create the Table
 
-Restart `rebase dev`. It regenerates the schema from your collections and applies the new table before it serves, so **Products** appears in the navigation.
+Restart the dev servers. `rebase dev` regenerates the schema from your
+collections and boot creates the new table, so your **Products** collection
+appears in the navigation.
 
-On a PostgreSQL of your own, that is `db:push`'s job instead:
+On your own PostgreSQL you can also apply it without restarting:
 
 ```bash
 pnpm run db:push
 ```
 
+That is also the command for the changes boot leaves alone — a renamed column, a
+narrowed type, a removed field.
+
 ## Database Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
+| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
-| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
-| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
+| `rebase db push` | Push schema changes directly to the database (dev only) |
+| `rebase db generate` | Generate SQL migration files |
+| `rebase db migrate` | Run pending migrations |
 
 ## What's Next
 

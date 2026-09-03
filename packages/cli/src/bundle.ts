@@ -121,7 +121,11 @@ const RUNTIME_PROVIDED = new Set([
     "hono",
     "@hono/node-server",
     "typescript",
-    "tsx"
+    "tsx",
+    // See entrypoint.mjs: a second zod makes `loadEnv({ extend })` reject every
+    // value carrying a `.default()`, and the deploy reports success with no
+    // crons running.
+    "zod"
 ]);
 
 function log(options: BuildBundleOptions, message: string): void {

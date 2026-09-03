@@ -355,6 +355,24 @@ else
   warn "Needs Docker. Record it before the next release with: pnpm record:project-snapshot"
 fi
 
+# The other half of the same discipline, and it had been skipped for longer: the
+# AUTH schema snapshot, which `upgrade-e2e.test.ts` replays. Between v0.16.0 and
+# v0.17.3 nothing recorded one, and neither recorder even ran when tried — one
+# imported a path that had moved, the other wrote a primary key the current
+# schema rejects. Both are fixed; running it here is what stops the next gap.
+#
+# It needs a database THIS release provisioned. The recorder takes one from
+# DATABASE_URL, so a release run without one skips it loudly rather than
+# recording a schema from somewhere else.
+step "Recording the auth schema snapshot"
+if [ -n "${DATABASE_URL:-}" ] && node --import tsx tooling/scripts/record-schema-snapshot.mts; then
+  ok "Auth schema snapshot recorded for v$NEW_VERSION"
+else
+  warn "NO AUTH SCHEMA SNAPSHOT for v$NEW_VERSION — upgrade-e2e has no entry for this release."
+  warn "Point DATABASE_URL at a database this release booted against, then:"
+  warn "  node --import tsx tooling/scripts/record-schema-snapshot.mts"
+fi
+
 # ── Commit & Tag ────────────────────────────────────────────
 step "Committing and tagging"
 

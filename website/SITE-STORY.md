@@ -234,7 +234,7 @@ its own close and drops `ClosingCta`.
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
 **The home page's beat order, and why it is that order.** Revised 2026-08-10 after
-the competitor audit in `COMPETITOR-AUDIT-2026-08-10.md`, and again 2026-09-02
+the competitor audit, which is kept privately, and again 2026-09-02
 after the brand audit.
 
 | Beat | Section | Carries |

@@ -106,6 +106,10 @@ const translatePath = useTranslatedPath(getLangFromUrl(Astro.url));
             const maxAge = 365 * 24 * 60 * 60;
             const domain = window.location.hostname.includes('rebase.pro') ? '; domain=.rebase.pro' : '';
             document.cookie = `cookie-consent=${value}; path=/; max-age=${maxAge}${domain}; samesite=lax; secure`;
+            // Layout.astro waits for this before fetching gtag.js. Without it,
+            // accepting would only take effect on the next page view — and the
+            // visitor who just said yes is the one most likely to leave next.
+            dispatchEvent(new CustomEvent("rebase:consent", { detail: value }));
         }
 
         // Check if user has already made a choice

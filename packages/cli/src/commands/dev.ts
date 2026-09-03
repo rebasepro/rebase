@@ -185,6 +185,33 @@ export function resolveStartPort(projectRoot: string, explicitPort?: number): nu
 }
 
 /**
+ * The frontend port for this project, derived the same way the backend's is.
+ *
+ * `rebase dev` used to leave this entirely to Vite, which takes 5173 and, when
+ * that is busy, silently walks to 5174, 5175 and onward. The backend was then
+ * started with whatever `FRONTEND_URL` the scaffold's `.env` happened to say —
+ * `http://localhost:5173` — so the welcome email linked a port the app was not
+ * on. Deriving it here means the value handed to the backend describes the
+ * server we are about to start rather than a default nobody checked.
+ *
+ * Range 5173–5372, so the familiar port is still the common case for a single
+ * project and two projects rarely collide.
+ *
+ * Note this is passed to Vite WITHOUT `--strictPort` unless the developer
+ * pinned it explicitly. Vite keeps its fallback, so a busy port still starts —
+ * it just starts somewhere the email link does not name, which is exactly
+ * today's behaviour and no worse. Pinning REBASE_FRONTEND_PORT makes both
+ * exact.
+ */
+export function getProjectFrontendPort(projectRoot: string): number {
+    let hash = 0;
+    for (let i = 0; i < projectRoot.length; i++) {
+        hash = ((hash << 5) - hash + projectRoot.charCodeAt(i)) | 0;
+    }
+    return 5173 + (Math.abs(hash) % 200);
+}
+
+/**
  * The flags `rebase dev` takes.
  *
  * Exported so `dev.test.ts` can assert that every short alias the help
@@ -354,8 +381,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendOnly = args["--frontend-only"] || false;
     const shouldGenerate = args["--generate"] || process.env.REBASE_AUTO_GENERATE === "true" || process.env.REBASE_GENERATE === "true";
 
-    // Resolve the port ONCE, before starting anything
+    // Resolve the ports ONCE, before starting anything. Both, because the
+    // backend is told where the frontend will be and cannot be told later: its
+    // environment is fixed when it spawns.
     const startPort = resolveStartPort(projectRoot, args["--port"]);
+    const pinnedFrontendPort = process.env.REBASE_FRONTEND_PORT;
+    if (pinnedFrontendPort && !/^\d+$/.test(pinnedFrontendPort)) {
+        throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
+    }
+    const frontendPort = pinnedFrontendPort
+        ? Number(pinnedFrontendPort)
+        : getProjectFrontendPort(projectRoot);
 
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
@@ -475,15 +511,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          * the kind of difference that silently passes `--port` to the package
          * manager instead of to Vite.
          */
-        const frontendPort = process.env.REBASE_FRONTEND_PORT;
-        if (frontendPort) {
-            if (!/^\d+$/.test(frontendPort)) {
-                throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(frontendPort)}.`);
-            }
-            if (pm === "npm") runDevCmd.push("--");
-            runDevCmd.push("--port", frontendPort, "--strictPort");
-            console.log(`  ${chalk.gray("↳ frontend port")} = ${chalk.white(frontendPort)}`);
-        }
+        if (pm === "npm") runDevCmd.push("--");
+        runDevCmd.push("--port", String(frontendPort));
+        // `--strictPort` only when the developer pinned the port: they asked for
+        // that exact one and a silent move defeats the point. Unpinned, Vite
+        // keeps its own fallback, so a busy port still starts the frontend.
+        if (pinnedFrontendPort) runDevCmd.push("--strictPort");
+        console.log(`  ${chalk.gray("↳ frontend port")} = ${chalk.white(String(frontendPort))}`);
 
         const frontendChild = execa(
             runDevCmd[0],
@@ -566,6 +600,16 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // its hardcoded default (3001). This prevents cross-project collisions
         // when multiple Rebase instances run simultaneously.
         env.PORT = String(startPort);
+
+        // And where the frontend will be, for the same reason. `FRONTEND_URL`
+        // is the base of every emailed link and one of the two things CORS is
+        // derived from, and the scaffold's `.env` states a fixed
+        // `http://localhost:5173` that this command overrides — so the welcome
+        // email linked a port the app was not running on. The frontend-only
+        // case never reaches here, and there the .env value is still right.
+        if (!backendOnly && frontendDir) {
+            env.FRONTEND_URL = `http://localhost:${frontendPort}`;
+        }
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);

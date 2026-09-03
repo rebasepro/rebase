@@ -50,6 +50,7 @@
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, auth hooks, and custom auth adapters on the backend.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
+- [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
@@ -67,6 +68,7 @@
 - [Authentication & Login](https://rebase.pro/docs/frontend/authentication): Set up the auth controller, login view, and role simulation in your Rebase React frontend.
 - [Storage & File Uploads](https://rebase.pro/docs/frontend/storage): Add file upload fields to your collections, manage files programmatically, and route uploads to different storage backends.
 - [View Modes](https://rebase.pro/docs/frontend/view-modes): Configure table, cards, and Kanban board views for your collections.
+- [Firebase](https://rebase.pro/docs/frontend/firebase): @rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved.
 - [Custom Fields](https://rebase.pro/docs/frontend/custom-fields): Build custom form fields for entity editing with full access to the form context, entity values, and Rebase hooks.
 - [Form Layout](https://rebase.pro/docs/frontend/form-layout): Control how the entity form is arranged — column spans, sections, and the metadata rail.
 - [Entity Views](https://rebase.pro/docs/frontend/entity-views): Add custom tabs and views to entity detail pages for previews, analytics, related data, or custom UI.
@@ -95,6 +97,7 @@
 - [Runtime and Bundles](https://rebase.pro/docs/architecture/runtime-and-bundles): How a Rebase project separates into a project bundle and a versioned runtime, and why that separation is what makes upgrades, multi-repo apps and managed hosting possible.
 - [Apps and Repositories](https://rebase.pro/docs/architecture/apps-and-repositories): A project is a backend plus the apps that talk to it, which can each live in their own repository.
 - [Deployment](https://rebase.pro/docs/getting-started/deployment): Deploy your Rebase project to production using Docker, cloud platforms, or manual setups.
+- [Rebase Cloud](https://rebase.pro/docs/deployment/cloud): Rebase Cloud is the same Rebase, operated for you. What it is, how a project links and deploys, and what the private beta does not include yet.
 - [Self-Hosting](https://rebase.pro/docs/deployment/self-hosting): Run Rebase anywhere with the official runtime image and your project bundle — Docker Compose, Fly, Railway, or a plain VPS.
 - [Splitting into several processes](https://rebase.pro/docs/deployment/split-processes): Run one bundle as several cooperating processes — an API, a functions tier, a worker — from the same published runtime image, so a heavy custom function stops competing with the data API.
 - [Kubernetes](https://rebase.pro/docs/deployment/kubernetes): Deploy Rebase to a Kubernetes cluster with the official Helm chart — one Deployment or several, a migration Job that owns the schema, and static apps on the same host.

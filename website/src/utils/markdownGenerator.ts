@@ -84,7 +84,7 @@ Rebase is adopted in layers, and each one is additive:
 - **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
 - **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
 
-Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check $DATABASE_URL\` audits any Postgres, read-only, with nothing installed.
+Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check\` audits any Postgres, read-only, with nothing installed.
 
 ## The panel, when you want one
 
@@ -185,7 +185,7 @@ ${cleanHtml(tr("about.story.p3"))}
   if (page === "backend") {
     return `# Rebase — Backend & APIs
 
-Define your collections in TypeScript and get a production-ready API server.
+Define your collections in TypeScript and get a complete API server.
 
 ## Features
 - **Hono & Drizzle Engine**: Built on lightweight Hono server and Drizzle ORM.

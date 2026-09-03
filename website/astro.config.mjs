@@ -19,6 +19,16 @@ export default defineConfig({
         }),
         starlight({
             title: "Rebase Docs",
+            // Starlight emits og:title, og:type, og:url and og:description and
+            // no og:image at all, so every documentation page previewed as a
+            // bare text card. One image for the whole section: a page-specific
+            // one would mean generating 1,200 of them, and the section is the
+            // useful unit anyway.
+            head: [
+                { tag: "meta", attrs: { property: "og:image", content: "https://rebase.pro/img/og/docs.png" } },
+                { tag: "meta", attrs: { name: "twitter:image", content: "https://rebase.pro/img/og/docs.png" } },
+                { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } }
+            ],
             locales: { root: { label: "English", lang: "en" }, es: { label: "Español", lang: "es" }, de: { label: "Deutsch", lang: "de" }, fr: { label: "Français", lang: "fr" }, it: { label: "Italiano", lang: "it" }, pt: { label: "Português", lang: "pt" } },
             customCss: [
                 "./src/styles/global.css",
@@ -97,6 +107,7 @@ export default defineConfig({
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
+                        { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
@@ -120,6 +131,7 @@ export default defineConfig({
                         { label: "Authentication & Login", slug: "docs/frontend/authentication" },
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
                         { label: "View Modes", slug: "docs/frontend/view-modes" },
+                        { label: "Firebase", slug: "docs/frontend/firebase" },
                         { label: "Custom Fields", slug: "docs/frontend/custom-fields" },
                         { label: "Form Layout", slug: "docs/frontend/form-layout" },
                         { label: "Entity Views", slug: "docs/frontend/entity-views" },
@@ -188,6 +200,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
+                        { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },
                         { label: "Kubernetes", slug: "docs/deployment/kubernetes" },

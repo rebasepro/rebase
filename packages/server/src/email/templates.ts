@@ -447,7 +447,7 @@ export function getWelcomeEmailTemplate(
     const greeting = getGreeting(user);
     const url = loginUrl || "";
 
-    const subject = `¡Bienvenido/a a ${appName}!`;
+    const subject = `Welcome to ${appName}`;
 
     const body = html`
 <!DOCTYPE html>
@@ -460,35 +460,29 @@ export function getWelcomeEmailTemplate(
 <body style="margin: 0; padding: 0; background-color: #f8fafc;">
     <div style="${styles.container}">${renderHeader(appName, logoUrl)}
         <div style="${styles.card}">
-            <h1 style="${styles.heading}">¡Bienvenido/a a ${appName}!</h1>
-            
+            <h1 style="${styles.heading}">Welcome to ${appName}</h1>
+
             <p style="${styles.paragraph}">
-                Hola ${greeting},
+                Hi ${greeting},
             </p>
-            
+
             <p style="${styles.paragraph}">
-                Tu cuenta en ${appName} ha sido creada exitosamente. 
-                Estamos encantados de tenerte con nosotros.
-            </p>
-            
-            <p style="${styles.paragraph}">
-                Ya puedes acceder a tu panel y empezar a explorar todas las oportunidades 
-                que tenemos para ti.
+                Your ${appName} account is ready.
             </p>
 
             ${url ? html`
             <div style="text-align: center;">
-                <a href="${url}" style="${styles.button}">Ir a mi Panel</a>
+                <a href="${url}" style="${styles.button}">Open ${appName}</a>
             </div>
             ` : raw("")}
-            
+
             <p style="${styles.paragraph}">
-                Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
+                If you have any questions, just reply to this email.
             </p>
-            
+
             <div style="${styles.footer}">
                 <p style="margin: 0;">
-                    Este correo fue enviado porque se creó una cuenta con esta dirección de email en ${appName}.
+                    You received this because an account was created with this email address at ${appName}.
                 </p>
             </div>
         </div>
@@ -498,17 +492,15 @@ export function getWelcomeEmailTemplate(
     `;
 
     const text = `
-¡Bienvenido/a a ${appName}!
+Welcome to ${appName}
 
-Hola ${greeting},
+Hi ${greeting},
 
-Tu cuenta en ${appName} ha sido creada exitosamente. Estamos encantados de tenerte con nosotros.
+Your ${appName} account is ready.
 
-Ya puedes acceder a tu panel y empezar a explorar todas las oportunidades que tenemos para ti.
+${url ? `Open ${appName}: ${url}` : ""}
 
-${url ? `Ir a mi panel: ${url}` : ""}
-
-Si tienes alguna pregunta, no dudes en contactarnos respondiendo a este correo.
+If you have any questions, just reply to this email.
     `.trim();
 
     return { subject,

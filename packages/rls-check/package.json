@@ -1,40 +1,7 @@
 {
   "name": "@rebasepro/rls-check",
   "version": "0.17.3",
-  "description": "Audit Row-Level Security on any PostgreSQL database — finds tables served without RLS, permissive tautologies, unqualified columns in policy subqueries, RLS-bypassing views and unprotected junction tables. Read-only.",
-  "main": "./dist/index.es.js",
-  "module": "./dist/index.es.js",
-  "types": "./dist/index.d.ts",
-  "type": "module",
-  "source": "src/index.ts",
-  "bin": {
-    "rls-check": "bin/rls-check.js"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "//files": "No workspace deps and no `src` — this is the one package that must `npx` cold on a stranger's machine in seconds, so the install is `pg` and nothing else.",
-  "files": [
-    "dist",
-    "bin",
-    "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/rls-check"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
-    "test": "vitest run",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
-    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
+  "description": "Audit Row-Level Security on any PostgreSQL database \u2014 finds tables served without RLS, permissive tautologies, unqualified columns in policy subqueries, RLS-bypassing views and unprotected junction tables. Read-only.",
   "keywords": [
     "postgres",
     "postgresql",
@@ -46,8 +13,45 @@
     "supabase",
     "policy"
   ],
-  "author": "rebase.pro",
+  "homepage": "https://github.com/rebasepro/rebase#readme",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/rls-check"
+  },
   "license": "MIT",
+  "author": "rebase.pro",
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "source": "src/index.ts",
+  "bin": {
+    "rls-check": "bin/rls-check.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "//files": "No workspace deps and no `src` \u2014 this is the one package that must `npx` cold on a stranger's machine in seconds, so the install is `pg` and nothing else.",
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "dependencies": {
     "pg": "^8.22.0"
   },

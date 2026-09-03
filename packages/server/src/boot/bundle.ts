@@ -314,6 +314,23 @@ export function createSourceBundle(options: {
             ? path.join(configDir, "collections")
             : undefined);
 
+    // A manifest states what this project HAS, never what it might have.
+    //
+    // These used to be declared from the conventional layout whether or not the
+    // paths existed, and the runtime believed them: a `--headless` project — no
+    // collections directory, no generated schema, both absent by design — booted
+    // with two warnings telling its author the build was broken. "Declares a
+    // schema at backend/src/schema.generated.ts, but that file does not exist"
+    // is alarming, accurate about the manifest, and wrong about the project.
+    //
+    // `resolve` is the existence check the returned directories already used, so
+    // declaring through it is what makes the manifest and the loaded bundle
+    // agree. A project that is genuinely missing a file it should have still
+    // gets the warning, because then the path is real and empty rather than
+    // never declared.
+    const declaredCollections = resolve(collectionsDir) ? collectionsDir : undefined;
+    const declaredConfig = resolve(options.config ?? configDir) ? (options.config ?? configDir) : undefined;
+
     const manifest: RebaseBundleManifest = {
         bundleFormat: BUNDLE_FORMAT_VERSION,
         runtime: {
@@ -325,11 +342,11 @@ export function createSourceBundle(options: {
         app: options.app ?? "backend",
         kind: "backend",
         entry: {
-            config: options.config ?? configDir,
-            collections: collectionsDir,
-            functions: options.functions,
-            crons: options.crons,
-            schema: options.schema
+            config: declaredConfig,
+            collections: declaredCollections,
+            functions: resolve(options.functions) ? options.functions : undefined,
+            crons: resolve(options.crons) ? options.crons : undefined,
+            schema: resolve(options.schema) ? options.schema : undefined
         },
         hooks: { native: false },
         deps: { declared: {} },

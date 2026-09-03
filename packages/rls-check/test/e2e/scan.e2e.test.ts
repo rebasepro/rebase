@@ -194,6 +194,47 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
         expect(flagged).not.toContain("secure_definer_fn");
     });
 
+    /**
+     * The regression that matters most in this file: it is the one the unit
+     * tests cannot fully prove, because what broke the previous version of this
+     * check was the shape Postgres rewrites an expression *into* — the parens it
+     * adds around each conjunct, and the `::text` casts it inserts next to every
+     * literal. A hand-written qual string is the author guessing at that.
+     */
+    it("flags a guard that excludes the wrong literal, and not one that excludes the right ones", () => {
+        const flagged = full.findings
+            .filter((finding) => finding.id === "policy-anonymous-tautology")
+            .map(objectName);
+
+        expect(flagged).toContain("vuln_anon_decoy_guard");
+        expect(flagged).not.toContain("secure_anon_real_guard");
+    });
+
+    it("names the useless literal in the finding, so the reader can see the typo", () => {
+        const [f] = full.findings.filter(
+            (finding) =>
+                finding.id === "policy-anonymous-tautology" &&
+                finding.target.table === "vuln_anon_decoy_guard"
+        );
+
+        expect(f.title).toContain("'anon'");
+        expect(f.detail).toContain("the guard excludes nobody");
+    });
+
+    it("records what Postgres rewrote the guard into, because that is what broke it", async () => {
+        const [row] = await querySql<{ qual: string }>(
+            container.connectionString,
+            "SELECT qual FROM pg_policies WHERE policyname = 'vuln_anon_decoy_guard_all'"
+        );
+
+        // Neither the parens nor the cast were written in fixture.sql. Both are
+        // Postgres's, and both are what a naive split or a literal-string bail
+        // fails on. If this assertion ever breaks, the parse needs re-checking
+        // before the check is trusted again.
+        expect(row.qual).toContain("::text");
+        expect(row.qual).toMatch(/\(current_setting/);
+    });
+
     it("does not flag correct tenant scoping as a throwing current_setting", () => {
         const flagged = full.findings
             .filter((finding) => finding.id === "current-setting-throws")

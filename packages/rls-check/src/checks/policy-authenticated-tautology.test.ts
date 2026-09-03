@@ -31,14 +31,31 @@ describe("policy-authenticated-tautology", () => {
         expect(findings[0].impact).toContain("every row");
     });
 
-    it("recognises the short sentinel and the reversed order", () => {
-        expect(policyAuthenticatedTautology.run(
-            withPolicy("(auth.uid() IS NOT NULL AND auth.uid() <> 'anon')")
-        )).toHaveLength(1);
-
+    it("recognises the reversed order", () => {
         expect(policyAuthenticatedTautology.run(
             withPolicy("(auth.uid() <> 'anonymous' AND auth.uid() IS NOT NULL)")
         )).toHaveLength(1);
+    });
+
+    /**
+     * `'anon'` is NOT this check's case, and used to be asserted here as if it
+     * were.
+     *
+     * A guard only belongs to this finding if it excludes an id a signed-out
+     * caller can actually arrive with. `'anon'` is the id the request path
+     * reported before the sentinel was unified on `'anonymous'`, so a policy
+     * excluding only `'anon'` excludes nobody on any server shipping today — it
+     * is still wide open to anonymous callers, not merely to signed-in ones.
+     *
+     * So it stays with {@link policyAnonymousTautology}, which is `critical`
+     * rather than this check's `high`, and which names the decoy in its title.
+     * Routing it here would have quietly downgraded the severity of the exact
+     * predicate that leaked a production `users` table.
+     */
+    it("leaves `<> 'anon'` to the anonymous check, which rates it higher", () => {
+        expect(policyAuthenticatedTautology.run(
+            withPolicy("(auth.uid() IS NOT NULL AND auth.uid() <> 'anon')")
+        )).toEqual([]);
     });
 
     it("recognises the empty-string sentinel", () => {

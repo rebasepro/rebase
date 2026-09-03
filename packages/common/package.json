@@ -1,25 +1,7 @@
 {
   "name": "@rebasepro/common",
-  "type": "module",
   "version": "0.17.3",
-  "description": "Rebase shared core — collection registry, data driver adapter and fluent query builder. No React dependency.",
-  "funding": {
-    "url": "https://github.com/sponsors/rebaseco"
-  },
-  "author": "Rebase",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/common"
-  },
-  "main": "./dist/index.es.js",
-  "module": "./dist/index.es.js",
-  "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
-  "engines": {
-    "node": ">=20"
-  },
+  "description": "Rebase shared core \u2014 collection registry, data driver adapter and fluent query builder. No React dependency.",
   "keywords": [
     "rebase",
     "cms",
@@ -29,8 +11,30 @@
     "headless cms",
     "content manager"
   ],
+  "homepage": "https://github.com/rebasepro/rebase#readme",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/common"
+  },
+  "funding": {
+    "url": "https://github.com/sponsors/rebasepro"
+  },
+  "license": "MIT",
+  "author": "Rebase",
+  "type": "module",
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",

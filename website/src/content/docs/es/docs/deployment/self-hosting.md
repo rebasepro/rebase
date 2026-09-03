@@ -16,71 +16,80 @@ saber por qué está dividido de esa manera.
 
 ## Docker Compose
 
+El archivo de compose vive en el repositorio, en
+[`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml).
+Usa ese en lugar de copiar un fragmento de esta página: es el archivo que la
+verificación de aceptación del proyecto arranca en cada push, así que no puede
+divergir de lo que realmente funciona.
+
 ```bash
-rebase build                     # produces ./dist-bundle
-docker compose up -d db          # start Postgres
-rebase db push                   # create the collection tables, once
-docker compose up                # start the runtime
+rebase build                    # produce ./dist-bundle
+./infra/docker/quickstart.sh    # escribe infra/docker/.env si falta, y lo levanta
 ```
 
-Un `docker-compose.yml` mínimo:
+`quickstart.sh` es un comando que hace dos cosas evidentes e imprime ambas. La
+forma larga, si prefieres controlar cada paso:
 
-```yaml
-services:
-  db:
-    image: pgvector/pgvector:pg18
-    environment:
-      POSTGRES_USER: rebase_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: rebase
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
-      interval: 5s
-      retries: 12
-
-  api:
-    image: rebasepro/server:latest
-    depends_on:
-      db: { condition: service_healthy }
-    environment:
-      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
-      CORS_ORIGINS: ${CORS_ORIGINS}
-    volumes:
-      # Writable: the container installs the bundle's declared dependencies into
-      # it on first start. See "Dependencies" below for the read-only variant.
-      - ./dist-bundle:/bundle
-    ports:
-      - "8080:8080"
-
-volumes:
-  db-data:
+```bash
+docker compose -f infra/docker/docker-compose.selfhost.yml \
+  --env-file infra/docker/.env up
 ```
+
+No hace falta arrancar la base de datos por separado: `api` espera a su
+healthcheck.
+
+### Los cuatro valores que necesita
+
+`quickstart.sh` los genera por ti. Para escribir el `.env` a mano:
+
+```bash
+cat > infra/docker/.env <<EOF
+POSTGRES_PASSWORD=$(openssl rand -hex 32)
+JWT_SECRET=$(openssl rand -hex 32)
+REBASE_SERVICE_KEY=$(openssl rand -hex 32)
+CORS_ORIGINS=https://app.example.com
+EOF
+```
+
+Tres secretos y un dato:
+
+- **`POSTGRES_PASSWORD`** — la contraseña de la base de datos. Cambiarla más
+  tarde implica cambiarla también en el volumen, así que elígela una vez.
+- **`JWT_SECRET`** — firma cada sesión. Rotarlo cierra la sesión de todo el mundo.
+- **`REBASE_SERVICE_KEY`** — la credencial que salta la seguridad a nivel de fila
+  para llamadas servidor a servidor. Trátala como una contraseña de root:
+  cualquiera que la tenga puede leer todas las filas.
+- **`CORS_ORIGINS`** — los orígenes desde los que se sirve tu frontend, separados
+  por comas. No es un secreto, y tampoco es opcional: en producción el runtime se
+  niega a arrancar en vez de adivinar, porque una API que adivina sus orígenes
+  permitidos acaba permitiendo el equivocado.
+
+Cada uno de los tres secretos debe tener al menos 32 caracteres. El archivo de
+compose los declara con `${VAR:?…}`, de modo que si falta uno el stack se detiene
+con un mensaje que lo nombra, en lugar de arrancar algo a medio configurar.
 
 ## Dependencias
 
-`rebase build` escribe un `package.json` junto a tu bundle listando las
-dependencias que declaró tu proyecto. El contenedor las instala en el primer inicio,
-razón por la cual el montaje anterior es de escritura.
+`rebase build` **instala las dependencias de tu proyecto dentro del bundle** por
+defecto, así que `dist-bundle` llega con un `node_modules` y un
+`package-lock.json` junto a su `package.json`. Un bundle así arranca en unos
+cinco segundos.
 
-Para montarlo en modo solo lectura en su lugar —algo recomendable, ya que un hook
-comprometido no podrá reescribir el código que se ejecuta tras el siguiente reinicio—,
-instálalas primero:
-
-```bash
-npm install --omit=dev --prefix dist-bundle
-```
+Como ya están ahí, puedes montar el bundle en solo lectura — algo que vale la
+pena, porque así un hook comprometido no puede reescribir el código que se
+ejecuta tras el siguiente reinicio:
 
 ```yaml
     volumes:
       - ./dist-bundle:/bundle:ro
 ```
 
-Para un despliegue real, es preferible empaquetar ambos dentro de una imagen, lo cual
-también fija exactamente lo que se ejecuta:
+`rebase build --no-vendor` renuncia a eso y produce un bundle que instala sus
+dependencias en el primer arranque, lo que tarda entre 40 y 60 segundos por
+arranque y necesita que el montaje sea escribible.
+
+Para un despliegue real, es preferible hornear ambos en una imagen, lo que
+además fija exactamente lo que se ejecuta:
 
 ```dockerfile
 FROM rebasepro/server:0.17.3
@@ -89,24 +98,57 @@ COPY dist-bundle /bundle
 
 ## Creación del esquema
 
-El runtime crea sus propias tablas de **auth** al iniciar. **Las tablas de colecciones son
-un paso separado y deliberado**, y la imagen del runtime no lo realiza —el reinicio de un
-contenedor no debe poder cambiar un esquema como efecto secundario de un despliegue.
+**El runtime crea las tablas que faltan al arrancar, incluidas las de tus
+colecciones.** `REBASE_MIGRATE_ON_BOOT` vale `ensure` por defecto, que es aditivo
+en todo el esquema: crea tablas, columnas y tipos enum que falten, y aplica su
+seguridad a nivel de fila. Un primer arranque contra una base de datos vacía
+levanta sirviendo tus colecciones, sin ningún paso aparte.
+
+Lo que `ensure` nunca hace, deliberadamente, es cambiar algo que ya existe. No
+altera el tipo de una columna, no elimina tablas ni columnas y no edita las
+etiquetas de un enum existente, porque el reinicio de un contenedor no debe poder
+reformar un esquema como efecto secundario de un despliegue.
+
+Por eso `rebase db push` sigue mereciendo la pena, para las dos cosas que el
+arranque deja de lado:
 
 ```bash
 rebase db push
 ```
 
-Ejecútalo desde un repositorio local (checkout) o un trabajo de CI, apuntando a la base
-de datos del despliegue. Realiza una simulación (dry-run) del cambio primero, rechaza los
-cambios destructivos sin una confirmación explícita y puede hacer una copia de seguridad
-antes de aplicarlos.
+- **RLS de las tablas puente** de las relaciones muchos a muchos.
+- **Cualquier cambio que no sea puramente aditivo**: una columna renombrada, un
+  tipo restringido, un campo eliminado.
 
-`REBASE_MIGRATE_ON_BOOT` acepta `ensure` (el valor por defecto) y `none`, y nada
-más — la imagen **se niega a arrancar** con `push`, por el motivo anterior.
-`ensure` es aditivo sobre todo el esquema, no solo sobre las tablas de auth:
-crea tablas, columnas y tipos enum que falten, y nunca elimina ni reescribe
-ninguno.
+Ejecútalo desde un checkout o un job de CI, apuntando a la base de datos del
+despliegue. Primero hace una simulación, rechaza los cambios destructivos sin
+confirmación explícita y puede hacer una copia de seguridad antes de aplicar. En
+el archivo de compose la base de datos publica un puerto para que esto pueda
+alcanzarla desde el host; quita ese mapeo cuando el esquema ya esté en su sitio
+si la base de datos no debe ser accesible desde fuera.
+
+`REBASE_MIGRATE_ON_BOOT` acepta `ensure` y `none`, y nada más: la imagen **se
+niega a arrancar** con `push`, por el motivo anterior.
+
+## Almacenamiento de archivos
+
+El almacenamiento está **desactivado** mientras no haya un bucket configurado, y
+es deliberado: la alternativa por defecto sería el sistema de archivos del
+contenedor, que pierde en silencio cada archivo subido en el siguiente reinicio.
+Las subidas se rechazan con `501 STORAGE_NOT_CONFIGURED` hasta que configures uno.
+
+Para un bucket, define `STORAGE_TYPE=s3` (o `gcs`) más su bucket y credenciales;
+el archivo de compose lista las variables, comentadas.
+
+Para disco local, algo apropiado solo cuando la ruta es un volumen real que
+sobrevive al contenedor:
+
+```yaml
+      STORAGE_TYPE: local
+      STORAGE_PATH: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+```
 
 ## Otras plataformas
 

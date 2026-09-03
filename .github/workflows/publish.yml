@@ -830,6 +830,77 @@ jobs:
             --version "$VERSION" --destination /tmp/chart-verify
           test -f "/tmp/chart-verify/rebase-${VERSION}.tgz"
 
+      # ── The stranger's first run, against the registry ──────
+      #
+      # Every other gate in this repository looks at the workspace. This one
+      # installs what was just published and follows the documented first run,
+      # which is the only check that can see the class of failure 0.17.3 shipped
+      # with: the CLI, the server and the driver were each correct, and the
+      # scaffold they produced together returned 500 on its first data read
+      # because nothing replaced the template's stub schema. Seventeen thousand
+      # workspace tests were green.
+      #
+      # It runs LAST, after npm, the images, the tag and the chart, because it
+      # can only test what exists on the registry. So it cannot prevent a bad
+      # publish — it reports one, loudly, while the release is still in
+      # somebody's hands. The npm view retry is not optional: a package is
+      # visible to `npm publish` before it is visible to the CDN a fresh install
+      # reads from.
+      - name: Smoke — install the published CLI and read a collection
+        if: ${{ !inputs.dry_run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$(mktemp -d)"
+
+          for attempt in $(seq 1 20); do
+            if npm view "@rebasepro/cli@${VERSION}" version >/dev/null 2>&1; then break; fi
+            echo "waiting for @rebasepro/cli@${VERSION} to appear on the registry (${attempt}/20)…"
+            sleep 15
+          done
+
+          # `--yes` because there is no TTY here to answer the prompts.
+          npx --yes "@rebasepro/cli@${VERSION}" init smoke --yes
+          cd smoke
+          pnpm install
+
+          pnpm run dev > dev.log 2>&1 &
+          DEV_PID=$!
+          # The port is derived per project and printed; reading it back is the
+          # only way to know where the server actually is.
+          for _ in $(seq 1 60); do
+            PORT="$(grep -oE 'Server running at http://localhost:[0-9]+' dev.log | tail -1 | grep -oE '[0-9]+$' || true)"
+            [ -n "${PORT:-}" ] && break
+            sleep 2
+          done
+          if [ -z "${PORT:-}" ]; then
+            echo "::error::The dev server never announced a port."
+            cat dev.log
+            kill "$DEV_PID" 2>/dev/null || true
+            exit 1
+          fi
+
+          TOKEN="$(curl -sS -X POST "http://localhost:${PORT}/api/auth/register" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"smoke@example.com","password":"Password123!"}' \
+            | node -e 'let b="";process.stdin.on("data",d=>b+=d).on("end",()=>{process.stdout.write(JSON.parse(b).tokens.accessToken)})')"
+
+          STATUS="$(curl -sS -o /tmp/read.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${TOKEN}" \
+            "http://localhost:${PORT}/api/data/posts")"
+
+          kill "$DEV_PID" 2>/dev/null || true
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::A freshly published scaffold cannot read its own collections (HTTP ${STATUS})."
+            cat /tmp/read.json
+            echo "--- dev.log ---"
+            cat dev.log
+            exit 1
+          fi
+          echo "✓ Published ${VERSION}: init → dev → register → read returned 200."
+
       # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release (with CHANGELOG notes)
         if: ${{ !inputs.dry_run && steps.notes.outputs.found == 'true' }}

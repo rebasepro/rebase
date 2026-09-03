@@ -15,8 +15,14 @@ Ele funciona em **qualquer** Postgres — Supabase, Neon, RDS, Cloud SQL ou em u
 execute. Ele não requer o Rebase e é útil independentemente de você adotá-lo ou não.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Execute-o no diretório do seu projeto e ele encontra o banco de dados sozinho: `DATABASE_URL`, depois
+`POSTGRES_URL`, depois um `.env` ao lado. Passe a string de conexão como argumento apenas quando não
+for possível — o npm imprime a linha de comando antes de o programa iniciar, e o seu shell a registra,
+então uma senha em um argumento acaba em dois lugares que o `rls-check` não consegue ocultar.
+`$DATABASE_URL` não é mais seguro ali: o shell o expande antes mesmo de o npm o ver.
 
 Ele é somente leitura por definição: abre uma transação somente leitura e executa consultas de
 catálogo. Não escreve nada e não envia nada para lugar nenhum — não há telemetria e nenhuma
@@ -25,11 +31,14 @@ chamada de rede além daquela para o seu banco de dados.
 ## Executando
 
 ```bash
-# Explicit connection string
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Or from the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
+# From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
+
+# For a database that is not the one in your environment
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# As an argument. Works, but see the warning above about where the password lands
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 Se sua senha contiver `@`, `:`, `/`, `?` ou `#`, codifique-a em percent-encode. Essa é, de longe, a
@@ -68,7 +77,7 @@ dados limpo.
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```

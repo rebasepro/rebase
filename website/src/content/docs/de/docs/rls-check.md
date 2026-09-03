@@ -11,19 +11,29 @@ description: Überprüfe Row-Level Security auf jeder PostgreSQL-Datenbank — S
 Es funktioniert mit **jeder** Postgres — Supabase, Neon, RDS, Cloud SQL oder einem Server, den du selbst betreibst. Es erfordert kein Rebase und ist nützlich, unabhängig davon, ob du Rebase jemals einsetzt.
 
 ```bash
-npx @rebasepro/rls-check $DATABASE_URL
+npx @rebasepro/rls-check
 ```
+
+Führe es in deinem Projektverzeichnis aus, und es findet die Datenbank selbst: `DATABASE_URL`, dann
+`POSTGRES_URL`, dann eine `.env` daneben. Übergib die Verbindungszeichenfolge nur dann als Argument,
+wenn das nicht möglich ist — npm gibt die Befehlszeile aus, bevor das Programm startet, und deine
+Shell zeichnet sie auf, sodass ein Passwort in einem Argument an zwei Stellen landet, die `rls-check`
+nicht schwärzen kann. `$DATABASE_URL` ist dort nicht sicherer: Die Shell expandiert es, bevor npm es
+überhaupt sieht.
 
 Es ist bauartbedingt schreibgeschützt: Es öffnet eine schreibgeschützte Transaktion und führt Katalogabfragen aus. Es schreibt nichts und sendet nichts irgendwohin — es gibt keine Telemetrie und keinen Netzwerkaufruf außer dem zu deiner Datenbank.
 
 ## Ausführung
 
 ```bash
-# Explicit connection string
-npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
-
-# Or from the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
+# From the environment — DATABASE_URL, then POSTGRES_URL, then a .env in the cwd
 npx @rebasepro/rls-check
+
+# For a database that is not the one in your environment
+DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
+
+# As an argument. Works, but see the warning above about where the password lands
+npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
 Wenn dein Passwort `@`, `:`, `/`, `?` oder `#` enthält, kodierte es als Percent-Encoding (Prozent-Kodierung). Das ist bei weitem die häufigste Ursache für einen Authentifizierungsfehler an dieser Stelle, und `rls-check` weist darauf hin, anstatt dich raten zu lassen.
@@ -58,7 +68,7 @@ Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, führt zu ein
 
 ```yaml
 - name: Audit RLS
-  run: npx @rebasepro/rls-check "$DATABASE_URL" --fail-on high
+  run: npx @rebasepro/rls-check --fail-on high
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```

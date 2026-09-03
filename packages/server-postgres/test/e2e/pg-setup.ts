@@ -53,7 +53,35 @@ function installCleanup(): void {
  * Spins up a temporary PostgreSQL instance using a Docker container.
  * Publishes port 5432 to a random host port to prevent collisions.
  */
-export async function startPgContainer(): Promise<PgContainer> {
+/**
+ * The image every e2e suite gets.
+ *
+ * Alpine, and deliberately: its default collation is not Debian's, and several
+ * suites assert on text ordering. `offline-query-agreement` exists to prove the
+ * offline evaluator and Postgres DISAGREE about string comparison, and
+ * `introspect-live` compares committed fixtures against a live catalogue. Both
+ * went green-but-wrong the moment this was pointed at a Debian-based image —
+ * the divergence they assert simply stopped happening.
+ *
+ * So the image is a per-caller decision, not a global one. See
+ * {@link PGVECTOR_IMAGE}.
+ */
+export const DEFAULT_PG_IMAGE = "postgres:18-alpine";
+
+/**
+ * The same major with pgvector built in, for callers that need `vector`.
+ *
+ * `record-project-snapshot.mts` is the one today: the reference fixture declares
+ * a vector property, and the framework deliberately withholds
+ * `CREATE EXTENSION` from generated DDL. Do not make this the default — see
+ * above.
+ */
+export const PGVECTOR_IMAGE = "pgvector/pgvector:pg18";
+
+export async function startPgContainer(
+    options: { image?: string } = {}
+): Promise<PgContainer> {
+    const image = options.image ?? DEFAULT_PG_IMAGE;
     const containerName = `rebase-db-e2e-${crypto.randomUUID().slice(0, 8)}`;
 
     console.log(`[pg-setup] Starting PostgreSQL container: ${containerName}`);
@@ -70,7 +98,7 @@ export async function startPgContainer(): Promise<PgContainer> {
         "-e", "POSTGRES_PASSWORD=rebase",
         "-p", "5432",          // random host port
         "-d",
-        "postgres:18-alpine"
+        image
     ]);
 
     // Discover the assigned host port

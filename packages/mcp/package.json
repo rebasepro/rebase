@@ -1,9 +1,25 @@
 {
   "name": "@rebasepro/mcp",
   "version": "0.17.3",
-  "mcpName": "io.github.rebasepro/rebase",
+  "description": "Model Context Protocol Server for Rebase \u2014 exposes schema, DB, document, and user management tools to AI assistants.",
+  "keywords": [
+    "rebase",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "agents"
+  ],
+  "homepage": "https://github.com/rebasepro/rebase#readme",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/mcp"
+  },
   "license": "MIT",
-  "description": "Model Context Protocol Server for Rebase — exposes schema, DB, document, and user management tools to AI assistants.",
+  "mcpName": "io.github.rebasepro/rebase",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -11,7 +27,7 @@
     "rebase-mcp": "bin/rebase-mcp.js"
   },
   "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "build": "tsc && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
@@ -33,10 +49,5 @@
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/rebasepro/rebase.git",
-    "directory": "packages/mcp"
   }
 }

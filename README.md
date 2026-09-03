@@ -7,10 +7,17 @@
 <h1 align="center">Rebase</h1>
 <h3 align="center">The Open-Source Backend-as-a-Service for Postgres — with an Admin Panel when you want one</h3>
 <p align="center">
-  <strong>Point it at a database and get a production-ready backend in minutes.</strong><br/>
+  <strong>Point it at a database and get a working backend in minutes.</strong><br/>
   REST, auth, storage, realtime and backups over your own Postgres — then add a
   schema-driven admin panel, or don't.<br/>
   Own your data, own your code. The absolute easiest way to build on PostgreSQL.
+</p>
+
+<p align="center">
+  <strong>Public beta.</strong> The API you write against can change in a minor,
+  with a changelog entry. Your data cannot break quietly.<br/>
+  <a href="https://rebase.pro/docs/compatibility">What that promise rests on, and
+  which subsystems are ready</a>
 </p>
 
 <p align="center">
@@ -56,7 +63,7 @@ Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](
 
 - 🔓 **No Vendor Lock-in** — Self-host anywhere. Full control over your infrastructure, code, and database.
 - 🧱 **Modular** — Start as a pure API and add the admin panel later, or never. Nothing is bundled that you didn't ask for.
-- ⚡ **Instant Setup** — `pnpm dlx @rebasepro/cli init` scaffolds a production-ready project in seconds.
+- ⚡ **Instant Setup** — `pnpm dlx @rebasepro/cli init` scaffolds a complete project in seconds.
 - 🗄️ **PostgreSQL First** — First-class Postgres support with Drizzle ORM, schema introspection, and automatic migrations.
 - 🔒 **Secure by Default** — Authorization is Postgres RLS, not application code. Tables without row-level security aren't served.
 - 🧩 **Radical Extensibility** — Not constrained to pre-built widgets. If you can build it in React, you can build it in Rebase.
@@ -76,16 +83,24 @@ pnpm install
 pnpm run dev
 ```
 
-That is the whole first run. `rebase dev` starts the project's Postgres container
-and pushes the schema to it before starting the servers — but only when
-`DATABASE_URL` points at this machine and nothing is already listening on it. A
-database that is already running is never touched, and a `DATABASE_URL` pointing
-anywhere other than localhost is left alone entirely. Pass `--no-db` to skip all
-of it and drive `docker compose up -d db` and `rebase db push` yourself.
+That is the whole first run — no database to install, no schema step. With no
+`DATABASE_URL` set, `rebase dev` starts a managed PostgreSQL (PGlite) that lives
+in the project directory, generates the schema from your collections, and creates
+the tables at boot.
 
-`rebase dev` picks a free port per project rather than fixed ones, and prints the
-admin panel and API URLs it settled on. Read them from its output — they differ
-between projects, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here.
+**Read the URLs from its output.** `rebase dev` picks a free port per project
+rather than fixed ones, so they differ between projects. `PORT` and
+`VITE_API_URL` in `.env` apply to `rebase start`, not here.
+
+Useful flags: `--yes` (required when there is no terminal to prompt, such as CI),
+`--headless` (see below), `--template <name>`, and `--install` / `--no-install`
+on `init`; `--docker` on `dev` to use Postgres in a container instead, and
+`--no-db` to bring your own.
+
+**To use your own Postgres instead:** uncomment `DATABASE_URL` in `.env` and run
+`pnpm run dev` again. Nothing else changes — a `DATABASE_URL` that is set is
+never touched, and one pointing anywhere other than this machine is left alone
+entirely.
 
 ### Just want the API?
 
@@ -96,9 +111,13 @@ pnpm dlx @rebasepro/cli init my-api --headless
 ```
 
 That scaffolds a headless backend: REST, auth, storage, realtime and backups over
-your database, with **no collection files and no UI**. Every table is served
-automatically, derived from your schema at boot — change the schema with a migration
-and the API follows. No React anywhere in the dependency tree.
+your database, with **no collection files and no UI**. Tables are served
+automatically, derived from your schema at boot — change the schema with a
+migration and the API follows. No React anywhere in the dependency tree.
+
+A fresh headless project has no tables yet, so `/api/data/*` answers
+`404 NO_COLLECTIONS` until you create some. Point it at a database that already
+has tables, or add them with a migration, and they appear.
 
 The three adoption modes — BaaS (like Supabase), CMS (like Payload/Directus), and
 both together — are described in [MODULAR-ARCHITECTURE.md](docs/MODULAR-ARCHITECTURE.md).

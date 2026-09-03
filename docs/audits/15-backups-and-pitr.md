@@ -8,7 +8,7 @@ settle are marked **UNCONFIRMED-BY-EXECUTION**.
 Scope: `packages/server/src/backup/`, `packages/server-postgres/src/backup/`,
 `packages/client/src/backups.ts`, the Studio panel that consumes them, and the
 barman/PITR code in `saas/backend` (read only). The disaster-recovery *runbook*
-is unit 76 (`docs/audits/76-disaster-recovery.md`); its finding that production
+is unit 76 (moved to the private control-plane repo); its finding that production
 tenants have no barman archives because `BACKUP_S3_*` is unset is not
 re-reported here. This audit is about the backup **code**.
 

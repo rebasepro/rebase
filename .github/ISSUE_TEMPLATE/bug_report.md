@@ -30,8 +30,8 @@ If applicable, add screenshots to help explain the problem.
 
 ## Environment
 
-- **Rebase version**: [e.g. 0.6.1]
-- **Node.js version**: [e.g. 20.x]
+- **Rebase version**: [e.g. 0.17.3]
+- **Node.js version**: [e.g. 22.x]
 - **Database**: [e.g. PostgreSQL 16]
 - **OS**: [e.g. macOS 15, Ubuntu 24.04]
 - **Browser** (if applicable): [e.g. Chrome 130]
