@@ -37,7 +37,13 @@ const TODAY: { path: string; code: string; ok: boolean; verdict: string }[] = [
     { path: "routes/orders.ts", code: `${k("if")} (order.ownerId !== req.user.id) ${k("return")} 403;`, ok: true, verdict: "checks" },
     { path: "jobs/nightly-report.ts", code: `db.select().from(orders)  ${dim("// every row")}`, ok: false, verdict: "no check" },
     { path: "scripts/backfill.ts", code: `db.update(orders).set(…)  ${dim("// run once, kept forever")}`, ok: false, verdict: "no check" },
-    { path: "agents/tools.ts", code: `createClient(URL, SERVICE_ROLE_KEY)`, ok: false, verdict: "bypasses RLS" },
+    // Deliberately not the SDK-factory spelling that
+    // check-marketing-snippets.mjs denylists — a landing page once shipped that
+    // name as though this SDK exported it, and the checker greps this file's
+    // source, comments included. The row is about somebody else's stack, a
+    // privileged key handed to an agent, so it says so without borrowing a name
+    // a reader might then try to import.
+    { path: "agents/tools.ts", code: `connect(URL, SERVICE_ROLE_KEY)`, ok: false, verdict: "bypasses RLS" },
     { path: "the hosted dashboard", code: `${k("select")} * ${k("from")} orders  ${dim("-- as the owner")}`, ok: false, verdict: "no policy" },
 ];
 

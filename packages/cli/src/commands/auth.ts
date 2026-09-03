@@ -8,6 +8,7 @@ import chalk from "chalk";
 import path from "path";
 import fs from "fs";
 import { spawn } from "child_process";
+import { randomBytes } from "node:crypto";
 import {
     requireProjectRoot,
     requireBackendDir,
@@ -147,8 +148,27 @@ export function resolveResetPasswordArgs(rawArgs: string[]): {
     };
 }
 
+/**
+ * A password for a reset that was not given one.
+ *
+ * This used to be a constant, and `--help` printed it as the default. Reset is
+ * the documented way back into an account nobody can sign in to — an admin,
+ * usually — so the recovery path set every such account to a fixed string that
+ * ships inside a public repository and a published npm package, and left it
+ * there until somebody remembered to change it.
+ *
+ * base64url of 18 random bytes: 24 characters, ~144 bits, no shell-quoting
+ * hazard, and nothing that reads like a placeholder somebody might keep.
+ */
+export function generatePassword(): string {
+    return randomBytes(18).toString("base64url");
+}
+
 async function resetPassword(rawArgs: string[]): Promise<void> {
-    const { email, password: newPassword } = resolveResetPasswordArgs(rawArgs);
+    const { email, password: providedPassword } = resolveResetPasswordArgs(rawArgs);
+    // Generated once, so both reset paths set and report the same thing.
+    const wasGenerated = !providedPassword;
+    const newPassword = providedPassword || generatePassword();
 
     if (!email) {
         console.error(chalk.red("✗ Email is required."));
@@ -199,7 +219,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     if (baseUrl && serviceKey) {
         console.log("Trying API-first reset via running backend...");
         try {
-            const finalPass = newPassword || "NewPassword123!";
+            const finalPass = newPassword;
             const cleanBaseUrl = baseUrl.replace(/\/+$/, "");
             // Not `limit=1`: the search is fuzzy and ordered by role count, so
             // the exact match is not necessarily first — asking for one row can
@@ -246,7 +266,9 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             // The address as stored, not as typed — they differ in case often
             // enough that echoing the input hides which account was touched.
             console.log(`  ${chalk.gray("Email:")} ${matched.email}`);
-            console.log(`  ${chalk.gray("Password:")} ${finalPass}`);
+            // Echoed only when we invented it. A password the operator typed
+            // is already theirs; printing it again only adds scrollback.
+            console.log(`  ${chalk.gray("Password:")} ${wasGenerated ? finalPass : "*".repeat(finalPass.length)}`);
             console.log("");
             return;
         } catch (err) {
@@ -271,7 +293,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             env.DOTENV_CONFIG_PATH = envFile;
         }
         env.REBASE_RESET_EMAIL = email;
-        env.REBASE_RESET_PASSWORD = newPassword || "NewPassword123!";
+        env.REBASE_RESET_PASSWORD = newPassword;
         env.REBASE_ENV_FILE_PATH = envFile || path.join(projectRoot, ".env");
 
         const scriptContent = `
@@ -319,7 +341,7 @@ async function resetPassword() {
 
     if (result.length > 0) {
         console.log("✅ Password reset for: " + result[0].email);
-        ${!newPassword ? 'console.log("   New password: " + newPassword);' : ""}
+        ${wasGenerated ? 'console.log("   New password: " + newPassword);' : ""}
         process.exit(0);
     }
     // Nothing was updated, so nothing was reset. Exiting 0 here reported
@@ -338,7 +360,7 @@ resetPassword().catch(console.error);
         console.log(chalk.bold("  🔑 Rebase Auth — Reset Password (Direct DB Fallback)"));
         console.log("");
         console.log(`  ${chalk.gray("Email:")} ${email}`);
-        if (newPassword) {
+        if (!wasGenerated) {
             console.log(`  ${chalk.gray("Password:")} ${"*".repeat(newPassword.length)}`);
         }
         console.log("");
@@ -391,7 +413,7 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("reset-password Options")}
   ${chalk.blue("--email, -e")}        User's email address
-  ${chalk.blue("--password, -p")}     New password (default: NewPassword123!)
+  ${chalk.blue("--password, -p")}     New password (default: one is generated and printed)
 
 ${chalk.green.bold("Examples")}
   rebase auth reset-password user@example.com

@@ -84,7 +84,14 @@ CORS_ORIGINS=http://localhost:8080
 #
 # The password below is random. Change the email to yours, sign in, and change
 # the password.
-REBASE_ADMIN_EMAIL=admin@localhost
+#
+# Not `admin@localhost`, which is what this said and which does not work: the
+# login route parses its body with `z.string().email()`, and that rejects a
+# domain with no dot in it. Seeding accepted the address, so the result was a
+# server with an admin account, no first-run path — the account exists, so the
+# deployment is not "fresh" — and a 400 on every attempt to sign in. The
+# runtime now refuses such an address at boot; this default is one it accepts.
+REBASE_ADMIN_EMAIL=admin@example.com
 REBASE_ADMIN_PASSWORD=$(secret)
 
 # The published runtime tag to run. Change it and restart to upgrade; your
