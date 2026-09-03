@@ -14,9 +14,11 @@ import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS
 // picture under the same lead — the section-level version of the /features
 // duplicate SITE-STORY §4 deleted.
 //
-// Base ground, not raised: the plates carry their own surface, and the hero
-// above already lifted the page once. The fork is CSS, not a measured SVG —
-// the lane centres are known from the grid, so nothing needs a resize handler.
+// Page ground, not the home figure's raised plate — asked for explicitly
+// (2026-09-03): the ground is part of what makes this section read as a
+// different thing from home beat 01, and the two plates carry their own
+// surface. The fork is CSS, not a measured SVG — the lane centres are known
+// from the grid, so nothing needs a resize handler.
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 
@@ -221,7 +223,7 @@ const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TablePrope
         margin-left: -3.5px;
         border-radius: 9999px;
         background: var(--color-primary);
-        box-shadow: 0 0 0 3px #08090a;
+        box-shadow: 0 0 0 3px var(--color-page-ground);
     }
     .cl-node.cl-l { left: 50%; }
 

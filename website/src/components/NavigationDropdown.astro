@@ -41,6 +41,14 @@ const { title, href } = Astro.props;
 </style>
 
 <script>
+    // Whether a panel is open is a property of the PAGE, like the header's
+    // scrolled state: the header reads `html[data-menu-open]` to put a plate
+    // under the bar so bar and panel become one surface (Header.astro). The
+    // flag is cleared on every swap — a click inside the open panel navigates,
+    // and the next page must start with a transparent bar over its own hero.
+    const MENU_OPEN = 'data-menu-open';
+    document.addEventListener('astro:after-swap', () => document.documentElement.removeAttribute(MENU_OPEN));
+
     document.addEventListener('astro:page-load', () => {
         const allContainers = Array.from(document.querySelectorAll('[data-dropdown-container]'));
         if (!allContainers.length) return;
@@ -91,6 +99,7 @@ const { title, href } = Astro.props;
             trigger.setAttribute('aria-expanded', 'true');
             positionPanel(container, panel);
             activeContainer = container;
+            document.documentElement.setAttribute(MENU_OPEN, '');
         }
 
         function closeDropdownInstant(container: Element) {
@@ -104,6 +113,7 @@ const { title, href } = Astro.props;
 
             if (activeContainer === container) {
                 activeContainer = null;
+                document.documentElement.removeAttribute(MENU_OPEN);
             }
         }
 

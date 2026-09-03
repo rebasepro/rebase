@@ -456,6 +456,20 @@ const flatNavLinks = [
         backdrop-filter: blur(8px);
     }
 
+    /* ── The bar while a menu is open ──
+       The mega-menu panel (NavigationDropdown.astro) is a 95% surface-950 plate
+       hung from the bar's bottom edge. At the top of a page the bar above it was
+       still transparent, so the open menu read as a black slab with a strip of
+       hero art running over its head — and the panel's own tint let the hero
+       type bleed through around it. While any panel is open the bar takes the
+       panel's exact surface and blur, so the two paint as one plate, and this
+       state wins over the lighter scrolled tint above by source order. */
+    html[data-menu-open] .site-header {
+        background-color: color-mix(in oklab, var(--color-surface-950) 95%, transparent);
+        -webkit-backdrop-filter: blur(24px);
+        backdrop-filter: blur(24px);
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .site-header { transition: none; }
     }
