@@ -4,9 +4,10 @@ import { getLangFromUrl, useTranslations } from "../i18n/ui";
 import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS } from "../data/collection-sample";
 
 // /product's rendering of the sample that CollectionPowerSection fans out on the
-// home page. Same file, same five artifacts — but sorted into the two layers,
-// because /product answers "what do I get, in each layer?" (SITE-STORY §5), not
-// the home page's "one file generates everything". The two components share the
+// home page. Same file, same five artifacts — but sorted into the two products
+// they belong to, because /product answers "what do I actually get?" (SITE-STORY
+// §5), not the home page's "one file generates everything". The copy never says
+// "layers": that is our map of the product, not a word a first-time visitor has. The two components share the
 // sample (src/data/collection-sample.ts) and nothing else: the home draws a star
 // around the file, this draws a fork below it. Until 2026-09-03 /product mounted
 // the home component with a different heading, and the two pages showed the same
@@ -61,10 +62,15 @@ const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TablePrope
                     <div class="pointer-events-none absolute inset-0"
                          style="background: radial-gradient(520px 240px at 50% 0%, rgba(0,112,244,0.14), transparent 70%);"></div>
 
-                    <div class="relative flex items-baseline gap-3 px-6 py-4 border-b border-white/8">
-                        <span class="eyebrow">01</span>
-                        <span class="text-lg text-white">{t("productpage.layers.l1")}</span>
-                        <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-primary-light">{t("productpage.layer1.state")}</span>
+                    {/* A product name alone tells a first-time visitor nothing; the line
+                        under it says what the plate holds in words they already have. */}
+                    <div class="relative px-6 py-4 border-b border-white/8">
+                        <div class="flex items-baseline gap-3">
+                            <span class="eyebrow">01</span>
+                            <span class="text-lg text-white">{t("productpage.layers.l1")}</span>
+                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-primary-light">{t("productpage.layer1.state")}</span>
+                        </div>
+                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l1.desc")}</p>
                     </div>
 
                     <div class="relative grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_13.5rem] border-b border-white/8">
@@ -98,10 +104,13 @@ const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TablePrope
 
                 {/* ── Layer 02 · Rebase CMS ────────────────────────────── */}
                 <div class="cl-layer relative overflow-hidden rounded-2xl border border-white/10 bg-surface-950/50">
-                    <div class="flex items-baseline gap-3 px-6 py-4 border-b border-white/8">
-                        <span class="eyebrow">02</span>
-                        <span class="text-lg text-white">{t("productpage.layers.l2")}</span>
-                        <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer2.state")}</span>
+                    <div class="px-6 py-4 border-b border-white/8">
+                        <div class="flex items-baseline gap-3">
+                            <span class="eyebrow">02</span>
+                            <span class="text-lg text-white">{t("productpage.layers.l2")}</span>
+                            <span class="ml-auto font-mono text-2xs uppercase tracking-wider text-surface-500">{t("productpage.layer2.state")}</span>
+                        </div>
+                        <p class="mt-1.5 text-sm text-surface-400">{t("productpage.layers.l2.desc")}</p>
                     </div>
 
                     {/* Collection view — the real VirtualTable's proportions */}

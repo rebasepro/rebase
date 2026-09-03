@@ -50,6 +50,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/react-syntax-highlighter": "^15.5.13",
     "typedoc": "^0.28.20"
   }
