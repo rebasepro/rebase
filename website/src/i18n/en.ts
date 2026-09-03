@@ -19,15 +19,16 @@ export const en = {
   "demo.dev": "✔ API, realtime and panel running.",
   "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
-  // The recognition beat — before the argument starts (SITE-STORY §5).
+  // The recognition beat — before the argument starts (SITE-STORY §5). It is
+  // claim 1's beat: five ways into one table, and the rule lives in one of them.
   // Code in the figure stays English; only this prose is translated.
-  "recognition.badge": "What you write today",
-  "recognition.title": "You have already written this table five times.",
+  "recognition.badge": "Where the rule lives today",
+  "recognition.title": "Where is your permission check?",
   "recognition.subtitle":
-    "A migration, a type, a validator, a route and a form. Five copies of one table, each drifting from the others at its own speed — and the permission check lives in whichever of them someone remembered. Below is the version that is one file.",
-  "recognition.five": "Five files",
-  "recognition.one": "One file",
-  "recognition.oneNote": "schema · API · SDK · form · policies — generated from this",
+    "Five ways into the same table, and the rule lives in one of them. The route checks. The cron job, the backfill script, the agent holding a service key and the hosted dashboard do not — because a rule in application code protects the door, not the room. Below: the rule moved into Postgres, where every path hits it.",
+  "recognition.five": "Five ways in",
+  "recognition.one": "One rule",
+  "recognition.oneNote": "one rule, in Postgres, on every path",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),

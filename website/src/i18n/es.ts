@@ -17,15 +17,16 @@ export const es = {
   "demo.dev": "✔ API, realtime y panel en marcha.",
   "demo.ports": "API en <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel en <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Equipos que lanzan con nuestras herramientas — Rebase, y FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
-  // The recognition beat — before the argument starts (SITE-STORY §5).
+  // The recognition beat — before the argument starts (SITE-STORY §5). It is
+  // claim 1's beat: five ways into one table, and the rule lives in one of them.
   // Code in the figure stays English; only this prose is translated.
-  "recognition.badge": "Lo que escribes hoy",
-  "recognition.title": "Esta tabla ya la has escrito cinco veces.",
+  "recognition.badge": "Dónde vive la regla hoy",
+  "recognition.title": "¿Dónde está tu comprobación de permisos?",
   "recognition.subtitle":
-    "Una migración, un tipo, un validador, una ruta y un formulario. Cinco copias de una misma tabla, cada una alejándose de las demás a su propio ritmo — y la comprobación de permisos vive en la que alguien recordó. Debajo, la versión que es un solo archivo.",
-  "recognition.five": "Cinco archivos",
-  "recognition.one": "Un archivo",
-  "recognition.oneNote": "esquema · API · SDK · formulario · políticas — generados desde aquí",
+    "Cinco formas de entrar en la misma tabla, y la regla vive en una de ellas. La ruta comprueba. El cron, el script de backfill, el agente con una clave de servicio y el panel alojado no — porque una regla en el código de la aplicación protege la puerta, no la habitación. Debajo: la regla movida a Postgres, donde todos los caminos la atraviesan.",
+  "recognition.five": "Cinco entradas",
+  "recognition.one": "Una regla",
+  "recognition.oneNote": "una regla, en Postgres, en cada camino",
   "engine.badge": "Con lo que habla tu app",
   "engine.title": "Todo el backend, ya en marcha.",
   "engine.subtitle":
