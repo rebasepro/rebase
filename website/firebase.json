@@ -10,6 +10,16 @@
     ],
     "redirects": [
       {
+        "source": "/roadmap",
+        "destination": "/about#roadmap",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/roadmap",
+        "destination": "/:lang/about#roadmap",
+        "type": 301
+      },
+      {
         "source": "/f/backend_extension",
         "destination": "/backend",
         "type": 301

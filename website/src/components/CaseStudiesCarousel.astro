@@ -247,6 +247,7 @@ const cases = [
                         <h3 class="mt-3 flex items-center gap-3 min-h-9">
                             {c.logo && (
                                 <img src={c.logo} alt={(c as any).logoIsMark ? "" : t(`showcase.${c.key}.title`)}
+                                     aria-hidden={(c as any).logoIsMark ? "true" : undefined}
                                      class={`${c.logoClass} w-auto`} loading="lazy"/>
                             )}
                             {(!c.logo || (c as any).logoIsMark) && (
