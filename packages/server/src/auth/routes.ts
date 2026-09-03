@@ -8,11 +8,19 @@ import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
-import { requireAuth } from "./middleware";
+import { createRequireAuth, requireAuth } from "./middleware";
 import { EmailService, EmailConfig, resolveEmailLinkBase } from "../email";
 import { getPasswordResetTemplate, getEmailVerificationTemplate, getWelcomeEmailTemplate, resolveEmailBranding } from "../email/templates";
 import { HonoEnv } from "../api/types";
-import { defaultAuthLimiter, strictAuthLimiter, verificationEmailLimiter } from "./rate-limiter";
+import {
+    RECIPIENT_ROUTE_FLOOR_MS,
+    captureRecipientEmail,
+    defaultAuthLimiter,
+    notBefore,
+    recipientEmailLimiter,
+    strictAuthLimiter,
+    verificationEmailLimiter
+} from "./rate-limiter";
 import { buildCaptchaMiddlewares, type CaptchaConfig } from "./captcha";
 import { z } from "zod";
 import { logger } from "../utils/logger";
@@ -194,6 +202,20 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     router.onError(errorHandler);
 
     const authRepo = config.authRepo;
+
+    /**
+     * `requireAuth`, plus the question of whether the session still exists.
+     *
+     * Plain `requireAuth` verifies the signature and the expiry and stops
+     * there, so an access token stays good for its full hour after the account
+     * behind it has signed out everywhere or reset its password — the
+     * revocation watermark those write is checked on the data plane and was not
+     * checked here. On the three self-service routes below that mattered
+     * disproportionately: `/link/<provider>` attaches an OAuth identity to the
+     * account, so a stolen token could be turned into a permanent way back in
+     * AFTER the victim had done the one thing that is supposed to end it.
+     */
+    const requireLiveSession = createRequireAuth({ revocationRepo: authRepo });
     const { emailService, emailConfig, allowRegistration = false } = config;
     const ops = resolveAuthHooks(config.authHooks);
 
@@ -341,10 +363,22 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         const roles = await authRepo.getUserRoles(uid);
         const roleIds = roles.map(r => r.id);
 
+        // Is this session a GUEST — anonymous sign-in rather than an account?
+        //
+        // It goes into the token because everything that needs it downstream
+        // has no database: the RLS identity carries it into
+        // `rebase.is_anonymous()`, and the WebSocket path has only the token.
+        // Read once here rather than per request.
+        //
+        // The lookup below already happens whenever a custom-claims hook is
+        // configured; this is the same read, hoisted so it happens either way.
+        const sessionUser = await authRepo.getUserById(uid);
+        const isAnonymous = sessionUser?.isAnonymous === true;
+
         // Allow customization of access token claims via hook
         let customClaims: Record<string, unknown> | undefined;
         if (ops.customizeAccessToken) {
-            const user = await authRepo.getUserById(uid);
+            const user = sessionUser;
             if (user) {
                 const defaultClaims: Record<string, unknown> = { uid,
 roles: roleIds,
@@ -353,7 +387,7 @@ aal };
             }
         }
 
-        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims);
+        const accessToken = await generateAccessToken(uid, roleIds, aal, customClaims, isAnonymous);
         const refreshToken = generateRefreshToken();
 
         // A sign-in opens a session; every token later rotated out of it
@@ -726,7 +760,7 @@ displayName: user.displayName });
              * email plays no part in the decision, so its verification status
              * is irrelevant.
              */
-            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireAuth, async (c) => {
+            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireLiveSession, async (c) => {
                 const userCtx = c.get("user") as { uid: string } | undefined;
                 if (!userCtx) {
                     throw ApiError.unauthorized("Not authenticated");
@@ -776,7 +810,19 @@ displayName: user.displayName });
      * POST /auth/forgot-password
      * Request password reset email
      */
-    router.post("/forgot-password", strictAuthLimiter, ...(captcha.forgotPassword ? [captcha.forgotPassword] : []), async (c) => {
+    router.post(
+        "/forgot-password",
+        strictAuthLimiter,
+        // Per-address as well as per-IP. `strictAuthLimiter` bounds a machine;
+        // an IP is the attacker's to rotate and the mailbox being filled is
+        // not, so without this a distributed run puts an unbounded number of
+        // reset messages into one person's inbox, from this deployment's
+        // domain. See `recipientEmailLimiter`.
+        captureRecipientEmail,
+        recipientEmailLimiter,
+        ...(captcha.forgotPassword ? [captcha.forgotPassword] : []),
+        async (c) => {
+        const startedAt = Date.now();
         const { email } = parseBody(forgotPasswordSchema, await c.req.json());
 
         // Check if email service is configured
@@ -809,25 +855,30 @@ displayName: user.displayName })
                 : getPasswordResetTemplate(resetUrl, { email: user.email,
 displayName: user.displayName }, appName, logoUrl);
 
-            // Send email
-            try {
-                await emailService!.send({
-                    to: user.email,
-                    subject: emailContent.subject,
-                    html: emailContent.html,
-                    text: emailContent.text
-                });
-            } catch (emailError: unknown) {
+            // Deliberately NOT awaited.
+            //
+            // An SMTP round trip is the largest and most variable thing this
+            // handler does, and it only happens on the branch where the address
+            // exists — so awaiting it made the response TIME the answer to the
+            // question the response TEXT refuses to answer. A failure was
+            // already withheld from the caller for the same reason; the only
+            // change is that the log line arrives after the response.
+            void emailService!.send({
+                to: user.email,
+                subject: emailContent.subject,
+                html: emailContent.html,
+                text: emailContent.text
+            }).catch((emailError: unknown) => {
                 logger.error("Failed to send password reset email", { error: emailError instanceof Error ? emailError.message : emailError });
-                // Don't reveal email sending failure to client
-            }
+            });
         }
 
-        // Always return success
-        return c.json({
+        // Held to a floor, so a known address and an unknown one take the same
+        // time to answer. See `RECIPIENT_ROUTE_FLOOR_MS`.
+        return notBefore(startedAt, RECIPIENT_ROUTE_FLOOR_MS, c.json({
             success: true,
             message: "If an account with that email exists, a password reset link has been sent."
-        });
+        }));
     });
 
     /**
@@ -881,7 +932,7 @@ message: "Password has been reset successfully" });
      * POST /auth/change-password
      * Change password for authenticated user
      */
-    router.post("/change-password", requireAuth, async (c) => {
+    router.post("/change-password", requireLiveSession, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -930,7 +981,7 @@ message: "Password has been changed successfully" });
      * here: the address is unverified by construction, so an attacker can hold a
      * session for a mailbox that is not theirs.
      */
-    router.post("/send-verification", strictAuthLimiter, requireAuth, verificationEmailLimiter, async (c) => {
+    router.post("/send-verification", strictAuthLimiter, requireLiveSession, verificationEmailLimiter, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
@@ -1135,7 +1186,13 @@ aal: sessionAal };
             customClaims = await ops.customizeAccessToken(defaultClaims, user);
         }
 
-        const newAccessToken = await generateAccessToken(storedToken.uid, roleIds, sessionAal, customClaims);
+        // The guest flag is carried across a rotation, from the user row
+        // rather than from the old token: a session that WAS anonymous and has
+        // since been upgraded to a real account should stop being a guest at
+        // its next refresh, not at its next sign-in.
+        const newAccessToken = await generateAccessToken(
+            storedToken.uid, roleIds, sessionAal, customClaims, user?.isAnonymous === true
+        );
         const newRefreshToken = generateRefreshToken();
 
         // Rotate: mark the presented token superseded and mint its successor

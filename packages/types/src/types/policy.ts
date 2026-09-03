@@ -27,6 +27,7 @@ export type PolicyExpression =
     | RolesOverlapPolicyExpression
     | RolesContainPolicyExpression
     | AuthenticatedPolicyExpression
+    | RegisteredPolicyExpression
     | ServerContextPolicyExpression
     | ExistsInPolicyExpression
     | RawPolicyExpression;
@@ -163,6 +164,34 @@ export interface RolesContainPolicyExpression {
  */
 export interface AuthenticatedPolicyExpression {
     kind: "authenticated";
+}
+
+/**
+ * True for a signed-in caller who has an ACCOUNT — not a guest.
+ *
+ * The distinction {@link AuthenticatedPolicyExpression} cannot make. Anonymous
+ * SIGN-IN (`POST /auth/anonymous`) mints a real user row with a real uid and a
+ * real session, so such a caller is "authenticated" by every test that looks at
+ * `rebase.uid()`: same shape, same default role, indistinguishable inside a
+ * policy. On a deployment with anonymous sign-in enabled, every rule meaning
+ * "a signed-in person" therefore also meant "anybody at all", since pressing
+ * Continue as guest needs no email, no password and no agreement to anything.
+ *
+ * Note the two senses of "anonymous", which is the reason this was easy to
+ * miss. {@link ANONYMOUS_USER_ID} is the sentinel for a request carrying NO
+ * session, and `authenticated()` already excludes it. A guest is the other
+ * thing: a session with nobody behind it. This node excludes both.
+ *
+ * Compiles to `authenticated() AND NOT rebase.is_anonymous()`.
+ *
+ * Use it wherever a rule is about a person who could be held responsible for
+ * something — writing a review, joining an organization, spending money. Use
+ * `authenticated()` where a guest is genuinely welcome, which is what
+ * anonymous sign-in is for: a cart before checkout, a draft before signup.
+ * @group Models
+ */
+export interface RegisteredPolicyExpression {
+    kind: "registered";
 }
 
 /**
@@ -310,6 +339,7 @@ roles: roles as string[] }),
     rolesContain: (roles: readonly string[]): RolesContainPolicyExpression => ({ kind: "rolesContain",
 roles: roles as string[] }),
     authenticated: (): AuthenticatedPolicyExpression => ({ kind: "authenticated" }),
+    registered: (): RegisteredPolicyExpression => ({ kind: "registered" }),
     serverContext: (): ServerContextPolicyExpression => ({ kind: "serverContext" }),
     existsIn: (args: { collection: string; where: PolicyExpression }): ExistsInPolicyExpression =>
         ({ kind: "existsIn",

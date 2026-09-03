@@ -46,6 +46,11 @@ const BASE = [
     "--set", "config.databaseUrl=postgres://rebase:rebase@db:5432/rebase",
     "--set", "config.jwtSecret=0123456789012345678901234567890123456789",
     "--set", "config.serviceKey=9876543210987654321098765432109876543210",
+    // The chart ships with self-registration off, so a release has to name the
+    // account its operator signs in with — otherwise it comes up with an empty
+    // user table and no way to produce the first authenticated caller.
+    "--set", "config.adminEmail=ops@example.com",
+    "--set", "config.adminPassword=an-adequately-long-password",
     "--set", "ingress.host=api.example.com",
     "--set", "image.repository=example/my-app"
 ];
@@ -500,6 +505,11 @@ const REFUSAL_CASES = [
     ["rate limit store nonsense", ["--set", "sharedState.rateLimitStore=redis"]],
     ["migration mode the image refuses", ["--set", "migrationJob.mode=push"]],
     ["migration mode nonsense", ["--set", "migrationJob.mode=sync"]],
+    // A release with sign-up closed and no seeded admin is a release nobody can
+    // sign in to, which is a values mistake worth catching at `helm install`
+    // rather than at the sign-in form.
+    ["no admin and no self-registration", ["--set", "config.adminEmail="]],
+    ["an admin password too short to be created", ["--set", "config.adminPassword=short"]],
     ["topology variable in config.env", ["--set", "config.env.REBASE_ROLE=worker"]],
     ["static app with no name", ["--set-json", 'staticApps=[{"path":"/x","image":{"repository":"e/x"}}]']],
     ["static app with no path", ["--set-json", 'staticApps=[{"name":"x","image":{"repository":"e/x"}}]']],

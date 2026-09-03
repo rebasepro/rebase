@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 
@@ -97,6 +97,19 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // still reports `'anon'`, which is exactly how excluding one
             // spelling turned this helper into a grant. See ANONYMOUS_USER_IDS.
             return `${RLS_UID_SQL} IS NOT NULL AND ${RLS_UID_SQL} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
+        case "registered":
+            // "Signed in" AND "not a guest". The first half is the same clause
+            // `authenticated` compiles to; the second is the fact anonymous
+            // sign-in used not to put anywhere the database could see, so a
+            // guest and an account were one principal inside every policy.
+            //
+            // `rebase.is_anonymous()` defaults to false when its GUC is unset,
+            // so a policy compiled here and enforced by an older server reads
+            // every session as an account — which is the behaviour that
+            // deployment already had, rather than a lockout.
+            return `${RLS_UID_SQL} IS NOT NULL`
+                + ` AND ${RLS_UID_SQL} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`
+                + ` AND NOT ${RLS_IS_ANONYMOUS_SQL}`;
         case "serverContext":
             // Only the built-in server flows leave `app.uid` unset.
             return `${RLS_UID_SQL} IS NULL`;

@@ -15,6 +15,21 @@ import * as fs from "fs";
 const COLLECTION_FACTORIES = new Set(["defineCollection"]);
 
 /**
+ * The only relation-target expression this editor will write through verbatim.
+ *
+ * A relation's `target` is emitted as SOURCE, not as a string literal, because
+ * it has to be `() => otherCollection`. The test for "is this already a thunk?"
+ * used to be "does it contain an arrow", which `() => { require("child_process")
+ * .execSync("…") }` also satisfies — and `rebase dev` re-imports the file the
+ * moment it changes, so the payload ran without anyone deploying anything.
+ *
+ * An arrow returning a single identifier is the whole grammar. Anything else is
+ * read as a collection name and turned into a thunk by `targetThunk`, which
+ * resolves it against the collections directory and refuses a name with no file.
+ */
+const ARROW_TO_IDENTIFIER = /^\(\s*\)\s*=>\s*[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
  * A value that must be emitted as source code rather than as JSON.
  *
  * Everything reaching the writer has been through `JSON.stringify` on the wire,
@@ -487,7 +502,14 @@ export class AstSchemaEditor {
                     prop.setInitializer(newInit);
                 } else {
                     collectionObj.addPropertyAssignment({
-                        name: key,
+                        // `quoteKey`, like every other site that emits a key.
+                        // This one did not, and ts-morph writes a property name
+                        // out verbatim — so a top-level key of
+                        // `injected: (() => { … })(), tail` closed the property
+                        // and opened an expression, which `rebase dev` then
+                        // re-imported and ran. The rest of this file has always
+                        // quoted; this was the one that did not.
+                        name: AstSchemaEditor.quoteKey(key),
                         initializer: newInit
                     });
                 }
@@ -553,9 +575,17 @@ export class AstSchemaEditor {
 
             let targetText: string | undefined;
             if (typeof rawTarget === "string" && rawTarget.trim().length > 0) {
-                targetText = rawTarget.includes("=>")
-                    ? rawTarget.trim()
-                    : this.targetThunk(file, rawTarget.trim());
+                const trimmed = rawTarget.trim();
+                // A target that already looks like a thunk is written into the
+                // file as source, so "contains an arrow" is not a good enough
+                // reason to trust it: `() => { require("child_process")… }` also
+                // contains one. Only the exact shape this emits is accepted —
+                // an arrow returning one identifier — and anything else is
+                // treated as a collection NAME and turned into a thunk here,
+                // which is the path that was always safe.
+                targetText = ARROW_TO_IDENTIFIER.test(trimmed)
+                    ? trimmed
+                    : this.targetThunk(file, trimmed);
             } else if (relationName && oldTargetsByName.has(relationName)) {
                 targetText = oldTargetsByName.get(relationName);
             } else if (value.length === oldElements.length) {

@@ -86,9 +86,10 @@ back.
 | \`Update\` | What \`update()\` accepts. Everything optional, and the primary key is not settable. |
 
 A property marked \`excludeFromApi\` is absent from all three: the API surface
-does not mention it, in either direction. The server still accepts one on a
-write — these types describe the surface, they do not enforce it — but nothing
-generated names a password hash.
+does not mention it, in either direction. The server holds the same line — a
+read never serves the column and a write naming it is refused — so this is a
+guarantee rather than a description, and nothing generated names a password
+hash.
 
 If you need an untyped escape hatch, \`rebase.data.collection(slug)\` still works —
 but it is generic over \`Record<string, unknown>\` and gives up everything above.

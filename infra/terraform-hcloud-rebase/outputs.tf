@@ -67,3 +67,14 @@ output "postgres_password" {
   value       = local.postgres_password
   sensitive   = true
 }
+
+output "admin_email" {
+  description = "Email of the seeded first admin account, or null when self-registration was left open."
+  value       = local.seed_admin ? var.admin_email : null
+}
+
+output "admin_password" {
+  description = "Password for the seeded first admin account. Read with `terraform output -raw admin_password`, sign in, and change it."
+  value       = local.seed_admin ? local.admin_password : null
+  sensitive   = true
+}

@@ -133,6 +133,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
+| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -144,6 +145,42 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.literal(value)` | a string, number, boolean or `null` |
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
+
+### `authenticated()` and `registered()`
+
+Two different things are called anonymous, and it is worth being precise about
+which one a rule means.
+
+An **unauthenticated** request carries no session at all. It is given a sentinel
+id so that `rebase.uid()` is never `NULL` on the user path, and
+`policy.authenticated()` excludes it — that is what makes it mean "signed in"
+rather than "anyone".
+
+A **guest** is the other thing: a session with nobody behind it.
+`POST /auth/anonymous` mints a real user row with a real uid, so a guest passes
+every test that looks at the id. That is the point of the feature — a cart
+before checkout, a draft before signup — and it means `authenticated()` is true
+for anybody who pressed *Continue as guest*, which asks for no email, no
+password and no agreement to anything.
+
+`policy.registered()` is `authenticated()` plus "not a guest". Reach for it
+wherever a rule is about a person who could be held responsible for something:
+writing a review, joining an organization, spending money. Reach for
+`authenticated()` where a guest is genuinely welcome.
+
+```ts
+// Anyone with a session, guests included — a draft cart.
+{ operation: "insert", check: policy.authenticated() }
+
+// Someone with an account.
+{ operation: "insert", check: policy.registered() }
+```
+
+Under the hood the guest flag travels with the session — it is in the access
+token and reaches the database as `rebase.is_anonymous()` — so a policy can ask
+the question without a lookup. A database served by a server too old to set it
+reads every session as an account, which is the behaviour that deployment
+already had.
 
 :::caution[`serverContext()` is not satisfied by the server singleton]
 It compiles to `rebase.uid() IS NULL`, and `rebase.dataAsAdmin` runs as

@@ -26,6 +26,25 @@ failed `helm install` and has one screen to work from.
   {{- end }}
 {{- end }}
 
+{{/* ── The first account ────────────────────────────────────────────────── */}}
+{{/*
+  With self-registration off and no seeded admin, the release comes up with an
+  empty user table and no way to produce the first authenticated caller — a
+  deployment nobody can sign in to. That is a values mistake, and it is worth
+  catching here rather than at the sign-in form, so the two settings are
+  checked against each other.
+
+  `existingSecret` is trusted to carry the credentials: the chart cannot read a
+  Secret it does not own, and refusing on that basis would block the correct
+  way to manage them.
+*/}}
+{{- if and (not .Values.config.allowSelfRegistration) (not .Values.config.adminEmail) (not .Values.existingSecret) }}
+  {{- fail "Set config.adminEmail and config.adminPassword — with self-registration off (the default) there is otherwise no way to sign in to this release. Or set config.allowSelfRegistration=true, understanding that the first person to reach the sign-up form becomes its administrator." }}
+{{- end }}
+{{- if and .Values.config.adminPassword (lt (len .Values.config.adminPassword) 12) }}
+  {{- fail "config.adminPassword must be at least 12 characters — the runtime refuses to create the account otherwise, and the release would come up with no way to sign in." }}
+{{- end }}
+
 {{/* ── Bundle ───────────────────────────────────────────────────────────── */}}
 {{- if not (has .Values.bundle.mode (list "image" "url")) }}
   {{- fail (printf "bundle.mode=%q is not a mode. Use \"image\" (bundle baked into your own image) or \"url\" (fetched at pod start)." .Values.bundle.mode) }}

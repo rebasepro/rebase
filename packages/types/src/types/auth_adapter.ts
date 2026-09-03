@@ -55,6 +55,18 @@ export interface AuthenticatedUser {
     roles: string[];
     /** Whether the user has admin privileges. */
     isAdmin: boolean;
+    /**
+     * Whether this session is a GUEST — anonymous sign-in rather than an
+     * account.
+     *
+     * Optional, and absent means "not a guest", so an external adapter that
+     * has no such concept keeps behaving exactly as it did. When present it
+     * reaches the database as `rebase.is_anonymous()`, which is what lets a
+     * policy say "a signed-in person, not somebody who pressed Continue as
+     * guest" — two things that were the same principal inside every rule,
+     * because anonymous sign-in mints a real user row with a real uid.
+     */
+    isAnonymous?: boolean;
     /** Raw bearer token from the request (for forwarding). */
     rawToken?: string;
     /** Extra claims/metadata from the auth provider. */

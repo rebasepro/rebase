@@ -35,6 +35,35 @@ on:
 
 jobs:
   # ══════════════════════════════════════════════════════════════
+  # Where a release may be cut from
+  # ══════════════════════════════════════════════════════════════
+  #
+  # `workflow_dispatch` takes a ref, and the picker offers every branch and tag
+  # in the repository. So any collaborator could publish to npm — under this
+  # package name, with provenance attesting to this repository — from a branch
+  # nobody had reviewed. Nothing about the trusted-publisher setup prevents
+  # that: OIDC attests to the WORKFLOW and the REPOSITORY, not to what the
+  # branch contains.
+  #
+  # A separate job rather than a first step inside each publish job, so the
+  # refusal is legible in the run graph: one red box named for what it checks,
+  # with the publish jobs skipped behind it, instead of a publish that started
+  # and died. It is also one place rather than two, so the two channels cannot
+  # drift into disagreeing about where a release comes from.
+  guard-ref:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse a release from anywhere but main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Releases are cut from main. This run targets ${{ github.ref }}."
+            echo "Re-run the workflow with 'main' selected as the branch."
+            exit 1
+          fi
+          echo "Releasing from ${{ github.ref }}."
+
+  # ══════════════════════════════════════════════════════════════
   # Canary — manual runs with channel=canary
   # ══════════════════════════════════════════════════════════════
 
@@ -49,6 +78,7 @@ jobs:
   # place to find problems — but by testing the release, not by shipping one
   # nobody checked.
   verify-canary:
+    needs: guard-ref
     if: ${{ inputs.channel == 'canary' }}
     uses: ./.github/workflows/verify.yml
 
@@ -56,6 +86,12 @@ jobs:
     if: ${{ inputs.channel == 'canary' }}
     needs: verify-canary
     runs-on: ubuntu-latest
+    # A GitHub environment, so publishing to npm is gated by whatever
+    # protection rules that environment carries — required reviewers, a wait
+    # timer, a branch restriction — rather than by who can press a button. The
+    # rules are set on the environment in repository settings; naming it here
+    # is what makes this job subject to them.
+    environment: npm-canary
     # 4 minutes median across 31 runs, 6.4 at the slowest. The ceiling exists
     # because GitHub's default is six hours, and a step that hangs rather than
     # fails holds the runner while the run reports "pending" — which looks
@@ -231,6 +267,7 @@ jobs:
   # This is the same workflow CI runs, called rather than copied — a second copy of
   # the step list on the path that runs least often is how a release gate rots.
   verify-stable:
+    needs: guard-ref
     if: ${{ inputs.channel == 'stable' }}
     uses: ./.github/workflows/verify.yml
 
@@ -238,6 +275,10 @@ jobs:
     if: ${{ inputs.channel == 'stable' }}
     needs: verify-stable
     runs-on: ubuntu-latest
+    # See publish-canary. A stable release also moves `latest` and pushes the
+    # fleet image the control plane registers as a canary within fifteen
+    # minutes, so this is the environment to put reviewers on first.
+    environment: npm-stable
     # Higher than publish-canary, and not because it is observed to be slower:
     # there is exactly one successful run to measure (11.7 minutes), and it does
     # strictly more — publishes to npm, commits and pushes a tag, then builds

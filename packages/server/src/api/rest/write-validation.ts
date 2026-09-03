@@ -45,6 +45,32 @@ export function assertKnownWriteFields(
 
     const known = new Set<string>(Object.keys(collection.properties));
 
+    // `excludeFromApi` means what the generated SDK already says it means:
+    // "absent from Row, Insert and Update — the API surface does not mention it,
+    // in either direction". The server only ever enforced the read half, so the
+    // column a collection had declared unservable was still writable by anyone
+    // whose policies let them write the row.
+    //
+    // On the user store that is the sharp one. `users_write_own` lets you update
+    // your own row, `password_hash` is a column on it, and setting it directly
+    // is a password change that does not need the old password — so a stolen
+    // access token, which expires within the hour, becomes a password the
+    // attacker chose. Everything else the flag protects is the same shape: a
+    // verification token, a rotation counter, a secret the server owns.
+    //
+    // Refused for every caller, not only unprivileged ones. The framework's own
+    // auth paths do not come through here — `prepareUserCreation` builds the
+    // row itself — so what is left is callers the flag was written to exclude.
+    const excludedFromApi = new Set<string>();
+    for (const [name, property] of Object.entries(collection.properties)) {
+        if ((property as { excludeFromApi?: boolean })?.excludeFromApi) {
+            known.delete(name);
+            excludedFromApi.add(name);
+            const columnName = (property as { columnName?: string })?.columnName;
+            if (columnName) excludedFromApi.add(columnName);
+        }
+    }
+
     // An owning relation stores its target in a local FK column that usually
     // has no property of its own; writing it directly is legitimate. Under its
     // *wire* name — `authorId` — which is the key the row is served under and
@@ -61,6 +87,20 @@ export function assertKnownWriteFields(
     if (unknown.length === 0) return;
 
     const where = options?.rowIndex !== undefined ? `Row ${options.rowIndex}: ` : "";
+
+    // Named separately from "no such field", because it is a different fact and
+    // the generic message would send the reader looking for a typo in a name
+    // that is spelled correctly.
+    const excluded = unknown.filter(key => excludedFromApi.has(key));
+    if (excluded.length > 0) {
+        throw ApiError.badRequest(
+            `${where}${excluded.map(f => `'${f}'`).join(", ")} ` +
+            `${excluded.length > 1 ? "are" : "is"} excluded from the API on '${collection.slug}' ` +
+            `and cannot be written through it. ${excluded.length > 1 ? "These columns are" : "This column is"} ` +
+            "the server's to set.",
+            "VALIDATION_EXCLUDED_FIELDS"
+        );
+    }
 
     // The `id` case is worth its own sentence, because the caller almost
     // certainly did not choose to send it — `create(data, id)` puts it there,

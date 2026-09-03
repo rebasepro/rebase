@@ -242,6 +242,35 @@ The suggested SQL is printed with the caller-id function your database actually 
 spellings are recognised when reading policies, so a Rebase database mid-migration from
 the pre-1.0 `auth` schema is still checked.
 
+### policy-authenticated-tautology
+
+**Policy admits every signed-in caller to every row.** High.
+
+The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
+'anonymous'` — and the place people stop. It does exclude signed-out callers. What it does
+not do is scope any rows: what remains is *every registered account may read every row of
+this table*, which is a different sentence from the one it is usually meant to be.
+
+That is the shape that turns a `users` table into a directory of every address on the
+platform, readable by anyone who signed up — and where registration is open, "anyone who
+signed up" is anyone at all. It is reported separately from the anonymous form because the
+fix is different and so is the severity, and because you may legitimately want to silence
+one and not the other.
+
+```sql
+-- Scope to the row
+ALTER POLICY "your_policy" ON "public"."your_table"
+    USING (user_id = rebase.uid());
+
+-- Or, where members of a shared group really may see each other's rows, say which group
+--     USING (EXISTS (SELECT 1 FROM memberships m
+--                    WHERE m.org_id = your_table.org_id AND m.user_id = rebase.uid()));
+```
+
+If the table genuinely is readable by every account — a shared price list, a list of
+countries — keep the policy and silence the finding with
+`rls-check --skip policy-authenticated-tautology`.
+
 ### view-bypasses-rls
 
 **View reads past its base table's RLS.** Critical.

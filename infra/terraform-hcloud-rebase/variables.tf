@@ -163,6 +163,41 @@ variable "acme_email" {
 # state file in an encrypted backend and not fine for one in a git repository.
 # Pass them in from a secret manager for anything you would be upset to leak.
 
+# ─── The first account ───────────────────────────────────────────────────────
+#
+# This module brings a public hostname, DNS and a Let's Encrypt certificate up
+# before its operator has opened a browser. A fresh Rebase database has no
+# users, and the registration policy admits the first registration and promotes
+# it to admin — so between `terraform apply` finishing and the operator signing
+# up, the deployment belongs to whoever gets there first.
+#
+# So the module ships with self-registration off and asks who the first account
+# is. The runtime creates it once, while the user table is still empty.
+
+variable "admin_email" {
+  description = "Email of the first admin account, created at first boot. Required unless allow_self_registration is true."
+  type        = string
+  default     = null
+}
+
+variable "admin_password" {
+  description = "Password for the first admin account, min 12 chars. Generated if unset and admin_email is set; read with `terraform output -raw admin_password`. Change it after the first sign-in."
+  type        = string
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition     = var.admin_password == null ? true : length(var.admin_password) >= 12
+    error_message = "admin_password must be at least 12 characters."
+  }
+}
+
+variable "allow_self_registration" {
+  description = "Leave the public sign-up form open instead of seeding an admin. The first person to reach it becomes this deployment's administrator, so this is off by default."
+  type        = bool
+  default     = false
+}
+
 variable "jwt_secret" {
   description = "JWT_SECRET, min 32 chars. Generated if unset. Changing it invalidates every issued token."
   type        = string

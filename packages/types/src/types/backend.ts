@@ -875,6 +875,28 @@ export interface BackendBootstrapper {
     ): Promise<{ applied: number }>;
 
     /**
+     * Re-check, after the schema exists, that requests will actually be
+     * constrained by the database's own authorization.
+     *
+     * A driver that isolates user requests by switching to a restricted role has
+     * to decide at connect time whether the switch is needed — and on a fresh
+     * database that question is asked before there is anything to answer with.
+     * The process then creates the schema, becomes its owner, and an owner is
+     * exempt from the policies on what it owns. So the answer that was true when
+     * the driver initialized can be false by the time it serves a request.
+     *
+     * This is where a driver asks again. It runs once, after collection tables,
+     * auth tables and policies are all in place, and it MUST fail rather than
+     * serve when the answer changed and cannot be acted on: booting anyway
+     * produces exactly the unenforced server this exists to prevent.
+     *
+     * Optional, because it is only meaningful for drivers whose isolation
+     * depends on state the schema affects. A driver with nothing to re-check
+     * omits it.
+     */
+    finalizeSecurityPosture?(driverResult: InitializedDriver): Promise<void>;
+
+    /**
      * Read the collections schema version this database was last provisioned
      * from, or `null` when nothing has ever stamped it.
      *

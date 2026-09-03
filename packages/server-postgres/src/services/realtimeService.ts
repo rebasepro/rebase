@@ -31,6 +31,14 @@ const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
 export interface SubscriptionAuthContext {
     uid: string;
     roles: string[];
+    /**
+     * Whether this session is a guest — anonymous sign-in rather than an
+     * account. Carried so a refetch's policies see the same principal the
+     * initial fetch did; without it a rule that excludes guests would filter on
+     * the REST read and not on the frames that follow, which is the shape that
+     * makes a realtime leak invisible from the surface people test.
+     */
+    isAnonymous?: boolean;
 }
 
 /** What a channel frame is asking to do. */
@@ -951,7 +959,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);
+                await applyAuthContext(
+                    tx,
+                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                    this.rlsUserRole
+                );
                 const txEntityService = new DataService(tx, this.registry);
                 let fetchedEntities;
                 if (collectionRequest.searchString) {
@@ -1147,7 +1159,11 @@ roles: activeAuth.roles },
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);
+                await applyAuthContext(
+                    tx,
+                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                    this.rlsUserRole
+                );
                 const txEntityService = new DataService(tx, this.registry);
                 let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 

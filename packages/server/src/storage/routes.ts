@@ -21,7 +21,7 @@ import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTo
 import { generateDownloadToken } from "../auth";
 import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
-import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, type ImageTransformOptions } from "./image-transform";
+import { parseTransformOptions, transformImage, isTransformableImage, TransformCache, InvalidTransformOptionsError, TransformOverloadedError, UntransformableImageError, type ImageTransformOptions } from "./image-transform";
 import { TusHandler } from "./tus-handler";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
 import { compileStorageTriggers, triggerUser, type StorageTrigger, type StorageTriggerDispatcher } from "./triggers";
@@ -112,6 +112,14 @@ async function transformOnce(
             if (err instanceof TransformOverloadedError) {
                 throw ApiError.serviceUnavailable(err.message, "TRANSFORM_OVERLOADED");
             }
+            // A file whose bytes are not a transformable image is a 415, not a
+            // 500. The declared content type said one thing and the decoder
+            // found another — which is the caller's file, not this server's
+            // problem, and the status has to say so or every SVG served as PNG
+            // reads as an outage.
+            if (err instanceof UntransformableImageError) {
+                throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", err.message);
+            }
             throw err;
         }
     })();
@@ -190,6 +198,15 @@ export interface StorageRoutesConfig {
     /** Allow unauthenticated read access to stored files (default: false).
      *  When false and requireAuth is true, reads also require authentication. */
     publicRead?: boolean;
+    /**
+     * The storage configuration's `maxFileSize`.
+     *
+     * Only the resumable route needs it: `POST /upload` is capped by the body
+     * limit the server mounts in front of it, and the controllers check on
+     * write. TUS has neither — a chunked upload is many small bodies, and the
+     * controller's check runs at finalize, after every byte is on disk.
+     */
+    maxFileSize?: number;
     /**
      * When provided, storage routes delegate auth to this adapter instead
      * of the built-in JWT module. This mirrors how data routes use
@@ -858,6 +875,26 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const resolved = resolveController(storageId);
         const { bucket, resolvedPath } = parseBucketAndPath(filePath);
 
+        // A download token cannot buy another download token.
+        //
+        // This route mints them, and `checkAuthorized` deliberately does not
+        // re-run the hook for the synthetic `download-token` principal — it
+        // cannot answer an ownership question, and re-asking would break every
+        // `<img>` a client has already rendered. Together those two facts made
+        // the 300-second token self-renewing: present one here, receive a fresh
+        // one, forever. For a key ending in `/` the grant is path-prefixed, so
+        // what renewed itself was read access to a whole folder.
+        //
+        // A download token is evidence of one past authorization for one path,
+        // not a session. Minting needs the credential that was authorized.
+        const principal = c.get("user") as { uid?: string } | undefined;
+        if (principal?.uid === "download-token") {
+            throw ApiError.forbidden(
+                "A download token cannot be used to mint another. Request metadata with the " +
+                    "session or key the object was authorized against."
+            );
+        }
+
         // The load-bearing check. This route mints the short-lived path-scoped
         // download token that `/file/*` then trusts, and it used to mint one
         // for any authenticated caller for any path — which is exactly why
@@ -1063,7 +1100,10 @@ message: "No file to delete" });
                     at: new Date().toISOString()
                 });
             }
-            : undefined
+            : undefined,
+        // What this deployment accepts, so the resumable path refuses a file
+        // that is too large at creation rather than after receiving it.
+        config.maxFileSize
     );
     tusHandler.startCleanup();
 

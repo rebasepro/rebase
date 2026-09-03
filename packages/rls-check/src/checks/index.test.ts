@@ -9,6 +9,7 @@ const EXPECTED_IDS = [
     "rls-disabled",
     "policy-always-true",
     "policy-anonymous-tautology",
+    "policy-authenticated-tautology",
     "view-bypasses-rls",
     "matview-bypasses-rls",
     "anonymous-write-allowed",

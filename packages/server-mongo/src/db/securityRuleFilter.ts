@@ -142,6 +142,8 @@ function referencesField(expr: PolicyExpression): boolean {
 interface PolicyUserContext {
     uid: string;
     roles: string[];
+    /** Whether the session is a guest — anonymous sign-in, not an account. */
+    isAnonymous?: boolean;
 }
 
 function userContext(user: User | undefined): PolicyUserContext {
@@ -151,7 +153,10 @@ function userContext(user: User | undefined): PolicyUserContext {
     // reads as `{ owner: null }` and matches every document that has no owner.
     return {
         uid: user?.uid || ANONYMOUS_USER_ID,
-        roles: user?.roles ?? []
+        roles: user?.roles ?? [],
+        // A guest — anonymous sign-in — has a real uid, so the sentinel above
+        // says nothing about them. See `policy.registered()`.
+        isAnonymous: user?.isAnonymous === true
     };
 }
 
@@ -264,6 +269,11 @@ export function policyToMongoFilter(expr: PolicyExpression, user: User | undefin
             return expr.roles.every(r => r === "public" || ctx.roles.includes(r)) ? MATCH_ALL : MATCH_NONE;
         case "authenticated":
             return !isAnonymousUid(ctx.uid) ? MATCH_ALL : MATCH_NONE;
+        case "registered":
+            // "Signed in" AND "not a guest". Anonymous sign-in mints a real
+            // user with a real id, so `isAnonymousUid` alone — which is about
+            // the no-session sentinel — says nothing about it.
+            return !isAnonymousUid(ctx.uid) && ctx.isAnonymous !== true ? MATCH_ALL : MATCH_NONE;
         case "serverContext":
             // A scoped driver is always acting for a user, never the server
             // context — the same answer `evaluatePolicy` gives.

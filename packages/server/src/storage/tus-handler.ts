@@ -123,7 +123,18 @@ export class TusHandler {
             size: number;
             contentType?: string;
             user?: { uid: string; email?: string; roles?: string[] } | null;
-        }) => Promise<void>
+        }) => Promise<void>,
+        /**
+         * The storage configuration's own `maxFileSize`.
+         *
+         * `POST /upload` enforces it; this path did not, so the resumable route
+         * was a way around a limit the deployment had set — 5 GB regardless of
+         * what the controller was configured to accept, and the controller's
+         * own check only ran at finalize, after every byte had been received
+         * and written to disk. Told up front, the refusal costs one request
+         * instead of an hour of the customer's bandwidth.
+         */
+        private maxFileSize?: number
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -215,8 +226,10 @@ export class TusHandler {
         if (Number.isNaN(uploadLength) || uploadLength <= 0) {
             throw ApiError.badRequest("Invalid Upload-Length");
         }
-        if (uploadLength > MAX_UPLOAD_SIZE) {
-            throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Upload-Length exceeds maximum of ${MAX_UPLOAD_SIZE} bytes`);
+        // The smaller of the protocol ceiling and what this deployment accepts.
+        const limit = Math.min(MAX_UPLOAD_SIZE, this.maxFileSize ?? MAX_UPLOAD_SIZE);
+        if (uploadLength > limit) {
+            throw new ApiError(413, "PAYLOAD_TOO_LARGE", `Upload-Length exceeds maximum of ${limit} bytes`);
         }
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
@@ -315,12 +328,45 @@ export class TusHandler {
         });
     }
 
-    /** `HEAD /tus/:id` — Query upload progress. */
-    head(c: Context, id: string): Response {
+    /**
+     * The upload with this id, if it belongs to the caller.
+     *
+     * An upload id is the only thing HEAD, PATCH and DELETE ever checked, which
+     * made it a bearer token — and it is one that travels in a `Location`
+     * header, gets logged by proxies, and is held by the client for as long as
+     * the upload takes to resume. Anyone who came by one could read the
+     * progress of someone else's upload, finish it with their own bytes under
+     * the key the owner was authorized for, or cancel it.
+     *
+     * A mismatch is 404, not 403: whether an id exists is not something a
+     * caller who does not own it should be able to learn.
+     *
+     * An upload created by an anonymous caller has no owner, and is reachable
+     * by anonymous callers — that is the same open door `requireAuth: false`
+     * already opens on every other storage route, and narrowing it here would
+     * break the resumable path on public sites while changing nothing about
+     * the rest.
+     */
+    private ownedUpload(c: Context, id: string): TusUpload {
         const upload = this.uploads.get(id);
         if (!upload) {
             throw ApiError.notFound("Upload not found");
         }
+
+        const caller = c.get("user") as { uid?: string; roles?: string[] } | undefined;
+        const owner = upload.user?.uid;
+        if (owner === undefined || owner === null) return upload;
+        if (caller?.uid === owner) return upload;
+        // The platform's own identity and administrators keep operational
+        // access — cancelling a stuck upload is a real support action.
+        if (caller?.uid === "service" || (caller?.roles ?? []).includes("admin")) return upload;
+
+        throw ApiError.notFound("Upload not found");
+    }
+
+    /** `HEAD /tus/:id` — Query upload progress. */
+    head(c: Context, id: string): Response {
+        const upload = this.ownedUpload(c, id);
 
         return new Response(null, {
             status: 200,
@@ -335,10 +381,7 @@ export class TusHandler {
 
     /** `PATCH /tus/:id` — Append data to an upload. */
     async patch(c: Context, id: string): Promise<Response> {
-        const upload = this.uploads.get(id);
-        if (!upload) {
-            throw ApiError.notFound("Upload not found");
-        }
+        const upload = this.ownedUpload(c, id);
         if (upload.completed) {
             throw ApiError.badRequest("Upload already completed");
         }
@@ -392,10 +435,7 @@ export class TusHandler {
 
     /** `DELETE /tus/:id` — Cancel and remove an upload. */
     async delete(c: Context, id: string): Promise<Response> {
-        const upload = this.uploads.get(id);
-        if (!upload) {
-            throw ApiError.notFound("Upload not found");
-        }
+        const upload = this.ownedUpload(c, id);
 
         try { await unlink(upload.filePath); } catch { /* ok */ }
         this.uploads.delete(id);
@@ -463,8 +503,21 @@ export class TusHandler {
         }
 
         try {
-            const { readFile } = await import("fs/promises");
-            const data = await readFile(upload.filePath);
+            // `openAsBlob` hands back a Blob backed by the file on disk rather
+            // than a copy of it in the heap. `readFile` was the whole upload in
+            // memory at once — up to the protocol's 5 GB ceiling, on a process
+            // whose container limit is a fraction of that, and the peak arrives
+            // at finalize where nothing is watching. Available since Node 19.8;
+            // the fallback keeps an older runtime working rather than failing
+            // the upload it just received.
+            let blob: Blob;
+            const fsPromises = await import("fs/promises");
+            const openAsBlob = (fsPromises as { openAsBlob?: (p: string) => Promise<Blob> }).openAsBlob;
+            if (typeof openAsBlob === "function") {
+                blob = await openAsBlob(upload.filePath);
+            } else {
+                blob = new Blob([new Uint8Array(await fsPromises.readFile(upload.filePath))]);
+            }
             // `upload.key` and nothing else. The fallback chain that used to
             // live here (`|| metadata.filename || id`) is what let the write
             // land somewhere the hook was never asked about; the destination is
@@ -472,11 +525,7 @@ export class TusHandler {
             const fileName = upload.key;
             const mimeType = upload.metadata.contentType || upload.metadata.filetype || "application/octet-stream";
 
-            // `new Uint8Array(buffer)` rather than the Buffer directly: a Node
-            // `Buffer` is typed `Buffer<ArrayBufferLike>`, and `ArrayBufferLike`
-            // admits `SharedArrayBuffer`, which is not a `BlobPart`. This copies
-            // into a plain ArrayBuffer, which is.
-            const file = new File([new Uint8Array(data)], fileName, { type: mimeType });
+            const file = new File([blob], fileName, { type: mimeType });
 
             await targetController.putObject({
                 file,
@@ -501,7 +550,7 @@ export class TusHandler {
                 key: fileName,
                 bucket: upload.bucket,
                 storageId,
-                size: data.byteLength,
+                size: upload.size,
                 contentType: mimeType,
                 user: upload.user
             });

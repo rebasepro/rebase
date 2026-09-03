@@ -173,8 +173,19 @@ export interface AuthHooks {
     /**
      * Customize JWT access token claims before signing.
      *
-     * Return the modified claims object. The returned claims are merged
-     * into the JWT payload alongside standard claims (uid, roles).
+     * Return the modified claims object. The returned claims are merged into
+     * the JWT payload BESIDE the identity claims, never over them: `uid`,
+     * `roles` and `aal` are written last and a value returned for any of them
+     * is discarded.
+     *
+     * That is not a limitation of the hook, it is what keeps it safe to have.
+     * `uid` is who the whole request is — down to the identity the database
+     * evaluates its policies against — `roles` is what the admin gate reads,
+     * and `aal` is whether a second factor was actually passed. The obvious
+     * implementation of this hook spreads the claims it was handed and adds a
+     * field, and one that merges a user-controlled profile object returns
+     * whatever that object happened to contain. Add facts about a session
+     * here; the session's subject is decided by the server.
      *
      * @param claims - The default claims that would be included.
      * @param user - The authenticated user data.

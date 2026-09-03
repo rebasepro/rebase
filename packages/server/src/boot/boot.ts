@@ -415,11 +415,35 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 error: source.result?.error }));
         const healthy = result.healthy && unhealthy.length === 0;
 
+        // `/health` is unauthenticated — it has to be, an orchestrator probe
+        // carries no credential — and the driver's own error text is not
+        // written for strangers: a failed connection quotes the host, the port,
+        // the database name and the role. That is the shape of a deployment,
+        // handed to whoever asks, at the moment it is least able to defend
+        // itself.
+        //
+        // So the verdict is public and the reason is not. An operator reading
+        // the logs sees everything; the probe sees "ok" or "degraded", plus
+        // which data source is degraded, which is what a probe acts on.
+        const verbose = process.env.NODE_ENV !== "production";
+        if (!healthy) {
+            logger.error("Health check degraded", {
+                details: result.details,
+                dataSources: unhealthy
+            });
+        }
+
         return c.json({
             status: healthy ? "ok" : "degraded",
             latencyMs: result.latencyMs,
-            ...(result.details ? { details: result.details } : {}),
-            ...(unhealthy.length > 0 ? { dataSources: unhealthy } : {})
+            ...(verbose && result.details ? { details: result.details } : {}),
+            ...(unhealthy.length > 0
+                ? {
+                    dataSources: verbose
+                        ? unhealthy
+                        : unhealthy.map(source => ({ key: source.key }))
+                }
+                : {})
         }, healthy ? 200 : 503);
     });
 

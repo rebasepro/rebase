@@ -61,6 +61,10 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
                 bootstrapper.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
 
+        finalizeSecurityPosture: bootstrapper.finalizeSecurityPosture
+            ? (driverResult) => bootstrapper.finalizeSecurityPosture!(driverResult)
+            : undefined,
+
         // Same forwarding rule, third instance. Dropping these is not a type
         // error and not a runtime error: the stamp is simply never written and
         // never read, so a split deployment loses the only thing that would tell

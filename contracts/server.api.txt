@@ -305,7 +305,7 @@ interface StorageController { deleteObject, getObject, getSignedUrl, getType, li
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
-interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, publicRead, registry, renditionCache, requireAuth, sources, triggers }
+interface StorageRoutesConfig { authAdapter, authorize, authorizeData, basePath, controller, maxFileSize, publicRead, registry, renditionCache, requireAuth, sources, triggers }
 interface TokenRepository { createMagicLinkToken, createPasswordResetToken, createRefreshToken, deleteAllPasswordResetTokensForUser, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteRefreshToken, deleteRefreshTokenById, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getTokensValidAfter, listRefreshTokensForUser, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setTokensValidAfter }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface UserData { createdAt, displayName, email, emailVerificationSentAt, emailVerificationToken, emailVerified, id, isAnonymous, metadata, passwordHash, photoUrl, updatedAt }
@@ -490,7 +490,7 @@ interface AuthUserListOptions { limit, offset, orderBy, orderDir, roleId, search
 interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
 interface AuthenticatedUser { claims, displayName, email, isAdmin, photoUrl, rawToken, roles, uid }
-interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type }
+interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendLifecycle { destroy, healthCheck, initialize }
@@ -534,7 +534,7 @@ interface DataRepository { checkUniqueField, count, delete, fetchCollection, fet
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
 interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
-interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type }
+interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type }
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, introspectCollections, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }

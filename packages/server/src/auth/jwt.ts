@@ -51,6 +51,21 @@ export interface AccessTokenPayload {
     /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
     aal?: "aal1" | "aal2";
     /**
+     * Whether this session is a GUEST: anonymous sign-in rather than an account.
+     *
+     * An identity claim, written by the server and never taken from a custom
+     * claims hook — see {@link generateAccessToken}. It is here rather than
+     * looked up per request because everything downstream needs it and nothing
+     * downstream has a database: the RLS identity carries it into
+     * `rebase.is_anonymous()`, and the WebSocket path has only the token.
+     *
+     * Absent means "not a guest". A token minted before this claim existed is
+     * therefore read as an ordinary account, which is the behaviour that
+     * deployment already had — the alternative would reclassify every session
+     * in flight at the moment of a deploy.
+     */
+    isAnonymous?: boolean;
+    /**
      * When the token was issued, in seconds since the epoch — the standard JWT
      * `iat` claim, which the signer behind `jwt-crypto.ts` sets on every token
      * it mints — see the note there before replacing that implementation.
@@ -202,23 +217,42 @@ export async function generateAccessToken(
     uid: string,
     roles: string[],
     aal: "aal1" | "aal2" = "aal1",
-    customClaims?: Record<string, unknown>
+    customClaims?: Record<string, unknown>,
+    /**
+     * Whether this session is a guest — anonymous sign-in rather than an
+     * account. Written into the token so the RLS identity and the WebSocket
+     * path can tell the two apart without a database lookup.
+     */
+    isAnonymous = false
 ): Promise<string> {
     if (!jwtConfig.secret) {
         throw new Error("JWT secret not configured. Call configureJwt() first.");
     }
 
-    // `aal` is written AFTER the custom claims, not before. The hook is handed a
-    // `defaultClaims` object that already contains `aal`, and the obvious hook
-    // — spread the input, add a field — echoes it straight back; one that
-    // merged a user-controlled profile object could echo back `aal: "aal2"`.
-    // Spreading last made the assurance level of a session something its own
-    // holder could assert, which is the one claim that must be decided here.
+    // The identity claims are written AFTER the custom ones, not before.
+    //
+    // `aal` already was, for a reason that applies just as much to the other
+    // two: the hook is handed a `defaultClaims` object that already contains
+    // them, and the obvious hook — spread the input, add a field — echoes them
+    // straight back, while one that merges a user-controlled profile object
+    // echoes back whatever that object happened to hold. Spread last, a claim
+    // becomes something its own holder can assert.
+    //
+    // For `aal` that meant a session could claim it had passed a second factor.
+    // For `uid` and `roles` it is worse and was not covered: `uid` is who the
+    // whole request is, down to the RLS identity the database evaluates
+    // policies against, and `roles` is what the admin gate reads. A custom
+    // claims hook is a place to add facts about a session, not the place its
+    // subject is decided.
     const payload: Record<string, unknown> = {
+        ...customClaims,
         uid,
         roles,
-        ...customClaims,
-        aal
+        aal,
+        // An identity claim, so it goes with the others — after the custom
+        // ones, where a hook cannot overwrite it. Omitted when false to keep
+        // the token as small as it was.
+        ...(isAnonymous ? { isAnonymous: true } : {})
     };
 
     // The `kid` is what lets a verifier pick the right public key out of the
@@ -308,7 +342,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
         const decoded = (namedKey
             ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
             : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; purpose?: string; iat?: number };
+        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
@@ -325,6 +359,13 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             uid: id,
             roles: decoded.roles || [],
             aal,
+            // Present only when true, mirroring the mint. Absent means "not a
+            // guest" on both sides, which is what a token issued before this
+            // claim existed carries — and reading that as an ordinary account
+            // is the behaviour that deployment already had. Keeping the key off
+            // the object also means the verified payload has exactly the shape
+            // it had, for everything that compares whole payloads.
+            ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
             iat: decoded.iat
         };
     } catch (error) {

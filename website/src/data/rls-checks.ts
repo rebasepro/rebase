@@ -1,5 +1,5 @@
 /**
- * The fourteen checks `@rebasepro/rls-check` runs.
+ * The fifteen checks `@rebasepro/rls-check` runs.
  *
  * ── Copied from the source, not written for the page ─────────────────────────
  * Every `id`, `title` and `description` below is lifted verbatim from
@@ -49,6 +49,14 @@ export const RLS_CHECKS: RlsCheck[] = [
             "A policy whose expression is `auth.uid() IS NOT NULL`-shaped: it separates signed-in from "
             + "signed-out callers but scopes no rows.",
         severity: "critical"
+    },
+    {
+        id: "policy-authenticated-tautology",
+        title: "Policy admits every signed-in caller to every row",
+        description:
+            "A policy whose expression is only \"the caller is signed in and not anonymous\": it excludes "
+            + "signed-out callers correctly and scopes no rows between accounts.",
+        severity: "high"
     },
     {
         id: "view-bypasses-rls",

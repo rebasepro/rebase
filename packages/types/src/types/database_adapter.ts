@@ -140,6 +140,17 @@ export interface DatabaseAdapter {
     ): Promise<{ applied: number }>;
 
     /**
+     * Re-check, once the schema exists, that requests will really be constrained
+     * by the database's own authorization. See
+     * `BackendBootstrapper.finalizeSecurityPosture`.
+     *
+     * Same forwarding requirement as the two hooks above, and the most costly
+     * one to drop: a wrapper that omits it turns a fresh deployment's first boot
+     * into a server that applies no row-level policy at all, and says nothing.
+     */
+    finalizeSecurityPosture?(driverResult: InitializedDriver): Promise<void>;
+
+    /**
      * Read the collections schema version this database was last provisioned
      * from, or `null` when nothing has ever stamped it.
      *

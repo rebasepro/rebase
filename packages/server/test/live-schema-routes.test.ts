@@ -273,6 +273,48 @@ describe("input validation", () => {
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
     });
+
+    /**
+     * Only `collectionId` was checked here, and it is the one name that becomes
+     * a FILENAME. The names that become Postgres IDENTIFIERS — `table`,
+     * `schema`, a property's `columnName` — went through unexamined into DDL
+     * that is quoted and concatenated, on the owner connection: the one
+     * connection in the system that no RLS policy applies to.
+     */
+    it.each([
+        ["a table that closes the statement", {
+            collectionId: "posts",
+            collection: { table: 'x" (id int); DROP TABLE users; --', properties: {} }
+        }],
+        ["a schema that closes the statement", {
+            collectionId: "posts",
+            collection: { schema: 'public"; DROP TABLE users; --', properties: {} }
+        }],
+        ["a column name that closes the statement", {
+            collectionId: "posts",
+            collection: { properties: { title: { type: "string", columnName: 'a" ); DROP TABLE users; --' } } }
+        }],
+        ["a table name that is not a string at all", {
+            collectionId: "posts",
+            collection: { table: { toString: "nope" }, properties: {} }
+        }]
+    ])("rejects %s", async (_label, body) => {
+        const { post, events } = harness();
+        const res = await post("/apply", body);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+        // And nothing happened on the way to the refusal: no plan, no write.
+        expect(events).toEqual([]);
+    });
+
+    it("still accepts an ordinary table, schema and column name", async () => {
+        const { post } = harness();
+        const res = await post("/plan", {
+            collectionId: "posts",
+            collection: { table: "posts", schema: "public", properties: { title: { type: "string", columnName: "title" } } }
+        });
+        expect(res.status).toBe(200);
+    });
 });
 
 /**

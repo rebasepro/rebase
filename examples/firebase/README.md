@@ -11,9 +11,15 @@ This example is used for development purposes.
 IMPORTANT: If you want to get started using Rebase it is advisable to check the
 [docs](https://rebase.pro/docs)
 
-The Firebase project it points at is declared inline as `firebaseConfig` in
-`src/App.tsx`. Replace those values with your own project's web config to run it
-against your own Firebase.
+The Firebase project it points at comes from the environment. Copy
+`.env.example` to `.env` and fill in your own project's web config — Project
+settings → Your apps in the Firebase console.
+
+None of those values are secrets: a Firebase web config identifies a project,
+and its security rules are what protect the data. They are not committed
+because a live project's config inside a public example is an invitation to
+spend its quota and probe its rules, which is exactly what this file used to
+do — it carried a working config for an unrelated product.
 
 If you enable App Check, copy `src/appcheck_config.ts.template` to
 `src/appcheck_config.ts` and fill in your reCAPTCHA site key.

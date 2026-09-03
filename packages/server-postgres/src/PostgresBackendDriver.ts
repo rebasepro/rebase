@@ -1752,7 +1752,16 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             //
             // Fails closed: if the switch cannot be performed, the transaction
             // aborts rather than falling back to an RLS-bypassing connection.
-            await applyAuthContext(tx, { uid, roles: userRoles }, this.delegate.rlsUserRole);
+            // `isAnonymous` rides along so a policy can tell a GUEST from an
+            // account. Anonymous sign-in mints a real user row and a real uid,
+            // so without it the two are the same principal inside the database
+            // and every rule meaning "signed in" also means "anybody who called
+            // POST /auth/anonymous". See `rebase.is_anonymous()`.
+            await applyAuthContext(
+                tx,
+                { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
+                this.delegate.rlsUserRole
+            );
 
             const txEntityService = new DataService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);

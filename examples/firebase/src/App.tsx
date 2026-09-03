@@ -9,17 +9,11 @@ import { demoCollection } from "./collections/demo";
 import { productsCollection } from "./collections/products";
 import { blogCollection } from "./collections/blog";
 import { usersCollection } from "./collections/users";
+import { firebaseConfig } from "./firebase_config";
 
-export const firebaseConfig = {
-    apiKey: "AIzaSyBzt-JvcXvpDrdNU7jYX3fC3v0EAHjTKEw",
-    authDomain: "demo.firecms.co",
-    databaseURL: "https://firecms-demo-27150.firebaseio.com",
-    projectId: "firecms-demo-27150",
-    storageBucket: "firecms-demo-27150.appspot.com",
-    messagingSenderId: "837544933711",
-    appId: "1:837544933711:web:75822ffc0840e3ae01ad3a",
-    measurementId: "G-8HRE8MVXZJ"
-};
+// From the environment, not from this file. See ./firebase_config for why a
+// live project's configuration does not belong in a public example.
+export { firebaseConfig } from "./firebase_config";
 
 function App() {
 

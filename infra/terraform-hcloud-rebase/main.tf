@@ -36,6 +36,11 @@ locals {
   service_key       = coalesce(var.service_key, random_password.service_key.result)
   postgres_password = coalesce(var.postgres_password, random_password.postgres.result)
 
+  # The first account. Generated when an email is given without a password, so
+  # the common case is one variable and a `terraform output`.
+  seed_admin     = var.admin_email != null
+  admin_password = coalesce(var.admin_password, random_password.admin.result)
+
   data_root = "/mnt/rebase-data"
 
   # Derived from the volume id rather than read from `linux_device`:
@@ -86,7 +91,18 @@ locals {
       # caller to X-Forwarded-For. Without this every request looks like it came
       # from the Caddy container and all callers share one rate-limit bucket.
       TRUSTED_PROXY_HOPS = "1"
+
+      # Off unless explicitly asked for. This module has DNS and a certificate
+      # up before its operator has opened a browser, and the registration
+      # policy makes the first registration an admin — so an open sign-up form
+      # here is a deployment waiting to be claimed by a stranger. The account
+      # below is created once, while the user table is empty.
+      DISABLE_SELF_REGISTRATION = var.allow_self_registration ? "false" : "true"
     },
+    local.seed_admin ? {
+      REBASE_ADMIN_EMAIL    = var.admin_email
+      REBASE_ADMIN_PASSWORD = local.admin_password
+    } : {},
     local.storage_env,
     local.bundle_env,
     var.extra_env,
@@ -301,6 +317,11 @@ resource "random_password" "service_key" {
 
 resource "random_password" "postgres" {
   length  = 32
+  special = false
+}
+
+resource "random_password" "admin" {
+  length  = 24
   special = false
 }
 

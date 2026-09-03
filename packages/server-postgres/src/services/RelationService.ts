@@ -17,6 +17,7 @@ import {
     type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
+import { stripExcluded } from "./row-pipeline";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
@@ -124,6 +125,15 @@ export class RelationService {
         const values = options?.resolveNested
             ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
             : await parseDataFromServer(targetRow, targetCollection);
+
+        // The target's OWN exclusions, applied to the target's own columns.
+        // This is the second rendering of a relation target (row-pipeline's
+        // `renderTarget` is the first) and it reached the same clients by a
+        // different route: WebSocket fetches and every realtime frame come
+        // through here. REST was clean and `.listen()` was not, which is the
+        // worst version of this to have — the leak is invisible from the surface
+        // people test.
+        stripExcluded(values as Record<string, unknown>, targetCollection);
 
         return {
             // The whole key: a composite target addressed by its first column

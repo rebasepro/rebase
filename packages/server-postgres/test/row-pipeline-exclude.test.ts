@@ -89,6 +89,95 @@ describe("excludeFromApi", () => {
         expect(served).not.toHaveProperty("email_verification_token");
     });
 
+    /**
+     * A relation target is rendered twice, in two shapes, and only one of them
+     * used to be filtered.
+     *
+     * REST inlines the target's columns; the admin's view-model and every
+     * realtime/WebSocket frame carry a *ref* with the target's values attached.
+     * The inline branch stripped, the ref branch copied the row through
+     * untouched — so a collection with any relation to `users` (the scaffold's
+     * `posts.author` is one) served colleagues' password hashes on every
+     * `.listen()` frame while REST looked clean.
+     */
+    describe("relation targets", () => {
+        const postsCollection = {
+            name: "Posts",
+            slug: "posts",
+            properties: {
+                id: { name: "Id", type: "number", isId: "increment" },
+                title: { name: "Title", type: "string" },
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => usersCollection, relationName: "author" }
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        /*
+         * Keyed by PROPERTY name, which is how a row comes back from the
+         * relational query — drizzle maps the column to its field name on the
+         * way out. A fixture keyed by column name proves nothing here: the
+         * normalizer drops keys it cannot find a property for, so the secret
+         * would appear to be stripped by a pipeline that in fact never looked.
+         */
+        const author = {
+            id: 7,
+            email: "author@example.com",
+            passwordHash: "salt:hash",
+            emailVerificationToken: "tok_123"
+        };
+
+        it("strips the target's excluded columns from an inlined relation (REST)", () => {
+            const served = toRestRow({ id: 1, title: "hi", author }, postsCollection, registry);
+
+            const inlined = served.author as Record<string, unknown>;
+            expect(inlined.email).toBe("author@example.com");
+            expect(inlined).not.toHaveProperty("passwordHash");
+            expect(inlined).not.toHaveProperty("password_hash");
+            expect(inlined).not.toHaveProperty("emailVerificationToken");
+            expect(inlined).not.toHaveProperty("email_verification_token");
+        });
+
+        it("strips them from a relation REFERENCE too (admin, WebSocket, realtime)", () => {
+            const served = toFlatRow({ id: 1, title: "hi", author }, postsCollection, registry);
+
+            const ref = served.author as { data?: { values?: Record<string, unknown> } };
+            expect(ref.data?.values?.email).toBe("author@example.com");
+            // Both spellings: `normalizeDbValues` renames the column to its
+            // property key on the way through, so asserting only on the
+            // snake_case name would pass on a ref that still carries the secret.
+            expect(ref.data?.values).not.toHaveProperty("passwordHash");
+            expect(ref.data?.values).not.toHaveProperty("password_hash");
+            expect(ref.data?.values).not.toHaveProperty("emailVerificationToken");
+            expect(ref.data?.values).not.toHaveProperty("email_verification_token");
+        });
+
+        it("strips them from every element of a to-many relation", () => {
+            const authorsCollection = {
+                name: "Articles",
+                slug: "articles",
+                properties: {
+                    id: { name: "Id", type: "number", isId: "increment" },
+                    editors: {
+                        name: "Editors",
+                        type: "relation",
+                        relation: { kind: "hasMany", target: () => usersCollection, relationName: "editors" }
+                    }
+                }
+            } as unknown as CollectionConfig;
+
+            const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, authorsCollection, registry);
+
+            for (const ref of served.editors as Array<{ data?: { values?: Record<string, unknown> } }>) {
+                expect(ref.data?.values?.email).toBe("author@example.com");
+                expect(ref.data?.values).not.toHaveProperty("passwordHash");
+                expect(ref.data?.values).not.toHaveProperty("emailVerificationToken");
+            }
+        });
+    });
+
     it("leaves collections without the flag untouched", () => {
         const posts = {
             name: "Posts",

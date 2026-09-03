@@ -73,6 +73,20 @@ REBASE_SERVICE_KEY=$(secret)
 # this in front of anyone.
 CORS_ORIGINS=http://localhost:8080
 
+# The first account.
+#
+# A fresh Rebase database has no users, and the registration policy admits the
+# first registration and makes it an admin — otherwise an empty database is a
+# dead end. On localhost that is convenient; the moment this stack answers on a
+# hostname it is a race the operator can lose. So sign-up is off and the first
+# account is named here. The runtime creates it once, while the user table is
+# empty, and does nothing on every boot after that.
+#
+# The password below is random. Change the email to yours, sign in, and change
+# the password.
+REBASE_ADMIN_EMAIL=admin@localhost
+REBASE_ADMIN_PASSWORD=$(secret)
+
 # The published runtime tag to run. Change it and restart to upgrade; your
 # bundle is untouched.
 REBASE_VERSION=latest

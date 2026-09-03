@@ -202,11 +202,27 @@ const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] =
  */
 const CLEARING_SENTINELS = ["anonymous", ""];
 
-interface TautologyMatch {
+export interface TautologyMatch {
     /** How to name the caller-id expression in prose, e.g. `auth.uid()`. */
     shape: string;
     /** Literals the policy excludes that exclude nobody. Empty for a bare null test. */
     decoyGuards: string[];
+    /**
+     * Whether the clause excludes an id a signed-out caller can actually arrive
+     * with — the *corrected* form of this shape.
+     *
+     * This is the fork between two findings. `false` is
+     * {@link policyAnonymousTautology}: the null test stands on its own, so
+     * signed-out callers satisfy it. `true` is `policy-authenticated-tautology`:
+     * signed-out callers really are excluded, and still no row is scoped, so
+     * every registered account reads every row — the shape that left a
+     * customer's `users` table readable by anyone who could sign up.
+     *
+     * Returning the distinction rather than treating the guarded form as a clean
+     * bill of health is the whole point: the previous version answered `null`
+     * here, which is why the policy that actually shipped passed silently.
+     */
+    guardsSentinel: boolean;
 }
 
 /**
@@ -233,7 +249,7 @@ interface TautologyMatch {
  * A guard naming the wrong literal is now the *loudest* case, not the silent one,
  * because it is the one that survives code review.
  */
-function matchTautology(clause: string | null | undefined): TautologyMatch | null {
+export function callerIdOnlyClause(clause: string | null | undefined): TautologyMatch | null {
     if (!clause) return null;
 
     const flat = clause
@@ -271,12 +287,27 @@ function matchTautology(clause: string | null | undefined): TautologyMatch | nul
         }
 
         if (!sawNullTest) continue;
-        if (cleared) return null;
+        if (cleared) {
+            return { shape: label(first), decoyGuards: [...new Set(decoys)], guardsSentinel: true };
+        }
 
-        return { shape: label(first), decoyGuards: [...new Set(decoys)] };
+        return { shape: label(first), decoyGuards: [...new Set(decoys)], guardsSentinel: false };
     }
 
     return null;
+}
+
+/**
+ * The subset of {@link callerIdOnlyClause} that *this* check reports: a bare
+ * null test wearing no guard that excludes a real signed-out id.
+ *
+ * A clause that does exclude the sentinel is not clean, it is a different
+ * finding with a different severity and a different fix, and
+ * `policy-authenticated-tautology` reports it from the same parse.
+ */
+function matchTautology(clause: string | null | undefined): TautologyMatch | null {
+    const matched = callerIdOnlyClause(clause);
+    return matched && !matched.guardsSentinel ? matched : null;
 }
 
 /**

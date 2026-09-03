@@ -101,7 +101,7 @@ function coerceDeclaredNumbers(
  * path was overlooked. Keyed by both the property name and its column name,
  * since a row can arrive keyed either way depending on the caller.
  */
-function stripExcluded(
+export function stripExcluded(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {
@@ -133,7 +133,16 @@ function renderTarget(
     return createRelationRefWithData(address, path, {
         id: address,
         path,
-        values: normalizeDbValues(targetRow, targetCollection)
+        // Stripped here as well as in the inline branch above. The two branches
+        // are the same data in two renderings — REST inlines the target's
+        // columns, the admin and every realtime frame carry a ref with those
+        // columns attached — and only the first one was filtered. So a password
+        // hash that REST correctly withheld rode out on every `.listen()` frame
+        // and every WebSocket fetch of anything with a relation to users.
+        values: stripExcluded(
+            normalizeDbValues(targetRow, targetCollection) as Record<string, unknown>,
+            targetCollection
+        )
     });
 }
 

@@ -179,6 +179,29 @@ describe("storage per-object authorization", () => {
             expect(res.status).not.toBe(200);
         });
 
+        /**
+         * The token's whole safety rests on it expiring. If presenting one at
+         * `/metadata` mints another, it never does: the hook is not re-run for
+         * the `download-token` principal — it owns nothing and answers no
+         * ownership question — so the loop closes and 300 seconds becomes
+         * forever. For a key ending in `/`, what renews is a whole folder.
+         */
+        it("does not let a download token mint another one", async () => {
+            const metaRes = await app.fetch(
+                new Request("http://localhost/api/storage/metadata/default/alice/notes.txt")
+            );
+            const { data } = await metaRes.json() as { data: { token?: string } };
+            expect(data.token).toBeDefined();
+
+            const renewed = await app.fetch(new Request(
+                `http://localhost/api/storage/metadata/default/alice/notes.txt?token=${data.token}`
+            ));
+
+            expect(renewed.status).toBe(403);
+            const body = await renewed.json() as { data?: { token?: string } };
+            expect(body.data?.token).toBeUndefined();
+        });
+
         it("does not let a token stand in for the hook on another path", async () => {
             // The bypass is only safe because the token is path-scoped. If it
             // were not, one legitimately minted token would be a skeleton key

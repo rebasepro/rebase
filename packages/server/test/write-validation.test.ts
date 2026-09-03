@@ -51,6 +51,50 @@ isId: true },
         }
     };
 
+    /**
+     * The generated SDK already tells developers that a property marked
+     * `excludeFromApi` is "absent from Row, Insert and Update — the API surface
+     * does not mention it, in either direction". Only the read half was ever
+     * enforced, so the types promised something the server did not hold.
+     *
+     * The sharp case is the user store: `users_write_own` lets you update your
+     * own row, `password_hash` is a column on it, and writing it directly is a
+     * password change that does not need the old password — which turns a
+     * stolen access token, good for an hour, into a password the attacker
+     * chose.
+     */
+    describe("columns excluded from the API", () => {
+        const users: CollectionConfig = {
+            slug: "users",
+            name: "Users",
+            table: "users",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                email: { type: "string" },
+                passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true }
+            }
+        } as unknown as CollectionConfig;
+
+        it("refuses a write naming one", () => {
+            expect(() => assertKnownWriteFields({ passwordHash: "scrypt$…" }, users))
+                .toThrow(/excluded from the API/i);
+        });
+
+        it("refuses it under its column name too", () => {
+            expect(() => assertKnownWriteFields({ password_hash: "scrypt$…" }, users))
+                .toThrow(/excluded from the API/i);
+        });
+
+        it("says it is excluded rather than unknown, which would read as a typo", () => {
+            expect(() => assertKnownWriteFields({ passwordHash: "x" }, users))
+                .toThrow(/is the server's to set/i);
+        });
+
+        it("leaves the rest of the collection writable", () => {
+            expect(() => assertKnownWriteFields({ email: "a@b.c" }, users)).not.toThrow();
+        });
+    });
+
     it("accepts declared fields", () => {
         expect(() => assertKnownWriteFields({ title: "Hello" }, posts)).not.toThrow();
     });

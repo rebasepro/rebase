@@ -30,6 +30,7 @@ import type { EditorAIController } from "../types";
 import { onFileRead, UploadFn } from "../extensions/Image";
 import { textLoadingCommands } from "../extensions/TextLoadingDecorationExtension";
 import { parser } from "../markdown";
+import { parseSanitizedHtml } from "../sanitize-html";
 
 interface SuggestionItem {
     title: string;
@@ -215,9 +216,16 @@ const autocompleteSuggestionItem: SuggestionItem = {
             let parsedDoc;
 
             if (isHTML) {
-                const div = document.createElement("div");
-                div.innerHTML = unescapedResult;
-                parsedDoc = DOMParser.fromSchema(view.state.schema).parse(div);
+                // Parsed inertly and reduced to the editor's own allowlist
+                // before it touches the live document. `document.createElement`
+                // plus `innerHTML` was the opposite: an element in this
+                // document, so the content ran as it was assigned.
+                //
+                // ProseMirror's own parse drops nodes its schema does not know,
+                // but that happens AFTER the browser has already executed
+                // whatever it was handed — the schema is a shape filter, not a
+                // security boundary.
+                parsedDoc = DOMParser.fromSchema(view.state.schema).parse(parseSanitizedHtml(unescapedResult));
             } else {
                 parsedDoc = parser.parse(unescapedResult);
             }

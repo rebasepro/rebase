@@ -35,6 +35,7 @@ const CAPABILITIES = [
     "initializeWebsockets",
     "ensureCollectionSchema",
     "ensureCollectionPolicies",
+    "finalizeSecurityPosture",
     "readCollectionsSchemaVersion",
     "stampCollectionsSchemaVersion",
     "getAdmin",

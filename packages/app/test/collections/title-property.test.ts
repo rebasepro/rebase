@@ -363,22 +363,22 @@ type: "string" }
 
         it("uses the top candidate when it holds a value", () => {
             expect(getTitlePropertyKeyForValues(collection, {
-                full_name: "Priscila Alaniz",
-                email: "palaniz@peersocial.com.mx"
+                full_name: "Ada Lovelace",
+                email: "ada@example.com"
             })).toBe("full_name");
         });
 
         it("falls through when the top candidate is empty", () => {
             expect(getTitlePropertyKeyForValues(collection, {
                 full_name: "",
-                email: "palaniz@peersocial.com.mx"
+                email: "ada@example.com"
             })).toBe("email");
         });
 
         it("falls through when the top candidate holds an id", () => {
             expect(getTitlePropertyKeyForValues(collection, {
                 full_name: "fdda6c2a-5310-4b0c-87cc-a13eb36e5167",
-                email: "palaniz@peersocial.com.mx"
+                email: "ada@example.com"
             })).toBe("email");
         });
 
@@ -395,7 +395,7 @@ type: "string" }
         });
 
         it("leaves human text alone", () => {
-            expect(looksLikeIdentifierValue("Priscila Alaniz")).toBe(false);
+            expect(looksLikeIdentifierValue("Ada Lovelace")).toBe(false);
             expect(looksLikeIdentifierValue("Consultoría ambiental")).toBe(false);
             expect(looksLikeIdentifierValue("")).toBe(false);
             expect(looksLikeIdentifierValue(42)).toBe(false);

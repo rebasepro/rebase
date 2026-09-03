@@ -53,6 +53,45 @@ describe("SPA serving stays inside the frontend root", () => {
         await fsp.rm(tempRoot, { recursive: true, force: true });
     });
 
+    /**
+     * A build directory is also a directory on a disk, and in a self-host it is
+     * very often the checkout or something beside it. `serve-static` answers
+     * for whatever is under the root it was given, and the only thing marking
+     * `/.env` out from `/assets/app.js` is a convention it does not know about.
+     */
+    describe("dot-files under the build root", () => {
+        beforeAll(async () => {
+            await fsp.writeFile(path.join(frontendPath, ".env"), "JWT_SECRET=hunter2");
+            await fsp.mkdir(path.join(frontendPath, ".git"), { recursive: true });
+            await fsp.writeFile(path.join(frontendPath, ".git", "config"), "[remote]\n  url = git@github.com:acme/private.git");
+        });
+
+        it.each([
+            ["/.env"],
+            ["/.git/config"],
+            ["/%2e%65nv"],
+            ["/.git/../.env"]
+        ])("refuses %s", async (requestPath) => {
+            const res = await app.request(requestPath);
+            const body = await res.text();
+            expect(body).not.toContain("hunter2");
+            expect(body).not.toContain("acme/private");
+        });
+    });
+
+    /**
+     * A symlink inside the build resolves wherever it points, so it is a way
+     * out of the directory being served — and unlike `../`, nothing in the
+     * request looks like an escape.
+     */
+    it("refuses a symlink that leaves the build directory", async () => {
+        await fsp.symlink(path.join(tempRoot, "secret.txt"), path.join(frontendPath, "linked.txt"));
+
+        const res = await app.request("/linked.txt");
+
+        expect(await res.text()).not.toContain("TOP-SECRET-CONTENTS");
+    });
+
     it("actually serves a real asset, so the containment tests are not vacuous", async () => {
         // The trap this avoids: if the static handler were not wired at all —
         // wrong root, missing directory — every traversal below would "pass"

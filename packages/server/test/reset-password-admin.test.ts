@@ -18,7 +18,11 @@ accessExpiresIn: "1h" });
     beforeEach(() => {
         mockAuthRepo = {
             getUserById: jest.fn(),
-            getUserRoleIds: jest.fn().mockResolvedValue(["admin"]),
+            // Per uid. This route re-reads roles from the repository so a
+            // token's own claim cannot decide, and a mock answering "admin"
+            // for every caller makes the 403 test below pass without the gate
+            // having done anything.
+            getUserRoleIds: jest.fn(async (id: string) => (id.startsWith("editor") ? ["editor"] : ["admin"])),
             updatePassword: jest.fn().mockResolvedValue(undefined),
             createPasswordResetToken: jest.fn().mockResolvedValue(undefined)
         } as unknown as jest.Mocked<AuthRepository>;

@@ -177,6 +177,27 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origins your frontend is served from}
       PORT: 8080
 
+      # ─── The first account ─────────────────────────────────────────────
+      #
+      # A fresh Rebase database has no users, and the registration policy
+      # admits the first registration and makes it an admin — otherwise an
+      # empty database is a dead end, because bootstrapping an admin needs a
+      # caller who is already signed in. On a laptop that is convenient. The
+      # moment this stack answers on a hostname it is a race, and the operator
+      # can lose it to whoever finds the sign-up form first.
+      #
+      # So self-registration is off here and the first account is named
+      # instead. The runtime creates it once, while the user table is empty,
+      # and does nothing on every boot after that.
+      #
+      # Set both in your .env. The password must be at least 12 characters;
+      # change it after the first sign-in.
+      REBASE_ADMIN_EMAIL: ${REBASE_ADMIN_EMAIL:?set REBASE_ADMIN_EMAIL to the email of the first admin account}
+      REBASE_ADMIN_PASSWORD: ${REBASE_ADMIN_PASSWORD:?set REBASE_ADMIN_PASSWORD to a password of at least 12 characters}
+      # Open sign-up instead: set this to false and clear the two above — but
+      # the first person to reach the form becomes the administrator.
+      DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
+
       # `ensure` (the default) creates auth tables AND collection tables with
       # their RLS, additively, on every boot. It never alters a column type,
       # never drops anything and never edits an existing enum label — those go

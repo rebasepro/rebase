@@ -117,6 +117,8 @@ import { MemoryRateLimitStore } from "./auth/rate-limit-store";
 import { createSqlRateLimitStore } from "./auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "./auth/resolve-rate-limit-store";
 import { warnOnAuthCollectionDataCallbacks } from "./auth/collection-callback-warning";
+import { enforceAuthSecretExclusion } from "./auth/exclude-auth-secrets";
+import { seedInitialAdmin } from "./auth/seed-admin";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
@@ -543,9 +545,16 @@ export interface RebaseBackendConfig {
      * Allow unauthenticated read access to stored files (default: false).
      *
      * Set this only when the bucket is genuinely a public, read-only CDN.
-     * Writes, deletes and listing still require authentication. Because it is a
-     * deliberate statement that reads are public, it also satisfies the
-     * production storage boot guard (see {@link storageAuthorize}).
+     * Because it is a deliberate statement that reads are public, it also
+     * satisfies the production storage boot guard (see {@link storageAuthorize}).
+     *
+     * On its own — no {@link storagePolicies}, no {@link storageAuthorize} — it
+     * means public READ and nothing else: writes, deletes and listings are
+     * admin-only. The sentence "writes still require authentication" used to be
+     * the whole of it, and it was not enough, because the deployment this flag
+     * is for is the public site, which commonly runs with `requireAuth` off —
+     * so "requires authentication" required nothing. A deployment that wants
+     * anonymous or per-user writes says where, with a policy or a hook.
      */
     storagePublicRead?: boolean;
 
@@ -940,6 +949,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        finalizeSecurityPosture: dbAdapter.finalizeSecurityPosture
+            ? (driverResult) => dbAdapter.finalizeSecurityPosture!(driverResult)
+            : undefined,
         readCollectionsSchemaVersion: dbAdapter.readCollectionsSchemaVersion
             ? (driverResult) => dbAdapter.readCollectionsSchemaVersion!(driverResult)
             : undefined,
@@ -1082,6 +1094,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     let defaultDriverResult: InitializedDriver | undefined = undefined;
 
+    /** What each bootstrapper's `initializeDriver` returned, by bootstrapper. */
+    const driverResults = new Map<BackendBootstrapper, InitializedDriver>();
+
     // ─── Collection schema ───────────────────────────────────────────────
     //
     // Create any collection tables the database is missing, BEFORE any driver
@@ -1143,6 +1158,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
+        // Kept because a later step has to hand each bootstrapper back its own
+        // result: `finalizeSecurityPosture` reaches into the driver it
+        // initialized, and only the default driver's result was retained here.
+        driverResults.set(bootstrapper, driverResult);
 
         // In baas mode the driver reports what it found in the database.
         // `undefined` means it never looked — it has no introspection support,
@@ -1186,6 +1205,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     }
 
     const driverRegistry = DefaultDriverRegistry.create(delegates);
+
+    // A redeclared `users` collection must not lose the exclusions the default
+    // one carries. Here rather than in the auth block below, because the
+    // registries copy what they are handed and a flag set after registration
+    // reaches only the copy it was set on. See exclude-auth-secrets.ts.
+    enforceAuthSecretExclusion(activeCollections);
+
     activeCollections.forEach(collection => collectionRegistry.register(collection));
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
@@ -1357,6 +1383,24 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         provision: config.provisionSchema ?? true
     });
 
+    // ── Is the database's authorization actually in force? ───────────────────
+    //
+    // The driver decided that at connect time, which on a fresh database is
+    // before there is anything to decide from: a role that owns no tables does
+    // not bypass RLS, so no isolation is configured — and then the steps above
+    // create every table on that same connection, making it their owner, and an
+    // owner is exempt from the policies on what it owns. The answer has to be
+    // taken again now that the schema exists, on every driver that has one.
+    //
+    // Deliberately after the policies, not merely after the tables: a table with
+    // RLS enabled and no policy is closed, so the window this closes is the one
+    // where both halves are in place and only the role switch is missing.
+    for (const bootstrapper of bootstrappers) {
+        const result = driverResults.get(bootstrapper);
+        if (!bootstrapper.finalizeSecurityPosture || !result) continue;
+        await bootstrapper.finalizeSecurityPosture(result);
+    }
+
     // ── Does this process match the schema it is about to serve? ─────────────
     //
     // Deliberately here, after the policies rather than after the tables: half a
@@ -1448,6 +1492,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // Authenticates `rk_` bearer tokens in front of the JWT-based admin gates,
     // so keys created with `admin: true` genuinely reach the admin surfaces
+    // ─── What an administrative gate must re-read, per request ───────────
+    //
+    // `requireAdmin` reads `roles` out of the access token, and the token was
+    // minted up to an hour ago. Everything that has happened since — a demotion,
+    // a sign-out-everywhere, a password reset — is invisible to it. The user
+    // management routers already close that by re-reading both from the
+    // database on every request; the gate in front of backups, cron, logs, the
+    // schema editors, the RLS audit, the dev mailbox and the API-key router did
+    // not, which is to say it did not on the surfaces worth the most: a revoked
+    // token still downloaded a full database dump, and a demoted admin could
+    // mint themselves a permanent `admin: true` API key.
+    //
+    // Same repository, same two questions, wired once here so a new admin
+    // surface inherits the answer instead of having to remember it.
+    const adminIdentityRepo = (
+        authConfigResult?.authRepository ?? authConfigResult?.userService
+    ) as import("./auth/interfaces").AuthRepository | undefined;
+    const adminGateIdentity = {
+        resolveRoles: typeof adminIdentityRepo?.getUserRoleIds === "function"
+            ? (uid: string) => adminIdentityRepo.getUserRoleIds(uid)
+            : undefined,
+        revocationRepo: typeof adminIdentityRepo?.getTokensValidAfter === "function"
+            ? adminIdentityRepo
+            : undefined
+    };
+
     // (users, roles, api-keys, cron, backups, logs, schema editor) — their
     // documented behavior. Non-admin keys still fail `requireAdmin` with 403.
     const apiKeyPreAuth = apiKeyStore
@@ -1461,7 +1531,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Mount API key admin routes
         const apiKeyRoutes = createApiKeyRoutes({
             store: apiKeyStore,
-            serviceKey: internalServiceKey
+            serviceKey: internalServiceKey,
+            // A key minted here never expires and can carry `admin: true`, so
+            // this is the single most valuable thing a stale token can reach.
+            ...adminGateIdentity
         });
         config.app.route(`${basePath}/admin/api-keys`, apiKeyRoutes);
         logger.debug("API key admin routes mounted", { path: `${basePath}/admin/api-keys` });
@@ -1601,6 +1674,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
         }
+
+        // ── The operator's own account, before anyone can race them to it ──
+        //
+        // A fresh deployment's user table is empty, and the registration policy
+        // admits the first registration and makes it an admin — because
+        // otherwise an empty database can never produce the authenticated
+        // caller that `POST /admin/bootstrap` needs. That is fine on a laptop
+        // and a race on anything with a hostname. Naming the first account in
+        // the environment is what lets an artifact ship with self-registration
+        // off and still be reachable by the person who deployed it.
+        //
+        // Awaited, so the account exists before the server accepts a request.
+        // See ./auth/seed-admin.
+        await seedInitialAdmin(authAdapter?.userManagement);
     }
 
     // ── JWKS ─────────────────────────────────────────────────────────────
@@ -1669,7 +1756,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             return;
         }
         if (apiKeyPreAuth) router.use("/*", apiKeyPreAuth);
-        router.use("/*", createRequireAuth({ serviceKey: internalServiceKey }), requireAdmin);
+        router.use(
+            "/*",
+            createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
+            requireAdmin
+        );
     };
 
     // The schema editor rewrites collection files, so it needs a collectionsDir
@@ -2020,7 +2111,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // here rather than on the first upload.
         const storageAccessControl = resolveStorageAccessControl({
             storagePolicies: config.storagePolicies,
-            storageAuthorize: config.storageAuthorize
+            storageAuthorize: config.storageAuthorize,
+            // `storagePublicRead` alone satisfies the guard below but only
+            // relaxes the READ gate, leaving write/delete/list on the global
+            // requireAuth — which is off on precisely the public-site
+            // configuration this flag is for. See publicReadOnlyAuthorize.
+            storagePublicRead: config.storagePublicRead === true
         });
 
         assertStorageAccessControlConfigured(
@@ -2044,7 +2140,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // after these routes are mounted, but always before a request runs.
             authorizeData: () => storageAuthorizeData.current,
             renditionCache: config.storageRenditionCache,
-            triggers: config.storageTriggers
+            triggers: config.storageTriggers,
+            // The same number the body limit above is derived from. The
+            // resumable route has no body limit in front of it — a chunked
+            // upload is many small bodies — so it has to be told.
+            maxFileSize: storageMaxSize
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it
@@ -3011,12 +3111,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         callbacks: import("@rebasepro/types").CollectionCallbacks
     ): void => {
         let attached = 0;
+        // Assignment, not a merge — attaching callbacks REPLACES whatever the
+        // collection declared. That is the right semantics (the caller is
+        // taking ownership) and a silent one: a `beforeSave` on the collection
+        // config simply stops running, and a guard that is gone looks exactly
+        // like a guard that passed. It has already cost a duplicate-membership
+        // check in the control plane. So the replacement is said out loud,
+        // naming what is being dropped.
+        const replaced = new Set<string>();
         for (const registry of callbackTargets()) {
-            const collection = registry.get(slug) as { callbacks?: unknown } | undefined;
+            const collection = registry.get(slug) as { callbacks?: Record<string, unknown> } | undefined;
             if (collection) {
+                for (const [name, value] of Object.entries(collection.callbacks ?? {})) {
+                    if (typeof value === "function" && typeof (callbacks as Record<string, unknown>)[name] !== "function") {
+                        replaced.add(name);
+                    }
+                }
                 collection.callbacks = callbacks;
                 attached++;
             }
+        }
+        if (replaced.size > 0) {
+            logger.warn(
+                `[callbacks] Attaching callbacks to "${slug}" replaced ${[...replaced].map(n => `'${n}'`).join(", ")} ` +
+                "declared on the collection itself, which will no longer run. Callbacks are assigned, not merged — " +
+                "fold the collection's own callbacks into the ones being attached."
+            );
         }
         if (attached === 0) {
             logger.warn(`[callbacks] Collection "${slug}" not found in any registry — callbacks not attached.`);

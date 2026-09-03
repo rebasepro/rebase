@@ -7,6 +7,7 @@ import { parser } from "../markdown";
 import { nodeViews } from "../nodeViews";
 import { createDropImagePlugin } from "../extensions/Image";
 import { columnResizing, tableEditing } from "prosemirror-tables";
+import { parseSanitizedHtml } from "../sanitize-html";
 
 const trailingNodePlugin = new Plugin({
     appendTransaction: (_, oldState, newState) => {
@@ -67,8 +68,14 @@ export function useProseMirror({ initialContent, editable = true, handleImageUpl
                 // Strip inline styles and classes from pasted HTML so we don't
                 // get textStyle marks (color, font-size, etc.) that have no
                 // markdown representation. This makes paste look consistent.
-                const div = document.createElement("div");
-                div.innerHTML = html;
+                //
+                // Parsed inertly rather than through `document.createElement` +
+                // `innerHTML`, which builds the content in the LIVE document —
+                // so `<img src=x onerror=…>` in a clipboard fired here, before
+                // this function had decided anything. A person pasting from a
+                // page they were reading is the ordinary case, which is what
+                // makes it worth closing.
+                const div = parseSanitizedHtml(html);
                 div.querySelectorAll("*").forEach((el) => {
                     el.removeAttribute("style");
                     el.removeAttribute("class");

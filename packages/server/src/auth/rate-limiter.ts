@@ -266,6 +266,88 @@ export const strictAuthLimiter = createRateLimiter({
  * useless as a mail bomb. Unauthenticated requests fall back to the IP bucket so
  * the limiter is never a no-op if it is ever mounted before the auth middleware.
  */
+/**
+ * Read the recipient address out of the body, so a limiter can key on it.
+ *
+ * A limiter runs before the handler, and Hono caches a parsed body — so this
+ * reads a clone, stashes the address, and lets the handler read the same
+ * request normally. Without it the limiters below have no account to key on
+ * and collapse into one global bucket, which is a limiter in name only.
+ *
+ * A malformed body is left to the handler, which reports it with the message
+ * that names the field; failing here would answer 429 to bad JSON.
+ */
+export const captureRecipientEmail: MiddlewareHandler<HonoEnv> = async (c, next) => {
+    try {
+        // `c.req.json()`, NOT `c.req.raw.clone().json()`. Hono caches the parsed
+        // body on the request, so reading it here is what lets the handler read
+        // it again; cloning the raw Request instead marks the original stream
+        // distributed, and the handler's own parse then fails — which surfaces
+        // as a 500 on a route that was about to answer 503.
+        const body = await c.req.json() as { email?: unknown };
+        if (typeof body?.email === "string") {
+            c.set("recipientEmail", body.email.trim().toLowerCase());
+        }
+    } catch {
+        // A malformed body is the handler's error to report, with the message
+        // that names the field. Failing here would answer 429 to bad JSON.
+    }
+    await next();
+};
+
+/**
+ * Per-ADDRESS throttle for a route that mails an address the caller named.
+ *
+ * `strictAuthLimiter` bounds a machine, and a machine is the attacker's to
+ * multiply. The mailbox being filled belongs to somebody who cannot rotate
+ * anything, and the domain the messages come from is this deployment's
+ * reputation — so a distributed run against one address passed the IP limiter
+ * untouched and cost the operator their sender score.
+ *
+ * Five per fifteen minutes: generous for "I didn't get it, send it again",
+ * useless as a mail bomb. The same numbers as `verificationEmailLimiter`,
+ * which bounds the same act for a signed-in caller.
+ *
+ * Falls back to the IP bucket for a request whose body named no address, so
+ * the limiter is never silently a no-op.
+ */
+export const recipientEmailLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    limit: 5,
+    keyGenerator: (c) => {
+        const email = c.get("recipientEmail") as string | undefined;
+        return email ? `recipient-email:${email}` : `recipient-email:ip:${defaultKeyGenerator(c)}`;
+    },
+    message: "Too many emails requested for this address, please try again later."
+});
+
+/**
+ * How long a route that answers "if an account exists…" takes, whoever asked.
+ *
+ * These routes deliberately answer the same words for a known and an unknown
+ * address. They did not take the same TIME: a known address meant a token
+ * insert, a template render and an SMTP round trip, and an unknown one meant
+ * returning immediately. That difference is measurable from anywhere, so an
+ * endpoint that refuses to say whether an account exists said it anyway, one
+ * address at a time.
+ *
+ * The mail is sent off the response path at each call site, which removes the
+ * largest and most variable part; this floor covers the rest without requiring
+ * the two branches to be instruction-for-instruction equal, which is not a
+ * property anyone can maintain across a refactor.
+ *
+ * 400ms is chosen to sit above the slow branch rather than to be pleasant: it
+ * is a step a person takes once, and the alternative is an enumeration oracle.
+ */
+export const RECIPIENT_ROUTE_FLOOR_MS = 400;
+
+/** Hold a result until at least `floorMs` has passed since `startedAt`. */
+export async function notBefore<T>(startedAt: number, floorMs: number, result: T): Promise<T> {
+    const remaining = floorMs - (Date.now() - startedAt);
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+    return result;
+}
+
 export const verificationEmailLimiter = createRateLimiter({
     windowMs: 15 * 60 * 1000,
     limit: 5,
