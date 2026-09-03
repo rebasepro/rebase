@@ -21,8 +21,9 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 18+
-- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
+
+No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ## Your Environment Is Already Configured
 
@@ -192,11 +193,11 @@ narrowed type, a removed field.
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database (dev only) |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending migrations |
+| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
+| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
+| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
 
 ## What's Next
 
