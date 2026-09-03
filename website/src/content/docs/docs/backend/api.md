@@ -181,11 +181,11 @@ Use `limit` and `offset`, or `page`:
 # Limit and offset
 GET /api/data/products?limit=20&offset=40
 
-# Page-based (uses default limit of 20)
+# Page-based (uses the default limit of 50)
 GET /api/data/products?page=3
 ```
 
-The default limit is **20**, the maximum is **100**.
+The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
 
 ### Response Format
 

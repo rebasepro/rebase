@@ -12,7 +12,7 @@ point for this project.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) >= 18
+- [Node.js](https://nodejs.org) >= 22.22
 - [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
 - [Docker](https://www.docker.com) (to run the included PostgreSQL container),
   or your own PostgreSQL database

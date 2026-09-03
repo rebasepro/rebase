@@ -20,7 +20,7 @@ This scaffolds a project with three packages:
 
 ## Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 22.22+ (a headless `--headless` project needs only 20)
 - **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
 
