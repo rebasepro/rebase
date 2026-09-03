@@ -1724,4 +1724,42 @@ verified: true });
             expect(body.user).toBeNull();
         });
     });
+
+    describe("self-service routes after the user signs out everywhere", () => {
+        // A stolen access token outlives `DELETE /auth/sessions` by up to its
+        // own lifetime. The data plane and the admin gates consult the
+        // revocation watermark; the routes that can make a takeover permanent
+        // — enrolling a factor, reading the account, listing sessions — must
+        // too, or the remedy the product recommends leaves them open.
+        const revokedRoutes: Array<[string, string]> = [
+            ["POST", "/auth/mfa/enroll"],
+            ["GET", "/auth/mfa/factors"],
+            ["GET", "/auth/me"],
+            ["GET", "/auth/sessions"],
+            ["DELETE", "/auth/sessions/session-1"]
+        ];
+
+        it.each(revokedRoutes)("%s %s refuses a token issued before the watermark", async (method, path) => {
+            const app = createApp();
+            mockAuthRepo.getTokensValidAfter.mockResolvedValue(new Date(Date.now() + 5_000));
+
+            const res = await app.request(path, {
+                method,
+                headers: { "Content-Type": "application/json", ...await authHeader() },
+                ...(method === "POST" ? { body: JSON.stringify({}) } : {})
+            });
+
+            expect(res.status).toBe(401);
+            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+        });
+
+        it("still admits a token with no watermark against it", async () => {
+            const app = createApp();
+            mockAuthRepo.getTokensValidAfter.mockResolvedValue(null);
+            mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([]);
+
+            const res = await app.request("/auth/sessions", { headers: await authHeader() });
+            expect(res.status).toBe(200);
+        });
+    });
 });

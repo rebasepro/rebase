@@ -1274,7 +1274,8 @@ aal: sessionAal };
         parseBody,
         buildAuthResponse,
         createSessionAndTokens,
-        applyTransformHook
+        applyTransformHook,
+        requireLiveSession
     });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1287,7 +1288,8 @@ aal: sessionAal };
         parseBody,
         buildAuthResponse,
         createSessionAndTokens,
-        applyTransformHook
+        applyTransformHook,
+        requireLiveSession
     });
 
     // ═══════════════════════════════════════════════════════════════════════
