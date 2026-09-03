@@ -93,7 +93,10 @@ deployment you already run.
   chart, the platform blueprints, or the Hetzner module whose README brings DNS
   and TLS up before the operator has had a chance to register. The first
   administrator is now seeded from `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
-  and self-registration ships off.
+  and self-registration ships off. The address is checked against the same rule
+  the login route parses its body with, and a boot refuses one that rule would
+  reject — an admin nobody can sign in to is worse than the race it replaced,
+  because the account existing is also what removes the first-run path.
 
 - **Smaller, and all reproduced:** preview URLs were sanitized by a blocklist
   that tab and newline variants walked past, and the rich-text editor assigned
