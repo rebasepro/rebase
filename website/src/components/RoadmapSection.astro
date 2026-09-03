@@ -4,7 +4,7 @@ import { getLangFromUrl, useTranslations } from '../i18n/ui';
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 ---
-<section class="relative isolate py-28 sm:py-36 overflow-hidden border-t border-surface-800/40">
+<section id="roadmap" class="relative isolate py-28 sm:py-36 overflow-hidden border-t border-surface-800/40 scroll-mt-24">
     <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-20 animate-on-scroll fade-in-up">
             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
