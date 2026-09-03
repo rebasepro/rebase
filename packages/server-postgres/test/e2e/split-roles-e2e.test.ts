@@ -484,7 +484,16 @@ describe("serving one named function", () => {
         expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(404);
         // The listing must agree with what is mounted, or a caller reading it is
         // told about a function this process will 404.
-        const listed = await (await fetch(`${functions.origin}/api/functions`)).json() as {
+        //
+        // Authenticated, because the index stopped answering strangers: it named
+        // every custom endpoint to anyone who asked. `requireAuth` there admits
+        // any resolved identity, and the service key is the one this fixture
+        // already has. Without the header this reads a 401 whose body carries no
+        // `functions` key at all, so the assertion failed on `undefined` rather
+        // than on a listing that disagreed — which says nothing about the split.
+        const listed = await (await fetch(`${functions.origin}/api/functions`, {
+            headers: { authorization: `Bearer ${SERVICE_KEY}` }
+        })).json() as {
             functions: unknown[];
         };
         expect(listed.functions).toEqual([]);
