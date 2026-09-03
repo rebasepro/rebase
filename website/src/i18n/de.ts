@@ -17,16 +17,15 @@ export const de = {
   "demo.dev": "✔ API, Realtime und Panel laufen.",
   "demo.ports": "API auf <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> Panel auf <span class=\"text-surface-200\">:5173</span>",
   "social.title": "Teams, die mit unseren Tools ausliefern — Rebase, und FireCMS, das Open-Source-CMS in über 10.000 Firebase-Projekten.",
-  // The recognition beat — before the argument starts (SITE-STORY §5). It is
-  // claim 1's beat: five ways into one table, and the rule lives in one of them.
-  // Code in the figure stays English; only this prose is translated.
+  // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
+  // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Wo die Regel heute lebt",
-  "recognition.title": "Wo steht deine Berechtigungsprüfung?",
-  "recognition.subtitle":
-    "Fünf Wege in dieselbe Tabelle, und die Regel steht in einem davon. Die Route prüft. Der Cron-Job, das Backfill-Skript, der Agent mit dem Service-Key und das gehostete Dashboard prüfen nicht — denn eine Regel im Anwendungscode schützt die Tür, nicht den Raum. Darunter: die Regel, verschoben nach Postgres, wo jeder Weg durch sie hindurchführt.",
   "recognition.five": "Fünf Wege hinein",
   "recognition.one": "Eine Regel",
   "recognition.oneNote": "eine Regel, in Postgres, auf jedem Weg",
+  // Beat 04 — the panel, when you want one (carousel + the three products).
+  "panel.badge": "Das Panel, wenn du es willst",
+  "panel.title": "Füge es an dem Tag hinzu, an dem ein Mensch die Daten anfassen muss.",
   "engine.badge": "Womit deine App spricht",
   "engine.title": "Das gesamte Backend, direkt einsatzbereit.",
   "engine.subtitle":
@@ -36,8 +35,6 @@ export const de = {
   "agentera.title": "Das Backend, das ein Agent nicht ruinieren kann",
   "agentera.p1": "Ein KI-Agent kann in einer Stunde ein Backend hochziehen. Ob dieses Backend sicher ist, kann er dir nicht sagen. Agenten sind hervorragend darin, <em>plausible</em> Backends zu produzieren — und notorisch schlecht darin, <em>sichere</em> zu bauen. Rebase macht das sichere Ergebnis zum einzig möglichen, per Konstruktion.",
   "agentera.link": "KI- und Agent-Funktionen ansehen",
-  "modes.badge": "Eine Definition, jeder Teil",
-  "modes.title": "Nimm nur die Teile, die du brauchst.",
   "modes.subtitle": "Das Panel liest deine Daten über dieselbe API und dieselben Policies wie deine App. Liefere heute headless aus und füge es an dem Tag hinzu, an dem ein Mensch die Daten anfassen muss — oder nie. Was immer du weglässt, die API antwortet genau gleich.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":

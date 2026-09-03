@@ -152,7 +152,7 @@ Every major page is a variation on the same three acts:
 ## 4. Information architecture
 
 ```
-/                    Home — the story in nine beats, for someone who arrived cold
+/                    Home — six beats, for someone who arrived cold: run it, see it, play, trust it, add the panel, who runs it — then it is yours
 /product             The platform map — every product, every subsystem, one screen each
 ├── /backend         Rebase Backend, in depth. Live proof per API surface.
 │   ├── /security    RLS-first security, rls-check, hosting & GDPR
@@ -210,7 +210,7 @@ its own close and drops `ClosingCta`.
 
 | Page | The one question it answers | Demos it owns |
 |------|------------------------------|---------------|
-| `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, RLSEditor, AdminCarousel, AgentConsole |
+| `/` | What is this and why should I care? | Terminal, CollectionPower, mini-demos, PolicyPathsFigure, AdminCarousel, AgentConsole |
 | `/product` | What do I actually get, in every product? | AdoptionStack, per-subsystem strip, AdminDemoCarousel |
 | `/backend` | Is the backend good enough on its own? | HeroConnection, ApiMini, SdkMini, RealtimeMini, RLSEditor, SplitLayer |
 | `/cms` | Will non-developers actually live in this? | AdminDemoCarousel, ScrollSync, the editor, Kanban, Spreadsheet, CustomFields, ReactExt — each mounted once |
@@ -233,57 +233,45 @@ its own close and drops `ClosingCta`.
 | `/kit-digital` | Can my Spanish SME get this subsidised? | Sourced amounts; one product under five categories |
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
-**The home page's beat order, and why it is that order.** Revised 2026-08-10 after
-the competitor audit in `COMPETITOR-AUDIT-2026-08-10.md`, and again 2026-09-02
-after the brand audit.
+**The home page's beat order, and why it is that order.** Revised 2026-09-03.
+The page's job is to get a developer to run the command, not to win an
+argument. Six beats, each with a product artifact, in the order a developer's
+curiosity runs: run it, see what appears, play with it, trust it, add the
+panel if you want, see who runs it — then it is yours. The argument lives on
+the deep pages. This replaced a nine-beat page (thirteen sections, ~13,400px)
+that made five claims in sequence and read as a thesis.
 
 | Beat | Section | Carries |
 |------|---------|---------|
-| — | `s-hero` | Headline, one action, and the install terminal — whose output names the API and realtime before the panel |
-| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" — and, since 2026-09-02, naming FireCMS's 10,000+ projects, the heritage the star count cannot supply |
-| — | `s-recognition` | Recognition, before the argument — and it is **claim 1's**: five ways into the same table (route, cron, backfill script, agent with a service key, hosted dashboard) and the rule lives in one of them, folding into the policy as Postgres holds it. Unnumbered because it precedes the argument the numerals carry |
-| 01 | `s-collection-power` | Claim 2 — one definition, every surface; the chips run schema → REST → SDK → forms → views |
-| 02 | `s-backend-engine` | What that definition generates |
-| 03 | `s-security` | **Claim 1** — security lives in the database; links to `/security`, the page that carries it |
-| — | rls-check band | The proof for 03: "Don't take that on faith." Unnumbered on purpose — the numerals are the spine, and a proof point is not a chapter |
-| 04 | `s-modes` | Claim 3 — Rebase Backend / Rebase CMS / Rebase Studio; "take only the parts you need" |
-| 05 | `s-demo-carousel` | The panel itself; eyebrow "The panel" |
-| 06 | `s-personas` | Developer / operator / agent, one scenario each |
-| 07 | `s-agent-era` | Claim 4 — agent-native |
-| 08 | `s-case-study` | Real products, seven of them |
-| 09 | `s-opensource` | Claim 5 — it is yours. Immediately before the ask |
-| — | `ground-close` | Three lanes: run it locally, self-host it, Rebase Cloud (private beta, request access) |
+| — | `s-hero` | Headline, the claim-1 sub, the install terminal (API and realtime named before the panel) |
+| — | `s-social-proof` | Logo wall, captioned "Rebase and FireCMS" and naming FireCMS's 10,000+ projects |
+| 01 | `s-collection-power` | Claim 2 — one collection, everything generated |
+| 02 | `s-backend-engine` | The running backend: SDK, REST, realtime — live, press the buttons |
+| 03 | `s-security` | **Claim 1**, on the brand blue. Its figure (`PolicyPathsFigure`) is the villain and the fix in one frame: five ways into the same table with the rule in one of them, folding into the policy as Postgres holds it. Links to `/security` |
+| — | rls-check band | The proof for 03: "Don't take that on faith." Unnumbered |
+| 04 | `s-panel` | Claim 3 — the panel, when you want one: the carousel, then Rebase Backend / CMS / Studio beneath it |
+| 05 | `s-agent-era` | Claim 4 — the backend an agent can't screw up |
+| 06 | `s-case-study` | Real products, seven of them |
+| — | `ground-close` | Claim 5 — "Your code. Your infra. Zero lock-in." — then the three lanes |
 
-**Not on the page, by decision.** The roadmap — moved to `/about` on 2026-09-02:
-it is not a beat, and a list of things that do not exist yet sat between the real
-customers and the close. The manifesto banner (§6). The FAQ, the "what you will
-never build again" list and the feature bento from the pre-V2 page — their keys
-were deleted with `IndexContent.astro`, so they cannot come back by accident.
+**Cut on 2026-09-03, and why.** The standalone recognition section: its figure
+moved into 03. A screen of someone else's broken code before the first product
+artifact was a tonal drop after the hero, and with the hero sub now carrying
+claim 1 the claim was being made four times in the top half. The personas
+prose: a rest bar on a page that needed to be shorter; the deep pages carry
+the scenarios. The "modes" columns as their own chapter: they said in prose
+what the carousel shows a screen later, so they sit under it now. The
+ownership chapter: a fact about the terms is the close's headline, not a
+chapter before it. The roadmap (2026-09-02): it ships on /about.
 
-**Both beats recorded missing on 2026-08-29 are on the page now.** Ownership at
-the close is 09. Recognition, before the argument starts, is the unnumbered
-section above 01.
-
-**Recognition is claim 1's beat, not claim 2's.** Decided 2026-09-03, after a
-day in which it was the other. The first version showed the same table declared
-five times — migration, type, validator, route, form — folding into one
-collection file, which is the beat the intro film opens on. It asks the reader
-to recognise boilerplate, and boilerplate stopped hurting: an agent writes those
-five files in a minute, and beat 07 says so in as many words ("boilerplate
-depreciates, guarantees appreciate"). Every code-first tool in the category
-makes the write-it-once claim; it is the mechanism, not the story. The pain
-that is real is "I do not know whether my access rules hold" — the suspicion
-§1 names as the reason we win the reader at all. So the figure is five ways
-into the same `orders` table with the rule in one of them (the route checks;
-the cron job, the backfill script, the agent holding a service key and the
-hosted dashboard do not), folding into the rule as Postgres holds it, with
-every path reading "policy applies". The manifesto's line is the beat's
-argument: a rule in application code protects the door, not the room. 01 then
-shows where the rule is written, 03 what enforces it, and the rls-check band
-proves it. The page opens, argues and closes on the same claim.
-
-The film still opens on the five-declarations figure; that is a film decision
-to revisit separately, and the two need not match.
+**One recognition moment, in the beat that owns the claim.** The figure in 03
+is where the reader recognises their own week — the route checks; the cron
+job, the backfill script, the agent holding a service key and the hosted
+dashboard do not. A rule in application code protects the door, not the room.
+The rls-check band beneath lets them test exactly that against their own
+database. That is the whole argument the home page makes; the rest is showing.
+The RLS editor demo that stood in 03 lives on /security and /studio, which the
+demo budget allows and the third mount did not.
 
 Three rules are encoded in that table and should not be quietly undone:
 
@@ -303,13 +291,6 @@ Three rules are encoded in that table and should not be quietly undone:
   spends the highest-intent click on our weakest signal is a self-inflicted
   wound. GitHub stays in the header and the footer. Revisit when the number
   argues for us.
-
-**Beat 06 is the only place a person appears.** The page was mechanism from top to
-bottom, which left the reader to translate every claim into their own week
-unaided. Each column is one concrete scenario closing on a different deep page —
-`/backend`, `/cms`, `/ai`. It is three columns of prose divided by hairlines
-rather than three cards, because beat 05 above it is a carousel and §6 bans a card
-grid straight after another one.
 
 **The `/europe` rule: jurisdiction, not location.** The tempting sovereignty
 pitch — "their servers are in Virginia" — is false. Supabase provisions in
@@ -454,11 +435,11 @@ there once. Do not re-implement any of them inline on a page.
   | | | |
   |---|---|---|
   | **BASE** `#08090A` | evidence | the logo wall, the panel, the people, the customers, the roadmap. You are being shown, not argued at. |
-  | **RAISED** `#14161B` | mechanism | 01 the collection and what it generates, 02 the running backend, 04 the two halves, 07 what an agent can reach. The lift says *a machine is being opened*. |
+  | **RAISED** `#14161B` | mechanism | 01 the collection and what it generates, 02 the running backend, 05 what an agent can reach. The lift says *a machine is being opened*. |
   | **LIT** Neat | transition | the hero and the dividers, where the page changes subject. The only register with the full palette. |
   | **CHROMA** flat hue | remember this | twice, and only twice. |
 
-  Which gives the page a shape: `LIT · RAISED RAISED [BLUE] RAISED · LIT · BASE
+  Which gives the page a shape: `LIT · BASE · RAISED RAISED [BLUE] BASE · LIT ·
   BASE RAISED BASE · [CORAL]`.
 
 - **The two chroma sections are the claim and the close, and they are not
