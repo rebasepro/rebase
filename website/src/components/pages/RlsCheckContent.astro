@@ -152,7 +152,7 @@ const appSchema = {
     <!-- What it finds -->
     <section class="relative z-0 py-16 sm:py-24 border-t border-surface-900/60">
         <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("rlscheckpage.03")}</h2>
+            <h2 class="text-2xl sm:text-3xl text-white mb-3">{t("rlscheckpage.03")}</h2>
             <p class="text-surface-400 mb-12 leading-relaxed max-w-2xl">{t("rlscheckpage.04")}</p>
 
             {bySeverity.map(({ severity, checks }) => (
@@ -168,13 +168,13 @@ const appSchema = {
                         {checks.map((check) => (
                             <div class="frame p-6" id={check.id}>
                                 <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mb-2">
-                                    <h3 class="text-white font-medium leading-snug">{check.title}</h3>
+                                    <h3 class="text-white leading-snug">{check.title}</h3>
                                     <code class="flex-none font-mono text-2xs text-surface-500">{check.id}</code>
                                 </div>
                                 <p class="text-sm text-surface-400 leading-relaxed">{check.description}</p>
                                 <a href={`/docs/rls-check#${check.id}`}
                                    class="mt-3 inline-block text-sm text-primary-light hover:text-white underline underline-offset-2">
-                                    How to fix it &rarr;
+                                    {t("rlscheck.link.fix")}
                                 </a>
                             </div>
                         ))}
@@ -187,7 +187,7 @@ const appSchema = {
     <!-- What it looks like -->
     <section class="relative z-0 py-16 sm:py-24 border-t border-surface-900/60">
         <div class="mx-auto max-w-5xl px-6 lg:px-8">
-            <h2 class="text-2xl sm:text-3xl font-semibold text-white mb-3">{t("rlscheckpage.05")}</h2>
+            <h2 class="text-2xl sm:text-3xl text-white mb-3">{t("rlscheckpage.05")}</h2>
             <p class="text-surface-400 mb-10 leading-relaxed max-w-2xl">{t("rlscheckpage.06")}</p>
             <RlsCheckReport />
         </div>
@@ -196,8 +196,8 @@ const appSchema = {
     <ComparisonFaq competitor="rls-check" heading="Questions about rls-check" faqs={faqs} pageUrl={PAGE_URL} />
 
     <ClosingCta
-        title="Then fix it once, in code."
-        blurb="A scanner tells you where the policies are wrong. Rebase compiles them from your collection definitions, so the next one is reviewed in a pull request before it ever reaches a database."
+        title={t("close.rlscheck.title")}
+        blurb={t("close.rlscheck.blurb")}
         trackId="rls-check"
     />
 </div>

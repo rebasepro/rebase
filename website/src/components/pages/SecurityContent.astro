@@ -95,7 +95,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="max-w-3xl">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20 font-medium">
                             <svg class="lucide lucide-shield-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                            Enforced by the database
+                            {t("securitypage.lbl.db")}
                         </div>
                         <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.09")}</h2>
                         <p class="mt-4 text-base text-surface-400 max-w-2xl">{t("securitypage.10")}</p>
@@ -172,7 +172,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div>
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20 font-medium">
                             <svg class="lucide lucide-users" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
-                            Roles and permissions
+                            {t("securitypage.lbl.roles")}
                         </div>
                         <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("securitypage.28")}</h2>
                         <p class="text-lg text-surface-300 mb-8">{t("securitypage.29")}</p>
@@ -236,21 +236,21 @@ import ClosingCta from "../ClosingCta.astro";
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="font-semibold text-white">{t("securitypage.35")}</h3>
+                                    <h3 class="text-white">{t("securitypage.35")}</h3>
                                     <p class="text-surface-400">{t("securitypage.36")}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="font-semibold text-white">{t("securitypage.37")}</h3>
+                                    <h3 class="text-white">{t("securitypage.37")}</h3>
                                     <p class="text-surface-400">{t("securitypage.38")}</p>
                                 </div>
                             </div>
                             <div class="flex items-start gap-3">
                                 <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
                                 <div>
-                                    <h3 class="font-semibold text-white">{t("securitypage.39")}</h3>
+                                    <h3 class="text-white">{t("securitypage.39")}</h3>
                                     <p class="text-surface-400">{t("securitypage.40")}</p>
                                 </div>
                             </div>
@@ -279,21 +279,21 @@ import ClosingCta from "../ClosingCta.astro";
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 mb-6">
                             <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.83")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.83")}</h3>
                         <p class="text-surface-400 text-sm">{t("securitypage.43")}</p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 mb-6">
                             <svg class="lucide lucide-container text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="14" rx="2" /><rect width="20" height="8" x="2" y="2" rx="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.84")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.84")}</h3>
                         <p class="text-surface-400 text-sm">{t("securitypage.44")}</p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-git-branch text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.85")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.85")}</h3>
                         <p class="text-surface-400 text-sm">{t("securitypage.45")}</p>
                     </div>
                 </div>
@@ -316,9 +316,9 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">
                             <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
-                            Self-hosted / open source
+                            {t("securitypage.lbl.oss")}
                         </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">{t("securitypage.48")}</h3>
+                        <h3 class="text-2xl text-white mb-4">{t("securitypage.48")}</h3>
                         <p class="text-surface-400 mb-4">{t("securitypage.49")}</p>
                         <p class="text-surface-500 text-sm">{t("securitypage.50")}</p>
                     </div>
@@ -327,7 +327,7 @@ import ClosingCta from "../ClosingCta.astro";
                             <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
                             Rebase Cloud · Private beta
                         </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">{t("securitypage.51")}</h3>
+                        <h3 class="text-2xl text-white mb-4">{t("securitypage.51")}</h3>
                         <p class="text-surface-400 mb-4" set:html={t("securitypage.52")}></p>
                         <p class="text-surface-500 text-sm">{t("securitypage.53")}</p>
                     </div>
@@ -352,42 +352,42 @@ import ClosingCta from "../ClosingCta.astro";
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10 mb-6">
                             <svg class="lucide lucide-map-pin text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.56")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.56")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.57")}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 mb-6">
                             <svg class="lucide lucide-users text-violet-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.58")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.58")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.59")}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 mb-6">
                             <svg class="lucide lucide-database text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.60")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.60")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.61")}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10 mb-6">
                             <svg class="lucide lucide-shield-check text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.62")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.62")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.63")}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-rose-500/10 mb-6">
                             <svg class="lucide lucide-lock text-rose-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.64")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.64")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.65")}></p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-500/10 mb-6">
                             <svg class="lucide lucide-history text-sky-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-3">{t("securitypage.66")}</h3>
+                        <h3 class="text-xl text-white mb-3">{t("securitypage.66")}</h3>
                         <p class="text-surface-400 text-sm" set:html={t("securitypage.67")}></p>
                     </div>
                 </div>
@@ -406,7 +406,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
                     <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">{t("securitypage.86")}</div>
-                        <h3 class="text-xl font-semibold text-white mb-4">{t("securitypage.71")}</h3>
+                        <h3 class="text-xl text-white mb-4">{t("securitypage.71")}</h3>
                         <ul class="space-y-3 text-surface-400 text-sm">
                             <li set:html={t("securitypage.72")}></li>
                             <li set:html={t("securitypage.73")}></li>
@@ -415,7 +415,7 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">{t("securitypage.87")}</div>
-                        <h3 class="text-xl font-semibold text-white mb-4">{t("securitypage.75")}</h3>
+                        <h3 class="text-xl text-white mb-4">{t("securitypage.75")}</h3>
                         <ul class="space-y-3 text-surface-400 text-sm">
                             <li set:html={t("securitypage.76")}></li>
                             <li set:html={t("securitypage.77")}></li>

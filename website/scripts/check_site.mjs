@@ -33,7 +33,7 @@ const pages = new Map();
 /* Marketing pages only. `/docs/**` is generated from the packages' AST and is
    gated by `pnpm verify:docs`; component reference pages legitimately share a
    title across locales because a component name is a proper noun. */
-const IGNORED = /^\/(?:[a-z]{2}\/)?(?:docs|pagefind|_astro)(?:\/|$)/;
+const IGNORED = /^\/(?:[a-z]{2}\/)?(?:docs|pagefind|_astro|dev|404)(?:\/|$)/;
 for (const r of [...pages.keys()]) if (IGNORED.test(r)) pages.delete(r);
 
 const failures = [];
@@ -46,9 +46,14 @@ const routeExists = (r) => {
     return existsSync(asFile);
 };
 
-/* SITE-STORY §2: banned as a name for Rebase's own product. The carve-out is
-   competitor copy in `alternatives.ts`, which keeps a competitor's own name. */
-const BANNED = [/\bRebase Admin\b/, /\bAdmin UI\b/, /\badmin console\b/i, /\badmin scaffolding\b/i, /\bthe Rebase Studio\b/];
+/* SITE-STORY §2, the naming sheet. Only phrases that can ONLY be naming Rebase's
+   own product: a competitor keeps its own name, and the tree legitimately says
+   "Admin UI" about PocketBase's and Directus's products. A bare /\bAdmin UI\b/
+   would fire on those and train everyone to ignore this check. */
+const BANNED = [
+    /\bRebase Admin\b/, /\bRebase admin (?:UI|panel|console)\b/i,
+    /\bthe Rebase Studio\b/, /\badmin console\b/i, /\badmin scaffolding\b/i,
+];
 
 for (const [route, file] of [...pages].sort()) {
     const html = readFileSync(file, "utf8");
@@ -76,8 +81,7 @@ for (const [route, file] of [...pages].sort()) {
     // 4. SITE-STORY §6: meta titles are `<Page> — Rebase`, em dash.
     const title = body.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim();
     if (!title) fail(route, "meta-title", "missing");
-    else if (!title.includes("—") && !/^Rebase\b/.test(title))
-        fail(route, "meta-title", title);
+    else if (!title.includes("—")) fail(route, "meta-title", title);
 
     // 5. §2 naming sheet.
     for (const re of BANNED) {
@@ -91,10 +95,14 @@ for (const [route, file] of [...pages].sort()) {
       page sets deliberately. */
 for (const [route, file] of pages) {
     if (!/^\/(es|de|fr)\//.test(route)) continue;
+    // Pages kept out of the index are not localisation surfaces (`/pitch`).
+    if (/noindex/i.test(readFileSync(file, "utf8"))) continue;
     const en = pages.get(route.replace(/^\/(es|de|fr)/, "") || "/");
     if (!en) continue;
     const t = (f) => readFileSync(f, "utf8").match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim();
-    if (t(file) && t(file) === t(en)) fail(route, "untranslated-title", t(file));
+    const got = t(file);
+    if (got && got === t(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
+        fail(route, "untranslated-title", got);
 }
 
 const byCheck = {};

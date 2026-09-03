@@ -128,11 +128,9 @@ import ClosingCta from "../ClosingCta.astro";
 
         <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
             <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
-                <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL · React-free</span>
+                <span class="text-sm font-medium">{t("backendpage.badge")}</span>
             </div>
-            <h1 class="mb-6 text-display-2 text-white">
-                The backend,<br/>on its own.
-            </h1>
+            <h1 class="mb-6 text-display-2 text-white" set:html={t("backendpage.hero.title")}></h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                 REST, a typed SDK, realtime over WebSocket, auth, storage and an OpenAPI spec — with every access
                 rule enforced by the database itself. Point it at your own Postgres, or
@@ -151,10 +149,10 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
                 <div class="lg:col-span-5">
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        REST, without writing it
+                        {t("backendpage.rest.title")}
                     </p>
                     <h2 class="text-3xl sm:text-4xl text-white mb-5">
-                        Every table you expose becomes an endpoint
+                        {t("backendpage.rest.sub")}
                     </h2>
                     <p class="text-base text-surface-400 leading-relaxed mb-4">
                         No controllers, no serializers, no validation middleware. Filtering, sorting, pagination
@@ -177,7 +175,7 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <div class="frame overflow-hidden">
                         <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                            <span class="font-mono text-xs text-surface-400">the generated surface</span>
+                            <span class="font-mono text-xs text-surface-400">{t("backendpage.label.generated")}</span>
                         </div>
                         <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={restCode}></code></pre>
                     </div>
@@ -197,7 +195,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <p class="text-base text-surface-400 leading-relaxed mb-6" set:html={t("backendpage.03")}></p>
                     <a href={translatePath("/sdk")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                        The full SDK tour
+                        {t("backendpage.link.sdk")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14"/>
@@ -278,7 +276,7 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <a href={translatePath("/security")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The whole security model
+                    {t("backendpage.link.security")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -353,9 +351,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
                     <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Mount it as a sub-app on a server you already run</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Your middleware, your routes, your error handling</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Node, Docker, Railway, Fly.io or bare metal</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f1")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f2")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.hono.f3")}</li>
                     </ul>
                 </div>
 
@@ -366,9 +364,9 @@ import ClosingCta from "../ClosingCta.astro";
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
                     <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> One-to-one, one-to-many and many-to-many</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Field selection — fetch the columns you asked for</li>
-                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Cursor and offset pagination</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f1")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f2")}</li>
+                        <li class="flex gap-2.5"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("backendpage.drizzle.f3")}</li>
                     </ul>
                 </div>
             </div>
@@ -387,7 +385,7 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="mt-10 text-center">
                 <a href={translatePath("/cms")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    See what the admin panel gives your team
+                    {t("backendpage.link.panel")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>

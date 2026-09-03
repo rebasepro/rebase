@@ -61,14 +61,14 @@ import ClosingCta from "../ClosingCta.astro";
 
         <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <h3 class="text-lg font-semibold text-white mb-2">{t("cli.06")}</h3>
+            <h3 class="text-lg text-white mb-2">{t("cli.06")}</h3>
             <p class="text-sm text-surface-400 mb-3">{t("cli.07")}</p>
             <div class="rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-2.5 font-mono text-xs text-surface-300">
               rebase skills install --agent claude
             </div>
           </div>
           <div>
-            <h3 class="text-lg font-semibold text-white mb-2">{t("cli.08")}</h3>
+            <h3 class="text-lg text-white mb-2">{t("cli.08")}</h3>
             <p class="text-sm text-surface-400 mb-3" set:html={t("cli.09")}></p>
             <div class="rounded-lg border border-surface-800 bg-surface-900/60 px-4 py-2.5 font-mono text-xs text-surface-300">
               rebase db backup --out s3://backups/app.dump
@@ -77,7 +77,7 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
 
         <a href="/docs/cli" class="accent-link mt-10">
-          Every command, with its flags
+          {t("clipage.link.reference")}
           <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>

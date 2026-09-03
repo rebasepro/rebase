@@ -13,36 +13,16 @@ const translatePath = useTranslatedPath(lang);
 // ── The map ────────────────────────────────────────────────────────────────
 // The one thing this page exists to show: two layers, what is in each, and
 // which page goes deeper. Backend first — see website/SITE-STORY.md.
-const backendParts = [
-    { name: "REST API", note: "CRUD, filtering, sorting, pagination, relations", meta: "/api/data/:collection" },
-    { name: "Typed SDK", note: "Generated from your collections, checked at compile time", meta: "@rebasepro/client" },
-    { name: "Realtime", note: "Row subscriptions, channels and presence over WebSocket", meta: "listen()" },
-    { name: "Auth", note: "JWT access and refresh, OAuth, MFA, roles, API keys", meta: "/api/auth/*" },
-    { name: "Storage", note: "Local, S3-compatible or GCS, routed per field", meta: "/api/storage/*" },
-    { name: "Functions & cron", note: "Your own Hono routes and scheduled jobs, auto-mounted", meta: "functions/" },
-    { name: "Row-level security", note: "Policies compiled into Postgres — closed by default", meta: "securityRules" },
-    { name: "OpenAPI", note: "A spec and an explorer, regenerated with the schema", meta: "/api/docs" },
-];
+const backendParts = ["rest", "sdk", "realtime", "auth", "storage", "functions", "rls", "openapi"].map(
+    (k, i) => ({ k, meta: ["/api/data/:collection", "@rebasepro/client", "listen()", "/api/auth/*", "/api/storage/*", "functions/", "securityRules", "/api/docs"][i] })
+);
 
-const adminParts = [
-    { name: "Collection views", note: "Table, cards, list and Kanban over the same rows", meta: "enabledViews" },
-    { name: "Entity forms", note: "Generated from properties, with validation and relations", meta: "properties" },
-    { name: "Your React", note: "Custom fields, previews, views and entity actions", meta: "admin.Field" },
-    { name: "Users & roles", note: "The same roles your policies read, managed by humans", meta: "RBAC" },
-    { name: "Rebase Studio", note: "Studio is the developer workspace. It registers inside the same panel as CMS.", meta: "/studio" },
-];
+const adminParts = ["views", "forms", "react", "roles", "studio"].map(
+    (k, i) => ({ k, meta: ["enabledViews", "properties", "admin.Field", "RBAC", "/studio"][i] })
+);
 
 // What you stop maintaining. Concrete, not aspirational.
-const replaced = [
-    "CRUD controllers, serializers and request validation",
-    "A hand-rolled back office, and the sprint it costs every quarter",
-    "JWT plumbing, refresh rotation and password-reset email",
-    "Permission checks scattered across route handlers",
-    "File-upload endpoints and signed-URL helpers",
-    "A cron runner, a webhook dispatcher and an audit-log table",
-    "The OpenAPI document nobody remembered to update",
-    "A second data model, kept in sync with the first by hand",
-];
+const replaced = [1, 2, 3, 4, 5, 6, 7, 8]
 import ClosingCta from "../ClosingCta.astro";
 ---
 
@@ -62,7 +42,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <a href={translatePath("/demo")}
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
                    data-track id="product-hero-demo">
-                    Try the demo
+                    {t("cta.button.demo")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -71,7 +51,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href="/docs" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
                    data-track id="product-hero-docs">
-                    Read the docs
+                    {t("cta.button.docs")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -101,7 +81,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="flex flex-col items-start gap-3">
                         <a href={translatePath("/backend")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            The backend, in depth
+                            {t("productpage.link.backend")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -111,7 +91,7 @@ import ClosingCta from "../ClosingCta.astro";
                         </a>
                         <a href={translatePath("/security")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            How the security model works
+                            {t("productpage.link.security")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -126,7 +106,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="rounded-2xl border border-surface-800/80 bg-surface-950/60 p-7">
                         <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-5">{t("productpage.06")}</p>
                         <ul class="space-y-3">
-                            {replaced.map(item => (
+                            {replaced.map(n => (
                                     <li class="flex gap-3 text-sm text-surface-400 leading-relaxed">
                                         <svg class="mt-0.5 h-4 w-4 shrink-0 text-surface-600" viewBox="0 0 24 24"
                                              fill="none" stroke="currentColor" stroke-width="2"
@@ -134,7 +114,7 @@ import ClosingCta from "../ClosingCta.astro";
                                             <path d="M18 6 6 18"/>
                                             <path d="m6 6 12 12"/>
                                         </svg>
-                                        {item}
+                                        {t(`productpage.replaced.${n}`)}
                                     </li>
                             ))}
                         </ul>
@@ -179,10 +159,10 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/ai")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.19")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("productpage.19")}</h3>
                     <p class="text-sm text-surface-400 mb-4">{t("productpage.09")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
-                        AI &amp; agents
+                        {t("productpage.link.ai")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                              stroke-linejoin="round">
@@ -193,10 +173,10 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href={translatePath("/security")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.10")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("productpage.10")}</h3>
                     <p class="text-sm text-surface-400 mb-4" set:html={t("productpage.11")}></p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
-                        Security &amp; RLS
+                        {t("productpage.link.rls")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                              stroke-linejoin="round">
@@ -207,7 +187,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href={translatePath("/developers")}
                    class="group p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("productpage.20")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("productpage.20")}</h3>
                     <p class="text-sm text-surface-400 mb-4">{t("productpage.12")}</p>
                     <span class="inline-flex items-center gap-2 text-sm font-medium text-primary">
                         For developers
@@ -240,25 +220,25 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="relative px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
                         <div>
                             <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 01</p>
-                            <h3 class="text-2xl font-semibold text-white">{t("productpage.21")}</h3>
+                            <h3 class="text-2xl text-white">{t("productpage.21")}</h3>
                         </div>
-                        <span class="text-xs text-surface-500 shrink-0">always on</span>
+                        <span class="text-xs text-surface-500 shrink-0">{t("productpage.layer1.state")}</span>
                     </div>
                     <ul class="relative divide-y divide-surface-800/60">
                         {backendParts.map(part => (
                                 <li class="px-7 py-4">
                                     <div class="flex items-baseline justify-between gap-4">
-                                        <span class="text-sm font-semibold text-white">{part.name}</span>
+                                        <span class="text-sm font-semibold text-white">{t(`productpage.be.${part.k}.name`)}</span>
                                         <code class="font-mono text-2xs text-surface-500 shrink-0">{part.meta}</code>
                                     </div>
-                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{part.note}</p>
+                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{t(`productpage.be.${part.k}.note`)}</p>
                                 </li>
                         ))}
                     </ul>
                     <div class="relative px-7 py-5 border-t border-surface-800/80">
                         <a href={translatePath("/backend")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            Everything in the backend, with live demos
+                            {t("productpage.link.backendDemos")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -274,18 +254,18 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="px-7 py-6 border-b border-surface-800/80 flex items-baseline justify-between gap-4">
                         <div>
                             <p class="text-2xs font-semibold uppercase tracking-[0.18em] text-surface-500 mb-1">Layer 02</p>
-                            <h3 class="text-2xl font-semibold text-white">{t("productpage.22")}</h3>
+                            <h3 class="text-2xl text-white">{t("productpage.22")}</h3>
                         </div>
-                        <span class="text-xs text-surface-500 shrink-0">opt in</span>
+                        <span class="text-xs text-surface-500 shrink-0">{t("productpage.layer2.state")}</span>
                     </div>
                     <ul class="divide-y divide-surface-800/60">
                         {adminParts.map(part => (
                                 <li class="px-7 py-4">
                                     <div class="flex items-baseline justify-between gap-4">
-                                        <span class="text-sm font-semibold text-white">{part.name}</span>
+                                        <span class="text-sm font-semibold text-white">{t(`productpage.panel.${part.k}.name`)}</span>
                                         <code class="font-mono text-2xs text-surface-500 shrink-0">{part.meta}</code>
                                     </div>
-                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{part.note}</p>
+                                    <p class="mt-1 text-sm text-surface-400 leading-relaxed">{t(`productpage.panel.${part.k}.note`)}</p>
                                 </li>
                         ))}
                     </ul>
@@ -295,7 +275,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="px-7 py-5 border-t border-surface-800/80">
                         <a href={translatePath("/cms")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            What your team gets from the panel
+                            {t("productpage.link.panel")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">

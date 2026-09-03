@@ -191,13 +191,13 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 
             <div class="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <h3 class="mb-4 text-2xl font-semibold text-white">{t("aipage.16")}</h3>
+                    <h3 class="mb-4 text-2xl text-white">{t("aipage.16")}</h3>
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.17")}></p>
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.18")}></p>
                     <p class="text-base leading-relaxed text-surface-400">{t("aipage.19")}</p>
                     <a href={translatePath("/security")}
                        class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
-                        How the policies are generated
+                        {t("aipage.link.policies")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
@@ -273,7 +273,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                    class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">{t("aipage.29")}</a>
                 <a href="/docs/ai"
                    class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
-                    Read the AI docs
+                    {t("aipage.link.docs")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>

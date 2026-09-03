@@ -71,7 +71,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <span class="text-sm font-medium">Optional layer · React 19 · Bring your own components</span>
             </div>
             <h1 class="mb-6 text-display-2 text-white">
-                Rebase CMS.<br/>The same definition, rendered for people.
+                Rebase CMS.<br/>{t("cmspage.hero.tagline")}
             </h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
                 A complete back office, generated from the collections your backend already uses. It is a layer
@@ -82,7 +82,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <a href={translatePath("/demo")}
                    class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
                    data-track id="admin-hero-demo">
-                    Try the demo
+                    {t("cta.button.demo")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -91,7 +91,7 @@ import ClosingCta from "../ClosingCta.astro";
                 </a>
                 <a href={translatePath("/backend")}
                    class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                    Looking for the backend?
+                    {t("cmspage.link.backend")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -105,7 +105,7 @@ import ClosingCta from "../ClosingCta.astro";
     <!-- Real back offices, running -->
     <section class="relative z-0 pb-16 sm:pb-24 overflow-hidden">
         <div class="mx-auto max-w-6xl px-6 lg:px-8 mb-8">
-            <p class="text-center text-sm text-surface-500">Back offices teams run on Rebase every day</p>
+            <p class="text-center text-sm text-surface-500">{t("cmspage.marquee.caption")}</p>
         </div>
         <div class="h-72">
             <ScreenshotsMarquee/>
@@ -120,7 +120,7 @@ import ClosingCta from "../ClosingCta.astro";
                     The tour
                 </p>
                 <h2 class="text-3xl sm:text-4xl text-white">
-                    Not a table viewer. A place to work.
+                    {t("cmspage.work.title")}
                 </h2>
                 <p class="mt-5 text-lg leading-8 text-surface-400">
                     Everything below is generated from the same collection definitions your API is served from.
@@ -145,10 +145,10 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                 <div class="lg:col-span-5">
                     <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                        Day to day
+                        {t("cmspage.eyebrow.daytoday")}
                     </p>
                     <h2 class="text-3xl sm:text-4xl text-white mb-8">
-                        What the people who are not developers actually get
+                        {t("cmspage.work.sub")}
                     </h2>
                     <div class="space-y-5">
                         {capabilities.map(item => (
@@ -163,7 +163,7 @@ import ClosingCta from "../ClosingCta.astro";
                     <div class="mt-8 flex flex-col items-start gap-3">
                         <a href={translatePath("/studio")}
                            class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            Studio, for whoever writes the schema
+                            {t("cmspage.studio.title")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                  stroke-linejoin="round">
@@ -177,7 +177,7 @@ import ClosingCta from "../ClosingCta.astro";
                 <div class="lg:col-span-7">
                     <StorageViewDemo client:visible/>
                     <p class="mt-4 text-sm text-surface-500">
-                        File storage, in the panel — the same bucket your API writes to, not a second one.
+                        {t("cmspage.storage.note")}
                     </p>
                 </div>
             </div>
@@ -211,7 +211,7 @@ import ClosingCta from "../ClosingCta.astro";
             <RichTextEditorDemo client:only="react" />
           </div>
         </div>
-        <p class="mt-4 text-center text-xs sm:text-sm text-surface-500">The real Rebase rich text editor — try typing, it's fully interactive.</p>
+        <p class="mt-4 text-center text-xs sm:text-sm text-surface-500">{t("cmspage.rte.caption")}</p>
       </div>
     </section>
 
@@ -238,12 +238,12 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20">
               Markdown
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Write Markdown. Watch it render.</h2>
-            <p class="text-lg text-surface-400 mb-6">Prefer plain text? Markdown fields come with a split-pane live preview — headings, bold, lists and code render as you type, and the raw Markdown is what lands in your database.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.md.title")}</h2>
+            <p class="text-lg text-surface-400 mb-6">{t("cmspage.md.body")}</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Side-by-side editor and live preview</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Select text to format with the floating toolbar</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Stored as plain Markdown — portable by default</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f1")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f2")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.md.f3")}</li>
             </ul>
           </div>
           <div class="rounded-2xl overflow-hidden shadow-2xl" inert aria-hidden="true">
@@ -262,12 +262,12 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/20">
               Kanban
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Drag cards, update your database.</h2>
-            <p class="text-lg text-surface-400 mb-6">A collection with a string property that has an <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">enum</code> gets the Kanban view without asking for it. The <code class="text-xs bg-surface-800/60 px-1.5 py-0.5 rounded text-primary-light">enabledViews</code> line in the sample above narrows the switcher rather than turning the board on. Dragging a card writes to Postgres, under the same policies as every other write.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.kanban.title")}</h2>
+            <p class="text-lg text-surface-400 mb-6" set:html={t("cmspage.kanban.body")}></p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Auto-generated from any enum or status property</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Drag-and-drop with optimistic database updates</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Filterable, sortable, and fully responsive</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f1")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f2")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.kanban.f3")}</li>
             </ul>
           </div>
           <div class="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl" style="height:260px">
@@ -286,13 +286,13 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">
               Spreadsheet View
             </div>
-            <h2 class="text-3xl sm:text-4xl text-white mb-4">Edit like a spreadsheet. Save like a database.</h2>
-            <p class="text-lg text-surface-400 mb-6">Click any cell and start typing; the change is written to Postgres through the same API your app uses. Sort, filter, bulk-select and export, in a grid that behaves the way a spreadsheet does.</p>
+            <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("cmspage.sheet.title")}</h2>
+            <p class="text-lg text-surface-400 mb-6">{t("cmspage.sheet.body")}</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Click-to-edit cells with type-aware inputs</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Multi-row selection and bulk actions</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> Column resizing, reordering, and visibility toggles</li>
-              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> CSV / JSON export with one click</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f1")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f2")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f3")}</li>
+              <li class="flex gap-3"><span class="mt-1 shrink-0 text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span> {t("cmspage.sheet.f4")}</li>
             </ul>
           </div>
           <div className="rounded-2xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl h-[400px]">
@@ -311,8 +311,8 @@ import ClosingCta from "../ClosingCta.astro";
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl text-white">One editor. Every content type.</h2>
-          <p class="mt-4 text-surface-400 text-lg">A blog entry, a product description and an internal doc are the same block editor writing to three different columns.</p>
+          <h2 class="text-3xl sm:text-4xl text-white">{t("cmspage.formats.title")}</h2>
+          <p class="mt-4 text-surface-400 text-lg">{t("cmspage.formats.body")}</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
 
@@ -344,9 +344,9 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base font-semibold text-white">Content teams</h3>
+                <h3 class="text-base text-white">{t("cmspage.persona.content.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">Write blog posts with the rich text editor. Drag blocks, insert media, and preview — no developer needed.</p>
+              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.content.body")}</p>
             </div>
           </div>
 
@@ -377,9 +377,9 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base font-semibold text-white">Operations</h3>
+                <h3 class="text-base text-white">{t("cmspage.persona.ops.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">Manage data with spreadsheet views and Kanban boards. Bulk edit, filter, and export to CSV in seconds.</p>
+              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.ops.body")}</p>
             </div>
           </div>
 
@@ -408,9 +408,9 @@ import ClosingCta from "../ClosingCta.astro";
 </svg>
 
                 </div>
-                <h3 class="text-base font-semibold text-white">Developers</h3>
+                <h3 class="text-base text-white">{t("cmspage.persona.dev.title")}</h3>
               </div>
-              <p class="text-sm text-surface-400 leading-relaxed">Build custom entity views, preview panels, and field widgets — all in standard React and TypeScript.</p>
+              <p class="text-sm text-surface-400 leading-relaxed">{t("cmspage.persona.dev.body")}</p>
             </div>
           </div>
 
@@ -423,23 +423,18 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
                 <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">
-                    Yours to extend
+                    {t("cmspage.extend.eyebrow")}
                 </p>
                 <h2 class="text-3xl sm:text-4xl text-white">
-                    It is a React app. Treat it like one.
+                    {t("cmspage.extend.title")}
                 </h2>
-                <p class="mt-5 text-lg leading-8 text-surface-400">
-                    Point a property at your own component and the generated form gets out of the way. Custom
-                    fields, custom previews, whole custom entity views, extra actions in the toolbar — written in
-                    the React you already write, referenced from
-                    the <code class="font-mono text-surface-300">admin</code> block by path.
-                </p>
+                <p class="mt-5 text-lg leading-8 text-surface-400" set:html={t("cmspage.extend.body")}></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                 <div class="frame overflow-hidden flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">a property with your components</span>
+                        <span class="font-mono text-xs text-surface-400">{t("cmspage.code.customComponent")}</span>
                     </div>
                     <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customComponentCode}></code></pre>
                     <div class="px-5 pb-5 mt-auto">
@@ -469,7 +464,7 @@ import ClosingCta from "../ClosingCta.astro";
             <div class="mt-8">
                 <a href={translatePath("/ui")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                    The component library the panel is built from
+                    {t("cmspage.ui.link")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>
@@ -509,15 +504,15 @@ import ClosingCta from "../ClosingCta.astro";
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.09")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.09")}</h3>
                     <p class="text-sm text-surface-400">{t("cmspage.10")}</p>
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.11")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.11")}</h3>
                     <p class="text-sm text-surface-400">{t("cmspage.12")}</p>
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.13")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.13")}</h3>
                     <p class="text-sm text-surface-400" set:html={t("cmspage.14")}></p>
                 </div>
             </div>
@@ -535,18 +530,18 @@ import ClosingCta from "../ClosingCta.astro";
                 <a href={translatePath("/backend")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 01</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.21")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.21")}</h3>
                     <p class="text-sm text-surface-400">{t("cmspage.17")}</p>
                 </a>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-primary/30">
                     <p class="text-xs font-mono text-surface-500 mb-2">{t("cmspage.18")}</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.22")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.22")}</h3>
                     <p class="text-sm text-surface-400" set:html={t("cmspage.19")}></p>
                 </div>
                 <a href={translatePath("/studio")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 03</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">{t("cmspage.23")}</h3>
+                    <h3 class="text-lg text-white mb-2">{t("cmspage.23")}</h3>
                     <p class="text-sm text-surface-400">{t("cmspage.20")}</p>
                 </a>
             </div>

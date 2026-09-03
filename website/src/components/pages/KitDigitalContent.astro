@@ -213,7 +213,7 @@ const solutions = [
                         { name: t('kd.seg.3'), range: t('kd.range.3'), bono: t('kd.amount.2k') },
                     ].map((seg) => (
                         <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-5 ring-1 ring-inset ring-surface-800 text-center">
-                            <h3 class="text-base font-semibold text-white mb-1">{seg.name}</h3>
+                            <h3 class="text-base text-white mb-1">{seg.name}</h3>
                             <p class="text-surface-400 text-xs mb-2">{seg.range}</p>
                             <p class="text-primary font-semibold text-sm">{seg.bono}</p>
                         </div>
@@ -239,7 +239,7 @@ const solutions = [
                                 {t('kd.solutions.badge')}
                             </div>
 
-                            <h3 class="text-2xl font-semibold text-white mb-2">{sol.category}</h3>
+                            <h3 class="text-2xl text-white mb-2">{sol.category}</h3>
                             <p class="text-primary-light font-medium text-lg mb-4">{t('kd.solutions.sol_prefix')} Rebase</p>
                             <p class="text-surface-300 leading-relaxed mb-6 max-w-4xl">{sol.description}</p>
 
@@ -263,7 +263,7 @@ const solutions = [
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <!-- Features -->
                                 <div>
-                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-4">{t('kd.solutions.features_title')}</h4>
+                                    <h4 class="text-sm uppercase text-surface-400 mb-4">{t('kd.solutions.features_title')}</h4>
                                     <ul class="space-y-3">
                                         {sol.features.map((f) => (
                                             <li class="flex items-start gap-3">
@@ -278,7 +278,7 @@ const solutions = [
 
                                 <!-- Segments & Sectors -->
                                 <div>
-                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-4">{t('kd.solutions.segments_title')}</h4>
+                                    <h4 class="text-sm uppercase text-surface-400 mb-4">{t('kd.solutions.segments_title')}</h4>
                                     <div class="space-y-3 mb-6">
                                         {sol.segments.map((seg) => (
                                             <div class="flex items-center justify-between rounded-lg bg-surface-800/50 px-4 py-3 ring-1 ring-surface-700">
@@ -292,7 +292,7 @@ const solutions = [
                                         ))}
                                     </div>
 
-                                    <h4 class="text-sm font-semibold uppercase tracking-wider text-surface-400 mb-3">{t('kd.solutions.sectors_title')}</h4>
+                                    <h4 class="text-sm uppercase text-surface-400 mb-3">{t('kd.solutions.sectors_title')}</h4>
                                     <p class="text-surface-400 text-sm leading-relaxed mb-4">{sol.sectors}</p>
 
                                     {sol.sourceUrl && (
