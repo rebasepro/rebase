@@ -14,10 +14,8 @@ point for this project.
 
 - [Node.js](https://nodejs.org) >= 18
 - [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
-
-No database to install, and **no Docker**. See
-[Using your own PostgreSQL](#using-your-own-postgresql) if you would rather
-supply one.
+- [Docker](https://www.docker.com) (to run the included PostgreSQL container),
+  or your own PostgreSQL database
 
 ### Run it
 
@@ -27,18 +25,26 @@ supply one.
 pnpm install   # or: npm install
 ```
 
-2. Start the dev servers:
+2. Start the PostgreSQL database container:
+
+```bash
+docker compose up -d db
+```
+
+3. Create the database tables from your collections:
+
+```bash
+pnpm run db:push   # or: npm run db:push
+```
+
+4. Start the dev servers:
 
 ```bash
 pnpm dev   # or: npm run dev
 ```
 
-That is the whole first run. `rebase dev` starts a managed PostgreSQL for this
-project (data in `.rebase/`), generates `backend/src/schema.generated.ts` from
-`config/collections/`, applies your collections to the database, and then serves.
-
-It prints the two URLs it actually bound and opens the admin panel there. The
-first account you register becomes the admin.
+`rebase dev` prints the two URLs it actually bound and opens the admin panel
+there. The first account you register becomes the admin.
 
 Ports are **derived from this project's path**, not fixed at 3001/5173, so
 several Rebase projects can run at once without colliding. That is why the URL
@@ -46,25 +52,10 @@ in your terminal is the one to trust — and why the `PORT` and `VITE_API_URL` i
 `.env` are ignored by `rebase dev` (they apply to `rebase start`, the production
 server). Pin a port with `rebase dev --port 3001` if you need a stable one.
 
-### Using your own PostgreSQL
-
-`DATABASE_URL` is commented out in `.env` on purpose — that is what makes the
-managed database the default. Uncomment it, or point it at any PostgreSQL you
-like, and it wins over the managed one. To use the container that ships with
-this project:
-
-```bash
-docker compose up -d db     # the URL already in .env points at this
-pnpm run db:push            # or: npm run db:push
-pnpm dev                    # or: npm run dev
-```
-
-> `db:push`, `db:generate` and `db:migrate` plan their changes with
-> [Atlas](https://atlasgo.io), which diffs against a second, empty database.
-> The managed development database serves exactly one, so those three commands
-> refuse to run against it and say so. You do not need them there: `rebase dev`
-> applies your collections at boot. Reach for `db:push` once you are on a real
-> PostgreSQL, and for migrations, column drops and renames.
+> The `db:push` step is what creates the tables for the example `posts`,
+> `authors`, and `tags` collections. Skip it and the admin panel still opens,
+> but those collections will be empty and their API calls will fail until the
+> tables exist.
 
 ## Project Structure
 
@@ -150,10 +141,7 @@ push the schema once, while the database is up.
 # 1. Build your project into ./dist-bundle
 pnpm run build          # or: npm run build
 
-# 2. Start the database and create the tables from your collections.
-#    Uncomment DATABASE_URL in .env first — `db:push` runs on the host, and
-#    without it the command addresses the managed development database, which
-#    is not what this stack runs.
+# 2. Start the database and create the tables from your collections
 docker compose up -d db
 pnpm run db:push        # or: npm run db:push
 
