@@ -178,11 +178,35 @@
    05 blush, 08 cyan. Six unrelated hues, none of which meant anything, all
    competing with the two that did.
 
-   `--hue` therefore exists on exactly two sections. A chapter qualifies for a
-   ground; it does not pick one. */
+   `--hue` therefore exists on exactly two sections of the home page — the claim
+   and the close. A chapter qualifies for a ground; it does not pick one.
+
+   ONE MORE CARRIES IT, OFF THE HOME PAGE. /product paints all eleven of its
+   sections on the page ground, which is the same failure this comment opens
+   with in a different key: no ground language at all, so the route reads as one
+   long page and no beat stops the scroll. Its collection figure — the answer to
+   the question the route exists to ask — takes the claim slab (asked for,
+   2026-09-04). The count is per route, not per site: a second coloured section
+   on /product would put the page back where this comment starts. */
+
+/* ── The ground, as a value ──────────────────────────────────────────────────
+   A child that punches a hole in a line — the connector node on /product with
+   a ring around it, a badge that sits on a rule — needs the colour BEHIND it,
+   and the only honest source for that is the section's own ground. Hard-coding
+   the page ground works right up until the section moves onto a slab: that is
+   exactly how the fork below /product's file drew near-black rings on blue.
+
+   So every ground states what it paints, and paints `var(--ground)`. `:root`
+   carries the page ground, so a component that never sits on a slab still
+   resolves, and the variable inherits, so a nested figure reads the ground of
+   whichever section it landed in. */
+:root {
+    --ground: var(--color-page-ground);
+}
 
 @utility ground-raised {
-    background: var(--color-page-raised);
+    --ground: var(--color-page-raised);
+    background: var(--ground);
 }
 
 /* ── The band behind the nav ─────────────────────────────────────────────────
@@ -347,7 +371,8 @@
 .ground-claim {
     --slab-l: 0.38;
     --slab-c: 1.15;
-    background: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
+    --ground: oklch(from var(--hue) var(--slab-l) calc(c * var(--slab-c)) h);
+    background: var(--ground);
     border-top: 1px solid rgb(255 255 255 / 0.14);
     border-bottom: 1px solid rgb(255 255 255 / 0.14);
     color: rgb(255 255 255 / 0.82);
@@ -368,7 +393,8 @@
    of reading as a foreign black dropped onto the colour. Measured on #FB5066:
    heading 6.11:1, body 5.04:1, eyebrow 5.90:1. */
 .ground-close {
-    background: var(--hue);
+    --ground: var(--hue);
+    background: var(--ground);
     border-top: 1px solid rgb(8 9 10 / 0.2);
     border-bottom: 1px solid rgb(8 9 10 / 0.2);
     color: rgb(8 9 10 / 0.82);
