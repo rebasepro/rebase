@@ -11,7 +11,46 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Security
+
+- **In production, whoever registered first owned the deployment.** An empty
+  user table admitted the first registration and promoted it to admin — the
+  right rule for a laptop, and an open window on every host with a public
+  hostname, since the shipped artifacts bring DNS and TLS up before the
+  operator has typed anything. `GET /auth/config` advertised `needsSetup:
+  true`, so the unclaimed hosts were also easy to find. `POST /admin/bootstrap`
+  offered the same prize one request later, to the earliest-registered user.
+
+  The window now exists only outside `NODE_ENV=production`. In production an
+  empty table refuses the bootstrap registration with `SETUP_REQUIRED` and says
+  what to do instead, a first account created through open registration is an
+  ordinary account, `needsSetup` is never advertised, `/admin/bootstrap`
+  refuses, and boot warns when the table is empty and `REBASE_ADMIN_EMAIL` is
+  unset. The two ways in — the named admin seed (`REBASE_ADMIN_EMAIL` /
+  `REBASE_ADMIN_PASSWORD`, which every shipped blueprint already sets) and the
+  service key — are the ones nobody can race for. Development, `rebase dev`
+  and the test suites keep first-registration-is-admin.
+
+- **`GET /api/functions` handed anyone the inventory of custom endpoints.**
+  Functions themselves stay anonymous-callable by default (a webhook receiver
+  has to be), but the listing now requires a resolved identity — a signed-in
+  user, an API key or the service key. `rebase cloud debug` already read a
+  401 there as "mounted".
+
+- **Two audit reports named internal infrastructure.** A private database
+  address and a cluster-internal service hostname in `docs/audits/` are
+  replaced with placeholders, and the webhook audit carries a dated status
+  line, since the SSRF guard it says does not exist has existed since
+  2026-08-08.
+
 ### Fixed
+
+- **Four of the seven showcase cards on the homepage rendered blank.** A
+  key sweep on 2026-09-02 deleted the strings for the presupuestos, Prospector,
+  Unfeigned and Edith cards because the carousel builds its keys dynamically
+  and the sweep only saw literal `t("…")` calls. The four locales get their
+  copy back, and the built page no longer carries `alt="undefined …"`.
+
 
 - **`rls-check` reported clean on a table the whole internet could read.** The
   `policy-anonymous-tautology` check bailed out whenever it saw the literal
