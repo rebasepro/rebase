@@ -28,22 +28,22 @@ sound like a way to generate REST routes.
 | # | Scene | Starts | Secs | Line |
 |---|-------|--------|------|------|
 | 00 | ColdOpen | 0 | 3.2 | *(silent — the mark assembles)* |
-| 01 | Plausible | 126 | 7.6 | An agent built this backend in an afternoon. A ten-second check found two ways anyone could read the data. |
-| 02 | Claim | 386 | 5.2 | So Rebase keeps the rules about who sees what inside the database itself. |
-| 03 | OneDefinition | 610 | 7.2 | You describe your data once, and the API, the code and the security rules all come from it. |
-| 04 | Headline | 909 | 4.8 | It's one install, your own Postgres, and everything you're about to see. |
-| 05 | Headless | 1067 | 4.4 | Logins, file storage, live updates, scheduled jobs, backups — already running. |
-| 06 | Stream | 1230 | 6.4 | When data changes your app hears about it instantly, and only what that person may see. |
-| 07 | Panel | 1444 | 7.2 | Your team gets a real admin panel, on the same data and the same rules. Nothing built twice. |
-| 08 | Everything | 1705 | 6.4 | Boards, tables, cards, forms, filters and search — all of it generated, all of it live. |
-| 09 | Studio | 1926 | 4.8 | And you can query the database and change the schema right here. |
-| 10 | SchemaMap | 2139 | 6.4 | This diagram is read from the live database, so it can never be out of date. |
-| 11 | TwoUsers | 2399 | 5.6 | The same request, from two people, returns different rows. Neither can see the other's. |
-| 12 | Proof | 2639 | 5.2 | Try it on the database you use today. It works on any Postgres. |
-| 13 | Agent | 2835 | 4.4 | An agent gets your permissions, and it can't argue past them. |
-| 14 | OneCommand | 3030 | 4.0 | Three commands, no account, and nothing to sign up for. |
-| 15 | Ownership | 3235 | 5.6 | It's open source, it runs on your machine, and nobody else has your password. |
-| 16 | Close | 3445 | 6.0 | So build it by lunch if you like. The difference is you'll know it's safe. |
+| 01 | Plausible | 126 | 7.0 | An agent built this backend in an afternoon. A ten-second check found two ways anyone could read the data. |
+| 02 | Claim | 386 | 4.8 | So Rebase keeps the rules about who sees what inside the database itself. |
+| 03 | OneDefinition | 610 | 6.6 | You describe your data once, and the API, the code and the security rules all come from it. |
+| 04 | Headline | 909 | 4.4 | It's one install, your own Postgres, and everything you're about to see. |
+| 05 | Headless | 1055 | 4.0 | Logins, file storage, live updates, scheduled jobs, backups — already running. |
+| 06 | Stream | 1230 | 5.9 | When data changes your app hears about it instantly, and only what that person may see. |
+| 07 | Panel | 1444 | 6.6 | Your team gets a real admin panel, on the same data and the same rules. Nothing built twice. |
+| 08 | Everything | 1705 | 5.9 | Boards, tables, cards, forms, filters and search — all of it generated, all of it live. |
+| 09 | Studio | 1926 | 4.4 | And you can query the database and change the schema right here. |
+| 10 | SchemaMap | 2139 | 5.9 | This diagram is read from the live database, so it can never be out of date. |
+| 11 | TwoUsers | 2399 | 5.1 | The same request, from two people, returns different rows. Neither can see the other's. |
+| 12 | Proof | 2639 | 4.8 | Try it on the database you use today. It works on any Postgres. |
+| 13 | Agent | 2835 | 4.0 | An agent gets your permissions, and it can't argue past them. |
+| 14 | OneCommand | 3030 | 3.7 | Three commands, no account, and nothing to sign up for. |
+| 15 | Ownership | 3235 | 5.1 | It's open source, it runs on your machine, and nobody else has your password. |
+| 16 | Close | 3445 | 5.5 | So build it by lunch if you like. The difference is you'll know it's safe. |
 
 ## Notes for the read
 

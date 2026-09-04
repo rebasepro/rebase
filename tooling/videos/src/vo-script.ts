@@ -15,17 +15,17 @@
  * Frames are absolute from the first frame of the film. If a scene duration
  * changes these do NOT follow it — regenerate them.
  */
-export const WORDS_PER_SECOND = 2.5;
+export const WORDS_PER_SECOND = 2.73;
 
 /** Frames per word at that pace, at 30fps. */
-export const FRAMES_PER_WORD = 12;
+export const FRAMES_PER_WORD = 11;
 
 export const NARRATION: { at: number; words: string[] }[] = [
     { at: 126, words: ["An", "agent", "built", "this", "backend", "in", "an", "afternoon.", "A", "ten-second", "check", "found", "two", "ways", "anyone", "could", "read", "the", "data."] },
     { at: 386, words: ["So", "Rebase", "keeps", "the", "rules", "about", "who", "sees", "what", "inside", "the", "database", "itself."] },
     { at: 610, words: ["You", "describe", "your", "data", "once,", "and", "the", "API,", "the", "code", "and", "the", "security", "rules", "all", "come", "from", "it."] },
     { at: 909, words: ["It's", "one", "install,", "your", "own", "Postgres,", "and", "everything", "you're", "about", "to", "see."] },
-    { at: 1067, words: ["Logins,", "file", "storage,", "live", "updates,", "scheduled", "jobs,", "backups", "\u2014", "already", "running."] },
+    { at: 1055, words: ["Logins,", "file", "storage,", "live", "updates,", "scheduled", "jobs,", "backups", "\u2014", "already", "running."] },
     { at: 1230, words: ["When", "data", "changes", "your", "app", "hears", "about", "it", "instantly,", "and", "only", "what", "that", "person", "may", "see."] },
     { at: 1444, words: ["Your", "team", "gets", "a", "real", "admin", "panel,", "on", "the", "same", "data", "and", "the", "same", "rules.", "Nothing", "built", "twice."] },
     { at: 1705, words: ["Boards,", "tables,", "cards,", "forms,", "filters", "and", "search", "\u2014", "all", "of", "it", "generated,", "all", "of", "it", "live."] },
