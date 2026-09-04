@@ -149,7 +149,7 @@ export const Routes: React.FC = () => {
                     opacity: ramp(frame, 132, 26),
                 }}
             >
-                Forty endpoints. None of them typed.
+                Forty endpoints. Nobody wrote one.
             </div>
         </AbsoluteFill>
     );

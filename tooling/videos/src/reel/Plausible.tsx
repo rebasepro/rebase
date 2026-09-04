@@ -40,6 +40,11 @@ const SHIPPED = [
    film audit the same tables twice and read as one canned screenshot used
    twice.
 
+   All three name checks rls-check ACTUALLY has — see packages/rls-check/src/
+   checks. Two of them did not: `anon-can-insert` and `permissive-select` were
+   invented because they sounded like the right shape, in the one scene whose
+   subject is that you should verify claims rather than take them.
+
    All three are DATABASE findings. An earlier draft had rls-check reporting a
    service key committed in apps/web, which it cannot do and does not claim to:
    the proof scene says it opens a read-only transaction and nothing leaves
@@ -47,9 +52,9 @@ const SHIPPED = [
 const FOUND: { text: string; tone: "crit" | "body" | "fix" }[] = [
     { text: "[critical] rls-disabled     public.customers", tone: "crit" },
     { text: "readable by anyone holding the anon key", tone: "body" },
-    { text: "[critical] anon-can-insert  public.orders", tone: "crit" },
-    { text: "no policy restricts INSERT for anon", tone: "body" },
-    { text: "[high]     permissive-select  public.tickets", tone: "crit" },
+    { text: "[critical] anonymous-write-allowed  public.orders", tone: "crit" },
+    { text: "anon may INSERT with no policy restricting it", tone: "body" },
+    { text: "[high]     grant-to-public  public.tickets", tone: "crit" },
 ];
 
 export const Plausible: React.FC = () => {

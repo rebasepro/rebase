@@ -39,10 +39,10 @@ const C = {
 const RULE = "─".repeat(58);
 
 const REPORT: Line[] = [
-    { text: "rls-check 0.1.2  ·  read-only Row-Level Security audit", color: C.white, at: 0 },
+    { text: "rls-check 0.17.3  ·  read-only Row-Level Security audit", color: C.white, at: 0 },
     { text: RULE, color: C.rule, at: 2 },
     { text: "Database  db.acme.internal:5432/production", color: C.body, at: 4 },
-    { text: "Scanned   3 schemas · 41 tables · 26 policies · 14 checks", color: C.body, at: 6 },
+    { text: "Scanned   3 schemas · 41 tables · 26 policies · 15 checks", color: C.body, at: 6 },
     { text: "", at: 8 },
     { text: "CRITICAL", color: C.critical, at: 12 },
     { text: RULE, color: C.rule, at: 13 },

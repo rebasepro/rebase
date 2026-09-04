@@ -11,7 +11,6 @@ import { S04_Claim } from "./scenes/S04_Claim";
 import { S08b_TwoUsers } from "./scenes/S08b_TwoUsers";
 import { S05b_Stream } from "./scenes/S05b_Stream";
 import { S08c_Map } from "./scenes/S08c_Map";
-import { S12_Matrix } from "./scenes/S12_Matrix";
 import { S04b_Routes } from "./scenes/S04b_Routes";
 import { S01_Plausible } from "./scenes/S01_Plausible";
 import { S05_Proof } from "./scenes/S05_Proof";
@@ -164,43 +163,37 @@ export const SCENES: SceneEntry[] = [
         enter: "push",
     },
     {
-        id: "Matrix", title: "12 · Access is not a switch", component: S12_Matrix,
-        durationInFrames: 240, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.5, reveal: 0.3 },
-        enter: "descend",
-    },
-    {
-        id: "TwoUsers", title: "13 · The same query, twice", component: S08b_TwoUsers,
+        id: "TwoUsers", title: "12 · The same query, twice", component: S08b_TwoUsers,
         durationInFrames: 240, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Proof", title: "14 · The proof", component: S05_Proof,
+        id: "Proof", title: "13 · The proof", component: S05_Proof,
         durationInFrames: 200, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
         enter: "rise",
     },
     {
-        id: "Agent", title: "15 · Agent-native", component: S07_Agent,
+        id: "Agent", title: "14 · Agent-native", component: S07_Agent,
         durationInFrames: 165, ground: "deep",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.34, reveal: 0.3 },
         enter: "descend",
     },
     {
-        id: "OneCommand", title: "16 · One command", component: S02_OneCommand,
+        id: "OneCommand", title: "15 · One command", component: S02_OneCommand,
         durationInFrames: 205, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
         enter: "push",
     },
     {
-        id: "Ownership", title: "17 · Yours", component: S11_Ownership,
+        id: "Ownership", title: "16 · Yours", component: S11_Ownership,
         durationInFrames: 175, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
         enter: "rise",
     },
     {
-        id: "Close", title: "18 · The ask", component: S08_Close,
+        id: "Close", title: "17 · The ask", component: S08_Close,
         durationInFrames: 160, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.3 },
         enter: "scale",
