@@ -22,6 +22,19 @@
  * Frames are absolute from the first frame of the film. If a scene duration
  * changes these do NOT follow it — regenerate them.
  *
+ * The film opens on a QUESTION — but the SLIDE asks it, and the line under
+ * it supplies the evidence. Both saying it is how nine of eighteen lines
+ * ended up paraphrasing their own picture once before.
+ *
+ * Anyone can ship a backend in an afternoon now, Anyone can ship a backend in an
+ * afternoon now, so "you can build one fast" persuades nobody — the slide
+ * already shows an agent that did it, and an audit finding three ways in.
+ * The line asks whether you can trust the thing, and the rest of the film
+ * answers it. Security is the argument, not a feature listed halfway down.
+ *
+ * There are NO references to Rebase Cloud. "Any cloud" in the ownership line
+ * means the viewer's own infrastructure, which is the deploy-anywhere claim.
+ *
  * PLAIN ENGLISH IS A HARD RULE HERE, not a preference. "Live" was the word
  * that proved it: it meant real-time in one scene, running in another, and
  * not-a-mockup in a third, all within thirty seconds. A word that means three
@@ -35,8 +48,8 @@ export const WORDS_PER_SECOND = 3.0;
 export const FRAMES_PER_WORD = 10;
 
 export const NARRATION: { at: number; words: string[] }[] = [
-    { at: 126, words: ["An", "agent", "built", "this", "backend", "in", "an", "afternoon.", "A", "ten-second", "check", "found", "two", "ways", "anyone", "could", "read", "the", "data."] },   // Plausible
-    { at: 372, words: ["So", "Rebase", "puts", "the", "rules", "about", "who", "sees", "what", "inside", "the", "database", "itself,", "where", "nothing", "can", "get", "around", "them."] },   // Claim
+    { at: 126, words: ["An", "agent", "built", "this", "one", "in", "an", "afternoon,", "and", "it", "works.", "Then", "a", "ten-second", "scan", "found", "three", "ways", "in."] },   // Plausible
+    { at: 372, words: ["That's", "what", "Rebase", "is", "for.", "Every", "rule", "about", "who", "sees", "what", "is", "enforced", "by", "Postgres,", "not", "by", "your", "code."] },   // Claim
     { at: 582, words: ["You", "describe", "your", "data", "once,", "and", "the", "API,", "the", "code", "and", "the", "security", "rules", "all", "come", "from", "it.", "Change", "it,", "all", "three", "change."] },   // OneDefinition
     { at: 837, words: ["It's", "one", "install,", "and", "it", "brings", "you", "everything", "you're", "about", "to", "see.", "Nothing", "else", "to", "set", "up."] },   // Headline
     { at: 1017, words: ["Logins,", "file", "storage,", "real-time", "updates,", "scheduled", "jobs", "and", "backups", "—", "all", "of", "it", "already", "running."] },   // Headless
@@ -46,9 +59,9 @@ export const NARRATION: { at: number; words: string[] }[] = [
     { at: 1972, words: ["Run", "a", "query,", "change", "a", "field,", "or", "fix", "a", "permission,", "without", "opening", "a", "database", "tool."] },   // Studio
     { at: 2147, words: ["This", "diagram", "is", "read", "from", "the", "running", "database,", "so", "it", "is", "never", "out", "of", "date.", "Nobody", "has", "to", "update", "it."] },   // SchemaMap
     { at: 2407, words: ["The", "same", "request,", "sent", "by", "two", "different", "people,", "returns", "two", "completely", "different", "sets", "of", "records.", "Neither", "of", "them", "can", "see", "the", "other's", "data."] },   // TwoUsers
-    { at: 2647, words: ["Try", "it", "on", "the", "database", "you", "already", "use", "today.", "It", "works", "on", "any", "Postgres,", "anywhere", "you", "run", "it."] },   // Proof
+    { at: 2647, words: ["You", "can", "run", "the", "audit", "yourself,", "on", "the", "database", "you", "use", "today.", "It", "works", "on", "any", "Postgres,", "anywhere."] },   // Proof
     { at: 2847, words: ["An", "agent", "gets", "your", "permissions,", "and", "it", "cannot", "go", "around", "them."] },   // Agent
     { at: 3012, words: ["Three", "commands", "and", "it's", "running", "on", "your", "own", "machine.", "No", "account", "to", "make,", "and", "nothing", "to", "sign", "up", "for."] },   // OneCommand
-    { at: 3217, words: ["It's", "open", "source,", "it", "runs", "on", "your", "own", "machine,", "and", "nobody", "else", "ever", "has", "a", "copy", "of", "your", "data."] },   // Ownership
+    { at: 3217, words: ["Open", "source,", "and", "it", "runs", "anywhere", "—", "your", "laptop,", "your", "servers,", "any", "cloud.", "Nobody", "else", "ever", "holds", "your", "data."] },   // Ownership
     { at: 3427, words: ["So", "go", "and", "build", "it", "by", "lunch,", "if", "you", "like.", "The", "difference", "is", "that", "this", "time,", "you'll", "know", "it's", "safe."] },   // Close
 ];
