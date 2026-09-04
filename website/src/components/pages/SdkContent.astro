@@ -150,14 +150,14 @@ import ClosingCta from "../ClosingCta.astro";
      <NeatBackground client:idle transition:persist="neat-hero" />
 
       <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("sdkpage.00")}></p>
+        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("sdkpage.00")}></p>
         <h1 class="mb-6 text-display-2 text-white" set:html={t("sdkpage.01")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("sdkpage.02")}</p>
       </div>
     </section>
 
     <!-- Init Code -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section class="relative z-0 py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
@@ -178,11 +178,11 @@ import ClosingCta from "../ClosingCta.astro";
     </div>
 
     <!-- Data Access -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-3xl text-center mb-12">
           <h2 class="text-3xl sm:text-4xl text-white">{t("sdkpage.05")}</h2>
-          <p class="mt-4 text-lg text-surface-400" set:html={t("sdkpage.06")}></p>
+          <p class="mt-lead text-lg text-surface-400" set:html={t("sdkpage.06")}></p>
         </div>
 
         {/* SITE-STORY §5: every page carries a live demo, and this is the page
@@ -212,7 +212,7 @@ import ClosingCta from "../ClosingCta.astro";
     </section>
 
     <!-- Auth & Admin -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
           <div>
@@ -238,7 +238,7 @@ import ClosingCta from "../ClosingCta.astro";
     </section>
 
     <!-- SDK Generator -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>

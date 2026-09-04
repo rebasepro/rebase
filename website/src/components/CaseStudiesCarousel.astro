@@ -100,7 +100,7 @@ const cases = [
 {/* Closes the sequence, so it carries the numeral like every other chapter —
     the eyebrow already said "08" while nothing else on the section did. Cyan
     returns here from beat 01: the page opens and closes on the same hue. */}
-<section id="s-case-study" class="chapter relative z-0 py-28 sm:py-36">
+<section id="s-case-study" class="chapter relative z-0 py-chapter">
 
     <!-- Header: heading left, supporting copy right -->
     <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
@@ -110,7 +110,7 @@ const cases = [
                     <span class="font-mono">06</span><span
                         class="mx-2 text-surface-700">·</span>{t("showcase.badge")}
                 </p>
-                <h2 class="mt-4 font-headers text-display-2 text-white text-balance">
+                <h2 class="mt-label font-headers text-display-2 text-white text-balance">
                     {t("showcase.title.part1")} {t("showcase.title.part2")}
                 </h2>
             </div>
@@ -119,7 +119,7 @@ const cases = [
         </div>
     </div>
 
-    <div class="cs-carousel mt-14 sm:mt-16 animate-on-scroll fade-in-up delay-100"
+    <div class="cs-carousel mt-block animate-on-scroll fade-in-up delay-100"
          role="region"
          aria-roledescription="carousel"
          aria-label={t("showcase.title.part1") + " " + t("showcase.title.part2")}>

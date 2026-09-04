@@ -28,7 +28,7 @@ import ClosingCta from "../ClosingCta.astro";
       </div>
     </section>
     <!-- Content Sections -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section class="relative z-0 py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         
         <div class="space-y-16">
@@ -314,18 +314,18 @@ import ClosingCta from "../ClosingCta.astro";
         the page. PRODUCT.md principle 4: a comparison has to survive a reader
         who uses the competitor daily, and a page that never says "stay" does
         not. Same text as the FAQ entry, so the two cannot drift. */}
-    <section id="concession-section" class="py-16 sm:py-20 border-t border-surface-800/60">
+    <section id="concession-section" class="py-band border-t border-surface-800/60">
       <div class="mx-auto max-w-3xl px-6 lg:px-8">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
+        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.noswitch")}</p>
         <h2 class="text-2xl sm:text-3xl text-white mb-5">{t("vsdjango.18")}</h2>
         <p class="text-base sm:text-lg leading-8 text-surface-300">{t("vsdjango.19")}</p>
       </div>
     </section>
 
     <!-- Back to the comparison hub -->
-    <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
+    <section id="compare-hub-footer" class="py-band border-t border-surface-800/60">
       <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
+        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("vs.hub.eyebrow")}</p>
         <h2 class="text-2xl sm:text-3xl text-white mb-4">{t("vs.hub.title")}</h2>
         <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">{t("vs.hub.blurb")}</p>
         <a href={translatePath("/compare")}

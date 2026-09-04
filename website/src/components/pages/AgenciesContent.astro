@@ -31,7 +31,7 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
                 </p>
             </div>
         </section>
- <section class="relative isolate py-16">
+ <section class="relative isolate py-strip">
             <div class="mx-auto max-w-6xl px-8 lg:px-12">
                 <h2 class="text-center text-lg leading-8 text-surface-400">
                     {t('social.title')}
@@ -50,7 +50,7 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 
 
         <!-- Agency Advantage Section -->
- <section class="relative isolate py-16 sm:py-24">
+ <section class="relative isolate py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-4xl text-center animate-on-scroll fade-in-up">
                     <div class="flex items-center justify-center mb-4">
@@ -72,7 +72,7 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
         <UsageExamples/>
 
 
- <section class="relative isolate py-16 sm:py-24">
+ <section class="relative isolate py-chapter">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center animate-on-scroll fade-in-up delay-100">
                     <div class="lg:col-span-6">
@@ -185,7 +185,7 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
 
 
         <!-- Easy to Customize Section -->
- <section class="relative isolate py-16 sm:py-24">
+ <section class="relative isolate py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center animate-on-scroll fade-in-up">
                     <div class="rounded-xl ring-1 ring-inset ring-surface-800 overflow-hidden bg-surface-950">
@@ -228,7 +228,7 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
         </section>
 
         <!-- Features for Agency Success Section -->
- <section class="relative isolate py-16 sm:py-24">
+ <section class="relative isolate py-chapter">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="text-center mb-12">
                     <h2 class="text-3xl sm:text-4xl text-white">{t('agencies.features.title')}</h2>
@@ -418,12 +418,12 @@ import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
              band used to carry "5×", "↓80%", "100%" and four unnamed client
              stories. The real projects are the proof, and they are named, live
              and linkable. -->
-        <section class="relative isolate py-16 sm:py-24">
+        <section class="relative isolate py-chapter">
             <div class="max-w-6xl mx-auto px-6 lg:px-8">
                 <div class="mb-12 max-w-2xl">
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("agenciespage.00")}</p>
+                    <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("agenciespage.00")}</p>
                     <h2 class="text-3xl sm:text-4xl text-white">{t("agenciespage.01")}</h2>
-                    <p class="mt-4 text-lg text-surface-400">{t("agenciespage.02")}</p>
+                    <p class="mt-lead text-lg text-surface-400">{t("agenciespage.02")}</p>
                 </div>
             </div>
             <CaseStudiesCarousel t={t} />

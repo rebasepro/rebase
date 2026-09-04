@@ -43,7 +43,7 @@ import ClosingCta from "../ClosingCta.astro";
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
           <span class="text-sm font-medium">{t("studiopage.00")}</span>
         </div>
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("studiopage.01")}></p>
+        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("studiopage.01")}></p>
         <h1 class="mb-6 text-display-2 text-white" set:html={t("studiopage.02")}></h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("studiopage.03")}</p>
         <div class="flex items-center justify-start gap-x-4">
@@ -73,7 +73,7 @@ import ClosingCta from "../ClosingCta.astro";
     </section>
 
     <!-- Collection Code Editor -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section class="relative z-0 py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div class="lg:order-last">
@@ -119,11 +119,11 @@ import ClosingCta from "../ClosingCta.astro";
          workspace" — the CMS data grid, which is /cms's argument, not this page's.
          Studio's flagship tool had no section and no card anywhere, while both the
          hero and the closing CTA promised it. -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-12">
           <h2 class="text-3xl sm:text-4xl text-white">{t("studiopage.06")}</h2>
-          <p class="mt-4 text-surface-400 text-lg" set:html={t("studiopage.07")}></p>
+          <p class="mt-lead text-surface-400 text-lg" set:html={t("studiopage.07")}></p>
         </div>
         <div class="rounded-2xl border border-surface-800 bg-surface-950 shadow-2xl overflow-hidden">
           <SQLEditorDemo client:visible />
@@ -137,11 +137,11 @@ import ClosingCta from "../ClosingCta.astro";
     </div>
 
     <!-- More Studio Features -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
       <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="mx-auto max-w-2xl text-center mb-16">
           <h2 class="text-3xl sm:text-4xl text-white">{t("studiopage.08")}</h2>
-          <p class="mt-4 text-surface-400 text-lg">{t("studiopage.09")}</p>
+          <p class="mt-lead text-surface-400 text-lg">{t("studiopage.09")}</p>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 

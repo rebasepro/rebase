@@ -411,6 +411,29 @@ there once. Do not re-implement any of them inline on a page.
 - **One shell width (`72rem`) on every section**, so left edges agree across the
   page. Copy blocks are constrained separately: 42rem for section heads, 38rem
   for leads, 34rem for the hero sub.
+- **One vertical rhythm, six named gaps.** Added 2026-09-04; this section had
+  pinned the horizontal system and left the vertical one to the call site, so
+  the home page ran 112, 128 and 144px of section padding at once and framed a
+  63px headline with 16px of air. The scale lives in `global.css` as
+  `--spacing-chapter | band | strip | block | lead | label` and is used through
+  Tailwind — `py-chapter`, `mt-lead`, `mb-label`. Each name is a
+  RELATIONSHIP, not a size: a chapter's padding, a short band between two
+  chapters, a caption-and-logos strip, a head block to the content it opens, a
+  heading to its lead, an eyebrow to the heading it labels. All six are fluid
+  between 640px and 1440px for the same reason the display tiers are — German
+  and French run 15-25% longer, and a gap that frames a two-line English
+  heading has to frame a three-line one. `label` is deliberately tighter than
+  `lead`: the eyebrow belongs to the heading, the lead is the next thought.
+  One-off gaps inside a card stay on Tailwind's own 4px scale; naming every gap
+  is how a scale stops meaning anything.
+  **Every marketing section is on the scale** — 121 of them, swept the same day.
+  A `<section>` that hand-writes `py-16 sm:py-24` again is drift, and the
+  deep-page label mark (`text-xs`, `0.25em`, uppercase — not the mono `.eyebrow`,
+  which is the home page's) carries `mb-label`. Two deliberate exceptions: the
+  `<footer>`, which is chrome and not a beat, and Kit Digital's `py-8` legal
+  disclaimer. Heroes keep their own bottom padding: a hero's top is
+  `hero-under-nav` and its bottom is measured against the fold, not against
+  this scale.
 - **Headlines are one colour.** The white-line/accent-line split is retired; it
   had reached 21 instances across 13 pages and read as a template.
 - **Section labels are neutral**, not tinted.

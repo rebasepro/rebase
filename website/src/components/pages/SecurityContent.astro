@@ -18,7 +18,7 @@ import ClosingCta from "../ClosingCta.astro";
             <NeatBackground client:idle transition:persist="neat-hero" />
 
             <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-                <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("securitypage.00")}></p>
+                <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase" set:html={t("securitypage.00")}></p>
                 <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10">
                     <span class="text-sm font-medium">{t("securitypage.01")}</span>
                 </div>
@@ -38,13 +38,13 @@ import ClosingCta from "../ClosingCta.astro";
 
 
         <!-- Free tool: rls-check -->
-        <section class="relative z-0 py-16 sm:py-24">
+        <section class="relative z-0 py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <div class="rounded-2xl border border-surface-700/80 bg-surface-900/60 px-6 py-10 sm:px-10 sm:py-12">
                     <div class="text-center">
                         <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary">{t("securitypage.04")}</span>
                         <h2 class="mt-5 text-2xl sm:text-3xl text-white">{t("securitypage.05")}</h2>
-                        <p class="mt-4 text-base leading-7 text-surface-400" set:html={t("securitypage.06")}></p>
+                        <p class="mt-lead text-base leading-7 text-surface-400" set:html={t("securitypage.06")}></p>
                     </div>
 
                     <div class="mt-8 group relative">
@@ -89,7 +89,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- Row-Level Security Section -->
- <section id="rls" class="relative z-0 py-16 sm:py-24">
+ <section id="rls" class="relative z-0 py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="space-y-8">
                     <div class="max-w-3xl">
@@ -98,7 +98,7 @@ import ClosingCta from "../ClosingCta.astro";
                             {t("securitypage.lbl.db")}
                         </div>
                         <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.09")}</h2>
-                        <p class="mt-4 text-base text-surface-400 max-w-2xl">{t("securitypage.10")}</p>
+                        <p class="mt-lead text-base text-surface-400 max-w-2xl">{t("securitypage.10")}</p>
                     </div>
 
                     <!-- Browser chrome frame -->
@@ -122,11 +122,11 @@ import ClosingCta from "../ClosingCta.astro";
 
 
         <!-- Fail closed -->
-        <section class="py-16 sm:py-24">
+        <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
                     <div class="lg:col-span-5">
-                        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("securitypage.82")}</p>
+                        <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("securitypage.82")}</p>
                         <h2 class="text-3xl sm:text-4xl text-white mb-5">{t("securitypage.13")}</h2>
                         <p class="text-base text-surface-400 leading-relaxed mb-4">{t("securitypage.14")}</p>
                         <p class="text-base text-surface-400 leading-relaxed">{t("securitypage.15")}</p>
@@ -166,7 +166,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- RBAC Section -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid lg:grid-cols-2 gap-12 items-center">
                     <div>
@@ -222,7 +222,7 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
 
         <!-- Data Sovereignty Section -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section class="relative z-0 py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="grid lg:grid-cols-2 gap-12 items-center">
                     <div>
@@ -264,7 +264,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- Self-Hosted Architecture Section -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section class="relative z-0 py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium mx-auto">
@@ -272,7 +272,7 @@ import ClosingCta from "../ClosingCta.astro";
                         Self-Hosted
                     </div>
                     <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.41")}</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">{t("securitypage.42")}</p>
+                    <p class="mt-lead text-lg leading-8 text-surface-400">{t("securitypage.42")}</p>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
@@ -306,11 +306,11 @@ import ClosingCta from "../ClosingCta.astro";
         </div>
 
         <!-- Deployment Models Section -->
-        <section class="py-16 sm:py-24">
+        <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-12">
                     <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.46")}</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400" set:html={t("securitypage.47")}></p>
+                    <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("securitypage.47")}></p>
                 </div>
                 <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
@@ -336,7 +336,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- Rebase Cloud Section -->
-        <section class="py-16 sm:py-24">
+        <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium mx-auto">
@@ -344,7 +344,7 @@ import ClosingCta from "../ClosingCta.astro";
                         Rebase Cloud · Private beta
                     </div>
                     <h2 class="text-3xl sm:text-4xl text-white">{t("securitypage.54")}</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400" set:html={t("securitypage.55")}></p>
+                    <p class="mt-lead text-lg leading-8 text-surface-400" set:html={t("securitypage.55")}></p>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -397,7 +397,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- Privacy & Compliance Section -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="max-w-4xl mx-auto text-center mb-12">
                     <h2 class="text-3xl sm:text-4xl text-white mb-4">{t("securitypage.69")}</h2>
@@ -428,7 +428,7 @@ import ClosingCta from "../ClosingCta.astro";
         </section>
 
         <!-- Vulnerability Disclosure Section -->
-        <section class="py-16 sm:py-24">
+        <section class="py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 md:p-12 ring-1 ring-inset ring-surface-800">
                     <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 mb-6">

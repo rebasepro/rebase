@@ -36,9 +36,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
         {/* Bottom padding trimmed from pb-40. The hero is ~310px taller than it
             was, and 160px of air under a headline this size reads as the page
             having stopped rather than as breathing room. */}
-        {/* Top padding is what buys the CTA row its place above the fold on a
-            1440x900 window — the smallest laptop size that still matters here.
-            Measured, not guessed: at pt-28 the CTAs landed 42px under. */}
+        {/* Top padding is bounded by the fold on a 1440x900 window — the
+            smallest laptop size that still matters here. It was pinned at
+            pt-20 when the headline lived in one half of the grid and wrapped
+            to six lines; full width it sets in three, and the measurement that
+            justified the tighter scale ("at pt-28 the CTAs landed 42px under")
+            has not been true since. Re-measured 2026-09-04 at pt-28: the CTA
+            row bottoms out at 651px and the terminal at 688px, both clear of
+            the fold with room to spare. */}
         {/* `hero-under-nav` starts the section behind the transparent bar so the
             Neat canvas fills that band too (global.css). The top scale it comes
             with is the site's — this hero keeps its own tighter one, measured
@@ -46,7 +51,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
             The header's height is added back here for the same reason the shared
             class adds it: the negative margin has to be paid for, or every line
             below rides 60px too high. */}
-        <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(20)+var(--header-h))] pb-24 sm:pb-28">
+        <section class="relative isolate overflow-hidden flex items-center hero-under-nav pt-[calc(--spacing(28)+var(--header-h))] pb-24 sm:pb-28">
             <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true">
                 <NeatBackground client:idle transition:persist="neat-hero" />
             </div>
@@ -64,7 +69,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 below the fold — big, but not bold. Full width it sets in three,
                 and the product artifact stays where SITE-STORY §5 requires it. */}
             <div class="relative w-full mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-10 items-center">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
                     <div class="lg:col-span-12">
                         <!-- The Postgres mark the old hero carried: it says what the
                              product runs on before the headline has to. -->
@@ -163,7 +168,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
              `border-t` only: chapter 01 below opens with its own border-t at
              white/8, and now that the divider between them occupies no flow the
              two rules touch and paint as one 2px line. -->
-        <div class="border-t border-white/5 py-10 sm:py-14">
+        <div class="border-t border-white/5 py-strip">
             {/* The caption is the qualifier PRODUCT.md mandates — and, since
                 2026-09-02, the heritage argument: FireCMS's 10,000+ projects are
                 the credibility a star count cannot supply. The campaign pages
@@ -189,7 +194,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
             <!-- The bento, with the content kept and the uniform card dropped:
                  hairline cells on one raised plate instead of six floating cards. -->
-            <section class="chapter relative ground-raised border-y border-white/8 py-24 sm:py-32">
+            <section class="chapter relative ground-raised border-y border-white/8 py-chapter">
                 {/* The numeral is decoration only — the mono label below already
                     says "02", so this is aria-hidden and the digit is never read
                     twice. It is absolutely positioned and cropped by the
@@ -201,16 +206,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             <span class="font-mono">02</span>
                             <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
                         </p>
-                        <h2 class="mt-4 font-headers text-display-2 text-balance">
+                        <h2 class="mt-label font-headers text-display-2 text-balance">
                             {t("engine.title")}
                         </h2>
-                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("engine.subtitle")}</p>
+                        <p class="mt-lead max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("engine.subtitle")}</p>
                     </div>
 
                     <!-- The demos were 232px postage stamps inside a hairline grid.
                          They are the most interesting thing on the page, so they get
                          the room: one wide frame, then two half-width ones. -->
-                    <div class="mt-12 animate-on-scroll fade-in-up">
+                    <div class="mt-block animate-on-scroll fade-in-up">
                         <div class="frame">
                             <div class="frame-head">
                                 <span class="h-2 w-2 rounded-full bg-rose-500/70"></span>
@@ -245,7 +250,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     </div>
 
                     <!-- What is left over is a line of text, not a fourth panel. -->
-                    <div class="mt-10 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-6">
+                    <div class="mt-12 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-8">
                         <p class="text-sm text-[#b4b8bd] max-w-2xl">
                             {t("engine.plus")}
                         </p>
@@ -274,9 +279,9 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 Brand blue deepened, because this promise holds by construction —
                 it is what Rebase is. See `ground-chroma` for the rule and for
                 why the raw #0070F4 cannot be used here. */}
-            <section class="chapter ground-chroma ground-claim py-24 sm:py-32" style="--hue: var(--color-primary)">
+            <section class="chapter ground-chroma ground-claim py-chapter" style="--hue: var(--color-primary)">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div class="lg:col-span-5">
                             {/* No `text-[#b4b8bd]` inside a slab. That grey is
                                 tuned for the near-black page ground; on a
@@ -286,11 +291,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <span class="font-mono">03</span>
                                 <span class="mx-2 opacity-40">·</span>{t("security.badge")}
                             </p>
-                            <h2 class="mt-4 font-headers text-display-2 text-balance">
+                            <h2 class="mt-label font-headers text-display-2 text-balance">
                                 {t("security.title")}
                             </h2>
-                            <p class="mt-5 max-w-[38rem] leading-relaxed">{t("security.desc")}</p>
-                            <div class="mt-8 flex flex-col items-start gap-3">
+                            <p class="mt-lead max-w-[38rem] leading-relaxed">{t("security.desc")}</p>
+                            <div class="mt-10 flex flex-col items-start gap-3">
                                 <a href={translatePath("/studio")} class="accent-link">
                                     {t("security.link")}
                                     <ArrowRight size={15} />
@@ -350,15 +355,15 @@ const SELFHOST_COMMAND = "docker compose up -d";
             other bands use, so the proof point separates itself without
             claiming a chapter number or a second colour. -->
         */}
-        <section class="chapter relative ground-raised border-y border-white/8 py-16 sm:py-20">
+        <section class="chapter relative ground-raised border-y border-white/8 py-band">
             <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
                     <div class="max-w-xl">
                         <h2 class="font-headers text-2xl sm:text-3xl text-balance">
                             {t("rlscheck.title")}
                         </h2>
-                        <p class="mt-4 text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
-                        <a href={translatePath("/rls-check")} class="accent-link mt-6">
+                        <p class="mt-lead text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
+                        <a href={translatePath("/rls-check")} class="accent-link mt-8">
                             {t("rlscheck.cta")}
                             <ArrowRight size={15} />
                         </a>
@@ -403,45 +408,45 @@ const SELFHOST_COMMAND = "docker compose up -d";
         <div>
             {/* No `overflow-hidden` here and no z-0: the gold divider above
                 bleeds THROUGH this section by design (§6). */}
-            <section class="chapter relative py-24 sm:py-32">
+            <section class="chapter relative py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="max-w-[42rem] animate-on-scroll fade-in-up">
                         <p class="eyebrow">
                             <span class="font-mono">04</span>
                             <span class="mx-2 text-surface-700">·</span>{t("panel.badge")}
                         </p>
-                        <h2 class="mt-4 font-headers text-display-2 text-balance">
+                        <h2 class="mt-label font-headers text-display-2 text-balance">
                             {t("panel.title")}
                         </h2>
-                        <p class="mt-4 max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
+                        <p class="mt-lead max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
                     </div>
                     {/* No `.frame`: the carousel draws its own browser chrome, and
                         §6 allows a demo one frame, not two. The view toggle is page
                         furniture and sits outside the product's edge. */}
-                    <div class="mt-12 animate-on-scroll fade-in-up">
+                    <div class="mt-block animate-on-scroll fade-in-up">
                         <AdminDemoCarousel client:visible height={620} />
                     </div>
-                    <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
-                        <div class="md:border-r border-white/8 py-8 md:pr-8">
+                    <div class="mt-block grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
+                        <div class="md:border-r border-white/8 py-10 md:pr-8">
                             <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.baas.tag")}</p>
                             <h3 class="mt-3 font-headers text-lg">{t("modes.baas.title")}</h3>
                             <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.baas.desc")}</p>
                             <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/server</p>
                         </div>
-                        <div class="md:border-r border-white/8 py-8 md:px-8 border-t md:border-t-0">
+                        <div class="md:border-r border-white/8 py-10 md:px-8 border-t md:border-t-0">
                             <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.cms.tag")}</p>
                             <h3 class="mt-3 font-headers text-lg">{t("modes.cms.title")}</h3>
                             <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.cms.desc")}</p>
                             <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/cms</p>
                         </div>
-                        <div class="py-8 md:pl-8 border-t md:border-t-0 border-white/8">
+                        <div class="py-10 md:pl-8 border-t md:border-t-0 border-white/8">
                             <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t("modes.full.tag")}</p>
                             <h3 class="mt-3 font-headers text-lg">{t("modes.full.title")}</h3>
                             <p class="mt-2 text-sm text-[#b4b8bd] leading-relaxed">{t("modes.full.desc")}</p>
                             <p class="mt-4 font-mono text-2xs text-surface-600">@rebasepro/app</p>
                         </div>
                     </div>
-                    <a href={translatePath("/cms")} class="accent-link mt-8">
+                    <a href={translatePath("/cms")} class="accent-link mt-10">
                         {t("showcase.exploreCms")}
                         <ArrowRight size={15} />
                     </a>
@@ -466,19 +471,19 @@ const SELFHOST_COMMAND = "docker compose up -d";
             ground is a stronger version of the same gesture, and running both
             would have two devices doing one job. */}
         <div>
-            <section class="chapter ground-raised relative border-y border-white/8 py-24 sm:py-32">
+            <section class="chapter ground-raised relative border-y border-white/8 py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div class="lg:col-span-5">
                             <p class="eyebrow">
                                 <span class="font-mono">05</span>
                                 <span class="mx-2 opacity-40">·</span>{t("agentera.badge")}
                             </p>
-                            <h2 class="mt-4 font-headers text-display-2 text-balance">
+                            <h2 class="mt-label font-headers text-display-2 text-balance">
                                 {t("agentera.title")}.
                             </h2>
-                            <p class="mt-5 leading-relaxed" set:html={t("agentera.p1")}></p>
-                            <a href={translatePath("/ai")} class="accent-link mt-8">
+                            <p class="mt-lead leading-relaxed" set:html={t("agentera.p1")}></p>
+                            <a href={translatePath("/ai")} class="accent-link mt-10">
                                 {t("agentera.link")}
                                 <ArrowRight size={15} />
                             </a>
@@ -520,19 +525,19 @@ const SELFHOST_COMMAND = "docker compose up -d";
              decided the product is good, and worth more than any other to
              one who has — which is who is standing here. The close goes back
              to asking. -->
-        <section class="chapter relative border-t border-white/8 py-24 sm:py-32">
+        <section class="chapter relative border-t border-white/8 py-chapter">
             <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
                     <div class="lg:col-span-5">
                         <p class="eyebrow">
                             <span class="font-mono">07</span>
                             <span class="mx-2 text-surface-700">·</span>{t("opensource.badge")}
                         </p>
-                        <h2 class="mt-4 font-headers text-display-2 text-balance" set:html={t("opensource.title")}></h2>
+                        <h2 class="mt-label font-headers text-display-2 text-balance" set:html={t("opensource.title")}></h2>
                     </div>
                     <div class="lg:col-span-7">
                         <p class="text-lg leading-relaxed text-[#b4b8bd] max-w-measure-lead">{t("opensource.desc")}</p>
-                        <div class="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3">
+                        <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3">
                             <a href={translatePath("/developers")} class="accent-link">
                                 {t("opensource.link1")}
                                 <ArrowRight size={15} />
@@ -561,13 +566,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
             change the reader can feel: atmosphere while you are being
             persuaded, flat colour when you are being asked. */}
         <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8 py-24 sm:py-32">
+            <div class="mx-auto max-w-6xl px-6 lg:px-8 py-chapter">
                 <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
                     {t("cta.title")}
                 </h2>
 
-                <div class="mt-12 grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
-                    <div class="md:border-r border-white/10 py-9 md:pr-8">
+                <div class="mt-block grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
+                    <div class="md:border-r border-white/10 py-10 md:pr-8">
                         <h3 class="text-base">{t("cta.lane.local.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.local.desc")}</p>
                         <div class="mt-5 flex items-center gap-2 rounded-lg border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
@@ -595,7 +600,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             {t("cta.lane.local.link")} <ArrowRight size={14} />
                         </a>
                     </div>
-                    <div class="md:border-r border-white/10 py-9 md:px-8 border-t md:border-t-0">
+                    <div class="md:border-r border-white/10 py-10 md:px-8 border-t md:border-t-0">
                         <h3 class="text-base">{t("cta.lane.selfhost.title")}</h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.selfhost.desc")}</p>
                         <div class="mt-5 flex items-center gap-2 rounded-lg border border-white/10 pl-3 pr-1.5 py-1.5 font-mono text-xs text-surface-200">
@@ -623,7 +628,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             {t("cta.lane.selfhost.link")} <ArrowRight size={14} />
                         </a>
                     </div>
-                    <div class="py-9 md:pl-8 border-t md:border-t-0 border-white/10">
+                    <div class="py-10 md:pl-8 border-t md:border-t-0 border-white/10">
                         <h3 class="text-base flex items-center gap-3">
                             {t("cta.lane.cloud.title")}
                             <span class="rounded-md bg-white/10 px-2 py-1 font-mono text-3xs uppercase tracking-[0.1em] text-surface-300">
@@ -637,7 +642,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                     </div>
                 </div>
 
-                <div class="mt-10 flex flex-wrap gap-3">
+                <div class="mt-12 flex flex-wrap gap-3">
                     <a
                         href={translatePath("/demo")}
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:bg-primary-dark"

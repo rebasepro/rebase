@@ -64,6 +64,45 @@
     --spacing-measure-head: 42rem;
     --spacing-measure-lead: 38rem;
     --spacing-measure-sub: 34rem;
+
+    /* ── Vertical rhythm (2026-09-04) ────────────────────────────────────────
+       §6 pinned the horizontal system — one shell, three copy measures — and
+       left the vertical one to the call site, so every section improvised it:
+       112, 128 and 144px of section padding coexisted on the home page, and a
+       63px headline carried 16px of air above and below it. The type grew twice
+       and the space around it never did; that is what read as cramped, not the
+       section padding, which was already larger than the sites this was
+       measured against.
+
+       Six numbers, each naming a RELATIONSHIP rather than a size, so a section
+       states what a gap is for and the scale decides how big it is:
+
+         chapter   a numbered chapter's padding-block      96 → 160
+         band      a short band between two chapters       64 → 112
+         strip     a caption-and-logos strip               40 →  72
+         block     a head block → the content it opens     48 →  80
+         lead      a heading → its lead paragraph          24 →  32
+         label     an eyebrow → the heading it labels      20 →  24
+
+       Fluid, not breakpointed, and for the same reason the display tiers are:
+       German and French run 15-25% longer, so the gap that frames an English
+       two-line heading has to frame a three-line one. Each curve is linear
+       between 640px and 1440px and flat outside it — the floor is the phone
+       value, the ceiling stops a 2560px monitor from paying 280px a section.
+
+       `label` stays smaller than `lead` on purpose. The eyebrow belongs TO the
+       heading and the lead is the next thought; equal gaps (both were 16px)
+       made the three read as one undifferentiated stack.
+
+       Use these for the rhythm that repeats. A one-off gap inside a card is
+       still Tailwind's own 4px scale — naming every gap is how a scale stops
+       meaning anything. */
+    --spacing-chapter: clamp(6rem, 1.9rem + 9vw, 10rem);
+    --spacing-band: clamp(4rem, 1.6rem + 6vw, 7rem);
+    --spacing-strip: clamp(2.5rem, 0.9rem + 4vw, 4.5rem);
+    --spacing-block: clamp(3rem, 1.4rem + 4vw, 5rem);
+    --spacing-lead: clamp(1.5rem, 1.1rem + 1vw, 2rem);
+    --spacing-label: clamp(1.25rem, 1.1rem + 0.4vw, 1.5rem);
 }
 
 /* One treatment for every product surface. A demo that draws its own window

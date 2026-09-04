@@ -168,7 +168,7 @@ const solutions = [
             </div>
         </section>
         <!-- Logos institucionales -->
- <section class="relative z-0 py-12 border-b border-surface-800">
+ <section class="relative z-0 py-strip border-b border-surface-800">
             <div class="mx-auto max-w-5xl px-6 lg:px-8">
                 <p class="text-center text-sm text-surface-400 mb-8">{t('kd.logos.funded')}</p>
                 <div class="flex items-center justify-center gap-8 flex-wrap">
@@ -195,7 +195,7 @@ const solutions = [
 
 
         <!-- ¿Qué es el Kit Digital? -->
- <section class="py-16 sm:py-24">
+ <section class="py-chapter">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <h2 class="text-3xl sm:text-4xl text-white mb-8 text-center">{t('kd.whatis.title')}</h2>
                 <div class="prose prose-lg prose-invert max-w-none">
@@ -223,11 +223,11 @@ const solutions = [
         </section>
 
         <!-- Catálogo de Soluciones -->
- <section id="soluciones" class="py-16 sm:py-24 scroll-mt-20">
+ <section id="soluciones" class="py-chapter scroll-mt-20">
             <div class="mx-auto max-w-6xl px-6 lg:px-8">
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <h2 class="text-3xl sm:text-4xl text-white">{t('kd.solutions.title')}</h2>
-                    <p class="mt-6 text-lg leading-8 text-surface-400">{t('kd.solutions.desc')}</p>
+                    <p class="mt-lead text-lg leading-8 text-surface-400">{t('kd.solutions.desc')}</p>
                     <p class="mt-4 text-base leading-7 text-surface-500">{t('kd.solutions.oneProduct')}</p>
                 </div>
 
@@ -312,7 +312,7 @@ const solutions = [
         </section>
 
         <!-- Zona geográfica de actuación -->
- <section class="py-16 sm:py-24 border-t border-surface-800">
+ <section class="py-chapter border-t border-surface-800">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <h2 class="text-3xl sm:text-4xl text-white mb-8 text-center">{t('kd.geo.title')}</h2>
                 <p class="text-lg text-surface-300 leading-relaxed mb-8 text-center" set:html={t('kd.geo.desc')} />
@@ -339,7 +339,7 @@ const solutions = [
         </section>
 
         <!-- CTA -->
- <section class="py-24 sm:py-32">
+ <section class="py-chapter">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 text-center">
                 <h2 class="text-3xl sm:text-4xl text-white mb-4">{t('kd.cta.title')}</h2>
                 <p class="text-lg text-surface-400 mb-8 max-w-2xl mx-auto">{t('kd.cta.desc')}</p>

@@ -95,7 +95,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
         <NeatBackground client:idle transition:persist="neat-hero" />
 
         <div class="relative z-10 mx-auto max-w-6xl px-4 lg:px-12">
-            <p class="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">
+            <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">
                 <a href={translatePath("/backend")} class="transition-colors hover:text-primary">{t("aipage.27")}</a>
                 <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">{t("aipage.00")}</span>
             </p>
@@ -109,11 +109,11 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </section>
 
     <!-- ═══════════════════════ ONE CONFIG BLOCK ═══════════════════════ -->
-    <section class="relative z-0 py-16 sm:py-24">
+    <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
                 <div class="lg:col-span-5">
-                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.04")}</p>
+                    <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.04")}</p>
                     <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.05")}</h2>
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.06")}></p>
                     <p class="mb-4 text-base leading-relaxed text-surface-400" set:html={t("aipage.07")}></p>
@@ -133,10 +133,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </section>
 
     <!-- ═══════════════════════ THE TOOL SURFACE ═══════════════════════ -->
-    <section class="relative z-0 py-16 sm:py-24">
+    <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto mb-12 max-w-3xl text-center">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.10")}</p>
+                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.10")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">
                     {toolCount} tools, and these are their real names
                 </h2>
@@ -176,10 +176,10 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </div>
 
     <!-- ═══════════════════════ TRY TO MAKE IT LEAK ═══════════════════════ -->
-    <section class="relative z-0 py-16 sm:py-24">
+    <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
             <div class="mx-auto mb-12 max-w-3xl text-center">
-                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.12")}</p>
+                <p class="mb-label text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.12")}</p>
                 <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.13")}</h2>
                 <p class="text-base leading-relaxed text-surface-400">{t("aipage.14")}</p>
                 <p class="mt-4 text-base leading-relaxed text-surface-400">{t("aipage.15")}</p>
@@ -217,7 +217,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </section>
 
     <!-- ═══════════════════════ AGENT INFRASTRUCTURE ═══════════════════════ -->
-    <section id="s-ai-apps" class="relative isolate overflow-hidden py-24 sm:py-32">
+    <section id="s-ai-apps" class="relative isolate overflow-hidden py-chapter">
         <div class="pointer-events-none absolute inset-0 -z-10">
             <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
         </div>
@@ -226,7 +226,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
             <div class="mx-auto mb-16 max-w-3xl text-center">
                 <p class="text-xs font-semibold uppercase tracking-[0.25em] text-surface-500">{t("aipage.28")}</p>
                 <h2 class="mt-4 text-display-2 text-white">{t("aipage.21")}</h2>
-                <p class="mt-4 text-base leading-relaxed text-surface-400 sm:text-lg">{t("aipage.22")}</p>
+                <p class="mt-lead text-base leading-relaxed text-surface-400 sm:text-lg">{t("aipage.22")}</p>
             </div>
 
             <!-- Not `inert`, unlike the decorative mockups elsewhere on the site:
@@ -239,7 +239,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </section>
 
     <!-- ═══════════════════════ CLIENTS ═══════════════════════ -->
-    <section class="relative z-0 py-16 sm:py-20">
+    <section class="relative z-0 py-band">
         <!-- max-w-6xl so the eight chips clear one row on desktop; the sentence
              keeps its own narrower measure so it does not stretch with them. -->
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
@@ -260,7 +260,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
     </section>
 
     <!-- ═══════════════════════ CTA ═══════════════════════ -->
-    <section class="relative z-0 py-20 sm:py-28">
+    <section class="relative z-0 py-chapter">
         <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
             <h2 class="mb-5 text-3xl sm:text-4xl text-white">{t("aipage.24")}</h2>
             <p class="mb-8 text-lg leading-relaxed text-surface-400">{t("aipage.25")}</p>
