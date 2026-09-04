@@ -28,24 +28,24 @@ sound like a way to generate REST routes.
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | The problem | 300 | 10.0 | Getting a backend has never been easier. Knowing whether it is safe never got easier. |
-| 02 | Row-level security | 170 | 5.7 | Authorization belongs in the database, where code cannot forget to ask. |
+| 01 | The problem | 300 | 10.0 | An afternoon to build. Ten seconds to find what it missed. |
+| 02 | Row-level security | 170 | 5.7 | Every client hits it, including the ones you did not write. |
 | 03 | One definition | 210 | 7.0 | One definition, and everything else is compiled from it. |
-| 04 | Forty endpoints | 270 | 9.0 | REST, an OpenAPI spec, a typed SDK. None of it written. |
-| 05 | Headline | 150 | 5.0 | A backend for Postgres. The one you choose. |
-| 06 | Headless | 175 | 5.8 | Take only that: SDK, auth, storage, functions, cron, backups. |
-| 07 | The wire | 240 | 8.0 | Realtime too — and the rows you cannot see never arrive. |
-| 08 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone else. |
+| 04 | Forty endpoints | 270 | 9.0 | The same file also wrote an OpenAPI spec and a typed SDK. |
+| 05 | Headline | 150 | 5.0 | Everything after this point is optional. |
+| 06 | Headless | 175 | 5.8 | And the panel's packages are never installed on this path. |
+| 07 | The wire | 240 | 8.0 | You did not write a subscription server, or decide who may listen. |
+| 08 | The panel | 280 | 9.3 | Delete it tomorrow and not one API response changes for anyone. |
 | 09 | Every view | 240 | 8.0 | Lists, boards, tables, forms. Every one of them generated. |
-| 10 | Studio | 175 | 5.8 | Add Studio and run the database from the same app. |
-| 11 | The schema | 260 | 8.7 | Drawn from the catalogue, so it is what is actually there. |
-| 12 | Access is not a switch | 240 | 8.0 | Per collection, per operation, per role. Postgres enforces every cell. |
-| 13 | The same query, twice | 240 | 8.0 | The same call, two people, different rows. No branch anywhere. |
-| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres. |
-| 15 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. |
-| 16 | One command | 205 | 6.8 | Three commands, and all of it runs against your database. |
+| 10 | Studio | 175 | 5.8 | No psql tab, and no second set of credentials. |
+| 11 | The schema | 260 | 8.7 | Nobody maintains this drawing, because nobody drew it. |
+| 12 | Access is not a switch | 240 | 8.0 | Forty of these, and one file decides them all. |
+| 13 | The same query, twice | 240 | 8.0 | Neither of them can ask for the other's rows. |
+| 14 | The proof | 200 | 6.7 | Run it on what you have now, before believing any of this. |
+| 15 | Agent-native | 165 | 5.5 | There is nothing to talk into giving it more. |
+| 16 | One command | 205 | 6.8 | No account, no container to pull, nothing to sign up for. |
 | 17 | Yours | 175 | 5.8 | MIT, end to end. Nobody else holds your keys. |
-| 18 | The ask | 160 | 5.3 | Rebase. Open source. Postgres-native. |
+| 18 | The ask | 160 | 5.3 | Start with the one you already have. |
 
 ## Notes for the read
 
