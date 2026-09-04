@@ -9,15 +9,15 @@ export const en = {
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
   "rlscheck.title": "Don't take that on faith.",
-  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> reads your database's own catalogue and reports what is actually exposed — tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. Fourteen checks. Any Postgres: Supabase, Neon, RDS, your own server. It is read-only, it needs no account, and it does not care whether you use Rebase.",
+  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> reads your database's own catalogue and reports what is actually exposed — tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. Fifteen checks. Any Postgres: Supabase, Neon, RDS, your own server. It is read-only, it needs no account, and it does not care whether you use Rebase.",
   "rlscheck.note": "SELECTs against the system catalogues and nothing else. No telemetry, no upload, and it never reads your data.",
-  "rlscheck.cta": "See all 14 checks",
+  "rlscheck.cta": "See all 15 checks",
   "copy.command": "Copy",
   "copy.command.done": "Copied",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ API, realtime and panel running.",
-  "demo.ports": "API on <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel on <span class=\"text-surface-200\">:5173</span>",
+  "demo.ports": "API and panel URLs printed on start <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> picks free ports per project",
   "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
@@ -750,8 +750,8 @@ export const en = {
   // ── rlscheckpage ────────────────────────────────────────────────
   "rlscheckpage.00": "Free tool · no account",
   "rlscheckpage.01": "Audit row-level security on any Postgres",
-  "rlscheckpage.02": "Fourteen checks for the failures that make a Postgres database leak in practice — not the ones that are easy to check for. Works on Supabase, Neon, RDS, Cloud SQL, or a container on your laptop. One command, nothing to install, nothing to sign up for.",
-  "rlscheckpage.03": "The fourteen checks",
+  "rlscheckpage.02": "Fifteen checks for the failures that make a Postgres database leak in practice — not the ones that are easy to check for. Works on Supabase, Neon, RDS, Cloud SQL, or a container on your laptop. One command, nothing to install, nothing to sign up for.",
+  "rlscheckpage.03": "The fifteen checks",
   "rlscheckpage.04": "Each finding the tool prints carries the id below, the reason it matters, and the SQL that fixes it. Severity is the worst level a check can report — several grade themselves down depending on what they find.",
   "rlscheckpage.05": "What a run looks like",
   "rlscheckpage.06": "Every finding names the relation, says who can reach it and what they would get, and prints the SQL that closes it. Exits non-zero above a severity you choose, so it belongs in CI.",
@@ -761,7 +761,7 @@ export const en = {
   "rlscheckpage.10": "No Rebase required",
   "rlscheckpage.11": "It reads the database, not your codebase. It needs no Rebase and asks about none.",
   "rlscheckpage.meta.title": "Free Postgres RLS audit — check your row-level security in one command",
-  "rlscheckpage.meta.description": "rls-check is a free, read-only Row-Level Security audit for any PostgreSQL database. Fourteen checks for the failures that make Postgres leak: RLS disabled on exposed tables, policies that are always true, views that read past their base table. Works on Supabase, Neon, RDS. No account, no install.",
+  "rlscheckpage.meta.description": "rls-check is a free, read-only Row-Level Security audit for any PostgreSQL database. Fifteen checks for the failures that make Postgres leak: RLS disabled on exposed tables, policies that are always true, views that read past their base table. Works on Supabase, Neon, RDS. No account, no install.",
 
   // ── contact ─────────────────────────────────────────────────────
   "contact.00": "Talk to the people building it.",
@@ -1125,7 +1125,7 @@ export const en = {
   "securitypage.58": "Processor and sub-processor",
   "securitypage.59": "You are the data controller for the data your users put into your project. <b class=\"text-white\">Rebase is the processor</b>, and <b class=\"text-white\">Google Cloud is a sub-processor</b> because it provides the compute, storage and network Rebase Cloud runs on.",
   "securitypage.60": "One database per tenant",
-  "securitypage.61": "This is <b class=\"text-white\">not shared-schema multi-tenancy</b>. Each project gets its own CloudNativePG PostgreSQL cluster, running in its own Kubernetes namespace. There is no <span class=\"font-mono text-surface-300\">tenant_id</span> column separating you from another customer — there is a different database.",
+  "securitypage.61": "This is <b class=\"text-white\">not shared-schema multi-tenancy</b>. Every project gets a PostgreSQL database of its own — there is no <span class=\"font-mono text-surface-300\">tenant_id</span> column separating you from another customer, and a connection is bound to one database, so a cross-tenant read is unreachable rather than policy-gated. Where that database lives is a choice you make: on a shared CloudNativePG cluster, or on a <b class=\"text-white\">dedicated cluster of your own</b> in its own Kubernetes namespace.",
   "securitypage.62": "Network isolation between tenants",
   "securitypage.63": "Every tenant namespace is created with a Kubernetes <span class=\"font-mono text-surface-300\">NetworkPolicy</span> covering both ingress and egress, so one project's pods cannot open connections to another project's pods or database. Tenant applications are served from <span class=\"font-mono text-surface-300\">*.rebase.website</span> — a separate registrable domain, deliberately never sharing one with the console, so browser cookie and same-site boundaries fall between them.",
   "securitypage.64": "Encryption in transit and for secrets",

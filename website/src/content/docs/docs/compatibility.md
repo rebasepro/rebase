@@ -59,7 +59,7 @@ The three ratings mean:
 | REST API + generated SDK | Stable | The wire contract is versioned and gated; `client-sdk-e2e` drives register → sign-in → RLS-scoped reads → refresh → storage → realtime end to end |
 | Auth — email/password, OAuth, OIDC, magic link, one-time code | Stable | Twelve OAuth providers ship. The auth schema is a versioned contract, stamped and checked at boot |
 | Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
-| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fourteen checks, and the RLS e2e suite runs on every push |
+| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
 | Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
 | Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
