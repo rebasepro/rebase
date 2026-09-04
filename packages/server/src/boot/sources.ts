@@ -1,17 +1,12 @@
-import fs from "fs";
-import path from "path";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
     findStorageSuffixCollision,
-    normalizeStorageSources,
     storageEnvSuffix,
     type DataSourceDefinition,
-    type DeclaredStorageSources,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 import type { BackendStorageConfig } from "../storage/types";
-import { logger } from "../utils/logger";
 import { BundleError } from "./bundle";
 
 /**
@@ -448,59 +443,4 @@ export function resolveStorageSources(
     }
 
     return Object.keys(result).length > 0 ? result : undefined;
-}
-
-/**
- * Read a project's declared storage sources from its `rebase.json`.
- *
- * A managed bundle carries its topology in `manifest.json`, resolved at build
- * time. A **custom** runtime has no manifest — it builds its own image and its
- * own entrypoint — so without this it would have to re-declare in code what
- * `rebase.json` already says, and the two would drift. Since a custom image
- * contains the repository anyway, reading the file it already ships is what
- * keeps one declaration authoritative for both runtimes.
- *
- * Walks up from `startDir` because an entrypoint lives at `backend/src` in the
- * scaffolded layout and somewhere else in a hand-rolled one. A missing,
- * unreadable or malformed file means "declared nothing" — one default source —
- * which is the correct reading of every project that predates this and must
- * never be an error: a storage declaration is optional, and failing to boot a
- * whole backend over an absent optional file would be the worse bug.
- */
-export function loadDeclaredStorageSources(
-    startDir: string,
-    levels = 5
-): StorageSourceDefinition[] {
-    let dir = startDir;
-    for (let i = 0; i <= levels; i++) {
-        const candidate = path.join(dir, "rebase.json");
-        if (fs.existsSync(candidate)) {
-            // Only the read and the parse degrade quietly. What the file *says*
-            // is validated outside this catch on purpose: a collision between two
-            // source keys is precisely the failure this loader exists to prevent,
-            // and swallowing it would turn "these two buckets would read each
-            // other's credentials" into "this project declared nothing" — the
-            // silent wrong answer instead of the loud right one.
-            let declared: DeclaredStorageSources | undefined;
-            try {
-                declared = (JSON.parse(fs.readFileSync(candidate, "utf8")) as {
-                    storage?: DeclaredStorageSources;
-                })?.storage;
-            } catch (err) {
-                logger.warn(
-                    `Could not read storage sources from ${candidate}: ` +
-                    `${err instanceof Error ? err.message : String(err)}. ` +
-                    "Continuing with a single default storage source."
-                );
-                return [];
-            }
-            const sources = normalizeStorageSources(declared, undefined);
-            assertDistinctSuffixes(sources, DEFAULT_STORAGE_SOURCE_KEY, "Storage source");
-            return sources;
-        }
-        const parent = path.dirname(dir);
-        if (parent === dir) break;
-        dir = parent;
-    }
-    return [];
 }

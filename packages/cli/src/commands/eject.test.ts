@@ -76,6 +76,40 @@ function unresolvedImports(modulePath: string): string[] {
     return missing;
 }
 
+/**
+ * Every name a package's barrel re-exports, following one level of `export *`.
+ *
+ * Textual rather than an `import()` of the package: importing @rebasepro/server
+ * here would drag its whole module graph, and side effects, into a test about
+ * a template's text.
+ */
+function collectExports(barrel: string, depth = 0): Set<string> {
+    const names = new Set<string>();
+    if (!fs.existsSync(barrel) || depth > 2) return names;
+    const source = fs.readFileSync(barrel, "utf8");
+    const dir = path.dirname(barrel);
+
+    for (const match of source.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+        for (const part of match[1].split(",")) {
+            const name = part.trim().split(/\s+as\s+/).pop()?.replace(/^type\s+/, "").trim();
+            if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
+        }
+    }
+    for (const match of source.matchAll(/^\s*export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm)) {
+        names.add(match[1]);
+    }
+    for (const match of source.matchAll(/export\s+\*\s+from\s*["'](\.[^"']+)["']/g)) {
+        const target = path.resolve(dir, match[1].replace(/\.js$/, ""));
+        for (const candidate of [`${target}.ts`, path.join(target, "index.ts")]) {
+            if (fs.existsSync(candidate)) {
+                for (const name of collectExports(candidate, depth + 1)) names.add(name);
+                break;
+            }
+        }
+    }
+    return names;
+}
+
 /** The `COPY` instructions of a Dockerfile, per build stage. */
 function copyInstructions(dockerfile: string): { stage: number; from?: string; sources: string[] }[] {
     const copies: { stage: number; from?: string; sources: string[] }[] = [];
@@ -368,6 +402,61 @@ describe("the ejected payload", () => {
         const call = /serveSPA\(app, \{ frontendPath: path\.resolve\(__dirname, "([^"]+)"\)/.exec(source);
         expect(call).not.toBeNull();
         expect(path.resolve(COMPILED_DIR, call![1])).toBe("/app/frontend/dist");
+    });
+
+    it("imports only symbols the runtime packages actually export", async () => {
+        // Nothing type-checks this template: it carries `{{…}}` markers and
+        // resolves `../../config/*` against a project that does not exist here.
+        // So a symbol renamed or removed in @rebasepro/server reaches a user as
+        // a TS2305 in the file they were just handed. This is the check the
+        // compiler cannot run.
+        manifestWith("managed");
+
+        await run();
+
+        const source = fs.readFileSync(path.join(scratch, "backend/src/index.ts"), "utf8");
+        const barrels: Record<string, string> = {
+            "@rebasepro/server": path.join(cliRoot, "..", "server", "src", "index.ts"),
+            "@rebasepro/types": path.join(cliRoot, "..", "types", "src", "index.ts")
+        };
+
+        for (const [pkg, barrel] of Object.entries(barrels)) {
+            const block = new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*["']${pkg}["']`).exec(source);
+            if (!block) continue;
+            const named = block[1]
+                .split(",")
+                .map(part => part.replace(/^\s*type\s+/, "").split(/\s+as\s+/)[0].trim())
+                .filter(Boolean)
+                // The payload's own comment markers are stripped before this,
+                // but a `// {{#frontend}}` line inside the block leaves text.
+                .filter(name => /^[A-Za-z_$][\w$]*$/.test(name));
+            expect(named.length).toBeGreaterThan(0);
+
+            // Resolved by name against the package's own public surface, which
+            // is an explicit barrel of named re-exports.
+            const surface = collectExports(barrel);
+            for (const name of named) {
+                expect({ pkg, name, exported: surface.has(name) })
+                    .toEqual({ pkg, name, exported: true });
+            }
+        }
+    });
+
+    it("opens one connection per declared database, not one per project", async () => {
+        // It used to be `createPostgresDatabaseConnection(env.DATABASE_URL)` and
+        // nothing else, so a project declaring `database("analytics")` ejected
+        // into a backend that ignored it: collections routed there fell back to
+        // the default driver and their rows landed in the wrong database, behind
+        // a server that health-checked green.
+        manifestWith("managed");
+
+        await run();
+
+        const source = fs.readFileSync(path.join(scratch, "backend/src/index.ts"), "utf8");
+        expect(source).toMatch(/resolveDataSources\(\s*process\.env,\s*dataSources\s*\)/);
+        expect(source).toMatch(/bootstrappers:\s*drivers\.map/);
+        // And every pool closes, not just the first.
+        expect(source).toMatch(/drivers\.map\(driver => driver\.connection\.pool\?\.end\(\)\)/);
     });
 
     it("passes a cronsDir, and the scaffolded tsconfig compiles what it points at", async () => {

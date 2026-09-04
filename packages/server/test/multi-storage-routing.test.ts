@@ -8,11 +8,12 @@ import { errorHandler } from "../src/api/errors";
 import { createStorageRoutes } from "../src/storage/routes";
 import { createStorageController } from "../src/storage";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
-import { loadDeclaredStorageSources, resolveStorageSources } from "../src/boot/sources";
+import { resolveStorageSources } from "../src/boot/sources";
+import { graphToStorageSources } from "../src/boot/resource-adapters";
 import { configureJwt } from "../src/auth/jwt";
 
 /**
- * Two buckets, declared and used, from `rebase.json` to bytes on disk.
+ * Two buckets, declared and used, from a `bucket()` call to bytes on disk.
  *
  * Every seam in this path has unit tests; none of them proves that a file
  * uploaded to `media` is a file that *lands* in the media bucket and not the
@@ -38,22 +39,16 @@ describe("two declared buckets, end to end", () => {
         defaultDir = path.join(root, "uploads");
         mediaDir = path.join(root, "media");
 
-        // 1. The project declares its topology, exactly as a developer would.
-        await fs.promises.writeFile(
-            path.join(root, "rebase.json"),
-            JSON.stringify({
-                rebase: "^1",
-                apps: { backend: { type: "backend", runtime: "custom" } },
-                storage: {
-                    "(default)": { engine: "local" },
-                    media: { engine: "local", label: "Media" }
-                }
-            }),
-            "utf8"
-        );
+        // 1. The project declares its topology, exactly as a developer would —
+        //    in config code, which is the only place buckets are declared.
+        const { bucket, buildResourceGraph, resetDeclaredResources } =
+            await import("@rebasepro/types");
+        resetDeclaredResources();
+        bucket({ engine: "local" });
+        bucket("media", { engine: "local", label: "Media" });
 
-        // 2. The runtime reads it back — the step a custom image performs at boot.
-        const declared = loadDeclaredStorageSources(root);
+        // 2. The runtime reads the graph back — the step every boot path performs.
+        const declared = graphToStorageSources(buildResourceGraph());
         expect(declared.map(s => s.key).sort()).toEqual(["(default)", "media"]);
 
         // 3. The environment configures each source through its own suffix.

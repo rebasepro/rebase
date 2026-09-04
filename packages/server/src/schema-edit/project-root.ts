@@ -16,10 +16,10 @@
  *
  * ## Why `rebase.json`
  *
- * Because the codebase already treats it as the project marker:
- * `loadDeclaredStorageSources` walks up to it from the collections directory to
- * find what a project declares. Using the same anchor means one answer to
- * "where does this project start", not two that can disagree.
+ * Because the codebase already treats it as the project marker: it is the file
+ * the CLI validates as the manifest and the file `rebase resources --write`
+ * writes `rebase.resources.json` beside. Using the same anchor means one answer
+ * to "where does this project start", not two that can disagree.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -28,10 +28,10 @@ import { DEFAULT_COMMIT_PATHS, type SchemaCommitPaths } from "@rebasepro/types";
 /**
  * The nearest ancestor of `startDir` holding a `rebase.json`.
  *
- * Bounded, like the storage-source loader it mirrors: an unbounded walk from a
- * misconfigured path climbs to the filesystem root and reads whatever it finds
- * there. `undefined` when there is none, which is a project that predates the
- * file — the caller then keeps the historical behaviour rather than guessing.
+ * Bounded: an unbounded walk from a misconfigured path climbs to the filesystem
+ * root and reads whatever it finds there. `undefined` when there is none, which
+ * is a project that predates the file — the caller then keeps the historical
+ * behaviour rather than guessing.
  */
 /**
  * Where a scaffolded project keeps its collection source, project-relative.

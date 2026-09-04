@@ -11,40 +11,42 @@ the same fact was stated in several places and nothing said which one won.
 
 | Concern | Where it lives | Notes |
 |---|---|---|
-| **Topology** — which buckets exist | `rebase.json` → `storage` | Committed. Read by the platform *before* any build |
+| **Topology** — which buckets exist | `bucket()` in `config/resources.ts` | Committed. Generated into `rebase.resources.json` for hosts that read before a build |
 | **Credentials** — how to reach each | Environment, `<BASE>__<KEY>` | Never committed. The default source takes no suffix |
 | **Access model** — who may touch what | `storageAuthorize` in config code | A function; no environment variable can express it |
 | **Cloud convenience** | The console's storage settings | Rendered into the same variables; the environment still wins |
 
 ## Declaring sources
 
-```jsonc
-// rebase.json
-{
-  "rebase": "^1",
-  "storage": {
-    "(default)": { "engine": "s3" },
-    "media":     { "engine": "s3",  "label": "Media" },
-    "avatars":   { "engine": "firebase", "transport": "direct" }
-  },
-  "apps": { /* … */ }
-}
+```ts
+// config/resources.ts
+import { bucket } from "@rebasepro/types";
+
+export const uploads = bucket({ engine: "s3" });                    // (default)
+export const media   = bucket("media", { engine: "s3", label: "Media" });
+export const avatars = bucket("avatars", { engine: "firebase", transport: "direct" });
 ```
 
-Omit the block entirely for a single bucket — the overwhelmingly common project,
-which must not be required to say so.
+Declare nothing for a single bucket — the overwhelmingly common project, which
+must not be required to say so.
 
 `engine` is `s3`, `gcs`, `local`, or a custom id. `transport` is how the
 *frontend* reaches it: `server` (default, proxied through `/api/storage`) or
 `direct` (a provider SDK talks to the bucket and the backend is not in the upload
 path). `label` is what the console and admin UI show.
 
-**Why `rebase.json` and not code.** It is the one artifact a host can read
-before running a build. A managed bundle records the resolved list in its
-`manifest.json`; a custom runtime reads the same file out of the image it already
-ships. Both end at the same list, so the console cannot describe a topology the
-tenant does not have. Config code may still `export const storageSources` to add
-sources `rebase.json` does not mention — but it may not contradict it.
+**Why code and not `rebase.json`.** It used to be the JSON, on the argument that
+a host must be able to read the topology before running a build. That argument
+was right and the conclusion was wrong: storage could then be declared in *both*
+places, and the merge silently kept the JSON's engine and discarded the code's.
+`rebase resources --write` generates `rebase.resources.json` from the
+declarations instead, so a host still reads a file without running anything, and
+there is still exactly one place the fact is stated. A `storage` block in
+`rebase.json` is now **refused** by the manifest validator rather than ignored —
+a key that still parses and no longer does anything is the same failure wearing
+a nicer hat.
+
+Run `rebase resources` to list what a project declares.
 
 ## Configuring them
 
@@ -74,6 +76,39 @@ variable names — `S3_BUCKET_NAME` would otherwise parse as bucket `name`.
 Two keys that collapse onto the same suffix are refused at build time rather than
 silently reading each other's credentials.
 
+## Buckets that share one account
+
+Every binding is read per key, which is right for the bucket *name* — different
+for every source by definition — and wrong for the credentials, which usually
+are not. Fifteen buckets on one MinIO install meant fifteen copies of the same
+endpoint, access key and secret: ninety variables where eighteen would do, and
+one key rotation became fifteen paired edits where a single missed one fails at
+upload time with an opaque signing error.
+
+```ts
+export const media   = bucket("media",   { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```bash
+S3_BUCKET__MEDIA=b-media           # per bucket, always
+S3_BUCKET__AVATARS=b-avatars
+S3_ACCESS_KEY_ID__MINIO=…          # shared by both
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+Only the **account-scoped** bindings fall back — the ones describing the
+provider rather than the bucket: `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+`S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE`, and the GCS `PROJECT_ID` /
+`KEY_FILENAME` pair. The bucket name never falls back: it is what distinguishes
+one source from another. A per-key value still wins, so one source can move to
+another provider without breaking the rest off their shared account.
+
+There is deliberately **no** third form falling through to the bare `<BASE>`.
+That variable belongs to the default source, and a named bucket inheriting it
+would mean a typo'd key silently signs with another source's credentials.
+
 ## Properties opt in by key
 
 ```ts
@@ -88,7 +123,7 @@ Omitting `storageSource` means `(default)`.
 
 ## Declared is not configured
 
-A source declared in `rebase.json` with nothing set for it in the environment is
+A source declared with nothing set for it in the environment is
 **skipped**, not fatal. Requests routed to it answer
 `501 STORAGE_SOURCE_NOT_CONFIGURED` — distinct from the `STORAGE_NOT_CONFIGURED`
 the whole `/storage` router answers when the deployment has no storage at all,
@@ -156,9 +191,10 @@ the reason.
 
 | Piece | File |
 |---|---|
-| Naming rule, merge rule | `packages/types/src/types/storage_source.ts` |
+| Naming rule | `packages/types/src/types/storage_source.ts` |
+| `bucket()`, and the one declaration → definition mapper | `packages/types/src/types/resource_kinds.ts` |
 | Resolving env → controller configs | `packages/server/src/boot/sources.ts` |
-| Reading `rebase.json` at runtime | `loadDeclaredStorageSources`, same file |
+| Reading the graph at boot | `packages/server/src/boot/resource-adapters.ts` |
 | Registry and routing | `packages/server/src/storage/storage-registry.ts` |
 | Manifest recording | `packages/cli/src/bundle.ts` |
 | Cloud: row → environment | `saas/backend/src/utils/project-storage.ts` |

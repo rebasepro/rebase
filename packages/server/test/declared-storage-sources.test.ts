@@ -1,106 +1,77 @@
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { loadDeclaredStorageSources, resolveStorageSources } from "../src/boot/sources";
+import { describe, it, expect, beforeEach } from "@jest/globals";
+import {
+    bucket,
+    buildResourceGraph,
+    database,
+    declaredDataSources,
+    declaredStorageSources,
+    resetDeclaredResources
+} from "@rebasepro/types";
+import { resolveStorageSources } from "../src/boot/sources";
+import { graphToDataSources, graphToStorageSources } from "../src/boot/resource-adapters";
 
 /**
- * Reading a project's storage topology from the `rebase.json` it ships.
+ * The two readers of one declaration, held to the same answer.
  *
- * This is what lets a **custom** runtime — which builds its own image and its own
- * entrypoint, and so has no bundle manifest — declare its buckets in the same one
- * place a managed bundle does, instead of re-stating them in code where the two
- * would drift.
+ * A project declares its buckets once, in config code, and two different pieces
+ * of code turn those declarations into the definitions a resolver takes:
+ *
+ *   - `graphToStorageSources`, which the managed runtime's boot path uses;
+ *   - `declaredStorageSources()`, which an **ejected** project's own entrypoint
+ *     and the frontend use.
+ *
+ * They were separate field-by-field maps, and they disagreed. The server's copy
+ * carried a bucket's `account`; the types copy dropped it. So
+ * `bucket("media", { account: "minio" })` found its shared credentials on the
+ * managed runtime and found nothing in an ejected backend — where the source was
+ * silently skipped as unconfigured and every upload to it answered 501.
+ *
+ * There is now one mapper. These tests are what keeps it that way.
  */
-let scratch: string;
+describe("one declaration, two readers", () => {
+    beforeEach(() => resetDeclaredResources());
 
-beforeEach(() => {
-    scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-declared-storage-"));
-});
+    it("carries `account` all the way to the ejected entrypoint's resolver", () => {
+        bucket("media", { engine: "s3", account: "minio" });
+        bucket("avatars", { engine: "s3", account: "minio" });
 
-afterEach(() => {
-    fs.rmSync(scratch, { recursive: true, force: true });
-});
+        // The list the eject template builds. It used to lose `account` here.
+        const sources = declaredStorageSources();
+        expect(sources.map(s => s.account)).toEqual(["minio", "minio"]);
 
-const writeManifest = (dir: string, manifest: unknown): void => {
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "rebase.json"), JSON.stringify(manifest), "utf8");
-};
+        const resolved = resolveStorageSources({
+            S3_BUCKET__MEDIA: "b-media",
+            S3_BUCKET__AVATARS: "b-avatars",
+            S3_ACCESS_KEY_ID__MINIO: "AKIA_SHARED",
+            S3_SECRET_ACCESS_KEY__MINIO: "SECRET_SHARED"
+        }, sources, "/tmp/uploads")!;
 
-describe("loadDeclaredStorageSources", () => {
-    it("reads the storage block into definitions", () => {
-        writeManifest(scratch, {
-            rebase: "^1",
-            apps: {},
-            storage: { media: { engine: "s3", label: "Media" } }
-        });
-        expect(loadDeclaredStorageSources(scratch)).toEqual([
-            { key: "media", engine: "s3", transport: "server", label: "Media" }
-        ]);
+        expect(Object.keys(resolved).sort()).toEqual(["avatars", "media"]);
+        expect(resolved.media).toMatchObject({ bucket: "b-media", accessKeyId: "AKIA_SHARED" });
+        expect(resolved.avatars).toMatchObject({ bucket: "b-avatars", accessKeyId: "AKIA_SHARED" });
     });
 
-    it("walks up from a nested entrypoint directory", () => {
-        // The scaffolded layout runs from `backend/src`, and a compiled one from
-        // `backend/dist/backend/src` — a fixed relative path cannot serve both.
-        writeManifest(scratch, {
-            rebase: "^1",
-            apps: {},
-            storage: { media: { engine: "s3" } }
-        });
-        const nested = path.join(scratch, "backend", "dist", "backend", "src");
-        fs.mkdirSync(nested, { recursive: true });
-        expect(loadDeclaredStorageSources(nested).map(s => s.key)).toEqual(["media"]);
-    });
+    it("gives the graph reader and the registry reader identical definitions", () => {
+        // Not "both work" — byte-identical. Anything else is a field one of
+        // them drops, which is the failure this pairing exists to catch.
+        database("analytics", { databaseId: "warehouse", label: "Analytics" });
+        bucket("media", { engine: "s3", account: "minio", label: "Media" });
 
-    it("treats an absent rebase.json as 'declared nothing'", () => {
-        // A storage declaration is optional. Failing to boot a whole backend over
-        // a missing optional file would be the worse bug.
-        expect(loadDeclaredStorageSources(scratch)).toEqual([]);
-    });
-
-    it("treats a manifest with no storage block as 'declared nothing'", () => {
-        writeManifest(scratch, { rebase: "^1", apps: {} });
-        expect(loadDeclaredStorageSources(scratch)).toEqual([]);
-    });
-
-    it("degrades to 'declared nothing' on malformed JSON rather than throwing", () => {
-        fs.writeFileSync(path.join(scratch, "rebase.json"), "{ not json", "utf8");
-        expect(loadDeclaredStorageSources(scratch)).toEqual([]);
-    });
-
-    it("refuses two sources that would read the same variables", () => {
-        writeManifest(scratch, {
-            rebase: "^1",
-            apps: {},
-            storage: { "media-cdn": { engine: "s3" }, media_cdn: { engine: "s3" } }
-        });
-        expect(() => loadDeclaredStorageSources(scratch)).toThrow(/same environment/);
-    });
-
-    it("stops walking up after the given number of levels", () => {
-        writeManifest(scratch, {
-            rebase: "^1",
-            apps: {},
-            storage: { media: { engine: "s3" } }
-        });
-        const deep = path.join(scratch, "a", "b", "c", "d", "e", "f", "g");
-        fs.mkdirSync(deep, { recursive: true });
-        expect(loadDeclaredStorageSources(deep, 2)).toEqual([]);
+        const graph = buildResourceGraph();
+        expect(declaredStorageSources()).toEqual(graphToStorageSources(graph));
+        expect(declaredDataSources()).toEqual(graphToDataSources(graph));
     });
 });
 
 describe("a custom runtime resolving what it declared", () => {
+    beforeEach(() => resetDeclaredResources());
+
     it("configures each declared bucket from its own suffixed variables", () => {
         // The end-to-end property the eject template depends on: declare in
-        // rebase.json, configure per source in the environment.
-        writeManifest(scratch, {
-            rebase: "^1",
-            apps: {},
-            storage: {
-                "(default)": { engine: "s3" },
-                media: { engine: "s3" }
-            }
-        });
-        const sources = loadDeclaredStorageSources(scratch);
+        // config code, configure per source in the environment.
+        bucket({ engine: "s3" });
+        bucket("media", { engine: "s3" });
+
         const resolved = resolveStorageSources(
             {
                 STORAGE_TYPE: "s3",
@@ -112,7 +83,7 @@ describe("a custom runtime resolving what it declared", () => {
                 S3_ACCESS_KEY_ID__MEDIA: "mkey",
                 S3_SECRET_ACCESS_KEY__MEDIA: "msecret"
             },
-            sources,
+            declaredStorageSources(),
             "/tmp/uploads"
         );
         expect(resolved).toBeDefined();
@@ -130,68 +101,19 @@ describe("a custom runtime resolving what it declared", () => {
                 S3_ACCESS_KEY_ID: "key",
                 S3_SECRET_ACCESS_KEY: "secret"
             },
-            loadDeclaredStorageSources(scratch),
+            declaredStorageSources(),
             "/tmp/uploads"
         );
         expect(Object.keys(resolved!)).toEqual(["(default)"]);
         expect(resolved!["(default)"]).toMatchObject({ type: "s3", bucket: "app-uploads" });
     });
-});
 
-describe("a declared source is not a configured one", () => {
-    /**
-     * Declaring a bucket in `rebase.json` states the project's topology, usually
-     * well before anyone attaches storage to it — that is the console's whole
-     * "declared, not configured" state. It must not be a fatal boot error, or
-     * the act of declaring a bucket would crash-loop the backend until someone
-     * configured it: precisely the unreadable failure the declaration exists to
-     * prevent.
-     */
-    it("skips a declared source the environment says nothing about", () => {
-        const resolved = resolveStorageSources(
-            {},
-            [{ key: "media", engine: "s3", transport: "server" }],
-            "/tmp/uploads"
-        );
-        expect(resolved).toBeUndefined();
-    });
-
-    it("skips only the unconfigured one, keeping the rest", () => {
-        const resolved = resolveStorageSources(
-            {
-                STORAGE_TYPE: "s3",
-                S3_BUCKET: "app-uploads",
-                S3_ACCESS_KEY_ID: "key",
-                S3_SECRET_ACCESS_KEY: "secret"
-            },
-            [
-                { key: "(default)", engine: "s3", transport: "server" },
-                { key: "media", engine: "s3", transport: "server" }
-            ],
-            "/tmp/uploads"
-        );
-        expect(Object.keys(resolved ?? {})).toEqual(["(default)"]);
-    });
-
-    it("still refuses a source the ENVIRONMENT configured wrongly", () => {
-        // Someone set this and got it wrong, which is different from never
-        // having set it. A silent skip would hide a real mistake.
-        expect(() => resolveStorageSources(
-            { STORAGE_TYPE__MEDIA: "s3" },
-            [{ key: "media", engine: "s3", transport: "server" }],
-            "/tmp/uploads"
-        )).toThrow(/S3_BUCKET__MEDIA/);
-    });
-
-    it("refuses a bucket with no credentials", () => {
-        // `S3StorageController` passes explicit empty credentials to the AWS
-        // SDK, which suppresses the SDK's own credential chain — so this never
-        // falls back to an instance profile. It signs every request with
-        // nothing and fails each one separately, at upload time.
-        expect(() => resolveStorageSources(
-            { STORAGE_TYPE: "s3", S3_BUCKET: "app-uploads" },
-            undefined,
-            "/tmp/uploads"
-        )).toThrow(/no credentials/);
+    it("refuses two declared buckets whose keys collapse onto one suffix", () => {
+        // `media-cdn` and `media_cdn` are different keys and the same variable
+        // name, so one would silently read the other's credentials.
+        bucket("media-cdn", { engine: "s3" });
+        bucket("media_cdn", { engine: "s3" });
+        expect(() => resolveStorageSources({}, declaredStorageSources(), "/tmp/uploads"))
+            .toThrow(/same environment/);
     });
 });

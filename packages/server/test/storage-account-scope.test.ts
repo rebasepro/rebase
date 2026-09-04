@@ -138,11 +138,14 @@ describe("account survives the whole path, declaration to reader", () => {
         // definition field by field — so an option can be accepted at the call
         // site, pass every type check, and never arrive. That is the failure
         // this model exists to remove, and it is one line away at all times.
-        const { bucket, buildResourceGraph, resetResourceRegistry } =
+        const { bucket, buildResourceGraph, resetDeclaredResources } =
             await import("@rebasepro/types");
         const { graphToStorageSources } = await import("../src/boot/resource-adapters");
 
-        resetResourceRegistry?.();
+        // Not `resetResourceRegistry?.()`, which is what this said: no such
+        // export exists, so the optional call was a silent no-op and the test
+        // passed on whatever any earlier test had declared.
+        resetDeclaredResources();
         bucket("media", { engine: "s3", account: "minio" });
         bucket("avatars", { engine: "s3", account: "minio" });
 

@@ -17,9 +17,11 @@ import {
     declaredResources,
     registerResourceKind,
     type DeclareOptions,
-    type ResourceHandle,
-    type ResourceTransport
+    type ResourceDeclaration,
+    type ResourceHandle
 } from "./resources";
+import { DEFAULT_DATA_SOURCE_KEY, type DataSourceDefinition } from "./data_source";
+import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "./storage_source";
 
 // ── database ─────────────────────────────────────────────────────────────────
 
@@ -27,11 +29,22 @@ registerResourceKind({
     kind: "database",
     engines: ["postgres", "mongodb", "firestore", "sqlite"],
     defaultEngine: "postgres",
-    // REBASE_DRIVER overrides the engine's default driver package; the pool
-    // ceiling is per-source because one source can be a single-session PGlite
-    // and another a real server.
-    envBases: ["DATABASE_URL", "REBASE_DRIVER", "REBASE_DB_POOL_MAX"],
-    // No per-engine narrowing: every engine binds from the same three, and the
+    // Exactly the bases `resolveDataSources` reads, and no others. REBASE_DRIVER
+    // overrides the engine's default driver package; the pool settings are
+    // per-source because one source can be a single-session PGlite and another a
+    // real server. A name here that the resolver does not read is worse than an
+    // omission — it is a variable somebody sets and nothing consults — so
+    // `resource-env-bases.test.ts` holds this list to the resolver's own source.
+    envBases: [
+        "DATABASE_URL",
+        "DATABASE_READ_URL",
+        "ADMIN_CONNECTION_STRING",
+        "REBASE_DRIVER",
+        "DB_POOL_MAX",
+        "DB_POOL_IDLE_TIMEOUT",
+        "DB_POOL_CONNECT_TIMEOUT"
+    ],
+    // No per-engine narrowing: every engine binds from the same set, and the
     // driver package that differs between them is named by REBASE_DRIVER either
     // way.
     optionKeys: ["databaseId", "migrations", "extensions"],
@@ -138,13 +151,43 @@ registerResourceKind({
     kind: "bucket",
     engines: ["local", "s3", "gcs", "azure", "firebase"],
     defaultEngine: "local",
-    envBases: ["S3_BUCKET", "GCS_BUCKET", "STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+    // Exactly the bases `resolveStorageBackend` reads. This list said
+    // STORAGE_BUCKET, STORAGE_ENDPOINT, STORAGE_REGION and STORAGE_PUBLIC_URL,
+    // none of which the runtime has ever read — so a generator or control plane
+    // binding from it produced a bucket the backend then skipped as
+    // unconfigured. `resource-env-bases.test.ts` holds it to the resolver.
+    envBases: [
+        "STORAGE_TYPE",
+        "STORAGE_PATH",
+        "S3_BUCKET",
+        "S3_REGION",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+        "S3_ENDPOINT",
+        "S3_FORCE_PATH_STYLE",
+        "GCS_BUCKET",
+        "GCS_PROJECT_ID",
+        "GCS_KEY_FILENAME"
+    ],
     envBasesByEngine: {
-        local: ["STORAGE_BUCKET"],
-        s3: ["S3_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_PUBLIC_URL"],
-        gcs: ["GCS_BUCKET", "STORAGE_PUBLIC_URL"],
-        azure: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
-        firebase: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]
+        local: ["STORAGE_TYPE", "STORAGE_PATH"],
+        s3: [
+            "STORAGE_TYPE",
+            "S3_BUCKET",
+            "S3_REGION",
+            "S3_ACCESS_KEY_ID",
+            "S3_SECRET_ACCESS_KEY",
+            "S3_ENDPOINT",
+            "S3_FORCE_PATH_STYLE"
+        ],
+        gcs: ["STORAGE_TYPE", "GCS_BUCKET", "GCS_PROJECT_ID", "GCS_KEY_FILENAME"],
+        // The backend holds no controller for these: they are reached by a
+        // provider SDK in the browser, so a bucket on one is declared with
+        // `transport: "direct"` and the server binds nothing for it. An empty
+        // list is the honest answer, and better than naming variables that
+        // would be set and never read.
+        azure: [],
+        firebase: []
     },
     optionKeys: ["publicRead", "prefix", "account"],
     // Storage is genuinely optional: plenty of projects store nothing.
@@ -187,14 +230,28 @@ export type BucketHandle = ResourceHandle;
  * Declare a bucket.
  *
  * ```ts
- * export const media = bucket("media", { transport: "direct" });
+ * export const uploads = bucket({ engine: "s3" });               // the default one
+ * export const media   = bucket("media", { transport: "direct" });
  * ```
  *
  * `transport: "direct"` means a provider SDK talks to the bucket and the
  * backend is not in the upload path.
+ *
+ * The options-only form exists for the same reason `database`'s does: the
+ * default bucket has no name to pass, and without it the only way to configure
+ * one was `bucket("(default)", { … })` — writing out an internal sentinel to
+ * reach the options. Passing options where a key belongs used to throw "a
+ * bucket needs a non-empty key", which names neither the mistake nor the fix.
  */
-export function bucket(key: string = DEFAULT_RESOURCE_KEY, options: BucketOptions = {}): BucketHandle {
-    return declareResource("bucket", key, options);
+export function bucket(options?: BucketOptions): BucketHandle;
+export function bucket(key?: string, options?: BucketOptions): BucketHandle;
+export function bucket(
+    keyOrOptions: string | BucketOptions = DEFAULT_RESOURCE_KEY,
+    options: BucketOptions = {}
+): BucketHandle {
+    return typeof keyOrOptions === "string"
+        ? declareResource("bucket", keyOrOptions, options)
+        : declareResource("bucket", DEFAULT_RESOURCE_KEY, keyOrOptions);
 }
 
 // ── topic ────────────────────────────────────────────────────────────────────
@@ -348,12 +405,60 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
     } as TopicHandle<T>;
 }
 
-// ── Handing declarations to the frontend ─────────────────────────────────────
+// ── Handing declarations to the readers ──────────────────────────────────────
 
 /**
- * The declared databases, in the shape `<Rebase dataSources>` takes.
+ * One declaration, as the data layer's definition.
  *
- * The frontend needs to know which sources exist and how they are reached — a
+ * There is exactly one of these per kind, and everything that needs a
+ * definition goes through it — the frontend, the managed runtime's boot path,
+ * and an ejected project's own entrypoint. That is not tidiness: the mapping
+ * used to exist twice, once here and once in `@rebasepro/server`'s
+ * `graphToStorageSources`, and the two disagreed. The server's copy carried a
+ * bucket's `account`; this one dropped it, so a bucket declared with shared
+ * credentials resolved them on the managed runtime and resolved *nothing* in an
+ * ejected backend — the source was skipped and every upload to it answered 501.
+ *
+ * A field-by-field map is one line away from that failure at all times, so
+ * there is now one line to keep right instead of two to keep equal.
+ */
+export function resourceToDataSource(declaration: ResourceDeclaration): DataSourceDefinition {
+    return {
+        // The graph and the data layer spell "the unnamed one" identically
+        // today, but they are separate constants and nothing stops them
+        // drifting. Mapped explicitly so a divergence is a compile error rather
+        // than a default database that silently fails to bind.
+        key: declaration.key === DEFAULT_RESOURCE_KEY ? DEFAULT_DATA_SOURCE_KEY : declaration.key,
+        engine: declaration.engine,
+        transport: declaration.transport,
+        ...(typeof declaration.options.databaseId === "string"
+            ? { databaseId: declaration.options.databaseId }
+            : {}),
+        ...(declaration.label !== undefined ? { label: declaration.label } : {})
+    };
+}
+
+/** One declaration, as the storage layer's definition. See {@link resourceToDataSource}. */
+export function resourceToStorageSource(declaration: ResourceDeclaration): StorageSourceDefinition {
+    return {
+        key: declaration.key === DEFAULT_RESOURCE_KEY ? DEFAULT_STORAGE_SOURCE_KEY : declaration.key,
+        engine: declaration.engine,
+        transport: declaration.transport,
+        // Carried, or the declaration's `account` is accepted at the call site
+        // and lost on the way to the reader — a declared option that does
+        // nothing, which is the exact failure this whole model exists to remove.
+        ...(typeof declaration.options.account === "string"
+            ? { account: declaration.options.account }
+            : {}),
+        ...(declaration.label !== undefined ? { label: declaration.label } : {})
+    };
+}
+
+/**
+ * The declared databases, as definitions.
+ *
+ * Both the frontend and a project's own backend entrypoint read this. The
+ * frontend needs to know which sources exist and how they are reached — a
  * `direct`-transport source is one the browser talks to itself — and it imports
  * the same config package the backend does. Without these it would mean writing
  * the list a second time, by hand, next to the declarations, which is precisely
@@ -370,21 +475,11 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
  * would leave this empty — hence the side-effect import above rather than a
  * bare re-export.
  */
-export function declaredDataSources(): { key: string; engine: string; transport: ResourceTransport; label?: string }[] {
-    return declaredResources("database").map(r => ({
-        key: r.key,
-        engine: r.engine,
-        transport: r.transport,
-        ...(r.label !== undefined ? { label: r.label } : {})
-    }));
+export function declaredDataSources(): DataSourceDefinition[] {
+    return declaredResources("database").map(resourceToDataSource);
 }
 
-/** The declared buckets, in the shape `<Rebase storageSources>` takes. */
-export function declaredStorageSources(): { key: string; engine: string; transport: ResourceTransport; label?: string }[] {
-    return declaredResources("bucket").map(r => ({
-        key: r.key,
-        engine: r.engine,
-        transport: r.transport,
-        ...(r.label !== undefined ? { label: r.label } : {})
-    }));
+/** The declared buckets, as definitions. */
+export function declaredStorageSources(): StorageSourceDefinition[] {
+    return declaredResources("bucket").map(resourceToStorageSource);
 }

@@ -379,7 +379,6 @@ export { resolveAuthOptions, resolveEmailOptions } from "./boot/options";
 export {
     envSuffixForKey,
     assertDistinctSuffixes,
-    loadDeclaredStorageSources,
     resolveDataSources,
     resolveStorageSources,
     resolveStorageBackend

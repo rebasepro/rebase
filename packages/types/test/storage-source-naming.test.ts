@@ -1,7 +1,6 @@
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
     findStorageSuffixCollision,
-    normalizeStorageSources,
     storageEnvSuffix
 } from "../src/types/storage_source";
 
@@ -54,66 +53,5 @@ describe("findStorageSuffixCollision", () => {
 
     it("passes distinct keys, including the default", () => {
         expect(findStorageSuffixCollision([DEFAULT_STORAGE_SOURCE_KEY, "media", "backups"])).toBeNull();
-    });
-});
-
-describe("normalizeStorageSources", () => {
-    it("turns the rebase.json record into definitions, defaulting transport", () => {
-        expect(normalizeStorageSources({ media: { engine: "s3" } }, undefined)).toEqual([
-            { key: "media", engine: "s3", transport: "server" }
-        ]);
-    });
-
-    it("keeps an explicit transport and label", () => {
-        expect(normalizeStorageSources(
-            { avatars: { engine: "firebase", transport: "direct", label: "Avatars" } },
-            undefined
-        )).toEqual([
-            { key: "avatars", engine: "firebase", transport: "direct", label: "Avatars" }
-        ]);
-    });
-
-    it("lets config code add a source rebase.json does not mention", () => {
-        const merged = normalizeStorageSources(
-            { media: { engine: "s3" } },
-            [{ key: "avatars", engine: "firebase", transport: "direct" }]
-        );
-        expect(merged.map(s => s.key)).toEqual(["media", "avatars"]);
-    });
-
-    it("does NOT let config code contradict rebase.json", () => {
-        // rebase.json is what the console reads to decide which buckets to
-        // configure. A runtime that quietly disagreed with it would put the
-        // console back to describing a topology the tenant does not have.
-        const merged = normalizeStorageSources(
-            { media: { engine: "s3", transport: "server", label: "Media" } },
-            [{ key: "media", engine: "gcs", transport: "direct", label: "Something else" }]
-        );
-        expect(merged).toEqual([
-            { key: "media", engine: "s3", transport: "server", label: "Media" }
-        ]);
-    });
-
-    it("lets config code fill in a label rebase.json left out", () => {
-        const merged = normalizeStorageSources(
-            { media: { engine: "s3" } },
-            [{ key: "media", engine: "s3", transport: "server", label: "Media files" }]
-        );
-        expect(merged[0].label).toBe("Media files");
-    });
-
-    it("accepts the already-resolved array form the bundle manifest stores", () => {
-        const merged = normalizeStorageSources(
-            [{ key: "media", engine: "s3", transport: "server" }],
-            [{ key: "avatars", engine: "firebase", transport: "direct" }]
-        );
-        expect(merged.map(s => s.key)).toEqual(["media", "avatars"]);
-    });
-
-    it("invents nothing when both inputs are empty", () => {
-        // Whether "declared nothing" means one default bucket is the resolver's
-        // decision, not this function's.
-        expect(normalizeStorageSources(undefined, undefined)).toEqual([]);
-        expect(normalizeStorageSources({}, [])).toEqual([]);
     });
 });

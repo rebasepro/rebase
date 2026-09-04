@@ -13,6 +13,52 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ### Fixed
 
+- **A bucket's shared credentials worked on the managed runtime and silently
+  did nothing in an ejected one.** Turning a declaration into a source
+  definition was two field-by-field maps — `graphToStorageSources` in
+  `@rebasepro/server`, which the managed boot path uses, and
+  `declaredStorageSources()` in `@rebasepro/types`, which an ejected project's
+  entrypoint and the frontend use. The server's copy carried a bucket's
+  `account`; the types copy dropped it. So
+  `bucket("media", { account: "minio" })` found `S3_ACCESS_KEY_ID__MINIO` on the
+  managed runtime and found nothing after `rebase eject` — the source was
+  skipped as unconfigured and every upload to it answered
+  `501 STORAGE_SOURCE_NOT_CONFIGURED`, having never asked for the credentials
+  the project had set. There is now one mapper, and a test that the two readers
+  return identical definitions.
+
+- **An ejected backend ignored every database but the first.** The emitted
+  entrypoint was one hardcoded
+  `createPostgresDatabaseConnection(env.DATABASE_URL)`, so a project declaring
+  `database("analytics")` ejected into a server that never opened a second
+  connection: collections routed there fell back to the default driver and their
+  rows landed in the wrong database, behind a boot that logged a warning and a
+  health check that stayed green. It now uses `resolveDataSources` +
+  `initializeDataSources` — the same resolvers the managed runtime uses — binds
+  one bootstrapper per declared database, and closes every pool on shutdown
+  rather than only the first.
+
+- **`bucket({ engine: "s3" })` threw "a bucket needs a non-empty key".** The
+  options-only form `database()` has had since it shipped was missing here, so
+  configuring the *default* bucket meant writing the internal sentinel
+  `bucket("(default)", { … })`, and passing options where a key belongs failed
+  with a message naming neither the mistake nor the fix.
+
+- **The bucket and database kinds advertised environment variables nothing
+  reads.** `ResourceKindSpec.envBases` is what a generator or control plane
+  binds from, and the bucket kind named `STORAGE_BUCKET`, `STORAGE_ENDPOINT`,
+  `STORAGE_REGION` and `STORAGE_PUBLIC_URL` — none of which the runtime has ever
+  read — while omitting `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`, without
+  which a bucket cannot be reached at all. The database kind named
+  `REBASE_DB_POOL_MAX` for a resolver that reads `DB_POOL_MAX`. Both lists now
+  match `boot/sources.ts`, and a new test holds them to it by reading the
+  resolver's own source.
+
+- **A test's registry reset was a silent no-op.** `storage-account-scope.test.ts`
+  called `resetResourceRegistry?.()`, which is not an export — so the optional
+  call did nothing and the test ran against whatever an earlier test had
+  declared.
+
 - **Every `rebase db` failure exited 1 without saying anything.** The driver's
   entry point ended in `.catch(() => process.exit(1))`, which discarded the
   error. So a branch that could not be created, a name Postgres would silently
@@ -520,6 +566,17 @@ deployment you already run.
 
 - **`@rebasepro/server-mongo` and `@rebasepro/firebase` have pages**, each
   leading with what it does not do.
+
+### Removed
+
+- **`loadDeclaredStorageSources`** (`@rebasepro/server`), **`normalizeStorageSources`**
+  and **`DeclaredStorageSources`** (`@rebasepro/types`). All three served the
+  `storage` block of `rebase.json`, which the manifest validator now refuses:
+  buckets are declared with `bucket()` and the graph is generated into
+  `rebase.resources.json`. The loader parsed a block that can no longer exist and
+  the merge resolved a conflict between two homes there is now one of. Pre-release,
+  a breaking change is just a change — the runtime contract stays at 1, as it did
+  for the declaration change itself.
 
 ## [0.17.3] - 2026-08-31
 

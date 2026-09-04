@@ -430,17 +430,13 @@ export interface RebaseBackendConfig {
     provisioningDriverResult?: InitializedDriver;
 
     /**
-     * Declared data sources, shared with the frontend `<Rebase dataSources>`.
+     * Database bootstrappers, one per data source.
      *
-     * Used to resolve each collection's engine (capabilities) and transport.
-     * Collections on a `direct`/`custom` transport are client-only: the backend
-     * still owns their schema/registry but does **not** generate server data
-     * routes for them. Server-mediated sources (the default) need no entry.
-     */
-
-
-    /**
-     * Database bootstrappers.
+     * The `id` of each is the key `collection.dataSource` routes against, so a
+     * project with several databases passes several — `initializeDataSources`
+     * builds them from the declared graph. The list of *declared* sources is no
+     * longer an option here: it is read from the resource graph, which is the
+     * one place a project declares them.
      */
     bootstrappers?: BackendBootstrapper[];
     /**

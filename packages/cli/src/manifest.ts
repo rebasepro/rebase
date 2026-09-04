@@ -20,7 +20,6 @@ import path from "path";
 import {
     findStorageSuffixCollision,
     reservedPrefixFor,
-    type DeclaredStorageSources,
     type ManagedCompatibility,
     type RebaseAppConfig,
     type RebaseBackendAppConfig,

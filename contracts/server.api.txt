@@ -152,7 +152,6 @@ function loadBundleSchema
 function loadCollectionsFromDirectory
 function loadCronJobsFromDirectory
 function loadCronJobsWithDiagnostics
-function loadDeclaredStorageSources
 function loadEnv
 function loadFunctionsFromDirectory
 function loadFunctionsWithDiagnostics
@@ -440,7 +439,6 @@ function isValidEngine
 function nestAdminCollectionKeys
 function nestAdminKeysOf
 function nestAdminPropertyKeys
-function normalizeStorageSources
 function parseRelationAggregateSort
 function registerDataSourceCapabilities
 function registerResourceKind
@@ -452,6 +450,8 @@ function resourceEnvSuffix
 function resourceKeyOf
 function resourceKind
 function resourceKinds
+function resourceToDataSource
+function resourceToStorageSource
 function rewriteLegacyRlsFunctions
 function serializeCollections
 function setTopicRuntime
@@ -743,7 +743,6 @@ type DataSourceTransport
 type DataType
 type DatabaseAdmin
 type DatabaseHandle
-type DeclaredStorageSources
 type ElementOf
 type EngineProperties
 type EntityStatus

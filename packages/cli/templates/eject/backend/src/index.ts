@@ -15,11 +15,12 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
+    initializeDataSources,
+    resolveDataSources,
     resolveStorageSources,
     logger
 } from "@rebasepro/server";
-import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
-import { declaredStorageSources } from "@rebasepro/types";
+import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
 // Side-effect import: declaring is what registers, so anything that dropped
 // this as "unused" would leave the backend with no buckets — silently.
 import "../../config/resources.js";
@@ -35,10 +36,11 @@ import usersCollection from "../../config/collections/users.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Which buckets this project has, read from the declarations in
+// Which databases and buckets this project has, read from the declarations in
 // `config/resources.ts`. One declaration site, so this process, the platform
 // and the frontend all read the same list. A project that declares none gets
-// one default source from the plain, unsuffixed S3_*/GCS_* variables.
+// one default source of each, from the plain unsuffixed variables.
+const dataSources = declaredDataSources();
 const storageSources = declaredStorageSources();
 
 // ─── App ─────────────────────────────────────────────────────────────
@@ -84,10 +86,21 @@ app.use("/*", cors({
 
 app.use("/*", secureHeaders());
 
-// ─── Database ────────────────────────────────────────────────────────
-const databaseUrl = env.DATABASE_URL;
-
-const { db, pool, connectionString } = createPostgresDatabaseConnection(databaseUrl);
+// ─── Databases ───────────────────────────────────────────────────────
+// One connection per declared database, resolved from `DATABASE_URL` for the
+// default one and `DATABASE_URL__<KEY>` for every other — the same resolver the
+// managed runtime uses, so this entrypoint cannot drift from it.
+//
+// It reads `process.env` rather than the typed `env` above on purpose: the
+// suffixed names belong to sources this project declared, so no fixed schema
+// can list them.
+//
+// Doing this by hand — one `createPostgresDatabaseConnection(env.DATABASE_URL)`
+// — is what this file used to do, and it quietly broke the moment anyone
+// declared a second database: collections routed to it fell back to the default
+// driver and their rows landed in the wrong database, behind a server that
+// looked healthy.
+const resolvedDataSources = resolveDataSources(process.env, dataSources);
 
 // ─── Start ───────────────────────────────────────────────────────────
 async function startServer() {
@@ -102,6 +115,21 @@ async function startServer() {
     // the same path is right from source and from `backend/dist/backend/src`.
     const cronsDir = path.resolve(__dirname, "../crons");
 
+    // Open a connection per declared database. Sequential, and a failure on the
+    // second closes whatever the first opened rather than leaking it against a
+    // server this process is about to abandon.
+    const drivers = await initializeDataSources(
+        resolvedDataSources,
+        // {{#collections}}
+        { tables, enums, relations },
+        // {{/collections}}
+        // {{^collections}}
+        // No generated schema: this project declares no collections in code.
+        undefined,
+        // {{/collections}}
+        [__dirname]
+    );
+
     const backend = await initializeRebaseBackend({
         // {{#collections}}
         collectionsDir: path.resolve(__dirname, "../../config/collections"),
@@ -115,16 +143,11 @@ async function startServer() {
         cronsDir: fs.existsSync(cronsDir) ? cronsDir : undefined,
         server,
         app,
-        database: createPostgresAdapter({
-            connection: db,
-            // {{#collections}}
-            schema: { tables,
-enums,
-relations },
-            // {{/collections}}
-            adminConnectionString: env.ADMIN_CONNECTION_STRING || databaseUrl,
-            connectionString
-        }),
+        // One bootstrapper per data source, each registered under its own key —
+        // the key is exactly what `collection.dataSource` routes against. Only
+        // the default source is handed the generated schema, which describes
+        // this project's tables and they live in the default database.
+        bootstrappers: drivers.map(driver => driver.bootstrapper),
         auth: {
             // {{#collections}}
             collection: usersCollection,
@@ -275,7 +298,11 @@ pass: env.SMTP_PASS! }
     // Drains HTTP, stops crons, tears down realtime, then closes the pool.
     // Guards against double signals and force-exits if shutdown hangs.
     installShutdownHandlers(backend, {
-        onCleanup: () => pool.end()
+        // Every pool, not just the first: a second database left open holds a
+        // connection against the server while this process is meant to be gone.
+        onCleanup: async () => {
+            await Promise.all(drivers.map(driver => driver.connection.pool?.end()));
+        }
     });
 }
 

@@ -13,56 +13,29 @@
  * becomes a rewrite and then does not ship.
  */
 import {
-    DEFAULT_DATA_SOURCE_KEY,
-    DEFAULT_RESOURCE_KEY,
-    DEFAULT_STORAGE_SOURCE_KEY,
+    resourceToDataSource,
+    resourceToStorageSource,
     type DataSourceDefinition,
     type ResourceGraph,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 
 /**
- * The graph and the two subsystems spell "the unnamed one" identically today,
- * but they are three separate constants and nothing stops them drifting. Mapped
- * explicitly so a future divergence is a compile error here rather than a
- * default database that silently fails to bind.
+ * Databases in the graph, as the data layer's definitions.
+ *
+ * The per-field mapping lives in `@rebasepro/types` next to the constructors,
+ * so this and `declaredDataSources()` cannot answer differently. They used to:
+ * this side carried a bucket's `account` and the types side dropped it, which
+ * meant shared credentials resolved on the managed runtime and resolved nothing
+ * in an ejected backend.
  */
-function toDataSourceKey(key: string): string {
-    return key === DEFAULT_RESOURCE_KEY ? DEFAULT_DATA_SOURCE_KEY : key;
-}
-
-function toStorageSourceKey(key: string): string {
-    return key === DEFAULT_RESOURCE_KEY ? DEFAULT_STORAGE_SOURCE_KEY : key;
-}
-
-/** Databases in the graph, as the data layer's definitions. */
 export function graphToDataSources(graph: ResourceGraph): DataSourceDefinition[] {
-    return graph.resources
-        .filter(r => r.kind === "database")
-        .map(r => ({
-            key: toDataSourceKey(r.key),
-            engine: r.engine,
-            transport: r.transport,
-            ...(typeof r.options.databaseId === "string" ? { databaseId: r.options.databaseId } : {}),
-            ...(r.label !== undefined ? { label: r.label } : {})
-        }));
+    return graph.resources.filter(r => r.kind === "database").map(resourceToDataSource);
 }
 
 /** Buckets in the graph, as the storage layer's definitions. */
 export function graphToStorageSources(graph: ResourceGraph): StorageSourceDefinition[] {
-    return graph.resources
-        .filter(r => r.kind === "bucket")
-        .map(r => ({
-            key: toStorageSourceKey(r.key),
-            engine: r.engine,
-            transport: r.transport,
-            // Carried, or the declaration's `account` is accepted at the call
-            // site and lost on the way to the reader — a declared option that
-            // does nothing, which is the exact failure this whole model exists
-            // to remove.
-            ...(typeof r.options.account === "string" ? { account: r.options.account } : {}),
-            ...(r.label !== undefined ? { label: r.label } : {})
-        }));
+    return graph.resources.filter(r => r.kind === "bucket").map(resourceToStorageSource);
 }
 
 /** Topics in the graph, for the runtime to publish through and the worker to wire. */

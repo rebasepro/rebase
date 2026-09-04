@@ -6658,19 +6658,19 @@ Client                                                   Rebase Server
 
 ### Several Buckets
 
-A project can have more than one bucket. Declare them in `rebase.json` — the one
-place the platform, the runtime and the console all read:
+A project can have more than one bucket. Declare each one in `config/resources.ts`
+— the one place the platform, the runtime and the console all read:
 
-```json
-{
-  "rebase": "^1",
-  "storage": {
-    "(default)": { "engine": "s3" },
-    "media": { "engine": "s3", "label": "Media" }
-  },
-  "apps": {}
-}
+```ts
+
+export const uploads = bucket({ engine: "s3" });    // the default one
+export const media = bucket("media", { engine: "s3", label: "Media" });
 ```
+
+Then run `rebase resources --write`, which regenerates `rebase.resources.json`
+so a host can read your topology without running a build. See
+[Multiple Sources](/docs/backend/multiple-sources) for databases, buckets and
+topics together.
 
 Each source is configured from the **same variable names carrying its own
 suffix**. The default source takes no suffix, so a single-bucket project keeps
@@ -6704,6 +6704,31 @@ happens before anyone attaches storage to it, and a boot error there would
 crash-loop the backend until someone did. A source the environment configures
 *wrongly* — a type with no bucket, or a bucket with no credentials — is refused
 at boot, because that is a mistake rather than an absence.
+
+#### Buckets that share one account
+
+Credentials usually describe the **provider**, not the bucket. Fifteen buckets on
+one MinIO install would otherwise mean fifteen copies of the same access key, and
+a rotation would be fifteen paired edits. Name an account instead:
+
+```ts
+export const media = bucket("media", { engine: "s3", account: "minio" });
+export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
+```
+
+```bash
+S3_BUCKET__MEDIA=b-media          # per bucket, always
+S3_BUCKET__AVATARS=b-avatars
+S3_ACCESS_KEY_ID__MINIO=…         # shared by both
+S3_SECRET_ACCESS_KEY__MINIO=…
+S3_ENDPOINT__MINIO=https://minio.internal
+```
+
+Only the account-scoped variables fall back — `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE`, and
+the GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME` pair. The bucket name never does:
+it is what distinguishes one source from another. A per-bucket value still wins,
+so one source can move providers without breaking the rest.
 
 ### Frontend Storage Sources
 
