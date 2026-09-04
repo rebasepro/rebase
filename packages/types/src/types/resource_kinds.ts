@@ -44,6 +44,13 @@ registerResourceKind({
         "DB_POOL_IDLE_TIMEOUT",
         "DB_POOL_CONNECT_TIMEOUT"
     ],
+    // `REBASE_DB_POOL_MAX` is deliberately absent, and was listed here once. It
+    // is a real variable — `poolMaxCeiling` in @rebasepro/server-postgres reads
+    // it — but a process-global ceiling rather than a per-source binding, so
+    // `REBASE_DB_POOL_MAX__ANALYTICS` would read nothing. Every name here is
+    // one a binder appends `__<KEY>` to; a global belongs to the process, not
+    // to a resource.
+    //
     // No per-engine narrowing: every engine binds from the same set, and the
     // driver package that differs between them is named by REBASE_DRIVER either
     // way.

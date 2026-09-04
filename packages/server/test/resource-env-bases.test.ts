@@ -14,7 +14,9 @@ import { resourceKind } from "@rebasepro/types";
  * `resolveStorageBackend` has ever read, while omitting `S3_ACCESS_KEY_ID` and
  * `S3_SECRET_ACCESS_KEY`, without which a bucket cannot be reached at all. The
  * database kind advertised `REBASE_DB_POOL_MAX` for a resolver that reads
- * `DB_POOL_MAX`.
+ * `DB_POOL_MAX` — a real variable, but a process-global pool ceiling rather than
+ * a per-source binding, so the `__<KEY>` form a binder would write reads
+ * nothing.
  *
  * Nothing caught it because nothing compared the two. This does, by reading the
  * resolver's source for the literal base names it passes to its readers. A

@@ -525,7 +525,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, provisionableSchemas, restoreArgs } =
+    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, restoreArgs } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
 
