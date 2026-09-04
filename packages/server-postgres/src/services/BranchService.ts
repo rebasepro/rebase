@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm";
 import { BranchInfo } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { DrizzleClient } from "../interfaces";
+import { BranchRow } from "../branch-prune";
 import { DatabasePoolManager } from "../databasePoolManager";
 import { extractPgError, extractCauseMessage } from "../utils/pg-error-utils";
 
@@ -252,6 +253,60 @@ export class BranchService {
         await this.db.execute(
             sql`DELETE FROM rebase.branches WHERE name = ${name}`
         );
+    }
+
+    /**
+     * Everything prune needs to decide, in two queries.
+     *
+     * Reads the rows and the server's database list rather than joining them,
+     * so the *disagreements* between the two are visible — a row whose database
+     * is gone and a database with no row are the two things prune exists to
+     * find, and a join hides both.
+     */
+    async pruneCandidates(): Promise<{ rows: BranchRow[]; databases: string[] }> {
+        const rowResult = await this.db.execute(sql.raw(`
+            SELECT name, db_name, created_at FROM ${BRANCHES_TABLE} ORDER BY created_at
+        `));
+        const rows = (rowResult.rows as Record<string, unknown>[]).map((row) => ({
+            name: row.name as string,
+            dbName: row.db_name as string,
+            createdAt: new Date(row.created_at as string)
+        }));
+
+        const dbResult = await this.db.execute(sql`
+            SELECT datname FROM pg_database WHERE NOT datistemplate
+        `);
+        const databases = (dbResult.rows as Record<string, unknown>[]).map((row) => String(row.datname));
+
+        return { rows, databases };
+    }
+
+    /** Remove a metadata row whose database is already gone. */
+    async forgetBranchRow(name: string): Promise<void> {
+        await this.db.execute(sql`DELETE FROM rebase.branches WHERE name = ${name}`);
+    }
+
+    /**
+     * Drop a database by name, with no metadata row required.
+     *
+     * `deleteBranch` deliberately takes its database name from the row, because
+     * the row is the only value that is true by construction. Prune has the
+     * opposite job — the cases it handles are exactly the ones where row and
+     * database disagree — so it needs to name a database directly. Guarded the
+     * same way regardless: the main database is never droppable.
+     */
+    async dropDatabase(dbName: string): Promise<void> {
+        validateIdentifier(dbName, "database name");
+        if (dbName === this.poolManager.defaultDatabaseName) {
+            throw new Error("Cannot delete the main database.");
+        }
+
+        await this.poolManager.disconnectDatabase(dbName);
+        try {
+            await this.db.execute(sql.raw(`DROP DATABASE "${dbName.replace(/"/g, '""')}"`));
+        } catch (err) {
+            throw describeBranchDdlError(err, dbName);
+        }
     }
 
     /**

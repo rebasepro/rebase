@@ -30,6 +30,7 @@ import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
+import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -667,6 +668,17 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
     }
 }
 
+/** `--flag value` or `--flag=value`, for the branch commands' own flags. */
+function readBranchFlag(rawArgs: readonly string[], flag: string): string | null {
+    for (let index = 0; index < rawArgs.length; index += 1) {
+        const arg = rawArgs[index];
+        if (arg === flag) return rawArgs[index + 1] ?? null;
+        if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
+    }
+
+    return null;
+}
+
 async function branchCommand(rawArgs: string[]): Promise<void> {
     const branchAction = rawArgs[2]; // create, list, delete, info
 
@@ -796,6 +808,89 @@ max: 3 });
                 break;
             }
 
+            case "prune": {
+                const olderThanRaw = readBranchFlag(rawArgs, "--older-than");
+                const olderThanDays = olderThanRaw == null ? null : parseOlderThan(olderThanRaw);
+                if (olderThanRaw != null && olderThanDays == null) {
+                    outError(chalk.red(`  ✗ --older-than "${olderThanRaw}" is not a duration.`));
+                    out(chalk.gray("    Use a number of days (14), or 14d / 2w."));
+                    process.exit(1);
+                }
+
+                const includeDevDiff = rawArgs.includes("--include-dev-diff");
+                const { rows, databases } = await branchService.pruneCandidates();
+                const plan = planPrune({ rows, databases, branchPrefix: "rb_" }, { olderThanDays });
+
+                out("");
+                if (planIsEmpty(plan, includeDevDiff)) {
+                    out(chalk.gray("  Nothing to prune."));
+                    if (!olderThanDays && rows.length > 0) {
+                        out(chalk.gray(`  ${rows.length} branch(es) are healthy — --older-than 14 also removes old ones.`));
+                    }
+                    if (!includeDevDiff && plan.devDiff.length > 0) {
+                        out(chalk.gray(`  ${plan.devDiff.length} Atlas scratch database(s) left over from db push;`));
+                        out(chalk.gray("  --include-dev-diff removes those too."));
+                    }
+                    out("");
+                    break;
+                }
+
+                out(chalk.bold("  🧹 Prune plan"));
+                out("");
+                for (const row of plan.staleRows) {
+                    out(`  ${chalk.yellow("○")} ${chalk.bold(row.name)} ${chalk.gray("— registered, but its database is gone; the entry will be removed")}`);
+                }
+                for (const dbName of plan.orphanDatabases) {
+                    out(`  ${chalk.yellow("○")} ${chalk.bold(dbName)} ${chalk.gray("— a branch database with no entry; the database will be dropped")}`);
+                }
+                for (const { branch, ageDays } of plan.expired) {
+                    out(`  ${chalk.red("●")} ${chalk.bold(branch.name)} ${chalk.gray(`— ${ageDays} days old; branch and database will be dropped`)}`);
+                }
+                if (includeDevDiff) {
+                    for (const dbName of plan.devDiff) {
+                        out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— Atlas scratch database; will be dropped")}`);
+                    }
+                } else if (plan.devDiff.length > 0) {
+                    out(chalk.gray(`  (${plan.devDiff.length} Atlas scratch database(s) not listed — --include-dev-diff)`));
+                }
+                out("");
+
+                if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+                    // Dropping a database is not undoable and a branch may be
+                    // the only copy of an afternoon's work.
+                    const confirmed = await promptConfirm("  Remove these? (y/N) ");
+                    if (!confirmed) {
+                        out(chalk.gray("  Nothing was changed."));
+                        out("");
+                        break;
+                    }
+                }
+
+                let removed = 0;
+                for (const row of plan.staleRows) {
+                    await branchService.forgetBranchRow(row.name);
+                    removed += 1;
+                }
+                for (const dbName of plan.orphanDatabases) {
+                    await branchService.dropDatabase(dbName);
+                    removed += 1;
+                }
+                for (const { branch } of plan.expired) {
+                    await branchService.deleteBranch(branch.name);
+                    removed += 1;
+                }
+                if (includeDevDiff) {
+                    for (const dbName of plan.devDiff) {
+                        await branchService.dropDatabase(dbName);
+                        removed += 1;
+                    }
+                }
+
+                out(chalk.green(`  ✓ Pruned ${removed} item(s).`));
+                out("");
+                break;
+            }
+
             default:
                 outError(chalk.red(`Unknown branch action: "${branchAction}".`));
                 printBranchHelp();
@@ -819,6 +914,13 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("list")}                              List all branches
   ${chalk.blue.bold("delete")} <name>                     Delete a branch
   ${chalk.blue.bold("info")} <name>                       Show branch details
+  ${chalk.blue.bold("prune")} [--older-than <14|14d|2w>]  Remove branches nothing is using
+
+${chalk.green.bold("Why prune")}
+  Every branch is a full-size copy — CREATE DATABASE ... TEMPLATE duplicates the
+  files on disk, so five branches of a 100GB database cost 500GB. Prune also
+  finds the two ways branches drift: an entry whose database was dropped
+  outside Rebase, and a branch database whose entry never got written.
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Create a branch from the current database")}
@@ -826,6 +928,9 @@ ${chalk.green.bold("Examples")}
 
   ${chalk.gray("# Create a branch from a specific source")}
   rebase db branch create staging --from production
+
+  ${chalk.gray("# Remove branches older than two weeks, and anything orphaned")}
+  rebase db branch prune --older-than 2w
 
   ${chalk.gray("# List all branches")}
   rebase db branch list
