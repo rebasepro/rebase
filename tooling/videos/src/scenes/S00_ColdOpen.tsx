@@ -50,7 +50,10 @@ export const S00_ColdOpen: React.FC = () => {
                                 transform: `translateY(${(1 - word) * 108}%)`,
                             }}
                         >
-                            Rebase
+                            {/* Lowercase, like the close's rebase.pro. The two
+                                bookends are the only places the wordmark is set
+                                in the film and they should not disagree. */}
+                            rebase
                         </div>
                     </div>
                 </div>

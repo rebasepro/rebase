@@ -94,7 +94,7 @@ export const Lockup: React.FC<{
                         transform: `translateY(${(1 - t) * 105}%)`,
                     }}
                 >
-                    Rebase
+                    rebase
                 </div>
             </div>
         </div>
