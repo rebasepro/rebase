@@ -782,7 +782,16 @@ max: 3 });
                 const info = await branchService.getBranchInfo(name);
                 out("");
                 if (!info) {
+                    // Exit 1, like `delete` on a branch that is not there.
+                    // These two answered the same question — "is there a branch
+                    // called this?" — and disagreed about how to say no: delete
+                    // failed, info printed `✗ Branch "x" not found.` and exited
+                    // 0. Anything reading the status saw success, so
+                    // `rebase db branch info "$b" && deploy_against "$b"` ran
+                    // the deploy against a branch that does not exist.
                     outError(chalk.red(`  ✗ Branch "${name}" not found.`));
+                    out("");
+                    process.exit(1);
                 } else {
                     out(chalk.bold(`  🌿 Branch: ${info.name}`));
                     out(chalk.gray(`    Database: rb_${info.name}`));
