@@ -190,6 +190,10 @@ with `permission denied`. The pull re-provisions the app role afterwards, using
 the same routine boot and `rebase db push` use, so Rebase's internal tables stay
 revoked as they should be.
 
+The target is always this project's local development database and cannot be
+chosen: `--database-url` is refused rather than accepted, so there is no way to
+spell "pull into production". `--from` is the only direction.
+
 ### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:
