@@ -17,3 +17,16 @@ export * from "./services/BranchService";
 export * from "./backup";
 export * from "./PostgresBootstrapper";
 export * from "./PostgresAdapter";
+
+/**
+ * The app-role provisioning boot performs, for callers that restore a database
+ * outside a boot.
+ *
+ * `rebase db pull` writes a database nobody has booted yet: `pg_dump
+ * --no-privileges` strips every GRANT, so the copy arrives with its policies
+ * and its RLS intact and no privileges at all, and the first read as
+ * `rebase_user` fails with `permission denied`. It needs exactly what
+ * `PostgresBootstrapper` and `rebase db push` already do, and needs it to be
+ * the same code rather than a second description of the same grants.
+ */
+export { ensureAppRole, detectConnectionPosture, REBASE_USER_ROLE } from "./security/rls-enforcement";

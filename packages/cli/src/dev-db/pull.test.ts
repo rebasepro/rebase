@@ -13,16 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-    type ColumnRef,
-    anonymizableColumns,
-    anonymizeStatements,
-    describeTarget,
-    dumpArgs,
-    replacementFor,
-    restoreArgs,
-    shouldAnonymize
-} from "./pull";
+import { anonymizableColumns, anonymizeStatements, describeTarget, dumpArgs, provisionableSchemas, replacementFor, restoreArgs, shouldAnonymize, type ColumnRef } from "./pull";
 
 function column(overrides: Partial<ColumnRef> & { column: string }): ColumnRef {
     return { schema: "public", table: "users", dataType: "text", ...overrides };
@@ -192,5 +183,52 @@ describe("pg_dump and pg_restore arguments", () => {
 
         expect(target).toBe(plan.target);
         expect(target).toContain("127.0.0.1");
+    });
+});
+
+describe("provisionableSchemas", () => {
+    /**
+     * The grant repair that runs after a restore. `pg_dump --no-privileges`
+     * strips every GRANT, so a pulled database arrives with its policies and no
+     * privileges — measured at 68 policies / 0 grants against a source with 60,
+     * and a read as `rebase_user` failing with `permission denied for table
+     * leads`. These fix which schemas that repair covers.
+     */
+    it("keeps the schemas a Rebase project actually uses", () => {
+        expect(provisionableSchemas([{ schema: "public" }, { schema: "rebase" }]))
+            .toEqual(["public", "rebase"]);
+    });
+
+    it("keeps a schema the source has and this project never declared", () => {
+        // Boot grants on its `managedSchemas`; a restore only knows what
+        // arrived, and a pulled database may carry more than the collections do.
+        expect(provisionableSchemas([{ schema: "public" }, { schema: "analytics" }]))
+            .toContain("analytics");
+    });
+
+    it("drops the catalogs, which are never ours to grant on", () => {
+        const schemas = provisionableSchemas([
+            { schema: "public" },
+            { schema: "pg_catalog" },
+            { schema: "information_schema" },
+            { schema: "pg_toast" },
+            { schema: "pg_temp_1" }
+        ]);
+
+        expect(schemas).toEqual(["public"]);
+    });
+
+    it("does not mistake a schema that merely starts like a table prefix", () => {
+        // `pgboss` is a real schema name in the wild; only `pg_*` is reserved.
+        expect(provisionableSchemas([{ schema: "pgboss" }])).toEqual(["pgboss"]);
+    });
+
+    it("de-duplicates and sorts, so the reported count is the real one", () => {
+        expect(provisionableSchemas([{ schema: "rebase" }, { schema: "public" }, { schema: "rebase" }]))
+            .toEqual(["public", "rebase"]);
+    });
+
+    it("survives a database with nothing but catalogs", () => {
+        expect(provisionableSchemas([{ schema: "pg_catalog" }])).toEqual([]);
     });
 });

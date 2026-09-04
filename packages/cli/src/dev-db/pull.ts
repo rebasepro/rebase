@@ -99,6 +99,37 @@ export function anonymizeStatements(columns: readonly ColumnRef[]): string[] {
         });
 }
 
+/**
+ * Schemas the restored copy needs the app role provisioned on.
+ *
+ * `pg_dump --no-privileges` strips every GRANT, so a pulled database arrives
+ * with its RLS policies and its `FORCE ROW LEVEL SECURITY` intact and no
+ * privileges behind them. Measured on a 30-table project: 68 policies restored,
+ * 14 tables with RLS on, and **0** grants to `rebase_user` — where the source
+ * had 60. Reading one table as the role Rebase serves every request through:
+ *
+ *     source:  6
+ *     copy:    ERROR: permission denied for table leads
+ *
+ * The dump flags are right and stay: without `--no-owner`/`--no-privileges`
+ * every `ALTER … OWNER TO` and `GRANT … TO <prod role>` in the dump fails
+ * against roles that do not exist on a laptop, and buries the real output. The
+ * repair belongs after the restore, and belongs to `ensureAppRole` — the same
+ * routine boot and `rebase db push` call — rather than to a second list of
+ * grants written here.
+ *
+ * Which schemas: every non-system schema the restored database actually has.
+ * Boot knows its `managedSchemas` from the collections; a restore knows only
+ * what arrived, and a source may carry schemas this project does not declare.
+ * `pg_catalog`, `information_schema` and the `pg_*` internals are never ours to
+ * grant on and PostgreSQL would refuse anyway.
+ */
+export function provisionableSchemas(rows: readonly { schema: string }[]): string[] {
+    const skip = (name: string) => name === "information_schema" || name.startsWith("pg_");
+
+    return [...new Set(rows.map((row) => row.schema))].filter((name) => !skip(name)).sort();
+}
+
 /** Host and database of a connection string, with no credentials in it. */
 export function describeTarget(connectionString: string): string {
     try {
