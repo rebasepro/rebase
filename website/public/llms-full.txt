@@ -537,8 +537,21 @@ All configuration is done via environment variables in your `.env` file at the p
 | `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
+| `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
+| `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
+| `CAPTCHA_PROVIDER` | Turn on captcha verification on the auth routes: `turnstile` or `hcaptcha`. Unset means no captcha. | — |
+| `CAPTCHA_SECRET` | The provider's secret, used server-side to verify the token the browser sends. Required once `CAPTCHA_PROVIDER` is set. | — |
+| `CAPTCHA_ROUTES` | Comma-separated auth routes to protect (for example `register,login`). Unset protects the provider's default set. | — |
 
 #### Storage
+
+:::caution[Storage has no row-level security, so it needs an access model]
+Collections are protected by Postgres RLS. Object storage has no equivalent —
+keys share one flat namespace — so with a bucket configured and no access model
+the server **refuses to boot in production**. Satisfy it with exactly one of:
+a `storageAuthorize` hook exported from `config/index.ts` (what the scaffold
+ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
+:::
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -551,6 +564,12 @@ All configuration is done via environment variables in your `.env` file at the p
 | `S3_SECRET_ACCESS_KEY` | AWS secret key | — |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, Cloudflare R2, etc.) | — |
 | `S3_FORCE_PATH_STYLE` | Force path-style URLs for S3 bucket (`true`/`false`) | `false` |
+| `GCS_BUCKET` | GCS bucket name (when `STORAGE_TYPE=gcs`) | — |
+| `GCS_PROJECT_ID` | GCP project. Usually inferred from the credentials. | — |
+| `GCS_KEY_FILENAME` | Path to a service-account key file. Omit on GCP, where Workload Identity supplies credentials. | — |
+| `STORAGE_PUBLIC_READ` | Serve every object to anyone, no token. Only for a bucket that genuinely is a public CDN. One of the three ways to satisfy the boot guard below. | `false` |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Let any signed-in caller read, write, list and delete every object. Named `INSECURE` in the config object for a reason: it is only defensible in a single-tenant app where every account is trusted with every file. | `false` |
+| `STORAGE_RENDITION_CACHE` | Cache generated image renditions (resizes, format conversions) instead of producing them per request. | `false` |
 
 #### Email (Optional)
 
@@ -583,6 +602,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `REBASE_RLS_AUDIT` | Run the row-level-security audit at boot and mount its endpoint, which reports tables that are served without policies. | — |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |

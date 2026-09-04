@@ -42,6 +42,7 @@ import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
+import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -71,6 +72,7 @@ if (asJson) {
         out.agentBundle = checkAgentBundle(ROOT).findings;
         out.proseTypes = checkProseTypes(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
+        out.envReference = checkEnvReference(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -144,6 +146,20 @@ if (only === "both" || only === "names") {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC} ${b.what} is ${RED}${b.found}${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);
         }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Environment reference ━━━${NC}`);
+    const { findings: bad, scanned } = checkEnvReference(ROOT);
+    console.log(`${DIM}Checked ${scanned} validated variable(s) against the configuration page.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every environment variable the runtime validates is documented.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
+        for (const key of bad) console.log(`  ${RED}${key}${NC}`);
+        console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
     }
 }
 
