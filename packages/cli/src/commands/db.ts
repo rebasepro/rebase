@@ -716,7 +716,9 @@ async function restoreAppRole(target: string): Promise<void> {
     } finally {
         await client.end();
     }
+}
 
+/**
  * Stop pointing at a branch that was just deleted.
  *
  * Without this, `branch delete` succeeds and leaves the checkout aimed at a
